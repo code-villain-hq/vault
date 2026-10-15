@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+/* Colours are placeholders until Forge has a visual identity. */
+:root {
+  /* Text colours meet WCAG AA (4.5:1) on every background, from faint up. */
+  /* The frame and sidebar; pages sit on a lighter panel. */
+  --bg: #f4f4f6;
+  --panel: #ffffff;
+  --surface: #ffffff;
+  --line: #e4e4e9;
+  --fg: #18181d;
+  --muted: #52525c;
+  --faint: #696970;
+  --hover: #ececf0;
+  /* A group's heading in a list: a band instead of a line. */
+  --band: #f6f6f8;
+  --accent: #5b5bd6;
+  /* Filled with white text on it (buttons, badges): 5.4:1. */
+  --accent-fill: #5b5bd6;
+  /* Outlines of fields people type in: 3:1 against the panel. */
+  --line-strong: #87878d;
+  --danger: #ba3d35;
+  --ok: #36754e;
+  --warn: #8f5f0c;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0c0e;
+    --panel: #141417;
+    --surface: #1a1a1e;
+    --line: #26262c;
+    --fg: #ececf1;
+    --muted: #a6a6b0;
+    --faint: #8b8b93;
+    --hover: #222228;
+    --band: #1b1b20;
+    --accent: #8080f2;
+    --accent-fill: #5b5bd6;
+    --line-strong: #6c6c72;
+    --danger: #ef6a5f;
+    --ok: #63b383;
+    --warn: #e0a43a;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-hover: var(--hover);
+  --color-band: var(--band);
+  --color-accent: var(--accent);
+  --color-accent-fill: var(--accent-fill);
+  --color-line-strong: var(--line-strong);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* Secondary text: 13px, a step under the 14px body. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  /* A touch heavier than regular reads better, most of all on dark. */
+  font-weight: 450;
+  font-feature-settings: "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Rendered Markdown: specs, decisions, descriptions. */
+.markdown {
+  line-height: 1.65;
+}
+.markdown > * + * {
+  margin-top: 0.75em;
+}
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.4em;
+}
+.markdown h1 {
+  font-size: 1.35em;
+}
+.markdown h2 {
+  font-size: 1.15em;
+}
+.markdown h3 {
+  font-size: 1em;
+}
+.markdown ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.markdown ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+}
+.markdown img {
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.markdown .mention {
+  color: var(--accent);
+  font-weight: 500;
+}
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.markdown pre {
+  background: var(--hover);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.8em 1em;
+  overflow-x: auto;
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+}
+.markdown blockquote {
+  margin-left: 0;
+  padding: 0.15em 0;
+  color: var(--muted);
+}
+.markdown table {
+  border-collapse: collapse;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--line);
+  padding: 0.3em 0.7em;
+}
+
+/* Spec page: title is the only large type; section labels stay quiet. */
+.spec-doc .markdown {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.spec-doc .markdown h1,
+.spec-doc .markdown h2,
+.spec-doc .markdown h3 {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+.spec-doc .markdown > h2:not(:first-child) {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.spec-doc .markdown p {
+  color: var(--fg);
+}

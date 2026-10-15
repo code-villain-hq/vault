@@ -1,0 +1,239 @@
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use ts_rs::TS;
+use uuid::Uuid;
+
+use crate::drift::{AiRunCreate, AiRunPatch, SuggestionCreate, SuggestionPatch};
+use crate::issue::{
+    CommentCreate, CommentPatch, IssueCreate, IssuePatch, IssueRelationCreate, IssueRelationPatch,
+};
+use crate::knowledge::{
+    DecisionCreate, DecisionPatch, DomainCreate, DomainPatch, ServiceCreate, ServicePatch,
+    SpecCreate, SpecPatch,
+};
+use crate::link::{IssueLinkCreate, IssueLinkPatch};
+use crate::notification::NotificationPatch;
+use crate::planning::{InitiativeCreate, InitiativePatch, ProjectCreate, ProjectPatch};
+use crate::spec_change::{SpecChangeCreate, SpecChangePatch};
+use crate::team::{
+    LabelCreate, LabelPatch, TeamCreate, TeamPatch, WorkflowStateCreate, WorkflowStatePatch,
+};
+use crate::verdict::{RequirementVerdictCreate, RequirementVerdictPatch};
+
+/// Who is making a change, and in which workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Actor {
+    pub user_id: Uuid,
+    pub workspace_id: Uuid,
+}
+
+/// Every kind of record that clients sync.
+///
+/// To add one: add a variant, a migration for its table, and its record,
+/// create and patch types; the compiler points at every `match` to extend.
+/// See "Adding a synced model" in AGENTS.md.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub enum ModelKind {
+    Team,
+    WorkflowState,
+    Label,
+    Issue,
+    IssueRelation,
+    Comment,
+    Project,
+    Initiative,
+    User,
+    Notification,
+    Service,
+    Domain,
+    Spec,
+    Decision,
+    AiRun,
+    Suggestion,
+    IssueLink,
+    RequirementVerdict,
+    SpecChange,
+}
+
+/// The three kinds of write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Write {
+    Create,
+    Update,
+    Delete,
+}
+
+impl ModelKind {
+    pub const ALL: &[ModelKind] = &[
+        ModelKind::Team,
+        ModelKind::WorkflowState,
+        ModelKind::Label,
+        ModelKind::Issue,
+        ModelKind::IssueRelation,
+        ModelKind::Comment,
+        ModelKind::Project,
+        ModelKind::Initiative,
+        ModelKind::User,
+        ModelKind::Notification,
+        ModelKind::Service,
+        ModelKind::Domain,
+        ModelKind::Spec,
+        ModelKind::Decision,
+        ModelKind::AiRun,
+        ModelKind::Suggestion,
+        ModelKind::IssueLink,
+        ModelKind::RequirementVerdict,
+        ModelKind::SpecChange,
+    ];
+
+    /// The table (or view) holding this kind of record.
+    pub fn table(self) -> &'static str {
+        match self {
+            ModelKind::Team => "teams",
+            ModelKind::WorkflowState => "workflow_states",
+            ModelKind::Label => "labels",
+            ModelKind::Issue => "issues",
+            ModelKind::IssueRelation => "issue_relations",
+            ModelKind::Comment => "comments",
+            ModelKind::Project => "projects",
+            ModelKind::Initiative => "initiatives",
+            ModelKind::User => "workspace_users",
+            ModelKind::Notification => "notifications",
+            ModelKind::Service => "services",
+            ModelKind::Domain => "domains",
+            ModelKind::Spec => "specs",
+            ModelKind::Decision => "decisions",
+            ModelKind::AiRun => "ai_runs",
+            ModelKind::Suggestion => "suggestions",
+            ModelKind::IssueLink => "issue_links",
+            ModelKind::RequirementVerdict => "requirement_verdicts",
+            ModelKind::SpecChange => "spec_changes",
+        }
+    }
+
+    /// The name used on the wire and in `sync_log.model`.
+    pub fn name(self) -> &'static str {
+        match self {
+            ModelKind::Team => "Team",
+            ModelKind::WorkflowState => "WorkflowState",
+            ModelKind::Label => "Label",
+            ModelKind::Issue => "Issue",
+            ModelKind::IssueRelation => "IssueRelation",
+            ModelKind::Comment => "Comment",
+            ModelKind::Project => "Project",
+            ModelKind::Initiative => "Initiative",
+            ModelKind::User => "User",
+            ModelKind::Notification => "Notification",
+            ModelKind::Service => "Service",
+            ModelKind::Domain => "Domain",
+            ModelKind::Spec => "Spec",
+            ModelKind::Decision => "Decision",
+            ModelKind::AiRun => "AiRun",
+            ModelKind::Suggestion => "Suggestion",
+            ModelKind::IssueLink => "IssueLink",
+            ModelKind::RequirementVerdict => "RequirementVerdict",
+            ModelKind::SpecChange => "SpecChange",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<ModelKind> {
+        ModelKind::ALL.iter().copied().find(|m| m.name() == name)
+    }
+
+    /// Whether clients may make this kind of write through sync. Teams are
+    /// created by the server (with their workflow); users are read-only;
+    /// notifications come from the server, and their recipient may mark them
+    /// read or delete them.
+    pub fn client_may(self, write: Write) -> bool {
+        match self {
+            // Server-managed: runs are requested, and suggestions accepted or
+            // dismissed, through the API; verdicts come from drift checks;
+            // agents write spec changes through the MCP tools.
+            ModelKind::User
+            | ModelKind::AiRun
+            | ModelKind::Suggestion
+            | ModelKind::IssueLink
+            | ModelKind::RequirementVerdict
+            | ModelKind::SpecChange => false,
+            ModelKind::Team => write == Write::Update,
+            ModelKind::Notification => write != Write::Create,
+            _ => true,
+        }
+    }
+
+    /// Records only their owner (`user_id`) syncs, rather than the whole workspace.
+    pub fn private_to_user(self) -> bool {
+        self == ModelKind::Notification
+    }
+
+    /// Checks the fields sent to create a record.
+    pub fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
+        match self {
+            ModelKind::Team => check::<TeamCreate>(data),
+            ModelKind::WorkflowState => check::<WorkflowStateCreate>(data),
+            ModelKind::Label => check::<LabelCreate>(data),
+            ModelKind::Issue => check::<IssueCreate>(data),
+            ModelKind::IssueRelation => check::<IssueRelationCreate>(data),
+            ModelKind::Comment => check::<CommentCreate>(data),
+            ModelKind::Project => check::<ProjectCreate>(data),
+            ModelKind::Initiative => check::<InitiativeCreate>(data),
+            ModelKind::User => Err(ValidationError("users are read-only".into())),
+            ModelKind::Notification => {
+                Err(ValidationError("notifications come from the server".into()))
+            }
+            ModelKind::Service => check::<ServiceCreate>(data),
+            ModelKind::Domain => check::<DomainCreate>(data),
+            ModelKind::Spec => check::<SpecCreate>(data),
+            ModelKind::Decision => check::<DecisionCreate>(data),
+            ModelKind::AiRun => check::<AiRunCreate>(data),
+            ModelKind::Suggestion => check::<SuggestionCreate>(data),
+            ModelKind::IssueLink => check::<IssueLinkCreate>(data),
+            ModelKind::RequirementVerdict => check::<RequirementVerdictCreate>(data),
+            ModelKind::SpecChange => check::<SpecChangeCreate>(data),
+        }
+    }
+
+    /// Checks the fields sent to update a record.
+    pub fn validate_patch(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
+        match self {
+            ModelKind::Team => check::<TeamPatch>(data),
+            ModelKind::WorkflowState => check::<WorkflowStatePatch>(data),
+            ModelKind::Label => check::<LabelPatch>(data),
+            ModelKind::Issue => check::<IssuePatch>(data),
+            ModelKind::IssueRelation => check::<IssueRelationPatch>(data),
+            ModelKind::Comment => check::<CommentPatch>(data),
+            ModelKind::Project => check::<ProjectPatch>(data),
+            ModelKind::Initiative => check::<InitiativePatch>(data),
+            ModelKind::User => Err(ValidationError("users are read-only".into())),
+            ModelKind::Notification => check::<NotificationPatch>(data),
+            ModelKind::Service => check::<ServicePatch>(data),
+            ModelKind::Domain => check::<DomainPatch>(data),
+            ModelKind::Spec => check::<SpecPatch>(data),
+            ModelKind::Decision => check::<DecisionPatch>(data),
+            ModelKind::AiRun => check::<AiRunPatch>(data),
+            ModelKind::Suggestion => check::<SuggestionPatch>(data),
+            ModelKind::IssueLink => check::<IssueLinkPatch>(data),
+            ModelKind::RequirementVerdict => check::<RequirementVerdictPatch>(data),
+            ModelKind::SpecChange => check::<SpecChangePatch>(data),
+        }
+    }
+}
+
+/// Business rules a create or patch input must satisfy, beyond its types.
+pub trait Validate {
+    fn validate(&self) -> Result<(), ValidationError>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{0}")]
+pub struct ValidationError(pub String);
+
+/// Parses `data` as `T`, which rejects unknown fields and wrong types, then
+/// applies `T`'s rules.
+fn check<T: DeserializeOwned + Validate>(data: &Map<String, Value>) -> Result<(), ValidationError> {
+    let input: T = serde_json::from_value(Value::Object(data.clone()))
+        .map_err(|e| ValidationError(e.to_string()))?;
+    input.validate()
+}

@@ -1,0 +1,602 @@
+/**
+ * What the mock backend answers with. Typed against `lib/types.ts` on
+ * purpose: when a Rust struct changes and its TypeScript mirror follows, this
+ * file stops compiling, and the harness cannot drift into showing a UI the
+ * real backend would never produce.
+ *
+ * Neutral names only (acme, ACME-1) — nothing here is anyone's real Jira or
+ * GitHub.
+ */
+import type {
+  AgentStatus,
+  AuthoredPr,
+  ChangedFile,
+  CleanupItem,
+  CreateField,
+  JiraIssue,
+  JiraIssueType,
+  JiraTransition,
+  Message,
+  PaneInfo,
+  Project,
+  RepoFeedback,
+  RepoHealth,
+  RepoNote,
+  ReviewQueue,
+  ReviewRequest,
+  Settings,
+  SlackBotView,
+  TaskPrs,
+  TaskView,
+  UiPrefs,
+  WaitingPane,
+} from "../lib/types";
+
+export interface World {
+  projects: Project[];
+  health: RepoHealth[];
+  cleanup: CleanupItem[];
+  tasks: TaskView[];
+  panes: PaneInfo[];
+  /** Panes the last launch did not put back (PANE-7). */
+  waiting: WaitingPane[];
+  agents: AgentStatus[];
+  settings: Settings;
+  prs: TaskPrs[];
+  reviews: ReviewQueue;
+  issues: JiraIssue[];
+  issueTypes: JiraIssueType[];
+  transitions: JiraTransition[];
+  requiredFields: CreateField[];
+  changed: ChangedFile[];
+  feedback: RepoFeedback[];
+  /** What each pane's terminal shows when it comes on screen. */
+  output: Record<string, string>;
+  /** The message center's log, newest first. */
+  messages: Message[];
+  /** Repo notes by project id (MEM-6). */
+  notes: Record<string, RepoNote[]>;
+  /** The Slack bot's connection and threads (§24). */
+  slackBot: SlackBotView;
+}
+
+const now = Date.now();
+export const ago = (seconds: number) => new Date(now - seconds * 1000).toISOString();
+
+const ui: UiPrefs = {
+  scale: 1,
+  theme: "dark",
+  terminal_font_size: 13,
+  conversation_font_size: 14,
+  restore_panes: true,
+  trust_agent_dirs: true,
+  sync_jira_status: true,
+  system_notifications: true,
+  notify_waiting_agents: true,
+  agents_read_panes: false,
+  keep_awake: false,
+};
+
+const disconnected: Settings = {
+  ui,
+  jira: null,
+  github: null,
+  slack: null,
+  grafana: null,
+  slack_bot: null,
+  agent_models: {},
+  worktree_root: "/Users/you/.villain-worktrees",
+  worktree_root_is_default: true,
+  jira_connected: false,
+  github_connected: false,
+  slack_connected: false,
+  grafana_connected: false,
+  log_sources: [],
+  log_scanned_today: {},
+  phone_open: false,
+  browser_sites: [],
+  browser_sign_ins: [],
+};
+
+const agents: AgentStatus[] = [
+  { id: "claude", name: "Claude Code", program: "claude", installed: true, path: "/usr/local/bin/claude", resumes: true, acp: true },
+  { id: "copilot", name: "GitHub Copilot CLI", program: "copilot", installed: true, path: "/usr/local/bin/copilot", resumes: false, acp: true },
+  { id: "opencode", name: "OpenCode", program: "opencode", installed: false, path: null, resumes: false, acp: false },
+  { id: "gemini", name: "Gemini CLI", program: "gemini", installed: true, path: "/usr/local/bin/gemini", resumes: false, acp: false },
+];
+
+const issueTypes: JiraIssueType[] = [
+  { id: "1", name: "Epic", subtask: false, hierarchy_level: 1, icon: null },
+  { id: "2", name: "Story", subtask: false, hierarchy_level: 0, icon: null },
+  { id: "3", name: "Task", subtask: false, hierarchy_level: 0, icon: null },
+  { id: "4", name: "Bug", subtask: false, hierarchy_level: 0, icon: null },
+  { id: "5", name: "Sub-task", subtask: true, hierarchy_level: -1, icon: null },
+];
+
+/** Shaped like a real workflow: Review shares In Progress's category, and two statuses are done. */
+const STATUS_IDS: Record<string, string> = { "To Do": "1", "In Progress": "3", Review: "10322", Done: "10002", Cancelled: "10016" };
+
+function issue(key: string, summary: string, status: string, category: string, epic: string | null, days = 3): JiraIssue {
+  return {
+    key,
+    summary,
+    description: `What ${key} is about, as the ticket says it.`,
+    status,
+    status_id: STATUS_IDS[status] ?? "0",
+    status_category: category,
+    issue_type: "Story",
+    priority: "Medium",
+    assignee: "You",
+    labels: [],
+    components: [],
+    epic_key: epic,
+    epic_summary: epic ? "Sign-in overhaul" : null,
+    url: `https://acme.atlassian.net/browse/${key}`,
+    created: ago(days * 86400),
+  };
+}
+
+const copies = "/Users/you/.villain-worktrees/.repos";
+const projects: Project[] = [
+  { id: "p-api", name: "api", path: "/Users/you/code/api", default_branch: "main", group: "platform", store: `${copies}/api.git` },
+  { id: "p-web", name: "web", path: "/Users/you/code/web", default_branch: "main", group: "platform", store: `${copies}/web.git`, check: "bun run check" },
+  { id: "p-infra", name: "infra", path: "/Users/you/code/infra", default_branch: "main", group: null, store: null },
+];
+
+const hourAgo = Math.round(Date.now() / 1000) - 3600;
+
+/** api is behind, web has a commit of its own on main, infra has moved. */
+const health: RepoHealth[] = [
+  { project_id: "p-api", clone: "ok", origin: "git@github.com:acme/api.git", store: `${copies}/api.git`, synced_at: hourAgo, behind: 3, ahead: 0, found: null, update_guess: "rebase", update_reason: "main is a straight line of commits: branches are rebased onto it" },
+  { project_id: "p-web", clone: "ok", origin: "git@github.com:acme/web.git", store: `${copies}/web.git`, synced_at: hourAgo, behind: 0, ahead: 1, found: null, update_guess: "merge", update_reason: "pull requests land on main as merge commits" },
+  { project_id: "p-infra", clone: "missing", origin: null, store: null, synced_at: null, behind: null, ahead: null, found: "/Users/you/code/ops/infra", update_guess: null, update_reason: null },
+];
+
+/** One of each thing Clean up finds, in each verdict it can have. */
+const cleanup: CleanupItem[] = [
+  { id: "folder:ACME-90", kind: "folder", repo: null, title: "ACME-90", verdict: "safe", detail: "No task uses it. It holds 2 files the app wrote." },
+  { id: "folder:ACME-77", kind: "folder", repo: null, title: "ACME-77", verdict: "blocked", detail: "No task uses it, but api: 3 uncommitted changes." },
+  { id: "folder:ACME-61", kind: "folder", repo: null, title: "ACME-61", verdict: "risky", detail: "No task uses it, but it holds 2 files the app did not make (860 KB), none of them git's: .cursor/debug-8b0881.log, web/apps/host/.angular/cache/21.2.24/web/.tsbuildinfo." },
+  { id: "clone_branch:api:ACME-123", kind: "clone_branch", repo: "api", title: "ACME-123", verdict: "safe", detail: "A task works on this branch in the app's copy, which has every commit on it. The task does not need this one." },
+  { id: "store_branch:api:ACME-85", kind: "store_branch", repo: "api", title: "ACME-85", verdict: "safe", detail: "No task uses it, and #85 merged every commit on it. GitHub can restore it from the pull request." },
+  { id: "store_branch:api:review/api-392", kind: "store_branch", repo: "api", title: "review/api-392", verdict: "safe", detail: "Left from reviewing #392. GitHub keeps every commit on it in that pull request." },
+  { id: "store_branch:api:ACME-88", kind: "store_branch", repo: "api", title: "ACME-88", verdict: "risky", detail: "No task uses it, no pull request of yours came from it, and 2 commits on it are on no origin branch." },
+  { id: "origin_branch:api:ACME-70", kind: "origin_branch", repo: "api", title: "ACME-70", verdict: "safe", detail: "#70 merged, and nothing was pushed to it since. GitHub can restore it from the pull request." },
+  { id: "origin_branch:api:ACME-71", kind: "origin_branch", repo: "api", title: "ACME-71", verdict: "risky", detail: "#71 was closed without merging: its work is not in main. GitHub can restore what the pull request saw." },
+  { id: "origin_branch:web:?", kind: "origin_branch", repo: "web", title: "Branches on origin", verdict: "blocked", detail: "Could not ask GitHub about them: GitHub 403 Forbidden: Resource not accessible by personal access token" },
+  { id: "records:web", kind: "records", repo: "web", title: "Records of deleted worktrees", verdict: "safe", detail: "Git still lists 1 worktree whose folder is gone." },
+  { id: "store:old-tool.git", kind: "store", repo: null, title: "old-tool.git", verdict: "safe", detail: "No repo uses it, and origin has everything in it." },
+];
+
+const clean = { ahead: 0, behind: 0, staged: 0, unstaged: 0, untracked: 0, conflicted: 0, dirty_files: 0 };
+
+const CHAT_ROOM = "/Users/you/.villain-worktrees/_chat/1a2b3c4d";
+
+const tasks: TaskView[] = [
+  {
+    id: "t-login",
+    name: "ACME-123 Fix login race",
+    root: "/Users/you/.villain-worktrees/ACME-123",
+    branch: "ACME-123",
+    issue_key: "ACME-123",
+    issue_url: "https://acme.atlassian.net/browse/ACME-123",
+    created_at: ago(2 * 86400),
+    pane_count: 2,
+    checkouts: [
+      {
+        id: "c-login-api", task_id: "t-login", project_id: "p-api", project_name: "api",
+        path: "/Users/you/.villain-worktrees/ACME-123/api", base: "main", exists: true, broken: null, changed: 2,
+        status: { ...clean, branch: "ACME-123", ahead: 2, behind: 3, unstaged: 1, untracked: 1, dirty_files: 2 },
+      },
+      {
+        id: "c-login-web", task_id: "t-login", project_id: "p-web", project_name: "web",
+        path: "/Users/you/.villain-worktrees/ACME-123/web", base: "main", exists: true, broken: null, changed: 0,
+        status: { ...clean, branch: "ACME-123", ahead: 1 },
+      },
+    ],
+  },
+  {
+    id: "t-audit",
+    name: "ACME-130 Audit log page",
+    root: "/Users/you/.villain-worktrees/ACME-130",
+    branch: "ACME-130",
+    issue_key: "ACME-130",
+    issue_url: "https://acme.atlassian.net/browse/ACME-130",
+    created_at: ago(6 * 86400),
+    pane_count: 1,
+    checkouts: [
+      {
+        id: "c-audit-web", task_id: "t-audit", project_id: "p-web", project_name: "web",
+        path: "/Users/you/.villain-worktrees/ACME-130/web", base: "main", exists: true, broken: null, changed: 0,
+        status: { ...clean, branch: "ACME-130" },
+      },
+    ],
+  },
+  {
+    // Filed and started by the chat's agent, which works on it from there (CHAT-3).
+    id: "t-release",
+    name: "ACME-141 Release checklist",
+    root: "/Users/you/.villain-worktrees/ACME-141",
+    branch: "ACME-141",
+    issue_key: "ACME-141",
+    issue_url: "https://acme.atlassian.net/browse/ACME-141",
+    created_at: ago(1800),
+    chat: CHAT_ROOM,
+    pane_count: 0,
+    checkouts: [
+      {
+        id: "c-release-api", task_id: "t-release", project_id: "p-api", project_name: "api",
+        path: "/Users/you/.villain-worktrees/ACME-141/api", base: "main", exists: true, broken: null, changed: 3,
+        status: { ...clean, branch: "ACME-141", unstaged: 2, untracked: 1, dirty_files: 3 },
+      },
+    ],
+  },
+];
+
+function pane(
+  id: string, task: string, kind: PaneInfo["kind"], title: string, agent: string | null,
+  activity: PaneInfo["activity"], since: number, extra: Partial<PaneInfo> = {},
+): PaneInfo {
+  return {
+    id, task_id: task, checkout_id: null, kind, title, agent_id: agent,
+    cwd: `/Users/you/.villain-worktrees/${task}`, running: true, exit_code: null,
+    started_at: ago(3600), last_output_at: ago(2), notice: null,
+    activity, activity_since: ago(since), topic: null, acp: false, ...extra,
+  };
+}
+
+const panes: PaneInfo[] = [
+  pane("pane-claude", "t-login", "agent", "Claude Code · api", "claude", "asking", 40, { topic: "Fix the login redirect loop" }),
+  pane("pane-shell", "t-login", "shell", "Shell · api", null, "idle", 3600, { checkout_id: "c-login-api" }),
+  // An agent over ACP (§20), mid-conversation and asking (`acp.ts`).
+  pane("pane-acp", "t-login", "agent", "Claude Code · api", "claude", "asking", 25, { topic: "Rate-limit POST /login", acp: true }),
+  pane("pane-copilot", "t-audit", "agent", "GitHub Copilot CLI", "copilot", "done", 300),
+  pane("pane-chat", "chat", "agent", "Claude Code (resumed)", "claude", "working", 12, { topic: "Which tickets block the release", cwd: CHAT_ROOM }),
+];
+
+const pr = (number: number, repo: string, merged: boolean) => ({
+  number,
+  title: repo === "api" ? "Fix login race" : "Audit log page",
+  state: merged ? "closed" : "open",
+  draft: false,
+  author: "you",
+  head: "ACME-123",
+  head_sha: "4f2c9e1",
+  base: "main",
+  url: `https://github.com/acme/${repo}/pull/${number}`,
+  mergeable_state: merged ? null : "clean",
+  merged,
+  comments: 2,
+  review_comments: 3,
+});
+
+function authored(
+  number: number, repo: string, title: string, updated: string, extra: Partial<AuthoredPr> = {},
+): AuthoredPr {
+  return {
+    repo: `acme/${repo}`, number, title, url: `https://github.com/acme/${repo}/pull/${number}`,
+    draft: false, updated_at: updated, head: `ACME-${number}`, base: "main", checks: "passing", review: "none", approved_by: [],
+    changes_by: [], waiting_on: [], unresolved: 0, unresolved_more: false, conflicts: false, ...extra,
+  };
+}
+
+function requested(
+  number: number, repo: string, title: string, author: string, updated: string, extra: Partial<ReviewRequest> = {},
+): ReviewRequest {
+  return {
+    repo: `acme/${repo}`, number, title, url: `https://github.com/acme/${repo}/pull/${number}`, author,
+    draft: false, created_at: ago(3 * 86_400), updated_at: updated, head: `ACME-${number}`, base: "main",
+    head_sha: `${number}`.padEnd(40, "c"), cross_repo: false, additions: 40, deletions: 12, changed_files: 3,
+    checks: "passing", my_review: "none", new_since_review: false, ...extra,
+  };
+}
+
+const prs: TaskPrs[] = [
+  {
+    task_id: "t-login",
+    ticket: null,
+    rows: [
+      {
+        checkout_id: "c-login-api", repo: "api", pr: pr(42, "api", false),
+        checks: [
+          { name: "build", status: "completed", conclusion: "failure", url: "https://github.com/acme/api/actions/runs/1" },
+          { name: "lint", status: "completed", conclusion: "success", url: null },
+        ],
+        reviews: [{ author: "ana", state: "CHANGES_REQUESTED", submitted_at: ago(1800), url: "" }],
+        past: [], verdict: "changes_requested", base: "main", changed: 4, error: null,
+      },
+      {
+        checkout_id: "c-login-web", repo: "web", pr: null, checks: [], reviews: [], past: [],
+        verdict: "none", base: "main", changed: 1, error: null,
+      },
+    ],
+  },
+  {
+    task_id: "t-audit",
+    ticket: null,
+    rows: [
+      {
+        checkout_id: "c-audit-web", repo: "web", pr: pr(7, "web", true), checks: [], reviews: [],
+        past: [], verdict: "approved", base: "main", changed: 0, error: null,
+      },
+    ],
+  },
+];
+
+const feedback: RepoFeedback[] = [
+  {
+    checkout_id: "c-login-api", repo: "api", number: 42, title: "Fix login race",
+    url: "https://github.com/acme/api/pull/42", author: "you",
+    threads: [
+      {
+        path: "src/auth.ts", line: 42, start_line: null, resolved: false, outdated: false, url: "https://github.com/acme/api/pull/42#t1",
+        code: [
+          { n: 39, op: " ", text: "export async function withRetry<T>(run: () => Promise<T>, tries: number) {" },
+          { n: null, op: "-", text: "  let attempt = 0;" },
+          { n: 40, op: "+", text: "  let attempt = 1;" },
+          { n: 41, op: " ", text: "  for (;;) {" },
+          { n: 42, op: " ", text: "    if (attempt >= tries) throw new Error(\"gave up\");" },
+        ],
+        comments: [
+          { author: "ana", bot: false, state: null, body: "The retry counter starts at `1`, so this makes **one attempt fewer** than configured.\n\n```ts\nlet attempt = 0;\n```", url: "", at: ago(1800) },
+          { author: "you", bot: false, state: null, body: "Good catch — fixed in the next push.", url: "", at: ago(1700) },
+        ],
+      },
+      {
+        path: "src/table.scss", line: 20, start_line: 16, resolved: false, outdated: false, url: "https://github.com/acme/api/pull/42#t2",
+        code: [
+          { n: 16, op: "+", text: ".mat-column-id {" },
+          { n: 17, op: "+", text: "  font-size: var(--text-xs);" },
+          { n: 18, op: "+", text: "  line-height: var(--text-xs--line-height);" },
+          { n: 19, op: "+", text: "  word-break: break-all;" },
+          { n: 20, op: "+", text: "}" },
+        ],
+        comments: [
+          { author: "copilot-pull-request-reviewer", bot: true, state: null, url: "", at: ago(900), body: "This selector matches both the header and data cells. Scope these rules to `td.mat-column-id`." },
+        ],
+      },
+      {
+        path: "src/retry.ts", line: 8, start_line: null, resolved: true, outdated: true, url: "https://github.com/acme/api/pull/42#t3",
+        code: [{ n: 8, op: "+", text: "const DELAY = 100;" }],
+        comments: [
+          { author: "copilot-pull-request-reviewer", bot: true, state: null, url: "", at: ago(3600), body: "A fixed delay retries in lockstep; consider jitter." },
+        ],
+      },
+    ],
+    reviews: [{ author: "ana", bot: false, state: "CHANGES_REQUESTED", body: "Needs a test for the retry path.", url: "https://github.com/acme/api/pull/42#r1", at: ago(1800) }],
+    comments: [
+      {
+        author: "github-actions", bot: true, state: null, url: "https://github.com/acme/api/pull/42#c1", at: ago(360),
+        body: "<!-- deploy-comment -->\n### 🚀 Preview deployed\n\n**Build:** `a1b2c3d`\n\n**Available at:**\n- https://acme-123.web.preview.acme.test",
+      },
+      {
+        author: "codecov", bot: true, state: null, url: "https://github.com/acme/api/pull/42#c2", at: ago(1700),
+        body: "## Coverage dropped 0.4%\n\n| File | Coverage | Δ |\n|:--|--:|--:|\n| src/auth.ts | 81.2% | -2.1% |\n| src/retry.ts | 94.0% | +0.3% |\n\n<details><summary>Details</summary>\n\n- [x] tests ran\n- [ ] integration suite\n</details>",
+      },
+    ],
+    checks: [{
+      name: "build", conclusion: "failure", url: "https://github.com/acme/api/actions/runs/1", summary: "",
+      log: "src/auth.test.ts:\n  ✗ retries the configured number of times\n    expected 3, got 2",
+    }],
+    error: null,
+  },
+];
+
+const say = (lines: string[]) => lines.join("\r\n") + "\r\n";
+
+/** Everything connected and in use: the view most screens are designed for. */
+function busy(): World {
+  return {
+    projects,
+    health,
+    cleanup,
+    tasks,
+    panes,
+    // Over the 12 a launch puts back: a chat with a day's work in it, and a
+    // shell of the login task's.
+    waiting: [
+      { id: "saved-chat", task_id: "chat", kind: "agent", agent_id: "claude", cwd: "/Users/you/.villain-worktrees/_chat/18c735bb", title: "Backend architecture and domain structure review" },
+      { id: "saved-shell", task_id: "t-login", kind: "shell", agent_id: null, cwd: "/Users/you/.villain-worktrees/ACME-123", title: null },
+    ],
+    agents,
+    settings: {
+      ...disconnected,
+      jira: { base_url: "https://acme.atlassian.net", email: "you@acme.test", project_key: "ACME", jql: null, flow: {} },
+      github: { api_url: "https://api.github.com", web_url: "https://github.com", review_team: null },
+      slack: { channel: "#dev", enabled: true, notify_on_done: true, notify_on_prs: true, allow_agent_posts: true },
+      slack_bot: { owner: "U0123ABCD", agent_id: "claude", bot_user: "UBOT0001", bot_name: "drdoom", enabled: true, auto: true, personality: "", model: "" },
+      agent_models: {
+        claude: [
+          { value: "default", name: "Default (recommended)" },
+          { value: "opus", name: "Opus" },
+          { value: "sonnet", name: "Sonnet" },
+          { value: "haiku", name: "Haiku" },
+        ],
+      },
+      jira_connected: true,
+      github_connected: true,
+      slack_connected: true,
+      browser_sites: ["docs.acme.dev"],
+      browser_sign_ins: [{ id: "si-1", site: "localhost", username: "ada@acme.test" }],
+    },
+    prs,
+    reviews: {
+      mine: [
+        requested(88, "web", "Speed up the search box", "bo", ago(5400), { additions: 1240, deletions: 380, changed_files: 27, checks: "pending" }),
+        requested(61, "api", "Retry webhooks with backoff", "ana", ago(7200), {
+          my_review: "changes_requested", new_since_review: true, created_at: ago(9 * 86_400),
+        }),
+        requested(7, "docs", "Fix typos in the setup guide", "outsider", ago(20_000), {
+          cross_repo: true, head: "patch-1", additions: 3, deletions: 3, changed_files: 1, checks: "failing",
+        }),
+        requested(33, "web", "Drop the legacy theme", "bo", ago(50_000), { my_review: "approved" }),
+      ],
+      mine_more: false,
+      team: null,
+      authored: {
+        prs: [
+          authored(42, "api", "Fix login race", ago(1800), {
+            checks: "failing", review: "changes_requested", changes_by: ["ana"], unresolved: 1,
+          }),
+          authored(91, "web", "Remember the last workspace", ago(4000), { review: "approved", approved_by: ["bo"] }),
+          authored(12, "docs", "Document the retry settings", ago(9000), {
+            checks: "pending", review: "review_required", waiting_on: ["ana", "@fe"], conflicts: true,
+          }),
+          authored(95, "web", "Try a denser sidebar", ago(90_000), { draft: true, checks: "none" }),
+        ],
+        more: false,
+        error: null,
+      },
+    },
+    issues: [
+      issue("ACME-123", "Fix login race", "In Progress", "indeterminate", "ACME-100"),
+      issue("ACME-140", "Remember the last workspace", "To Do", "new", "ACME-100", 12),
+      issue("ACME-141", "Rate-limit password resets", "To Do", "new", null, 0.1),
+    ],
+    issueTypes,
+    transitions: [
+      { id: "11", name: "Start", to_status: "In Progress", to_id: "3", to_category: "indeterminate" },
+      { id: "4", name: "Request Review", to_status: "Review", to_id: "10322", to_category: "indeterminate" },
+      { id: "31", name: "Move to Done", to_status: "Done", to_id: "10002", to_category: "done" },
+      { id: "81", name: "Cancel", to_status: "Cancelled", to_id: "10016", to_category: "done" },
+    ],
+    requiredFields: [
+      { id: "components", name: "Components", required: true, kind: "array", allowed: [{ id: "c1", name: "Backend" }, { id: "c2", name: "Web" }] },
+    ],
+    changed: [
+      { path: "src/auth.ts", additions: 12, deletions: 3, binary: false, origin: "tracked", checkout_id: "c-login-api", repo: "api" },
+      { path: "src/auth.test.ts", additions: 40, deletions: 0, binary: false, origin: "untracked", checkout_id: "c-login-api", repo: "api" },
+    ],
+    feedback,
+    output: {
+      "pane-claude": say([
+        "\x1b[1m✻ Claude Code\x1b[0m",
+        "",
+        "> Fix the login race described in ACME-123",
+        "",
+        "I'll add a lock around the session refresh in src/auth.ts.",
+        "",
+        "\x1b[33mDo you want to make this edit to src/auth.ts?\x1b[0m",
+        "❯ 1. Yes",
+        "  2. No, and tell Claude what to do differently",
+      ]),
+      "pane-shell": say(["you@mac api % git status --short", " M src/auth.ts", "?? src/auth.test.ts", "you@mac api % "]),
+      "pane-copilot": say(["● Done. The audit log page is behind the feature flag."]),
+      "pane-chat": say(["> What is left on ACME-100?", "", "Looking at the epic's tickets…"]),
+    },
+    messages: messages(),
+    slackBot: {
+      status: { state: "connected", error: null },
+      threads: [{ room: CHAT_ROOM, label: "#ops", link: "https://acme.slack.com/archives/C01/p1760270400000100", pane_id: "pane-chat" }],
+    },
+    notes: notes(),
+  };
+}
+
+/** A note that holds, one whose files changed since, and one of yours. */
+function notes(): Record<string, RepoNote[]> {
+  const days = (d: number) => now - d * 86_400_000;
+  const n = (id: string, text: string, rest: Partial<RepoNote>): RepoNote => ({
+    id, repo: "github.com/acme/api", text, paths: [], written_at: days(40), source: "Claude Code in ACME-101 Session storage",
+    written_commit: "a1b2c3d", checked_at: days(40), checked_commit: "a1b2c3d", changed: null, ...rest,
+  });
+  return {
+    "p-api": [
+      n("n1", "Tests need Postgres: run `docker compose up -d db` before `bun test`, or every test times out.", { paths: ["docker-compose.yml"], checked_at: days(3), changed: [] }),
+      n("n2", "Migrations live in db/migrations and run with `bun run migrate`; never edit one that has shipped, add a new one.", { paths: ["db/migrations", "package.json"], changed: ["db/migrations/0042_sessions.sql", "package.json"] }),
+      n("n3", "The auth middleware caches sessions for 60s, so a revoked token keeps working that long.", { source: "you", written_at: days(120), checked_at: days(120) }),
+    ],
+  };
+}
+
+/** One of each kind the message center shows, and each way a click can land. */
+function messages(): Message[] {
+  const at = (seconds: number) => now - seconds * 1000;
+  const m = (id: number, seconds: number, rest: Partial<Message> & Pick<Message, "kind" | "title">): Message => ({
+    id, at: at(seconds), level: "info", body: "", target: null, read: false, count: 1, ...rest,
+  });
+  return [
+    m(8, 40, { kind: "agent", level: "info", title: "ACME-123 Fix login race", body: "Claude Code is asking for your permission", target: "pane:t-login:pane-claude" }),
+    m(7, 300, { kind: "pr", level: "success", title: "web #7 merged — ACME-130 Audit log page", target: "pr:t-audit" }),
+    m(6, 900, { kind: "review", title: "Review requested", body: "acme/web#88 — Speed up the search box", target: "review:acme/web#88" }),
+    m(5, 1500, { kind: "error", level: "error", title: "Jira did not answer: 503 Service Unavailable", count: 3 }),
+    m(4, 3600, { kind: "ticket", title: "New ticket", body: "ACME-141 — Rate-limit password resets", target: "ticket:ACME-141" }),
+    m(3, 7200, { kind: "agent", level: "error", title: "ACME-123 Fix login race", body: "Codex exited with 1", target: "pane:t-login:pane-from-last-launch" }),
+    m(2, 86400, { kind: "agent", level: "success", title: "Chat", body: "Claude Code finished", target: "pane:chat:pane-chat", read: true }),
+    m(1, 90000, { kind: "notice", title: "Moved 2 worktrees onto the app's own copies of their repositories.", read: true }),
+  ];
+}
+
+/** First launch: nothing added, nothing connected. */
+function empty(): World {
+  return {
+    projects: [], health: [], cleanup: [], tasks: [], panes: [], waiting: [], agents, settings: disconnected, prs: [],
+    reviews: { mine: [], mine_more: false, team: null, authored: { prs: [], more: false, error: null } },
+    issues: [], issueTypes: [], transitions: [], requiredFields: [], changed: [], feedback: [], output: {},
+    messages: [],
+    notes: {},
+    slackBot: { status: { state: "off", error: null }, threads: [] },
+  };
+}
+
+/** Busy, with ACME-123's worktrees cut off from their repositories (TASK-11). */
+function unlinked(): World {
+  const w = busy();
+  for (const c of w.tasks[0].checkouts) {
+    c.broken = `Git no longer knows this worktree: /Users/you/code/${c.project_name}/.git/worktrees/${c.project_name} is gone, usually because the repository was deleted or cloned again`;
+    c.status = null;
+    c.changed = 0;
+  }
+  w.changed = [];
+  return w;
+}
+
+/** Busy, with the PR sweep reporting what it did about tickets (TKT-8). */
+function tickets(): World {
+  const w = busy();
+  const [login, audit] = w.prs;
+  login.ticket = { key: "ACME-123", stage: "review", moved_to: "Review", unchosen: false, error: null };
+  const key = w.tasks.find((t) => t.id === audit.task_id)?.issue_key ?? "ACME-150";
+  audit.ticket = { key, stage: "merged", moved_to: null, unchosen: true, error: null };
+  return w;
+}
+
+/** Busy, with the login task's second repo in review too: feedback on two PRs. */
+function reviews(): World {
+  const w = busy();
+  const web = w.prs[0].rows.find((r) => r.checkout_id === "c-login-web");
+  if (web) {
+    web.pr = { ...pr(43, "web", false), title: "Fix login race" };
+    web.verdict = "commented";
+  }
+  w.feedback.push({
+    checkout_id: "c-login-web", repo: "web", number: 43, title: "Fix login race",
+    url: "https://github.com/acme/web/pull/43", author: "you",
+    threads: [
+      {
+        path: "src/login/LoginForm.tsx", line: 31, start_line: null, resolved: true, outdated: false,
+        url: "https://github.com/acme/web/pull/43#t1",
+        code: [{ n: 31, op: "+", text: "  const [busy, setBusy] = useState(false);" }],
+        comments: [
+          { author: "bo", bot: false, state: null, url: "", at: ago(5000), body: "Disable the button while this is true." },
+          { author: "you", bot: false, state: null, url: "", at: ago(4800), body: "Done." },
+        ],
+      },
+    ],
+    reviews: [
+      {
+        author: "copilot-pull-request-reviewer", bot: true, state: "COMMENTED", url: "https://github.com/acme/web/pull/43#r1", at: ago(2400),
+        body: "## Copilot review overview\n\n**Review effort:** Balanced\n**Findings:** 1\n\nOpen (1)\n\n- The submit button can be pressed twice while the request is in flight\n\n### Changes\n\n| File | Description |\n|--|--|\n| `LoginForm.tsx` | Tracks whether a login is in flight. |\n\n---\n\n💡 Add a `code-review` agent skill for tailored reviews.",
+      },
+      { author: "bo", bot: false, state: "COMMENTED", url: "https://github.com/acme/web/pull/43#r2", at: ago(1200), body: "Looks right. One question on the error message below." },
+    ],
+    comments: [
+      { author: "bo", bot: false, state: null, url: "https://github.com/acme/web/pull/43#c1", at: ago(1100), body: "Should *Wrong password* say which field was wrong? Support gets tickets about this." },
+    ],
+    checks: [],
+    error: null,
+  });
+  return w;
+}
+
+export const SCENARIOS: Record<string, () => World> = { busy, empty, unlinked, tickets, reviews };

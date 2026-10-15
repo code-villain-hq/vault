@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Villain Caster's icon: a forged search lens with Villain Layer's mask
+       peering through the glass. Background, colours and mask match Villain
+       Layer's icon (accent #a78bfa, background #0c0c11, eyes #4ade80).
+       Regenerate Resources/AppIcon.icns with `make icon`. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23203a"/>
+      <stop offset="1" stop-color="#0c0c11"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="512" cy="410" r="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a78bfa" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d6caff"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="handle" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d6caff"/>
+      <stop offset="1" stop-color="#8b74e0"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="452" cy="400" r="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2d2849"/>
+      <stop offset="1" stop-color="#0c0c11"/>
+    </radialGradient>
+    <radialGradient id="haze" cx="452" cy="455" r="150" gradientTransform="translate(0 273) scale(1 0.4)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ade80" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#4ade80" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="shadow" cx="512" cy="928" r="400" gradientTransform="translate(0 835) scale(1 0.1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="eye" cx="0" cy="0" r="1">
+      <stop offset="0" stop-color="#bbf7d0"/>
+      <stop offset="0.35" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#4ade80" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="lens">
+      <circle cx="452" cy="442" r="176"/>
+    </clipPath>
+  </defs>
+  <ellipse cx="512" cy="928" rx="400" ry="40" fill="url(#shadow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#glow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="182.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+
+  <!-- Handle: its dark underside, then the lit top, then the collar. -->
+  <g transform="translate(463 464) rotate(-45)">
+    <rect x="-44" y="215" width="88" height="250" rx="40" fill="#3d3760"/>
+  </g>
+  <g transform="translate(452 442) rotate(-45)">
+    <rect x="-44" y="215" width="88" height="250" rx="40" fill="url(#handle)"/>
+    <rect x="-44" y="215" width="88" height="250" rx="40" fill="none" stroke="#f1edff" stroke-opacity="0.35" stroke-width="4"/>
+    <rect x="-34" y="196" width="68" height="44" fill="#5f4fa0"/>
+  </g>
+
+  <!-- Lens: the ring's thickness below, dark glass, the lit ring on top. -->
+  <circle cx="463" cy="464" r="205" fill="none" stroke="#3d3760" stroke-width="58"/>
+  <circle cx="452" cy="442" r="205" fill="url(#glass)"/>
+  <circle cx="452" cy="442" r="205" fill="none" stroke="url(#face)" stroke-width="58"/>
+  <circle cx="452" cy="442" r="232" fill="none" stroke="#f1edff" stroke-opacity="0.35" stroke-width="4"/>
+
+  <!-- Villain Layer's mask behind the glass: brow, slits lower at the inner
+       end, eyes glowing, nose ridge. -->
+  <g clip-path="url(#lens)">
+    <rect x="276" y="266" width="352" height="352" fill="url(#haze)"/>
+    <g transform="translate(452 452) scale(1.05) translate(-512 -410)">
+      <path d="M358,362 L488,394 L484,432 L368,414 Z" fill="#0c0c11"/>
+      <path d="M666,362 L536,394 L540,432 L656,414 Z" fill="#0c0c11"/>
+      <ellipse cx="0" cy="0" rx="1" ry="1" fill="url(#eye)" transform="translate(438 404) rotate(13) scale(38 15)"/>
+      <ellipse cx="0" cy="0" rx="1" ry="1" fill="url(#eye)" transform="translate(586 404) rotate(-13) scale(38 15)"/>
+      <path d="M346,334 L492,368 L512,358 L532,368 L678,334 L684,356 L534,394 L512,386 L490,394 L340,356 Z" fill="#8b74e0"/>
+      <path d="M346,334 L492,368 L512,358 L532,368 L678,334" fill="none" stroke="#f1edff" stroke-opacity="0.8" stroke-width="6"/>
+      <path d="M512,386 L524,396 L519,478 L512,488 L505,478 L500,396 Z" fill="#8b74e0"/>
+      <path d="M512,386 L500,396 L505,478 L512,488 Z" fill="#f1edff" fill-opacity="0.5"/>
+    </g>
+  </g>
+
+  <!-- Glare on the glass. -->
+  <path d="M302,402 A160,160 0 0 1 412,292" fill="none" stroke="#f1edff" stroke-opacity="0.22" stroke-width="14" stroke-linecap="round"/>
+</svg>

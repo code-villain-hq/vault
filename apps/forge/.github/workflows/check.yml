@@ -1,0 +1,88 @@
+# `bun run check` on every pull request, so it's tested as it would merge
+# (GitHub checks out the pull request merged into main). Runs on main too, so
+# pull requests start from main's build cache.
+#
+# Kept fast (FOR-35): the desktop app, by far the biggest build, is checked in
+# a job of its own that runs alongside; builds skip debug info and link with
+# mold; and the Rust build is cached between runs.
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Debug info makes builds and the cache slower and bigger; CI never needs it.
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      # As in docker-compose.yml; .cargo/config.toml points tests at 5433.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: forge
+          POSTGRES_PASSWORD: forge
+          POSTGRES_DB: forge
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U forge"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      # The tests are a dozen binaries, each linking the server: mold links fast.
+      - uses: rui314/setup-mold@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: check
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+        env:
+          FORGE_CHECK_SKIP_DESKTOP: 1
+
+  # The desktop app (Tauri) has no tests of its own; clippy is its check.
+  desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      # Tauri's Linux libraries, and D-Bus for the keychain.
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev libdbus-1-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: rui314/setup-mold@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: desktop
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      # The desktop app embeds the built web app.
+      - run: bun run --cwd apps/web build
+      - run: cargo clippy -p forge-desktop --all-targets -- -D warnings

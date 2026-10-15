@@ -1,0 +1,78 @@
+/* A task's spec (§19): Start agent, the three files in turn (the tasks per
+   repository), the editor, and beside it the requirements and the tasks. */
+.spec { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.spec-repos { display: flex; gap: 4px; padding: 8px 14px 0; }
+.spec-repo { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; font-family: var(--mono); font-size: 13px; }
+.spec-repo.active { border-color: var(--accent-dim); background: var(--panel-2); }
+.spec-repo .muted { font-size: 11px; color: var(--dim); }
+.spec-steps { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.spec-step { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid transparent; border-radius: var(--radius); background: transparent; }
+.spec-step.active { border-color: var(--accent-dim); background: var(--panel-2); }
+.spec-num { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; border: 1px solid var(--border); color: var(--dim); }
+.spec-num.done { border-color: var(--green); color: var(--green); }
+.spec-state { font-size: 11px; color: var(--dim); }
+.spec-state.approved { color: var(--green); }
+.spec-state.draft, .spec-state.changed, .spec-state.out-of-date { color: var(--amber); }
+.spec-home { font-family: var(--mono); font-size: 12px; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spec-tell { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border-soft); background: color-mix(in srgb, var(--amber) 8%, transparent); }
+.spec-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.spec-body { flex: 1; min-height: 0; display: flex; }
+.spec-editor { flex: 1; min-width: 0; resize: none; border: 0; border-radius: 0; padding: 14px 18px; line-height: 1.55; background: var(--bg); }
+/* Its width is dragged (SPEC-8), by the grip on its left edge; a width kept
+   from a wider window still leaves the editor room. */
+.spec-grip { width: 6px; margin-right: -3px; border-right: 0; }
+.spec-grip:hover, body.dragging .spec-grip { background: var(--accent-dim); }
+.spec-side { width: 330px; min-width: 260px; max-width: calc(100% - 280px); flex: none; overflow-y: auto; border-left: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
+.spec-side section { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+.spec-side h3 { margin: 0 0 8px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.spec-side h3 .muted { text-transform: none; letter-spacing: 0; }
+.spec-side p { margin: 0; line-height: 1.45; }
+.spec-reqs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.spec-reqs li { line-height: 1.45; }
+.spec-reqs b { font-family: var(--mono); font-size: 11px; color: var(--accent); margin-right: 6px; }
+.spec-verdict { font-size: 11px; margin-right: 6px; padding: 0 5px; border-radius: 4px; border: 1px solid currentColor; }
+.spec-verdict.met { color: var(--green); }
+.spec-verdict.not-met { color: var(--red); }
+.spec-verdict.unclear { color: var(--amber); }
+.spec-check { margin-top: 10px; align-items: center; gap: 8px; }
+.spec-stale { color: var(--amber); }
+.spec-tasks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.spec-tasks li { display: flex; gap: 8px; line-height: 1.4; }
+.spec-tasks li.done { color: var(--dim); }
+.spec-tasks .mark { width: 1em; flex: none; text-align: center; color: var(--dim); }
+.spec-tasks li.done .mark { color: var(--green); }
+/* Start agent, once for the task, above its files (SPEC-12). */
+.spec-start-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; background: var(--panel); }
+.spec-start-bar select { width: auto; max-width: 260px; }
+.spec-working { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 12px; }
+/* What needs the user first: specs from before, a copy changed outside the
+   app, an agent's proposal (SPEC-22, SPEC-24, SPEC-25). */
+.spec-banner { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border-soft); background: color-mix(in srgb, var(--accent) 8%, transparent); line-height: 1.45; }
+.spec-banner > span { flex: 1; }
+.spec-banner.warn { background: color-mix(in srgb, var(--amber) 10%, transparent); }
+.spec-tag { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-right: 6px; }
+.spec-checks { display: flex; flex-direction: column; }
+.spec-checks .spec-check { margin-top: 8px; }
+.spec-start p { max-width: 560px; }
+.spec-kind { gap: 16px; margin-bottom: 4px; }
+.spec-kind label { display: flex; align-items: center; gap: 6px; }
+.spec-kind input { width: auto; }
+/* Open questions beside the requirements (SPEC-19, SPEC-20). */
+.spec-questions { display: flex; flex-direction: column; gap: 8px; }
+.spec-questions h3 { margin-bottom: 0 !important; }
+.spec-question { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); }
+.spec-question.answered { border-color: var(--border-soft); background: transparent; }
+.spec-question-text { display: flex; gap: 6px; align-items: baseline; line-height: 1.45; }
+.spec-question-text b { font-family: var(--mono); font-size: 11px; color: var(--accent); flex: none; }
+.spec-question-text span:nth-child(2) { flex: 1; }
+.spec-question-done { color: var(--green); flex: none; }
+.spec-options { display: flex; flex-wrap: wrap; gap: 4px; }
+/* A drafted answer is a sentence: a button's nowrap ran it out of the panel, cut off. */
+.spec-option { max-width: 100%; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; font-size: 12px; line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.spec-option:hover:not(:disabled) { border-color: var(--accent-dim); }
+/* As specific as the plain button's hover, which otherwise greys a picked answer while the pointer is still on it. */
+.spec-option.active, .spec-option.active:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--text); }
+.spec-question input { font-size: 12px; padding: 4px 8px; }
+.spec-applied { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 8%, transparent); line-height: 1.45; }
+.spec-applied span { flex: 1; }
+.spec-apply { align-items: center; gap: 8px; }

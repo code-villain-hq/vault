@@ -1,0 +1,163 @@
+/* The phone's page (PHONE-*): the app's colours, a phone's proportions. */
+:root {
+  /* The colours are the app's own, in ../theme.css (SET-5). */
+  --mono: "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button, input { font: inherit; color: inherit; }
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+button:disabled { opacity: 0.4; }
+button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
+input {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  width: 100%;
+  min-width: 0;
+  /* 16px, or iOS zooms the page in when the field is focused. */
+  font-size: 16px;
+}
+input:focus { outline: none; border-color: var(--accent-dim); }
+
+.brand { font-weight: 700; letter-spacing: 0.02em; }
+.brand span { color: var(--accent); }
+.spacer { flex: 1; }
+.muted { color: var(--dim); }
+.pad { padding: 16px; }
+.error { color: var(--red); font-size: 14px; padding: 8px 16px; }
+.note { color: var(--dim); font-size: 13px; padding: 8px 16px; border-top: 1px solid var(--border); }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--dimmer); display: inline-block; }
+.dot.live { background: var(--green); box-shadow: 0 0 6px color-mix(in srgb, var(--green) 60%, transparent); }
+.dot.idle { background: var(--amber); }
+.dot.gone { background: var(--red); }
+
+/* ------------------------------------------------------------ the frame */
+
+.screen { display: flex; flex-direction: column; height: 100dvh; }
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.bar .back { font-size: 24px; line-height: 1; padding: 2px 12px 6px; }
+.bar .title { flex: 1; min-width: 0; }
+.chip-btn { font-size: 13px; padding: 4px 10px; }
+.chip-btn.on { border-color: var(--accent-dim); color: var(--accent); }
+.scroll { flex: 1; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); }
+
+/* -------------------------------------------------------------- overview */
+
+.summary { padding: 14px 16px 4px; color: var(--dim); font-size: 14px; }
+.group { margin: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.group h2 { font-size: 14px; font-weight: 600; margin: 0; padding: 10px 12px; display: flex; gap: 8px; align-items: baseline; }
+.group.waiting { border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 12px;
+}
+.chev { color: var(--dim); font-size: 20px; line-height: 1; width: 12px; flex: none; transition: transform 0.15s; }
+.chev.open { transform: rotate(90deg); }
+.group-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.group-name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-sum { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--dim); }
+.group-sum .needs { color: var(--amber); margin-left: 3px; }
+.group-sum .dot + span { margin-left: 3px; }
+.key { font-family: var(--mono); font-size: 12px; color: var(--accent); flex: none; }
+.pane-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 12px;
+}
+.pane-row.waiting { background: color-mix(in srgb, var(--amber) 6%, transparent); }
+.pane-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pane-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-state { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+.pane-since { font-size: 12px; color: var(--dimmer); }
+.group.quiet h2 { color: var(--dim); font-weight: 500; }
+.quiet-task { padding: 8px 12px; border-top: 1px solid var(--border); font-size: 14px; color: var(--dim); }
+
+/* -------------------------------------------------------------- terminal */
+
+.term-wrap { flex: 1; min-height: 0; overflow: auto; padding: 4px; background: var(--bg); }
+.term-wrap.zoomed { overflow: scroll; }
+/* Rendered, not shown: the text view reads its rows. */
+.term-wrap.hidden { position: absolute; visibility: hidden; pointer-events: none; height: 0; flex: none; padding: 0; }
+.term-text {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.term { width: max-content; }
+.term .xterm-viewport { overflow-y: hidden; background-color: var(--bg); }
+
+.typing {
+  flex: none;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 8px 8px calc(env(safe-area-inset-bottom) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.keys { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.keys button { flex: none; min-width: 44px; padding: 8px 10px; font-family: var(--mono); font-size: 14px; }
+.line { display: flex; gap: 8px; }
+.line button { flex: none; }
+
+/* ---------------------------------------------------------------- pairing */
+
+.pair { max-width: 420px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 40px) 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+.pair .brand { font-size: 22px; }
+.pair p { color: var(--dim); line-height: 1.5; margin: 0; }
+.pair form { display: flex; flex-direction: column; gap: 14px; }
+.pair label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--dim); }
+.pair .code { font-family: var(--mono); font-size: 32px; letter-spacing: 0.2em; text-align: center; }
+.pair .error { padding: 0; }

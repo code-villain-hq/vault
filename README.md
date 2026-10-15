@@ -1,13 +1,21 @@
 # Villain Vault
 
-Where Villain Studios keeps its valuables.
+Villain Studios' home: the apps, the look, the words, and the record of building them.
+
+Villain Studios is a project to build things for fun and to show that building can be fun. The work is public on purpose. Someone looking in, including a future employer, should see the craft, the enjoyment, and the growth from senior front-end work into building whole products with AI. The name of that role can change. Product engineer is the current one.
+
+| Place | What it holds |
+| --- | --- |
+| [`brand/`](brand) | How Villain looks and sounds: color, type, mark, voice |
+| [`design/`](design) | Those decisions as tokens and reference layouts |
+| [`content/`](content) | Blog posts and social posts |
+| [`apps/`](apps) | The products |
 
 | App | What it is |
 | --- | --- |
 | [`apps/forge`](apps/forge) | Forge, the AI-first issue tracker |
 | [`apps/layer`](apps/layer) | Villain Layer, the agent development environment for macOS |
 | [`apps/caster`](apps/caster) | Villain Caster, the launcher for macOS |
-| [`apps/site`](apps/site) | The website and blog |
+| [`apps/site`](apps/site) | The website. It publishes [`content/blog`](content/blog) |
 
-Each app is self-contained for now: run its commands from its own folder
-(see its README / AGENTS.md).
+Each app keeps its own tooling. Run its commands from its own folder.

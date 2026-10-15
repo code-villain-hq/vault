@@ -1,0 +1,516 @@
+import { memo, useEffect, useRef, useState } from "react";
+import { api, errMessage } from "../lib/api";
+import { useFocusedPane } from "../lib/goto";
+import { usePanesOf } from "../lib/panes";
+import { read, write } from "../lib/persist";
+import { useStore } from "../store";
+import { canRestart, paneScope, paneState } from "../lib/derive";
+import type { PaneInfo, Resumable, TaskView } from "../lib/types";
+import { BrowserSide, BrowserToggle, useBrowserSide } from "./BrowserSide";
+import { ChatLink } from "./ChatLink";
+import { useHandoff } from "./Handoff";
+import { LoopBar, LoopButton } from "./LoopBar";
+import { PaneNotice } from "./PaneNotice";
+import { PaneExited, RestartButton, useRestart } from "./Restart";
+import { WaitingTaskPanes } from "./WaitingPanes";
+import { PaneView } from "./AcpPane";
+import { CloseIcon, PlusIcon, SwapIcon } from "./icons";
+import { ContextMenu, Field, Modal, Spinner, Switch } from "./ui";
+import type { MenuItem } from "./ui";
+
+function ago(unixSeconds: number): string {
+  const s = Math.max(0, Math.round(Date.now() / 1000 - unixSeconds));
+  if (s < 90) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
+
+/**
+ * A task's panes. Memoised: the task header above re-renders for its tab, its
+ * ticket and its counts, none of which reach the terminals.
+ */
+export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
+  const { panes, ids } = usePanesOf(task.id);
+  const agents = useStore((s) => s.agents);
+  const refreshPanes = useStore((s) => s.refreshPanes);
+  const tab = useStore((s) => s.tab);
+  const toast = useStore((s) => s.toast);
+  const fail = useStore((s) => s.fail);
+
+  const [active, setActive] = useState<string | null>(null);
+  const { restarting, restart } = useRestart(setActive);
+  const { startHandoff, dialog: handoffDialog } = useHandoff(task, setActive);
+  const [launching, setLaunching] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  /** Start it as a conversation over ACP (§20); remembered for the next launch. */
+  const [asAcp, setAsAcp] = useState(() => read<boolean>("launchAcp", false));
+  const chooseAcp = (v: boolean) => { setAsAcp(v); write("launchAcp", v); };
+  /** Panes whose ✕ was pressed, still waiting on their grace period. */
+  const [closing, setClosing] = useState<Set<string>>(new Set());
+  /**
+   * A start in flight. Spawning takes long enough to click twice, and each
+   * click started another agent in the same worktree on the same prompt.
+   * A ref as well as state: two clicks in one frame both saw the state false.
+   */
+  const [spawning, setSpawning] = useState(false);
+  const spawnRef = useRef(false);
+  async function once(start: () => Promise<void>) {
+    if (spawnRef.current) return;
+    spawnRef.current = true;
+    setSpawning(true);
+    try {
+      await start();
+    } finally {
+      spawnRef.current = false;
+      setSpawning(false);
+    }
+  }
+  const [resumable, setResumable] = useState<Resumable[]>([]);
+  const [addMenu, setAddMenu] = useState<{ x: number; y: number } | null>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  /** null = the task root, where every repo is visible as a sibling folder. */
+  const [scope, setScope] = useState<string | null>(null);
+  /** Last auto-fetched briefing; if the textarea still matches, scope changes replace it. */
+  const fetchedPrompt = useRef("");
+  const cursorIde = useStore((s) => s.cursorIde);
+
+  const multi = task.checkouts.length > 1;
+
+  const { open: browserOpen, show: showBrowser, view: browser } = useBrowserSide(task.id);
+
+  useEffect(() => { setScope(null); }, [task.id]);
+
+  // Panes die with the app, but the CLIs keep their own transcripts per
+  // directory — so a conversation can be picked up even though the process is
+  // long gone. Re-checked when panes change, since starting one creates a
+  // transcript and ending one is when you want to resume.
+  //
+  // Only for a scope that belongs to this task. Before TaskMain was keyed by
+  // task, switching rendered once with the last task's repo still picked, and
+  // that answer — or a slower earlier one — offered another task's
+  // conversations here.
+  const scopeHere = scope && task.checkouts.some((c) => c.id === scope) ? scope : null;
+  useEffect(() => {
+    let current = true;
+    api.resumableAgents(task.id, scopeHere)
+      .then((r) => { if (current) setResumable(r); })
+      .catch(() => { if (current) setResumable([]); });
+    return () => { current = false; };
+  }, [task.id, scopeHere, ids.length]);
+
+  // Prefill (and refresh on Start-in change) so the text matches where the
+  // agent will actually run. Edits the user typed are kept until they change
+  // Start in again while the box still holds the previous auto-fetch.
+  useEffect(() => {
+    if (!launching) return;
+    let cancelled = false;
+    setPromptLoading(true);
+    api.taskPrompt(task.id, scope)
+      .then((p) => {
+        if (cancelled) return;
+        setPrompt((current) => {
+          if (!current.trim() || current === fetchedPrompt.current) {
+            fetchedPrompt.current = p;
+            return p;
+          }
+          return current;
+        });
+      })
+      .catch((e) => {
+        if (!cancelled) toast("error", `Could not load the briefing: ${errMessage(e)}`);
+      })
+      .finally(() => { if (!cancelled) setPromptLoading(false); });
+    return () => { cancelled = true; };
+  }, [launching, task.id, scope, toast]);
+
+  // Keep a sensible pane selected as panes come and go. Panes are given fresh
+  // ids every launch, so what survives a restart is the position in the bar,
+  // not the identity of the pane.
+  useEffect(() => {
+    if (ids.length === 0) { setActive(null); return; }
+    if (!active || !ids.includes(active)) {
+      const want = read<number>(`activePane.${task.id}`, ids.length - 1);
+      const i = Number.isInteger(want) && want >= 0 && want < ids.length
+        ? want
+        : ids.length - 1;
+      setActive(ids[i]);
+    }
+  }, [ids, active, task.id]);
+
+  useFocusedPane(ids, setActive);
+
+  useEffect(() => {
+    const i = active ? ids.indexOf(active) : -1;
+    if (i >= 0) write(`activePane.${task.id}`, i);
+  }, [active, ids, task.id]);
+
+  // Ctrl+Tab cycles panes the way a browser cycles tabs. It has to be caught in
+  // the capture phase: the focused terminal would otherwise take the key and
+  // send a literal tab to the process. Bound only while the terminals are the
+  // thing on screen — this view stays mounted behind Diff and Pull requests,
+  // and switching a pane you cannot see is just a key that appears to do
+  // nothing.
+  useEffect(() => {
+    if (ids.length < 2 || tab !== "terminals") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const at = active ? ids.indexOf(active) : -1;
+      const from = at < 0 ? 0 : at;
+      const next = (from + (e.shiftKey ? -1 : 1) + ids.length) % ids.length;
+      setActive(ids[next]);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [ids, active, tab]);
+
+  const installed = agents.filter((a) => a.installed);
+  const offerResume = resumable.filter(
+    (r) => !panes.some((p) => p.running && p.agent_id === r.agent_id),
+  );
+  const scopeName = scope
+    ? task.checkouts.find((c) => c.id === scope)?.project_name ?? "repo"
+    : task.checkouts.length > 1
+      ? `all ${task.checkouts.length} repos`
+      : "the task folder";
+
+  // One "+" rather than a button per CLI: the bar has to stay readable with a
+  // pane or two already open, and the list grows with every agent installed.
+  const addItems: MenuItem[] = [
+    ...offerResume.map((r) => ({
+      label: `⟲ Resume ${r.name}${r.last_active ? ` · ${ago(r.last_active)}` : ""}`,
+      onSelect: () => void resume(r.agent_id),
+    })),
+    ...installed.map((a, i) => ({
+      label: a.name,
+      onSelect: () => { chooseAcp(false); setLaunching(a.id); },
+      separated: i === 0 && offerResume.length > 0,
+    })),
+    // The same agents as a conversation the app draws (§20), as the Chat
+    // view offers them. Behind the launch dialog's switch alone, nobody
+    // looking at this menu found them.
+    ...installed.filter((a) => a.acp).map((a, i) => ({
+      label: `${a.name} · conversation (ACP)`,
+      onSelect: () => { chooseAcp(true); setLaunching(a.id); },
+      separated: i === 0,
+    })),
+    {
+      label: "Shell",
+      onSelect: () => void launchShell(),
+      separated: installed.length > 0 || offerResume.length > 0,
+    },
+  ];
+
+  const launchAgent = (agentId: string) => once(async () => {
+    try {
+      const acp = asAcp && !!agents.find((a) => a.id === agentId)?.acp;
+      const pane = await api.spawnAgent(task.id, agentId, scope, prompt.trim() || null, false, acp);
+      setLaunching(null);
+      setPrompt("");
+      await refreshPanes();
+      setActive(pane.id);
+    } catch (e) {
+      fail(e);
+    }
+  });
+
+  const resume = (agentId: string) => once(async () => {
+    try {
+      const pane = await api.spawnAgent(task.id, agentId, scope, null, true);
+      await refreshPanes();
+      setActive(pane.id);
+    } catch (e) {
+      fail(e);
+    }
+  });
+
+  const launchShell = () => once(async () => {
+    try {
+      const pane = await api.spawnShell(task.id, scope);
+      await refreshPanes();
+      setActive(pane.id);
+    } catch (e) {
+      fail(e);
+    }
+  });
+
+  /// Closing signals the agent and gives it five seconds to save, so the tab
+  /// stays put for what feels like a hung click. Marking it spends that time
+  /// visibly, and stops a second ✕ landing on a pane already on its way out.
+  async function closePane(pane: PaneInfo) {
+    if (closing.has(pane.id)) return;
+    setClosing((c) => new Set(c).add(pane.id));
+    try {
+      await api.closePane(pane.id);
+      await refreshPanes();
+    } catch (e) {
+      fail(e);
+    } finally {
+      setClosing((c) => {
+        const next = new Set(c);
+        next.delete(pane.id);
+        return next;
+      });
+    }
+  }
+
+  return (
+    <>
+      <div className="pane-bar">
+        {panes.map((p) => (
+          <div
+            key={p.id}
+            className={`pane-tab${p.id === active ? " active" : ""}`}
+            onClick={() => setActive(p.id)}
+          >
+            <span className={`dot ${paneState(p).dot}`} title={paneState(p).label} />
+            {p.topic ? (
+              // Only the name gives way: the scope is what tells two repos' tabs apart.
+              <>
+                <span className="name" title={`${p.topic}\n${p.title}`}>{p.topic}</span>
+                {paneScope(p) && <span>· {paneScope(p)}</span>}
+              </>
+            ) : (
+              p.title
+            )}
+            {p.notice && (
+              <span
+                title={p.notice === "trust_prompt" ? "Waiting: trust this folder?" : "Usage limit"}
+                style={{ color: "var(--amber)" }}
+              >
+                {p.notice === "trust_prompt" ? "?" : "⚑"}
+              </span>
+            )}
+            {!p.running && p.exit_code !== null && (
+              <span style={{ color: "var(--dimmer)" }}>({p.exit_code})</span>
+            )}
+            {canRestart(p, agents) && !closing.has(p.id) && !restarting.has(p.id) && (
+              <RestartButton pane={p} onRestart={restart} />
+            )}
+            {p.kind === "agent" && installed.length > 0 && !closing.has(p.id) && !restarting.has(p.id) && (
+              <span
+                className="x"
+                title="Hand off to another agent"
+                onClick={(e) => { e.stopPropagation(); startHandoff(p); }}
+              >
+                <SwapIcon />
+              </span>
+            )}
+            {closing.has(p.id) || restarting.has(p.id) ? (
+              <Spinner />
+            ) : (
+              <span className="x" onClick={(e) => { e.stopPropagation(); void closePane(p); }}>
+                <CloseIcon />
+              </span>
+            )}
+          </div>
+        ))}
+        <div className="spacer" />
+
+        {multi && (
+          <>
+            <span
+              className={`repo-tag${scope === null ? " active" : ""}`}
+              title="New panes start at the task root, seeing every repo"
+              onClick={() => setScope(null)}
+            >
+              all
+            </span>
+            {task.checkouts.map((c) => (
+              <span
+                key={c.id}
+                className={`repo-tag${scope === c.id ? " active" : ""}`}
+                title={`New panes start inside ${c.project_name}`}
+                onClick={() => setScope(c.id)}
+              >
+                {c.project_name}
+              </span>
+            ))}
+            <span style={{ width: 6 }} />
+          </>
+        )}
+
+        <LoopButton pane={panes.find((x) => x.id === active)} task={task} />
+        <BrowserToggle open={browserOpen} view={browser} whose="this task's" onToggle={() => showBrowser(!browserOpen)} />
+        <button
+          ref={addRef}
+          className="btn btn-sm btn-add"
+          title="New pane"
+          onClick={() =>
+            setAddMenu((open) => {
+              if (open) return null;
+              const r = addRef.current?.getBoundingClientRect();
+              return r ? { x: r.right, y: r.bottom + 4 } : null;
+            })
+          }
+        >
+          <PlusIcon />
+        </button>
+      </div>
+
+      {addMenu && (
+        <ContextMenu
+          x={addMenu.x}
+          y={addMenu.y}
+          ignore={addRef}
+          items={addItems}
+          onClose={() => setAddMenu(null)}
+        />
+      )}
+
+      <ChatLink task={task} />
+      <WaitingTaskPanes taskId={task.id} />
+
+      <PaneNotice pane={panes.find((x) => x.id === active && x.notice)} onHandoff={startHandoff} />
+      <PaneExited pane={panes.find((x) => x.id === active)} busy={restarting.has(active ?? "")} onResume={restart} />
+      <LoopBar pane={panes.find((x) => x.id === active)} />
+
+      <div className="term-split">
+      <div className="pane-stack">
+        {panes.map((p) => (
+          // Visible also means this tab is the one on screen. Terminals stay
+          // mounted behind Diff and Pull requests, and a pane fitted while its
+          // container had no height keeps those rows: the process draws into a
+          // short terminal inside a tall one, which is the black band under a
+          // full-screen editor. Toggling this re-fits when the tab comes back.
+          <PaneView
+            key={p.id}
+            pane={p}
+            visible={p.id === active && tab === "terminals"}
+          />
+        ))}
+        {panes.length === 0 && (
+          <div className="empty">
+            <h2>No panes yet</h2>
+            <p>
+              {multi
+                ? `Start an agent in the task folder and it sees all ${task.checkouts.length} repos as sibling folders — the right choice when the change spans them.`
+                : "Start an agent in the task folder, with the repository as a folder inside it, or open a shell to run the dev server and tests."}
+            </p>
+            {offerResume.length > 0 && (
+              <div className="row" style={{ marginBottom: 6 }}>
+                {offerResume.map((r) => (
+                  <button
+                    key={r.agent_id}
+                    className="btn btn-primary"
+                    onClick={() => void resume(r.agent_id)}
+                  >
+                    ⟲ Resume {r.name}
+                    {r.last_active && (
+                      <span style={{ opacity: 0.75, marginLeft: 6 }}>
+                        · {ago(r.last_active)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="row">
+              {installed.length === 0 && (
+                <span>
+                  No agent CLIs found on your PATH. Install Claude Code, GitHub
+                  Copilot CLI, OpenCode or Gemini CLI and reopen the app.
+                </span>
+              )}
+              {installed.map((a) => (
+                <button key={a.id} className="btn" onClick={() => setLaunching(a.id)}>
+                  Start {a.name}
+                </button>
+              ))}
+              <button className="btn" onClick={() => void launchShell()}>Open shell</button>
+              {cursorIde && (
+                <button
+                  className="btn"
+                  title={`Open ${task.root} in Cursor`}
+                  onClick={() => void api.openInCursor(task.root).catch(fail)}
+                >
+                  Open in Cursor
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      {browserOpen && <BrowserSide taskId={task.id} visible={tab === "terminals"} onClose={() => showBrowser(false)} />}
+      </div>
+
+      {handoffDialog}
+
+      {launching && (
+        <Modal
+          title={`Start ${agents.find((a) => a.id === launching)?.name ?? launching}`}
+          onClose={() => { if (spawning) return; setLaunching(null); setPrompt(""); fetchedPrompt.current = ""; }}
+          footer={
+            <>
+              <button
+                className="btn"
+                disabled={spawning}
+                onClick={() => { setLaunching(null); setPrompt(""); fetchedPrompt.current = ""; }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={promptLoading || spawning}
+                onClick={() => void launchAgent(launching)}
+              >
+                {spawning ? "Starting…" : "Launch"}
+              </button>
+            </>
+          }
+        >
+          <Field
+            label="Start in"
+            hint="The task folder is where repositories appear, including ones added later. Starting inside one pins the agent to it, and anything added afterwards lands outside where it can see."
+          >
+            <select
+              value={scope ?? ""}
+              onChange={(e) => setScope(e.target.value || null)}
+            >
+              <option value="">
+                The task folder
+                {task.checkouts.length > 1 ? ` — all ${task.checkouts.length} repos` : ""}
+              </option>
+              {task.checkouts.map((c) => (
+                <option key={c.id} value={c.id}>Only {c.project_name}</option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label="Opening prompt"
+            hint={
+              promptLoading
+                ? "Fetching the ticket…"
+                : "Sent to the agent as it starts. Edit it, or clear it to drop in with no instruction."
+            }
+          >
+            <textarea
+              rows={10}
+              autoFocus
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="What should this agent do?"
+            />
+          </Field>
+          {agents.find((a) => a.id === launching)?.acp && (
+            <Switch
+              label="As a conversation (ACP)"
+              detail="The app draws it instead of a terminal: questions as buttons, prompts of any length."
+              checked={asAcp}
+              onChange={chooseAcp}
+            />
+          )}
+          <div className="muted" style={{ fontSize: 11 }}>
+            Starts in <code>{scope
+              ? task.checkouts.find((c) => c.id === scope)?.path
+              : task.root}</code>
+            {` · ${scopeName}`}
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+});

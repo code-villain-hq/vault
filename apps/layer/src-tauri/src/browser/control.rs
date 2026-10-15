@@ -1,0 +1,258 @@
+//! Who has a tab: an agent, while it is using it (BRW-15); the user, while
+//! they hold it (BRW-12); or a dialog the page opened, until someone answers
+//! it (BRW-13).
+
+use std::future::Future;
+
+use serde::Serialize;
+use serde_json::{json, Value};
+use tauri::{AppHandle, Manager, Runtime};
+
+use super::{changed, Browser};
+use crate::commands::AppState;
+use crate::error::{Error, Result};
+
+/// An alert, confirm or prompt the page opened. A headless Chrome draws
+/// none, and the page's scripts stop until it is answered.
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct Dialog {
+    /// `alert`, `confirm`, `prompt` or `beforeunload`.
+    pub kind: String,
+    pub message: String,
+    /// What a prompt offers before anything is typed.
+    pub default_prompt: String,
+}
+
+impl Dialog {
+    pub(super) fn from_event(p: &Value) -> Self {
+        let text = |k: &str| p.get(k).and_then(Value::as_str).unwrap_or_default().to_string();
+        Self { kind: text("type"), message: text("message"), default_prompt: text("defaultPrompt") }
+    }
+
+    /// The dialog as an agent is told of it.
+    pub fn describe(&self) -> String {
+        let message: String = self.message.chars().take(500).collect();
+        format!(
+            "The page opened a {} dialog: \"{message}\". Its scripts wait until it is answered: \
+             browser_dialog, accept true or false{}.",
+            self.kind,
+            if self.kind == "prompt" { ", with the text to give it" } else { "" }
+        )
+    }
+}
+
+/// The agent that last used a task's tab, for the panel to say so (BRW-15).
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct Driver {
+    /// Its pane, whose state says whether it is still at work.
+    pub pane: String,
+    /// What it is, as the user knows it: "Claude Code".
+    pub agent: String,
+    /// Its browser calls running now.
+    pub calls: u32,
+    /// When its last call began or ended, in milliseconds since the epoch.
+    pub last_at: i64,
+}
+
+/// An agent's browser call, from start to end: the panel shows the tab as
+/// the agent's while one runs (BRW-15).
+pub struct Driving<R: Runtime> {
+    app: AppHandle<R>,
+    task: String,
+}
+
+impl<R: Runtime> Drop for Driving<R> {
+    fn drop(&mut self) {
+        let browser = &self.app.state::<AppState>().browser;
+        if let Some(d) = browser.inner.lock().drivers.get_mut(&self.task) {
+            d.calls = d.calls.saturating_sub(1);
+            d.last_at = chrono::Utc::now().timestamp_millis();
+        }
+        changed(&self.app, &self.task);
+    }
+}
+
+/// The refusal while the user holds the tab.
+pub const HELD: &str = "The user has taken over this task's browser, to sign in or to look \
+     at something, and agents wait until they hand it back. Tell the user what you were about \
+     to do there, and try again once they have.";
+
+impl Browser {
+    /// An agent begins a browser call in the task's tab; it ends when the
+    /// returned value is dropped.
+    pub fn drive<R: Runtime>(&self, app: &AppHandle<R>, task: &str, pane: &str, agent: &str) -> Driving<R> {
+        {
+            let mut inner = self.inner.lock();
+            let now = chrono::Utc::now().timestamp_millis();
+            let d = inner.drivers.entry(task.to_string()).or_insert_with(|| Driver {
+                pane: pane.to_string(),
+                agent: agent.to_string(),
+                calls: 0,
+                last_at: now,
+            });
+            // Another agent in the same task takes the wheel; calls of the
+            // one before still running are counted until they end.
+            if d.pane != pane {
+                d.pane = pane.to_string();
+                d.agent = agent.to_string();
+            }
+            d.calls += 1;
+            d.last_at = now;
+        }
+        changed(app, task);
+        Driving { app: app.clone(), task: task.to_string() }
+    }
+
+    /// The user takes the task's tab, or hands it back (BRW-12).
+    pub fn hold<R: Runtime>(&self, app: &AppHandle<R>, task: &str, held: bool) {
+        {
+            let mut inner = self.inner.lock();
+            if held {
+                inner.held.insert(task.to_string());
+            } else {
+                inner.held.remove(task);
+            }
+        }
+        changed(app, task);
+    }
+
+    pub fn held(&self, task: &str) -> bool {
+        self.inner.lock().held.contains(task)
+    }
+
+    /// The dialog open in the task's tab, if one is.
+    pub fn dialog(&self, task: &str) -> Option<Dialog> {
+        self.inner.lock().active(task).and_then(|t| t.dialog.clone())
+    }
+
+    /// Answer the task's open dialog: accept it (OK), or dismiss it
+    /// (Cancel), with `text` for a prompt.
+    pub async fn answer_dialog(&self, task: &str, accept: bool, text: Option<&str>) -> Result<Dialog> {
+        let (cdp, session, dialog) = {
+            let inner = self.inner.lock();
+            let tab = inner.active(task);
+            let dialog = tab.and_then(|t| t.dialog.clone()).ok_or_else(|| Error::Other("no dialog is open".into()))?;
+            let cdp = inner.running.as_ref().map(|r| r.cdp.clone()).ok_or_else(|| Error::Other("the browser closed".into()))?;
+            (cdp, tab.map(|t| t.session.clone()).unwrap_or_default(), dialog)
+        };
+        let mut params = json!({ "accept": accept });
+        if let Some(t) = text {
+            params["promptText"] = json!(t);
+        }
+        cdp.call("Page.handleJavaScriptDialog", params, Some(&session)).await?;
+        // Closed now, whether or not Chrome's word of it has been read yet.
+        if let Some(tab) = self.inner.lock().active_mut(task) {
+            tab.dialog = None;
+        }
+        Ok(dialog)
+    }
+
+    /// Run an action on the page, but stop waiting on it if the page opens
+    /// a dialog: Chrome answers an input event only once its handlers have
+    /// run, and an `alert()` in one holds them until the dialog is answered.
+    /// A click that opened one waited out the whole call timeout.
+    pub async fn until_dialog<T>(&self, action: impl Future<Output = Result<T>>) -> Result<Option<T>> {
+        let opened = self.dialog_opened.notified();
+        tokio::select! {
+            done = action => done.map(Some),
+            _ = opened => Ok(None),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::browser::tests::{app_with_task, serve};
+    use crate::browser::tools::call;
+    use crate::commands::AppState;
+    use std::time::{Duration, Instant};
+    use tauri::Manager;
+
+    const ASKS: &str = r#"<html><head><title>Asks</title></head><body>
+        <button onclick="document.title = confirm('Delete it?') ? 'Deleted' : 'Kept'">Delete</button>
+    </body></html>"#;
+
+    fn text(content: &[Value]) -> String {
+        content.iter().filter_map(|c| c.get("text").and_then(Value::as_str)).collect()
+    }
+
+    /// Against a real Chrome: a click that opens a confirm comes back at once
+    /// saying so, not after the call's timeout; nothing else is done until it
+    /// is answered; answering it lets the page go on. While the user holds
+    /// the tab, agents are refused, reads included.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_dialog_stops_the_agent_until_answered_and_a_held_tab_stops_it_altogether() {
+        let Some((app, root, pane)) = app_with_task() else { return };
+        let state = app.state::<AppState>();
+        let base = serve(ASKS).await;
+        let handle = app.handle();
+        let tool = |name: &'static str, args: Value| call(handle, name, args, Some(&pane));
+
+        let opened = text(&tool("browser_navigate", json!({ "url": format!("{base}/") })).await.unwrap());
+        let at = opened.find("button \"Delete\" [ref=").unwrap() + "button \"Delete\" [ref=".len();
+        let button = opened[at..].split(']').next().unwrap().to_string();
+
+        let started = Instant::now();
+        let clicked = text(&tool("browser_click", json!({ "ref": button })).await.unwrap());
+        assert!(started.elapsed() < Duration::from_secs(10), "came back when the dialog opened");
+        assert!(clicked.contains("The page opened a confirm dialog: \"Delete it?\""), "{clicked}");
+
+        let refused = tool("browser_click", json!({ "ref": button })).await.unwrap_err();
+        assert!(refused.to_string().starts_with("Nothing was done."), "{refused}");
+
+        let answered = text(&tool("browser_dialog", json!({ "accept": false })).await.unwrap());
+        assert!(answered.contains("Page: Kept"), "{answered}");
+        assert_eq!(state.browser.dialog("t1"), None);
+
+        // The tab is the agent's while its call runs, and named for it (BRW-15).
+        let waiting = {
+            let (handle, pane) = (app.handle().clone(), pane.clone());
+            tokio::spawn(async move { call(&handle, "browser_wait", json!({ "seconds": 1 }), Some(&pane)).await })
+        };
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let driving = state.browser.view("t1").driver.unwrap();
+        assert_eq!((driving.agent.as_str(), driving.pane.as_str(), driving.calls), ("Claude Code", pane.as_str(), 1));
+        waiting.await.unwrap().unwrap();
+        assert_eq!(state.browser.view("t1").driver.unwrap().calls, 0);
+
+        state.browser.hold(app.handle(), "t1", true);
+        let held = tool("browser_snapshot", json!({})).await.unwrap_err();
+        assert_eq!(held.to_string(), HELD);
+        state.browser.hold(app.handle(), "t1", false);
+        assert!(text(&tool("browser_snapshot", json!({})).await.unwrap()).contains("Page: Kept"));
+
+        state.browser.shutdown(Duration::from_secs(3));
+        state.ptys.shutdown(Duration::from_secs(1));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_agent_is_told_what_the_dialog_says_and_how_to_answer_it() {
+        let d = Dialog::from_event(&json!({ "type": "prompt", "message": "Your name?", "defaultPrompt": "ada" }));
+        assert_eq!(d.default_prompt, "ada");
+        assert_eq!(
+            d.describe(),
+            "The page opened a prompt dialog: \"Your name?\". Its scripts wait until it is answered: \
+             browser_dialog, accept true or false, with the text to give it."
+        );
+    }
+
+    #[test]
+    fn a_closed_task_leaves_no_driver_hold_or_request_behind() {
+        let app = tauri::test::mock_app();
+        let browser = Browser::default();
+        let driver = Driver { pane: "p1".into(), agent: "Claude Code".into(), calls: 0, last_at: 0 };
+        browser.inner.lock().drivers.insert("t1".into(), driver);
+        browser.hold(app.handle(), "t1", true);
+        browser.ask(app.handle(), "t1", "github.com", "to read the PR");
+        browser.ask(app.handle(), "t2", "github.com", "to read the PR");
+
+        browser.close_task("t1");
+
+        assert!(browser.inner.lock().drivers.is_empty());
+        assert!(!browser.held("t1"));
+        assert!(browser.requests("t1").is_empty(), "nothing asks for a task that is gone");
+        assert_eq!(browser.requests_all().len(), 1, "another task's request stays");
+    }
+}

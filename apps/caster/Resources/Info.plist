@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>VillainCaster</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.villain.villaincaster</string>
+    <key>CFBundleName</key>
+    <string>Villain Caster</string>
+    <key>CFBundleDisplayName</key>
+    <string>Villain Caster</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>27.0</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Villain Caster asks Finder to empty the trash or open a window, and System Events to toggle dark mode.</string>
+    <key>LSUIElement</key>
+    <true/>
+</dict>
+</plist>

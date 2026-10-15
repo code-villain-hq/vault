@@ -1,0 +1,114 @@
+/* ----------------------------------------------- sidebar: profiles (§25) */
+
+.profile-foot {
+  border-top: 1px solid var(--border-soft);
+  padding: 6px;
+}
+.profile-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.profile-button:hover,
+.profile-button.active { background: var(--panel-2); }
+.profile-button.active { border-color: var(--accent-dim); }
+.profile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+.profile-chev { color: var(--dimmer); font-size: 11px; }
+
+.profile-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.profile-menu { min-width: 240px; }
+.profile-menu-head {
+  padding: 6px 10px 4px;
+  color: var(--dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+}
+.ctx-item.profile-item { display: flex; align-items: center; gap: 8px; }
+.profile-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-state { color: var(--dim); font-size: 11.5px; margin-left: 8px; }
+
+.profile-rows { display: flex; flex-direction: column; gap: 8px; }
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+.profile-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 550;
+}
+.profile-row .profile-state { font-weight: 400; }
+
+/* The initial in Manage profiles: bigger, and a button that recolours it. */
+.profile-recolour {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.profile-recolour .profile-initial { width: 34px; height: 34px; font-size: 16px; }
+.profile-recolour:hover .profile-initial,
+.profile-recolour:focus-visible .profile-initial {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent-dim);
+}
+
+.profile-colours {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+.profile-swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.profile-swatch:hover { box-shadow: 0 0 0 2px var(--panel-2), 0 0 0 4px var(--border); }
+.profile-swatch.chosen { box-shadow: 0 0 0 2px var(--panel-2), 0 0 0 4px var(--text); }
+.profile-rename { flex: 1; min-width: 0; }
+.profile-error { color: var(--red); margin-top: 8px; font-size: 13px; }

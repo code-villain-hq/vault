@@ -1,0 +1,23 @@
+[package]
+name = "forge-ai"
+description = "Forge's AI plumbing: the model provider, the tool-use loop, and read-only access to repositories"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+futures.workspace = true
+globset.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

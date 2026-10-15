@@ -1,0 +1,434 @@
+//! Agents waiting on you: the count on the dock icon, and a banner when one
+//! starts waiting while the window is in the background. The same pass keeps
+//! the Mac awake while one is working (`awake.rs`).
+//!
+//! Here rather than in the webview: its polls stop while the window is away,
+//! and macOS may suspend a hidden webview's timers altogether — so the one
+//! moment this exists for is the one the webview is least able to notice.
+//!
+//! "Waiting" is asking for something, or finished and not yet looked at. An
+//! agent finished and seen is only idle: counting those kept a number on the
+//! dock that nothing in the window explained.
+
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
+
+use tauri::{AppHandle, Manager};
+
+use crate::awake::{self, Awake};
+use crate::commands::{banner, AppState, CHAT_TASK_ID};
+use crate::messages::{self, Kind, Level, New};
+use crate::pty::{Activity, PaneInfo, PaneKind};
+use crate::target::Target;
+
+const TICK: Duration = Duration::from_secs(5);
+/// Past this many at once, one banner rather than a stack of them.
+const BATCH: usize = 3;
+/// A pane that keeps flickering between working and quiet — a watcher that
+/// prints now and then — would otherwise announce itself every minute.
+const REPEAT_AFTER: Duration = Duration::from_secs(120);
+
+/// Why this pane is waiting on you, if it is.
+///
+/// Only agents: a shell sits quietly by nature. A chat that has finished is
+/// not news either — sitting at its prompt is what a standing chat is for —
+/// but one asking permission, or stopped at a limit, is as stuck as any.
+pub(crate) fn waiting(info: &PaneInfo) -> Option<&'static str> {
+    if info.kind != PaneKind::Agent || !info.running {
+        return None;
+    }
+    if info.task_id == CHAT_TASK_ID && info.activity == Activity::Done {
+        return None;
+    }
+    match info.notice.as_deref() {
+        Some("usage_limit") => return Some("hit a usage limit — hand it off"),
+        Some("trust_prompt") => return Some("is asking whether to trust its folder"),
+        _ => {}
+    }
+    match info.activity {
+        Activity::Asking => Some("is asking for your permission"),
+        Activity::Done => Some("has finished — your turn"),
+        Activity::Working | Activity::Idle => None,
+    }
+}
+
+/// A finished turn a loop handed back says how the loop ended, or why it
+/// waits (LOOP-8), rather than only that the agent finished: that much was
+/// true of every round before it.
+fn loop_said(info: &PaneInfo) -> Option<&str> {
+    (info.activity == Activity::Done && info.notice.is_none()).then_some(info.loop_said.as_deref()).flatten()
+}
+
+/// What one pass found that is worth a banner.
+#[derive(Debug, PartialEq)]
+struct News {
+    pane_id: String,
+    task_id: String,
+    title: String,
+    what: String,
+    /// A crash or a usage limit is bad news; a clean finish is good.
+    level: Level,
+}
+
+#[derive(Default)]
+struct Watch {
+    /// Panes waiting at the last pass. None until the first pass, which only
+    /// records: whatever is already waiting at launch is not news.
+    waiting: Option<HashSet<String>>,
+    running: HashSet<String>,
+    /// Every pane at the last pass. An agent that dies on start-up can come
+    /// and go between two looks: never seen running, so without this its
+    /// exit, the one failure you most need to hear about, was never news.
+    known: HashSet<String>,
+    announced: HashMap<String, Instant>,
+}
+
+impl Watch {
+    /// One pass over the panes: the count for the badge, and what changed.
+    fn pass(&mut self, panes: &[(PaneInfo, bool)], at: Instant) -> (usize, Vec<News>) {
+        let mut quiet = HashSet::new();
+        let mut running = HashSet::new();
+        let mut known = HashSet::new();
+        let mut news = Vec::new();
+        let primed = self.waiting.is_some();
+
+        for (info, stopping) in panes {
+            known.insert(info.id.clone());
+            if info.running {
+                running.insert(info.id.clone());
+            }
+            if let Some(what) = waiting(info) {
+                quiet.insert(info.id.clone());
+                if self.waiting.as_ref().is_some_and(|w| !w.contains(&info.id)) {
+                    news.push(News {
+                        pane_id: info.id.clone(),
+                        task_id: info.task_id.clone(),
+                        title: info.title.clone(),
+                        what: loop_said(info).unwrap_or(what).to_string(),
+                        level: if info.notice.as_deref() == Some("usage_limit") {
+                            Level::Error
+                        } else {
+                            Level::Info
+                        },
+                    });
+                }
+            }
+            // An agent that exited by itself has stopped working as surely as
+            // one sitting at a prompt. One stopped on purpose — Stop, a
+            // handoff, quitting — is not news.
+            let exited = !info.running
+                && !stopping
+                && info.kind == PaneKind::Agent
+                && info.task_id != CHAT_TASK_ID
+                && (self.running.contains(&info.id) || (primed && !self.known.contains(&info.id)));
+            if exited {
+                news.push(News {
+                    pane_id: info.id.clone(),
+                    task_id: info.task_id.clone(),
+                    title: info.title.clone(),
+                    what: match info.exit_code {
+                        Some(0) => "finished".to_string(),
+                        code => format!(
+                            "exited with {}",
+                            code.map(|c| c.to_string()).unwrap_or_else(|| "?".into())
+                        ),
+                    },
+                    level: if info.exit_code == Some(0) { Level::Success } else { Level::Error },
+                });
+            }
+        }
+
+        let present: HashSet<&String> = panes.iter().map(|(i, _)| &i.id).collect();
+        self.announced
+            .retain(|id, when| present.contains(id) && at.duration_since(*when) < REPEAT_AFTER);
+        news.retain(|n| {
+            self.announced
+                .get(&n.pane_id)
+                .is_none_or(|when| at.duration_since(*when) >= REPEAT_AFTER)
+        });
+        for n in &news {
+            self.announced.insert(n.pane_id.clone(), at);
+        }
+
+        let count = quiet.len();
+        self.waiting = Some(quiet);
+        self.running = running;
+        self.known = known;
+        (count, news)
+    }
+}
+
+/// Watch the panes for as long as the app runs.
+pub fn spawn(app: AppHandle) -> std::io::Result<()> {
+    std::thread::Builder::new()
+        .name("attention".into())
+        .spawn(move || {
+            let mut watch = Watch::default();
+            let mut badge: Option<usize> = None;
+            let mut awake = Awake::default();
+            loop {
+                std::thread::sleep(TICK);
+                let state = app.state::<AppState>();
+                // Three switches, not a copy of every task and checkout: this
+                // runs every few seconds for as long as the app does.
+                let (on, keep_awake, phone) = state.config.with(|c| {
+                    (c.ui.notify_waiting_agents, c.ui.keep_awake, c.phone.tailscale || c.phone.home)
+                });
+                let panes = state.ptys.attention();
+                awake.hold(awake::wanted(keep_awake, phone, &panes));
+                let (count, news) = watch.pass(&panes, Instant::now());
+                // Kept whatever the switch and wherever you are looking
+                // (MSG-2): the switch is about interrupting you.
+                messages::record_all(&app, record(&news, |id| task_name(&state, id)));
+
+                let Some(window) = app.get_webview_window("main") else {
+                    continue;
+                };
+                let shown = if on { count } else { 0 };
+                if badge != Some(shown) {
+                    // Unsupported on Windows, and nothing to be done about it.
+                    let _ = window.set_badge_count((shown > 0).then_some(shown as i64));
+                    badge = Some(shown);
+                }
+
+                if !on || news.is_empty() || window.is_focused().unwrap_or(false) {
+                    continue;
+                }
+                for (title, body, target) in describe(&news, |id| task_name(&state, id)) {
+                    let _ = banner(&app, title, body, target);
+                }
+            }
+        })
+        .map(|_| ())
+}
+
+fn task_name(state: &AppState, task_id: &str) -> String {
+    if task_id == CHAT_TASK_ID {
+        return "Chat".to_string();
+    }
+    state
+        .config
+        .task(task_id)
+        .map(|t| t.name)
+        .unwrap_or_else(|_| "a task".into())
+}
+
+/// The line a banner and a message both say about one agent.
+fn line(n: &News) -> String {
+    format!("{} {}", n.title, n.what)
+}
+
+fn open(n: &News) -> String {
+    Target::Pane { task: &n.task_id, pane: &n.pane_id }.to_string()
+}
+
+/// What a pass found, for the message center: one each, never batched.
+fn record(news: &[News], name: impl Fn(&str) -> String) -> Vec<New> {
+    news.iter()
+        .map(|n| New {
+            kind: Kind::Agent,
+            level: n.level,
+            title: name(&n.task_id),
+            body: line(n),
+            target: Some(open(n)),
+        })
+        .collect()
+}
+
+/// The banners for what a pass found: title, body and what a click opens.
+fn describe(news: &[News], name: impl Fn(&str) -> String) -> Vec<(String, String, String)> {
+    if news.len() > BATCH {
+        let tasks: HashSet<&str> = news.iter().map(|n| n.task_id.as_str()).collect();
+        // One task: open it. Several: the Work overview lists every agent.
+        let target = match tasks.iter().next() {
+            Some(only) if tasks.len() == 1 => Target::task(only),
+            _ => Target::Work,
+        };
+        return vec![(
+            "Agents waiting".into(),
+            format!("{} agents have stopped and may need you", news.len()),
+            target.to_string(),
+        )];
+    }
+    news.iter().map(|n| (name(&n.task_id), line(n), open(n))).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pane(id: &str, activity: Activity) -> PaneInfo {
+        let now = chrono::Utc::now();
+        PaneInfo {
+            id: id.into(),
+            task_id: "t1".into(),
+            checkout_id: None,
+            kind: PaneKind::Agent,
+            title: "Claude Code".into(),
+            agent_id: Some("claude".into()),
+            cwd: "/tmp".into(),
+            running: true,
+            exit_code: None,
+            started_at: now,
+            last_output_at: now,
+            notice: None,
+            activity,
+            activity_since: now,
+            topic: None,
+            acp: false,
+            loop_said: None,
+        }
+    }
+
+    #[test]
+    fn only_asking_or_unseen_work_in_a_task_is_waiting() {
+        assert!(waiting(&pane("a", Activity::Asking)).is_some());
+        assert!(waiting(&pane("a", Activity::Done)).is_some());
+        // Finished and looked at: idle, not news.
+        assert!(waiting(&pane("a", Activity::Idle)).is_none());
+        assert!(waiting(&pane("a", Activity::Working)).is_none());
+
+        let mut shell = pane("s", Activity::Done);
+        shell.kind = PaneKind::Shell;
+        assert!(waiting(&shell).is_none());
+        let mut chat = pane("c", Activity::Done);
+        chat.task_id = CHAT_TASK_ID.into();
+        assert!(waiting(&chat).is_none(), "a chat at its prompt is where it should be");
+        chat.activity = Activity::Asking;
+        assert!(waiting(&chat).is_some(), "but one asking permission is stuck");
+        let mut exited = pane("x", Activity::Done);
+        exited.running = false;
+        assert!(waiting(&exited).is_none());
+    }
+
+    #[test]
+    fn a_turn_a_loop_handed_back_says_how_the_loop_ended() {
+        let mut watch = Watch::default();
+        let mut p = pane("a", Activity::Working);
+        watch.pass(&[(p.clone(), false)], Instant::now());
+        p.activity = Activity::Done;
+        p.loop_said = Some("passed its checks — your turn".into());
+        let (_, news) = watch.pass(&[(p, false)], Instant::now());
+        assert_eq!(news.len(), 1);
+        assert_eq!(news[0].what, "passed its checks — your turn");
+    }
+
+    #[test]
+    fn a_notice_is_waiting_whatever_else_it_is_doing() {
+        let mut p = pane("a", Activity::Working);
+        p.notice = Some("trust_prompt".into());
+        assert_eq!(waiting(&p), Some("is asking whether to trust its folder"));
+    }
+
+    #[test]
+    fn the_first_pass_records_without_announcing() {
+        let mut w = Watch::default();
+        let (count, news) = w.pass(&[(pane("a", Activity::Done), false)], Instant::now());
+        assert_eq!(count, 1);
+        assert!(news.is_empty());
+    }
+
+    #[test]
+    fn finishing_is_announced_once() {
+        let at = Instant::now();
+        let mut w = Watch::default();
+        w.pass(&[(pane("a", Activity::Working), false)], at);
+        let (count, news) = w.pass(&[(pane("a", Activity::Done), false)], at + TICK);
+        assert_eq!(count, 1);
+        assert_eq!(news.len(), 1);
+        assert_eq!(news[0].what, "has finished — your turn");
+        let (_, news) = w.pass(&[(pane("a", Activity::Done), false)], at + TICK * 2);
+        assert!(news.is_empty());
+        // Looked at: no longer counted.
+        let (count, _) = w.pass(&[(pane("a", Activity::Idle), false)], at + TICK * 3);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn flickering_back_soon_after_is_not_announced_again() {
+        let at = Instant::now();
+        let mut w = Watch::default();
+        w.pass(&[(pane("a", Activity::Working), false)], at);
+        let (_, news) = w.pass(&[(pane("a", Activity::Asking), false)], at + TICK);
+        assert_eq!(news.len(), 1);
+        w.pass(&[(pane("a", Activity::Working), false)], at + TICK * 2);
+        let (_, news) = w.pass(&[(pane("a", Activity::Done), false)], at + Duration::from_secs(60));
+        assert!(news.is_empty());
+        w.pass(&[(pane("a", Activity::Working), false)], at + Duration::from_secs(300));
+        let (_, news) = w.pass(&[(pane("a", Activity::Done), false)], at + Duration::from_secs(305));
+        assert_eq!(news.len(), 1);
+    }
+
+    #[test]
+    fn an_exit_is_news_unless_it_was_asked_for() {
+        let at = Instant::now();
+        let mut w = Watch::default();
+        w.pass(&[(pane("a", Activity::Working), false), (pane("b", Activity::Working), false)], at);
+
+        let mut a = pane("a", Activity::Idle);
+        a.running = false;
+        a.exit_code = Some(0);
+        let mut b = pane("b", Activity::Idle);
+        b.running = false;
+        b.exit_code = Some(143);
+        let (_, news) = w.pass(&[(a, false), (b, true)], at + TICK);
+        assert_eq!(news.len(), 1);
+        assert_eq!(news[0].pane_id, "a");
+        assert_eq!(news[0].what, "finished");
+    }
+
+    #[test]
+    fn an_agent_that_dies_between_two_looks_is_still_news() {
+        let at = Instant::now();
+        let mut w = Watch::default();
+        w.pass(&[], at);
+
+        let mut a = pane("a", Activity::Idle);
+        a.running = false;
+        a.exit_code = Some(127);
+        let (_, news) = w.pass(&[(a.clone(), false)], at + TICK);
+        assert_eq!(news.len(), 1);
+        assert_eq!(news[0].what, "exited with 127");
+        let (_, news) = w.pass(&[(a.clone(), false)], at + TICK * 2);
+        assert!(news.is_empty(), "once is enough");
+
+        // Already dead when the app looked first: restored, not news.
+        let mut fresh = Watch::default();
+        let (_, news) = fresh.pass(&[(a, false)], at);
+        assert!(news.is_empty());
+    }
+
+    fn news(task: &str, pane: &str) -> News {
+        News {
+            pane_id: pane.into(),
+            task_id: task.into(),
+            title: "Claude Code".into(),
+            what: "finished".into(),
+            level: Level::Success,
+        }
+    }
+
+    #[test]
+    fn a_banner_for_one_agent_opens_its_pane() {
+        let out = describe(&[news("t1", "p1")], |_| "Login".into());
+        assert_eq!(out, [("Login".into(), "Claude Code finished".into(), "pane:t1:p1".into())]);
+    }
+
+    #[test]
+    fn a_chat_agent_opens_its_chat() {
+        let out = describe(&[news(CHAT_TASK_ID, "c1")], |_| "Chat".into());
+        assert_eq!(out[0].2, "pane:chat:c1");
+        let many: Vec<News> = (0..4).map(|i| news(CHAT_TASK_ID, &format!("c{i}"))).collect();
+        assert_eq!(describe(&many, |_| String::new())[0].2, "chat");
+    }
+
+    #[test]
+    fn several_agents_in_one_task_open_the_task() {
+        let one: Vec<News> = (0..4).map(|i| news("t1", &format!("p{i}"))).collect();
+        let out = describe(&one, |_| String::new());
+        assert_eq!(out.len(), 1, "past three, one banner");
+        assert_eq!(out[0].2, "task:t1");
+        let mixed: Vec<News> = (0..4).map(|i| news(&format!("t{i}"), "p")).collect();
+        assert_eq!(describe(&mixed, |_| String::new())[0].2, "work");
+    }
+}

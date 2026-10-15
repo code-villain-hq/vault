@@ -1,0 +1,465 @@
+mod acp;
+mod agents;
+mod attention;
+mod awake;
+mod browser;
+mod commands;
+mod config;
+mod error;
+mod git;
+mod integrations;
+mod loops;
+mod mcp;
+mod messages;
+mod notes;
+mod oneshot;
+mod news;
+mod phone;
+mod previous;
+mod profiles;
+mod pty;
+mod runs;
+mod secrets;
+mod shellenv;
+mod slack_bot;
+mod spec;
+mod target;
+mod theme;
+
+use commands::AppState;
+use config::ConfigStore;
+use pty::PtyManager;
+use tauri::Manager;
+
+/// Where a crash is written down, so a packaged app leaves evidence too.
+fn panic_log() -> std::path::PathBuf {
+    std::env::var_os("HOME")
+        .map(|h| std::path::PathBuf::from(h).join("Library/Logs/villain-layer"))
+        .unwrap_or_else(std::env::temp_dir)
+        .join("panic.log")
+}
+
+/// Say why, before the process dies.
+///
+/// A panic that crosses an `extern "C"` frame — anything reached from the
+/// webview or from AppKit — aborts instead of unwinding, and all the default
+/// handler prints is "panic in a function that cannot unwind", with no file,
+/// no line and no trace. The hook still runs first, so this is the only
+/// chance to record where it actually happened.
+///
+/// Nothing in here may panic: a panic inside the hook aborts immediately and
+/// takes the report with it.
+fn report_panics() {
+    std::panic::set_hook(Box::new(|info| {
+        let at = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "an unknown location".into());
+        let what = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "no message".into());
+
+        let text = format!(
+            "\n=== villain-layer panicked at {at} ===\n{what}\n{}\n",
+            std::backtrace::Backtrace::force_capture(),
+        );
+        eprintln!("{text}");
+
+        let path = panic_log();
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        // A crash loop should not fill the disk with its own account of itself.
+        if std::fs::metadata(&path)
+            .map(|m| m.len() > 1_000_000)
+            .unwrap_or(false)
+        {
+            let _ = std::fs::remove_file(&path);
+        }
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            use std::io::Write;
+            let _ = writeln!(f, "{} {text}", chrono::Utc::now().to_rfc3339());
+        }
+    }));
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    report_panics();
+
+    // A GUI app launched from Finder starts at `/`, and every child process
+    // inherits it. A coding CLI spawned there treats the whole filesystem as
+    // its project and walks out into Photos, Downloads and Music, which macOS
+    // answers with a permission prompt apiece. Setting it once here is the
+    // only place that cannot be forgotten by the next spawn site added.
+    // Nothing in the app resolves a relative path, so this changes nothing
+    // else.
+    if let Some(home) = std::env::var_os("HOME") {
+        let _ = std::env::set_current_dir(home);
+    }
+
+    let context = tauri::generate_context!();
+    // Which profile this copy is, before there is a window to show it in
+    // (§25). None: that profile is open in another copy, which has been
+    // brought forward instead (PROF-3).
+    let args: Vec<String> = std::env::args().collect();
+    let Some(others) = profiles::start(&context.config().identifier, &args) else {
+        return;
+    };
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
+        .on_window_event(|window, event| {
+            match event {
+                tauri::WindowEvent::ThemeChanged(_) => theme::repaint(window),
+                // A profile created or renamed in another copy shows when
+                // this one is next looked at (PROF-6).
+                tauri::WindowEvent::Focused(true) => profiles::show_identity(window.app_handle()),
+                _ => {}
+            }
+        })
+        .setup(|app| {
+            let handle = app.handle();
+            let profile = profiles::current();
+            secrets::use_service(&profile.service());
+            // Only Default was ever saved under the old identifier.
+            if profile.is_default() {
+                previous::adopt(handle);
+            }
+            let config = ConfigStore::load(profile)?;
+            let (log, dirty) = messages::Messages::load(config.folder());
+            let notes = notes::Notes::load(config.folder());
+            let (runs, runs_dirty) = runs::Runs::load(config.folder());
+            let state = AppState {
+                config,
+                ptys: PtyManager::default(),
+                jira_types: Default::default(),
+                epic_field_missing: Default::default(),
+                pending_notices: Default::default(),
+                status_cache: Default::default(),
+                prs_settled: Default::default(),
+                news: Default::default(),
+                messages: log,
+                notes,
+                browser: Default::default(),
+                loops: Default::default(),
+                runs,
+                slack_bot: Default::default(),
+            };
+            app.manage(state);
+            profiles::show_identity(handle);
+            // The profiles that were open with this one last time (PROF-7).
+            if !others.is_empty() {
+                std::thread::spawn(move || {
+                    for id in others {
+                        if let Err(e) = profiles::launch(&id) {
+                            eprintln!("profile {id} was not reopened: {e}");
+                        }
+                    }
+                });
+            }
+            // Before the window first draws, or a light theme opens dark.
+            theme::apply(handle, &handle.state::<AppState>().config.read().ui.theme);
+            messages::spawn_writer(handle.clone(), dirty)?;
+            runs::spawn_writer(handle.clone(), runs_dirty)?;
+
+            // Agents reach the app's Jira, GitHub and Slack connections through
+            // this rather than holding their own credentials. Bound before any
+            // agent can start, so the endpoint is always ready to hand out.
+            match tauri::async_runtime::block_on(mcp::serve(handle.clone())) {
+                Ok(e) => {
+                    println!("villain-layer mcp listening on {}", e.url);
+                    // Publish into the chat folder up front, not only when the
+                    // app launches an agent: running `claude` in that folder by
+                    // hand should get the same tools and the same context.
+                    let state = handle.state::<AppState>();
+                    if let Ok(dir) = commands::chat_dir(&state) {
+                        let _ = commands::write_chat_context(&state, &dir);
+                        let _ = mcp::write_config(&dir);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("villain-layer mcp unavailable: {e}");
+                    // Agents will start without the app's tools; say so once
+                    // rather than leaving a missing .mcp.json to discover later.
+                    // Queued, not emitted: the webview has not subscribed yet.
+                    commands::push_notice(
+                        &handle.state::<AppState>(),
+                        "error",
+                        format!(
+                            "MCP server unavailable ({e}). Agents will not get the app's Jira, GitHub or Slack tools this run."
+                        ),
+                    );
+                }
+            }
+            // Resolve the login shell's PATH once, off the startup path.
+            std::thread::spawn(|| {
+                shellenv::user_env();
+            });
+
+            attention::spawn(handle.clone())?;
+            news::spawn(handle.clone());
+            // The Slack bot's connection, when it is set up and on (BOT-1).
+            handle.state::<AppState>().slack_bot.spawn(handle.clone());
+            // Phones, if a way in was left on (PHONE-1). Nothing when not.
+            tauri::async_runtime::spawn(phone::apply(handle.clone()));
+
+            // Put back the panes that were open last time. Off the startup
+            // path too: each agent spawn waits on the login shell's PATH.
+            //
+            // Worktrees move onto the app's own copies of their repositories
+            // first, while no agent is working in them (`git/store.rs`).
+            let restore = handle.clone();
+            std::thread::spawn(move || {
+                let state = restore.state::<AppState>();
+                let (moved, problems) = commands::adopt_worktrees(&state);
+                if moved > 0 {
+                    commands::notify(
+                        &restore,
+                        "info",
+                        format!(
+                            "{moved} task folder{} now belong to the app's own copies of their repositories, so nothing done to your clones can break them.",
+                            if moved == 1 { "" } else { "s" }
+                        ),
+                    );
+                }
+                if !problems.is_empty() {
+                    commands::notify(
+                        &restore,
+                        "error",
+                        format!("Some task folders could not be linked to the app's own copies of their repositories: {}", problems.join("; ")),
+                    );
+                }
+                commands::restore_panes(&restore);
+                commands::make_missing_stores(&state);
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::list_projects,
+            commands::add_projects,
+            commands::scan_repos,
+            commands::remove_project,
+            commands::project_branches,
+            commands::repo_health,
+            commands::locate_project,
+            commands::set_project_update_by,
+            commands::set_project_check,
+            commands::start_loop,
+            commands::stop_loop,
+            commands::loop_view,
+            commands::sync_repos,
+            commands::cleanup_plan,
+            commands::cleanup_apply,
+            commands::list_tasks,
+            commands::delete_task,
+            commands::finish_task,
+            commands::add_checkout,
+            commands::remove_checkout,
+            commands::suggest_repos,
+            commands::set_project_group,
+            commands::list_agents,
+            commands::list_panes,
+            commands::spawn_shell,
+            commands::spawn_agent,
+            commands::resumable_agents,
+            commands::spawn_chat,
+            commands::pty_write,
+            commands::pty_resize,
+            commands::pty_attach,
+            commands::pty_detach,
+            commands::close_pane,
+            commands::waiting_panes,
+            commands::reopen_waiting_pane,
+            commands::forget_waiting_pane,
+            commands::kill_pane,
+            commands::restart_pane,
+            commands::acp_view,
+            commands::acp_prompt,
+            commands::acp_cancel,
+            commands::acp_answer,
+            commands::acp_set,
+            commands::diff_files,
+            commands::diff_file,
+            commands::task_commits,
+            commands::send_review,
+            commands::commit_task,
+            commands::push_task,
+            commands::update_from_base,
+            commands::abort_update,
+            commands::send_merge_conflicts,
+            commands::jira_connect,
+            commands::jira_issues,
+            commands::jira_issue_types,
+            commands::jira_browse,
+            commands::jira_transitions,
+            commands::jira_sync_status,
+            commands::jira_transition,
+            commands::jira_project_statuses,
+            commands::set_ticket_flow,
+            commands::set_ticket_start,
+            commands::jira_create_fields,
+            commands::jira_create_issue,
+            commands::jira_start_work,
+            commands::task_prompt,
+            commands::handoff_prompt,
+            commands::draft_pr_description,
+            commands::optimize_issue_description,
+            commands::draft_spec,
+            commands::apply_spec_answers,
+            commands::read_spec,
+            commands::save_spec_draft,
+            commands::approve_spec,
+            commands::put_back_spec,
+            commands::turn_down_spec_proposal,
+            commands::merge_specs,
+            commands::check_spec,
+            commands::spec_work_prompt,
+            commands::tell_spec_change,
+            commands::set_project_specs,
+            commands::request_pr_description,
+            commands::take_pr_description,
+            commands::github_connect,
+            commands::github_task_prs,
+            commands::github_all_prs,
+            commands::github_review_queue,
+            commands::task_for_pr,
+            commands::task_outgoing,
+            commands::set_checkout_base,
+            commands::checkout_branches,
+            commands::task_branch_facts,
+            commands::github_retarget_pr,
+            commands::github_open_prs,
+            commands::github_pr_feedback,
+            commands::send_pr_feedback,
+            commands::set_slack_channel,
+            commands::slack_bot_connect,
+            commands::set_slack_bot_on,
+            commands::set_slack_bot_agent,
+            commands::set_slack_bot_auto,
+            commands::set_slack_bot_personality,
+            commands::slack_bot_view,
+            commands::grafana_connect,
+            commands::grafana_list_datasources,
+            commands::grafana_set_datasource,
+            commands::aws_setup,
+            commands::s3_log_source_find,
+            commands::s3_log_source_save,
+            commands::s3_log_source_remove,
+            commands::slack_notify,
+            commands::set_slack_prefs,
+            commands::get_settings,
+            commands::take_notices,
+            commands::list_messages,
+            commands::add_message,
+            commands::mark_messages_read,
+            commands::clear_messages,
+            commands::list_repo_notes,
+            commands::add_repo_note,
+            commands::edit_repo_note,
+            commands::check_repo_note,
+            commands::delete_repo_note,
+            commands::set_worktree_root,
+            commands::set_ui_prefs,
+            commands::disconnect,
+            commands::cursor_ide_installed,
+            commands::open_in_cursor,
+            commands::phone_status,
+            commands::set_phone_access,
+            commands::phone_pair,
+            commands::phone_forget,
+            commands::browser_view,
+            commands::browser_open,
+            commands::browser_go,
+            commands::browser_watch,
+            commands::browser_unwatch,
+            commands::browser_input,
+            commands::browser_copy,
+            commands::browser_answer_site,
+            commands::browser_hold,
+            commands::browser_dialog,
+            commands::browser_new_tab,
+            commands::browser_switch_tab,
+            commands::browser_close_tab,
+            commands::add_browser_sign_in,
+            commands::forget_browser_sign_in,
+            commands::browser_sign_in_form,
+            commands::browser_save_sign_in,
+            commands::set_browser_sites,
+            commands::list_runs,
+            commands::clear_runs,
+            commands::list_profiles,
+            commands::open_profile,
+            commands::create_profile,
+            commands::rename_profile,
+            commands::set_profile_colour,
+            commands::delete_profile,
+        ])
+        .build(context)
+        // guard: allow panic — startup, before any agent exists; without a window there is nothing to run.
+        .expect("error while building villain-layer")
+        .run(|app, event| {
+            // Quitting used to take the agents down with SIGHUP, so they never
+            // wrote their transcripts and nothing could be resumed next time.
+            // Ask them to stop and give them a moment to save. Once: closing
+            // the last window asks first and then exits.
+            if quits(&event) && !QUITTING.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                // Before the agents: their stop can outlast a logout's patience.
+                profiles::quitting();
+                let state = app.state::<AppState>();
+                // Whatever the writer had not got to yet.
+                let _ = state.messages.flush();
+                // Beside the agents, not after them: each waits out its own
+                // grace period, and quitting should not take both (BRW-7).
+                let browser = app.clone();
+                let closing = std::thread::spawn(move || {
+                    browser.state::<AppState>().browser.shutdown(std::time::Duration::from_secs(3));
+                });
+                state.loops.stop_all();
+                state.ptys.shutdown(std::time::Duration::from_secs(5));
+                state.loops.kill_checks();
+                // The runs of the agents just stopped: each is in memory
+                // before its pane reads as exited, which is what shutdown
+                // waits for.
+                let _ = state.runs.flush();
+                let _ = closing.join();
+            }
+        });
+}
+
+/// The agents have been asked to stop, on the way out.
+static QUITTING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether `event` is the app going away (PANE-5).
+///
+/// Cmd+Q, the Dock's Quit and logging out arrive as `Exit` alone: AppKit's
+/// `terminate:` ends the event loop without asking first. Only closing the
+/// last window and `app.exit` send `ExitRequested`, and that was the only one
+/// listened for, so an ordinary quit stopped nothing. Terminal agents were
+/// hung up on with no time to save, and an agent over ACP, which has no
+/// terminal to lose, could run on with nobody to talk to: two were found
+/// still holding their conversations the morning after the app had gone.
+fn quits(event: &tauri::RunEvent) -> bool {
+    matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quitting_from_the_menu_or_the_dock_stops_the_agents_too() {
+        assert!(quits(&tauri::RunEvent::Exit));
+        assert!(!quits(&tauri::RunEvent::Ready));
+    }
+}

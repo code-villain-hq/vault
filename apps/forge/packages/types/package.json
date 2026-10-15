@@ -1,0 +1,7 @@
+{
+  "name": "@forge/types",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript types generated from the Rust models in crates/domain. Regenerate with `bun run gen:types`.",
+  "exports": { ".": "./src/index.ts" }
+}

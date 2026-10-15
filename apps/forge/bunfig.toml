@@ -1,0 +1,3 @@
+[test]
+# Not the repository copies Forge keeps in data/ (they have tests of their own).
+pathIgnorePatterns = ["data/**", "backups/**"]

@@ -1,0 +1,562 @@
+import type { SavedSignIn } from "./types-browser";
+import type { GithubConfig, GrafanaConfig, JiraConfig, LogSource, ModelChoice, SlackBotConfig, SlackConfig } from "./types-integrations";
+
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  default_branch: string;
+  /** One group per repo; null means ungrouped. */
+  group: string | null;
+  /** The app's own copy of the repository, which task worktrees belong to. */
+  store: string | null;
+  /** How Update from base updates branches here: set in Repos, or the way it
+   *  was last updated. Absent: guessed from its history (UPD-7). */
+  update_by?: UpdateBy | null;
+  /** What says the work here is done, run by a loop (LOOP-1). */
+  check?: string | null;
+  /** Where specs are committed here (SPEC-1). Absent: `specs`. */
+  spec_folder?: string | null;
+  /** Specs are kept by the app instead of committed here (SPEC-3). */
+  specs_in_app?: boolean;
+}
+
+/** How a registered repository is doing (REPO-5). */
+export interface RepoHealth {
+  project_id: string;
+  /** `missing`: nothing at its path; `not_repo`: no longer a git repository;
+   *  `other`: a different repository from the one the app's copy was made of. */
+  clone: "ok" | "missing" | "not_repo" | "other";
+  origin: string | null;
+  store: string | null;
+  /** When a Sync last reached origin, in seconds since the epoch. */
+  synced_at: number | null;
+  /** The clone's default branch against origin's. */
+  behind: number | null;
+  ahead: number | null;
+  /** A folder that looks like this repository, when the clone is missing. */
+  found: string | null;
+  /** How its history says the team updates branches, and why. */
+  update_guess: UpdateBy | null;
+  update_reason: string | null;
+}
+
+/** One repository's row from Sync (REPO-7). */
+export interface Synced {
+  project_id: string;
+  repo: string;
+  ok: boolean;
+  detail: string;
+}
+
+/** Something Clean up would remove (REPO-8). */
+export interface CleanupItem {
+  id: string;
+  kind: "worktree" | "folder" | "clone_branch" | "store_branch" | "origin_branch" | "records" | "store";
+  repo: string | null;
+  title: string;
+  detail: string;
+  /** safe: loses nothing, pre-selected. risky: offered, never pre-selected.
+   *  blocked: not removable here. */
+  verdict: "safe" | "risky" | "blocked";
+}
+
+export interface Cleaned {
+  id: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface RepoSuggestion {
+  project_ids: string[];
+  reason: string | null;
+}
+
+/** One ticket's worth of work, spanning one or more repositories. */
+export interface Task {
+  id: string;
+  name: string;
+  root: string;
+  branch: string;
+  issue_key: string | null;
+  issue_url: string | null;
+  created_at: string;
+  /** The last stage its ticket was moved for (TKT-8). */
+  ticket_stage?: "review" | "merged" | null;
+  /** The room folder of the chat whose agent created this task (CHAT-3). */
+  chat?: string | null;
+  /**
+   * Someone else's pull request, checked out to review it by 0.5.0. Nothing
+   * makes one now; one left from then is never pushed.
+   */
+  review?: ReviewOf | null;
+}
+
+/** The pull request a review task left from 0.5.0 is of. */
+export interface ReviewOf {
+  /** `owner/name`. */
+  repo: string;
+  number: number;
+  url: string;
+  author: string;
+  /** The commit the worktree was last moved to: what the review is of. */
+  head_sha: string;
+}
+
+/** One repository's worktree within a task. */
+export interface Checkout {
+  id: string;
+  task_id: string;
+  project_id: string;
+  path: string;
+  base: string;
+}
+
+export interface WorktreeStatus {
+  branch: string;
+  ahead: number;
+  behind: number;
+  staged: number;
+  unstaged: number;
+  untracked: number;
+  conflicted: number;
+  /** Distinct paths with any uncommitted change. */
+  dirty_files: number;
+}
+
+export interface CheckoutView extends Checkout {
+  project_name: string;
+  status: WorktreeStatus | null;
+  exists: boolean;
+  /** The folder is there but git cannot read it, and why — its repository forgot it, say. */
+  broken: string | null;
+  /** Files with uncommitted changes — what the Diff tab lists by default. */
+  changed: number;
+}
+
+export interface TaskView extends Task {
+  checkouts: CheckoutView[];
+  pane_count: number;
+}
+
+export type PaneKind = "agent" | "shell";
+
+/**
+ * A pane a launch did not put back (PANE-7): over the 12 that come back at
+ * once. Kept for the user to reopen or forget; never reopened by itself.
+ */
+export interface WaitingPane {
+  /** Its saved id: what Reopen and Forget name. */
+  id: string;
+  task_id: string;
+  kind: "agent" | "shell";
+  agent_id: string | null;
+  cwd: string | null;
+  /** What its CLI last called the conversation, where it says. */
+  title: string | null;
+}
+
+export interface PaneInfo {
+  id: string;
+  task_id: string;
+  /** null means the pane is rooted at the task root, seeing every repo. */
+  checkout_id: string | null;
+  kind: PaneKind;
+  title: string;
+  agent_id: string | null;
+  cwd: string;
+  running: boolean;
+  exit_code: number | null;
+  started_at: string;
+  last_output_at: string;
+  /** Something is waiting on you: "usage_limit" or "trust_prompt". */
+  notice: string | null;
+  /**
+   * What the agent is doing: from its own reports — hooks, a plugin or its
+   * window title, for every CLI offered — and guessed from output only when
+   * those stop arriving. "done" is finished and not yet looked at; once seen
+   * it is "idle".
+   */
+  activity: "working" | "asking" | "done" | "idle";
+  /** Since when. Not `last_output_at`: an idle Claude Code repaints every few seconds. */
+  activity_since: string;
+  /** What the conversation is about, as the CLI named it. Show `paneName`, not this. */
+  topic: string | null;
+  /** An agent over ACP (§20): drawn as a conversation, not a terminal. */
+  acp: boolean;
+}
+
+/** What a terminal coming on screen missed. See `pty_attach`. */
+export interface Catchup {
+  /** Base64 output after the point asked from. */
+  data: string;
+  /** Where `data` ends in the pane's output; ask from here next time. */
+  end: number;
+  /** The point asked from is gone: clear the terminal before drawing `data`. */
+  reset: boolean;
+}
+
+export interface AgentStatus {
+  id: string;
+  name: string;
+  program: string;
+  installed: boolean;
+  path: string | null;
+  /** Whether it can pick a conversation back up: Restart and Resume (PANE-14). */
+  resumes: boolean;
+  /** It can run over ACP here: it has an ACP command, on the PATH (ACP-1). */
+  acp: boolean;
+}
+
+export interface Resumable {
+  agent_id: string;
+  name: string;
+  sessions: number;
+  /** Unix seconds of the newest transcript. */
+  last_active: number | null;
+}
+
+/** Which comparison the Diff tab is showing. */
+export type DiffScope = "uncommitted" | "branch";
+
+/** One commit on a task branch, for the Diff view's commit picker. */
+export interface CommitInfo {
+  sha: string;
+  short: string;
+  subject: string;
+}
+
+export interface RepoCommits {
+  checkout_id: string;
+  repo: string;
+  commits: CommitInfo[];
+}
+
+export interface ChangedFile {
+  path: string;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  origin: string;
+  checkout_id: string;
+  repo: string;
+}
+
+/** What finishing a task did. */
+export interface Finished {
+  /** Any row not ok means the task was kept and nothing after was done. */
+  repos: RepoResult[];
+  branches: RepoResult[];
+  ticket_moved: boolean;
+  ticket_error: string | null;
+}
+
+/** How Update from base takes in the base: merged in, or rebased onto. */
+export type UpdateBy = "merge" | "rebase";
+
+/** What bringing one repository up to date with its base came to. */
+export interface RepoUpdate {
+  checkout_id: string;
+  repo: string;
+  base: string;
+  outcome: "up_to_date" | "updated" | "conflicts" | "failed";
+  /** Commits the base had that the branch did not. */
+  commits: number;
+  conflicts: string[];
+  detail: string;
+}
+
+/** What Add repositories did (REPO-1). */
+export interface AddedRepos {
+  added: Project[];
+  /** Each path that could not be added, with why. */
+  skipped: { path: string; error: string }[];
+}
+
+export interface RepoResult {
+  checkout_id: string;
+  repo: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface JiraIssue {
+  key: string;
+  summary: string;
+  description: string;
+  status: string;
+  status_id: string;
+  status_category: string;
+  issue_type: string;
+  priority: string | null;
+  assignee: string | null;
+  labels: string[];
+  components: string[];
+  epic_key: string | null;
+  epic_summary: string | null;
+  url: string;
+  /** When it was filed, RFC 3339 (TKT-11). */
+  created: string | null;
+}
+
+/** A field a project insists on before it will accept a new issue. */
+export interface CreateField {
+  id: string;
+  name: string;
+  required: boolean;
+  /** "array" when Jira expects several values. */
+  kind: string;
+  allowed: { id: string; name: string }[];
+}
+
+/** A repository added to a task, and how many running agents were told. */
+export interface AddedRepo extends Checkout {
+  told: number;
+}
+
+/** A task, plus the status its ticket was moved to on the way. */
+export interface Started extends Task {
+  moved: string | null;
+}
+
+/** A page of search results, and whether Jira still had more to give. */
+export interface JiraPage {
+  issues: JiraIssue[];
+  more: boolean;
+}
+
+export interface JiraIssueType {
+  id: string;
+  name: string;
+  subtask: boolean;
+  /** 1+ is epic-level, 0 a standard issue, -1 a sub-task. */
+  hierarchy_level: number;
+  /** Jira's own icon, inlined as a data URI by the backend. */
+  icon: string | null;
+}
+
+export interface JiraTransition {
+  id: string;
+  name: string;
+  to_status: string;
+  to_id: string;
+  /** "new", "indeterminate" or "done" — the same on every site, unlike the names. */
+  to_category: string;
+}
+
+/** A status a project's tickets can be in. */
+export interface ProjectStatus {
+  id: string;
+  name: string;
+  category: string;
+}
+
+export interface FlowStatus {
+  id: string;
+  name: string;
+}
+
+/** Where a ticket goes when work on it starts (TKT-1). */
+export type StartTo = { to: "first_in_progress" } | { to: "leave" } | { to: "status"; id: string; name: string };
+
+/** Where a Jira project's tickets go as the work moves (TKT-1, TKT-8). */
+export interface TicketFlow {
+  /** Absent until chosen: then as the old switch, `sync_jira_status`, says. */
+  started?: StartTo | null;
+  review: FlowStatus | null;
+  merged: FlowStatus | null;
+}
+
+/** What the PR sweep did about one task's ticket. */
+export interface TicketMove {
+  key: string;
+  stage: "review" | "merged";
+  moved_to: string | null;
+  /** No status is chosen for this stage in the ticket's project yet. */
+  unchosen: boolean;
+  error: string | null;
+}
+
+// GitHub's pull requests, checks and reviews: their own file, re-exported here.
+export * from "./types-github";
+export * from "./types-spec";
+// The browser panel's (§18), likewise.
+export * from "./types-browser";
+export * from "./types-acp";
+export * from "./types-loop";
+// Where each integration is and how it is set.
+export * from "./types-integrations";
+
+export type ThemeChoice = "dark" | "light" | "tokyo-night" | "cursor-dark" | "cursor-light" | "ayu-dark" | "ayu-light" | "system";
+
+export interface UiPrefs {
+  scale: number;
+  /** The app's colours (SET-5); "system" follows the Mac's appearance. */
+  theme: ThemeChoice;
+  terminal_font_size: number;
+  /** An ACP conversation's text, in px (ACP-15). */
+  conversation_font_size: number;
+  restore_panes: boolean;
+  trust_agent_dirs: boolean;
+  sync_jira_status: boolean;
+  /** A banner for a new review or an assigned ticket, while the window is in the background. */
+  system_notifications: boolean;
+  /** A banner when an agent stops to wait on you while the window is away, and the dock count. */
+  notify_waiting_agents: boolean;
+  agents_read_panes: boolean;
+  /** Keep the Mac from idle sleep while an agent is working (STATE-7). */
+  keep_awake: boolean;
+}
+
+export interface Settings {
+  ui: UiPrefs;
+  jira: JiraConfig | null;
+  github: GithubConfig | null;
+  slack: SlackConfig | null;
+  grafana: GrafanaConfig | null;
+  slack_bot: SlackBotConfig | null;
+  /** The models each ACP agent last offered, by agent id (BOT-17). */
+  agent_models: Record<string, ModelChoice[]>;
+  worktree_root: string;
+  worktree_root_is_default: boolean;
+  jira_connected: boolean;
+  github_connected: boolean;
+  slack_connected: boolean;
+  grafana_connected: boolean;
+  /** Logs in S3 agents read (OBS-9). */
+  log_sources: LogSource[];
+  /** What each source's queries scanned today, in bytes, by id (OBS-14). */
+  log_scanned_today: Record<string, number>;
+  /** A phone's way in is open, which widens Keep awake (PHONE-8). */
+  phone_open: boolean;
+  /** Sites agents may use in the browser besides this machine's (BRW-3). */
+  browser_sites: string[];
+  /** Saved sign-ins, without their passwords (BRW-18). */
+  browser_sign_ins: SavedSignIn[];
+}
+
+/** Settings → Remote access (PHONE-*), as `phone::status` reports it. */
+export interface PhoneStatus {
+  tailscale: boolean;
+  home: boolean;
+  typing: boolean;
+  port: number;
+  /** The server is up: a way in is on and the port was free. */
+  listening: boolean;
+  error: string | null;
+  /** This Mac's addresses on the ways that are on, Tailscale's first. */
+  addresses: { way: "tailscale" | "home"; ip: string; interface: string }[];
+  devices: { id: string; name: string; paired_at: string; connected: boolean }[];
+  pairing: PhonePairing | null;
+}
+
+export interface PhonePairing {
+  code: string;
+  seconds_left: number;
+}
+
+/**
+ * What a click on a banner, a toast or a message opens (NOTE-4), as
+ * `target.rs` writes it; `lib/target.ts` routes it. Banners hand it back in
+ * `system-notify-click`.
+ */
+export type Target =
+  | "reviews"
+  | "tickets"
+  | "work"
+  | "chat"
+  | `task:${string}`
+  | `pane:${string}:${string}`
+  | `pr:${string}`
+  | `ticket:${string}`
+  | `review:${string}`;
+
+export type MessageKind = "agent" | "review" | "ticket" | "pr" | "error" | "notice";
+export type MessageLevel = "info" | "success" | "error";
+
+/** One row of the message center (`messages.rs`), newest first. */
+export interface Message {
+  id: number;
+  /** Unix milliseconds of the latest time it was said. */
+  at: number;
+  kind: MessageKind;
+  level: MessageLevel;
+  title: string;
+  body: string;
+  /** Where a click goes (NOTE-4). A string: an older build's may not be a `Target` this one knows. */
+  target: string | null;
+  read: boolean;
+  /** Said this many times while unread, within ten minutes. */
+  count: number;
+}
+
+/** Queued before the UI was listening — drained once on boot. */
+export interface AppNotice {
+  kind: string;
+  text: string;
+}
+
+export interface ReviewComment {
+  path: string;
+  line: number;
+  body: string;
+  code?: string | null;
+  repo?: string | null;
+  /** "LEFT" for a removed line; the new side otherwise. */
+  side?: "LEFT" | "RIGHT" | null;
+  /** The first line of a range ending at `line`. */
+  start_line?: number | null;
+}
+
+export interface FoundRepo {
+  path: string;
+  name: string;
+  branch: string;
+  registered: boolean;
+}
+
+/** A repo note (MEM-1), and whether it may be out of date (MEM-3). */
+export interface RepoNote {
+  id: string;
+  /** The repository, as where it fetches from, spelled one way. */
+  repo: string;
+  text: string;
+  /** Files or folders it is about, relative to the repository's root. */
+  paths: string[];
+  /** Unix milliseconds. */
+  written_at: number;
+  /** "Claude Code in ACME-12 …", or "you". */
+  source: string;
+  written_commit: string | null;
+  /** Unix milliseconds. Writing and editing count as checking. */
+  checked_at: number;
+  checked_commit: string | null;
+  /** Files under its paths changed on the default branch since it was last
+   *  checked. null: that cannot be told (it names no paths, say). */
+  changed: string[] | null;
+}
+
+export interface ProjectNotes {
+  project_id: string;
+  notes: RepoNote[];
+}
+
+/** Something in a push's added lines that is usually there by accident (PR-11). */
+export interface Leftover {
+  path: string;
+  line: number;
+  kind: "debug" | "focused test" | "conflict marker" | "todo";
+  text: string;
+}
+
+/** What a push of one repo would send (PR-11). */
+export interface RepoOutgoing {
+  checkout_id: string;
+  repo: string;
+  commits: CommitInfo[];
+  leftovers: Leftover[];
+  leftovers_more: boolean;
+  error: string | null;
+}
+
+

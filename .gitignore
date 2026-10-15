@@ -1,5 +1,58 @@
+# macOS
 .DS_Store
-node_modules/
-target/
-dist/
+.AppleDouble
+.LSOverride
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
+
+# Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.p12
+credentials.json
+
+# Logs and caches
+*.log
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Node / Bun (Forge, Layer, site)
+node_modules/
+dist/
+dist-ssr/
+.turbo/
+.vite/
+
+# Rust / Cargo (Forge, Layer)
+target/
+
+# Tauri generated schemas
+src-tauri/gen/
+
+# Swift / SwiftPM (Caster)
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj/
+xcuserdata/
+*.xcuserstate
+
+# Caster's packaged .app (source lives elsewhere)
+build/
+
+# Forge local database dumps and attachment storage
+apps/forge/backups/
+apps/forge/data/
+
+# Per-machine agent state
+.claude/settings.local.json
+.claude/worktrees/
+.serena/

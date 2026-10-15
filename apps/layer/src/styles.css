@@ -1,0 +1,1973 @@
+:root {
+  /* The colours are in theme.css, one set per theme (SET-5). */
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 5px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+button:hover:not(:disabled) { background: var(--panel-2); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+.btn {
+  border-color: var(--border);
+  background: var(--panel-2);
+}
+.btn:hover:not(:disabled) { border-color: var(--accent-dim); }
+.btn-primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+.btn-sm { padding: 3px 9px; font-size: 14px; }
+.btn-danger:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+
+input, textarea, select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  width: 100%;
+  user-select: text;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+}
+textarea { resize: vertical; font-family: var(--mono); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------------------------------------------------------- layout */
+
+/* The sidebar's width is dragged (TASK-16); the grip has the empty middle
+   column. min() keeps a width saved on a wide window from taking more than
+   half of a narrower one. */
+.app {
+  display: grid;
+  grid-template-columns: min(var(--sidebar-w, 260px), 50%) 0 1fr;
+  height: 100%;
+  width: 100%;
+}
+/* Hidden rather than unmounted, so expanded groups and scroll survive. */
+.app.no-sidebar { grid-template-columns: 1fr; }
+.app.no-sidebar > .sidebar, .app.no-sidebar > .sidebar-grip { display: none; }
+/* Wider than its zero-width column, straddling the border, above both. */
+.sidebar-grip { width: 6px; margin-left: -3px; z-index: 2; cursor: col-resize; outline: none; }
+.sidebar-grip:hover, .sidebar-grip:focus-visible, body.dragging .sidebar-grip.held { background: var(--accent-dim); }
+/* While any grip is dragged (drag.ts), nothing else takes the mouse. */
+body.dragging { cursor: col-resize; user-select: none; -webkit-user-select: none; }
+body.dragging * { pointer-events: none; }
+
+/* --------------------------------------------------------------- sidebar */
+
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.brand {
+  font-weight: 650;
+  letter-spacing: -0.2px;
+  font-size: 14px;
+}
+.brand span { color: var(--accent); }
+.sidebar-body { flex: 1; overflow-y: auto; padding: 0 6px 12px; }
+.ws {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  margin-bottom: 1px;
+}
+.ws:hover { background: var(--panel-2); }
+.ws.active { background: var(--panel-2); border-color: var(--accent-dim); }
+.ws.deleting {
+  opacity: 0.55;
+  pointer-events: none;
+  cursor: default;
+}
+.ws.deleting .ws-title .spin {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  flex: none;
+}
+.ws-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  overflow: hidden;
+}
+.ws-title .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--dimmer); }
+.dot.live { background: var(--green); box-shadow: 0 0 6px color-mix(in srgb, var(--green) 60%, transparent); }
+.dot.idle { background: var(--amber); }
+.dot.gone { background: var(--red); }
+
+.key-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: 3px;
+  padding: 0 3px;
+  flex: none;
+}
+
+/* ------------------------------------------------------------------ main */
+
+.main { display: flex; flex-direction: column; overflow: hidden; }
+
+.ws-header {
+  border-bottom: 1px solid var(--border);
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+}
+.ws-header h1 {
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-header .branch {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+.spacer { flex: 1; }
+
+.chips { display: flex; gap: 5px; align-items: center; }
+.chip {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--dim);
+}
+.chip.add { color: var(--green); border-color: var(--green-line); }
+.chip.del { color: var(--red); border-color: var(--red-line); }
+.chip.warn { color: var(--amber); border-color: var(--amber-line); }
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.tabs button {
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--dim);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.tabs button:hover { background: transparent; color: var(--text); }
+.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+/* The same strip inside a padded view (Reviews), without the full-bleed panel. */
+.tabs.sub-tabs { padding: 0; margin: 0 0 14px; background: transparent; }
+.tabs .badge {
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--dimmer);
+  font-family: var(--mono);
+}
+
+.content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+/* ------------------------------------------------------------- terminals */
+
+.pane-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  overflow-x: auto;
+}
+.pane-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+  font-size: 12.5px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.pane-tab:hover { background: var(--panel-2); }
+.pane-tab.active { color: var(--text); border-color: var(--accent-dim); background: var(--panel-2); }
+.pane-tab .x { display: inline-flex; padding: 2px; margin: -2px 0; color: var(--dimmer); }
+.pane-tab .x:hover { color: var(--red); }
+/* A conversation's name can be a sentence; the other tabs still need room. */
+.pane-tab .name { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.term-split { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.pane-stack { flex: 1; min-width: 0; position: relative; overflow: hidden; }
+.term-slot {
+  position: absolute;
+  inset: 0;
+  padding: 6px 2px 2px 8px;
+  background: var(--bg);
+}
+.term-slot.hidden { visibility: hidden; z-index: -1; }
+.term-host { width: 100%; height: 100%; }
+.term-host .xterm { height: 100%; }
+/* xterm.css paints this black, and xterm 6 colours only the element inside
+   it: the strip under the last whole row was black, plain on Light. */
+.term-host .xterm .xterm-viewport { background-color: var(--bg); }
+
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--dim);
+  text-align: center;
+  padding: 40px;
+}
+.empty h2 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+.empty p { margin: 0; max-width: 380px; line-height: 1.55; }
+.empty .row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+/* --------------------------------------------------------------- browser */
+
+/* A task's tab beside its terminals (BRW-9). The page is a picture Chrome
+   draws, so the screen is plain: the canvas is the page's own size. */
+.browser-side { flex: none; min-width: 320px; display: flex; overflow: hidden; }
+.browser { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--panel); }
+.browser-tabs { display: flex; align-items: center; gap: 2px; padding: 5px 6px 0; overflow-x: auto; border-bottom: 1px solid var(--border-soft); }
+.browser-tabs.locked { opacity: 0.55; }
+.browser-tabs.locked .browser-tab { cursor: not-allowed; }
+.browser-tab {
+  display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 200px; flex: 0 1 auto;
+  padding: 4px 4px 4px 10px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+  font-size: 12px; color: var(--dim); cursor: pointer; white-space: nowrap;
+}
+.browser-tab:hover { background: var(--panel-2); }
+.browser-tab.active { color: var(--text); background: var(--bg); border-color: var(--border-soft); }
+.browser-tab .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.browser-tab .x { display: inline-flex; padding: 2px; border-radius: 4px; color: var(--dimmer); opacity: 0; }
+.browser-tab:hover .x, .browser-tab.active .x { opacity: 1; }
+.browser-tab .x:hover:not(:disabled) { color: var(--red); background: var(--panel-2); }
+.browser-tab-new { margin: 0 0 3px 2px; flex: none; }
+.browser-bar { display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-bottom: 1px solid var(--border-soft); }
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; padding: 4px 6px; }
+.browser-address { flex: 1; min-width: 0; display: flex; }
+.browser-address input { flex: 1; min-width: 0; font-size: 12.5px; padding: 4px 8px; }
+/* Not white: the screen shows before the first frame, and a resize clears
+   the canvas until the next one, and white there was a flash in a dark app. */
+.browser-screen { flex: 1; min-height: 0; position: relative; overflow: hidden; background: var(--bg); outline: none; }
+.browser-screen.focused { box-shadow: inset 0 0 0 1px var(--accent-dim); }
+.browser-screen canvas { position: absolute; inset: 0; display: block; cursor: default; }
+.browser-screen .empty { position: absolute; inset: 0; background: var(--panel); }
+.browser-starting {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--dim); background: var(--panel);
+}
+/* Off screen but focusable: where the page's keys and pastes arrive. */
+.browser-keys { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+.browser-marker {
+  position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 25%, transparent);
+  pointer-events: none; z-index: 2; animation: browser-ping 1.2s ease-out forwards;
+}
+@keyframes browser-ping { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.browser-status {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 12px; color: var(--dim);
+  border-top: 1px solid var(--border-soft); white-space: nowrap; overflow: hidden;
+}
+.browser-status > span { overflow: hidden; text-overflow: ellipsis; }
+.browser-off { color: var(--amber); }
+.browser-ask {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 12.5px;
+  background: color-mix(in srgb, var(--amber) 12%, var(--panel)); border-bottom: 1px solid var(--border-soft);
+}
+.browser-ask > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.browser-dialog { background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+.browser-dialog input { width: 180px; font-size: 12.5px; padding: 3px 6px; }
+.browser-held { color: var(--accent); }
+/* An agent has the page (BRW-15): a tint and a frame, so the page still reads. */
+.browser-driving {
+  position: absolute; inset: 0; z-index: 1; display: flex; justify-content: center; align-items: flex-start;
+  padding-top: 12px; background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent-dim); cursor: not-allowed;
+}
+.browser-driving-card {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; max-width: calc(100% - 24px);
+  border-radius: 8px; background: var(--panel); border: 1px solid var(--accent-dim); color: var(--text);
+  font-size: 12.5px; box-shadow: 0 6px 24px color-mix(in srgb, var(--shade) 35%, transparent); cursor: default;
+}
+.browser-driving-card > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-row { padding: 2px 0; }
+.btn-add.active { color: var(--text); border-color: var(--accent-dim); background: var(--panel-2); }
+.btn-add .browser-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: 4px; }
+
+/* ------------------------------------------------------------------ diff */
+
+/* The file list is dragged, not fixed: a deep tree and a shallow one want
+   different widths, and only the person reading it knows which. */
+.diff { display: flex; flex: 1; overflow: hidden; }
+.diff-files {
+  flex: none;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--panel);
+}
+.diff-grip {
+  flex: none;
+  width: 5px;
+  margin-right: -2px;
+  cursor: col-resize;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  z-index: 1;
+}
+.diff-grip:hover { border-right-color: var(--accent-dim); }
+/* min-width:0 or a flex child refuses to shrink below its content, which lets
+   a long line push the whole pane wide instead of scrolling inside it. */
+.diff-main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+.diff-dir {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  font-family: var(--mono);
+  color: var(--dim);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.35;
+}
+.diff-dir:hover { background: var(--panel-2); }
+.diff-dir .p { overflow: hidden; text-overflow: ellipsis; }
+
+.diff-more {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--dim);
+  flex: none;
+}
+.diff-file {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  font-family: var(--mono);
+  cursor: pointer;
+  line-height: 1.35;
+}
+.diff-file:hover { background: var(--panel-2); }
+.diff-file.active { background: var(--panel-2); color: var(--accent); }
+.diff-file .p { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-file .n { font-size: 11px; }
+/* Notes on a file: a pill, not a digit that reads as part of its +/- counts. */
+.diff-file .badge { font-family: var(--mono); font-size: 10.5px; color: var(--bg); background: var(--amber); border-radius: 8px; padding: 0 6px; line-height: 15px; font-weight: 600; }
+
+/* Open pull requests, before it pushes (PR-11): advice, not a gate. */
+.outgoing { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.outgoing-head { display: flex; align-items: center; gap: 8px; }
+.outgoing-repo { display: flex; flex-direction: column; gap: 3px; line-height: 1.5; }
+.outgoing-repo .del { color: var(--red); }
+.outgoing-leftover { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.outgoing-leftover code { font-family: var(--mono); font-size: 11.5px; color: var(--dim); flex: none; }
+.outgoing-leftover .text { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.review-tray-hint .link { background: none; border: 0; padding: 0; font: inherit; color: var(--amber); cursor: pointer; text-decoration: underline; }
+.md .suggestion { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 6px 0; }
+.md .suggestion > span { display: block; padding: 3px 8px; font-size: 11px; color: var(--dim); border-bottom: 1px solid var(--border); }
+.md .suggestion pre { margin: 0; border: 0; border-radius: 0; background: color-mix(in srgb, var(--green) 10%, transparent); }
+
+/* A size container, so a note can be as wide as the pane showing it — see
+   `.inline-comment`. */
+.diff-body { flex: 1; overflow: auto; font-family: var(--mono); font-size: 13px; user-select: text; container-type: inline-size; }
+/* As wide as the longest line, and never narrower than the pane. Rows take
+   their width from this, so a highlight runs the whole way across instead of
+   stopping where that particular line's text happens to end. */
+.diff-lines { width: max-content; min-width: 100%; }
+.diff-line { display: flex; white-space: pre; line-height: 1.55; width: 100%; }
+.diff-line .ln {
+  flex: none;
+  width: 46px;
+  text-align: right;
+  padding-right: 10px;
+  color: var(--dimmer);
+  user-select: none;
+  cursor: pointer;
+  /* Pinned: scrolling right to read a long line should not take the line
+     numbers with it, which is the one thing anchoring a comment. */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  /* Opaque, and the plain background rather than the row's tint: a
+     translucent gutter would let the scrolled code show through it. */
+  background: var(--bg);
+}
+.diff-line .ln:hover { color: var(--accent); }
+.diff-line .tx { flex: 1; padding-right: 12px; }
+.diff-line.add { background: color-mix(in srgb, var(--green) 8%, transparent); }
+.diff-line.add .tx { color: var(--add-text); }
+.diff-line.del { background: color-mix(in srgb, var(--red) 8%, transparent); }
+.diff-line.del .tx { color: var(--del-text); }
+.diff-line.hunk { background: var(--panel-2); color: var(--blue); }
+.diff-line.meta { color: var(--dimmer); }
+.diff-line.commented { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* The lines a note being written covers (DIFF-8): one, or a shift-clicked range. */
+.diff-line.picked { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* A removed line's number is the old file's: dimmer, so the two columns' worth read apart. */
+.diff-line .ln.old { color: var(--dimmer); }
+
+/* A width of its own, and held in view. Inside `.diff-lines`, which is as wide
+   as its longest line, a note was sized as one unwrapped line — a long one
+   widened the whole diff, and the box to type it in stretched to the widest
+   line of code. Sticky, so scrolling right to read code does not scroll the
+   note away. */
+.inline-comment {
+  margin: 4px 0 4px 46px;
+  padding: 7px 9px;
+  border-left: 2px solid var(--accent);
+  background: var(--panel-2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-family: var(--sans);
+  white-space: normal;
+  box-sizing: border-box;
+  width: min(640px, calc(100cqw - 58px));
+  position: sticky;
+  left: 46px;
+}
+/* Notes keep the line breaks they were written with. */
+.inline-comment .body { font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inline-comment .actions { margin-top: 6px; display: flex; gap: 6px; }
+.inline-comment .note-head { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; font-size: 12px; }
+/* Notes on lines this patch does not draw, above it rather than lost. */
+.diff-offline { flex: none; max-height: 40%; overflow-y: auto; border-bottom: 1px solid var(--border); padding: 2px 0; }
+.diff-offline .inline-comment { position: static; margin-left: 12px; width: min(640px, calc(100% - 24px)); }
+
+/* Wraps rather than running off the edge: with a couple of agents and the
+   commit picker it outgrew windows narrower than ~1450px, and `.content`
+   clipped what did not fit — Send included. */
+.review-tray {
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.review-tray-group { flex: none; }
+.review-tray-group .subtabs { margin-left: 0; }
+.review-tray-hint {
+  color: var(--dimmer);
+  font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-tray-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.review-tray-actions select { width: auto; max-width: 220px; }
+.review-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.review-target select { width: auto; max-width: 200px; }
+.btn .badge,
+.review-tray-actions .badge {
+  margin-left: 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  opacity: 0.85;
+}
+
+/* -------------------------------------------------------------------- pr */
+
+.panel-scroll { flex: 1; overflow-y: auto; padding: 14px; }
+.card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.card h3 { margin: 0 0 8px; font-size: 13.5px; font-weight: 600; }
+.card .muted { color: var(--dim); font-size: 13px; line-height: 1.5; }
+.row { display: flex; gap: 8px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+.check:last-child { border-bottom: none; }
+.check .name { flex: 1; font-family: var(--mono); font-size: 12.5px; }
+
+/* Rows with a checkbox: Update from base's repos. */
+.fb-item {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+.fb-item:last-of-type { border-bottom: none; }
+.fb-item input[type="checkbox"] { width: auto; margin-top: 3px; flex: none; }
+.fb-main { flex: 1; min-width: 0; }
+
+/* The feedback picker: one box per thread, review, comment or failing check. */
+.modal-toolbar .fb-tabs { margin: -10px -16px; padding: 0 16px; background: transparent; border-bottom: none; }
+.fb-repo { margin-bottom: 16px; }
+.fb-pr { margin-bottom: 10px; }
+.fb-pr h3 { margin: 0; font-size: 13.5px; min-width: 0; }
+.fb-box {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 13px;
+  overflow: hidden;
+}
+/* A picked item is marked on its edge, so a long one says so all the way down. */
+.fb-box.on { border-color: var(--accent-dim); box-shadow: inset 3px 0 0 var(--accent); }
+.fb-pick { cursor: pointer; gap: 8px; padding: 6px 10px; background: var(--panel-2); }
+.fb-pick input[type="checkbox"] { width: auto; margin: 0; flex: none; }
+.fb-fold { padding: 0 5px; font-size: 13px; line-height: 1.2; }
+.fb-content { padding: 10px 12px 12px; border-top: 1px solid var(--border-soft); }
+.fb-comment + .fb-comment { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.fb-author { color: var(--dim); font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.fb-head { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fb-head.mono { font-family: var(--mono); font-size: 12.5px; font-weight: 400; }
+.fb-body { color: var(--dim); margin-top: 3px; line-height: 1.45; }
+
+/* Markdown from GitHub (components/Markdown.tsx), laid out as GitHub does. */
+.md { font-size: 13.5px; line-height: 1.55; color: var(--text); overflow-wrap: anywhere; user-select: text; cursor: text; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol, .md blockquote, .md pre, .md .md-table { margin: 0 0 10px; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 14px 0 8px; font-weight: 600; line-height: 1.3; }
+.md h1 { font-size: 19px; }
+.md h2 { font-size: 17px; }
+.md h3 { font-size: 15.5px; }
+.md h4, .md h5, .md h6 { font-size: 13.5px; }
+.md ul, .md ol { padding-left: 22px; }
+.md li + li { margin-top: 3px; }
+.md li > ul, .md li > ol { margin: 3px 0 0; }
+.md li.md-task { list-style: none; margin-left: -18px; }
+.md .md-box { margin-right: 6px; color: var(--dim); }
+.md code {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+}
+.md pre {
+  padding: 8px 10px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+.md pre code { padding: 0; border: none; background: none; font-size: 11.5px; line-height: 1.45; white-space: pre; }
+.md blockquote { padding: 0 10px; color: var(--dim); border-left: 3px solid var(--border); }
+.md hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+.md a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.md .md-table { overflow-x: auto; }
+.md table { border-collapse: collapse; font-size: 12.5px; }
+.md th, .md td { padding: 4px 10px; border: 1px solid var(--border); }
+.md th { font-weight: 600; background: var(--panel-2); }
+.fb-log {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  cursor: text;
+}
+.fb-note { font-size: 12.5px; padding-top: 6px; }
+/* Reuses the Diff tab's rows; `.ln` is not a click target here. */
+.fb-code {
+  margin-bottom: 8px; overflow-x: auto; background: var(--bg); font-family: var(--mono); font-size: 12px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius); user-select: text;
+}
+.fb-code .ln, .fb-code .ln:hover { cursor: text; color: var(--dimmer); }
+.finish-list {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.finish-list li { margin-bottom: 4px; }
+.fb-files {
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--red);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.status-pill {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  white-space: nowrap;
+}
+.status-pill.indeterminate { color: var(--blue); border-color: var(--blue-line); }
+.status-pill.new { color: var(--dim); }
+.status-pill.done { color: var(--green); border-color: var(--green-line); }
+
+/* ----------------------------------------------------------------- modal */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--shade) 60%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 40px;
+}
+.deleting-overlay {
+  /* Keep the spinner visible over confirm/menus; delete cannot be cancelled mid-flight. */
+  z-index: 60;
+  pointer-events: all;
+}
+.deleting-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 22px;
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--shade) 50%, transparent);
+  max-width: 360px;
+}
+.deleting-card .spin {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+  flex: none;
+}
+.deleting-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13.5px;
+  min-width: 0;
+}
+.deleting-copy > div:first-child {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--shade) 50%, transparent);
+}
+.modal-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+.modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+
+/* A fixed height stops the window resizing every time a section changes. */
+.modal.tall { height: min(74vh, 700px); }
+
+.modal-toolbar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.modal-toolbar .section-tabs { margin-bottom: 0; }
+/* Wraps: a footer wider than the modal (an agent picker beside the buttons,
+   at a large interface scale) ran off its left edge, which the modal clips,
+   and "Start Claude Code" read "de Code". */
+.modal-foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+/* A footer's buttons go to the next line together, at its right. */
+.foot-buttons { display: flex; gap: 8px; margin-left: auto; }
+
+.field { margin-bottom: 12px; }
+/* Direct child only: the picker renders its rows as <label>s, and they must
+   not inherit the field caption's uppercase styling. */
+.field > label {
+  display: block;
+  font-size: 12px;
+  color: var(--dim);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+}
+.field .hint { font-size: 12px; color: var(--dimmer); margin-top: 4px; line-height: 1.45; }
+
+.section-tabs { display: flex; gap: 2px; margin-bottom: 14px; }
+.section-tabs button {
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--dim);
+}
+.section-tabs button.active { color: var(--text); border-color: var(--accent-dim); background: var(--panel-2); }
+
+/* Merge or rebase, one repo at a time (UPD-7). */
+.by-toggle { display: inline-flex; gap: 2px; }
+.by-toggle button {
+  border: 1px solid var(--border);
+  padding: 1px 8px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.by-toggle button.active { color: var(--text); border-color: var(--accent-dim); background: var(--panel-2); }
+.repo-line select.update-by { width: auto; min-width: 150px; padding: 2px 6px; font-size: 12px; color: var(--dim); }
+
+/* ---------------------------------------------------------------- toasts */
+
+.toasts {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 100;
+  max-width: 400px;
+}
+.toast {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+  user-select: text;
+}
+.toast.error { border-left-color: var(--red); }
+.toast.success { border-left-color: var(--green); }
+.toast.info { border-left-color: var(--blue); }
+/* A toast that opens what it is about says so, so a click is not a surprise. */
+.toast.linked:hover { border-color: var(--accent-dim); }
+.toast.linked::after { content: " →"; color: var(--dim); }
+
+/* A spinner standing in for a button's label: same box, so the button does
+   not change width the moment it starts working. */
+.btn-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.btn-busy .spin {
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+}
+.spin {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------- sidebar: tasks + repos */
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 5px;
+  color: var(--dim);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+}
+.section-head .count { color: var(--dimmer); }
+
+.chev,
+.chev-spacer {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dimmer);
+  transition: transform 0.12s;
+}
+.chev.open { transform: rotate(90deg); }
+
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 20px;
+  font-size: 12.5px;
+  font-family: var(--mono);
+  color: var(--dim);
+  border-radius: var(--radius);
+}
+.repo-row:hover { background: var(--panel-2); color: var(--text); }
+.repo-row .rname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repo-row .x { display: inline-flex; padding: 2px; color: var(--dimmer); }
+.repo-row .x:hover { color: var(--red); }
+
+.repo-picker {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.repo-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  font-size: 13px;
+}
+.repo-pick:last-child { border-bottom: none; }
+.repo-pick:hover { background: var(--panel-2); }
+.repo-pick input { width: auto; }
+.repo-pick .path {
+  color: var(--dimmer);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+.repo-tag {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  cursor: pointer;
+}
+.repo-tag:hover { border-color: var(--accent-dim); color: var(--text); }
+.repo-tag.active { color: var(--accent); border-color: var(--accent-dim); }
+
+.diff-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 3px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dimmer);
+  font-family: var(--sans);
+  font-weight: 600;
+}
+.diff-group:hover { background: var(--panel-2); }
+.diff-summary {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.diff-summary b { font-family: var(--sans); }
+
+.diff-commit-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  min-width: 0;
+}
+.diff-commit-picker select {
+  width: auto;
+  max-width: 340px;
+  min-width: 140px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.diff-commit-picker .btn {
+  padding: 2px 8px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.diff-repo-banner {
+  flex: none;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--dim);
+  z-index: 1;
+}
+
+/* --------------------------------------------------------- repo selection */
+
+.picker {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.picker-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.picker-top input[type="text"] { flex: 1; }
+.picker-list { overflow-y: auto; max-height: 260px; }
+.picker-reason {
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 1;
+}
+.group-head .count { color: var(--dimmer); }
+.group-head .acts { display: flex; gap: 4px; }
+.group-head .acts button { font-size: 11.5px; padding: 1px 5px; text-transform: none; letter-spacing: 0; }
+
+.group-chip {
+  font-size: 11px;
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- shell + top tabs */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* Chrome scales as one; the terminal has its own font size, because xterm
+     measures its cell grid and a page zoom would fight it. */
+  zoom: var(--ui-scale, 1);
+}
+
+.topbar {
+  /* Three tracks so the tabs sit on the true centre of the window, whatever
+     the brand or the buttons either side happen to measure. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 42px;
+  flex: none;
+  padding: 0 12px 0 84px; /* leaves room for the macOS traffic lights */
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.topbar-left { display: flex; align-items: center; min-width: 0; }
+.topbar-center { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+.topbar-right { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.watch-chip {
+  font-size: 12px;
+  color: var(--amber);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  user-select: none;
+}
+.topbar .brand { margin-right: 14px; font-size: 14px; }
+
+.viewtab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: var(--radius);
+  color: var(--tab-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+.viewtab:hover { background: var(--panel-2); color: var(--text); }
+.viewtab.active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--accent-dim);
+}
+.viewtab .badge {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--tab-count);
+  background: var(--panel);
+  border-radius: 9px;
+  padding: 1px 6px;
+}
+.viewtab.active .badge { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
+/* What the dock icon counts: agents asking for something, or finished unseen. */
+.viewtab .badge.warn,
+.viewtab.active .badge.warn { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, var(--bg)); margin-left: 4px; font-family: var(--sans); }
+
+.views { flex: 1; overflow: hidden; display: flex; }
+
+/* ------------------------------------------------------------ agents view */
+
+.wide { flex: 1; overflow-y: auto; padding: 18px 22px; }
+.wide-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.wide-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.wide-head .sub { color: var(--dim); font-size: 13px; }
+
+.review-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.review-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  padding: 10px 13px;
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.review-list-head:hover { background: var(--panel-2); }
+.review-list-head .title { font-weight: 600; font-size: 13.5px; }
+.review-list-head .title.add { color: var(--green); }
+.review-list-head .title.del { color: var(--red); }
+.review-list-head .title.warn { color: var(--amber); }
+.review-list-head .count {
+  color: var(--dimmer);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.review-list-body { padding: 10px 12px 2px; }
+.review-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 11px 13px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.review-card:hover { background: var(--panel); border-color: var(--accent-dim); }
+.review-card.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+  background: var(--panel-2);
+}
+.review-card .top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.review-card .repo, .review-card .num {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+.review-card .num { color: var(--accent); }
+.review-card .when { color: var(--dimmer); font-size: 12px; }
+.review-card .title { font-size: 13.5px; line-height: 1.45; }
+.review-card .by { color: var(--dim); font-size: 12px; }
+.review-card .chip.size .add { color: var(--green); }
+.review-card .chip.size .del { color: var(--red); }
+.review-card .chips.standing { flex-wrap: wrap; margin-top: 6px; }
+.chip.task { font-family: var(--sans); color: var(--blue); border-color: var(--blue-line); }
+.review-card:focus-visible { outline: none; border-color: var(--accent); }
+.review-card .top .btn { padding: 1px 7px; font-size: 12px; }
+.review-card .chips .start { margin-left: auto; padding: 1px 9px; font-size: 12px; }
+.review-note {
+  margin: 0 0 10px;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 460px;
+}
+.review-note.warn { color: var(--amber); }
+
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 11px 13px;
+  margin-bottom: 8px;
+}
+.agent-card:hover { border-color: var(--accent-dim); }
+.agent-card .who { min-width: 190px; }
+.agent-card .name { font-weight: 600; font-size: 13.5px; }
+.agent-card .where { color: var(--dim); font-size: 12px; margin-top: 2px; }
+.agent-card .ctx { flex: 1; min-width: 0; }
+.agent-card .ctx .task { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card .ctx .branch {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--dimmer);
+  margin-top: 2px;
+}
+.agent-card .when { color: var(--dim); font-size: 12px; white-space: nowrap; }
+
+/* ----------------------------------------------------------- tickets view */
+
+.epic {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.epic-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.epic-head .title { font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 7px; }
+.epic-head .count { color: var(--dimmer); font-size: 12px; font-family: var(--mono); }
+
+.epic-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+.ticket {
+  border: 1px solid var(--border-soft);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  padding: 10px;
+  cursor: pointer;
+  background: var(--bg);
+}
+/*
+  Hierarchy on the left edge, and stated before the two rules below on purpose:
+  an inline colour here meant hover and "started" could only reach three sides,
+  so a ticket in flight lit up around three of its edges and looked as though
+  the fourth had gone missing.
+*/
+.ticket.lvl-epic { border-left-color: var(--accent); }
+.ticket.lvl-sub { border-left-color: var(--border); }
+.ticket:hover { border-color: var(--accent-dim); }
+.ticket.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+  background: var(--panel-2);
+}
+.ticket .top { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; flex-wrap: wrap; }
+.ticket .summary { font-size: 13px; line-height: 1.45; }
+.ticket .bottom {
+  margin-top: 7px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--dim);
+  flex-wrap: wrap;
+}
+.ticket.started { border-color: var(--accent-dim); }
+
+/* -------------------------------------------------------------- chat view */
+
+/* Chats run down the left rather than across the top: they are long lived and
+   unbounded in number, which is the case a tab strip handles worst. */
+.chat { flex: 1; display: flex; overflow: hidden; }
+/* The open chat: a banner over it when its agent has exited (PANE-14). */
+.chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-list {
+  width: min(var(--chat-list-w, 230px), 50%);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.chat-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.chat-list-body { flex: 1; overflow-y: auto; padding: 6px; }
+/* The list's edge (CHAT-4): as `.app`'s grip, at zero width between the two. */
+.chat > .sidebar-grip { flex: none; margin-right: -3px; }
+.chat-list-empty { padding: 10px 6px; color: var(--dimmer); font-size: 12.5px; }
+.chat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+.chat-item:hover { background: var(--panel-2); }
+.chat-item.active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--accent-dim);
+}
+.chat-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.chat-item-title {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-item-sub { font-size: 11px; color: var(--dimmer); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-item-slack { color: var(--accent); cursor: pointer; }
+.chat-item-slack:hover { text-decoration: underline; }
+.chat-item .x { display: inline-flex; color: var(--dimmer); font-size: 14px; line-height: 1; opacity: 0; }
+.chat-item:hover .x, .chat-item.active .x { opacity: 1; }
+.chat-item .x:hover { color: var(--red); }
+/* Chats the last launch did not put back (PANE-7), under the open ones. */
+.chat-list-waiting { padding: 12px 6px 4px; color: var(--dimmer); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.chat-item.waiting .chat-item-title { color: var(--dim); }
+.chat-item.waiting .dot { background: var(--dimmer); }
+.waiting-banner { flex-wrap: wrap; row-gap: 6px; }
+.waiting-pane { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+
+/* -------------------------------------------------------------- repos view */
+
+.repo-manage {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 2px solid transparent;
+  font-size: 13px;
+}
+.repo-manage:last-child { border-bottom: none; }
+.repo-manage.trouble { border-left-color: var(--red); }
+.repo-line { display: flex; align-items: center; gap: 10px; }
+.repo-line .chip { white-space: nowrap; }
+.repo-manage .rname { min-width: 140px; font-weight: 500; }
+.repo-manage .rstore { color: var(--dimmer); font-size: 12px; white-space: nowrap; }
+.repo-manage .rstore.warn { color: var(--amber); }
+.repo-sub { display: flex; align-items: center; gap: 14px; margin-top: 3px; min-width: 0; }
+.repo-sub .repo-check { width: 240px; flex: none; padding: 2px 7px; font-size: 11.5px; }
+.repo-sub .rpath,
+.repo-sub .rorigin {
+  color: var(--dimmer);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* The end of a path is the part that tells two clones apart. */
+.repo-sub .rpath { direction: rtl; text-align: left; flex: 0 1 auto; }
+.repo-sub .rorigin { flex: 1 1 0; }
+.repo-problem {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--red);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.repo-synced { margin-top: 4px; color: var(--dim); font-size: 12px; }
+.repo-synced.failed { color: var(--red); }
+.repo-manage input { width: 130px; }
+.trouble-text { color: var(--red); }
+.repo-line .btn.notes-stale { color: var(--amber); }
+.repo-notes { margin: 8px 0 2px 12px; padding-left: 10px; border-left: 2px solid var(--border-soft); }
+.repo-note { padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
+.repo-note:last-of-type { border-bottom: none; }
+.repo-note .note-text { white-space: pre-wrap; line-height: 1.5; color: var(--text); }
+.repo-note .note-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 2px; color: var(--dimmer); font-size: 12px; }
+.repo-note .note-meta code { font-size: 11.5px; margin-right: 4px; }
+.repo-note .note-actions { display: flex; gap: 6px; margin-top: 5px; }
+.repo-note.stale { border-left: 2px solid var(--amber); padding-left: 8px; margin-left: -10px; }
+.repo-note-edit { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
+.repo-note-edit textarea { min-height: 56px; font-family: inherit; }
+.repo-manage .repo-note-edit input { width: 100%; }
+.repo-note-edit .note-actions { display: flex; align-items: center; gap: 6px; }
+
+.cleanup-intro { color: var(--dim); font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
+.cleanup-section { margin-bottom: 14px; }
+.cleanup-section h4 {
+  margin: 0 0 4px;
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cleanup-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.cleanup-item:hover { background: var(--panel-2); }
+.cleanup-item input[type="checkbox"] { width: auto; margin-top: 3px; flex: none; }
+.cleanup-item.blocked { cursor: default; opacity: 0.6; }
+.cleanup-item.blocked:hover { background: none; }
+.cleanup-text { min-width: 0; }
+.cleanup-title { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cleanup-title code { overflow-wrap: anywhere; }
+.cleanup-detail { color: var(--dim); font-size: 12px; line-height: 1.5; margin-top: 2px; }
+.cleanup-item.risky .cleanup-detail { color: var(--amber); }
+
+/* Branch composer: a fixed ticket key with an optional suffix after it. */
+.branch-compose {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+}
+.branch-compose:focus-within { border-color: var(--accent-dim); }
+.branch-key {
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+.branch-dash {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  color: var(--dimmer);
+  font-family: var(--mono);
+}
+.branch-compose input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--mono);
+}
+.branch-compose input:focus { border: none; outline: none; }
+
+/* Issue-type accent. The stripe reflects hierarchy, which means the same in
+   every Jira; the icon beside it is the site's own, so type identity never
+   depends on us guessing a palette. */
+.ticket.is-epic {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%);
+}
+
+.chip-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ------------------------------------------------------- message center */
+
+.icon-btn.bell { position: relative; }
+.icon-btn.bell.open { border-color: var(--accent-dim); color: var(--text); }
+.bell-count {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font: 600 10px/16px var(--mono);
+  text-align: center;
+}
+.messages {
+  position: fixed;
+  z-index: 200;
+  width: 380px;
+  max-width: calc(100vw - 16px);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--shade) 50%, transparent);
+  display: flex;
+  flex-direction: column;
+}
+.messages-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.messages-head .title { font-weight: 600; font-size: 13px; }
+.messages-head .spacer { flex: 1; }
+.messages-list { max-height: min(520px, 70vh); overflow-y: auto; padding: 4px; }
+.messages-empty { color: var(--dim); font-size: 12.5px; padding: 14px 10px; margin: 0; line-height: 1.5; }
+.message {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--dim);
+  cursor: default;
+}
+.message.linked { cursor: pointer; }
+.message:hover { background: var(--panel); }
+.message.unread { color: var(--text); }
+.message .dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.message.success .dot { background: var(--green); }
+.message.error .dot { background: var(--red); }
+/* Read is still there to find again, just no longer asking to be. */
+.message:not(.unread) .dot { opacity: 0.35; }
+.message .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.message .line { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; }
+.message .what { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.message:not(.unread) .what { font-weight: 500; }
+/* An error is all title: cut to one line, it lost the part that said why. */
+.message.solo .what {
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.message .times { font: 11px var(--mono); color: var(--dim); }
+.message .when { margin-left: auto; flex: none; font-size: 11px; color: var(--dimmer); }
+.message .body {
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+/* --------------------------------------------------------- context menu */
+
+.ctx-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 210px;
+  padding: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--shade) 50%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ctx-item {
+  text-align: left;
+  justify-content: flex-start;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  width: 100%;
+}
+.ctx-item:hover:not(:disabled) { background: var(--accent-dim); }
+.ctx-item.danger { color: var(--red); }
+.ctx-item.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 15%, transparent); }
+.ctx-item.separated { margin-top: 5px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+
+.btn-danger-solid {
+  background: var(--danger-fill);
+  border-color: var(--danger-fill);
+  color: var(--on-danger);
+}
+.btn-danger-solid:hover:not(:disabled) { background: var(--red); border-color: var(--red); color: var(--on-red); }
+
+.confirm-detail {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--amber);
+  background: var(--panel-2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 13px;
+  color: var(--amber);
+}
+
+/* ------------------------------------------------------------- switches */
+
+.switch-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+.switch-row:last-child { border-bottom: none; }
+.switch-row:hover:not(.disabled) { background: var(--panel-2); }
+.switch-row.disabled { opacity: 0.45; cursor: default; }
+.switch-row input { width: auto; margin-top: 2px; flex: none; }
+.switch-text { display: flex; flex-direction: column; gap: 2px; }
+.switch-label { font-size: 13px; }
+.switch-detail { font-size: 12px; color: var(--dim); line-height: 1.45; }
+
+/* ------------------------------------------------------- theme picker */
+
+/* Settings → Appearance (SET-5). Each preview carries its own data-theme, so
+   the tokens inside it are that theme's whatever the page is drawn in. */
+.theme-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.theme-tile {
+  display: flex; flex-direction: column; gap: 7px; padding: 6px 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel);
+  color: var(--text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.theme-tile:hover { border-color: var(--accent-dim); }
+.theme-tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-tile .theme-name { padding: 0 2px; }
+.theme-tile .theme-note { display: block; color: var(--dim); font-size: 11.5px; }
+.theme-shot { position: relative; height: 78px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border-soft); }
+.theme-preview { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); }
+/* Match the Mac: Light on the left, Dark under it on the right. */
+.theme-preview.left-half { clip-path: inset(0 50% 0 0); }
+.theme-preview .tp-bar {
+  flex: none; display: flex; align-items: center; gap: 4px; height: 13px; padding: 0 6px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.theme-preview .tp-body { flex: 1; display: flex; min-height: 0; }
+.theme-preview .tp-side {
+  width: 32%; display: flex; flex-direction: column; gap: 5px; padding: 7px 6px;
+  background: var(--panel); border-right: 1px solid var(--border-soft);
+}
+.theme-preview .tp-main { flex: 1; display: flex; flex-direction: column; gap: 5px; padding: 7px; }
+.theme-preview i { display: block; height: 4px; border-radius: 2px; background: var(--dim); }
+.theme-preview .tp-bar i { width: 14px; background: var(--dimmer); }
+.theme-preview i.on { background: var(--accent); }
+.theme-preview i.text { background: var(--text); }
+.theme-preview .tp-dots { display: flex; gap: 4px; }
+.theme-preview .tp-dots b { width: 5px; height: 5px; border-radius: 50%; }
+.theme-preview .tp-button { margin-top: auto; width: 28px; height: 9px; border-radius: 3px; background: var(--accent-fill); }
+
+/* An icon-only button needs a real target; the old ⚙ glyph was ~11px of ink. */
+/* Inside a header the control should read as part of the bar, not as a button
+   competing with the title beside it. */
+.icon-btn.flat {
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: transparent;
+  margin-left: -4px;
+}
+.icon-btn.flat:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--dim);
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--panel-2);
+  border-color: var(--accent-dim);
+  color: var(--text);
+}
+
+/* Keep awake: on is the accent's outline; holding the Mac up, its colour. */
+.icon-btn.awake.on { border-color: var(--accent-dim); }
+.icon-btn.awake.holding { color: var(--accent); }
+
+/* Phone access (PHONE-*): a phone connected, and Settings → Remote access. */
+.icon-btn.phone.on { color: var(--green); }
+.phone-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; font-size: 13px; }
+.phone-list code, .phone-code { user-select: text; font-family: var(--mono); }
+.phone-pairing { display: flex; flex-direction: column; gap: 4px; }
+.phone-code { font-size: 28px; letter-spacing: 0.12em; color: var(--accent); }
+.phone-error { color: var(--red); font-size: 13px; margin-bottom: 12px; }
+.phone-hint { color: var(--dim); font-size: 12px; }
+
+/* An agent that has run out of budget says so where you are looking. */
+.limit-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  background: color-mix(in srgb, var(--amber) 9%, transparent);
+  border-bottom: 1px solid var(--amber-line);
+  font-size: 13px;
+  color: var(--amber);
+  flex: none;
+}
+.limit-banner b { color: var(--text); }
+/* A worktree cut off from its repository: red, since nothing here works until it is re-linked. */
+.unlinked-banner {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-bottom-color: var(--red-line);
+}
+/* A chat's agent is working on this task from the Chat view (CHAT-3):
+   accent, since it is news about the task rather than a warning. */
+.chat-link-banner {
+  color: var(--dim);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-bottom-color: var(--border);
+}
+
+/* An agent on a loop (§21, LOOP-9): accent while it runs, then how it ended. */
+.loop-bar { flex: none; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--accent) 7%, transparent); font-size: 13px; color: var(--dim); }
+.loop-bar.good { background: color-mix(in srgb, var(--green) 7%, transparent); color: var(--green); }
+.loop-bar.bad { background: color-mix(in srgb, var(--red) 7%, transparent); color: var(--red); }
+.loop-bar.held { background: color-mix(in srgb, var(--amber) 9%, transparent); color: var(--amber); }
+.loop-line { display: flex; align-items: center; gap: 8px; padding: 7px 13px; }
+.loop-line b { color: var(--text); }
+.loop-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loop-runs { max-height: 40vh; overflow: auto; padding: 0 13px 10px; color: var(--text); }
+.loop-run { margin-top: 8px; }
+.loop-run-head { font-size: 12px; color: var(--dimmer); margin-bottom: 3px; }
+.loop-result { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; cursor: pointer; }
+.loop-result .mark { width: 12px; }
+.loop-result.pass .mark { color: var(--green); }
+.loop-result.fail .mark { color: var(--red); }
+.loop-result code { font-family: var(--mono); font-size: 12px; }
+.loop-result .dim { color: var(--dimmer); font-size: 12px; }
+.loop-output {
+  margin: 4px 0 6px 20px; padding: 8px 10px; max-height: 260px; overflow: auto;
+  background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  font-family: var(--mono); font-size: 12px; white-space: pre-wrap; color: var(--dim);
+}
+.loop-intro { margin: 0 0 12px; color: var(--dim); line-height: 1.5; }
+input.mono { font-family: var(--mono); }
+
+.type-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.type-pick {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  font-size: 13.5px;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.type-pick:hover { border-color: var(--accent-dim); }
+.type-pick.active { color: var(--text); border-color: var(--accent); background: var(--panel-2); }
+
+/* The pane bar's single launcher. Wider than its glyph so it stays an easy
+   target; the menu itself is what says more than one thing can start. */
+.btn-add {
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+
+/* Tickets (and Diff scope): equal sub-tabs in a shared track. */
+.subtabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 6px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.subtabs button {
+  padding: 4px 11px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tab-text);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+.subtabs button:hover { color: var(--text); background: var(--panel-2); }
+.subtabs button.active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--accent-dim);
+}
+
+.subtabs .badge { margin-left: 6px; font-size: 11px; color: var(--tab-count); font-family: var(--mono); }
+.subtabs button.active .badge { color: var(--accent); }
+
+.browse-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.browse-bar input[type="text"] { flex: 1; min-width: 160px; }
+.browse-bar select { width: auto; }
+
+/* Results are not grouped by epic: what matters is finding one ticket. */
+.found {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+}
+
+/* Work nobody has claimed is the point of looking, so it should catch the eye. */
+.ticket .bottom .free { color: var(--green); }
+.ticket .bottom .age { margin-left: auto; font-family: var(--mono); color: var(--dimmer); }
+
+/* Type toggles, above whichever list is showing. */
+.type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.type-filter .type-pick { padding: 4px 9px; font-size: 12.5px; }
+.type-pick.clear { color: var(--dimmer); }
+.type-pick.clear:hover { color: var(--red); border-color: var(--red); }
+
+/* A ticket whose board status has fallen behind the work: the chip is the fix. */
+.chip.sync { cursor: pointer; font-family: var(--sans); }
+.chip.sync:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+
+/* In progress on the board, with nothing here to work in. */
+.chip.sync.open { color: var(--blue); border-color: var(--blue-line); }
+.chip.sync.open:hover { border-color: var(--blue); }
+
+/* ------------------------------------------------------------------ combo */
+
+.combo { position: relative; display: inline-flex; flex-direction: column; }
+.combo > input { width: 100%; }
+.combo-list {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--shade) 45%, transparent);
+}
+.combo-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.combo-list button.on { background: var(--panel); color: var(--accent); }
+.combo-empty { padding: 6px 8px; font-size: 12px; color: var(--dimmer); }
+
+/*
+  A Jira description, which arrives as text rather than markup: wrapped at the
+  dialog's width, its own line breaks kept, and deliberately not dressed up as
+  something the website rendered.
+*/
+.ticket-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}

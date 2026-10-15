@@ -1,0 +1,36 @@
+{
+  "name": "forge",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db": "docker compose up -d --wait",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "seed": "bun scripts/seed-dev.ts",
+    "seed:dogfood": "bun scripts/seed-dogfood.ts",
+    "runner": "bun scripts/agent-runner/main.ts",
+    "runner:install": "bun scripts/agent-runner/install.ts",
+    "reset-password": "cargo run -q -p forge-server -- reset-password",
+    "backup": "bun scripts/backup.ts",
+    "dev": "bun scripts/dev.ts",
+    "dev:desktop": "bun run --cwd apps/desktop tauri dev",
+    "dev:fake-ai": "bun scripts/dev-fake-ai.ts",
+    "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
+    "app": "docker compose --profile app up -d --build --wait",
+    "app:logs": "docker compose --profile app logs -f forge",
+    "gen:types": "bun scripts/gen-types.ts",
+    "typecheck": "tsc -p apps/web && tsc -p apps/web/tsconfig.test.json && tsc -p packages/sync-client",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "cargo test --workspace && bun test",
+    "check": "bun scripts/check.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "1.4.3",
+    "typescript": "7.0.2"
+  }
+}
