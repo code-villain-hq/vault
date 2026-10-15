@@ -1,14 +1,22 @@
 # Color
 
-This file is the studio palette. It is not chosen yet.
+Ground: night. The studio sits on #0A0B0D.
+Brand: cloak. Deep violet. #5A1470.
+Accent: poison. Chartreuse. #C9E265.
 
-The apps currently use two different ones:
+The cloak is the fill. The poison is the mark — links, focus, edges,
+one accent per screen. It never carries body copy. It never sits on
+the cloak.
 
-| | Background | Accent |
-| --- | --- | --- |
-| Forge | `#f4f4f6` light, `#0c0c0e` dark | `#5b5bd6` light, `#8080f2` dark |
-| Layer and Caster | `#0c0c11` | `#a78bfa`, with `#4ade80` for the mask's eyes |
-
-Forge's tokens are in `apps/forge/apps/web/src/styles.css`. Layer's are in `apps/layer/src/theme.css`. Caster's icon copies Layer's colors in `apps/caster/Resources/AppIcon.svg`.
-
-The shared palette gets written here first. `design/tokens` then carries the numbers, and each app updates its own colors from that. Until then, neither accent is the studio color.
+## Tokens
+| Token        | Value   | Use                                 |
+| ------------ | ------- | ----------------------------------- |
+| night        | #0A0B0D | Every ground. App, site, blog, card.|
+| cloak        | #5A1470 | Primary fill, mark, card edge.      |
+| cloak-hover  | #6B1884 | Hover state for cloak fills.        |
+| poison       | #C9E265 | Links, focus, borders, marks.       |
+| wash         | #1A0D24 | Selected rows, hover backgrounds.   |
+| ink          | #ECECF1 | Body text on night and panel.       |
+| muted        | #9B9BA8 | Secondary text.                     |
+| panel        | #12131A | Cards and raised surfaces.          |
+| line         | #2A2B36 | Hairline borders.                   |

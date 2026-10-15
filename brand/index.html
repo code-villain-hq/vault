@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brand</title>
+  <style>
+    :root {
+      --ink: #ececf1;
+      --paper: #0c0c11;
+      --measure: 66ch;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+      scroll-behavior: smooth;
+      scrollbar-color: var(--ink) var(--paper);
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 1.0625rem;
+      line-height: 1.5;
+      text-rendering: optimizeLegibility;
+    }
+
+    ::selection {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    a {
+      color: inherit;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.22em;
+    }
+
+    a:hover {
+      text-decoration-thickness: 2px;
+    }
+
+    .skip {
+      position: absolute;
+      left: 1rem;
+      top: 0;
+      transform: translateY(-120%);
+      background: var(--paper);
+      padding: 0.5rem 0.75rem;
+    }
+
+    .skip:focus {
+      transform: none;
+    }
+
+    .bar {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem 1.5rem;
+      padding: 0.85rem clamp(1.25rem, 4vw, 3rem);
+      background: var(--paper);
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .home {
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      text-decoration: none;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1.15rem;
+    }
+
+    nav a {
+      padding: 0.35rem 0;
+      text-decoration: none;
+    }
+
+    nav a:hover,
+    nav a[aria-current="true"] {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 0.28em;
+    }
+
+    main {
+      width: min(72rem, 100%);
+      margin: 0 auto;
+      padding: 0 clamp(1.25rem, 4vw, 3rem) 6rem;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.5;
+      text-wrap: balance;
+    }
+
+    h1 {
+      margin: 2.75rem 0 0.85rem;
+      font-size: clamp(2.75rem, 7vw, 4.5rem);
+    }
+
+    h2 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(1.75rem, 3vw, 2.25rem);
+    }
+
+    section {
+      padding-top: 5.5rem;
+      scroll-margin-top: 4.5rem;
+    }
+
+    .lead,
+    .prose,
+    .voice p,
+    .note {
+      max-width: var(--measure);
+    }
+
+    .lead {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    p {
+      margin: 0 0 1rem;
+    }
+
+    .source {
+      margin-top: 1.5rem;
+    }
+
+    .fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem 1.5rem;
+      margin-top: 1.75rem;
+    }
+
+    figure {
+      margin: 0;
+    }
+
+    .swatch {
+      min-height: 38vh;
+      border: 1px solid var(--ink);
+    }
+
+    .option {
+      margin-top: 2.5rem;
+    }
+
+    .option > h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1.15rem;
+    }
+
+    .option > p {
+      margin: 0 0 1.25rem;
+      max-width: var(--measure);
+    }
+
+    .option .fields {
+      margin-top: 0;
+    }
+
+    .trio {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.25rem 1.5rem;
+      margin-top: 0;
+    }
+
+    .compose {
+      display: grid;
+      gap: 0;
+      min-height: 38vh;
+      border: 1px solid var(--ink);
+    }
+
+    .compose-hero {
+      display: grid;
+      place-items: end start;
+      padding: 1.25rem;
+      min-height: 22vh;
+    }
+
+    .compose-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+      align-items: center;
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--ink);
+    }
+
+    .nightshade {
+      --demo-cloak: #5A1470;
+      --demo-lift: #C9E265;
+      --night: #0A0B0D;
+      --cloak: var(--demo-cloak);
+      --cloak-hover: #6B1884;
+      --poison: var(--demo-lift);
+      --wash: #1A0D24;
+      --ink: #ECECF1;
+      --muted: #9B9BA8;
+      --panel: #12131A;
+      --line: #2A2B36;
+      margin-top: 1.75rem;
+      padding: 1.25rem;
+      background: var(--night);
+      color: var(--ink);
+      border: 1px solid var(--ink);
+    }
+
+    .nightshade-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+    }
+
+    .ns-btn {
+      appearance: none;
+      padding: 0.55rem 0.9rem;
+      font: inherit;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+    }
+
+    .ns-btn-primary {
+      background: var(--cloak);
+      color: var(--ink);
+      border: 1px solid var(--poison);
+    }
+
+    .ns-btn-primary:hover {
+      background: var(--cloak-hover);
+    }
+
+    .ns-btn-primary:focus-visible {
+      outline: 2px solid var(--poison);
+      outline-offset: 3px;
+    }
+
+    .ns-btn-ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--cloak);
+    }
+
+    .ns-btn-ghost:hover {
+      background: var(--wash);
+    }
+
+    .ns-link {
+      color: var(--poison);
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 0.22em;
+    }
+
+    .ns-chip {
+      display: inline-block;
+      padding: 0.35rem 0.65rem;
+      color: var(--poison);
+      border: 1px solid var(--cloak);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .ns-card {
+      margin-top: 1.25rem;
+      padding: 1rem 1.1rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--poison);
+      color: var(--ink);
+    }
+
+    .ns-card p {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      max-width: none;
+    }
+
+    .ns-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .ns-pair .swatch {
+      min-height: 22vh;
+      border: 1px solid var(--ink);
+    }
+
+    .token-table code {
+      font-size: 0.92em;
+    }
+
+    #design .layouts {
+      --demo-cloak: #5A1470;
+      --demo-lift: #C9E265;
+    }
+
+    #design .layouts .card {
+      border-left: 3px solid var(--demo-lift);
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 38vh;
+      border: 1px solid var(--ink);
+    }
+
+    .pair > div {
+      display: grid;
+      place-items: end start;
+      padding: 1rem;
+      min-height: 10rem;
+    }
+
+    .pair > div + div {
+      border-left: 1px solid var(--ink);
+    }
+
+    .chip {
+      padding: 0.55rem 0.85rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 0.65rem;
+    }
+
+    figcaption span:last-child {
+      text-align: right;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 1.75rem;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th,
+    td {
+      padding: 0.85rem 1rem 0.85rem 0;
+      border-bottom: 1px solid var(--ink);
+      font-weight: 400;
+      line-height: 1.5;
+      vertical-align: baseline;
+    }
+
+    thead th {
+      font-weight: 700;
+      padding-top: 0;
+    }
+
+    tbody th {
+      font-weight: 700;
+    }
+
+    .voice .say {
+      max-width: 22em;
+      margin: 0 0 1.5rem;
+      font-size: clamp(1.65rem, 3vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
+
+    .short {
+      max-width: 16em;
+      margin: 1.75rem 0;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    #mark figure {
+      max-width: 36rem;
+    }
+
+    .clear {
+      margin-top: 1.75rem;
+      padding: clamp(1.25rem, 3vw, 2.5rem);
+      border: 1px solid var(--ink);
+    }
+
+    .clear-label {
+      margin: 0 0 clamp(1rem, 2vw, 1.75rem);
+    }
+
+    .slot {
+      display: grid;
+      place-items: center;
+      min-height: 18rem;
+      padding: 1.5rem;
+      border: 1px solid var(--ink);
+      text-align: center;
+    }
+
+    .slot p {
+      max-width: 11em;
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
+
+    .handoff {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 2.5rem 3rem;
+      margin-top: 1.75rem;
+    }
+
+    .handoff h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.15rem;
+    }
+
+    .layouts {
+      display: grid;
+      grid-template-columns: 1.45fr 0.62fr 0.9fr;
+      gap: 1rem 1.25rem;
+      align-items: end;
+      margin-top: 1.25rem;
+    }
+
+    .frame {
+      border: 1px solid var(--ink);
+    }
+
+    .window {
+      min-height: 11rem;
+    }
+
+    .window .split {
+      height: 1.75rem;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .post {
+      min-height: 16rem;
+    }
+
+    .card {
+      aspect-ratio: 1;
+    }
+
+    .layouts figcaption {
+      display: block;
+    }
+
+    .close {
+      max-width: var(--measure);
+      margin-top: 4.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--ink);
+    }
+
+    @media (max-width: 800px) {
+      .fields,
+      .trio,
+      .ns-pair,
+      .handoff,
+      .layouts {
+        grid-template-columns: 1fr;
+      }
+
+      .swatch {
+        min-height: 28vh;
+      }
+
+      .card {
+        max-width: 16rem;
+      }
+
+      table,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+      }
+
+      thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+
+      tr {
+        padding: 0.85rem 0;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      th,
+      td {
+        border: 0;
+        padding: 0;
+      }
+
+      td + td {
+        display: none;
+      }
+
+      td::before {
+        content: "Face and sizes: ";
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#color">Skip to color</a>
+  <header class="bar">
+    <a class="home" href="#top">Brand</a>
+    <nav aria-label="Brand">
+      <a href="#color">Color</a>
+      <a href="#type">Type</a>
+      <a href="#voice">Voice</a>
+      <a href="#mark">Mark</a>
+      <a href="#design">Design</a>
+    </nav>
+  </header>
+  <main id="top">
+    <h1>Brand</h1>
+    <p class="lead">Decisions about how Villain looks and sounds. The apps, the site, the blog, and social posts follow these.</p>
+
+    <section id="color">
+      <h2>Color</h2>
+      <p class="prose">Nightshade. Ground is night. The cloak is the fill. The poison is the mark — links, focus, edges, one accent per screen. It never carries body copy. It never sits on the cloak. Written in <a href="color.md">color.md</a>. Numbers in <a href="design/tokens/">brand/design/tokens</a>.</p>
+
+      <div class="option">
+        <h3>Nightshade</h3>
+        <p>The final pair on night.</p>
+        <div class="nightshade" aria-label="Nightshade pair on night">
+          <div class="nightshade-actions">
+            <button type="button" class="ns-btn ns-btn-primary">Cast</button>
+            <button type="button" class="ns-btn ns-btn-ghost">Ghost</button>
+            <a class="ns-link" href="#color">Open the vault</a>
+            <span class="ns-chip">V0.4</span>
+          </div>
+          <div class="ns-card">
+            <strong>Panel card</strong>
+            <p>Ink on panel for body. Muted for secondary. Poison only on the 3px edge.</p>
+          </div>
+          <div class="ns-pair">
+            <figure>
+              <div class="swatch" style="background:#5A1470"></div>
+              <figcaption>
+                <span>Cloak #5A1470 · Poison #C9E265</span>
+              </figcaption>
+            </figure>
+            <figure>
+              <div class="swatch" style="background:#C9E265"></div>
+              <figcaption>
+                <span>Cloak #5A1470 · Poison #C9E265</span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </div>
+
+      <div class="option">
+        <h3>Tokens</h3>
+        <table class="token-table">
+          <thead>
+            <tr>
+              <th scope="col">Token</th>
+              <th scope="col">Value</th>
+              <th scope="col">Use</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">night</th>
+              <td><code>#0A0B0D</code></td>
+              <td>Every ground. App, site, blog, card.</td>
+            </tr>
+            <tr>
+              <th scope="row">cloak</th>
+              <td><code>#5A1470</code></td>
+              <td>Primary fill, mark, card edge.</td>
+            </tr>
+            <tr>
+              <th scope="row">cloak-hover</th>
+              <td><code>#6B1884</code></td>
+              <td>Hover state for cloak fills.</td>
+            </tr>
+            <tr>
+              <th scope="row">poison</th>
+              <td><code>#C9E265</code></td>
+              <td>Links, focus, borders, marks.</td>
+            </tr>
+            <tr>
+              <th scope="row">wash</th>
+              <td><code>#1A0D24</code></td>
+              <td>Selected rows, hover backgrounds.</td>
+            </tr>
+            <tr>
+              <th scope="row">ink</th>
+              <td><code>#ECECF1</code></td>
+              <td>Body text on night and panel.</td>
+            </tr>
+            <tr>
+              <th scope="row">muted</th>
+              <td><code>#9B9BA8</code></td>
+              <td>Secondary text.</td>
+            </tr>
+            <tr>
+              <th scope="row">panel</th>
+              <td><code>#12131A</code></td>
+              <td>Cards and raised surfaces.</td>
+            </tr>
+            <tr>
+              <th scope="row">line</th>
+              <td><code>#2A2B36</code></td>
+              <td>Hairline borders.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <section id="type">
+      <h2>Type</h2>
+      <p class="prose">Type is not chosen yet. When it is, <a href="type.md">type.md</a> names the faces, the sizes, and where they are used. <a href="../design/tokens/">design/tokens</a> carries the sizes. One scale, including where a web font file cannot be shared.</p>
+      <p class="note">The letters on this page are the browser’s. They are not a face that was chosen.</p>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Where</th>
+            <th scope="col">Face</th>
+            <th scope="col">Sizes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Product UI</th>
+            <td>Not chosen</td>
+            <td>Not chosen</td>
+          </tr>
+          <tr>
+            <th scope="row">The site</th>
+            <td>Not chosen</td>
+            <td>Not chosen</td>
+          </tr>
+          <tr>
+            <th scope="row">A blog post</th>
+            <td>Not chosen</td>
+            <td>Not chosen</td>
+          </tr>
+          <tr>
+            <th scope="row">A social card</th>
+            <td>Not chosen</td>
+            <td>Not chosen</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="voice">
+      <h2>Voice</h2>
+      <div class="voice">
+        <p class="say">Villain sounds like someone building in public because they enjoy it — with the posture of a golden-age comic villain.</p>
+        <p>Doctor Doom is the reference: theatrical, precise, a little too sure of himself, and clearly having fun with the armor. Write about what got built and how it felt to build it. A reader who has never heard of Villain Studios should see the thing, and see that making it was fun. That record is also how the growth shows: from interface work to shipping whole products with AI. The work carries that. The job title does not need to be announced. Product engineer is a current name for the role, and the name can change.</p>
+        <p>Speak with confidence, not cruelty. Boast a little when the work earned it. Prefer short declarations over soft hedging. The villainy is costume and tone — never mean, never corporate-evil. The cloak is purple; the smile is real.</p>
+        <p>The same voice covers the interface, the blog, and social posts. A button and a post can sound like the same person.</p>
+        <p class="short">Keep a short surface short.</p>
+        <p>The rules live in <a href="voice.md">voice.md</a>. The pieces live in <a href="../content/blog/">content/blog</a> and <a href="../content/social/">content/social</a>.</p>
+      </div>
+    </section>
+
+    <section id="mark">
+      <h2>Mark</h2>
+      <p class="prose">The studio mark is not drawn yet. It will be the logo, the base for app icons, and the clear space around them. An icon for the site, a social card, or a blog header starts from <a href="mark/">the mark folder</a>.</p>
+      <figure>
+        <div class="clear">
+          <p class="clear-label">Clear space</p>
+          <div class="slot">
+            <p>The studio mark will live here.</p>
+          </div>
+        </div>
+        <figcaption>
+          <span>Logo</span>
+          <span>Not drawn</span>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section id="design">
+      <h2>Design</h2>
+      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade — cloak and poison. The pictures are not drawn yet. Each one will show the hierarchy, the spacing, and the type from here.</p>
+      <div class="handoff">
+        <div>
+          <h3>Tokens</h3>
+          <p>Nightshade color tokens live as CSS, Swift, and JSON. Type and space still empty.</p>
+          <p class="source"><a href="design/tokens/">brand/design/tokens</a></p>
+        </div>
+        <div>
+          <h3>Layouts</h3>
+          <p>Surfaces that should feel related. The implementation stays in the app or the site.</p>
+          <div class="layouts" style="--demo-cloak:#5A1470;--demo-lift:#C9E265">
+            <figure>
+              <div class="frame window" aria-hidden="true"><div class="split"></div></div>
+              <figcaption>A window</figcaption>
+            </figure>
+            <figure>
+              <div class="frame post" aria-hidden="true"></div>
+              <figcaption>A blog post</figcaption>
+            </figure>
+            <figure>
+              <div class="frame card" aria-hidden="true"></div>
+              <figcaption>A social card</figcaption>
+            </figure>
+          </div>
+          <p class="source"><a href="../design/layouts/">design/layouts</a></p>
+        </div>
+      </div>
+    </section>
+
+    <p class="close">A product can still have its own UI theme. Studio surfaces use what is written here.</p>
+  </main>
+  <script>
+    const links = [...document.querySelectorAll("nav a")];
+    const sections = links
+      .map((link) => document.querySelector(link.getAttribute("href")))
+      .filter(Boolean);
+
+    const markCurrent = (id) => {
+      for (const link of links) {
+        if (link.getAttribute("href") === "#" + id) link.setAttribute("aria-current", "true");
+        else link.removeAttribute("aria-current");
+      }
+    };
+
+    const place = () => {
+      const line = document.querySelector(".bar").offsetHeight + 8;
+      let current = sections[0];
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= line) current = section;
+      }
+      markCurrent(current.id);
+    };
+
+    place();
+    document.addEventListener("scroll", place, { passive: true });
+  </script>
+</body>
+</html>
