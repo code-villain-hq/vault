@@ -498,6 +498,51 @@
       max-width: 36rem;
     }
 
+    .mark-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: 1rem;
+      margin-top: 1.75rem;
+    }
+
+    .mark-grid figure {
+      margin: 0;
+      padding: 1.5rem;
+      background: var(--panel);
+      border-radius: var(--radius-lg);
+    }
+
+    .mark-hero {
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 1rem;
+    }
+
+    .mark-side {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .mark-sizes div {
+      display: flex;
+      align-items: flex-end;
+      gap: 1.25rem;
+    }
+
+    .logo-night,
+    .logo-day {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+    }
+
+    .logo-night { background: var(--night); }
+    .logo-day { background: #FFFFFF; }
+
+    .mark-grid figcaption {
+      width: 100%;
+    }
+
     .clear {
       margin-top: 1.75rem;
       padding: clamp(1.25rem, 3vw, 2.5rem);
@@ -613,6 +658,7 @@
         padding-left: 1rem;
       }
 
+      .mark-grid,
       .ns-pair,
       .handoff,
       .layouts {
@@ -925,19 +971,28 @@
 
     <section id="mark">
       <h2>Mark</h2>
-      <p class="prose">The studio mark is not drawn yet. It will be the logo, the base for app icons, and the clear space around them. An icon for the site, a social card, or a blog header starts from <a href="mark/">the mark folder</a>.</p>
-      <figure>
-        <div class="clear">
-          <p class="clear-label">Clear space</p>
-          <div class="slot">
-            <p>The studio mark will live here.</p>
-          </div>
+      <p class="prose">The strike. A gothic V with a poison bar behind it, cut where the letter crosses: the homepage’s strike, made into a mark. It is the surface’s one brand moment. App icons are each app’s initial built the same way. Written in <a href="mark/">the mark folder</a>.</p>
+      <div class="mark-grid">
+        <figure class="mark-hero">
+          <svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Villain Studios mark at 200px"><defs><mask id="m-hero"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-hero)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg>
+          <figcaption><span>The mark</span><span>Tile, favicon, app icon shape</span></figcaption>
+        </figure>
+        <div class="mark-side">
+          <figure class="mark-sizes">
+            <div><svg viewBox="0 0 200 200" width="64" height="64" role="img" aria-label="Villain Studios mark at 64px"><defs><mask id="m-64"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-64)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg><svg viewBox="0 0 200 200" width="32" height="32" role="img" aria-label="Villain Studios mark at 32px"><defs><mask id="m-32"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-32)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg><svg viewBox="0 0 200 200" width="16" height="16" role="img" aria-label="Villain Studios mark at 16px"><defs><mask id="m-16"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-16)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg></div>
+            <figcaption><span>64, 32, 16</span><span>Works down to 16px</span></figcaption>
+          </figure>
+          <figure class="mark-logo">
+            <div class="logo-night"><svg viewBox="0 0 300 108" width="270" height="97" role="img" aria-label="Villain Studios logo"><defs><mask id="l-night"><rect width="300" height="108" fill="#fff"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round">Villain</text></mask></defs><rect y="41" width="300" height="8" fill="#C9E265" mask="url(#l-night)"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#ECECF1">Villain</text><text x="14" y="96" font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="600" font-size="13" letter-spacing="4.2" fill="#9B9BA8">STUDIOS</text></svg></div>
+            <figcaption><span>Logo on night</span><span>At least 96px wide</span></figcaption>
+          </figure>
+          <figure class="mark-logo">
+            <div class="logo-day"><svg viewBox="0 0 300 108" width="270" height="97" role="img" aria-label="Villain Studios logo"><defs><mask id="l-day"><rect width="300" height="108" fill="#fff"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round">Villain</text></mask></defs><rect y="41" width="300" height="8" fill="#4C6A00" mask="url(#l-day)"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#18181C">Villain</text><text x="14" y="96" font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="600" font-size="13" letter-spacing="4.2" fill="#55555D">STUDIOS</text></svg></div>
+            <figcaption><span>Logo on day</span><span>Deep poison</span></figcaption>
+          </figure>
         </div>
-        <figcaption>
-          <span>Logo</span>
-          <span>Not drawn</span>
-        </figcaption>
-      </figure>
+      </div>
+      <p class="note">Clear space: a quarter of the mark’s height on every side. Never recolour the bar, move it, tilt it, or put it over the letter.</p>
     </section>
 
     <section id="design">

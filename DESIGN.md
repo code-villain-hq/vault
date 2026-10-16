@@ -129,6 +129,8 @@ Grey does most of the work. Cloak (violet) is the brand, held to the strength of
 - One quiet primary per screen; everything else steps back.
 - Poison only for focus, one brand moment per surface, and live dots.
 
+**The mark** is the strike: a gothic V with a poison bar behind it, low and heavy, cut by the letter (`brand/mark/`). It is the surface's one brand moment; app icons are each app's initial built the same way.
+
 Principles: `design/principles.md`. Components: `design/components.md`.
 
 ## Colors

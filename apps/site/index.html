@@ -56,15 +56,22 @@
       max-width: 100%;
     }
 
-    /* The poison strike runs through the first line and off both edges. */
-    .splash .struck { position: relative; }
+    /* The strike, as in brand/mark: behind the first line, low and heavy, cut by the letters, off both edges. */
+    .splash .struck {
+      position: relative;
+      isolation: isolate;
+      -webkit-text-stroke: 0.07em var(--bg);
+      paint-order: stroke fill;
+    }
     .splash .struck::after {
       content: "";
       position: absolute;
+      z-index: -1;
       left: -100vw;
       width: 300vw;
-      top: 54%;
-      height: clamp(5px, 0.7vw, 10px);
+      top: 65%;
+      height: 0.11em;
+      transform: translateY(-50%);
       background: var(--poison);
       pointer-events: none;
     }

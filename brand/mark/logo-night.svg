@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 108" role="img" aria-label="Villain Studios">
+  <title>Villain Studios</title>
+  <defs>
+    <mask id="cut">
+      <rect width="300" height="108" fill="#fff"/>
+      <text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round">Villain</text>
+    </mask>
+  </defs>
+  <rect y="41" width="300" height="8" fill="#C9E265" mask="url(#cut)"/>
+  <text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#ECECF1">Villain</text>
+  <text x="14" y="96" font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="600" font-size="13" letter-spacing="4.2" fill="#9B9BA8">STUDIOS</text>
+</svg>
