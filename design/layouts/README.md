@@ -7,5 +7,5 @@ Each one shows the hierarchy, the spacing, and the type from `brand/`, so a new 
 | Layout | State |
 | --- | --- |
 | [`app-window.md`](app-window.md) | Written. The frame Forge and Layer share. |
-| A blog post | Not drawn yet. |
+| [`blog-post.md`](blog-post.md) | Written. The blog index and post page. |
 | A social card | Not drawn yet. |

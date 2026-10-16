@@ -29,7 +29,7 @@ A one-person studio that ships real tools while narrating the build in public �
 
 - Brand decisions start in `brand/` (color, type, mark, voice); `design/` carries numbers and layouts; apps catch up in their own toolkits.
 - Studio surfaces follow `brand/` and stay night. Nightshade is every app's default, night and day; a theme picker like Layer's can add themes on the same colour names.
-- Content lives in `content/blog` and `content/social`; the site will publish the blog (not built yet).
+- Content lives in `content/blog` and `content/social`; the site shows the blog; post pages are hand-written until there is a build step.
 - Agents read `AGENTS.md` at the vault root and each app’s `AGENTS.md` before working there.
 - Role label in public writing: product engineer (current name; may change). The work carries the story, not the title.
 
@@ -40,7 +40,7 @@ A one-person studio that ships real tools while narrating the build in public �
 - Forge — AI-first issue tracker (web + desktop shell).
 - Villain Layer — agent development environment for macOS.
 - Villain Caster — launcher for macOS.
-- Site — the homepage; publishing the blog from `content/blog` is not built yet.
+- Site — the homepage and the blog (index and post pages, hand-written for now).
 
 **Company-wide design**
 
@@ -49,7 +49,8 @@ A one-person studio that ships real tools while narrating the build in public �
 
 **Undecided**
 
-- Layouts for a blog post and a social card (`design/layouts/`).
+- A layout for the social card (`design/layouts/`).
+- How the site builds post pages from `content/blog`.
 - A spacing scale (`design/tokens/`).
 
 ## Brand Commitments
