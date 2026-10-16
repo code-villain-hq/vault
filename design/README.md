@@ -7,5 +7,6 @@ Caster is AppKit. Forge, Layer, and the site are web. Each one builds its screen
 | | |
 | --- | --- |
 | [`principles.md`](principles.md) | How a screen is designed, and why |
-| [`tokens/`](tokens) | The numbers: color, type, space |
+| [`components.md`](components.md) | Button, field, link, pill, chip, row |
+| [`tokens/`](tokens) | The numbers: color, type, shape |
 | [`layouts/`](layouts) | Reference layouts: a window, a post, a social card |

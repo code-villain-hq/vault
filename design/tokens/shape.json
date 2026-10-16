@@ -1,0 +1,9 @@
+{
+  "radius": {
+    "sm": 4,
+    "md": 6,
+    "lg": 10,
+    "full": 999
+  },
+  "units": { "radius": "px" }
+}
