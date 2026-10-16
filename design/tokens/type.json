@@ -3,38 +3,51 @@
     "display": {
       "family": "Grenze Gotisch",
       "fallback": "ui-serif, Georgia, serif",
-      "weights": [700, 800],
+      "weights": [
+        700,
+        800
+      ],
       "license": "OFL-1.1",
       "source": "https://fonts.google.com/specimen/Grenze+Gotisch"
     },
     "reading": {
       "family": "Atkinson Hyperlegible Next",
       "fallback": "ui-sans-serif, system-ui, sans-serif",
-      "weights": [400, 700],
-      "italic": [400],
+      "weights": [
+        400,
+        600,
+        700
+      ],
+      "italic": [
+        400
+      ],
       "license": "OFL-1.1",
       "source": "https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next"
     },
     "mono": {
       "family": "Atkinson Hyperlegible Mono",
       "fallback": "ui-monospace, Menlo, monospace",
-      "weights": [400],
+      "weights": [
+        400
+      ],
       "license": "OFL-1.1",
       "source": "https://fonts.google.com/specimen/Atkinson+Hyperlegible+Mono"
     }
   },
   "roles": {
-    "splash":   { "face": "display", "weight": 800, "size": { "min": 72, "fluid": "14.5vw", "max": 184 }, "lineHeight": 0.95, "tracking": 0 },
-    "display":  { "face": "display", "weight": 700, "size": { "min": 36, "fluid": "6vw", "max": 56 }, "lineHeight": 1.1, "tracking": 0 },
-    "headline": { "face": "display", "weight": 700, "size": { "min": 28, "fluid": "3.4vw", "max": 34 }, "lineHeight": 1.18, "tracking": 0 },
-    "title":    { "face": "reading", "weight": 700, "size": 21, "lineHeight": 1.25, "tracking": 0 },
-    "label":    { "face": "reading", "weight": 700, "size": 15, "lineHeight": 1.2, "tracking": 0.01 },
-    "body":     { "face": "reading", "weight": 400, "size": 17, "lineHeight": 1.6, "tracking": 0, "measure": "66ch" },
-    "small":    { "face": "reading", "weight": 400, "size": 14, "lineHeight": 1.5, "tracking": 0 },
-    "code":     { "face": "mono", "weight": 400, "size": 14, "lineHeight": 1.6, "tracking": 0 }
+    "splash":   {"face": "display", "weight": 800, "size": {"min": 72, "fluid": "14.5vw", "max": 184}, "lineHeight": 0.95, "tracking": 0},
+    "display":  {"face": "display", "weight": 700, "size": {"min": 36, "fluid": "6vw", "max": 56}, "lineHeight": 1.1, "tracking": 0},
+    "headline": {"face": "display", "weight": 700, "size": {"min": 28, "fluid": "3.4vw", "max": 34}, "lineHeight": 1.18, "tracking": 0},
+    "title":    {"face": "reading", "weight": 700, "size": 21, "lineHeight": 1.25, "tracking": 0},
+    "label":    {"face": "reading", "weight": 700, "size": 15, "lineHeight": 1.2, "tracking": 0.01},
+    "body":     {"face": "reading", "weight": 400, "size": 17, "lineHeight": 1.6, "tracking": 0, "measure": "66ch"},
+    "small":    {"face": "reading", "weight": 400, "size": 14, "lineHeight": 1.5, "tracking": 0},
+    "code":     {"face": "mono", "weight": 400, "size": 14, "lineHeight": 1.6, "tracking": 0},
+    "ui":       {"face": "reading", "weight": 400, "size": 14, "lineHeight": 1.45, "tracking": 0},
+    "ui-small": {"face": "reading", "weight": 400, "size": 13, "lineHeight": 1.4, "tracking": 0},
+    "control":  {"face": "reading", "weight": 600, "size": 13, "lineHeight": 1, "tracking": 0},
+    "ui-code":  {"face": "mono", "weight": 400, "size": 13, "lineHeight": 1.6, "tracking": 0}
   },
-  "units": {
-    "size": "px; fluid sizes clamp between min and max",
-    "tracking": "em"
-  }
+  "groups": {"studio": ["splash", "display", "headline", "title", "label", "body", "small", "code"], "interface": ["title", "ui", "ui-small", "control", "ui-code"]},
+  "units": {"size": "px; fluid sizes clamp between min and max", "tracking": "em"}
 }

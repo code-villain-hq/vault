@@ -63,6 +63,21 @@ typography:
     fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.6
+  ui:
+    fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: 1.45
+  ui-small:
+    fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: 1.4
+  control:
+    fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 600
+    lineHeight: 1
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -135,7 +150,9 @@ Shared names, filled for night and day (full table in `brand/color.md`, numbers 
 ## Typography
 
 **Display Font:** Grenze Gotisch (700, 800). Splash, page titles, section titles.
-**Body Font:** Atkinson Hyperlegible Next (400–700, italic 400). Reading text, labels, buttons, nav, card titles.
+**Body Font:** Atkinson Hyperlegible Next (400, 600, 700, italic 400). Reading text, labels, buttons, nav, card titles.
+
+Studio roles (splash to code) serve the site, blog and social cards. Interface roles serve app windows: `title` 21px, `ui` 14px, `ui-small` 13px, `control` 13px/600 for buttons and chips.
 **Mono Font:** Atkinson Hyperlegible Mono (400). Code and terminal text.
 
 The gothic is the costume; Atkinson is the person inside it. Source: `brand/type.md`.
@@ -149,7 +166,7 @@ The gothic is the costume; Atkinson is the person inside it. Source: `brand/type
 
 ## Layout
 
-Apps share one frame: sidebar and top bar on `bg`, dimmed; content rises one step onto a rounded `panel`. Prose keeps a 66ch measure. No space scale is published yet; use rem rhythm consistently.
+Apps share one frame: sidebar and top bar on `bg`, dimmed; content rises one step onto a rounded `panel` (`design/layouts/app-window.md`). Prose keeps a 66ch measure. No space scale is published yet; use rem rhythm consistently.
 
 ## Elevation & Depth
 
@@ -161,7 +178,7 @@ Flat. Depth is tone: bg → panel → surface. No shadows, no borders to lift a 
 
 ## Components
 
-- **Button**: 28px, 13px semibold, no border. Primary: `primary` fill, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring.
+- **Button**: 28px, `control` role, no border. Primary: `primary` fill, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring.
 - **Field**: `surface` fill, no border; focus draws one accent ring on the edge.
 - **Status pill**: round; status colour as text and dot on a 13% tint.
 - **Chip**: round; muted text on `fg` at 7%.

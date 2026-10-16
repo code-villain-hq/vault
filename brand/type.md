@@ -14,11 +14,11 @@ them, and Caster bundles them.
 
 ## Faces
 
-| Face                       | Weights  | Use                                       |
-| -------------------------- | -------- | ----------------------------------------- |
-| Grenze Gotisch             | 700, 800 | Splash, page titles, section titles.      |
-| Atkinson Hyperlegible Next | 400, 700 | Body, labels, buttons, card titles, meta. |
-| Atkinson Hyperlegible Mono | 400      | Code and terminal text.                   |
+| Face                       | Weights       | Use                                       |
+| -------------------------- | ------------- | ----------------------------------------- |
+| Grenze Gotisch             | 700, 800      | Splash, page titles, section titles.      |
+| Atkinson Hyperlegible Next | 400, 600, 700 | Body, labels, buttons, card titles, meta. |
+| Atkinson Hyperlegible Mono | 400           | Code and terminal text.                   |
 
 ## Rules
 
@@ -26,20 +26,38 @@ them, and Caster bundles them.
 - Grenze is never set in capitals. Blackletter capitals in a row turn unreadable.
 - 800 belongs to the splash alone: the stacked Villain Studios lettering, a social card headline. One per surface.
 - Titles are sentence case.
-- Atkinson italic carries emphasis in prose. Atkinson 700 carries strong emphasis.
+- Atkinson italic carries emphasis in prose. Atkinson 700 carries strong emphasis. 600 is for controls.
 
 ## Roles
 
-| Role     | Face     | Weight | Size     | Leading | Use                         |
-| -------- | -------- | ------ | -------- | ------- | --------------------------- |
-| splash   | Grenze   | 800    | 72–184px | 0.95    | Cover lettering.            |
-| display  | Grenze   | 700    | 36–56px  | 1.1     | Page and post titles.       |
-| headline | Grenze   | 700    | 28–34px  | 1.18    | Section titles.             |
-| title    | Atkinson | 700    | 21px     | 1.25    | Card titles, product names. |
-| label    | Atkinson | 700    | 15px     | 1.2     | Buttons, chips, nav.        |
-| body     | Atkinson | 400    | 17px     | 1.6     | Reading text. 66ch measure. |
-| small    | Atkinson | 400    | 14px     | 1.5     | Captions, dates, meta.      |
-| code     | Mono     | 400    | 14px     | 1.6     | Code blocks, terminal text. |
+Studio surfaces (the site, the blog, social cards) read at a larger
+size. App windows are denser and use the interface roles.
 
-Ranges grow with the window. In an app window, use the largest size.
-The numbers live in [`design/tokens/type.json`](../design/tokens/type.json).
+### Studio
+
+| Role     | Face     | Weight | Size     | Leading | Use                          |
+| -------- | -------- | ------ | -------- | ------- | ---------------------------- |
+| splash   | Grenze   | 800    | 72–184px | 0.95    | Cover lettering.             |
+| display  | Grenze   | 700    | 36–56px  | 1.1     | Page and post titles.        |
+| headline | Grenze   | 700    | 28–34px  | 1.18    | Section titles.              |
+| title    | Atkinson | 700    | 21px     | 1.25    | Card titles, product names.  |
+| label    | Atkinson | 700    | 15px     | 1.2     | Site buttons and nav.        |
+| body     | Atkinson | 400    | 17px     | 1.6     | Reading text. 66ch measure.  |
+| small    | Atkinson | 400    | 14px     | 1.5     | Captions, dates, meta.       |
+| code     | Mono     | 400    | 14px     | 1.6     | Code blocks, terminal text.  |
+
+### Interface
+
+| Role     | Face     | Weight | Size | Leading | Use                                  |
+| -------- | -------- | ------ | ---- | ------- | ------------------------------------ |
+| title    | Atkinson | 700    | 21px | 1.25    | View and issue titles.               |
+| ui       | Atkinson | 400    | 14px | 1.45    | Rows, nav, descriptions, fields.     |
+| ui-small | Atkinson | 400    | 13px | 1.4     | Meta, ids, counts, captions.         |
+| control  | Atkinson | 600    | 13px | 1       | Buttons, chips. Status pills at 700. |
+| ui-code  | Mono     | 400    | 13px | 1.6     | Code, terminal, ids in mono.         |
+
+Grenze appears in an app only at 28px and up: the app's name in the
+sidebar, an empty state's headline.
+
+Studio ranges grow with the window. The numbers live in
+[`design/tokens/type.json`](../design/tokens/type.json).

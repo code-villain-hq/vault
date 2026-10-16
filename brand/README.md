@@ -10,4 +10,4 @@ Decisions about how Villain looks and sounds. The apps, the site, the blog, and 
 | [`mark/`](mark) | The studio mark |
 | [`index.html`](index.html) | The same decisions, drawn for looking |
 
-A product can still have its own UI theme. Layer's theme picker is that. Studio surfaces use what is written here.
+Nightshade is the default in every app, in night and in day. An app's theme picker, like Layer's, can offer more themes; they fill the same colour names. Studio surfaces stay Nightshade night.

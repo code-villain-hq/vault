@@ -8,7 +8,7 @@ The numbers taken from `brand/`: color, type, shape.
 | Type | [`brand/type.md`](../../brand/type.md) | [`type.json`](type.json), [`type.css`](type.css), [`type.swift`](type.swift) |
 | Shape (corner radius) | [`components.md`](../components.md) | [`shape.json`](shape.json), [`shape.css`](shape.css), [`shape.swift`](shape.swift) |
 
-The JSON is the source. Edit it, then run `python3 build.py` here to regenerate the color and shape CSS and Swift. Type's CSS and Swift are still written by hand.
+The JSON is the source. Edit it, then run `python3 build.py` here to regenerate every CSS and Swift file. Don't edit the generated files.
 
 In CSS, night is the default. An app's light mode sets `data-theme="day"` on its root. Studio surfaces stay night.
 

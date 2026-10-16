@@ -6,7 +6,7 @@
   <title>Brand — Villain Studios</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800&family=Atkinson+Hyperlegible+Next:ital,wght@0,400..700;1,400&family=Atkinson+Hyperlegible+Mono&display=swap">
   <link rel="stylesheet" href="../design/tokens/color.css">
   <link rel="stylesheet" href="../design/tokens/type.css">
   <link rel="stylesheet" href="../design/tokens/shape.css">
@@ -466,6 +466,10 @@
     .t-body { font-size: var(--type-body-size); }
     .t-small { font-size: var(--type-small-size); color: var(--muted); }
     .t-code { font-size: var(--type-code-size); }
+    .t-ui { font-size: var(--type-ui-size); }
+    .t-ui-small { font-size: var(--type-ui-small-size); color: var(--muted); }
+    .t-control { font-size: var(--type-control-size); font-weight: var(--type-control-weight); }
+    .t-ui-code { font-size: var(--type-ui-code-size); }
 
     .type-table td:last-child {
       color: var(--muted);
@@ -862,7 +866,7 @@
         </figure>
         <figure class="face">
           <p class="face-sample face-reading">Ships real tools. Narrates the build.</p>
-          <figcaption><span>Atkinson Hyperlegible Next</span><span>400 · 700 · italic</span></figcaption>
+          <figcaption><span>Atkinson Hyperlegible Next</span><span>400 · 600 · 700 · italic</span></figcaption>
         </figure>
         <figure class="face">
           <p class="face-sample face-mono">$ forge pickup</p>
@@ -881,13 +885,29 @@
           <tr><th scope="row">display</th><td><span class="t-display">Forge files its own tickets</span></td><td>Grenze 700 · 36–56px</td></tr>
           <tr><th scope="row">headline</th><td><span class="t-headline">Why build it this way</span></td><td>Grenze 700 · 28–34px</td></tr>
           <tr><th scope="row">title</th><td><span class="t-title">Villain Layer</span></td><td>Atkinson 700 · 21px</td></tr>
-          <tr><th scope="row">label</th><td><span class="t-label">Read the build.</span></td><td>Atkinson 700 · 15px</td></tr>
+          <tr><th scope="row">label</th><td><span class="t-label">Read the build.</span></td><td>Atkinson 700 · 15px · site buttons</td></tr>
           <tr><th scope="row">body</th><td><span class="t-body">A tool that cannot run its own project has no business running yours.</span></td><td>Atkinson 400 · 17px</td></tr>
           <tr><th scope="row">small</th><td><span class="t-small">Build log · Forge · 4 min read</span></td><td>Atkinson 400 · 14px</td></tr>
           <tr><th scope="row">code</th><td><code class="t-code">git commit -m "Lock the studio type."</code></td><td>Mono 400 · 14px</td></tr>
         </tbody>
       </table>
-      <p class="note">The splash runs 72–184px in Grenze 800, once per surface. The homepage shows it.</p>
+      <table class="type-table">
+        <thead>
+          <tr>
+            <th scope="col">Interface</th>
+            <th scope="col">Sample</th>
+            <th scope="col">Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">title</th><td><span class="t-title">Share tokens across the site and apps</span></td><td>Atkinson 700 · 21px</td></tr>
+          <tr><th scope="row">ui</th><td><span class="t-ui">Drift audit: specs against code</span></td><td>Atkinson 400 · 14px</td></tr>
+          <tr><th scope="row">ui-small</th><td><span class="t-ui-small">FOR-61 · opened by Villain</span></td><td>Atkinson 400 · 13px</td></tr>
+          <tr><th scope="row">control</th><td><span class="t-control">Start work</span></td><td>Atkinson 600 · 13px</td></tr>
+          <tr><th scope="row">ui-code</th><td><code class="t-ui-code">forge pickup FOR-61</code></td><td>Mono 400 · 13px</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Studio roles serve the site, the blog, and social cards; interface roles serve app windows. The splash runs 72–184px in Grenze 800, once per surface. The homepage shows it.</p>
     </section>
 
     <section id="voice">
@@ -922,7 +942,7 @@
 
     <section id="design">
       <h2>Design</h2>
-      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade, night and day. Principles and components are written down. Type is Grenze Gotisch and Atkinson Hyperlegible. The pictures are not drawn yet. Each one will show the hierarchy, the spacing, and the type from here.</p>
+      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade, night and day. Principles, components, and the app window are written down. Type is Grenze Gotisch and Atkinson Hyperlegible. The blog post and social card layouts are not drawn yet.</p>
       <div class="handoff">
         <div>
           <h3>Tokens</h3>
@@ -931,7 +951,7 @@
         </div>
         <div>
           <h3>Layouts</h3>
-          <p>Surfaces that should feel related. The implementation stays in the app or the site.</p>
+          <p>Surfaces that should feel related. The app window is written; the post and the social card are next. The implementation stays in the app or the site.</p>
           <div class="layouts">
             <figure>
               <div class="frame window" aria-hidden="true"><div class="split"></div></div>
@@ -951,7 +971,7 @@
       </div>
     </section>
 
-    <p class="close">A product can still have its own UI theme. Studio surfaces use what is written here.</p>
+    <p class="close">Nightshade is every app’s default, night and day. A theme picker can add themes on the same names. Studio surfaces stay night.</p>
   </main>
   <script>
     const links = [...document.querySelectorAll("nav a")];

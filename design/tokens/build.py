@@ -1,8 +1,7 @@
-"""Regenerate color.css/.swift and shape.css/.swift from their JSON.
+"""Regenerate the CSS and Swift for color, type, and shape from their JSON.
 
 Run from this folder: python3 build.py
 A stopgap until @villain/tokens builds these with Style Dictionary.
-type.css and type.swift are still written by hand.
 """
 import json
 import re
@@ -11,6 +10,7 @@ camel = lambda k: re.sub(r"-(\w)", lambda m: m.group(1).upper(), k)
 
 c = json.load(open("color.json"))
 s = json.load(open("shape.json"))
+t = json.load(open("type.json"))
 
 # Palette colours that share a name with a semantic token are covered by it in CSS.
 palette_only = [k for k in c["palette"] if k not in c["night"]]
@@ -44,3 +44,32 @@ open("shape.swift", "w").write(
     + "".join(f"  static let radius{k.capitalize()}: Double = {v}\n" for k, v in s["radius"].items())
     + "}\n"
 )
+
+# Type: faces as font stacks, roles as size, weight, leading, and tracking.
+rem = lambda px: f"{px / 16:g}rem"
+face_var = {"display": "display", "reading": "reading", "mono": "mono"}
+css = ["/* Generated from type.json. */", ":root {"]
+for name, f in t["faces"].items():
+    css.append(f'  --font-{face_var[name]}: "{f["family"]}", {f["fallback"]};')
+for role, r in t["roles"].items():
+    size = r["size"]
+    value = f"clamp({rem(size['min'])}, {size['fluid']}, {rem(size['max'])})" if isinstance(size, dict) else rem(size)
+    css += ["", f"  --type-{role}-size: {value};", f"  --type-{role}-weight: {r['weight']};", f"  --type-{role}-leading: {r['lineHeight']};"]
+    if r["tracking"]:
+        css.append(f"  --type-{role}-tracking: {r['tracking']}em;")
+    if "measure" in r:
+        css.append(f"  --type-{role}-measure: {r['measure']};")
+css += ["}", ""]
+open("type.css", "w").write("\n".join(css))
+
+# Swift: app windows use the largest size of each fluid range.
+swift_role = lambda k: {"display": "displayTitle"}.get(k, camel(k))
+sw = ["import Foundation", "", "// Generated from type.json. App windows use the largest size of each fluid range.", "enum TypeTokens {"]
+for name, f in t["faces"].items():
+    sw.append(f'  static let {name} = "{f["family"]}"')
+sw += ["", "  struct Role {", "    let face: String", "    let weight: Int", "    let size: Double", "    let lineHeight: Double", "    let trackingEm: Double", "  }", ""]
+for role, r in t["roles"].items():
+    size = r["size"]["max"] if isinstance(r["size"], dict) else r["size"]
+    sw.append(f"  static let {swift_role(role)} = Role(face: {r['face']}, weight: {r['weight']}, size: {size}, lineHeight: {r['lineHeight']}, trackingEm: {r['tracking']})")
+sw.append("}")
+open("type.swift", "w").write("\n".join(sw) + "\n")

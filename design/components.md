@@ -15,7 +15,7 @@ No borders lift a surface. Elevation is a step in tone.
 
 ## Button
 
-28px tall, 13px semibold Atkinson, 6px corners, no border.
+28px tall, the `control` type role (13px, 600), 6px corners, no border.
 
 - **Primary**: the one action the screen's state needs. Fill `primary`, text `on-primary`; hover `primary-hover`. One per screen.
 - **Secondary**: every other action. No fill, text `muted`; on hover, fill `hover` and text `fg`.
@@ -24,7 +24,7 @@ No borders lift a surface. Elevation is a step in tone.
 
 ## Field
 
-A tone step with no border: fill `surface`, text `fg`, placeholder `faint`. In the frame (top bar, sidebar), the fill is `panel`. Hover fills `hover`. Focus draws one ring on the edge: border `accent` plus a 3px glow of `accent` at 22%.
+A tone step with no border, in the `ui` type role: fill `surface`, text `fg`, placeholder `faint`. In the frame (top bar, sidebar), the fill is `panel`. Hover fills `hover`. Focus draws one ring on the edge: border `accent` plus a 3px glow of `accent` at 22%.
 
 ## Link
 
@@ -32,11 +32,11 @@ Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. 
 
 ## Status pill
 
-Round. The status colour (`ok`, `warn`, `danger`, `info`) as text and a leading dot, on a 13% tint of itself. Bold, 13px.
+Round. The status colour (`ok`, `warn`, `danger`, `info`) as text and a leading dot, on a 13% tint of itself. The `control` role at 700.
 
 ## Chip
 
-Round. Text `muted`, semibold, 13px, on `fg` at 7%. A label is detail, not a signal.
+Round. Text `muted` in the `control` role, on `fg` at 7%. A label is detail, not a signal.
 
 ## Row
 
