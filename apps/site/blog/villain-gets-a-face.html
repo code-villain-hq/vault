@@ -32,7 +32,7 @@
         <span aria-hidden="true">·</span>
         <time datetime="2026-10-16">16 Oct 2026</time>
         <span aria-hidden="true">·</span>
-        <span>2 min read</span>
+        <span>3 min read</span>
         <span class="status s-warn">Draft</span>
       </p>
 
@@ -47,11 +47,48 @@
       <p>Nightshade stays: night <code>#0A0B0D</code>, cloak violet, poison chartreuse. What changed is how much of it shows. Grey does the work now. The violet is held to the strength of a grey, and the chartreuse got three jobs and no more: the focus ring, one brand moment per surface, and small live dots like “agent running”. Links are ink, bold, underlined.</p>
       <p>There is a day mode too, for the apps. By day the chartreuse darkens, because bright poison on white is 1.4:1 and nobody can read that.</p>
 
+      <figure class="post-figure">
+        <img src="../../../content/blog/images/2026-10-16-night-and-day.svg" alt="Nightshade in two rows. Night: frame, panel, field, the main action's violet tone, cloak, poison. Day: the same names, filled for light." width="1200" height="520">
+        <figcaption>Night above, day below: frame, panel, field, the main action, cloak, poison.</figcaption>
+      </figure>
+
+      <p>Every surface reads the same names. An app switches to day with one attribute:</p>
+
+      <figure class="code">
+        <figcaption>CSS</figcaption>
+        <pre><code><span class="tok-c">/* design/tokens/color.css, generated from color.json */</span>
+[data-theme="day"] {
+  <span class="tok-p">--bg</span>: #F5F5F7;
+  <span class="tok-p">--panel</span>: #FFFFFF;
+  <span class="tok-p">--primary</span>: #E8DEEB;
+  <span class="tok-p">--accent</span>: #4C6A00;
+}</code></pre>
+      </figure>
+
       <h2>The button</h2>
       <p>Five directions, one shape: 28px, 13px semibold, no border. The winner is a violet tone at grey strength. In an issue, the title reads first, then the text, then the button. As it should.</p>
 
       <h2>The mark</h2>
       <p>Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind a gothic V, cut where the letter crosses. Forge, Layer and Caster will each wear their initial the same way.</p>
+
+      <figure class="post-figure post-figure-pair">
+        <div class="pair">
+          <img src="../../../brand/mark/mark.svg" alt="The mark: a gothic V on a night tile, with a chartreuse bar behind it." width="200" height="200">
+          <img src="../../../brand/mark/logo-night.svg" alt="The logo: Villain with the strike, Studios tucked under it." width="202" height="90">
+        </div>
+        <figcaption>The mark, and the logo it comes from.</figcaption>
+      </figure>
+
+      <p>The cut is one mask. The V, drawn again with a thick stroke, punches a gap in the bar wherever the two cross:</p>
+
+      <figure class="code">
+        <figcaption>SVG</figcaption>
+        <pre><code>&lt;mask id="cut"&gt;
+  &lt;rect <span class="tok-p">width</span>="200" <span class="tok-p">height</span>="200" <span class="tok-p">fill</span>="#fff"/&gt;
+  &lt;use <span class="tok-p">href</span>="#v" <span class="tok-p">stroke</span>="#000" <span class="tok-p">stroke-width</span>="14"/&gt;
+&lt;/mask&gt;
+&lt;rect <span class="tok-p">y</span>="108" <span class="tok-p">width</span>="200" <span class="tok-p">height</span>="15" <span class="tok-p">fill</span>="#C9E265" <span class="tok-p">mask</span>="url(#cut)"/&gt;</code></pre>
+      </figure>
 
       <h2>What it cost</h2>
       <p>One day, a dozen studies, and a rule written down for every decision, so the apps can catch up without asking. <a href="../../../design/principles.md">design/principles.md</a> has the rules. The rest is in the record.</p>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-label="Nightshade swatches: a night row from near-black to violet and chartreuse, and a day row from light grey to violet and deep chartreuse">
+  <title>Nightshade, night and day</title>
+  <rect width="1200" height="520" rx="24" fill="#16171F"/>
+  <!-- Night: bg, panel, surface, primary, cloak, accent -->
+  <rect x="40" y="40" width="170" height="200" rx="14" fill="#0A0B0D"/>
+  <rect x="230" y="40" width="170" height="200" rx="14" fill="#12131A"/>
+  <rect x="420" y="40" width="170" height="200" rx="14" fill="#191A23"/>
+  <rect x="610" y="40" width="170" height="200" rx="14" fill="#331C40"/>
+  <rect x="800" y="40" width="170" height="200" rx="14" fill="#5A1470"/>
+  <rect x="990" y="40" width="170" height="200" rx="14" fill="#C9E265"/>
+  <!-- Day: bg, panel, surface, primary, cloak, accent -->
+  <rect x="40" y="280" width="170" height="200" rx="14" fill="#F5F5F7"/>
+  <rect x="230" y="280" width="170" height="200" rx="14" fill="#FFFFFF"/>
+  <rect x="420" y="280" width="170" height="200" rx="14" fill="#F0F0F2"/>
+  <rect x="610" y="280" width="170" height="200" rx="14" fill="#E8DEEB"/>
+  <rect x="800" y="280" width="170" height="200" rx="14" fill="#5A1470"/>
+  <rect x="990" y="280" width="170" height="200" rx="14" fill="#4C6A00"/>
+</svg>

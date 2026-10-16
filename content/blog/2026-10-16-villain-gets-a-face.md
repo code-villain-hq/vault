@@ -17,6 +17,20 @@ Nightshade stays: night `#0A0B0D`, cloak violet, poison chartreuse. What changed
 
 There is a day mode too, for the apps. By day the chartreuse darkens, because bright poison on white is 1.4:1 and nobody can read that.
 
+![Nightshade in two rows. Night: frame, panel, field, the main action's violet tone, cloak, poison. Day: the same names, filled for light.](images/2026-10-16-night-and-day.svg)
+
+Every surface reads the same names. An app switches to day with one attribute:
+
+```css
+/* design/tokens/color.css, generated from color.json */
+[data-theme="day"] {
+  --bg: #F5F5F7;
+  --panel: #FFFFFF;
+  --primary: #E8DEEB;
+  --accent: #4C6A00;
+}
+```
+
 ## The button
 
 Five directions, one shape: 28px, 13px semibold, no border. The winner is a violet tone at grey strength. In an issue, the title reads first, then the text, then the button. As it should.
@@ -24,6 +38,18 @@ Five directions, one shape: 28px, 13px semibold, no border. The winner is a viol
 ## The mark
 
 Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind a gothic V, cut where the letter crosses. Forge, Layer and Caster will each wear their initial the same way.
+
+![The mark on its night tile, and the logo with "Studios" tucked under "Villain".](../../brand/mark/mark.svg)
+
+The cut is one mask. The V, drawn again with a thick stroke, punches a gap in the bar wherever the two cross:
+
+```svg
+<mask id="cut">
+  <rect width="200" height="200" fill="#fff"/>
+  <use href="#v" stroke="#000" stroke-width="14"/>
+</mask>
+<rect y="108" width="200" height="15" fill="#C9E265" mask="url(#cut)"/>
+```
 
 ## What it cost
 
