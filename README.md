@@ -2,7 +2,7 @@
 
 Villain Studios' home: the apps, the look, the words, and the record of building them.
 
-Villain Studios is a project to build things for fun and to show that building can be fun. The work is public on purpose. Someone looking in, including a future employer, should see the craft, the enjoyment, and the growth from senior front-end work into building whole products with AI. The name of that role can change. Product engineer is the current one.
+Villain Studios builds real tools and shows the build in public. Someone looking in, including a future employer, should see the craft and the growth from senior front-end work into building whole products with AI. The name of that role can change. Product engineer is the current one.
 
 | Place | What it holds |
 | --- | --- |

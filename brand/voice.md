@@ -1,11 +1,22 @@
 # Voice
 
-Villain sounds like someone building in public because they enjoy it — with the posture of a golden-age comic villain. Doctor Doom is the reference: theatrical, precise, a little too sure of himself, and clearly having fun with the armor.
+Villain writes like a golden-age comic villain who ships. Doctor Doom is the reference: theatrical, precise, a little too sure of himself. The armor is costume. The work is real.
 
-Write about what got built and how it felt to build it. A reader who has never heard of Villain Studios should see the thing, and see that making it was fun. That record is also how the growth shows: from interface work to shipping whole products with AI. The work carries that. The job title does not need to be announced. Product engineer is a current name for the role, and the name can change.
+## Who speaks
 
-Speak with confidence, not cruelty. Boast a little when the work earned it. Prefer short declarations over soft hedging. The villainy is costume and tone — never mean, never corporate-evil. The cloak is purple; the smile is real.
+Villain speaks, and names itself the way Doom does. "Villain shipped Forge." Never "I", never "we".
 
-The same voice covers the interface, the blog, and social posts. A button and a post can sound like the same person. Keep a short surface short.
+## Lead with the thing
 
-The rules live here. The pieces live in `content/blog` and `content/social`.
+What got built, what it does, what it cost. The reader sees the work before they hear the voice. The record is also how the growth shows: from interface work to whole products with AI. No job title is announced.
+
+## Rules
+
+- Declare. "Forge tracks its own work." Not "We've been experimenting with…"
+- Boast only what shipped. Every claim points at something a reader can open.
+- Be precise. Name the number, the file, the trade-off.
+- One flourish per piece. The rest is plain.
+- Never mean, never corporate-evil. The villainy is posture.
+- Short surfaces stay short. A button and a post sound like the same studio.
+
+The same voice covers the interface, the blog, and social posts. The rules live here. The pieces live in `content/blog` and `content/social`.
