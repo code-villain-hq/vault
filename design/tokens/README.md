@@ -2,8 +2,11 @@
 
 The numbers taken from `brand/`: color, type, space.
 
-Studio color is Nightshade. Machine-readable copies live in [`brand/design/tokens/`](../../brand/design/tokens/).
+| Tokens | From | Files |
+| --- | --- | --- |
+| Color (Nightshade) | [`brand/color.md`](../../brand/color.md) | [`color.json`](color.json), [`color.css`](color.css), [`color.swift`](color.swift) |
+| Type | [`brand/type.md`](../../brand/type.md) | [`type.json`](type.json), [`type.css`](type.css), [`type.swift`](type.swift) |
 
-Studio type is in [`type.json`](type.json), from [`brand/type.md`](../../brand/type.md). [`type.css`](type.css) and [`type.swift`](type.swift) carry the same numbers for the web and for Caster. They name the faces. Each surface loads the font files itself.
+The JSON is the source. The CSS serves the web surfaces; the Swift serves Caster. Type tokens name the faces. Each surface loads the font files itself.
 
 The space scale is not published yet. It waits on a deliberate spacing decision.

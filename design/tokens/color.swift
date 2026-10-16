@@ -1,6 +1,6 @@
 import Foundation
 
-enum BrandTokens {
+enum ColorTokens {
   static let night = "#0A0B0D"
   static let cloak = "#5A1470"
   static let cloakHover = "#6B1884"

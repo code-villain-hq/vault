@@ -3,11 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Brand</title>
+  <title>Brand — Villain Studios</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono&display=swap">
+  <link rel="stylesheet" href="../design/tokens/color.css">
+  <link rel="stylesheet" href="../design/tokens/type.css">
   <style>
     :root {
-      --ink: #ececf1;
-      --paper: #0c0c11;
       --measure: 66ch;
     }
 
@@ -20,26 +23,27 @@
     html {
       color-scheme: dark;
       scroll-behavior: smooth;
-      scrollbar-color: var(--ink) var(--paper);
+      scrollbar-color: var(--muted) var(--night);
     }
 
     body {
       margin: 0;
-      background: var(--paper);
+      background: var(--night);
       color: var(--ink);
-      font-family: ui-sans-serif, system-ui, sans-serif;
-      font-size: 1.0625rem;
-      line-height: 1.5;
+      font-family: var(--font-reading);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-leading);
       text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
     }
 
     ::selection {
-      background: var(--ink);
-      color: var(--paper);
+      background: var(--cloak);
+      color: var(--ink);
     }
 
     :focus-visible {
-      outline: 2px solid var(--ink);
+      outline: 2px solid var(--poison);
       outline-offset: 3px;
     }
 
@@ -53,13 +57,26 @@
       text-decoration-thickness: 2px;
     }
 
+    .prose a,
+    .voice a,
+    .source a,
+    .note a {
+      color: var(--poison);
+      font-weight: 600;
+    }
+
     .skip {
       position: absolute;
       left: 1rem;
       top: 0;
       transform: translateY(-120%);
-      background: var(--paper);
+      z-index: 2;
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid var(--cloak);
       padding: 0.5rem 0.75rem;
+      text-decoration: none;
+      font-weight: 700;
     }
 
     .skip:focus {
@@ -76,13 +93,19 @@
       justify-content: space-between;
       gap: 0.75rem 1.5rem;
       padding: 0.85rem clamp(1.25rem, 4vw, 3rem);
-      background: var(--paper);
-      border-bottom: 1px solid var(--ink);
+      background: color-mix(in srgb, var(--night) 88%, var(--panel));
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+
+    @supports not (backdrop-filter: blur(8px)) {
+      .bar {
+        background: var(--night);
+      }
     }
 
     .home {
       font-weight: 700;
-      letter-spacing: -0.03em;
       text-decoration: none;
     }
 
@@ -94,11 +117,19 @@
 
     nav a {
       padding: 0.35rem 0;
+      color: var(--muted);
       text-decoration: none;
     }
 
-    nav a:hover,
+    nav a:hover {
+      color: var(--ink);
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 0.28em;
+    }
+
     nav a[aria-current="true"] {
+      color: var(--ink);
       text-decoration: underline;
       text-decoration-thickness: 2px;
       text-underline-offset: 0.28em;
@@ -110,23 +141,49 @@
       padding: 0 clamp(1.25rem, 4vw, 3rem) 6rem;
     }
 
+    .hero {
+      padding-top: 2.75rem;
+      border-left: 3px solid var(--cloak);
+      padding-left: 1.25rem;
+      margin-left: -1.25rem;
+    }
+
     h1,
     h2,
     h3 {
       font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.5;
+      line-height: 1.25;
       text-wrap: balance;
     }
 
+    h1,
+    h2 {
+      font-family: var(--font-display);
+    }
+
     h1 {
-      margin: 2.75rem 0 0.85rem;
-      font-size: clamp(2.75rem, 7vw, 4.5rem);
+      margin: 0 0 0.85rem;
+      font-size: var(--type-display-size);
+      line-height: var(--type-display-leading);
     }
 
     h2 {
       margin: 0 0 0.75rem;
-      font-size: clamp(1.75rem, 3vw, 2.25rem);
+      font-size: var(--type-headline-size);
+      line-height: var(--type-headline-leading);
+    }
+
+    code {
+      font-family: var(--font-mono);
+    }
+
+    h2::after {
+      content: "";
+      display: block;
+      width: 2.5rem;
+      height: 2px;
+      margin-top: 0.65rem;
+      background: var(--cloak);
     }
 
     section {
@@ -137,13 +194,19 @@
     .lead,
     .prose,
     .voice p,
-    .note {
+    .note,
+    .handoff p {
       max-width: var(--measure);
     }
 
     .lead {
       margin: 0;
       font-size: 1.2rem;
+      color: var(--muted);
+    }
+
+    .note {
+      color: var(--muted);
     }
 
     p {
@@ -152,22 +215,6 @@
 
     .source {
       margin-top: 1.5rem;
-    }
-
-    .fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.25rem 1.5rem;
-      margin-top: 1.75rem;
-    }
-
-    figure {
-      margin: 0;
-    }
-
-    .swatch {
-      min-height: 38vh;
-      border: 1px solid var(--ink);
     }
 
     .option {
@@ -182,59 +229,24 @@
     .option > p {
       margin: 0 0 1.25rem;
       max-width: var(--measure);
+      color: var(--muted);
     }
 
-    .option .fields {
-      margin-top: 0;
+    figure {
+      margin: 0;
     }
 
-    .trio {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 1.25rem 1.5rem;
-      margin-top: 0;
-    }
-
-    .compose {
-      display: grid;
-      gap: 0;
+    .swatch {
       min-height: 38vh;
-      border: 1px solid var(--ink);
-    }
-
-    .compose-hero {
-      display: grid;
-      place-items: end start;
-      padding: 1.25rem;
-      min-height: 22vh;
-    }
-
-    .compose-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem 1rem;
-      align-items: center;
-      padding: 1rem 1.25rem;
-      border-top: 1px solid var(--ink);
+      border: 1px solid var(--line);
     }
 
     .nightshade {
-      --demo-cloak: #5A1470;
-      --demo-lift: #C9E265;
-      --night: #0A0B0D;
-      --cloak: var(--demo-cloak);
-      --cloak-hover: #6B1884;
-      --poison: var(--demo-lift);
-      --wash: #1A0D24;
-      --ink: #ECECF1;
-      --muted: #9B9BA8;
-      --panel: #12131A;
-      --line: #2A2B36;
       margin-top: 1.75rem;
       padding: 1.25rem;
       background: var(--night);
       color: var(--ink);
-      border: 1px solid var(--ink);
+      border: 1px solid var(--line);
     }
 
     .nightshade-actions {
@@ -247,10 +259,11 @@
     .ns-btn {
       appearance: none;
       padding: 0.55rem 0.9rem;
+      min-height: 2.75rem;
       font: inherit;
       font-weight: 700;
-      letter-spacing: -0.02em;
       cursor: pointer;
+      border-radius: 0;
     }
 
     .ns-btn-primary {
@@ -261,11 +274,6 @@
 
     .ns-btn-primary:hover {
       background: var(--cloak-hover);
-    }
-
-    .ns-btn-primary:focus-visible {
-      outline: 2px solid var(--poison);
-      outline-offset: 3px;
     }
 
     .ns-btn-ghost {
@@ -292,7 +300,6 @@
       border: 1px solid var(--cloak);
       font-size: 0.9rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
     }
 
     .ns-card {
@@ -319,56 +326,17 @@
 
     .ns-pair .swatch {
       min-height: 22vh;
-      border: 1px solid var(--ink);
+    }
+
+    .ns-pair figcaption {
+      color: var(--muted);
+      font-size: 0.95rem;
     }
 
     .token-table code {
       font-size: 0.92em;
-    }
-
-    #design .layouts {
-      --demo-cloak: #5A1470;
-      --demo-lift: #C9E265;
-    }
-
-    #design .layouts .card {
-      border-left: 3px solid var(--demo-lift);
-    }
-
-    .pair {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      min-height: 38vh;
-      border: 1px solid var(--ink);
-    }
-
-    .pair > div {
-      display: grid;
-      place-items: end start;
-      padding: 1rem;
-      min-height: 10rem;
-    }
-
-    .pair > div + div {
-      border-left: 1px solid var(--ink);
-    }
-
-    .chip {
-      padding: 0.55rem 0.85rem;
-      font-size: 0.9rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-
-    figcaption {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-top: 0.65rem;
-    }
-
-    figcaption span:last-child {
-      text-align: right;
+      color: var(--poison);
+      font-weight: 600;
     }
 
     table {
@@ -381,7 +349,7 @@
     th,
     td {
       padding: 0.85rem 1rem 0.85rem 0;
-      border-bottom: 1px solid var(--ink);
+      border-bottom: 1px solid var(--line);
       font-weight: 400;
       line-height: 1.5;
       vertical-align: baseline;
@@ -390,19 +358,91 @@
     thead th {
       font-weight: 700;
       padding-top: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
     }
 
     tbody th {
       font-weight: 700;
     }
 
+    .faces {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1px;
+      margin-top: 1.75rem;
+      background: var(--line);
+      border: 1px solid var(--line);
+    }
+
+    .face {
+      margin: 0;
+      display: grid;
+      align-content: space-between;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      background: var(--panel);
+      min-width: 0;
+    }
+
+    .face-sample {
+      margin: 0;
+    }
+
+    .face-display {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(2.75rem, 6vw, 4.5rem);
+      line-height: var(--type-splash-leading);
+    }
+
+    .face-reading {
+      font-size: var(--type-title-size);
+      line-height: var(--type-title-leading);
+    }
+
+    .face-mono {
+      font-family: var(--font-mono);
+      font-size: var(--type-title-size);
+    }
+
+    .face figcaption {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.25rem 1rem;
+      color: var(--muted);
+      font-size: var(--type-small-size);
+    }
+
+    .t-display,
+    .t-headline {
+      font-family: var(--font-display);
+      font-weight: var(--type-display-weight);
+    }
+
+    .t-display { font-size: var(--type-display-size); line-height: var(--type-display-leading); }
+    .t-headline { font-size: var(--type-headline-size); line-height: var(--type-headline-leading); }
+    .t-title { font-size: var(--type-title-size); font-weight: var(--type-title-weight); }
+    .t-label { font-size: var(--type-label-size); font-weight: var(--type-label-weight); letter-spacing: var(--type-label-tracking); }
+    .t-body { font-size: var(--type-body-size); }
+    .t-small { font-size: var(--type-small-size); color: var(--muted); }
+    .t-code { font-size: var(--type-code-size); }
+
+    .type-table td:last-child {
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: var(--type-small-size);
+    }
+
     .voice .say {
       max-width: 22em;
+      font-family: var(--font-display);
       margin: 0 0 1.5rem;
       font-size: clamp(1.65rem, 3vw, 2.2rem);
       font-weight: 700;
-      letter-spacing: -0.03em;
       text-wrap: balance;
+      color: var(--ink);
     }
 
     .short {
@@ -410,7 +450,8 @@
       margin: 1.75rem 0;
       font-size: 1.35rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      border-left: 3px solid var(--cloak);
+      padding-left: 0.85rem;
     }
 
     #mark figure {
@@ -420,11 +461,15 @@
     .clear {
       margin-top: 1.75rem;
       padding: clamp(1.25rem, 3vw, 2.5rem);
-      border: 1px solid var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
     }
 
     .clear-label {
       margin: 0 0 clamp(1rem, 2vw, 1.75rem);
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.9rem;
     }
 
     .slot {
@@ -432,7 +477,9 @@
       place-items: center;
       min-height: 18rem;
       padding: 1.5rem;
-      border: 1px solid var(--ink);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--cloak);
+      background: var(--night);
       text-align: center;
     }
 
@@ -441,8 +488,20 @@
       margin: 0;
       font-size: 1.35rem;
       font-weight: 700;
-      letter-spacing: -0.03em;
       text-wrap: balance;
+      color: var(--muted);
+    }
+
+    figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 0.65rem;
+      color: var(--muted);
+    }
+
+    figcaption span:last-child {
+      text-align: right;
     }
 
     .handoff {
@@ -457,7 +516,15 @@
       font-size: 1.15rem;
     }
 
+    .handoff > div {
+      padding: 1.25rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
     .layouts {
+      --demo-cloak: var(--cloak);
+      --demo-lift: var(--poison);
       display: grid;
       grid-template-columns: 1.45fr 0.62fr 0.9fr;
       gap: 1rem 1.25rem;
@@ -466,7 +533,8 @@
     }
 
     .frame {
-      border: 1px solid var(--ink);
+      border: 1px solid var(--line);
+      background: var(--night);
     }
 
     .window {
@@ -475,7 +543,8 @@
 
     .window .split {
       height: 1.75rem;
-      border-bottom: 1px solid var(--ink);
+      border-bottom: 1px solid var(--line);
+      background: var(--wash);
     }
 
     .post {
@@ -484,22 +553,29 @@
 
     .card {
       aspect-ratio: 1;
+      border-left: 3px solid var(--demo-lift);
     }
 
     .layouts figcaption {
       display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
     }
 
     .close {
       max-width: var(--measure);
       margin-top: 4.5rem;
       padding-top: 1.5rem;
-      border-top: 1px solid var(--ink);
+      border-top: 1px solid var(--line);
+      color: var(--muted);
     }
 
     @media (max-width: 800px) {
-      .fields,
-      .trio,
+      .hero {
+        margin-left: 0;
+        padding-left: 1rem;
+      }
+
       .ns-pair,
       .handoff,
       .layouts {
@@ -514,15 +590,19 @@
         max-width: 16rem;
       }
 
-      table,
-      tbody,
-      tr,
-      th,
-      td {
+      .faces {
+        grid-template-columns: 1fr;
+      }
+
+      table.type-table,
+      table.type-table tbody,
+      table.type-table tr,
+      table.type-table th,
+      table.type-table td {
         display: block;
       }
 
-      thead {
+      table.type-table thead {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -530,23 +610,26 @@
         clip: rect(0 0 0 0);
       }
 
-      tr {
+      table.type-table tr {
+        display: grid;
+        gap: 0.35rem;
         padding: 0.85rem 0;
-        border-bottom: 1px solid var(--ink);
+        border-bottom: 1px solid var(--line);
       }
 
-      th,
-      td {
+      table.type-table th,
+      table.type-table td {
         border: 0;
         padding: 0;
       }
 
-      td + td {
-        display: none;
+      table.type-table th {
+        color: var(--muted);
+        font-size: var(--type-small-size);
       }
 
-      td::before {
-        content: "Face and sizes: ";
+      .token-table td {
+        color: var(--muted);
       }
     }
 
@@ -554,13 +637,18 @@
       html {
         scroll-behavior: auto;
       }
+
+      .bar {
+        backdrop-filter: none;
+        background: var(--night);
+      }
     }
   </style>
 </head>
 <body>
-  <a class="skip" href="#color">Skip to color</a>
+  <a class="skip" href="#top">Skip to content</a>
   <header class="bar">
-    <a class="home" href="#top">Brand</a>
+    <a class="home" href="#top">Villain</a>
     <nav aria-label="Brand">
       <a href="#color">Color</a>
       <a href="#type">Type</a>
@@ -570,12 +658,14 @@
     </nav>
   </header>
   <main id="top">
-    <h1>Brand</h1>
-    <p class="lead">Decisions about how Villain looks and sounds. The apps, the site, the blog, and social posts follow these.</p>
+    <div class="hero">
+      <h1>Brand</h1>
+      <p class="lead">Decisions about how Villain looks and sounds. The apps, the site, the blog, and social posts follow these.</p>
+    </div>
 
     <section id="color">
       <h2>Color</h2>
-      <p class="prose">Nightshade. Ground is night. The cloak is the fill. The poison is the mark — links, focus, edges, one accent per screen. It never carries body copy. It never sits on the cloak. Written in <a href="color.md">color.md</a>. Numbers in <a href="design/tokens/">brand/design/tokens</a>.</p>
+      <p class="prose">Nightshade. Ground is night. The cloak is the fill. The poison is the mark — links, focus, edges, one accent per screen. It never carries body copy. It never sits on the cloak. Written in <a href="color.md">color.md</a>. Numbers in <a href="../design/tokens/">design/tokens</a>.</p>
 
       <div class="option">
         <h3>Nightshade</h3>
@@ -627,7 +717,7 @@
             <tr>
               <th scope="row">cloak</th>
               <td><code>#5A1470</code></td>
-              <td>Primary fill, mark, card edge.</td>
+              <td>Primary fill; borders on controls.</td>
             </tr>
             <tr>
               <th scope="row">cloak-hover</th>
@@ -637,7 +727,7 @@
             <tr>
               <th scope="row">poison</th>
               <td><code>#C9E265</code></td>
-              <td>Links, focus, borders, marks.</td>
+              <td>Links, focus, 3px edges, chips.</td>
             </tr>
             <tr>
               <th scope="row">wash</th>
@@ -667,44 +757,44 @@
           </tbody>
         </table>
       </div>
-
     </section>
 
     <section id="type">
       <h2>Type</h2>
-      <p class="prose">Type is not chosen yet. When it is, <a href="type.md">type.md</a> names the faces, the sizes, and where they are used. <a href="../design/tokens/">design/tokens</a> carries the sizes. One scale, including where a web font file cannot be shared.</p>
-      <p class="note">The letters on this page are the browser’s. They are not a face that was chosen.</p>
-      <table>
+      <p class="prose">The gothic is the costume. Atkinson is the person inside it. Grenze Gotisch sets the splash, page titles, and section titles — never below 28px, never in capitals. Atkinson Hyperlegible Next sets everything read or clicked. Atkinson Hyperlegible Mono sets code. Written in <a href="type.md">type.md</a>. Numbers in <a href="../design/tokens/">design/tokens</a>.</p>
+      <div class="faces">
+        <figure class="face">
+          <p class="face-sample face-display">Villain Studios</p>
+          <figcaption><span>Grenze Gotisch</span><span>700 · 800</span></figcaption>
+        </figure>
+        <figure class="face">
+          <p class="face-sample face-reading">Ships real tools. Narrates the build.</p>
+          <figcaption><span>Atkinson Hyperlegible Next</span><span>400 · 700 · italic</span></figcaption>
+        </figure>
+        <figure class="face">
+          <p class="face-sample face-mono">$ forge pickup</p>
+          <figcaption><span>Atkinson Hyperlegible Mono</span><span>400</span></figcaption>
+        </figure>
+      </div>
+      <table class="type-table">
         <thead>
           <tr>
-            <th scope="col">Where</th>
-            <th scope="col">Face</th>
-            <th scope="col">Sizes</th>
+            <th scope="col">Role</th>
+            <th scope="col">Sample</th>
+            <th scope="col">Size</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <th scope="row">Product UI</th>
-            <td>Not chosen</td>
-            <td>Not chosen</td>
-          </tr>
-          <tr>
-            <th scope="row">The site</th>
-            <td>Not chosen</td>
-            <td>Not chosen</td>
-          </tr>
-          <tr>
-            <th scope="row">A blog post</th>
-            <td>Not chosen</td>
-            <td>Not chosen</td>
-          </tr>
-          <tr>
-            <th scope="row">A social card</th>
-            <td>Not chosen</td>
-            <td>Not chosen</td>
-          </tr>
+          <tr><th scope="row">display</th><td><span class="t-display">Forge files its own tickets</span></td><td>Grenze 700 · 36–56px</td></tr>
+          <tr><th scope="row">headline</th><td><span class="t-headline">Why build it this way</span></td><td>Grenze 700 · 28–34px</td></tr>
+          <tr><th scope="row">title</th><td><span class="t-title">Villain Layer</span></td><td>Atkinson 700 · 21px</td></tr>
+          <tr><th scope="row">label</th><td><span class="t-label">Read the build.</span></td><td>Atkinson 700 · 15px</td></tr>
+          <tr><th scope="row">body</th><td><span class="t-body">A tool that cannot run its own project has no business running yours.</span></td><td>Atkinson 400 · 17px</td></tr>
+          <tr><th scope="row">small</th><td><span class="t-small">Build log · Forge · 4 min read</span></td><td>Atkinson 400 · 14px</td></tr>
+          <tr><th scope="row">code</th><td><code class="t-code">git commit -m "Lock the studio type."</code></td><td>Mono 400 · 14px</td></tr>
         </tbody>
       </table>
+      <p class="note">The splash runs 72–184px in Grenze 800, once per surface. The homepage shows it.</p>
     </section>
 
     <section id="voice">
@@ -738,17 +828,17 @@
 
     <section id="design">
       <h2>Design</h2>
-      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade — cloak and poison. The pictures are not drawn yet. Each one will show the hierarchy, the spacing, and the type from here.</p>
+      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade — cloak and poison. Type is Grenze Gotisch and Atkinson Hyperlegible. The pictures are not drawn yet. Each one will show the hierarchy, the spacing, and the type from here.</p>
       <div class="handoff">
         <div>
           <h3>Tokens</h3>
-          <p>Nightshade color tokens live as CSS, Swift, and JSON. Type and space still empty.</p>
-          <p class="source"><a href="design/tokens/">brand/design/tokens</a></p>
+          <p>Nightshade color and studio type live as JSON, CSS, and Swift. Space is still empty.</p>
+          <p class="source"><a href="../design/tokens/">design/tokens</a></p>
         </div>
         <div>
           <h3>Layouts</h3>
           <p>Surfaces that should feel related. The implementation stays in the app or the site.</p>
-          <div class="layouts" style="--demo-cloak:#5A1470;--demo-lift:#C9E265">
+          <div class="layouts">
             <figure>
               <div class="frame window" aria-hidden="true"><div class="split"></div></div>
               <figcaption>A window</figcaption>
