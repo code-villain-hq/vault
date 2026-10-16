@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono&display=swap">
   <link rel="stylesheet" href="../../design/tokens/color.css">
   <link rel="stylesheet" href="../../design/tokens/type.css">
+  <link rel="stylesheet" href="../../design/tokens/shape.css">
   <style>
     :root {
       --gutter: clamp(1.25rem, 4.2vw, 3.5rem);
@@ -33,7 +34,7 @@
     }
 
     ::selection { background: var(--cloak); color: var(--ink); }
-    :focus-visible { outline: 2px solid var(--poison); outline-offset: 3px; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     a { color: inherit; text-decoration: none; }
 
     .hero {
@@ -89,18 +90,18 @@
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
-      padding: 0.75rem 1.25rem;
-      background: var(--cloak);
-      color: var(--ink);
-      border: 1px solid var(--poison);
-      border-radius: 0;
+      padding: 0.7rem 1.15rem;
+      background: var(--primary);
+      color: var(--on-primary);
+      border: 0;
+      border-radius: var(--radius-md);
       font-size: var(--type-label-size);
       font-weight: var(--type-label-weight);
       line-height: var(--type-label-leading);
       letter-spacing: var(--type-label-tracking);
     }
 
-    .btn-read:hover { background: var(--cloak-hover); }
+    .btn-read:hover { background: var(--primary-hover); }
 
     .products {
       margin: 0;
@@ -163,7 +164,7 @@
       gap: 0.15rem;
       padding: 1.1rem 1.25rem;
       background: var(--panel);
-      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
     }
 
     .roster strong {

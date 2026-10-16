@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,700;1,400&family=Atkinson+Hyperlegible+Mono&display=swap">
   <link rel="stylesheet" href="../design/tokens/color.css">
   <link rel="stylesheet" href="../design/tokens/type.css">
+  <link rel="stylesheet" href="../design/tokens/shape.css">
   <style>
     :root {
       --measure: 66ch;
@@ -43,7 +44,7 @@
     }
 
     :focus-visible {
-      outline: 2px solid var(--poison);
+      outline: 2px solid var(--accent);
       outline-offset: 3px;
     }
 
@@ -61,8 +62,16 @@
     .voice a,
     .source a,
     .note a {
-      color: var(--poison);
-      font-weight: 600;
+      color: var(--fg);
+      font-weight: 700;
+      text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
+    }
+
+    .prose a:hover,
+    .voice a:hover,
+    .source a:hover,
+    .note a:hover {
+      text-decoration-color: var(--fg);
     }
 
     .skip {
@@ -143,9 +152,6 @@
 
     .hero {
       padding-top: 2.75rem;
-      border-left: 3px solid var(--cloak);
-      padding-left: 1.25rem;
-      margin-left: -1.25rem;
     }
 
     h1,
@@ -238,84 +244,114 @@
 
     .swatch {
       min-height: 38vh;
-      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
     }
 
-    .nightshade {
-      margin-top: 1.75rem;
-      padding: 1.25rem;
-      background: var(--night);
-      color: var(--ink);
-      border: 1px solid var(--line);
+    .modes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
     }
 
-    .nightshade-actions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.75rem 1rem;
+    .demo {
+      display: grid;
+      gap: 0.75rem;
+      padding: 1.1rem 1.2rem;
+      background: var(--panel);
+      color: var(--fg);
+      border-radius: var(--radius-lg);
+      font-size: 14px;
     }
 
-    .ns-btn {
-      appearance: none;
-      padding: 0.55rem 0.9rem;
-      min-height: 2.75rem;
-      font: inherit;
+    .demo .mode {
+      margin: 0;
+      color: var(--faint);
+      font-size: 0.8125rem;
+    }
+
+    .demo strong {
+      font-size: var(--type-title-size);
+      line-height: var(--type-title-leading);
+    }
+
+    .demo p {
+      margin: 0;
+      max-width: none;
+      color: var(--muted);
+    }
+
+    .demo a {
+      color: var(--fg);
       font-weight: 700;
-      cursor: pointer;
-      border-radius: 0;
-    }
-
-    .ns-btn-primary {
-      background: var(--cloak);
-      color: var(--ink);
-      border: 1px solid var(--poison);
-    }
-
-    .ns-btn-primary:hover {
-      background: var(--cloak-hover);
-    }
-
-    .ns-btn-ghost {
-      background: transparent;
-      color: var(--ink);
-      border: 1px solid var(--cloak);
-    }
-
-    .ns-btn-ghost:hover {
-      background: var(--wash);
-    }
-
-    .ns-link {
-      color: var(--poison);
-      font-weight: 600;
       text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
       text-underline-offset: 0.22em;
     }
 
-    .ns-chip {
-      display: inline-block;
-      padding: 0.35rem 0.65rem;
-      color: var(--poison);
-      border: 1px solid var(--cloak);
-      font-size: 0.9rem;
+    .demo-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 0.7rem;
+      border: 0;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn:hover { background: var(--hover); color: var(--fg); }
+    .btn-primary { background: var(--primary); color: var(--on-primary); }
+    .btn-primary:hover { background: var(--primary-hover); color: var(--on-primary); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .chip {
+      padding: 0.15rem 0.65rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in srgb, var(--fg) 7%, transparent);
+      color: var(--muted);
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+      padding: 0.15rem 0.6rem 0.15rem 0.5rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in srgb, currentColor 13%, transparent);
+      font-size: 0.8125rem;
       font-weight: 700;
     }
 
-    .ns-card {
-      margin-top: 1.25rem;
-      padding: 1rem 1.1rem;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-left: 3px solid var(--poison);
-      color: var(--ink);
+    .status::before { content: ""; width: 0.45em; height: 0.45em; border-radius: 50%; background: currentColor; }
+    .s-ok { color: var(--ok); }
+    .s-warn { color: var(--warn); }
+    .s-danger { color: var(--danger); }
+    .s-info { color: var(--info); }
+
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.8125rem;
     }
 
-    .ns-card p {
-      margin: 0.35rem 0 0;
-      color: var(--muted);
-      max-width: none;
-    }
+    .live::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--accent); }
 
     .ns-pair {
       display: grid;
@@ -328,14 +364,17 @@
       min-height: 22vh;
     }
 
-    .ns-pair figcaption {
-      color: var(--muted);
-      font-size: 0.95rem;
+    .token-table td.sw i {
+      display: inline-block;
+      width: 0.9rem;
+      height: 0.9rem;
+      margin-right: 0.45rem;
+      border-radius: var(--radius-sm);
+      vertical-align: -0.1rem;
     }
 
     .token-table code {
       font-size: 0.92em;
-      color: var(--poison);
       font-weight: 600;
     }
 
@@ -369,13 +408,12 @@
     .faces {
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
-      gap: 1px;
+      gap: 0.5rem;
       margin-top: 1.75rem;
-      background: var(--line);
-      border: 1px solid var(--line);
     }
 
     .face {
+      border-radius: var(--radius-lg);
       margin: 0;
       display: grid;
       align-content: space-between;
@@ -450,8 +488,6 @@
       margin: 1.75rem 0;
       font-size: 1.35rem;
       font-weight: 700;
-      border-left: 3px solid var(--cloak);
-      padding-left: 0.85rem;
     }
 
     #mark figure {
@@ -462,7 +498,7 @@
       margin-top: 1.75rem;
       padding: clamp(1.25rem, 3vw, 2.5rem);
       background: var(--panel);
-      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
     }
 
     .clear-label {
@@ -477,8 +513,7 @@
       place-items: center;
       min-height: 18rem;
       padding: 1.5rem;
-      border: 1px solid var(--line);
-      border-left: 3px solid var(--cloak);
+      border-radius: var(--radius-md);
       background: var(--night);
       text-align: center;
     }
@@ -519,12 +554,11 @@
     .handoff > div {
       padding: 1.25rem;
       background: var(--panel);
-      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
     }
 
     .layouts {
       --demo-cloak: var(--cloak);
-      --demo-lift: var(--poison);
       display: grid;
       grid-template-columns: 1.45fr 0.62fr 0.9fr;
       gap: 1rem 1.25rem;
@@ -533,7 +567,8 @@
     }
 
     .frame {
-      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      overflow: hidden;
       background: var(--night);
     }
 
@@ -543,8 +578,7 @@
 
     .window .split {
       height: 1.75rem;
-      border-bottom: 1px solid var(--line);
-      background: var(--wash);
+      background: var(--hover);
     }
 
     .post {
@@ -553,7 +587,6 @@
 
     .card {
       aspect-ratio: 1;
-      border-left: 3px solid var(--demo-lift);
     }
 
     .layouts figcaption {
@@ -665,94 +698,154 @@
 
     <section id="color">
       <h2>Color</h2>
-      <p class="prose">Nightshade. Ground is night. The cloak is the fill. The poison is the mark — links, focus, edges, one accent per screen. It never carries body copy. It never sits on the cloak. Written in <a href="color.md">color.md</a>. Numbers in <a href="../design/tokens/">design/tokens</a>.</p>
+      <p class="prose">Nightshade. Grey does most of the work. Cloak is the brand, held to the strength of a grey: the main action, the selected row. Poison is an accent, never the main thing: the focus ring, one brand moment per surface, and small live dots. Links are ink, bold, and underlined. Written in <a href="color.md">color.md</a>. Numbers in <a href="../design/tokens/">design/tokens</a>.</p>
 
       <div class="option">
-        <h3>Nightshade</h3>
-        <p>The final pair on night.</p>
-        <div class="nightshade" aria-label="Nightshade pair on night">
-          <div class="nightshade-actions">
-            <button type="button" class="ns-btn ns-btn-primary">Cast</button>
-            <button type="button" class="ns-btn ns-btn-ghost">Ghost</button>
-            <a class="ns-link" href="#color">Open the vault</a>
-            <span class="ns-chip">V0.4</span>
+        <h3>Night and day</h3>
+        <p>The same names, filled twice. Night is the default and every studio surface. Day is the apps’ light mode.</p>
+        <div class="modes">
+          <div class="demo" data-theme="night">
+            <p class="mode">Night · default, and every studio surface</p>
+            <strong>Share tokens across the site and apps</strong>
+            <p>Tokens move into one package. See <a href="#color">the token spec</a>.</p>
+            <div class="demo-row"><span class="status s-info">In progress</span><span class="status s-warn">In review</span><span class="status s-ok">Done</span><span class="status s-danger">Blocked</span></div>
+            <div class="demo-row"><span class="chip">tokens</span><span class="chip">design</span><span class="live">Agent running</span></div>
+            <div class="demo-row"><button type="button" class="btn btn-primary">Start work</button><button type="button" class="btn">Move to Triage</button></div>
           </div>
-          <div class="ns-card">
-            <strong>Panel card</strong>
-            <p>Ink on panel for body. Muted for secondary. Poison only on the 3px edge.</p>
+          <div class="demo" data-theme="day">
+            <p class="mode">Day · the apps’ light mode</p>
+            <strong>Share tokens across the site and apps</strong>
+            <p>Tokens move into one package. See <a href="#color">the token spec</a>.</p>
+            <div class="demo-row"><span class="status s-info">In progress</span><span class="status s-warn">In review</span><span class="status s-ok">Done</span><span class="status s-danger">Blocked</span></div>
+            <div class="demo-row"><span class="chip">tokens</span><span class="chip">design</span><span class="live">Agent running</span></div>
+            <div class="demo-row"><button type="button" class="btn btn-primary">Start work</button><button type="button" class="btn">Move to Triage</button></div>
           </div>
-          <div class="ns-pair">
-            <figure>
-              <div class="swatch" style="background:#5A1470"></div>
-              <figcaption>
-                <span>Cloak #5A1470 · Poison #C9E265</span>
-              </figcaption>
-            </figure>
-            <figure>
-              <div class="swatch" style="background:#C9E265"></div>
-              <figcaption>
-                <span>Cloak #5A1470 · Poison #C9E265</span>
-              </figcaption>
-            </figure>
-          </div>
+        </div>
+        <div class="ns-pair">
+          <figure>
+            <div class="swatch" style="background:var(--cloak)"></div>
+            <figcaption><span>Cloak</span><span>#5A1470</span></figcaption>
+          </figure>
+          <figure>
+            <div class="swatch" style="background:var(--poison)"></div>
+            <figcaption><span>Poison</span><span>#C9E265</span></figcaption>
+          </figure>
         </div>
       </div>
 
       <div class="option">
-        <h3>Tokens</h3>
+        <h3>Names</h3>
         <table class="token-table">
           <thead>
             <tr>
-              <th scope="col">Token</th>
-              <th scope="col">Value</th>
+              <th scope="col">Name</th>
+              <th scope="col">Night</th>
+              <th scope="col">Day</th>
               <th scope="col">Use</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <th scope="row">night</th>
-              <td><code>#0A0B0D</code></td>
-              <td>Every ground. App, site, blog, card.</td>
-            </tr>
-            <tr>
-              <th scope="row">cloak</th>
-              <td><code>#5A1470</code></td>
-              <td>Primary fill; borders on controls.</td>
-            </tr>
-            <tr>
-              <th scope="row">cloak-hover</th>
-              <td><code>#6B1884</code></td>
-              <td>Hover state for cloak fills.</td>
-            </tr>
-            <tr>
-              <th scope="row">poison</th>
-              <td><code>#C9E265</code></td>
-              <td>Links, focus, 3px edges, chips.</td>
-            </tr>
-            <tr>
-              <th scope="row">wash</th>
-              <td><code>#1A0D24</code></td>
-              <td>Selected rows, hover backgrounds.</td>
-            </tr>
-            <tr>
-              <th scope="row">ink</th>
-              <td><code>#ECECF1</code></td>
-              <td>Body text on night and panel.</td>
-            </tr>
-            <tr>
-              <th scope="row">muted</th>
-              <td><code>#9B9BA8</code></td>
-              <td>Secondary text.</td>
+              <th scope="row">bg</th>
+              <td class="sw"><i style="background:#0A0B0D"></i><code>#0A0B0D</code></td>
+              <td class="sw"><i style="background:#F5F5F7"></i><code>#F5F5F7</code></td>
+              <td>The frame: sidebar, top bar, page.</td>
             </tr>
             <tr>
               <th scope="row">panel</th>
-              <td><code>#12131A</code></td>
-              <td>Cards and raised surfaces.</td>
+              <td class="sw"><i style="background:#12131A"></i><code>#12131A</code></td>
+              <td class="sw"><i style="background:#FFFFFF"></i><code>#FFFFFF</code></td>
+              <td>Where content sits.</td>
+            </tr>
+            <tr>
+              <th scope="row">surface</th>
+              <td class="sw"><i style="background:#191A23"></i><code>#191A23</code></td>
+              <td class="sw"><i style="background:#F0F0F2"></i><code>#F0F0F2</code></td>
+              <td>Fields, notes, raised cards.</td>
+            </tr>
+            <tr>
+              <th scope="row">hover</th>
+              <td class="sw"><i style="background:#1B1C26"></i><code>#1B1C26</code></td>
+              <td class="sw"><i style="background:#EAEAED"></i><code>#EAEAED</code></td>
+              <td>Hover background.</td>
+            </tr>
+            <tr>
+              <th scope="row">selected</th>
+              <td class="sw"><i style="background:#1A0D24"></i><code>#1A0D24</code></td>
+              <td class="sw"><i style="background:#F3EAF7"></i><code>#F3EAF7</code></td>
+              <td>Selected row, current nav item.</td>
             </tr>
             <tr>
               <th scope="row">line</th>
-              <td><code>#2A2B36</code></td>
-              <td>Hairline borders.</td>
+              <td class="sw"><i style="background:#2A2B36"></i><code>#2A2B36</code></td>
+              <td class="sw"><i style="background:#E3E3E7"></i><code>#E3E3E7</code></td>
+              <td>Tables and menus only.</td>
+            </tr>
+            <tr>
+              <th scope="row">fg</th>
+              <td class="sw"><i style="background:#ECECF1"></i><code>#ECECF1</code></td>
+              <td class="sw"><i style="background:#18181C"></i><code>#18181C</code></td>
+              <td>Text and links.</td>
+            </tr>
+            <tr>
+              <th scope="row">muted</th>
+              <td class="sw"><i style="background:#9B9BA8"></i><code>#9B9BA8</code></td>
+              <td class="sw"><i style="background:#55555D"></i><code>#55555D</code></td>
+              <td>Secondary text, quiet buttons, chips.</td>
+            </tr>
+            <tr>
+              <th scope="row">faint</th>
+              <td class="sw"><i style="background:#868693"></i><code>#868693</code></td>
+              <td class="sw"><i style="background:#67676E"></i><code>#67676E</code></td>
+              <td>Ids, counts, placeholders.</td>
+            </tr>
+            <tr>
+              <th scope="row">primary</th>
+              <td class="sw"><i style="background:#331C40"></i><code>#331C40</code></td>
+              <td class="sw"><i style="background:#E8DEEB"></i><code>#E8DEEB</code></td>
+              <td>The main action’s fill.</td>
+            </tr>
+            <tr>
+              <th scope="row">primary-hover</th>
+              <td class="sw"><i style="background:#3A1A49"></i><code>#3A1A49</code></td>
+              <td class="sw"><i style="background:#DBCBE0"></i><code>#DBCBE0</code></td>
+              <td>Its hover.</td>
+            </tr>
+            <tr>
+              <th scope="row">on-primary</th>
+              <td class="sw"><i style="background:#ECECF1"></i><code>#ECECF1</code></td>
+              <td class="sw"><i style="background:#18181C"></i><code>#18181C</code></td>
+              <td>Text on the main action.</td>
+            </tr>
+            <tr>
+              <th scope="row">accent</th>
+              <td class="sw"><i style="background:#C9E265"></i><code>#C9E265</code></td>
+              <td class="sw"><i style="background:#4C6A00"></i><code>#4C6A00</code></td>
+              <td>Poison: focus, brand moment, live dots.</td>
+            </tr>
+            <tr>
+              <th scope="row">danger</th>
+              <td class="sw"><i style="background:#F27A6B"></i><code>#F27A6B</code></td>
+              <td class="sw"><i style="background:#B5382C"></i><code>#B5382C</code></td>
+              <td>Errors, blocked.</td>
+            </tr>
+            <tr>
+              <th scope="row">ok</th>
+              <td class="sw"><i style="background:#5CC9A7"></i><code>#5CC9A7</code></td>
+              <td class="sw"><i style="background:#1B7357"></i><code>#1B7357</code></td>
+              <td>Done, passing.</td>
+            </tr>
+            <tr>
+              <th scope="row">warn</th>
+              <td class="sw"><i style="background:#E9AE45"></i><code>#E9AE45</code></td>
+              <td class="sw"><i style="background:#8A5A00"></i><code>#8A5A00</code></td>
+              <td>Waiting, in review.</td>
+            </tr>
+            <tr>
+              <th scope="row">info</th>
+              <td class="sw"><i style="background:#7AAEF5"></i><code>#7AAEF5</code></td>
+              <td class="sw"><i style="background:#2F62B8"></i><code>#2F62B8</code></td>
+              <td>In progress, neutral notices.</td>
             </tr>
           </tbody>
         </table>
@@ -829,11 +922,11 @@
 
     <section id="design">
       <h2>Design</h2>
-      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade — cloak and poison. Type is Grenze Gotisch and Atkinson Hyperlegible. The pictures are not drawn yet. Each one will show the hierarchy, the spacing, and the type from here.</p>
+      <p class="prose"><a href="../design/">design/</a> turns these decisions into numbers and reference layouts. Color is Nightshade, night and day. Principles and components are written down. Type is Grenze Gotisch and Atkinson Hyperlegible. The pictures are not drawn yet. Each one will show the hierarchy, the spacing, and the type from here.</p>
       <div class="handoff">
         <div>
           <h3>Tokens</h3>
-          <p>Nightshade color and studio type live as JSON, CSS, and Swift. Space is still empty.</p>
+          <p>Nightshade color (night and day), studio type, and corner radii live as JSON, CSS, and Swift. Space is still empty.</p>
           <p class="source"><a href="../design/tokens/">design/tokens</a></p>
         </div>
         <div>
