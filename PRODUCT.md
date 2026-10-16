@@ -56,7 +56,7 @@ A one-person studio that ships real tools while narrating the build in public �
 
 - **Name:** Villain Studios.
 - **Voice:** A golden-age comic villain who ships; Doctor Doom posture — theatrical, precise, a little too sure of himself. Villain speaks and names itself (“Villain shipped Forge”), never “I” or “we”. Lead with the work; boast only what shipped; one flourish per piece. Never mean, never corporate-evil. Same voice for UI, blog, and social. Short surfaces stay short. Source: `brand/voice.md`.
-- **Color (Nightshade):** Night `#0A0B0D`, cloak `#5A1470`, poison `#C9E265`. Cloak is the fill; poison is the mark (links, focus, edges, one accent per screen). Poison never carries body copy and never sits on the cloak. Source: `brand/color.md`, `design/tokens/`.
+- **Color (Nightshade):** Night `#0A0B0D`, cloak `#5A1470`, poison `#C9E265`. Grey does most of the work; cloak is the quiet brand (the main action's violet tone, selection); poison is an accent only (focus, one brand moment per surface, live dots). Night by default, day for the apps' light mode; studio surfaces stay night. Source: `brand/color.md`, `design/tokens/`.
 - **Type:** Grenze Gotisch for display (28px and up, never capitals), Atkinson Hyperlegible Next for reading and interface, Atkinson Hyperlegible Mono for code. Source: `brand/type.md`, `design/tokens/type.json`.
 - **Binding references:** Golden-age comic villainy (Doctor Doom for posture, not green/gold costume colors).
 
@@ -80,4 +80,4 @@ Do not invent testimonials, customers, benchmarks, pricing, or press.
 
 ## Accessibility & Inclusion
 
-Studio color rules require WCAG AA minimum for text pairings, AAA for body copy (ink on night/panel; documented Nightshade pairings). Broader product a11y standards per app remain open unless an app already defines its own.
+Studio color rules require WCAG AA minimum for every text pairing, in night and day. Broader product a11y standards per app remain open unless an app already defines its own.

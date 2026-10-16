@@ -1,16 +1,26 @@
 ---
 name: Villain Studios
-description: Nightshade studio system — cloak fill, poison mark, on night.
+description: Nightshade — grey does the work, cloak is the quiet brand, poison is the accent. Night by default, day for apps.
 colors:
-  night: "#0A0B0D"
-  cloak: "#5A1470"
-  cloak-hover: "#6B1884"
-  poison: "#C9E265"
-  wash: "#1A0D24"
-  ink: "#ECECF1"
-  muted: "#9B9BA8"
+  bg: "#0A0B0D"
   panel: "#12131A"
+  surface: "#191A23"
+  hover: "#1B1C26"
+  selected: "#1A0D24"
   line: "#2A2B36"
+  fg: "#ECECF1"
+  muted: "#9B9BA8"
+  faint: "#868693"
+  primary: "#331C40"
+  primary-hover: "#3A1A49"
+  on-primary: "#ECECF1"
+  accent: "#C9E265"
+  danger: "#F27A6B"
+  ok: "#5CC9A7"
+  warn: "#E9AE45"
+  info: "#7AAEF5"
+  cloak: "#5A1470"
+  poison: "#C9E265"
 typography:
   splash:
     fontFamily: "Grenze Gotisch, ui-serif, Georgia, serif"
@@ -55,85 +65,80 @@ typography:
     lineHeight: 1.6
 components:
   button-primary:
-    backgroundColor: "{colors.cloak}"
-    textColor: "{colors.ink}"
-    padding: "0.55rem 0.9rem"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    height: "28px"
+    padding: "0 0.7rem"
+    rounded: "6px"
   button-primary-hover:
-    backgroundColor: "{colors.cloak-hover}"
-    textColor: "{colors.ink}"
-  button-ghost:
+    backgroundColor: "{colors.primary-hover}"
+    textColor: "{colors.on-primary}"
+  button-secondary:
     backgroundColor: "transparent"
-    textColor: "{colors.ink}"
-    padding: "0.55rem 0.9rem"
-  button-ghost-hover:
-    backgroundColor: "{colors.wash}"
-    textColor: "{colors.ink}"
+    textColor: "{colors.muted}"
+    height: "28px"
+    padding: "0 0.7rem"
+    rounded: "6px"
+  button-secondary-hover:
+    backgroundColor: "{colors.hover}"
+    textColor: "{colors.fg}"
+  field:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.fg}"
+    rounded: "6px"
   chip:
-    textColor: "{colors.poison}"
-    padding: "0.35rem 0.65rem"
+    textColor: "{colors.muted}"
+    rounded: "999px"
   card-panel:
     backgroundColor: "{colors.panel}"
-    textColor: "{colors.ink}"
-    padding: "1rem 1.1rem"
+    textColor: "{colors.fg}"
+    rounded: "10px"
 ---
 
 # Design System: Villain Studios
+
+This file summarises `brand/` and `design/` for design tools. Those folders are the source; when they change, this follows.
 
 ## Overview
 
 **Creative North Star: "The Nightshade Cloak"**
 
-Villain Studios’ visual system is theatrical, sharp, grand, and imperious — a golden-age comic villain’s court rendered as a dark product surface. The world sits on near-black night. Deep violet (Cloak) is the authoritative fill: buttons, brand mass, armor. Chartreuse (Poison) is the rare mark: a link, a focus ring, a 3px edge — never the page’s voice.
+A golden-age comic villain's court, rendered as a calm product surface. The theatre lives in a few large places: Grenze Gotisch titles and the poison strike on the homepage. Everything read or clicked stays plain, quiet, and legible.
 
-Depth comes from tonal steps (night → panel → wash) and hard hairlines, not glow or soft shadow. Corners stay square. Grenze Gotisch carries the large titles; Atkinson Hyperlegible Next carries everything read or clicked. Apps may keep product themes; studio surfaces follow Nightshade.
+Grey does most of the work. Cloak (violet) is the brand, held to the strength of a grey: the main action, selection. Poison (chartreuse) is an accent, never the main thing.
 
 **Key Characteristics:**
-- Night ground; Cloak fill; Poison mark
-- Flat, tonal, square — no accent glows
-- One Poison accent per screen
-- Imperious density: sparse chrome, clear hierarchy
-- Poison never on Cloak as text; never as body copy
+- Night by default; day for the apps' light mode. Studio surfaces stay night.
+- Tone, not lines: regions separate by steps in tone and space.
+- Soft corners: 6px controls, 10px panels, round pills.
+- One quiet primary per screen; everything else steps back.
+- Poison only for focus, one brand moment per surface, and live dots.
+
+Principles: `design/principles.md`. Components: `design/components.md`.
 
 ## Colors
 
-Nightshade is a two-note brand on a neutral night stack: violet authority beside chartreuse signal.
+Shared names, filled for night and day (full table in `brand/color.md`, numbers in `design/tokens/color.json`).
 
-### Primary
-- **Cloak** (`#5A1470`): Deep violet. Primary fills — buttons, brand mass, ghost borders, chip borders. Hover sibling **Cloak Hover** (`#6B1884`).
-- **Poison** (`#C9E265`): Chartreuse. Links, focus outlines, 3px card edges, chips. One accent per screen.
-
-### Neutral
-- **Night** (`#0A0B0D`): Every studio ground.
-- **Panel** (`#12131A`): Cards and raised surfaces.
-- **Wash** (`#1A0D24`): Selected rows and hover backgrounds (violet-tinted, not a purple slab).
-- **Ink** (`#ECECF1`): Body text on night and panel; labels on Cloak fills.
-- **Muted** (`#9B9BA8`): Secondary text.
-- **Line** (`#2A2B36`): Hairline borders.
+- **bg / panel / surface**: frame, content, fields. Elevation is a step in tone.
+- **fg / muted / faint**: text, secondary text, ids and placeholders. Links are `fg`, bold, underlined.
+- **primary**: the main action's fill, a violet tone (`#331C40` night, `#E8DEEB` day).
+- **selected**: violet-tinted selection. Day greys carry no violet.
+- **accent**: poison. Bright `#C9E265` by night, deep `#4C6A00` by day.
+- **danger / ok / warn / info**: status. Ok is teal so it never reads as poison.
 
 ### Named Rules
-**The Cloak-and-Poison Rule.** Cloak is the fill. Poison is the mark. Poison never carries body copy and never sits on the cloak.
+**The Accent Rule.** Poison goes to the focus ring, one brand moment per surface, and live dots. Never links, labels, chips, body copy, or large fills. Never on cloak.
 
-**The One Mark Rule.** Use at most one Poison accent treatment per screen (link cluster, edge, or focus — not all competing).
-
-**The Muddy-Fill Ban.** Do not paint large surfaces with deep violet on night; keep grounds Night/Panel and let Cloak stay chrome and fill for controls.
+**The Quiet Brand Rule.** Cloak appears as a tone (primary, selected), not as a solid purple block in product UI.
 
 ## Typography
 
 **Display Font:** Grenze Gotisch (700, 800). Splash, page titles, section titles.
-**Body Font:** Atkinson Hyperlegible Next (400, 700, italic 400). Reading text, labels, buttons, nav, card titles.
+**Body Font:** Atkinson Hyperlegible Next (400–700, italic 400). Reading text, labels, buttons, nav, card titles.
 **Mono Font:** Atkinson Hyperlegible Mono (400). Code and terminal text.
 
-**Character:** The gothic is the costume; Atkinson is the person inside it. Blackletter carries the theatre in a few large places. Everything meant to be read or clicked stays plain and legible. Source: `brand/type.md`; numbers in `design/tokens/type.json`.
-
-### Hierarchy
-- **Splash** (Grenze 800, `clamp(4.5rem, 14.5vw, 11.5rem)`, 0.95): Cover lettering. One per surface.
-- **Display** (Grenze 700, `clamp(2.25rem, 6vw, 3.5rem)`, 1.1): Page and post titles.
-- **Headline** (Grenze 700, `clamp(1.75rem, 3.4vw, 2.125rem)`, 1.18): Section titles.
-- **Title** (Atkinson 700, `1.3125rem`, 1.25): Card titles, product names.
-- **Label** (Atkinson 700, `0.9375rem`, 1.2, tracking `0.01em`): Buttons, chips, nav.
-- **Body** (Atkinson 400, `1.0625rem`, 1.6): Reading text; measure 66ch.
-- **Small** (Atkinson 400, `0.875rem`, 1.5): Captions, dates, meta.
-- **Code** (Atkinson Mono 400, `0.875rem`, 1.6): Code blocks, terminal text.
+The gothic is the costume; Atkinson is the person inside it. Source: `brand/type.md`.
 
 ### Named Rules
 **The 28px Floor.** Grenze never goes below 28px. Under that, use Atkinson 700.
@@ -144,60 +149,36 @@ Nightshade is a two-note brand on a neutral night stack: violet authority beside
 
 ## Layout
 
-Studio brand study uses a centered measure (`max-width` ~72rem main, ~66ch prose), horizontal padding `clamp(1.25rem, 4vw, 3rem)`, and section rhythm with large top padding (`~5.5rem`). Action rows use flex wrap with gap `0.75rem 1rem`. Swatch pairs are two equal columns collapsing to one under ~800px. No formal spacing token scale is published yet — use rem rhythm consistently rather than inventing a scale name.
+Apps share one frame: sidebar and top bar on `bg`, dimmed; content rises one step onto a rounded `panel`. Prose keeps a 66ch measure. No space scale is published yet; use rem rhythm consistently.
 
 ## Elevation & Depth
 
-Flat by default. No box-shadow vocabulary in the Nightshade brand system. Depth is tonal (Night → Panel → Wash) plus 1px Line/Ink borders and the 3px Poison left edge on emphasized cards.
-
-### Named Rules
-**The No-Glow Rule.** No gradients, glows, or soft shadows on the accent. Poison is hard edge and ink, not bloom.
+Flat. Depth is tone: bg → panel → surface. No shadows, no borders to lift a surface, no glow. The `line` token is for tables and menus only.
 
 ## Shapes
 
-Square corners throughout the documented Nightshade components. No border-radius token. Forms read as cut armor plates, not pills.
-
-### Named Rules
-**The Square Armor Rule.** Prefer hard corners for studio chrome until a radius scale is deliberately chosen.
+`radius-sm` 4px (key hints), `radius-md` 6px (buttons, fields, rows, nav, notes), `radius-lg` 10px (panels, dialogs), `radius-full` (pills, chips).
 
 ## Components
 
-Controls feel sharp and theatrical — imperious, not soft SaaS.
-
-### Buttons
-- **Shape:** Square (0 radius).
-- **Primary:** Cloak fill, Ink label, 1px Poison border; padding `0.55rem 0.9rem`; weight 700. Hover → Cloak Hover. Focus-visible → 2px Poison outline, offset 3px.
-- **Ghost:** Transparent, Ink label, 1px Cloak border. Hover → Wash background.
-
-### Chips
-- **Style:** Poison text, Cloak border, transparent fill; padding `0.35rem 0.65rem`; weight 700.
-- **State:** Mark-only; do not fill chips with Poison.
-
-### Cards / Containers
-- **Corner Style:** Square.
-- **Background:** Panel.
-- **Shadow Strategy:** None; flat.
-- **Border:** 1px Line; emphasized cards add 3px Poison left edge.
-- **Internal Padding:** ~`1rem 1.1rem`.
-
-### Navigation
-- Brand study nav is Ink on Night with underline current state — not Poison (Poison is for content links, not nav).
-
-### Links
-- Poison, underline, weight 600; underline offset ~0.22em. Content/action links only.
+- **Button**: 28px, 13px semibold, no border. Primary: `primary` fill, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring.
+- **Field**: `surface` fill, no border; focus draws one accent ring on the edge.
+- **Status pill**: round; status colour as text and dot on a 13% tint.
+- **Chip**: round; muted text on `fg` at 7%.
+- **Row**: no dividers; hover and selection are tone steps.
+- **Live dot**: small round accent dot for something happening now.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** put Ink (`#ECECF1`) on Night or Panel for body, and Ink on Cloak for primary button labels.
-- **Do** use Poison for links, focus, 3px edges, and chips — sparsely.
-- **Do** keep surfaces Night / Panel / Wash; reserve Cloak for fills and borders.
-- **Do** meet WCAG AA minimum (AAA for body) on text pairings.
+- **Do** lead each screen with one quiet primary.
+- **Do** separate regions by tone and space.
+- **Do** keep links in ink, bold and underlined.
+- **Do** meet WCAG AA on every text pairing, in night and day.
 
 ### Don't:
-- **Don't** put Poison text on a Cloak fill.
-- **Don't** use Poison for headings, body copy, or nav links.
-- **Don't** use Poison as a large background fill.
+- **Don't** colour links, chips, or labels with poison.
+- **Don't** use solid cloak as a button fill in product UI.
+- **Don't** add hairlines between rows or regions.
 - **Don't** set Grenze Gotisch below 28px or in capitals.
-- **Don't** invent radii or accent glows ahead of brand decisions.
-- **Don't** treat app theme accents (Layer lavender, Forge indigo) as the studio brand.
+- **Don't** add shadows or glows.
