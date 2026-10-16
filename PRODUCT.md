@@ -28,7 +28,7 @@ A one-person studio that ships real tools while narrating the build in public �
 ## Operating Context
 
 - Brand decisions start in `brand/` (color, type, mark, voice); `design/` carries numbers and layouts; apps catch up in their own toolkits.
-- Studio surfaces follow `brand/`. A product may keep its own UI theme (e.g. Layer’s theme picker).
+- Studio surfaces follow `brand/` and stay night. Nightshade is every app's default, night and day; a theme picker like Layer's can add themes on the same colour names.
 - Content lives in `content/blog` and `content/social`; the site publishes the blog.
 - Agents read `AGENTS.md` at the vault root and each app’s `AGENTS.md` before working there.
 - Role label in public writing: product engineer (current name; may change). The work carries the story, not the title.
@@ -50,7 +50,6 @@ A one-person studio that ships real tools while narrating the build in public �
 **Undecided**
 
 - Studio mark — not drawn yet (`brand/mark/`).
-- How far Nightshade is applied inside each app’s product UI (timing and scope open).
 
 ## Brand Commitments
 
