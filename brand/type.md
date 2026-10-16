@@ -24,7 +24,7 @@ them, and Caster bundles them.
 
 - Grenze never goes below 28px. Under that, use Atkinson 700.
 - Grenze is never set in capitals. Blackletter capitals in a row turn unreadable.
-- 800 belongs to the splash alone: the stacked Villain Studios lettering, a social card headline. One per surface.
+- 800 belongs to the splash alone: the logo set large on the homepage, a social card headline. One per surface.
 - Titles are sentence case.
 - Atkinson italic carries emphasis in prose. Atkinson 700 carries strong emphasis. 600 is for controls.
 
