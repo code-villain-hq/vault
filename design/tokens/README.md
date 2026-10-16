@@ -4,6 +4,6 @@ The numbers taken from `brand/`: color, type, space.
 
 Studio color is Nightshade. Machine-readable copies live in [`brand/design/tokens/`](../../brand/design/tokens/).
 
-[`apps.json`](apps.json) lists the colors the apps use now. It is not the studio palette.
+Studio type is in [`type.json`](type.json), from [`brand/type.md`](../../brand/type.md). [`type.css`](type.css) and [`type.swift`](type.swift) carry the same numbers for the web and for Caster. They name the faces. Each surface loads the font files itself.
 
-An app does not import this folder on its own. Matching an app to the tokens is a change in that app.
+The space scale is not published yet. It waits on a deliberate spacing decision.
