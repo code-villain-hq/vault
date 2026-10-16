@@ -7,11 +7,11 @@ mark.
 | File | What it is |
 | --- | --- |
 | [`mark.svg`](mark.svg) | The mark on its night tile. The app icon shape and the favicon. |
-| [`logo-night.svg`](logo-night.svg) | "Villain" with the strike, "Studios" under it, for night grounds. |
+| [`logo-night.svg`](logo-night.svg) | "Villain" with the strike, "Studios" tucked under it, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 
 Every letter is outlined: the V and "Villain" from Grenze Gotisch 800,
-"Studios" from Atkinson Hyperlegible Next 600. The files render
+"Studios" from Atkinson Hyperlegible Next 700. The files render
 without any font installed.
 
 ## Construction
@@ -28,8 +28,9 @@ the strokes come together.
 
 The logo uses the same strike at the size of "Villain": the bar is
 0.11 of the letter size, its centre 0.24 of it above the baseline,
-and it runs past both ends of the word. "Studios" sits under it in
-Atkinson Hyperlegible Next 600, capitals, tracked 0.32em.
+and it runs past both ends of the word. "Studios" is tucked right
+under it in Atkinson Hyperlegible Next 700 capitals, in ink, spread to
+exactly the width of "Villain", so the two read as one block.
 
 ## Use
 
