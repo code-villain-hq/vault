@@ -10,9 +10,10 @@ mark.
 | [`logo-night.svg`](logo-night.svg) | "Villain" with the strike, "Studios" under it, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 
-The letters are set in Grenze Gotisch as live text, so the files
-need the font to render. They get outlined before they ship as
-assets.
+"Villain" and the V are outlined from Grenze Gotisch 800, so the files
+render without the font. "Studios" in the logos is still live text in
+Atkinson Hyperlegible Next and needs that font until it is outlined
+too.
 
 ## Construction
 
