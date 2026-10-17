@@ -16,6 +16,7 @@ Code Villain builds real tools and shows the build in public. Someone looking in
 | [`apps/forge`](apps/forge) | Forge, the AI-first issue tracker |
 | [`apps/layer`](apps/layer) | Layer, the agent development environment for macOS |
 | [`apps/caster`](apps/caster) | Caster, the launcher for macOS |
+| [`apps/schemer`](apps/schemer) | Schemer, a delivery tool that feeds itself (planning only) |
 | [`apps/site`](apps/site) | The website. It publishes [`content/blog`](content/blog) |
 
 The studio website is [www.codevillain.eu](https://www.codevillain.eu/). Naming rules live in [`brand/name.md`](brand/name.md).
