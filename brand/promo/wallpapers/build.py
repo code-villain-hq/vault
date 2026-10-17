@@ -5,6 +5,7 @@ Writes one SVG per design and format, and renders a PNG of each with
 headless Chrome. The letters and strikes come from brand/mark; nothing is
 redrawn.
 """
+import math
 import pathlib
 import re
 import subprocess
@@ -17,6 +18,11 @@ GROUND, INK, POISON = "#0A0B0D", "#ECECF1", "#C9E265"
 # The rows pattern repeats the wordmark in a grey a step above night, so
 # the lit wordmark and its strike stay the one bright moment.
 TEXTURE = "#1A1B20"
+# The cube pattern: tumbling blocks in cloak and night, no letters and no
+# poison. Each face splits on its long diagonal into a solid and a hatched
+# half, lit from the left: cloak, then wash, then night.
+CUBE = dict(lit="#5A1470", shade="#1A0D24", dark=GROUND, top="#16171C",
+            top_line="#2E2F3A", deep_line="#3B1149")
 
 
 def path(file, name):
@@ -78,6 +84,43 @@ def rows(design, width, height):
     return "".join(uses)
 
 
+def cubes(width, height):
+    edge = max(width, height) * 0.075
+    stripe = edge / 9
+    c = CUBE
+
+    def hatch(name, ground, line, angle, share):
+        return (f'<pattern id="{name}" patternUnits="userSpaceOnUse" width="{stripe:.2f}" height="{stripe:.2f}" '
+                f'patternTransform="rotate({angle})"><rect width="{stripe:.2f}" height="{stripe:.2f}" fill="{ground}"/>'
+                f'<rect width="{stripe:.2f}" height="{stripe * share:.2f}" fill="{line}"/></pattern>')
+
+    def cube(cx, cy):
+        p = {k: (cx + edge * math.cos(math.radians(a)), cy + edge * math.sin(math.radians(a)))
+             for k, a in (("T", -90), ("UR", -30), ("LR", 30), ("B", 90), ("LL", 150), ("UL", 210))}
+        p["C"] = (cx, cy)
+
+        def triangle(fill, *corners):
+            # A 1px outline in the same fill closes anti-aliasing seams between neighbours.
+            return ('<path d="M' + "L".join(f"{p[k][0]:.1f} {p[k][1]:.1f}" for k in corners)
+                    + f'Z" fill="{fill}" stroke="{fill}" stroke-width="1"/>')
+        return (triangle("url(#top)", "UL", "T", "UR") + triangle("url(#rim)", "UL", "C", "UR")
+                + triangle(c["lit"], "UL", "LL", "B") + triangle("url(#side)", "UL", "C", "B")
+                + triangle(c["shade"], "UR", "C", "B") + triangle(c["dark"], "UR", "LR", "B"))
+
+    across, down = edge * math.sqrt(3), edge * 1.5
+    tiles = "".join(cube(column * across + (across / 2 if row % 2 else 0), row * down)
+                    for row in range(-1, int(height / down) + 2)
+                    for column in range(-1, int(width / across) + 2))
+    patterns = (hatch("top", c["top"], c["top_line"], -30, 0.5) + hatch("rim", c["dark"], c["deep_line"], -30, 0.35)
+                + hatch("side", c["shade"], c["lit"], 60, 0.4))
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <title>Code Villain</title>
+  <defs>{patterns}</defs>
+  <rect width="{width}" height="{height}" fill="{GROUND}"/>{tiles}
+</svg>
+"""
+
+
 def svg(design, width, height, cx, cy, size):
     left, right, top, bottom = outline_box(design["d"])
     strike_top, strike_height = design["strike"]
@@ -110,11 +153,16 @@ def svg(design, width, height, cx, cy, size):
 """
 
 
-for (name, size_name), (cx, cy, size) in PLACEMENT.items():
+# The cube pattern has no letters, so it needs no placement.
+JOBS = [(name, size_name, svg(DESIGNS[name], *FORMATS[size_name], cx, cy, size))
+        for (name, size_name), (cx, cy, size) in PLACEMENT.items()]
+JOBS += [("cubes", size_name, cubes(*FORMATS[size_name])) for size_name in FORMATS]
+
+for name, size_name, drawing in JOBS:
     width, height = FORMATS[size_name]
     stem = f"code-villain-{name}-{size_name}"
     source = HERE / f"{stem}.svg"
-    source.write_text(svg(DESIGNS[name], width, height, cx, cy, size))
+    source.write_text(drawing)
     with tempfile.TemporaryDirectory() as profile:
         subprocess.run(
             [CHROME, "--headless=new", f"--user-data-dir={profile}", "--hide-scrollbars",

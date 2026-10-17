@@ -10,9 +10,10 @@ a change to the mark reaches every image. Don't edit the outputs by hand.
 
 ## Wallpapers
 
-[`wallpapers/`](wallpapers) has three designs, each for three screens. Both
-use the marks' own construction: ink letters on night, cut into a poison
-strike that runs edge to edge, the way the homepage logo extends it.
+[`wallpapers/`](wallpapers) has four designs, each for three screens. The
+first three use the marks' own construction: ink letters on night, cut
+into a poison strike that runs edge to edge, the way the homepage logo
+extends it.
 
 - **Mark**: CV from [`mark/mark.svg`](../mark/mark.svg), right of centre on
   desktop, clear of windows' usual middle; low on the phone, under the clock.
@@ -21,6 +22,9 @@ strike that runs edge to edge, the way the homepage logo extends it.
 - **Rows**: the wordmark design on a wall of staggered grey wordmarks, a
   step above night. They run up to the lit name and its strike, with the
   brand's thin cut around both, so it reads as one name called out of many.
+- **Cubes**: a pattern alone, with no letters and no poison. Tumbling blocks
+  lit from the left in cloak, wash and night; each face splits on its long
+  diagonal into a solid and a hatched half.
 
 | Screen | Size |
 | --- | --- |
