@@ -18,11 +18,14 @@ GROUND, INK, POISON = "#0A0B0D", "#ECECF1", "#C9E265"
 # The rows pattern repeats the wordmark in a grey a step above night, so
 # the lit wordmark and its strike stay the one bright moment.
 TEXTURE = "#1A1B20"
-# The cube pattern: tumbling blocks in cloak and night, no letters and no
-# poison. Each face splits on its long diagonal into a solid and a hatched
-# half, lit from the left: cloak, then wash, then night.
-CUBE = dict(lit="#5A1470", shade="#1A0D24", dark=GROUND, top="#16171C",
-            top_line="#2E2F3A", deep_line="#3B1149")
+# The cube pattern: tumbling blocks, no letters. Each palette lights the
+# left face, fans it into shade, and engraves a grey top over night.
+CUBES = {
+    # Poison, the brand colour, fading into a dark olive.
+    "cubes-poison": dict(lit="#C9E265", shade="#252919", dark=GROUND, top_line="#2E2F3A"),
+    # Cloak, the supporting colour, fading into wash.
+    "cubes-cloak": dict(lit="#5A1470", shade="#1A0D24", dark=GROUND, top_line="#2E2F3A"),
+}
 
 
 def path(file, name):
@@ -84,11 +87,10 @@ def rows(design, width, height):
     return "".join(uses)
 
 
-def cubes(width, height):
+def cubes(width, height, c):
     """Tumbling blocks. Hatched halves are engraved: stripes run parallel to
     the face's edge and thin out towards the opposite corner."""
     edge = min(width, height) * 0.16
-    c = CUBE
 
     def solid(fill, points):
         # A 1px outline in the same fill closes anti-aliasing seams between neighbours.
@@ -181,7 +183,8 @@ def svg(design, width, height, cx, cy, size):
 # The cube pattern has no letters, so it needs no placement.
 JOBS = [(name, size_name, svg(DESIGNS[name], *FORMATS[size_name], cx, cy, size))
         for (name, size_name), (cx, cy, size) in PLACEMENT.items()]
-JOBS += [("cubes", size_name, cubes(*FORMATS[size_name])) for size_name in FORMATS]
+JOBS += [(name, size_name, cubes(*FORMATS[size_name], palette))
+         for name, palette in CUBES.items() for size_name in FORMATS]
 
 for name, size_name, drawing in JOBS:
     width, height = FORMATS[size_name]

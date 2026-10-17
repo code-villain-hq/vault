@@ -10,7 +10,8 @@ a change to the mark reaches every image. Don't edit the outputs by hand.
 
 ## Wallpapers
 
-[`wallpapers/`](wallpapers) has four designs, each for three screens. The
+[`wallpapers/`](wallpapers) has four designs, each for three screens (the
+cubes in two palettes). The
 first three use the marks' own construction: ink letters on night, cut
 into a poison strike that runs edge to edge, the way the homepage logo
 extends it.
@@ -22,12 +23,12 @@ extends it.
 - **Rows**: the wordmark design on a wall of staggered grey wordmarks, a
   step above night. They run up to the lit name and its strike, with the
   brand's thin cut around both, so it reads as one name called out of many.
-- **Cubes**: a pattern alone, with no letters and no poison. Tumbling blocks
-  lit from the left in cloak, wash and night. The top is one engraved face,
-  its stripes parallel to the back-right edge and thinning towards the
-  front; the lit face turns into shade through a fan of rays from the
-  bottom corner. Blocks are sized from the screen's short side,
-  so every screen shows about the same few.
+- **Cubes**: a pattern alone, with no letters. Tumbling blocks lit from
+  the left, in two palettes: `cubes-poison` (the brand colour fading into
+  dark olive) and `cubes-cloak` (the supporting violet fading into wash).
+  The top is one engraved face, its stripes parallel to the back-right
+  edge and thinning towards the front; the lit face turns into shade
+  through a fan of rays from the bottom corner.
 
 | Screen | Size |
 | --- | --- |
