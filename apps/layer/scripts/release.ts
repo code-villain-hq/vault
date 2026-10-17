@@ -85,8 +85,12 @@ async function draft() {
   if (read(["git", "rev-parse", "HEAD"]) !== read(["git", "rev-parse", "origin/main"])) {
     fail("main and origin/main differ. Push or pull first: a release is cut from a commit that is on Forgejo.");
   }
-  if (Bun.spawnSync(["git", "rev-parse", "-q", "--verify", `refs/tags/${tag}`]).exitCode === 0) {
+  if (read(["git", "ls-remote", "--tags", "origin", `refs/tags/${tag}`])) {
     fail(`${tag} already exists. Bump the version in src-tauri/Cargo.toml first.`);
+  }
+  const releases: any[] = await api("GET", "/releases?limit=50");
+  if (releases.some((r) => r.tag_name === tag)) {
+    fail(`there is already a release for ${tag} on Forgejo. Delete the draft there, or bump the version.`);
   }
 
   const set = SIGNING.filter((name) => process.env[name]);
@@ -141,14 +145,22 @@ async function draft() {
     ...(changes ? ["", `## Since ${previous}`, "", changes] : []),
   ].join("\n");
 
-  run(["git", "tag", tag]);
-  run(["git", "push", "origin", tag]);
-
+  // No tag is pushed: Forgejo publishes a release at once when its tag
+  // already exists, draft or not (0.9.0 went out that way). A draft names
+  // the commit instead, and Forgejo makes the tag when it is published.
   const release = await api(
     "POST",
     "/releases",
-    JSON.stringify({ tag_name: tag, name: `Layer ${version}`, body: notes, draft: true, prerelease: false }),
+    JSON.stringify({
+      tag_name: tag,
+      target_commitish: read(["git", "rev-parse", "HEAD"]),
+      name: `Layer ${version}`,
+      body: notes,
+      draft: true,
+      prerelease: false,
+    }),
   );
+  if (!release.draft) fail(`Forgejo published ${tag} instead of drafting it. Check it on Forgejo before anything else.`);
   for (const name of [dmgName, "SHA256SUMS.txt"]) {
     const form = new FormData();
     form.append("attachment", Bun.file(join(out, name)), name);
@@ -164,12 +176,14 @@ async function draft() {
 // bun run release:publish
 
 async function publish() {
-  const releases: any[] = await api("GET", "/releases?draft=true&limit=50");
+  // `?draft=true` filters drafts out rather than in, so read them all.
+  const releases: any[] = await api("GET", "/releases?limit=50");
   const release = releases.find((r) => r.tag_name === tag) ?? fail(`there is no draft for ${tag}. Run bun run release first.`);
   if (release.draft) {
     await api("PATCH", `/releases/${release.id}`, JSON.stringify({ draft: false }));
     console.log(`Published Layer ${version}: ${FORGEJO}/${REPO}/releases/tag/${tag}`);
   }
+  run(["git", "fetch", "--quiet", "--tags", "origin"]);
   // A prerelease would be what everyone gets from `brew upgrade`.
   if (release.prerelease) return console.log("A prerelease is not put in the tap.");
 

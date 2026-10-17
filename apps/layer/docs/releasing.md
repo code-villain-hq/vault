@@ -5,11 +5,12 @@ A release is built on your Mac and published on the vault's Forgejo, at
 [`scripts/release.ts`](../scripts/release.ts) does it in two steps:
 
 - `bun run release` runs `bun run check`, builds the app for Apple silicon,
-  tags the commit `layer-v<version>`, and puts
-  `Layer-<version>-macos-arm64.dmg` with its SHA-256 on a **draft** release.
-  Nothing is public yet.
-- `bun run release:publish` publishes the draft and puts it in the
-  Homebrew tap ([below](#homebrew)).
+  and puts `Layer-<version>-macos-arm64.dmg` with its SHA-256 on a **draft**
+  release for the commit. Nothing is public yet, not even the tag.
+- `bun run release:publish` publishes the draft, which makes the tag
+  `layer-v<version>` on Forgejo, and puts it in the Homebrew tap
+  ([below](#homebrew)). Forgejo publishes a release at once when its tag
+  already exists, so the script never pushes the tag itself.
 
 Tags carry the `layer-` prefix because the vault holds more than one app.
 Releases up to 0.8.0 were universal (Intel too) and are on the old GitHub
@@ -29,9 +30,8 @@ repository; from 0.9.0 they are Apple silicon only.
    `apps/layer` since the last tag), and edit them there if needed.
 6. `bun run release:publish`.
 
-A tag that failed can be deleted and cut again once the fix is on `main`:
-delete the draft on Forgejo, then
-`git tag -d layer-v0.9.0 && git push --delete origin layer-v0.9.0`.
+A draft that is wrong can be deleted on Forgejo and cut again once the fix
+is on `main`: there is no tag until it is published.
 
 ## Once per Mac
 
