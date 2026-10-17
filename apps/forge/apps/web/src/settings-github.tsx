@@ -49,7 +49,7 @@ export function GitHubSettingsPage() {
   return (
     <>
       <PageHeader title="GitHub" />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-8">
           <ErrorMessage>{error}</ErrorMessage>
           <section>
@@ -180,7 +180,7 @@ export function GitHubSettingsPage() {
             </section>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 }

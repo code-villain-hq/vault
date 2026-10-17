@@ -97,7 +97,7 @@ export function ProjectsPage() {
           <NewPlanForm kind="Project" onDone={() => setCreating(false)} />
         </CreateDialog>
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {sorted.length === 0 && (
           <p className="px-4 py-16 text-center text-muted">
             No projects yet. A project is a set of issues working toward one outcome.
@@ -139,7 +139,7 @@ export function ProjectsPage() {
             );
           })}
         </ul>
-      </main>
+      </div>
     </>
   );
 }
@@ -279,7 +279,7 @@ export function ProjectPage() {
           />
         )}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <EditableHeader
           name={project.name}
           description={project.description}
@@ -332,7 +332,7 @@ export function ProjectPage() {
           }
           showProject={false}
         />
-      </main>
+      </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );
@@ -410,7 +410,7 @@ export function InitiativesPage() {
           <NewPlanForm kind="Initiative" onDone={() => setCreating(false)} />
         </CreateDialog>
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {initiatives.length === 0 && (
           <p className="px-4 py-16 text-center text-muted">
             No initiatives yet. An initiative groups projects toward a larger goal.
@@ -458,7 +458,7 @@ export function InitiativesPage() {
               );
             })}
         </ul>
-      </main>
+      </div>
     </>
   );
 }
@@ -510,7 +510,7 @@ export function InitiativePage() {
           />
         )}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <EditableHeader
           name={initiative.name}
           description={initiative.description}
@@ -560,7 +560,7 @@ export function InitiativePage() {
             );
           })}
         </ul>
-      </main>
+      </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );

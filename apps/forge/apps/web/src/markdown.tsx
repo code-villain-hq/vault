@@ -20,11 +20,32 @@ export function Markdown({ text, empty }: { text: string; empty?: string }) {
   useEffect(() => {
     // Again whenever the HTML, and so the DOM, is replaced.
     void html;
-    if (container.current) return showAttachments(container.current);
+    if (container.current) {
+      prepareMarkdown(container.current);
+      return showAttachments(container.current);
+    }
   }, [html]);
   if (!text.trim()) return <p className="text-faint">{empty ?? "Nothing here yet."}</p>;
   // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by DOMPurify above
   return <div ref={container} className="markdown" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** Preserve task state and make overflowing code reachable without a pointer. */
+function prepareMarkdown(root: HTMLElement) {
+  for (const checkbox of root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+    if (checkbox.hasAttribute("aria-label") || checkbox.hasAttribute("aria-labelledby")) continue;
+    const item = checkbox.closest("li")?.cloneNode(true) as HTMLElement | undefined;
+    // Nested tasks have their own names; don't repeat them in the parent's label.
+    for (const child of item?.querySelectorAll("ul, ol, input") ?? []) child.remove();
+    const label = item?.textContent?.replace(/\s+/g, " ").trim();
+    checkbox.setAttribute("aria-label", label || "Task");
+  }
+  for (const block of root.querySelectorAll("pre")) {
+    block.tabIndex = 0;
+    block.setAttribute("role", "group");
+    block.setAttribute("aria-label", "Code block");
+    block.classList.add("outline-none", "focus-visible:ring-2", "focus-visible:ring-accent");
+  }
 }
 
 /**

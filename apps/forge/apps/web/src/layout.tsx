@@ -38,7 +38,7 @@ import { Redirect } from "./redirect";
 import { defaultWorkspace, rememberWorkspace, signOut, useSession } from "./session";
 import { openShortcuts, Shortcuts } from "./shortcuts";
 import { SyncIndicator } from "./sync-indicator";
-import { AuthScreen, Button, Logo, Splash } from "./ui";
+import { AuthScreen, Button, Splash } from "./ui";
 import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /** `/`: opens the workspace used last, or asks to sign in. */
@@ -153,9 +153,9 @@ function Shell() {
     <NewIssueProvider pageDefaults={pageDefaults}>
       <div className="app-shell flex h-full bg-bg">
         <Sidebar />
-        <div className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
+        <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
           <Outlet />
-        </div>
+        </main>
       </div>
       <CommandMenu />
       <Shortcuts />
@@ -185,7 +185,6 @@ function Sidebar() {
       <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
         <div className="sidebar-heading flex shrink-0 items-center gap-1">
           <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
-            <Logo />
             <span className="font-display text-[28px] leading-[1.18] font-bold">Forge</span>
           </div>
           <SidebarActions />
@@ -247,13 +246,13 @@ function AppNav() {
   const unread = useUnreadCount();
   return (
     <>
-      <nav className="flex flex-col gap-0.5">
+      <nav aria-label="Personal" className="flex flex-col gap-0.5">
         <Link to="/$workspace/inbox" params={params} className={navLink}>
           <NavIcon icon={Inbox} />
           Inbox
           {unread > 0 && (
             <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-faint">
-              <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
+              <span className="size-1.5 rounded-full bg-signal" aria-hidden="true" />
               {unread}
             </span>
           )}
@@ -352,7 +351,7 @@ function DomainsNav() {
             aria-label={open ? "Fold domains" : "Show domains"}
             aria-expanded={open}
             onClick={toggle}
-            className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+            className="absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
           >
             <ChevronDown
               size={13}
@@ -398,7 +397,7 @@ function SettingsNav() {
         <NavIcon icon={ArrowLeft} />
         Back to app
       </a>
-      <nav className="flex flex-col gap-0.5">
+      <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
         <Link to="/$workspace/settings/members" params={params} className={navLink}>
           <NavIcon icon={UsersRound} />
@@ -421,7 +420,7 @@ function SettingsNav() {
           GitHub
         </Link>
       </nav>
-      <nav className="flex flex-col gap-0.5">
+      <nav aria-label="Personal settings" className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-xs text-faint">You</span>
         <Link to="/$workspace/settings/account" params={params} className={navLink}>
           <NavIcon icon={UserRound} />
@@ -451,7 +450,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
     }
   };
   return (
-    <nav className="sidebar-section flex flex-col gap-0.5">
+    <nav aria-label={title} className="sidebar-section flex flex-col gap-0.5">
       <button
         type="button"
         aria-expanded={open}

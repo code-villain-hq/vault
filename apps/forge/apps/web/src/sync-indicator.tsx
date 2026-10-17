@@ -27,7 +27,7 @@ export function SyncIndicator() {
 
 function Pill({ tone, label }: { tone: "ok" | "warn" | "danger" | "muted"; label: string }) {
   const dot = {
-    ok: "bg-accent",
+    ok: "bg-signal",
     warn: "bg-warn",
     danger: "bg-danger",
     muted: "bg-faint animate-pulse",

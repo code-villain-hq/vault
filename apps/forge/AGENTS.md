@@ -17,13 +17,21 @@ tokens live in [`design/tokens/`](../../design/tokens/README.md); the JSON
 is their source, and `build.py` generates CSS and Swift. Reference layouts
 and component rules live alongside the tokens.
 
+Nightshade is generated from `theme.base`, `theme.accent` and
+`theme.contrast` in `design/tokens/color.json`; the shared `theme.py`
+calculates night/day roles. Change the inputs or shared recipes rather
+than adding per-view colours. See [`theme.md`](../../design/tokens/theme.md).
+Regenerate shared outputs first, then run `bun run design:sync` here.
+Forge's numerical snapshot comes from generated `color.resolved.json`.
+
 [`brand/`](../../brand/README.md) holds the studio's identity and voice,
 including [`color.md`](../../brand/color.md) and
 [`type.md`](../../brand/type.md). Forge uses Nightshade in night and day,
 Atkinson Hyperlegible Next for interface text, Atkinson Hyperlegible Mono
 for code, and Grenze Gotisch only for display headings at 28px and above.
 Use cloak for primary actions and selection; reserve poison for focus and
-small live signals. Links use ink, bold and underlined.
+small live signals (`bg-signal` for live dots). Links use ink, bold and
+underlined.
 
 The sidebar wordmark uses Grenze Gotisch 700 at 28px, following
 [`design/layouts/app-window.md`](../../design/layouts/app-window.md).
@@ -33,8 +41,9 @@ below 560px the sidebar becomes a horizontal navigation row. The shared
 control rules are in [`design/components.md`](../../design/components.md):
 28px buttons, tinted chips and status pills, fields with focus rings, and
 elevation through tone. Shape tokens are bundled with color and type.
-Tint recipes stay translucent: `status-tint` and `chip-tint` blend with
-their host. Status text uses separate shared ink tokens; custom workflow
+Tint recipes stay translucent: `status-tint`, `chip-tint` and
+`highlight-tint` (`bg-highlight`, the active menu option) blend with their
+host. Status text uses separate shared ink tokens; custom workflow
 colours use `statusStyle` to check ink against the composite without
 changing the stored hue. Dialogs use `dialog`, with `dialog-field` and
 `dialog-field-hover` for form controls inside them. The toolbar names the

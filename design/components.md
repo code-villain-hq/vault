@@ -62,6 +62,8 @@ Tints are recipes, not precomputed solid colours. Chips and status pills blend w
 
 No dividers. 6px corners inside a list inset from the panel edge. Hover fills `hover`; selection fills `selected`.
 
+The active option in a menu or command list (the one the arrow keys move) uses a translucent `fg` tint at `highlight-tint` (8%), like a chip. A solid `hover` can match its host: in night, `dialog` and `hover` are the same tone. The tint stands apart on every host, and `fg`, `muted` and `faint` are checked on its composites.
+
 ## Live dot
 
-A small round `accent` dot for something happening now: unread, a running agent, a live sync. One of the three places poison goes.
+A small round `signal` dot for something happening now: unread, a running agent, a live sync. One of the three places poison goes. `signal` is poison moved only to the 3:1 non-text floor, so by day the dot stays nearer chartreuse than the text-strength `accent`.

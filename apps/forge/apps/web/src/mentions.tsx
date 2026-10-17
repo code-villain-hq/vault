@@ -204,7 +204,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
                   choose(person);
                 }}
                 onMouseMove={() => setActive(i)}
-                className={`flex cursor-default items-center gap-2 rounded px-2 py-1.5 ${i === active ? "bg-hover" : ""}`}
+                className={`flex cursor-default items-center gap-2 rounded px-2 py-1.5 ${i === active ? "bg-highlight" : ""}`}
               >
                 <Avatar user={person} size="size-4" />
                 <span className="truncate">{person.name}</span>

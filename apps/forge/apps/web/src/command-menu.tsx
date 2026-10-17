@@ -27,6 +27,7 @@ import {
   useTeamStates,
   useTeams,
 } from "./data";
+import { useDialogFocus } from "./dialog-focus";
 import { NavIcon, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { useNewIssue } from "./new-issue";
 import { signOut } from "./session";
@@ -49,6 +50,7 @@ export function openCommandMenu() {
 
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
+  const finalFocus = useDialogFocus(open);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -70,7 +72,10 @@ export function CommandMenu() {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="app-dialog fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <Dialog.Popup
+          finalFocus={finalFocus}
+          className="app-dialog fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+        >
           <Dialog.Title className="sr-only">Command menu</Dialog.Title>
           {open && <Commands onDone={() => setOpen(false)} />}
         </Dialog.Popup>
@@ -381,7 +386,7 @@ function Commands({ onDone }: { onDone: () => void }) {
                 onMouseMove={() => setActive(index)}
                 onClick={() => run(command)}
                 onKeyDown={() => {}}
-                className={`flex h-9 cursor-default items-center gap-2.5 rounded-md px-2.5 ${index === active ? "bg-hover" : ""}`}
+                className={`flex h-9 cursor-default items-center gap-2.5 rounded-md px-2.5 ${index === active ? "bg-highlight" : ""}`}
               >
                 {command.icon}
                 <span className="truncate">{command.label}</span>

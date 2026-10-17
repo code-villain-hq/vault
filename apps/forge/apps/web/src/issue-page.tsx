@@ -146,7 +146,7 @@ function IssueDetail({ issue, onDeleted }: { issue: Issue; onDeleted: () => void
           )
         }
       />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-6 px-8 py-8">
           {states.get(issue.state_id)?.type === "triage" && (
             <TriageBar issue={issue} onEditDescription={() => setEditingDescription(true)} />
@@ -171,7 +171,7 @@ function IssueDetail({ issue, onDeleted }: { issue: Issue; onDeleted: () => void
           <Links issue={issue} />
           <Activity issue={issue} onAddToDescription={addToDescription} />
         </div>
-      </main>
+      </div>
     </>
   );
 }

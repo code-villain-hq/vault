@@ -23,6 +23,7 @@ credentials.json
 .cache/
 coverage/
 *.tsbuildinfo
+__pycache__/
 
 # Node / Bun (Forge, Layer, site)
 node_modules/

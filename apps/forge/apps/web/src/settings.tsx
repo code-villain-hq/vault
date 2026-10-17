@@ -63,7 +63,7 @@ export function MembersPage() {
   return (
     <>
       <PageHeader title="Members" />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-2xl flex-col gap-10 px-6 py-8">
           <ErrorMessage>{error}</ErrorMessage>
           {isAdmin && <WorkspaceName />}
@@ -158,7 +158,7 @@ export function MembersPage() {
               ),
           )}
         </div>
-      </main>
+      </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );
@@ -445,7 +445,7 @@ export function AccountPage() {
   return (
     <>
       <PageHeader title="Account" />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-md flex-col gap-10 px-6 py-8">
           <section>
             <h2 className="mb-3 font-medium">Profile</h2>
@@ -537,7 +537,7 @@ export function AccountPage() {
             </Button>
           </section>
         </div>
-      </main>
+      </div>
     </>
   );
 }

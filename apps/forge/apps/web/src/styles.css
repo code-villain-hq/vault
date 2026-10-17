@@ -20,8 +20,11 @@
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-hover: var(--hover);
+  /* Translucent, so the active option shows on any host, dialogs included. */
+  --color-highlight: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
   --color-band: var(--band);
   --color-accent: var(--accent);
+  --color-signal: var(--signal);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-on-primary: var(--on-primary);
@@ -196,8 +199,8 @@
     width: 100%;
     margin-left: 0;
   }
-  .workspace-content main > div,
-  .workspace-content main > article {
+  .workspace-content > .page-content > div,
+  .workspace-content > .page-content > article {
     padding-inline: 1rem;
   }
 }

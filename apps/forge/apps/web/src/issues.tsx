@@ -92,11 +92,11 @@ export function TeamIssuesPage() {
       </PageHeader>
       <FilterBar filters={filters} onChange={setFilters} />
       {layout === "board" ? (
-        <main className="min-h-0 flex-1">
+        <div className="page-content min-h-0 flex-1">
           <IssueBoard issues={shown} states={columns} />
-        </main>
+        </div>
       ) : (
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="page-content min-h-0 flex-1 overflow-y-auto">
           <IssueList
             issues={shown}
             groupBy={groupBy}
@@ -104,7 +104,7 @@ export function TeamIssuesPage() {
               filtering ? "No issues match these filters." : `No issues in ${team.name} here yet.`
             }
           />
-        </main>
+        </div>
       )}
     </>
   );
@@ -220,7 +220,7 @@ export function MyIssuesPage() {
         <FilterButton filters={filters} onChange={setFilters} />
       </PageHeader>
       <FilterBar filters={filters} onChange={setFilters} />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <IssueList
           issues={shown}
           empty={
@@ -229,7 +229,7 @@ export function MyIssuesPage() {
               : "Nothing here."
           }
         />
-      </main>
+      </div>
     </>
   );
 }
@@ -264,7 +264,7 @@ export function TriagePage() {
   return (
     <>
       <PageHeader title="Triage" />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {suggestions.length > 0 && (
           <section className="flex flex-col gap-3 px-4 py-4">
             <h2 className="text-xs font-medium text-muted">Suggestions from Forge AI</h2>
@@ -339,7 +339,7 @@ export function TriagePage() {
             })}
           </ul>
         )}
-      </main>
+      </div>
     </>
   );
 }

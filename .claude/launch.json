@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "7395", "--bind", "127.0.0.1"],
       "port": 7395
+    },
+    {
+      "name": "forge-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "--cwd", "apps/forge", "dev"],
+      "port": 5173
     }
   ]
 }

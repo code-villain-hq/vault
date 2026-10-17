@@ -9,7 +9,7 @@ export interface PickerOption {
 }
 
 const itemClass =
-  "flex cursor-default items-center gap-2 rounded px-2 py-1.5 outline-none select-none data-highlighted:bg-hover";
+  "flex cursor-default items-center gap-2 rounded px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
 
 /** Enter after typing a search picks the first match, as in a command menu. */
 function chooseFirstMatch(event: KeyboardEvent<HTMLInputElement>) {

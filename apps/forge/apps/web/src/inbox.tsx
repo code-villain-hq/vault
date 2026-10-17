@@ -128,7 +128,7 @@ export function InboxPage() {
           </button>
         )}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {notifications.length === 0 && (
           <p className="px-4 py-20 text-center text-muted">
             You're all caught up. Assignments, comments and completed issues show up here.
@@ -150,7 +150,7 @@ export function InboxPage() {
                 className="group flex items-center gap-3 rounded-md px-3 py-2 hover:bg-hover"
               >
                 <span
-                  className={`size-1.5 shrink-0 rounded-full ${isUnread ? "bg-accent" : ""}`}
+                  className={`size-1.5 shrink-0 rounded-full ${isUnread ? "bg-signal" : ""}`}
                   aria-hidden="true"
                 />
                 {isUnread && <span className="sr-only">Unread:</span>}
@@ -221,7 +221,7 @@ export function InboxPage() {
             );
           })}
         </ul>
-      </main>
+      </div>
     </>
   );
 }

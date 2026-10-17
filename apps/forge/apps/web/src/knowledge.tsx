@@ -100,10 +100,10 @@ function ListPage({
       <PageHeader title={title} parent={parent}>
         {action}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {empty && <p className="px-6 py-16 text-center text-muted">{empty}</p>}
         <ul className="flex flex-col gap-0.5 p-2">{listItems("o")}</ul>
-      </main>
+      </div>
     </>
   );
 }
@@ -288,7 +288,7 @@ export function ServicePage() {
         )}
       </PageHeader>
       <div className="flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="page-content min-w-0 flex-1 overflow-y-auto">
           <EditableHeader
             name={service.name}
             description={service.description}
@@ -364,7 +364,7 @@ export function ServicePage() {
               )}
             </div>
           )}
-        </main>
+        </div>
       </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
@@ -987,7 +987,7 @@ export function DomainPage() {
           />
         )}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {domain ? (
           <EditableHeader
             name={domain.name}
@@ -1017,7 +1017,7 @@ export function DomainPage() {
             <li className="px-3 py-6 text-muted">No specs in this domain yet.</li>
           )}
         </ul>
-      </main>
+      </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );
@@ -1362,7 +1362,7 @@ export function SpecPage() {
           />
         )}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <article className="spec-doc flex flex-col">
           <EditableHeader
             name={spec.title}
@@ -1429,7 +1429,7 @@ export function SpecPage() {
             </div>
           </div>
         </article>
-      </main>
+      </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );
@@ -1738,7 +1738,10 @@ function Requirements({
                   {shown ? (
                     <Dot color={shown.color} />
                   ) : (
-                    <span className="size-2 shrink-0 rounded-full ui-field" aria-hidden="true" />
+                    <span
+                      className="size-2 shrink-0 rounded-full border border-faint"
+                      aria-hidden="true"
+                    />
                   )}
                   <span className="min-w-0 flex-1 truncate">{requirement.name}</span>
                   {coming.map(({ key, issue, touch }) => (
@@ -2009,7 +2012,7 @@ export function DecisionPage() {
           />
         )}
       </PageHeader>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <div className="page-content min-h-0 flex-1 overflow-y-auto">
         <EditableHeader
           name={decision.title}
           description=""
@@ -2104,7 +2107,7 @@ export function DecisionPage() {
             </section>
           )}
         </div>
-      </main>
+      </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );

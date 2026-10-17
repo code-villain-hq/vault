@@ -1,6 +1,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { PRIORITY_LABELS, useLabels, useTeamStates, useTeams, useUsers } from "./data";
+import { useDialogFocus } from "./dialog-focus";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { LabelChip } from "./issue-fields";
 import { Picker } from "./picker";
@@ -33,6 +34,7 @@ export function NewIssueProvider({
   pageDefaults: NewIssueDefaults;
 }) {
   const [open, setOpen] = useState<NewIssueDefaults | null>(null);
+  const finalFocus = useDialogFocus(open !== null);
   const defaultsRef = useRef(pageDefaults);
   defaultsRef.current = pageDefaults;
 
@@ -57,7 +59,10 @@ export function NewIssueProvider({
       <Dialog.Root open={open !== null} onOpenChange={(isOpen) => !isOpen && setOpen(null)}>
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-          <Dialog.Popup className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Dialog.Popup
+            finalFocus={finalFocus}
+            className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+          >
             {open && <NewIssueForm defaults={open} onDone={() => setOpen(null)} />}
           </Dialog.Popup>
         </Dialog.Portal>

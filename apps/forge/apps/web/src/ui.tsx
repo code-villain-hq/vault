@@ -57,7 +57,7 @@ export function AuthScreen({ title, children }: { title: string; children: React
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
-        <Logo className="mx-auto mb-6 size-9" />
+        <Logo className="mx-auto mb-4 size-20" />
         <h1 className="mb-6 text-center font-display text-[28px] leading-[1.18] font-bold">
           {title}
         </h1>

@@ -91,7 +91,7 @@ export function statusStyle(color = "var(--muted)"): CSSProperties & {
       color,
       grounds.map((ground) => mix(ground, color, colors.opacity["status-tint"])),
       toward,
-      colors.contrast["status-text"],
+      colors.contrast.text,
     );
   return {
     "--status-color": color,

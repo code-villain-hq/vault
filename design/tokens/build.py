@@ -5,6 +5,7 @@ A stopgap until @villain/tokens builds these with Style Dictionary.
 """
 import json
 import re
+from theme import generate
 
 camel = lambda k: re.sub(r"-(\w)", lambda m: m.group(1).upper(), k)
 
@@ -12,49 +13,7 @@ c = json.load(open("color.json"))
 s = json.load(open("shape.json"))
 t = json.load(open("type.json"))
 
-# Resolve role aliases before calculating ink against translucent status fills.
-def resolve(theme, key, path=()):
-    if key in path:
-        raise ValueError(f"Circular colour alias: {path + (key,)}")
-    value = theme[key]
-    if value.startswith("{") and value.endswith("}"):
-        return resolve(theme, value[1:-1], path + (key,))
-    return value
-
-def channels(hex):
-    return [int(hex[i:i + 2], 16) for i in (1, 3, 5)]
-
-def mix(ground, source, opacity):
-    return "#" + "".join(
-        f"{int(a * (1 - opacity) + b * opacity + 0.5):02X}"
-        for a, b in zip(channels(ground), channels(source))
-    )
-
-def luminance(hex):
-    srgb = [x / 255 for x in channels(hex)]
-    linear = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in srgb]
-    return sum(x * weight for x, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
-
-def contrast(a, b):
-    low, high = sorted((luminance(a), luminance(b)))
-    return (high + 0.05) / (low + 0.05)
-
-for mode in ("night", "day"):
-    theme = c[mode] = {key: resolve(c[mode], key) for key in c[mode]}
-    hosts = [theme[key] for key in (
-        "bg", "panel", "surface", "hover", "selected", "dialog", "field",
-        "field-hover", "dialog-field", "dialog-field-hover",
-    )]
-    for status in ("ok", "warn", "danger", "info", "neutral"):
-        hue = theme["muted" if status == "neutral" else status]
-        composites = [mix(host, hue, c["opacity"]["status-tint"]) for host in hosts]
-        for step in range(101):
-            ink = mix(hue, "#FFFFFF" if mode == "night" else "#000000", step / 100)
-            if all(contrast(ink, bg) >= c["contrast"]["status-text"] for bg in composites):
-                theme[f"status-{status}-ink"] = ink
-                break
-        else:
-            raise ValueError(f"No readable ink for {mode} {status}")
+c = generate(c)
 
 # Apps that need numerical colour values consume the same resolved aliases as CSS/Swift.
 open("color.resolved.json", "w").write(json.dumps(c, indent=2) + "\n")
