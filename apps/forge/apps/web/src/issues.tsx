@@ -174,7 +174,7 @@ function Toggle<T extends string>({
               // Hand the keyboard back to the list or board.
               event.currentTarget.blur();
             }}
-            className={`h-6 rounded px-2 text-xs capitalize ${value === option ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
+            className={`h-7 rounded-md px-2 text-xs capitalize ${value === option ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
           >
             {option}
           </button>
@@ -294,7 +294,7 @@ export function TriagePage() {
               return (
                 <li
                   key={issue.id}
-                  className="flex flex-col gap-2 rounded-lg px-2 py-2 hover:bg-hover"
+                  className="flex flex-col gap-2 rounded-md px-2 py-2 hover:bg-hover"
                 >
                   <div className="flex items-center gap-3">
                     {triage && <StateIcon state={triage} />}
@@ -318,7 +318,6 @@ export function TriagePage() {
                     )}
                     <Button
                       variant="secondary"
-                      className="h-7 px-2 text-xs"
                       disabled={!accept}
                       onClick={() =>
                         accept && sync.update("Issue", issue.id, { state_id: accept.id })
@@ -328,7 +327,6 @@ export function TriagePage() {
                     </Button>
                     <Button
                       variant="secondary"
-                      className="h-7 px-2 text-xs"
                       disabled={!decline}
                       onClick={() =>
                         decline && sync.update("Issue", issue.id, { state_id: decline.id })
