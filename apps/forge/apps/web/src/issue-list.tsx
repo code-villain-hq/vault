@@ -562,7 +562,7 @@ export function EmptyState({ text, offerCreate = true }: { text: string; offerCr
           onClick={() => newIssue()}
           className="ui-control h-7 rounded-md bg-primary px-3 text-on-primary outline-none hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
         >
-          Create an issue <kbd className="ml-1 text-faint">C</kbd>
+          Create an issue <kbd className="ml-1 text-on-primary/70">C</kbd>
         </button>
       )}
     </div>

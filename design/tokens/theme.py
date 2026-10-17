@@ -174,8 +174,9 @@ def generate(source):
             theme["on-primary"] = readable(theme["fg"], [theme["primary"], theme["primary-hover"]], mode, minimum)
         # The accent marks focus and live signals, never a large fill. Both modes derive from one hue.
         theme["accent"] = readable(accent, hosts, mode, minimum)
-        # Live dots carry no text: WCAG's 3:1 non-text floor keeps them nearer the seed.
-        theme["signal"] = readable(accent, hosts, mode, source["contrast"]["signal"])
+        # Live dots wear the brand colour. They carry no text, so WCAG's 3:1
+        # non-text floor keeps them nearer the seed than text would be.
+        theme["signal"] = readable(base, hosts, mode, source["contrast"]["signal"])
         for name, color in source["semantics"].items():
             theme[name] = readable(color, hosts, mode, minimum)
         for status in (*source["semantics"], "neutral"):

@@ -26,8 +26,6 @@ class ThemeTests(unittest.TestCase):
                 self.assertGreaterEqual(contrast(theme["on-primary"], theme[role]), minimum)
             for host in hosts:
                 self.assertGreaterEqual(contrast(theme["signal"], host), result["contrast"]["signal"], (mode, host))
-            # The signal never moves further from the seed than the text accent does.
-            self.assertGreaterEqual(contrast(theme["accent"], theme["bg"]), contrast(theme["signal"], theme["bg"]) - 1e-9)
             for host in hosts:
                 chip = mix(host, theme["fg"], result["opacity"]["chip-tint"])
                 for role in ("muted", "faint"):
@@ -73,6 +71,8 @@ class ThemeTests(unittest.TestCase):
         changed_base = generate(source)
         for mode in ("night", "day"):
             self.assertNotEqual(original[mode]["primary"], changed_base[mode]["primary"])
+            # Live dots wear the brand colour, so they follow the base.
+            self.assertNotEqual(original[mode]["signal"], changed_base[mode]["signal"])
         source = copy.deepcopy(SOURCE)
         source["theme"]["accent"] = "#ff5500"
         changed_accent = generate(source)

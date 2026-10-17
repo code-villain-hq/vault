@@ -7,8 +7,8 @@ Brand: poison. Chartreuse. #C9E265.
 Supporting: cloak. Deep violet. #5A1470.
 
 Grey does most of the work. Poison is the brand: the colour people
-remember, carried by the strike in every mark. Cloak supports it with
-depth and mood, and a lifted violet marks focus.
+remember, carried by the strike in every mark and every live signal.
+Cloak supports it with depth and mood, and a lifted violet marks focus.
 
 Until October 2026 the roles were the other way round. Poison was
 already what people saw in every mark, so the brand now says so.
@@ -20,6 +20,7 @@ already what people saw in every mark, so the brand now says so.
 - The strike inside a product mark, wherever that product is shown.
 - The main action's fill, once per screen, with dark ink.
 - A faint tint for the selected row and the current nav item.
+- Small live signals: an unread dot, a running agent, a live sync.
 
 Poison never colours links, labels, chips, or body copy, and it never
 fills a large area beyond that one action. Links are ink, bold, and
@@ -28,7 +29,6 @@ underlined.
 ## Where cloak goes
 
 - The focus ring, lifted to a readable violet on night.
-- Small live signals: an unread dot, a running agent, a live sync.
 - Depth on studio surfaces, such as the cube wallpaper.
 
 Cloak never sits under poison text, and neither colour tints the
@@ -63,7 +63,7 @@ hand-tuned night/day colour lists.
 | primary-hover | `#B6CE50` | `#B6CE50` | Its hover.                              |
 | on-primary    | `#0B0B0B` | `#181818` | Dark text on the main action.           |
 | accent        | `#AF6BC8` | `#5A1470` | Cloak, lifted: focus.                   |
-| signal        | `#8F4CA7` | `#5A1470` | Cloak for live dots, at 3:1.            |
+| signal        | `#C9E265` | `#7C9000` | Poison for live dots, at 3:1.           |
 | danger        | `#F27A6B` | `#B54338` | Errors, blocked.                        |
 | ok            | `#5CC9A7` | `#00775D` | Done, passing.                          |
 | warn          | `#E9AE45` | `#8C6100` | Waiting, in review.                     |
@@ -74,7 +74,8 @@ wears it as is in both modes, with dark ink at better than 12:1. By
 day its edge against white is only 1.4:1, so the button reads by
 colour; it is the one fill of its kind on the screen. Cloak is dark, so
 at night the accent lifts it to a readable violet; by day cloak itself
-is readable. Ok is teal, so it never reads as poison. Greys stay
+is readable. Live dots carry no text, so `signal` stops at WCAG's 3:1
+non-text floor: bright poison at night, `#7C9000` by day. Ok is teal, so it never reads as poison. Greys stay
 achromatic in both modes.
 
 Every text colour meets WCAG AA (4.5:1) on panel, in both modes.
