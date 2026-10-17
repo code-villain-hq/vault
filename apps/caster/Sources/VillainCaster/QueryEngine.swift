@@ -38,7 +38,7 @@ private struct Command {
 func symbolIcon(_ name: String, _ description: String) -> NSImage? {
     NSImage(systemSymbolName: name, accessibilityDescription: description)?
         // The size and weight of the row text beside it (design/components.md).
-        .withSymbolConfiguration(.init(pointSize: 15, weight: .regular))
+        .withSymbolConfiguration(.init(pointSize: CGFloat(TypeTokens.body.size), weight: .regular))
 }
 
 final class QueryEngine {

@@ -2,19 +2,19 @@ import AppKit
 
 // Forge's command menu (apps/forge/apps/web/src/command-menu.tsx) scaled
 // up a step: a launcher sits alone on the desktop, not inside an app.
-private let panelWidth: CGFloat = 640
-private let inputHeight: CGFloat = 56
-private let rowHeight: CGFloat = 40
+private let panelWidth: CGFloat = 680
+private let inputHeight: CGFloat = 60
+private let rowHeight: CGFloat = 44
 private let maxVisibleRows = 10
 private let listInset: CGFloat = 8
 /// Row content sits this far in from the row's edge.
 private let rowContentInset: CGFloat = 10
-private let iconSize: CGFloat = 20
+private let iconSize: CGFloat = 22
 /// An NSTextField draws its text 2pt inside its frame.
 private let inputSidePadding: CGFloat = listInset + rowContentInset - 2
-/// The query at the brand's body size; rows a step under it.
-private let inputFont = Nightshade.font(TypeTokens.ui, size: TypeTokens.body.size)
-private let rowFont = Nightshade.font(TypeTokens.ui, size: 15)
+/// The query at the title size, rows at the body size: read at a glance.
+private let inputFont = Nightshade.font(TypeTokens.ui, size: TypeTokens.title.size)
+private let rowFont = Nightshade.font(TypeTokens.ui, size: TypeTokens.body.size)
 private let screenshotPadding: CGFloat = 48
 
 /// The panel itself: a solid `dialog` tone with `radius-lg` corners. No
