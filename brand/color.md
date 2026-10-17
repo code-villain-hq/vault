@@ -16,6 +16,7 @@ accent, never the main thing.
 - One brand moment per surface: the strike through "Code Villain" on the
   homepage, the bar on a social card.
 - Small live signals: an unread dot, a running agent, a live sync.
+- The strike inside a product mark, wherever that product is shown.
 
 Poison never colours links, labels, chips, or body copy. It never
 fills a large area, and it never sits on the cloak. Links are ink,

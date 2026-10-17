@@ -6,6 +6,8 @@ The strike. A gothic V with a poison bar behind it, cut where the letter crosses
 | --- | --- |
 | [`mark.svg`](mark.svg) | The V on its night tile. The app icon shape and the favicon. |
 | [`forge.svg`](forge.svg) | Forge's outlined F on the same night tile with the strike. |
+| [`layer.svg`](layer.svg) | Layer's L, built the same way. |
+| [`caster.svg`](caster.svg) | Caster's C, built the same way. |
 | [`logo-night.svg`](logo-night.svg) | “Code Villain” with the strike, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 | [`logo-home.svg`](logo-home.svg) | Homepage variant on night: cropped lettering with an extended strike. |
@@ -45,12 +47,18 @@ This variant is the exception to the standard logo’s clear space at the horizo
 
 Each app's icon is its initial built the same way: Forge is an F, Layer an L, Caster a C, each on the night tile with the strike behind it.
 
-Today's icons stay until each app moves over:
+`python3 products.py` writes all three from the font with `outline.swift`
+(Swift and CoreText, nothing to install). Each app keeps a copy and builds
+its native icons from it:
 
-| App | Icon now |
-| --- | --- |
-| Forge | Web: `apps/forge/apps/web/public/icon.svg`, copied from `forge.svg`. Native icon bundles use the same outlined mark. |
-| Layer | `apps/layer/src-tauri/icons/icon.svg`: a mask on stacked layers |
-| Caster | `apps/caster/Resources/AppIcon.svg`: a lens with Layer's mask |
+| App | Copy | Native icons |
+| --- | --- | --- |
+| Forge | `apps/forge/apps/web/public/icon.svg` | `bun run design:sync`; desktop bundle from the same mark |
+| Layer | `apps/layer/src-tauri/icons/icon.svg` | `bun tauri icon src-tauri/icons/icon.svg` (keep the macOS and Windows sizes) |
+| Caster | `apps/caster/Resources/AppIcon.svg` | `make icon` |
+
+A product mark is that product's name in picture form, not decoration.
+It keeps its strike wherever the product is shown, so a page that lists
+the products shows each mark's strike beside the page's own brand moment.
 
 How the mark was chosen: the [mark study](https://claude.ai/artifact/NGociCBQhTY3Qhd28DrfLr) (four concepts, then the strike refined).
