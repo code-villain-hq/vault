@@ -34,6 +34,17 @@ underlined.
 Cloak never sits under poison text, and neither colour tints the
 large neutral surfaces of an app.
 
+## Marks and icons
+
+The marks and app icons use the apps' black and white: night `bg`
+`#0B0B0B` for the tile, `fg` `#EBEBEB` for the letters, and day `fg`
+`#181818` on day grounds. They do not use the tinted `night` and `ink`
+from the palette below. Poison is the strike and nothing else. Rules
+for the mark live in [`mark/`](mark/README.md).
+
+Interface icons are not marks. They take the text colours, never
+poison or cloak; see [`design/components.md`](../design/components.md#icon).
+
 ## Night and day
 
 Night is the default and the only ground for studio surfaces: the

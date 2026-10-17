@@ -9,6 +9,6 @@
       </mask>
     </defs>
     <rect x="0" y="35.48" width="348" height="8" fill="#4C6A00" mask="url(#cut)"/>
-    <use href="#lettering" fill="#18181C"/>
+    <use href="#lettering" fill="#181818"/>
   </g>
 </svg>

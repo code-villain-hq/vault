@@ -18,10 +18,12 @@ Every letter is outlined from Grenze Gotisch 800. The files render without any f
 
 On a 200-unit tile:
 
-- **Tile**: night `#0A0B0D`, corner radius 45.
-- **Letters**: Grenze Gotisch 800. A product mark is its initial at 150 units, centred on its advance, baseline at 152. The studio mark is C and V at 0.88 of that, 1 unit apart, the pair centred with its middle at y=104.5. Ink `#ECECF1`.
+- **Tile**: night `bg` `#0B0B0B`, corner radius 45.
+- **Letters**: Grenze Gotisch 800. A product mark is its initial at 150 units, centred on its advance, baseline at 152. The studio mark is C and V at 0.88 of that, 1 unit apart, the pair centred with its middle at y=104.5. Letters night `fg` `#EBEBEB`.
 - **Bar**: poison `#C9E265`, 15 units tall, top at 108, edge to edge. It sits behind the letters.
 - **Cut**: the letters cut the bar with a 7-unit gap on each side of their strokes. In CV the two cuts meet, so the bar stops between the letters and the pair reads as one.
+
+Black and white are the apps' own `bg` and `fg` from [`color.md`](../color.md): achromatic, so a mark beside an app's frame or text matches it exactly. Only the strike carries colour.
 
 The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes every mark from the font.
 
@@ -31,7 +33,7 @@ The wordmark uses Grenze Gotisch 800 at 72 units, on a `348 × 72` viewBox. The 
 
 ## Use
 
-- On night, ink letters and bright poison. On day, `#18181C` letters and deep poison `#4C6A00`.
+- On night, `#EBEBEB` letters and bright poison. On day, `#181818` letters and deep poison `#4C6A00`.
 - The strike is the surface's one brand moment. Nothing else on the same surface uses poison as decoration.
 - Clear space: a quarter of the mark's height on every side, kept empty.
 - Smallest sizes: the tile works down to 16px. The full wordmark needs 160px of width; under that, use the tile.
@@ -59,8 +61,20 @@ its native icons from it:
 | Layer | `apps/layer/src-tauri/icons/icon.svg` | `bun tauri icon src-tauri/icons/icon.svg` (keep the macOS and Windows sizes) |
 | Caster | `apps/caster/Resources/AppIcon.svg` | `make icon` |
 
+An app icon is the product mark as drawn: the full tile, the strike edge to edge. The tile is the app's night `bg`, so on a night page it blends in and only the letter and its strike show. That is intended. Never add a border, a gradient, a shadow, or a second colour to lift it.
+
 A product mark is that product's name in picture form, not decoration.
 It keeps its strike wherever the product is shown, so a page that lists
 the products shows each mark's strike beside the page's own brand moment.
 
 How the mark was chosen: the [mark study](https://claude.ai/artifact/NGociCBQhTY3Qhd28DrfLr) (four concepts, then the strike refined).
+
+## Menu bar glyph
+
+A menu bar or tray icon is the product mark without its tile: the letter with the strike behind it, cut the same way, the bar no wider than the icon.
+
+- 18 × 18 points. The letter fills 16 of them, centred. The bar, cut, and their position scale with it from the 200-unit construction.
+- In colour, not a monochrome template: the strike is the product's name and stays poison. On a dark menu bar, `#EBEBEB` letters and bright poison; on a light one, `#181818` letters and deep poison `#4C6A00`. Follow the bar's appearance, not the app's theme.
+- Drawn from the same outlined letter as the app icon, never retyped from the font, so the two never drift.
+- Nothing else in the glyph: no badge, no count, no state colour. Status lives in the menu it opens.
+
