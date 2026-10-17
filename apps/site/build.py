@@ -82,8 +82,11 @@ def main() -> None:
     for path in (SITE / 'assets/fonts').iterdir():
         if path.suffix in {'.ttf', '.css', '.txt'}:
             copy(path, 'assets/fonts/' + path.name)
+    # Only captures a page shows: the folder also holds drafts not yet on the site.
+    pages = ''.join((OUTPUT / page).read_text() for page in ['index.html', 'blog/index.html', 'blog/villain-gets-a-face.html'])
     for path in (SITE / 'assets/captures').glob('*.png'):
-        copy(path, 'assets/captures/' + path.name)
+        if f'assets/captures/{path.name}' in pages:
+            copy(path, 'assets/captures/' + path.name)
     for path in (VAULT / 'brand/mark').glob('*.svg'):
         copy(path, 'assets/brand/' + path.name)
     for path in (VAULT / 'design/tokens').glob('*.css'):
