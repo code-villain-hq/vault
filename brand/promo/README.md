@@ -24,7 +24,9 @@ extends it.
   brand's thin cut around both, so it reads as one name called out of many.
 - **Cubes**: a pattern alone, with no letters and no poison. Tumbling blocks
   lit from the left in cloak, wash and night; each face splits on its long
-  diagonal into a solid and a hatched half.
+  diagonal into a solid half and an engraved half, whose stripes thin out
+  towards the far corner. Blocks are sized from the screen's short side,
+  so every screen shows about the same few.
 
 | Screen | Size |
 | --- | --- |

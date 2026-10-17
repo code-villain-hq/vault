@@ -85,37 +85,52 @@ def rows(design, width, height):
 
 
 def cubes(width, height):
-    edge = max(width, height) * 0.075
-    stripe = edge / 9
+    """Tumbling blocks. Hatched halves are engraved: stripes run parallel to
+    the face's edge and thin out towards the opposite corner."""
+    edge = min(width, height) * 0.16
     c = CUBE
 
-    def hatch(name, ground, line, angle, share):
-        return (f'<pattern id="{name}" patternUnits="userSpaceOnUse" width="{stripe:.2f}" height="{stripe:.2f}" '
-                f'patternTransform="rotate({angle})"><rect width="{stripe:.2f}" height="{stripe:.2f}" fill="{ground}"/>'
-                f'<rect width="{stripe:.2f}" height="{stripe * share:.2f}" fill="{line}"/></pattern>')
+    def solid(fill, points):
+        # A 1px outline in the same fill closes anti-aliasing seams between neighbours.
+        d = "M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in points)
+        return f'<path d="{d}Z" fill="{fill}" stroke="{fill}" stroke-width="1"/>'
+
+    def engraved(ground, line, base_a, base_b, apex, stripes=11):
+        # Stripe i sits in band i of the way from the base to the apex; its
+        # share of the band falls from 0.8 at the base to 0.1 near the apex.
+        out = [solid(ground, (base_a, base_b, apex))]
+        lerp = lambda p, q, t: (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+        for i in range(stripes):
+            start = i / stripes
+            share = 0.8 - 0.7 * i / (stripes - 1)
+            end = start + share / stripes
+            quad = (lerp(base_a, apex, start), lerp(base_b, apex, start),
+                    lerp(base_b, apex, end), lerp(base_a, apex, end))
+            out.append(f'<path d="M{"L".join(f"{x:.1f} {y:.1f}" for x, y in quad)}Z" fill="{line}"/>')
+        return "".join(out)
 
     def cube(cx, cy):
         p = {k: (cx + edge * math.cos(math.radians(a)), cy + edge * math.sin(math.radians(a)))
              for k, a in (("T", -90), ("UR", -30), ("LR", 30), ("B", 90), ("LL", 150), ("UL", 210))}
         p["C"] = (cx, cy)
-
-        def triangle(fill, *corners):
-            # A 1px outline in the same fill closes anti-aliasing seams between neighbours.
-            return ('<path d="M' + "L".join(f"{p[k][0]:.1f} {p[k][1]:.1f}" for k in corners)
-                    + f'Z" fill="{fill}" stroke="{fill}" stroke-width="1"/>')
-        return (triangle("url(#top)", "UL", "T", "UR") + triangle("url(#rim)", "UL", "C", "UR")
-                + triangle(c["lit"], "UL", "LL", "B") + triangle("url(#side)", "UL", "C", "B")
-                + triangle(c["shade"], "UR", "C", "B") + triangle(c["dark"], "UR", "LR", "B"))
+        # Top stripes run parallel to the back edge across both halves; the
+        # shaded side's run along the long diagonal, thick beside the lit half.
+        return (engraved(c["top"], c["top_line"], p["UL"], p["T"], p["UR"])
+                + engraved(c["dark"], c["deep_line"], p["UR"], p["C"], p["UL"])
+                + solid(c["lit"], (p["UL"], p["LL"], p["B"]))
+                + engraved(c["shade"], c["lit"], p["UL"], p["B"], p["C"])
+                + solid(c["shade"], (p["UR"], p["C"], p["B"]))
+                + solid(c["dark"], (p["UR"], p["LR"], p["B"])))
 
     across, down = edge * math.sqrt(3), edge * 1.5
-    tiles = "".join(cube(column * across + (across / 2 if row % 2 else 0), row * down)
-                    for row in range(-1, int(height / down) + 2)
-                    for column in range(-1, int(width / across) + 2))
-    patterns = (hatch("top", c["top"], c["top_line"], -30, 0.5) + hatch("rim", c["dark"], c["deep_line"], -30, 0.35)
-                + hatch("side", c["shade"], c["lit"], 60, 0.4))
+    # Centre the grid so the blocks sit evenly on every screen.
+    columns, rows = int(width / across) + 3, int(height / down) + 3
+    x0 = (width - (columns - 1) * across) / 2
+    y0 = (height - (rows - 1) * down) / 2
+    tiles = "".join(cube(x0 + column * across + (across / 2 if row % 2 else 0), y0 + row * down)
+                    for row in range(rows) for column in range(-1, columns))
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>Code Villain</title>
-  <defs>{patterns}</defs>
   <rect width="{width}" height="{height}" fill="{GROUND}"/>{tiles}
 </svg>
 """
