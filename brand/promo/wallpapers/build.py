@@ -95,30 +95,40 @@ def cubes(width, height):
         d = "M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in points)
         return f'<path d="{d}Z" fill="{fill}" stroke="{fill}" stroke-width="1"/>'
 
-    def engraved(ground, line, base_a, base_b, apex, stripes=11):
-        # Stripe i sits in band i of the way from the base to the apex; its
-        # share of the band falls from 0.8 at the base to 0.1 near the apex.
-        out = [solid(ground, (base_a, base_b, apex))]
-        lerp = lambda p, q, t: (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+    lerp = lambda p, q, t: (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+    shape = lambda fill, pts: f'<path d="M{"L".join(f"{x:.1f} {y:.1f}" for x, y in pts)}Z" fill="{fill}"/>'
+
+    def engraved(ground, line, near_a, near_b, far_b, far_a, stripes=14):
+        # A parallelogram engraved with stripes parallel to its near edge.
+        # Each stripe's share of its band falls from 0.85 at the near edge to
+        # 0.05 at the far one, so the face fades from line to ground.
+        out = [solid(ground, (near_a, near_b, far_b, far_a))]
         for i in range(stripes):
             start = i / stripes
-            share = 0.8 - 0.7 * i / (stripes - 1)
-            end = start + share / stripes
-            quad = (lerp(base_a, apex, start), lerp(base_b, apex, start),
-                    lerp(base_b, apex, end), lerp(base_a, apex, end))
-            out.append(f'<path d="M{"L".join(f"{x:.1f} {y:.1f}" for x, y in quad)}Z" fill="{line}"/>')
+            end = start + (0.85 - 0.8 * i / (stripes - 1)) / stripes
+            out.append(shape(line, (lerp(near_a, far_a, start), lerp(near_b, far_b, start),
+                                    lerp(near_b, far_b, end), lerp(near_a, far_a, end))))
+        return "".join(out)
+
+    def fan(ground, line, apex, lit_side, dark_side, rays=16):
+        # Rays from one corner, thick beside the lit face and thinning out, so
+        # the shading turns like a cone into the dark.
+        out = [solid(ground, (apex, lit_side, dark_side))]
+        for i in range(rays):
+            start = i / rays
+            end = start + (0.85 - 0.8 * i / (rays - 1)) / rays
+            out.append(shape(line, (apex, lerp(lit_side, dark_side, start), lerp(lit_side, dark_side, end))))
         return "".join(out)
 
     def cube(cx, cy):
         p = {k: (cx + edge * math.cos(math.radians(a)), cy + edge * math.sin(math.radians(a)))
              for k, a in (("T", -90), ("UR", -30), ("LR", 30), ("B", 90), ("LL", 150), ("UL", 210))}
         p["C"] = (cx, cy)
-        # Top stripes run parallel to the back edge across both halves; the
-        # shaded side's run along the long diagonal, thick beside the lit half.
-        return (engraved(c["top"], c["top_line"], p["UL"], p["T"], p["UR"])
-                + engraved(c["dark"], c["deep_line"], p["UR"], p["C"], p["UL"])
+        # The top is one engraved face, its stripes parallel to the back-right
+        # edge. The left face is lit, then fans into shade; the right stays dark.
+        return (engraved(c["dark"], c["top_line"], p["T"], p["UR"], p["C"], p["UL"])
                 + solid(c["lit"], (p["UL"], p["LL"], p["B"]))
-                + engraved(c["shade"], c["lit"], p["UL"], p["B"], p["C"])
+                + fan(c["shade"], c["lit"], p["B"], p["UL"], p["C"])
                 + solid(c["shade"], (p["UR"], p["C"], p["B"]))
                 + solid(c["dark"], (p["UR"], p["LR"], p["B"])))
 

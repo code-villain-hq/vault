@@ -23,9 +23,10 @@ extends it.
   step above night. They run up to the lit name and its strike, with the
   brand's thin cut around both, so it reads as one name called out of many.
 - **Cubes**: a pattern alone, with no letters and no poison. Tumbling blocks
-  lit from the left in cloak, wash and night; each face splits on its long
-  diagonal into a solid half and an engraved half, whose stripes thin out
-  towards the far corner. Blocks are sized from the screen's short side,
+  lit from the left in cloak, wash and night. The top is one engraved face,
+  its stripes parallel to the back-right edge and thinning towards the
+  front; the lit face turns into shade through a fan of rays from the
+  bottom corner. Blocks are sized from the screen's short side,
   so every screen shows about the same few.
 
 | Screen | Size |
