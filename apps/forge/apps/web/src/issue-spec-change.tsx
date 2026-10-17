@@ -84,7 +84,7 @@ function SpecChangeStanding({ issue }: { issue: Issue }) {
     <div className="flex flex-col gap-2">
       {(first.length > 0 || outdated.length > 0 || taken.length > 0 || exists.length > 0) && (
         <div className="flex flex-col gap-1 rounded-md px-3 py-2 text-sm">
-          <p className="font-medium text-warn">
+          <p className="font-medium text-warn-ink">
             {started ? "Its spec change has to be settled" : "This issue can't start yet"}
           </p>
           <ul className="flex flex-col gap-1">
@@ -122,7 +122,7 @@ function SpecChangeStanding({ issue }: { issue: Issue }) {
       {second.map((conflict) => (
         <p
           key={`${conflict.second}-${conflict.spec_id}-${conflict.requirement}`}
-          className="text-xs text-warn"
+          className="text-xs text-warn-ink"
         >
           <OtherIssue issue={issueOf(conflict.second)} /> also wants to change{" "}
           {what(conflict.spec_id, conflict.requirement)}.
@@ -156,7 +156,7 @@ function ChangedAfterStart({ change }: { change: SpecChange }) {
     (then.replaces_decision_ids ?? []).length === 0;
   return (
     <div className="flex flex-col gap-1 rounded-md px-3 py-2 text-sm">
-      <p className="font-medium text-warn">Changed after work started</p>
+      <p className="font-medium text-warn-ink">Changed after work started</p>
       <p className="text-xs text-muted">
         {nothingThen
           ? "It was written only after work on this issue started."
@@ -164,9 +164,7 @@ function ChangedAfterStart({ change }: { change: SpecChange }) {
       </p>
       {!nothingThen && (
         <details>
-          <summary className="cursor-pointer text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4">
-            See what it said then
-          </summary>
+          <summary className="ui-link cursor-pointer text-xs">See what it said then</summary>
           <div className="mt-2 flex flex-col gap-3">
             {[...(then.replaces_decision_ids ?? [])].sort().join() !==
               [...change.replaces_decision_ids].sort().join() && (
@@ -231,7 +229,7 @@ function OtherIssue({ issue }: { issue: Issue | undefined }) {
       <Link
         to="/$workspace/issue/$identifier"
         params={{ workspace: workspace.url_key, identifier: id }}
-        className="font-medium hover:underline"
+        className="ui-link"
       >
         {id}
       </Link>
@@ -319,9 +317,7 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
           {verb} also adds a new spec, “{part.title}”.
         </h3>
         <details className="text-sm">
-          <summary className="cursor-pointer text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4">
-            Read the new spec
-          </summary>
+          <summary className="ui-link cursor-pointer text-xs">Read the new spec</summary>
           <div className="mt-2">
             <Markdown text={part.text} />
           </div>
@@ -344,9 +340,7 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
           {removed.length > 0 && <NameList change="Removes" names={removed} />}
         </ul>
         <details className="text-sm">
-          <summary className="cursor-pointer text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4">
-            See the full change
-          </summary>
+          <summary className="ui-link cursor-pointer text-xs">See the full change</summary>
           <div className="mt-2">
             <TextDiff label={`What changes in ${title}`} before={part.before} after={part.after} />
           </div>
@@ -376,7 +370,7 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
               />
             ) : (
               <>
-                <p className="text-xs text-warn">
+                <p className="text-xs text-warn-ink">
                   The spec doesn't have this requirement any more.
                 </p>
                 <Markdown text={statement(after)} />

@@ -1,5 +1,6 @@
 // The filter menu and the bar of filters in use, over a list or board of
 // issues (see issue-filter.ts for what they mean). "F" opens the menu.
+import { X } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { PRIORITY_LABELS, useLabels, useUsers } from "./data";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon } from "./icons";
@@ -141,7 +142,7 @@ export function FilterBar({
               onClick={() => onChange({ ...filters, [field]: [] })}
               className="flex h-7 items-center rounded-r-full px-1.5 text-faint outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
             >
-              ×
+              <X size={12} strokeWidth={1.75} aria-hidden="true" />
             </button>
           </span>
         );

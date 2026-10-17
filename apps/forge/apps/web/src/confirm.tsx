@@ -32,7 +32,7 @@ export function ConfirmDialog({
   return (
     <AlertDialog.Root open={confirmation !== null} onOpenChange={(open) => !open && onClose()}>
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <AlertDialog.Backdrop className="app-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <AlertDialog.Popup className="app-dialog fixed top-[20vh] left-1/2 z-40 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface p-5 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           <AlertDialog.Title className="mb-2 font-medium">{shown?.title}</AlertDialog.Title>
           <AlertDialog.Description className="text-muted">{shown?.body}</AlertDialog.Description>

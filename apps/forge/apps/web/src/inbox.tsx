@@ -204,7 +204,7 @@ export function InboxPage() {
                 </time>
                 <button
                   type="button"
-                  className="hidden h-6 rounded px-1.5 text-xs text-faint outline-none group-hover:block hover:bg-panel hover:text-fg focus-visible:block focus-visible:ring-2 focus-visible:ring-accent"
+                  className="hidden h-7 rounded-md px-2 text-xs text-faint outline-none group-hover:block hover:bg-panel hover:text-fg focus-visible:block focus-visible:ring-2 focus-visible:ring-accent"
                   onClick={() =>
                     sync.transact(
                       group.map((n) => ({

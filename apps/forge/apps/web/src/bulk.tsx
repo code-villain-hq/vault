@@ -2,6 +2,7 @@
 // list (X selects). Each change is one transaction, so it applies to all of
 // them or none.
 import type { Issue, Operation } from "@forge/types";
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { type Confirmation, ConfirmDialog } from "./confirm";
 import { PRIORITY_LABELS, STATE_TYPE_ORDER, useLabels, useUsers } from "./data";
@@ -131,7 +132,7 @@ export function BulkBar({ issues, onClear }: { issues: Issue[]; onClear: () => v
         {mayDelete && (
           <button
             type="button"
-            className={`${trigger} rounded hover:text-danger`}
+            className={`${trigger} rounded-md hover:text-danger-ink`}
             onClick={() => {
               const count = issues.length;
               const noun = count === 1 ? "issue" : "issues";
@@ -160,10 +161,10 @@ export function BulkBar({ issues, onClear }: { issues: Issue[]; onClear: () => v
           type="button"
           aria-label="Clear the selection"
           title="Clear the selection (Esc)"
-          className="flex size-7 items-center justify-center rounded text-faint hover:bg-hover hover:text-fg"
+          className="flex size-7 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-fg"
           onClick={onClear}
         >
-          ×
+          <X size={15} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />

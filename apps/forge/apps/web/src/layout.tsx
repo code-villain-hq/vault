@@ -12,6 +12,7 @@ import {
   Bot,
   Box,
   ChevronDown,
+  ChevronsUpDown,
   CircleHelp,
   CircleUserRound,
   Folders,
@@ -31,7 +32,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { CommandMenu, openCommandMenu } from "./command-menu";
 import { useStates, useTeams } from "./data";
-import { NavIcon, ServiceIcon } from "./icons";
+import { Initial, NavIcon, ServiceIcon } from "./icons";
 import { useDesktopNotifications, useUnreadCount } from "./inbox";
 import { type NewIssueDefaults, NewIssueProvider, useNewIssue } from "./new-issue";
 import { Redirect } from "./redirect";
@@ -87,7 +88,7 @@ export function NotFound() {
       <p className="mb-6 text-center text-muted">
         This page doesn't exist, or you're not a member of its workspace.
       </p>
-      <Link to="/" className="block text-center text-fg underline-offset-4 hover:underline">
+      <Link to="/" className="ui-link block text-center">
         Go to your workspace
       </Link>
     </AuthScreen>
@@ -201,7 +202,7 @@ function Sidebar() {
           aria-label="Keyboard shortcuts"
           title="Keyboard shortcuts (?)"
           onClick={openShortcuts}
-          className={`${iconButton} ml-auto size-6`}
+          className={`${iconButton} ml-auto`}
         >
           <CircleHelp size={15} strokeWidth={1.75} aria-hidden="true" />
         </button>
@@ -298,9 +299,7 @@ function AppNav() {
             params={{ ...params, team: team.key }}
             className={navLink}
           >
-            <span className="flex size-[15px] items-center justify-center rounded bg-hover text-[9px] font-semibold text-muted">
-              {team.key.charAt(0)}
-            </span>
+            <NavIcon icon={Layers} />
             {team.name}
           </Link>
         ))}
@@ -351,11 +350,11 @@ function DomainsNav() {
             aria-label={open ? "Fold domains" : "Show domains"}
             aria-expanded={open}
             onClick={toggle}
-            className="absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+            className="absolute top-1/2 right-0 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
           >
             <ChevronDown
-              size={13}
-              strokeWidth={2}
+              size={15}
+              strokeWidth={1.75}
               aria-hidden="true"
               className={`transition-transform ${open ? "" : "-rotate-90"}`}
             />
@@ -370,7 +369,7 @@ function DomainsNav() {
             params={{ ...params, domain: domain.id }}
             className={`${navLink} pl-[2.1rem]`}
           >
-            <ServiceIcon service={domain} className="size-3.5" />
+            <ServiceIcon service={domain} />
             <span className="truncate">{domain.name}</span>
           </Link>
         ))}
@@ -455,12 +454,12 @@ function Section({ id, title, children }: { id: string; title: string; children:
         type="button"
         aria-expanded={open}
         onClick={toggle}
-        className="sidebar-group-label group flex h-6 items-center gap-1 self-start rounded px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
+        className="sidebar-group-label group flex h-6 items-center gap-1 self-start rounded-md px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
       >
         {title}
         <ChevronDown
-          size={12}
-          strokeWidth={2}
+          size={15}
+          strokeWidth={1.75}
           aria-hidden="true"
           className={`transition-transform ${open ? "" : "-rotate-90"}`}
         />
@@ -490,7 +489,7 @@ function WorkspaceMenu() {
   const navigate = useNavigate();
   const others = me.workspaces.filter((w) => w.id !== workspace.id);
   const item =
-    "flex cursor-default items-center gap-2 rounded px-2 py-1.5 outline-none select-none data-highlighted:bg-hover";
+    "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
 
   return (
     <Menu.Root>
@@ -500,14 +499,12 @@ function WorkspaceMenu() {
       >
         <WorkspaceBadge name={workspace.name} />
         <span className="truncate">{workspace.name}</span>
-        <svg
+        <ChevronsUpDown
+          size={15}
+          strokeWidth={1.75}
           aria-hidden="true"
-          viewBox="0 0 16 16"
-          className="ml-auto size-3.5 shrink-0 text-faint"
-          fill="currentColor"
-        >
-          <path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" />
-        </svg>
+          className="ml-auto shrink-0 text-faint"
+        />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
@@ -559,9 +556,5 @@ function WorkspaceMenu() {
 }
 
 function WorkspaceBadge({ name }: { name: string }) {
-  return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-primary text-[12px] font-semibold text-on-primary">
-      {name.trim().charAt(0).toUpperCase()}
-    </span>
-  );
+  return <Initial name={name} square />;
 }

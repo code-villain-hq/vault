@@ -36,7 +36,7 @@ export function AgentWorkLine({ issue }: { issue: Issue }) {
         work ? (
           <p
             key={user.id}
-            className={`flex items-center gap-2 text-xs ${work.stopped ? "text-warn" : "text-muted"}`}
+            className={`flex items-center gap-2 text-xs ${work.stopped ? "text-warn-ink" : "text-muted"}`}
           >
             <WorkDot stopped={work.stopped} />
             {workText(user.name, work, now)}
@@ -82,7 +82,7 @@ export function AgentWorkStatus({ agentId }: { agentId: string }) {
     <Link
       to="/$workspace/issue/$identifier"
       params={{ workspace: workspace.url_key, identifier: id }}
-      className="font-medium text-fg hover:underline"
+      className="ui-link"
     >
       {id} {issue.title}
     </Link>

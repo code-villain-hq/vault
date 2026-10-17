@@ -8,7 +8,7 @@ import type {
   RelationType,
 } from "@forge/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Ellipsis, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentWorkLine } from "./agent-work";
 import { type Confirmation, ConfirmDialog } from "./confirm";
@@ -230,11 +230,7 @@ function Fields({
           aria-label="More"
           className="flex size-7 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
         >
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="currentColor">
-            <circle cx="3.5" cy="8" r="1.3" />
-            <circle cx="8" cy="8" r="1.3" />
-            <circle cx="12.5" cy="8" r="1.3" />
-          </svg>
+          <Ellipsis size={15} strokeWidth={1.75} aria-hidden="true" />
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
@@ -275,7 +271,7 @@ function Fields({
                 <>
                   <Menu.Separator className="my-1 h-px bg-line" />
                   <Menu.Item
-                    className={`${menuItem} text-danger`}
+                    className={`${menuItem} text-danger-ink`}
                     onClick={() =>
                       setConfirmation({
                         title: `Delete “${issue.title}”?`,
@@ -307,7 +303,7 @@ function Fields({
 }
 
 const menuItem =
-  "flex cursor-default items-center gap-2 rounded px-2 py-1.5 outline-none select-none data-highlighted:bg-hover";
+  "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
 
 /** The due date as a chip; opens the calendar when just added from "⋯". */
 function DueDate({
@@ -475,10 +471,12 @@ function Knowledge({ issue }: { issue: Issue }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="-mx-2 flex items-center gap-2 self-start rounded px-2 py-1 text-xs text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+        className="-mx-2 flex items-center gap-2 self-start rounded-md px-2 py-1 text-xs text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
       >
         <ChevronRight
-          className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`}
+          size={15}
+          strokeWidth={1.75}
+          className={`transition-transform ${open ? "rotate-90" : ""}`}
           aria-hidden="true"
         />
         Follows {counts}
@@ -593,7 +591,7 @@ function AppliedSpecChange({ issue }: { issue: Issue }) {
                 <Link
                   to="/$workspace/spec/$spec"
                   params={{ workspace: workspace.url_key, spec: id }}
-                  className="font-medium hover:underline"
+                  className="ui-link"
                 >
                   {spec.title}
                 </Link>
@@ -612,7 +610,7 @@ function AppliedSpecChange({ issue }: { issue: Issue }) {
         {change.not_applied.map((missed) => (
           <li key={missed.spec_id ?? missed.title} className="flex flex-col">
             <span className="font-medium">{missed.title}</span>
-            <span className="text-warn">
+            <span className="text-warn-ink">
               Left as it was: {missed.reason} Change it by hand if it should still change.
             </span>
           </li>
@@ -667,7 +665,7 @@ function SubIssues({ issue }: { issue: Issue }) {
             key={child.id}
             to="/$workspace/issue/$identifier"
             params={{ workspace: workspace.url_key, identifier: identifier(child, teamsById) }}
-            className="-mx-2 flex h-8 items-center gap-2 rounded px-2 hover:bg-hover"
+            className="-mx-2 flex h-8 items-center gap-2 rounded-md px-2 hover:bg-hover"
           >
             {state && <StateIcon state={state} />}
             <span className="w-16 shrink-0 font-mono text-xs text-muted">
@@ -759,7 +757,7 @@ function Relations({
           onOpenChange={(open) => !open && onAsked()}
           triggerClassName="size-7 justify-center rounded-md text-muted hover:text-fg"
         >
-          <Plus className="size-4" aria-hidden="true" />
+          <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
         </Picker>
       }
     >
@@ -769,7 +767,7 @@ function Relations({
         return (
           <div
             key={relation.id}
-            className="group -mx-2 flex h-8 items-center gap-2 rounded px-2 hover:bg-hover"
+            className="group -mx-2 flex h-8 items-center gap-2 rounded-md px-2 hover:bg-hover"
           >
             <span className="w-24 shrink-0 text-xs text-muted">{label}</span>
             <Link
@@ -785,7 +783,7 @@ function Relations({
             <button
               type="button"
               aria-label={`Remove relation to ${other.title}`}
-              className="invisible text-xs text-faint group-hover:visible hover:text-danger"
+              className="invisible text-xs text-faint group-hover:visible hover:text-danger-ink"
               onClick={() =>
                 setConfirmation({
                   title: `Remove “${label} ${identifier(other, teamsById)}”?`,
@@ -890,7 +888,7 @@ function Activity({
             />
           ),
         )}
-        <div className="rounded-lg ui-field">
+        <div className="rounded-md ui-field">
           <MentionTextarea
             aria-label="Write a comment"
             placeholder="Leave a comment… (@ to mention, ⌘↵ to send)"
@@ -978,7 +976,7 @@ function CommentView({
               {(mine || isAdmin) && (
                 <button
                   type="button"
-                  className="text-faint hover:text-danger"
+                  className="text-faint hover:text-danger-ink"
                   onClick={() =>
                     setConfirmation({
                       title: "Delete this comment?",
@@ -1076,8 +1074,8 @@ function ParentPicker({ issue, onClose }: { issue: Issue; onClose: () => void })
 }
 
 const LINK_STATES: Record<string, { label: string; className: string }> = {
-  open: { label: "Open", className: "text-ok" },
-  merged: { label: "Merged", className: "text-ok" },
+  open: { label: "Open", className: "text-ok-ink" },
+  merged: { label: "Merged", className: "text-ok-ink" },
   closed: { label: "Closed", className: "text-faint" },
   pushed: { label: "Commit", className: "text-muted" },
 };
@@ -1102,7 +1100,7 @@ function Links({ issue }: { issue: Issue }) {
             target="_blank"
             rel="noreferrer"
             title={link.repository}
-            className="-mx-2 flex h-8 items-center gap-2 rounded px-2 hover:bg-hover"
+            className="-mx-2 flex h-8 items-center gap-2 rounded-md px-2 hover:bg-hover"
           >
             <span className={`w-14 shrink-0 text-xs ${state?.className ?? ""}`}>
               {state?.label}
@@ -1110,7 +1108,7 @@ function Links({ issue }: { issue: Issue }) {
             <span className="min-w-0 flex-1 truncate">{link.title}</span>
             {blocker && (
               <span
-                className={`shrink-0 text-xs ${link.blocker === "checks_running" ? "text-muted" : "text-danger"}`}
+                className={`shrink-0 text-xs ${link.blocker === "checks_running" ? "text-muted" : "text-danger-ink"}`}
               >
                 {blocker}
               </span>

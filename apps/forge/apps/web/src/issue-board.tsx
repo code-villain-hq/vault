@@ -3,6 +3,7 @@
 // keys (or h j k l) move between cards; Enter opens one.
 import type { Issue, WorkflowState } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { byId, byPriority, formatDate, identifier } from "./data";
 import { StateIcon } from "./icons";
@@ -154,7 +155,7 @@ function BoardColumn({
         const id = event.dataTransfer.getData(DRAG_TYPE);
         if (id) onDrop(id);
       }}
-      className={`flex w-72 shrink-0 flex-col rounded-lg ${highlighted ? "bg-hover" : "bg-surface/50"}`}
+      className={`flex w-72 shrink-0 flex-col rounded-lg ${highlighted ? "bg-highlight" : ""}`}
     >
       <h2 className="flex h-9 shrink-0 items-center gap-2 px-3 text-xs">
         <StateIcon state={state} />
@@ -165,9 +166,9 @@ function BoardColumn({
           aria-label={`New issue in ${state.name}`}
           title={`New issue in ${state.name}`}
           onClick={() => newIssue({ teamId: state.team_id, stateId: state.id })}
-          className="ml-auto flex size-6 items-center justify-center rounded text-faint hover:bg-hover hover:text-fg"
+          className="ml-auto flex size-7 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
         >
-          +
+          <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </h2>
       <div className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">

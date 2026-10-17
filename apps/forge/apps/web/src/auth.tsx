@@ -192,7 +192,7 @@ export function LoginPage() {
       </form>
       <p className="mt-6 text-center text-muted">
         New to Forge?{" "}
-        <Link to="/signup" className="text-fg underline-offset-4 hover:underline">
+        <Link to="/signup" className="ui-link">
           Create an account
         </Link>
       </p>
@@ -248,7 +248,7 @@ export function SignupPage() {
       </form>
       <p className="mt-6 text-center text-muted">
         Already have an account?{" "}
-        <Link to="/login" className="text-fg underline-offset-4 hover:underline">
+        <Link to="/login" className="ui-link">
           Sign in
         </Link>
       </p>
@@ -350,11 +350,7 @@ export function JoinPage() {
       </form>
       <p className="mt-6 text-center text-muted">
         Already have an account?{" "}
-        <Link
-          to="/login"
-          search={{ redirect: `/join/${token}` }}
-          className="text-fg underline-offset-4 hover:underline"
-        >
+        <Link to="/login" search={{ redirect: `/join/${token}` }} className="ui-link">
           Sign in to join
         </Link>
       </p>
