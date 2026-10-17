@@ -8,7 +8,7 @@ Decisions about how Code Villain looks and sounds. The apps, the site, the blog,
 | [`color.md`](color.md) | The palette |
 | [`type.md`](type.md) | The type |
 | [`voice.md`](voice.md) | How Code Villain writes |
-| [`mark/`](mark) | The studio mark |
+| [`mark/`](mark) | The studio mark, app icons, menu bar glyph |
 | [`promo/`](promo) | Wallpapers and other images made to share |
 | [`index.html`](index.html) | The same decisions, drawn for looking |
 
