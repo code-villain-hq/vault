@@ -3,9 +3,9 @@
   "private": true,
   "description": "An agent development environment for macOS",
   "license": "MIT OR Apache-2.0",
-  "author": "Code Villain <codevillain@proton.me> (https://codevillain.eu/)",
-  "homepage": "https://codevillain.eu/",
-  "repository": "github:Villain-Studios/villain-layer",
+  "author": "Code Villain <codevillain@proton.me> (https://www.codevillain.eu/)",
+  "homepage": "https://www.codevillain.eu/",
+  "repository": "github:code-villain-hq/villain-layer",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:app": "tauri dev --config src-tauri/tauri.dev.conf.json",
-    "release:mac": "if pgrep -f 'Villain Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then echo 'Villain Layer is running. Quit it first — replacing the bundle under a running app kills it, and takes its agents with it.'; exit 1; fi; tauri build --bundles app && rm -rf '/Applications/Villain Layer.app' && ditto 'src-tauri/target/release/bundle/macos/Villain Layer.app' '/Applications/Villain Layer.app'"
+    "release:mac": "if pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then echo 'Layer is running. Quit it first — replacing the bundle under a running app kills it, and takes its agents with it.'; exit 1; fi; tauri build --bundles app && rm -rf '/Applications/Villain Layer.app' '/Applications/Layer.app' && ditto 'src-tauri/target/release/bundle/macos/Layer.app' '/Applications/Layer.app'"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

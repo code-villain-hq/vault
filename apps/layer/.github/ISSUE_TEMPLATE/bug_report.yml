@@ -19,7 +19,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Villain Layer version
+      label: Layer version
       description: Settings → General → Version.
     validations:
       required: true

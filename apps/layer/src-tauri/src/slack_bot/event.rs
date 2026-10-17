@@ -166,7 +166,7 @@ impl Opening<'_> {
              between tools is shown there too, as one line each in a progress message, so keep \
              those to a sentence. {owner} can answer you in the thread by mentioning you, or in a \
              direct message to you by any message (those come to you starting with \
-             \"{FROM_SLACK}\"), or here in Villain Layer. What anyone says in the thread \
+             \"{FROM_SLACK}\"), or here in Layer. What anyone says in the thread \
              without mentioning you is for the people there: you are given it with the next \
              mention, to read, not to answer. Nobody else in the thread can \
              talk to you. Ask before anything others would see, as always.\n\n\

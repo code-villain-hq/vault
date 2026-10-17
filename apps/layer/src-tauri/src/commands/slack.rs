@@ -205,7 +205,7 @@ pub async fn set_slack_channel(state: State<'_, AppState>, channel: String) -> R
         .await??
         .ok_or(Error::NotConfigured("Slack"))?;
     let posted = Slack::new(&token)
-        .post(&channel, "Villain Layer notifications will be posted here. :white_check_mark:", None)
+        .post(&channel, "Layer notifications will be posted here. :white_check_mark:", None)
         .await?;
     state.config.update(|c| c.slack = Some(cfg))?;
     record_post(&state, posted);

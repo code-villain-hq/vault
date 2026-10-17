@@ -95,7 +95,7 @@ pub fn grafana_tools() -> Vec<Value> {
     vec![
         tool(
             "grafana_datasources",
-            "The Loki datasources of the Grafana the user connected to Villain Layer: uid, \
+            "The Loki datasources of the Grafana the user connected to Layer: uid, \
              name, which is the site's default, and `chosen`: the one the user picked for \
              their services' logs, used when no `datasource` is given. Pass a uid as \
              `datasource` to the other grafana_ tools to read another.",

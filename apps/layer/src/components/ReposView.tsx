@@ -153,7 +153,7 @@ export function ReposView() {
       label: "Remove",
       body: (
         <>
-          Remove <b>{p.name}</b> from Villain Layer? The clone at <code>{p.path}</code>{" "}
+          Remove <b>{p.name}</b> from Layer? The clone at <code>{p.path}</code>{" "}
           and any worktrees stay on disk untouched — only this app forgets about it.
           {using.length > 0 && (
             <div className="confirm-detail">

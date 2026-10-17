@@ -1,6 +1,6 @@
 # Security
 
-Villain Layer holds your Jira, GitHub and Slack tokens. It runs an MCP
+Layer holds your Jira, GitHub and Slack tokens. It runs an MCP
 server and a status endpoint on localhost for its agents. And it turns text
 other people wrote, tickets and review comments, into prompts, branch names
 and git arguments. A flaw in any of these matters, so please report one
@@ -9,7 +9,7 @@ privately.
 ## Reporting a vulnerability
 
 - **Report a vulnerability** on the repository's
-  [Security tab](https://github.com/Villain-Studios/villain-layer/security/advisories/new),
+  [Security tab](https://github.com/code-villain-hq/villain-layer/security/advisories/new),
   or
 - email **codevillain@proton.me**.
 

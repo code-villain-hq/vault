@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn url_keys_are_readable_and_avoid_app_paths() {
-        assert_eq!(url_key_from("Villain Studios"), "villain-studios");
+        assert_eq!(url_key_from("Code Villain"), "code-villain");
         assert_eq!(url_key_from("  Forge!!  Team "), "forge-team");
         assert_eq!(url_key_from("Über"), "ber");
         assert_eq!(url_key_from("???"), "workspace");

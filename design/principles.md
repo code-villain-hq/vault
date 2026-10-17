@@ -1,6 +1,6 @@
 # Principles
 
-How Villain designs a screen. Every UI change names the principle it serves. "Another product does it" is not a reason.
+How Code Villain designs a screen. Every UI change names the principle it serves. "Another product does it" is not a reason.
 
 Linear's account of its redesign is the reference for the thinking, not for the look: [A design reset](https://linear.app/now/a-design-reset) and [How we redesigned the Linear UI](https://linear.app/now/how-we-redesigned-the-linear-ui).
 
@@ -17,7 +17,7 @@ Linear's account of its redesign is the reference for the thinking, not for the 
 6. **The accent stays out of the neutrals.** Greys carry at most a trace of the base hue. Cloak and poison stay the only colours that mean something.
 7. **Elevation is lightness.** Frame, panel, surface, and dialog are steps in lightness. No shadows or borders to lift a surface.
 8. **Display for headings, plain for everything else.** Grenze Gotisch carries large titles; Atkinson Hyperlegible carries everything read or clicked ([`brand/type.md`](../brand/type.md)).
-9. **One frame for every app.** Forge and Layer share the frame that controls the content: the sidebar and the top bar. How the sidebar, tabs, app header, and view header behave is written once, in [`layouts/`](layouts).
+9. **One frame for every app.** Forge and Layer share the frame that controls the content: the sidebar and the top bar. The sidebar, top bar, and view header are defined in [`layouts/`](layouts). Shared tab and app-header behavior is not defined yet.
 
 ## How a look changes
 

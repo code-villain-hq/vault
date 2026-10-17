@@ -4,9 +4,9 @@ The site's blog: an index of posts and the post page. It follows [`../principles
 
 ## Header and footer
 
-- The logo at 7rem wide on the left: the page's one brand moment, so nothing else on the page uses poison as decoration.
+- The Code Villain wordmark at 10.5rem wide on the left: the page's one brand moment, so nothing else on the page uses poison as decoration.
 - Navigation on the right in the `label` role: `muted`, the current page `fg` and underlined.
-- The footer is one quiet line in `small`, `faint`: what Villain does, and the same two links.
+- The footer is one quiet line in `small`, `faint`: what Code Villain does, and the same two links.
 - No lines above or below either.
 
 ## Index
@@ -19,7 +19,7 @@ The site's blog: an index of posts and the post page. It follows [`../principles
 
 ## Post
 
-- A meta line in `small`, `faint`: "The build" (link back), product, date, reading time, and a draft pill when it is one.
+- A meta line in `small`, `faint`: "The log" (link back), product, date, reading time, and a draft pill when it is one.
 - The title in `display`. Section headings in `headline`. Both Grenze, both sentence case.
 - Body in `body`, 17px, at a 66ch measure.
 - Links are ink, bold, underlined at 45%. Inline code in mono on `surface` with `radius-sm`.

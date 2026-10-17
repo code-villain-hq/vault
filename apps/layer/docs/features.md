@@ -1,6 +1,6 @@
 # Features and requirements
 
-This is the contract for what Villain Layer does. Each area says what the
+This is the contract for what Layer does. Each area says what the
 user sees, then the requirements (**MUST** statements, each with a stable
 id), where the code is, and the gaps we know about.
 
@@ -25,6 +25,8 @@ is a terminal running an agent CLI or a shell, or an agent's conversation
 over ACP (§20).
 
 ---
+
+The public app name is **Layer**, by **Code Villain**. Its existing bundle identifiers, data paths, and integration keys remain stable across the display-name change (see [`brand/name.md`](../../../brand/name.md)).
 
 ## 1. Repositories
 
@@ -2349,7 +2351,7 @@ mention sent while the app is closed is never seen.
 - **BOT-7** A turn's permission questions (ACP-5) MUST share one message
   in the thread, posted at the first and changed as more come and as each
   is answered, from Slack or from the app. Each names what it asks in
-  words (`browser navigate (Villain Layer)`, not
+  words (`browser navigate (Layer)`, not
   `mcp__villain-layer__browser_navigate`) and has a button for each of the
   agent's answers. Only the owner's click answers; anyone else's is told,
   to them alone, that it is not theirs to answer. A question the turn

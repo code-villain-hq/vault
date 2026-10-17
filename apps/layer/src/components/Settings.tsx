@@ -337,7 +337,7 @@ export function Settings() {
               </>
             }
           >
-            <div style={{ fontFamily: "var(--mono)", fontSize: 12 }}>Villain Layer {version ?? "…"}</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 12 }}>Layer {version ?? "…"}</div>
           </Field>
           <Field label="Detected agents">
             <div className="col">

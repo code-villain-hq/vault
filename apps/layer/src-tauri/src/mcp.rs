@@ -1,6 +1,6 @@
 //! A Model Context Protocol server, hosted by the app itself.
 //!
-//! Agents launched from Villain Layer are pointed here for the launch, so they
+//! Agents launched from Layer are pointed here for the launch, so they
 //! reach Jira, GitHub and Slack through the credentials the app already holds —
 //! no second login, and no copy of those credentials anywhere the agent can
 //! read. What an agent holds is this server's own token for the run: in a 0600
@@ -335,14 +335,14 @@ fn tools() -> Vec<Value> {
     vec![
         tool(
             "list_tasks",
-            "Tasks currently in flight in Villain Layer: branch, Jira key, and the \
+            "Tasks currently in flight in Layer: branch, Jira key, and the \
              repositories each one has a worktree in, with uncommitted-change counts.",
             json!({}),
             vec![],
         ),
         tool(
             "list_repos",
-            "Repositories registered in Villain Layer, with their group and path.",
+            "Repositories registered in Layer, with their group and path.",
             json!({}),
             vec![],
         ),
@@ -502,7 +502,7 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "pane_output",
-            "What a terminal in Villain Layer has printed, with the escape codes \
+            "What a terminal in Layer has printed, with the escape codes \
              stripped: a dev server's log, a test run, or another agent's session. \
              Read it rather than starting a second copy of something already \
              running. list_panes gives the ids. Off unless the user has turned it \
@@ -535,7 +535,7 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "forget_repo",
-            "Remove a repository from Villain Layer's list. The clone and any \
+            "Remove a repository from Layer's list. The clone and any \
              worktrees stay on disk untouched; only the app forgets it. Needs \
              confirm: true after the user agrees.",
             json!({

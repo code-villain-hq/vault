@@ -78,7 +78,7 @@ pieces under other names.
 - **Plain HTTP.** Tailscale and WireGuard encrypt the way from the phone.
   On the home Wi-Fi itself the traffic is not encrypted, so anything else on
   that network could read it. Put guests on the router's guest network.
-- **macOS may ask** whether Villain Layer may accept incoming connections
+- **macOS may ask** whether Layer may accept incoming connections
   the first time a way is on. Allow it. The dev build asks for itself.
 - **The port** is 7420 (the dev build's 7421). If something else holds
   it, Settings → Remote access says so.

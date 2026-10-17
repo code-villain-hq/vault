@@ -172,7 +172,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             try data.write(to: url)
             showScreenshotFeedback("📸 saved (no blur — grant Screen Recording)")
         } catch {
-            NSLog("Villain Caster screenshot failed: \(error)")
+            NSLog("Caster screenshot failed: \(error)")
         }
     }
 

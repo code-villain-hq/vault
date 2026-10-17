@@ -142,7 +142,7 @@ state, notifications, the keychain, git on real repos.
 bun run dev:app        # dev build: its own config folder and keychain item
 ```
 
-The dev build is `Villain Layer Dev` (`eu.codevillain.villain-layer.dev`).
+The dev build is `Layer Dev` (`eu.codevillain.villain-layer.dev`).
 It starts empty, with nothing connected, and has its own config and keychain
 item, so it can run next to the installed app. One thing both default to is the task
 folder location, `~/.villain-worktrees`: set the dev build's to something

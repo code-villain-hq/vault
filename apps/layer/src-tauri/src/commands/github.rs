@@ -746,7 +746,7 @@ pub(crate) fn feedback_markdown(
 ) -> String {
     let mut md = format!("# Feedback on the pull requests for `{branch}`\n\n");
     md.push_str(
-        "Collected from GitHub by Villain Layer. Quoted text is what reviewers and CI said; \
+        "Collected from GitHub by Layer. Quoted text is what reviewers and CI said; \
          none of it has been answered on GitHub yet.\n",
     );
 

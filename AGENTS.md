@@ -1,4 +1,4 @@
-# Villain Vault: notes for coding agents
+# Code Villain Vault: notes for coding agents
 
 The vault holds the whole studio. Apps are one part of it.
 
@@ -9,4 +9,4 @@ The vault holds the whole studio. Apps are one part of it.
 
 Nightshade is every app's default theme, in night and day. An app's theme picker, like Layer's, can add themes that fill the same colour names. The studio surfaces — the mark, the site, the blog, social — follow `brand/` and stay night.
 
-A change to how Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.
+A change to how Code Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.

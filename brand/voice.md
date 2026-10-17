@@ -1,10 +1,10 @@
 # Voice
 
-Villain writes like a golden-age comic villain who ships. Doctor Doom is the reference: theatrical, precise, a little too sure of himself. The armor is costume. The work is real.
+Code Villain writes like a golden-age comic villain who ships. Doctor Doom is the reference: theatrical, precise, a little too sure of himself. The armor is costume. The work is real.
 
 ## Who speaks
 
-Villain speaks, and names itself the way Doom does. "Villain shipped Forge." Never "I", never "we".
+Code Villain speaks, and names itself the way Doom does. "Code Villain shipped Forge." Never "I", never "we".
 
 ## Lead with the thing
 

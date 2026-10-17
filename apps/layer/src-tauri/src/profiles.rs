@@ -448,7 +448,7 @@ pub fn show_identity(app: &tauri::AppHandle) {
         }
         // The profile button, when the change was made in another window.
         let _ = tauri::Emitter::emit(&app, "profiles:changed", ());
-        let product = app.config().product_name.clone().unwrap_or_else(|| "Villain Layer".into());
+        let product = app.config().product_name.clone().unwrap_or_else(|| "Layer".into());
         let title = if identity.many { format!("{product} — {}", identity.name) } else { product };
         let mark = identity.many.then(|| (identity.name.clone(), identity.colour));
         let on_main = app.clone();

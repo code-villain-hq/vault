@@ -27,7 +27,7 @@ enum MenuBarIcon {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Villain Caster"
+        image.accessibilityDescription = "Caster"
         return image
     }
 

@@ -1,6 +1,6 @@
 # Binary / SwiftPM target (no spaces) vs. user-facing app bundle name.
 APP = VillainCaster
-APP_NAME = Villain Caster
+APP_NAME = Caster
 BUNDLE = build/$(APP_NAME).app
 # Stable identity keeps TCC grants (Screen Recording, Accessibility) valid
 # across rebuilds; ad-hoc ("-") re-prompts after every install.
@@ -39,10 +39,11 @@ icon:
 	iconutil -c icns $(ICONSET) -o Resources/AppIcon.icns
 	@echo "Wrote Resources/AppIcon.icns"
 
-# Also removes the bundle name used before the "Villain Caster" rename.
+# Remove legacy bundle names when installing the renamed Caster app.
 install: app
 	-pkill -x $(APP)
 	rm -rf "/Applications/$(APP).app"
+	rm -rf "/Applications/Villain Caster.app"
 	rm -rf "/Applications/$(APP_NAME).app"
 	cp -R "$(BUNDLE)" /Applications/
 	open "/Applications/$(APP_NAME).app"

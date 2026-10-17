@@ -289,7 +289,7 @@ pub fn copilot_hooks() -> serde_json::Value {
 /// never awaited, so posting cannot hold the agent up. A subagent's session
 /// goes idle when its own piece is done, while the one you are talking to is
 /// still at work, so child sessions are not reported on.
-pub const OPENCODE_PLUGIN: &str = r#"// Written by Villain Layer, which reads it to tell whether this OpenCode is
+pub const OPENCODE_PLUGIN: &str = r#"// Written by Layer, which reads it to tell whether this OpenCode is
 // working, asking or done. Rewritten on every launch; edits here are lost.
 export const VillainLayer = async () => {
   const url = process.env.VILLAIN_HOOK_URL;

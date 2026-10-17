@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Villain Layer icon">
+  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Layer icon">
 </p>
 
-<h1 align="center">Villain Layer</h1>
+<h1 align="center">Layer</h1>
 
 <p align="center">
   <strong>A macOS app for coding agents, where no agent holds your credentials</strong><br>
-  By <a href="https://codevillain.eu">Villain Studios</a> · Tools for shipping with AI
+  By <a href="https://www.codevillain.eu/">Code Villain</a> · Tools for shipping with AI
 </p>
 
 <p align="center">
-  <a href="https://github.com/Villain-Studios/villain-layer/releases/latest">Download</a> ·
-  <a href="https://github.com/Villain-Studios/villain-layer/blob/main/docs/features.md">Features</a> ·
-  <a href="https://github.com/Villain-Studios/villain-layer/blob/main/AGENTS.md">Contributing</a>
+  <a href="https://github.com/code-villain-hq/villain-layer/releases/latest">Download</a> ·
+  <a href="https://github.com/code-villain-hq/villain-layer/blob/main/docs/features.md">Features</a> ·
+  <a href="https://github.com/code-villain-hq/villain-layer/blob/main/AGENTS.md">Contributing</a>
 </p>
 
 ---
@@ -29,7 +29,7 @@ Everything runs on your machine. The MCP server agents talk to runs on `127.0.0.
 
 ## Demo
 
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue)](https://github.com/Villain-Studios/villain-layer/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue)](https://github.com/code-villain-hq/villain-layer/releases/latest)
 
 *Video demo and animated walkthrough: coming soon*
 
@@ -80,8 +80,8 @@ See [`docs/architecture.md`](docs/architecture.md) for details.
 ### Homebrew (recommended)
 
 ```bash
-brew tap villain-studios/tap
-brew trust --cask villain-studios/tap/villain-layer
+brew tap code-villain-hq/tap
+brew trust --cask code-villain-hq/tap/villain-layer
 brew install --cask villain-layer
 ```
 
@@ -89,7 +89,7 @@ Updates: `brew upgrade --cask villain-layer`. Quit the app first, and run it fro
 
 ### Direct download
 
-Download the `.dmg` from the [latest release](https://github.com/Villain-Studios/villain-layer/releases/latest). Runs on Apple Silicon and Intel.
+Download the `.dmg` from the [latest release](https://github.com/code-villain-hq/villain-layer/releases/latest). Runs on Apple Silicon and Intel.
 
 macOS will block the first launch with "Apple could not verify…" because releases aren't notarized. Open System Settings → Privacy & Security → **Open Anyway**. Once is enough.
 
@@ -103,13 +103,13 @@ macOS will block the first launch with "Apple could not verify…" because relea
 ### Build from source
 
 ```bash
-git clone https://github.com/Villain-Studios/villain-layer.git
+git clone https://github.com/code-villain-hq/villain-layer.git
 cd villain-layer
 bun install
 bun run release:mac
 ```
 
-Installs to `/Applications/Villain Layer.app`. A self-built copy opens without the security warning.
+Installs to `/Applications/Layer.app`. A self-built copy opens without the security warning.
 
 **Development requirements**: Rust (stable) and [Bun](https://bun.sh).
 
@@ -125,7 +125,7 @@ Installs to `/Applications/Villain Layer.app`. A self-built copy opens without t
   - Settings showing credential configuration
 -->
 
-*Screenshots will be added in a future update. See [releases](https://github.com/Villain-Studios/villain-layer/releases) for the current state.*
+*Screenshots will be added in a future update. See [releases](https://github.com/code-villain-hq/villain-layer/releases) for the current state.*
 
 ## Getting started
 
@@ -194,7 +194,7 @@ Not promises—just ideas under consideration.
 
 ## Author
 
-Built by [Michael Lazarski](https://codevillain.eu) (Code Villain). Contact: [codevillain@proton.me](mailto:codevillain@proton.me)
+Built by [Michael Lazarski](https://www.codevillain.eu/) (Code Villain). Contact: [codevillain@proton.me](mailto:codevillain@proton.me)
 
 ## License
 
@@ -214,7 +214,7 @@ Unless you explicitly state otherwise, any contribution you intentionally submit
 ---
 
 <p align="center">
-  <a href="https://github.com/Villain-Studios/villain-layer">GitHub</a> ·
-  <a href="https://github.com/Villain-Studios/villain-layer/releases">Releases</a> ·
-  <a href="https://github.com/Villain-Studios/villain-layer/issues">Issues</a>
+  <a href="https://github.com/code-villain-hq/villain-layer">GitHub</a> ·
+  <a href="https://github.com/code-villain-hq/villain-layer/releases">Releases</a> ·
+  <a href="https://github.com/code-villain-hq/villain-layer/issues">Issues</a>
 </p>

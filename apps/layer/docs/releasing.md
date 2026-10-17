@@ -35,13 +35,13 @@ A tag that failed can be deleted and pushed again once the fix is on
 The cask is written here, in
 [`packaging/homebrew/villain-layer.rb`](../packaging/homebrew/villain-layer.rb),
 and published to
-[Villain-Studios/homebrew-tap](https://github.com/Villain-Studios/homebrew-tap)
+[code-villain-hq/homebrew-tap](https://github.com/code-villain-hq/homebrew-tap)
 by `tap.yml` when a release is published. It fills in the version and the
 .dmg's SHA-256, has `brew style` and `brew audit --online` check the
 result, and pushes it. Change the cask here: the tap's copy is overwritten.
 A prerelease is never put in the tap.
 
-The cask refuses to upgrade or uninstall while Villain Layer is running,
+The cask refuses to upgrade or uninstall while Layer is running,
 for the same reason `release:mac` does. It requires macOS 26, the oldest
 the tests run on: `check.yml` and `release.yml` run on `macos-26`, not
 `macos-latest`, so that 26 stays tested when GitHub moves on. Lower both
@@ -52,8 +52,8 @@ together.
 1. Create the tap. Homebrew finds it only by the `homebrew-` prefix.
 
    ```bash
-   gh repo create Villain-Studios/homebrew-tap --public --add-readme \
-     --description "Homebrew tap for Villain Layer"
+   gh repo create code-villain-hq/homebrew-tap --public --add-readme \
+     --description "Homebrew tap for Layer"
    ```
 
 2. Give the workflow a key that can push to the tap and nowhere else: a
@@ -61,9 +61,9 @@ together.
 
    ```bash
    ssh-keygen -t ed25519 -N "" -C "villain-layer tap.yml" -f tap-key
-   gh repo deploy-key add tap-key.pub -R Villain-Studios/homebrew-tap \
+   gh repo deploy-key add tap-key.pub -R code-villain-hq/homebrew-tap \
      --allow-write --title "villain-layer tap.yml"
-   gh secret set HOMEBREW_TAP_DEPLOY_KEY -R Villain-Studios/villain-layer < tap-key
+   gh secret set HOMEBREW_TAP_DEPLOY_KEY -R code-villain-hq/villain-layer < tap-key
    rm tap-key tap-key.pub
    ```
 
@@ -71,14 +71,14 @@ together.
    was in its tag does not run it.
 
    ```bash
-   gh workflow run tap.yml -R Villain-Studios/villain-layer -f tag=v0.2.0
+   gh workflow run tap.yml -R code-villain-hq/villain-layer -f tag=v0.2.0
    ```
 
 4. Try it the way everyone else will:
 
    ```bash
-   brew tap villain-studios/tap
-   brew trust --cask villain-studios/tap/villain-layer
+   brew tap code-villain-hq/tap
+   brew trust --cask code-villain-hq/tap/villain-layer
    brew install --cask villain-layer
    ```
 
@@ -119,7 +119,7 @@ What it takes:
    `Developer ID Application: <name> (TEAMID)`.
 
    ```bash
-   R=Villain-Studios/villain-layer
+   R=code-villain-hq/villain-layer
    base64 -i ~/Desktop/developer-id.p12 | gh secret set APPLE_CERTIFICATE -R $R
    gh secret set APPLE_CERTIFICATE_PASSWORD -R $R   # the .p12's export password
    gh secret set APPLE_SIGNING_IDENTITY -R $R       # Developer ID Application: <name> (TEAMID)

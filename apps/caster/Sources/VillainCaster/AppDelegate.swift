@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let registered = hotKey.register(keyCode: UInt32(kVK_Space), modifiers: UInt32(cmdKey))
         if !registered {
-            NSLog("Villain Caster: could not register ⌘Space. Disable Spotlight's shortcut in System Settings → Keyboard → Keyboard Shortcuts → Spotlight.")
+            NSLog("Caster: could not register ⌘Space. Disable Spotlight's shortcut in System Settings → Keyboard → Keyboard Shortcuts → Spotlight.")
         }
     }
 
@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settingsItem.target = self
             menu.addItem(settingsItem)
             menu.addItem(.separator())
-            menu.addItem(NSMenuItem(title: "Quit Villain Caster",
+            menu.addItem(NSMenuItem(title: "Quit Caster",
                                     action: #selector(NSApplication.terminate(_:)),
                                     keyEquivalent: "q"))
             // Attach the menu only for this click so left-click keeps toggling the panel.

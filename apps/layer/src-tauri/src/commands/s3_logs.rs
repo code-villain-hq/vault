@@ -207,7 +207,7 @@ pub fn s3_logs_tools() -> Vec<Value> {
     vec![
         tool(
             "s3_logs_sources",
-            "The log sources in S3 the user set up in Villain Layer: each one's name, where \
+            "The log sources in S3 the user set up in Layer: each one's name, where \
              it is (s3://bucket/prefix), and, when Athena has a table over it, the table's \
              columns and partition keys. Start here, then browse with s3_logs_list and \
              s3_logs_read, or query with s3_logs_query.",

@@ -1,0 +1,63 @@
+/* Draft studies only. These values do not publish design tokens. */
+.rule-study .app-window { width: 100%; background: var(--bg); border-radius: var(--radius-lg) var(--radius-lg) 0 0; overflow: hidden; color: var(--fg); font-size: var(--type-ui-small-size); font-weight: var(--type-ui-small-weight); line-height: var(--type-ui-small-leading); text-align: left; }.rule-study .forge-window { max-width: 68rem; min-height: 24rem; }.rule-study .window-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 2.25rem; padding-inline: 0.85rem; color: var(--muted); }.rule-study .window-controls { display: flex; gap: 0.3rem; }.rule-study .window-controls i { width: 0.5rem; height: 0.5rem; border-radius: var(--radius-full); background: var(--faint); opacity: 0.6; }.rule-study .window-shortcut { color: var(--faint); }.rule-study .forge-body { display: grid; grid-template-columns: 9rem minmax(0, 1.1fr) minmax(0, 1fr); min-height: 23rem; }.rule-study .app-sidebar { display: flex; flex-direction: column; align-items: stretch; gap: 0.2rem; padding: 0.75rem 0.55rem; color: var(--muted); }.rule-study .app-wordmark { font-family: var(--font-display); font-size: 1.75rem; font-weight: 700; line-height: 1.18; padding: 0 0.4rem 0.9rem; color: var(--fg); }.rule-study .app-sidebar > span { padding: 0.4rem 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.rule-study .app-sidebar small { padding: 1rem 0.5rem 0.35rem; font-size: inherit; color: var(--faint); }.rule-study .app-sidebar .nav-selected { background: var(--selected); border-radius: var(--radius-md); color: var(--fg); font-weight: 700; }.rule-study .issue-list { padding: 1.25rem 0.65rem; background: var(--panel); border-radius: var(--radius-lg) 0 0 0; }.rule-study .view-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 0.5rem 1rem; color: var(--fg); }.rule-study .view-heading strong { font-size: var(--type-ui-size); font-weight: 700; }.rule-study .mock-button { padding: 0.35rem 0.6rem; border-radius: var(--radius-md); color: var(--on-primary); background: var(--primary); white-space: nowrap; }.rule-study .issue-group { display: flex; align-items: center; gap: 0.5rem; padding: 0.8rem 0.5rem 0.5rem; color: var(--muted); }.rule-study .status-dot { display: inline-block; width: 0.45rem; height: 0.45rem; flex-shrink: 0; border-radius: var(--radius-full); vertical-align: middle; }.rule-study .progress { background: var(--info); }.rule-study .waiting { background: var(--warn); }.rule-study .done { background: var(--ok); }.rule-study .issue-row { display: flex; gap: 0.6rem; align-items: center; min-height: 2.35rem; padding: 0.5rem; border-radius: var(--radius-md); white-space: nowrap; }.rule-study .issue-row > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }.rule-study .issue-row > .status-dot { margin-left: auto; }.rule-study .issue-row.current { background: var(--selected); }.rule-study .issue-id { color: var(--faint); flex-shrink: 0; }.rule-study .issue-detail { padding: 1.3rem 1.5rem; margin: 0 0.5rem 0.5rem 0; background: var(--panel); border-radius: 0 var(--radius-lg) 0 0; }.rule-study .issue-breadcrumb { display: flex; gap: 0.6rem; color: var(--muted); }.rule-study .issue-breadcrumb span { color: var(--faint); }.rule-study .issue-detail .rule-task-title { display: block; margin: 1.5rem 0 1rem; font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }.rule-study .detail-properties { display: flex; flex-wrap: wrap; gap: 0.9rem; color: var(--muted); }.rule-study .detail-properties i { margin-right: 0.25rem; }.rule-study .issue-detail p { color: var(--muted); margin: 1.4rem 0; }.rule-study .linked-spec { display: grid; gap: 0.25rem; padding: 0.85rem; background: var(--surface); border-radius: var(--radius-md); }.rule-study .linked-spec small, .rule-study .linked-spec span { color: var(--muted); font-size: inherit; }.rule-study .linked-spec strong { font-weight: 600; }.rule-study .detail-bottom { display: flex; gap: 0.5rem; align-items: center; margin-top: 1.5rem; color: var(--muted); }
+
+.rule-study .rule-title { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 0.75rem; }
+.rule-study .rule-title h2 { margin: 0; }
+.rule-study .rule-toolbar { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; align-items: center; margin-block: 1.75rem 1rem; }
+.rule-study .rule-toolbar p { margin: 0; max-width: 38ch; color: var(--muted); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-segments { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.25rem; background: var(--panel); border-radius: var(--radius-md); }
+.rule-study .rule-segments button { appearance: none; border: 0; padding: 0.65rem 0.8rem; border-radius: var(--radius-sm); color: var(--muted); background: transparent; font-family: var(--font-reading); font-size: var(--type-control-size); font-weight: var(--type-control-weight); line-height: var(--type-control-leading); cursor: pointer; }
+.rule-study .rule-segments button:hover { background: var(--hover); color: var(--fg); }
+.rule-study .rule-segments button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+.rule-study .rule-image-stage { display: block; height: 420px; padding: 24px; overflow: hidden; background: var(--surface); border-radius: var(--radius-lg); }
+.rule-study .rule-image-canvas { width: 100%; height: 100%; }
+.rule-study #rule-art { display: block; width: 100%; height: 100%; }
+.rule-study .rule-scene { width: 900px; height: 420px; min-height: 0; }
+.rule-study .rule-scene .forge-body { grid-template-columns: 130px minmax(0, 1fr) 340px; }
+.rule-study .rule-scene .issue-detail { margin: 0 8px 8px 0; }
+.rule-study .rule-figure figcaption { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 8px; color: var(--muted); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-explanation { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr); gap: 1.5rem 3rem; margin-top: 2rem; }
+.rule-study .rule-explanation h3 { margin: 0; max-width: 20ch; font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); text-wrap: balance; }
+.rule-study dl { margin: 0; }
+.rule-study .rule-explanation dl { display: grid; gap: 1rem; }
+.rule-study .rule-explanation dl div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 1rem; }
+.rule-study dt { font-weight: 700; }
+.rule-study dd { margin: 0; color: var(--muted); }
+.rule-study .rule-source { margin-top: 1.75rem; font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-scale { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 1rem; align-items: start; margin-top: 2rem; padding-block: 1rem; }
+.rule-study .rule-scale div { display: grid; gap: 0.75rem; min-width: 0; }
+.rule-study .rule-scale span { font-size: var(--type-small-size); line-height: var(--type-small-leading); font-variant-numeric: tabular-nums; }
+.rule-study .rule-scale i { display: block; height: 8px; max-width: 100%; background: var(--muted); border-radius: var(--radius-sm); }
+.rule-study .rule-units { margin: 0; color: var(--muted); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-guides { display: inline-flex; gap: 0.5rem; align-items: center; color: var(--muted); font-size: var(--type-small-size); }
+.rule-study .rule-guides input { width: 1rem; height: 1rem; accent-color: var(--primary); }
+.rule-study .rule-spacing-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr); gap: 2rem 3rem; align-items: start; }
+.rule-study .rule-spacing-preview { --study-pad: 16px; --study-related: 4px; --study-group: 12px; --study-section: 32px; padding: var(--study-pad); background: var(--panel); border-radius: var(--radius-lg); }
+.rule-study .rule-spacing-preview[data-density="studio"] { --study-pad: 32px; --study-related: 8px; --study-group: 24px; --study-section: 64px; }
+.rule-study .rule-spacing-preview[data-guides="true"] { background: color-mix(in srgb, var(--muted) 16%, var(--panel)); }
+.rule-study .rule-spacing-content { background: var(--panel); }
+.rule-study .rule-example-meta { display: block; color: var(--faint); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-spacing-content h3 { margin: 0; font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }
+.rule-study .rule-spacing-content p { margin: 0; color: var(--muted); }
+.rule-study .rule-gap-related { height: var(--study-related); }
+.rule-study .rule-gap-group { height: var(--study-group); }
+.rule-study .rule-gap-section { height: var(--study-section); }
+.rule-study [data-guides="true"] .rule-gap { background: color-mix(in srgb, var(--muted) 16%, transparent); }
+.rule-study .rule-example-note { display: grid; gap: 4px; }
+.rule-study .rule-example-note strong { font-size: var(--type-label-size); line-height: var(--type-label-leading); }
+.rule-study .rule-example-note span { color: var(--muted); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-spacing-key { padding-top: 0.5rem; }
+.rule-study .rule-spacing-key h3 { margin: 0 0 0.5rem; font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }
+.rule-study .rule-spacing-key > p { color: var(--muted); }
+.rule-study .rule-spacing-key dl { display: grid; gap: 0.5rem; margin-block: 1.5rem; font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.rule-study .rule-spacing-key dl div { display: flex; justify-content: space-between; gap: 1rem; }
+.rule-study .rule-spacing-key dd { color: var(--fg); font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) {
+  .rule-study .rule-explanation, .rule-study .rule-spacing-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .rule-study .rule-explanation h3 { max-width: none; }
+  .rule-study .rule-scale { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem 1rem; }
+  .rule-study .rule-image-stage { height: 300px; padding: 16px; }
+  .rule-study .rule-spacing-preview[data-density="studio"] { --study-pad: 16px; --study-section: 48px; }
+  .rule-study .rule-figure figcaption span { text-align: left; }
+  .rule-study .rule-explanation dl div { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
+}

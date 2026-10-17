@@ -1,5 +1,5 @@
 ---
-name: Villain Studios
+name: Code Villain
 description: Nightshade — grey does the work, cloak is the quiet brand, poison is the accent. Night by default, day for apps.
 colors:
   bg: "#0A0B0D"
@@ -110,7 +110,7 @@ components:
     rounded: "10px"
 ---
 
-# Design System: Villain Studios
+# Design System: Code Villain
 
 This file summarises `brand/` and `design/` for design tools. Those folders are the source; when they change, this follows.
 
@@ -172,7 +172,7 @@ Apps share one frame: sidebar and top bar on `bg`, dimmed; content rises one ste
 
 ## Elevation & Depth
 
-Flat. Depth is tone: bg → panel → surface. No shadows, no borders to lift a surface, no glow. The `line` token is for tables and menus only.
+Flat. Depth is tone: bg → panel → surface. No shadows or borders to lift a surface, and no decorative glow. Field focus is the exception: an accent border plus a 3px accent glow at 22%, as specified in `design/components.md`. The `line` token is for tables and menus only.
 
 ## Shapes
 
@@ -180,8 +180,9 @@ Flat. Depth is tone: bg → panel → surface. No shadows, no borders to lift a 
 
 ## Components
 
-- **Button**: 28px, `control` role, no border. Primary: `primary` fill, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring.
-- **Field**: `surface` fill, no border; focus draws one accent ring on the edge.
+- **App button**: 28px, `control` role, no border. Primary: `primary` fill, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring, 2px out.
+- **Studio call to action**: `label` role (15px/700, leading 1.2, tracking 0.01em), `0.7rem 1.15rem` padding, automatic height, 6px corners. Same primary colours and no border; focus is a 2px accent ring, 3px out.
+- **Field**: `surface` fill (`panel` in the frame), no border; focus draws an `accent` border plus a 3px accent glow at 22%.
 - **Status pill**: round; status colour as text and dot on a 13% tint.
 - **Chip**: round; muted text on `fg` at 7%.
 - **Row**: no dividers; hover and selection are tone steps.
@@ -200,4 +201,4 @@ Flat. Depth is tone: bg → panel → surface. No shadows, no borders to lift a 
 - **Don't** use solid cloak as a button fill in product UI.
 - **Don't** add hairlines between rows or regions.
 - **Don't** set Grenze Gotisch below 28px or in capitals.
-- **Don't** add shadows or glows.
+- **Don't** add shadows or decorative glows; the specified field-focus glow is allowed.

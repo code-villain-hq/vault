@@ -79,7 +79,7 @@ final class QueryEngine {
                 symbol: "circle.lefthalf.filled",
                 isAvailable: { true },
                 run: { SystemActions.toggleDarkMode() }),
-        Command(title: "Quit Villain Caster",
+        Command(title: "Quit Caster",
                 subtitle: "Close this launcher",
                 symbol: "power",
                 isAvailable: { true },

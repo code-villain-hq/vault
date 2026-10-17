@@ -97,7 +97,7 @@ fn explain(stderr: String) -> String {
         return stderr;
     }
     format!(
-        "{stderr}\n\nmacOS keeps other apps' folders from Villain Layer, and your SSH setup reads a file \
+        "{stderr}\n\nmacOS keeps other apps' folders from Layer, and your SSH setup reads a file \
          in one. Copy the public key (.pub) it names to ~/.ssh and point IdentityFile at the copy: the \
          agent still holds the private key."
     )

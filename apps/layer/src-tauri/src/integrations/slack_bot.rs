@@ -350,7 +350,7 @@ pub fn split_reply(text: &str, max: usize, parts: usize) -> Vec<String> {
                 last.push_str("\n```");
             }
             let start = if fence_open { "```\n" } else { "" };
-            out.push(format!("{start}{last}\n\n_…the rest is in the chat in Villain Layer._"));
+            out.push(format!("{start}{last}\n\n_…the rest is in the chat in Layer._"));
             break;
         }
         let cut = if rest.chars().count() <= max {

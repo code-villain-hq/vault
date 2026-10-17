@@ -180,7 +180,7 @@ impl Conn {
                 // Agents read, write and run things themselves, as they do
                 // in a terminal: the app takes on none of it.
                 "clientCapabilities": { "fs": { "readTextFile": false, "writeTextFile": false }, "terminal": false },
-                "clientInfo": { "name": "villain-layer", "title": "Villain Layer", "version": env!("CARGO_PKG_VERSION") },
+                "clientInfo": { "name": "villain-layer", "title": "Layer", "version": env!("CARGO_PKG_VERSION") },
             });
             self.request(st, fx, "initialize", params, Waiting::Initialize);
             fx.report = Some(Activity::Idle);
@@ -374,7 +374,7 @@ impl Conn {
             // Not offered in `initialize`, so not expected; answered all the
             // same, so the agent is not left waiting on it.
             let reply = json!({ "jsonrpc": "2.0", "id": id, "error": {
-                "code": -32601, "message": format!("Villain Layer does not offer {method}") } });
+                "code": -32601, "message": format!("Layer does not offer {method}") } });
             let _ = self.out.send(reply.to_string());
             return;
         }

@@ -43,7 +43,7 @@ final class SettingsWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Villain Caster Settings"
+        window.title = "Caster Settings"
         super.init(window: window)
 
         let grid = NSGridView()

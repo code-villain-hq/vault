@@ -10,7 +10,9 @@ Atkinson sets every sentence meant to be read, and every label,
 button, and nav item.
 
 All three are free under the SIL Open Font License. The site serves
-them, and Caster bundles them.
+them from [`apps/site/assets/fonts/`](../apps/site/assets/fonts/), with
+the licenses alongside them. The brand page reuses the same local
+font stylesheet. Caster bundles them.
 
 ## Faces
 

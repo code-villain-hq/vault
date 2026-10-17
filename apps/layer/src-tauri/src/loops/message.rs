@@ -39,7 +39,7 @@ pub(super) fn tail(output: &str) -> String {
 /// failures alone did not tell it the user wanted them fixed.
 pub(super) fn failures(results: &[CheckResult], targets: &[Target], round: u32, rounds: u32) -> String {
     let mut text = format!(
-        "The user put you on a loop: each time you end a turn, Villain Layer runs this task's checks, and \
+        "The user put you on a loop: each time you end a turn, Layer runs this task's checks, and \
          they fail now (round {round} of {rounds}).\n\n\
          Make them pass, then end your turn: they run again when you do. If a failure is not yours to fix, \
          or you need something from the user, say so and end your turn without changing anything, and the loop \

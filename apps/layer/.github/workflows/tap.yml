@@ -1,4 +1,4 @@
-# The Homebrew cask, in Villain-Studios/homebrew-tap, when a release is
+# The Homebrew cask, in code-villain-hq/homebrew-tap, when a release is
 # published (docs/releasing.md). Fills packaging/homebrew/villain-layer.rb in
 # with the version and the .dmg's SHA-256 from the release, has Homebrew
 # check the result, and pushes it to the tap.
@@ -61,13 +61,13 @@ jobs:
           HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
         run: |
           brew update --quiet
-          brew tap-new --no-git villain-studios/check
-          casks="$(brew --repository villain-studios/check)/Casks"
+          brew tap-new --no-git code-villain-hq/check
+          casks="$(brew --repository code-villain-hq/check)/Casks"
           mkdir -p "$casks"
           cp "$RUNNER_TEMP/villain-layer.rb" "$casks/"
-          brew trust --cask villain-studios/check/villain-layer
-          brew style --cask villain-studios/check/villain-layer
-          brew audit --cask --online villain-studios/check/villain-layer
+          brew trust --cask code-villain-hq/check/villain-layer
+          brew style --cask code-villain-hq/check/villain-layer
+          brew audit --cask --online code-villain-hq/check/villain-layer
 
       - name: The tap's key is set
         env:
@@ -80,7 +80,7 @@ jobs:
 
       - uses: actions/checkout@v5
         with:
-          repository: Villain-Studios/homebrew-tap
+          repository: code-villain-hq/homebrew-tap
           ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           path: tap
 

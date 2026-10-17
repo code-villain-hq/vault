@@ -3,13 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Brand — Villain Studios</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800&family=Atkinson+Hyperlegible+Next:ital,wght@0,400..700;1,400&family=Atkinson+Hyperlegible+Mono&display=swap">
+  <title>Brand — Code Villain</title>
+  <link rel="stylesheet" href="../apps/site/assets/fonts/fonts.css">
   <link rel="stylesheet" href="../design/tokens/color.css">
   <link rel="stylesheet" href="../design/tokens/type.css">
   <link rel="stylesheet" href="../design/tokens/shape.css">
+  <link rel="stylesheet" href="studies/rules.css">
   <style>
     :root {
       --measure: 66ch;
@@ -23,7 +22,7 @@
 
     html {
       color-scheme: dark;
-      scroll-behavior: smooth;
+      scroll-behavior: auto;
       scrollbar-color: var(--muted) var(--night);
     }
 
@@ -117,6 +116,10 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.25rem 1.15rem;
+      font-size: var(--type-label-size);
+      font-weight: var(--type-label-weight);
+      line-height: var(--type-label-leading);
+      letter-spacing: var(--type-label-tracking);
     }
 
     nav a {
@@ -180,7 +183,7 @@
 
     section {
       padding-top: 5.5rem;
-      scroll-margin-top: 4.5rem;
+      scroll-margin-top: calc(var(--brand-header-size, 4rem) + 8px);
     }
 
     .lead,
@@ -193,7 +196,7 @@
 
     .lead {
       margin: 0;
-      font-size: 1.2rem;
+      font-size: var(--type-title-size);
       color: var(--muted);
     }
 
@@ -215,7 +218,7 @@
 
     .option > h3 {
       margin: 0 0 0.35rem;
-      font-size: 1.15rem;
+      font-size: var(--type-title-size);
     }
 
     .option > p {
@@ -247,13 +250,17 @@
       background: var(--panel);
       color: var(--fg);
       border-radius: var(--radius-lg);
-      font-size: 14px;
+      font-size: var(--type-ui-size);
+      font-weight: var(--type-ui-weight);
+      line-height: var(--type-ui-leading);
     }
 
     .demo .mode {
       margin: 0;
       color: var(--faint);
-      font-size: 0.8125rem;
+      font-size: var(--type-ui-small-size);
+      font-weight: var(--type-ui-small-weight);
+      line-height: var(--type-ui-small-leading);
     }
 
     .demo strong {
@@ -293,9 +300,10 @@
       background: transparent;
       color: var(--muted);
       font: inherit;
-      font-size: 0.8125rem;
-      font-weight: 600;
+      font-size: var(--type-control-size);
+      font-weight: var(--type-control-weight);
       cursor: pointer;
+      line-height: var(--type-control-leading);
     }
 
     .btn:hover { background: var(--hover); color: var(--fg); }
@@ -308,8 +316,9 @@
       border-radius: var(--radius-full);
       background: color-mix(in srgb, var(--fg) 7%, transparent);
       color: var(--muted);
-      font-size: 0.8125rem;
-      font-weight: 600;
+      font-size: var(--type-control-size);
+      font-weight: var(--type-control-weight);
+      line-height: var(--type-control-leading);
     }
 
     .status {
@@ -319,8 +328,9 @@
       padding: 0.15rem 0.6rem 0.15rem 0.5rem;
       border-radius: var(--radius-full);
       background: color-mix(in srgb, currentColor 13%, transparent);
-      font-size: 0.8125rem;
+      font-size: var(--type-control-size);
       font-weight: 700;
+      line-height: var(--type-control-leading);
     }
 
     .status::before { content: ""; width: 0.45em; height: 0.45em; border-radius: 50%; background: currentColor; }
@@ -334,7 +344,9 @@
       align-items: center;
       gap: 0.4rem;
       color: var(--muted);
-      font-size: 0.8125rem;
+      font-size: var(--type-ui-small-size);
+      font-weight: var(--type-ui-small-weight);
+      line-height: var(--type-ui-small-leading);
     }
 
     .live::before { content: ""; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--accent); }
@@ -360,8 +372,8 @@
     }
 
     .token-table code {
-      font-size: 0.92em;
-      font-weight: 600;
+      font-size: var(--type-code-size);
+      font-weight: var(--type-code-weight);
     }
 
     table {
@@ -384,7 +396,7 @@
       font-weight: 700;
       padding-top: 0;
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: var(--type-small-size);
     }
 
     tbody th {
@@ -416,7 +428,7 @@
     .face-display {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: clamp(2.75rem, 6vw, 4.5rem);
+      font-size: var(--type-display-size);
       line-height: var(--type-splash-leading);
     }
 
@@ -446,16 +458,16 @@
     }
 
     .t-display { font-size: var(--type-display-size); line-height: var(--type-display-leading); }
-    .t-headline { font-size: var(--type-headline-size); line-height: var(--type-headline-leading); }
-    .t-title { font-size: var(--type-title-size); font-weight: var(--type-title-weight); }
-    .t-label { font-size: var(--type-label-size); font-weight: var(--type-label-weight); letter-spacing: var(--type-label-tracking); }
-    .t-body { font-size: var(--type-body-size); }
-    .t-small { font-size: var(--type-small-size); color: var(--muted); }
-    .t-code { font-size: var(--type-code-size); }
-    .t-ui { font-size: var(--type-ui-size); }
-    .t-ui-small { font-size: var(--type-ui-small-size); color: var(--muted); }
-    .t-control { font-size: var(--type-control-size); font-weight: var(--type-control-weight); }
-    .t-ui-code { font-size: var(--type-ui-code-size); }
+    .t-headline { font-weight: var(--type-headline-weight); font-size: var(--type-headline-size); line-height: var(--type-headline-leading); }
+    .t-title { font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }
+    .t-label { font-size: var(--type-label-size); font-weight: var(--type-label-weight); letter-spacing: var(--type-label-tracking); line-height: var(--type-label-leading); }
+    .t-body { font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+    .t-small { font-size: var(--type-small-size); color: var(--muted); line-height: var(--type-small-leading); }
+    .t-code { font-size: var(--type-code-size); line-height: var(--type-code-leading); }
+    .t-ui { font-size: var(--type-ui-size); line-height: var(--type-ui-leading); }
+    .t-ui-small { font-size: var(--type-ui-small-size); color: var(--muted); line-height: var(--type-ui-small-leading); }
+    .t-control { font-size: var(--type-control-size); font-weight: var(--type-control-weight); line-height: var(--type-control-leading); }
+    .t-ui-code { font-size: var(--type-ui-code-size); line-height: var(--type-ui-code-leading); }
 
     .type-table td:last-child {
       color: var(--muted);
@@ -467,7 +479,8 @@
       max-width: 22em;
       font-family: var(--font-display);
       margin: 0 0 1.5rem;
-      font-size: clamp(1.65rem, 3vw, 2.2rem);
+      font-size: var(--type-headline-size);
+      line-height: var(--type-headline-leading);
       font-weight: 700;
       text-wrap: balance;
       color: var(--ink);
@@ -476,7 +489,7 @@
     .short {
       max-width: 16em;
       margin: 1.75rem 0;
-      font-size: 1.35rem;
+      font-size: var(--type-title-size);
       font-weight: 700;
     }
 
@@ -524,6 +537,9 @@
       border-radius: var(--radius-md);
     }
 
+    .logo-night img,
+    .logo-day img { display: block; max-width: 100%; height: auto; }
+
     .logo-night { background: var(--night); }
     .logo-day { background: #FFFFFF; }
 
@@ -542,7 +558,7 @@
       margin: 0 0 clamp(1rem, 2vw, 1.75rem);
       color: var(--muted);
       font-weight: 700;
-      font-size: 0.9rem;
+      font-size: var(--type-small-size);
     }
 
     .slot {
@@ -558,7 +574,7 @@
     .slot p {
       max-width: 11em;
       margin: 0;
-      font-size: 1.35rem;
+      font-size: var(--type-title-size);
       font-weight: 700;
       text-wrap: balance;
       color: var(--muted);
@@ -585,7 +601,7 @@
 
     .handoff h3 {
       margin: 0 0 0.5rem;
-      font-size: 1.15rem;
+      font-size: var(--type-title-size);
     }
 
     .handoff > div {
@@ -622,9 +638,9 @@
     .window .w-main {
       grid-column: 2;
       grid-row: 2;
-      margin: 0 0.4rem 0.4rem 0;
-      border-radius: var(--radius-md);
-      background: var(--surface);
+      margin: 0 0.5rem 0.5rem 0;
+      border-radius: var(--radius-lg);
+      background: var(--panel);
     }
 
     .post {
@@ -638,7 +654,7 @@
     .layouts figcaption {
       display: block;
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: var(--type-small-size);
     }
 
     .close {
@@ -721,19 +737,21 @@
 <body>
   <a class="skip" href="#top">Skip to content</a>
   <header class="bar">
-    <a class="home" href="#top"><svg viewBox="0 0 200 200" width="24" height="24" aria-hidden="true"><defs><mask id="m-home"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-home)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg>Villain Studios</a>
+    <a class="home" href="#top"><img src="mark/mark.svg" width="24" height="24" alt="">Code Villain</a>
     <nav aria-label="Brand">
       <a href="#color">Color</a>
       <a href="#type">Type</a>
       <a href="#voice">Voice</a>
       <a href="#mark">Mark</a>
+      <a href="#imagery">Imagery · draft</a>
+      <a href="#spacing">Spacing · draft</a>
       <a href="#design">Design</a>
     </nav>
   </header>
   <main id="top">
     <div class="hero">
       <h1>Brand</h1>
-      <p class="lead">Decisions about how Villain looks and sounds. The apps, the site, the blog, and social posts follow these.</p>
+      <p class="lead">Decisions about how Code Villain looks and sounds. The apps, the site, the blog, and social posts follow these.</p>
     </div>
 
     <section id="color">
@@ -897,11 +915,11 @@
       <p class="prose">The gothic is the costume. Atkinson is the person inside it. Grenze Gotisch sets the splash, page titles, and section titles — never below 28px, never in capitals. Atkinson Hyperlegible Next sets everything read or clicked. Atkinson Hyperlegible Mono sets code. Written in <a href="type.md">type.md</a>. Numbers in <a href="../design/tokens/">design/tokens</a>.</p>
       <div class="faces">
         <figure class="face">
-          <p class="face-sample face-display">Villain Studios</p>
+          <p class="face-sample face-display">Code Villain</p>
           <figcaption><span>Grenze Gotisch</span><span>700 · 800</span></figcaption>
         </figure>
         <figure class="face">
-          <p class="face-sample face-reading">Ships real tools. Narrates the build.</p>
+          <p class="face-sample face-reading">Ships real tools.</p>
           <figcaption><span>Atkinson Hyperlegible Next</span><span>400 · 600 · 700 · italic</span></figcaption>
         </figure>
         <figure class="face">
@@ -920,10 +938,10 @@
         <tbody>
           <tr><th scope="row">display</th><td><span class="t-display">Forge files its own tickets</span></td><td>Grenze 700 · 36–56px</td></tr>
           <tr><th scope="row">headline</th><td><span class="t-headline">Why build it this way</span></td><td>Grenze 700 · 28–34px</td></tr>
-          <tr><th scope="row">title</th><td><span class="t-title">Villain Layer</span></td><td>Atkinson 700 · 21px</td></tr>
-          <tr><th scope="row">label</th><td><span class="t-label">Read the build.</span></td><td>Atkinson 700 · 15px · site buttons</td></tr>
+          <tr><th scope="row">title</th><td><span class="t-title">Layer</span></td><td>Atkinson 700 · 21px</td></tr>
+          <tr><th scope="row">label</th><td><span class="t-label">Read the log.</span></td><td>Atkinson 700 · 15px · site buttons</td></tr>
           <tr><th scope="row">body</th><td><span class="t-body">A tool that cannot run its own project has no business running yours.</span></td><td>Atkinson 400 · 17px</td></tr>
-          <tr><th scope="row">small</th><td><span class="t-small">Build log · Forge · 4 min read</span></td><td>Atkinson 400 · 14px</td></tr>
+          <tr><th scope="row">small</th><td><span class="t-small">The log · Forge · 4 min read</span></td><td>Atkinson 400 · 14px</td></tr>
           <tr><th scope="row">code</th><td><code class="t-code">git commit -m "Lock the studio type."</code></td><td>Mono 400 · 14px</td></tr>
         </tbody>
       </table>
@@ -938,7 +956,7 @@
         <tbody>
           <tr><th scope="row">title</th><td><span class="t-title">Share tokens across the site and apps</span></td><td>Atkinson 700 · 21px</td></tr>
           <tr><th scope="row">ui</th><td><span class="t-ui">Drift audit: specs against code</span></td><td>Atkinson 400 · 14px</td></tr>
-          <tr><th scope="row">ui-small</th><td><span class="t-ui-small">FOR-61 · opened by Villain</span></td><td>Atkinson 400 · 13px</td></tr>
+          <tr><th scope="row">ui-small</th><td><span class="t-ui-small">FOR-61 · opened by Code Villain</span></td><td>Atkinson 400 · 13px</td></tr>
           <tr><th scope="row">control</th><td><span class="t-control">Start work</span></td><td>Atkinson 600 · 13px</td></tr>
           <tr><th scope="row">ui-code</th><td><code class="t-ui-code">forge pickup FOR-61</code></td><td>Mono 400 · 13px</td></tr>
         </tbody>
@@ -949,9 +967,9 @@
     <section id="voice">
       <h2>Voice</h2>
       <div class="voice">
-        <p class="say">Villain writes like a golden-age comic villain who ships.</p>
+        <p class="say">Code Villain writes like a golden-age comic villain who ships.</p>
         <p>Doctor Doom is the reference: theatrical, precise, a little too sure of himself. The armor is costume. The work is real.</p>
-        <p>Villain speaks, and names itself the way Doom does. “Villain shipped Forge.” Never “I”, never “we”.</p>
+        <p>Code Villain speaks, and names itself the way Doom does. “Code Villain shipped Forge.” Never “I”, never “we”.</p>
         <p>Lead with the thing: what got built, what it does, what it cost. The reader sees the work before they hear the voice. Declare instead of hedging. Boast only what shipped. Name the number, the file, the trade-off. One flourish per piece; the rest is plain. Never mean, never corporate-evil. The villainy is posture.</p>
         <p>The same voice covers the interface, the blog, and social posts. A button and a post sound like the same studio.</p>
         <p class="short">Short surfaces stay short.</p>
@@ -964,29 +982,76 @@
       <p class="prose">The strike. A gothic V with a poison bar behind it, cut where the letter crosses: the homepage’s strike, made into a mark. It is the surface’s one brand moment. App icons are each app’s initial built the same way. Written in <a href="mark/">the mark folder</a>.</p>
       <div class="mark-grid">
         <figure class="mark-hero">
-          <svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Villain Studios mark at 200px"><defs><mask id="m-hero"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-hero)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg>
+          <img src="mark/mark.svg" width="200" height="200" alt="Code Villain mark at 200px">
           <figcaption><span>The mark</span><span>Tile, favicon, app icon shape</span></figcaption>
         </figure>
         <div class="mark-side">
           <figure class="mark-sizes">
-            <div><svg viewBox="0 0 200 200" width="64" height="64" role="img" aria-label="Villain Studios mark at 64px"><defs><mask id="m-64"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-64)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg><svg viewBox="0 0 200 200" width="32" height="32" role="img" aria-label="Villain Studios mark at 32px"><defs><mask id="m-32"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-32)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg><svg viewBox="0 0 200 200" width="16" height="16" role="img" aria-label="Villain Studios mark at 16px"><defs><mask id="m-16"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">V</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#m-16)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">V</text></svg></div>
+            <div><img src="mark/mark.svg" width="64" height="64" alt="Code Villain mark at 64px"><img src="mark/mark.svg" width="32" height="32" alt="Code Villain mark at 32px"><img src="mark/mark.svg" width="16" height="16" alt="Code Villain mark at 16px"></div>
             <figcaption><span>64, 32, 16</span><span>Works down to 16px</span></figcaption>
           </figure>
           <figure class="mark-logo">
-            <div class="logo-night"><svg viewBox="0 0 202 90" width="202" height="90" role="img" aria-label="Villain Studios logo"><defs><mask id="l-night"><rect width="202" height="90" fill="#fff"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round">Villain</text></mask></defs><rect y="41" width="202" height="8" fill="#C9E265" mask="url(#l-night)"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#ECECF1">Villain</text><text x="8" y="80" textLength="183" lengthAdjust="spacing" font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="700" font-size="13" fill="#ECECF1">STUDIOS</text></svg></div>
-            <figcaption><span>Logo on night</span><span>At least 96px wide</span></figcaption>
+            <div class="logo-night"><img src="mark/logo-night.svg" width="348" height="72" alt="Code Villain logo on night"></div>
+            <figcaption><span>Logo on night</span><span>At least 160px wide</span></figcaption>
           </figure>
           <figure class="mark-apps">
             <div><svg viewBox="0 0 200 200" width="48" height="48" aria-hidden="true"><defs><mask id="a-f"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">F</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#a-f)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">F</text></svg><svg viewBox="0 0 200 200" width="48" height="48" aria-hidden="true"><defs><mask id="a-l"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">L</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#a-l)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">L</text></svg><svg viewBox="0 0 200 200" width="48" height="48" aria-hidden="true"><defs><mask id="a-c"><rect width="200" height="200" fill="#fff"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round">C</text></mask></defs><rect width="200" height="200" rx="45" fill="#0A0B0D"></rect><rect y="108" width="200" height="15" fill="#C9E265" mask="url(#a-c)"></rect><text x="100" y="152" text-anchor="middle" font-family="Grenze Gotisch, serif" font-weight="800" font-size="150" fill="#ECECF1">C</text></svg></div>
-            <figcaption><span>Forge, Layer, Caster</span><span>Each app’s initial, built the same way</span></figcaption>
+            <figcaption><span>Forge, Layer, Caster</span><span>Construction studies · each app’s initial</span></figcaption>
           </figure>
           <figure class="mark-logo">
-            <div class="logo-day"><svg viewBox="0 0 202 90" width="202" height="90" role="img" aria-label="Villain Studios logo"><defs><mask id="l-day"><rect width="202" height="90" fill="#fff"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#000" stroke="#000" stroke-width="7" stroke-linejoin="round">Villain</text></mask></defs><rect y="41" width="202" height="8" fill="#4C6A00" mask="url(#l-day)"></rect><text x="10" y="62" font-family="Grenze Gotisch, serif" font-weight="800" font-size="72" fill="#18181C">Villain</text><text x="8" y="80" textLength="183" lengthAdjust="spacing" font-family="Atkinson Hyperlegible Next, sans-serif" font-weight="700" font-size="13" fill="#18181C">STUDIOS</text></svg></div>
+            <div class="logo-day"><img src="mark/logo-day.svg" width="348" height="72" alt="Code Villain logo on day"></div>
             <figcaption><span>Logo on day</span><span>Deep poison</span></figcaption>
           </figure>
         </div>
       </div>
       <p class="note">Clear space: a quarter of the mark’s height on every side. Never recolour the bar, move it, tilt it, or put it over the letter.</p>
+    </section>
+
+    <section id="imagery" class="rule-study" aria-labelledby="imagery-title">
+      <div class="rule-title"><h2 id="imagery-title">Imagery</h2><span class="status s-warn">Draft</span></div>
+      <p class="prose">Show the work at a useful size. A capture should explain one task, with enough context to understand it.</p>
+      <div class="rule-toolbar"><div class="rule-segments" role="group" aria-label="Imagery example"><button type="button" aria-pressed="true" data-image-view="whole">Whole window</button><button type="button" aria-pressed="false" data-image-view="detail">Detail crop</button></div><p id="image-description" aria-live="polite">A whole window establishes where the work happens.</p></div>
+      <figure class="rule-figure">
+        <div class="rule-image-stage" data-image-mode="whole" role="img" aria-label="Example Forge interface illustration, presented straight on in a neutral frame. This is example content, not a real product screenshot.">
+          <div class="rule-image-canvas" aria-hidden="true"><svg id="rule-art" viewBox="0 0 900 420"><foreignObject width="900" height="420"><div xmlns="http://www.w3.org/1999/xhtml" class="app-window forge-window rule-scene" aria-hidden="true">
+              <div class="window-top"><span class="window-controls"><i></i><i></i><i></i></span><span>Forge</span><span class="window-shortcut">⌘ K</span></div>
+              <div class="forge-body">
+                <aside class="app-sidebar"><strong class="app-wordmark">Forge</strong><span>Inbox</span><span>My issues</span><small>Workspace</small><span class="nav-selected">All issues</span><span>Projects</span><span>Specs</span><span>Decisions</span></aside>
+                <div class="issue-list">
+                  <div class="view-heading"><strong>All issues</strong><span class="mock-button">New issue</span></div>
+                  <div class="issue-group"><span class="status-dot progress"></span>In progress</div>
+                  <div class="issue-row current"><span class="issue-id">VIL-24</span><span>Bring the studio together</span><span class="status-dot progress"></span></div>
+                  <div class="issue-row"><span class="issue-id">VIL-23</span><span>Keep the work in sync</span><span class="status-dot progress"></span></div>
+                  <div class="issue-group"><span class="status-dot waiting"></span>In review</div>
+                  <div class="issue-row"><span class="issue-id">VIL-22</span><span>A quieter command menu</span><span class="status-dot waiting"></span></div>
+                  <div class="issue-group"><span class="status-dot done"></span>Done</div>
+                  <div class="issue-row"><span class="issue-id">VIL-21</span><span>Make room for the details</span><span class="status-dot done"></span></div>
+                  <div class="issue-row"><span class="issue-id">VIL-20</span><span>Give every decision a home</span><span class="status-dot done"></span></div>
+                </div>
+                <div class="issue-detail"><div class="issue-breadcrumb">Studio <span>/</span> VIL-24</div><strong class="rule-task-title">Bring the studio<br>together</strong><div class="detail-properties"><span><i class="status-dot progress"></i> In progress</span><span>Studio</span></div><p>One palette. One type system.<br>A shared language for every tool.</p><div class="linked-spec"><small>Linked specification</small><strong>Studio design system</strong><span>Colours, type, and shared controls</span></div><div class="detail-bottom"><span class="status-dot done"></span>Specification linked to this issue</div></div>
+              </div>
+            </div></foreignObject></svg></div>
+        </div>
+        <figcaption><span>Interface illustration · example content</span><span id="image-framing">24px surround · 10px corners · straight on</span></figcaption>
+      </figure>
+      <div class="rule-explanation"><h3>Let the product provide the detail.</h3><dl><div><dt>Capture</dt><dd>Real product captures come first. Show one task, hide private information before capture, and preserve the interface’s actual colours.</dd></div><div><dt>Present</dt><dd>Use a straight view on a neutral ground. Start with 24px of surround and 10px corners. Crop to explain a feature; keep its title and enough context. No perspective tilt or decorative glow.</dd></div><div><dt>Describe</dt><dd>Put a plain caption 8px below the image. Say what it proves. Label illustrations and example data; never pass them off as screenshots.</dd></div></dl></div>
+      <p class="note rule-source">Draft wording: <a href="imagery.draft.md">imagery.draft.md</a>. The example above reuses the site’s interface illustration; real captures can replace it later.</p>
+    </section>
+
+    <section id="spacing" class="rule-study" aria-labelledby="spacing-title">
+      <div class="rule-title"><h2 id="spacing-title">Spacing</h2><span class="status s-warn">Draft</span></div>
+      <p class="prose">Keep related things close. Give separate tasks room. One scale serves both a dense app and a more open studio page.</p>
+      <div class="rule-scale" aria-label="Proposed spacing scale"><div><span>4</span><i style="width:4px" aria-hidden="true"></i></div><div><span>8</span><i style="width:8px" aria-hidden="true"></i></div><div><span>12</span><i style="width:12px" aria-hidden="true"></i></div><div><span>16</span><i style="width:16px" aria-hidden="true"></i></div><div><span>24</span><i style="width:24px" aria-hidden="true"></i></div><div><span>32</span><i style="width:32px" aria-hidden="true"></i></div><div><span>48</span><i style="width:48px" aria-hidden="true"></i></div><div><span>64</span><i style="width:64px" aria-hidden="true"></i></div><div><span>96</span><i style="width:96px" aria-hidden="true"></i></div></div>
+      <p class="rule-units">Proposed values in pixels; use rem equivalents on the web. These are study values, not published tokens.</p>
+      <div class="rule-toolbar"><div class="rule-segments" role="group" aria-label="Spacing density"><button type="button" aria-pressed="true" data-density="app">App interface</button><button type="button" aria-pressed="false" data-density="studio">Studio page</button></div><label class="rule-guides"><input type="checkbox" id="show-spacing" checked>Show spacing</label></div>
+      <div class="rule-spacing-layout">
+        <div class="rule-spacing-preview" data-density="app" data-guides="true" aria-label="Spacing example">
+          <div class="rule-spacing-content"><span class="rule-example-meta">VIL-24 · example content</span><div class="rule-gap rule-gap-related" aria-hidden="true"></div><h3>Bring the studio together</h3><div class="rule-gap rule-gap-group" aria-hidden="true"></div><p>One palette, one type system, and a shared language for every tool.</p><div class="rule-gap rule-gap-section" aria-hidden="true"></div><div class="rule-example-note"><strong>Studio design system</strong><span>Colours, type, and shared controls</span></div></div>
+        </div>
+        <div class="rule-spacing-key"><h3 id="density-title">App interface</h3><p id="density-description">Compact groups keep the task and its details in view.</p><dl aria-live="polite"><div><dt>Outer padding</dt><dd id="space-padding">16px</dd></div><div><dt>Related text</dt><dd id="space-related">4px</dd></div><div><dt>Between groups</dt><dd id="space-group">12px</dd></div><div><dt>Between sections</dt><dd id="space-section">32px</dd></div></dl><p class="rule-units">Shaded areas show the selected spacing. Type stays the same so the difference is easy to see.</p></div>
+      </div>
+      <div class="rule-explanation"><h3>Use the relationship, not a bigger number.</h3><dl><div><dt>4–12px</dt><dd>Details that belong together: an icon and label, a caption and image, fields within a group.</dd></div><div><dt>16–32px</dt><dd>Padding and groups. Begin with 16px in app panels, 24px around imagery, and 32px for a studio composition.</dd></div><div><dt>48–96px</dt><dd>Separate major sections. Begin with 64px on studio pages, reduce to 48px on narrow screens. Reserve 96px for a genuine change of subject.</dd></div></dl></div>
+      <p class="note rule-source">Draft wording: <a href="../design/spacing.draft.md">spacing.draft.md</a>. Fixed control heights, type leading, and logo clear space keep their existing rules.</p>
     </section>
 
     <section id="design">
@@ -995,7 +1060,7 @@
       <div class="handoff">
         <div>
           <h3>Tokens</h3>
-          <p>Nightshade color (night and day), studio type, and corner radii live as JSON, CSS, and Swift. Space is still empty.</p>
+          <p>Nightshade color (night and day), studio type, and corner radii live as JSON, CSS, and Swift. Spacing has a draft study above; no space tokens are published yet.</p>
           <p class="source"><a href="../design/tokens/">design/tokens</a></p>
         </div>
         <div>
@@ -1022,7 +1087,14 @@
 
     <p class="close">Nightshade is every app’s default, night and day. A theme picker can add themes on the same names. Studio surfaces stay night.</p>
   </main>
+  <script src="studies/rules.js"></script>
   <script>
+    const brandBar = document.querySelector(".bar");
+    const updateBrandHeader = () => {
+      document.documentElement.style.setProperty("--brand-header-size", brandBar.offsetHeight + "px");
+    };
+    updateBrandHeader();
+    new ResizeObserver(updateBrandHeader).observe(brandBar);
     const links = [...document.querySelectorAll("nav a")];
     const sections = links
       .map((link) => document.querySelector(link.getAttribute("href")))
@@ -1036,7 +1108,7 @@
     };
 
     const place = () => {
-      const line = document.querySelector(".bar").offsetHeight + 8;
+      const line = brandBar.offsetHeight + 9;
       let current = sections[0];
       for (const section of sections) {
         if (section.getBoundingClientRect().top <= line) current = section;

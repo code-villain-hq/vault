@@ -59,7 +59,7 @@ pub fn posts(t: &Turn) -> Vec<String> {
             .iter()
             .map(|m| clip(m, TYPED_MAX).lines().map(|l| format!("> {l}")).collect::<Vec<_>>().join("\n"))
             .collect();
-        out.push(format!("_Typed in Villain Layer:_\n{}", quoted.join("\n>\n")));
+        out.push(format!("_Typed in Layer:_\n{}", quoted.join("\n>\n")));
     }
     if let Some(reply) = &t.reply {
         out.extend(split_reply(reply, PART_MAX, PARTS_MAX));
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(t.reply.as_deref(), Some("Staging is fine; prod has 500s since 9:02."));
         let p = posts(&t);
         assert_eq!(p, vec![
-            "_Typed in Villain Layer:_\n> also check staging".to_string(),
+            "_Typed in Layer:_\n> also check staging".to_string(),
             "Staging is fine; prod has 500s since 9:02.".to_string(),
         ]);
     }

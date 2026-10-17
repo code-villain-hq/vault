@@ -1,6 +1,6 @@
 # Architecture
 
-How Villain Layer is put together, why it is shaped this way, and what has
+How Layer is put together, why it is shaped this way, and what has
 gone wrong in each part before. Read the section for the part you are about
 to change. What the app *does* is in [`features.md`](features.md).
 

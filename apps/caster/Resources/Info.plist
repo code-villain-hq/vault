@@ -9,9 +9,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.villain.villaincaster</string>
     <key>CFBundleName</key>
-    <string>Villain Caster</string>
+    <string>Caster</string>
     <key>CFBundleDisplayName</key>
-    <string>Villain Caster</string>
+    <string>Caster</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -21,7 +21,7 @@
     <key>LSMinimumSystemVersion</key>
     <string>27.0</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Villain Caster asks Finder to empty the trash or open a window, and System Events to toggle dark mode.</string>
+    <string>Caster asks Finder to empty the trash or open a window, and System Events to toggle dark mode.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

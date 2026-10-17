@@ -1,0 +1,17 @@
+DirectoryIndex index.html
+Options -Indexes
+RewriteEngine On
+RewriteBase /
+
+# One canonical website origin; 308 also preserves Git HTTP request methods.
+RewriteCond %{HTTP_HOST} ^codevillain\.eu$ [NC]
+RewriteRule ^ https://www.codevillain.eu%{REQUEST_URI} [R=308,L,NE]
+
+# Internal design documents are not part of the public site.
+RewriteRule ^design(?:/|$) - [R=404,L]
+
+# Existing Forgejo repository, login, API, and Git HTTP URLs keep a route
+# to the relocated service. Website files and directories take precedence.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ https://git.codevillain.eu%{REQUEST_URI} [R=307,L,NE]

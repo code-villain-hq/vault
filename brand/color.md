@@ -13,7 +13,7 @@ accent, never the main thing.
 ## Where poison goes
 
 - The focus ring.
-- One brand moment per surface: the strike through "Villain" on the
+- One brand moment per surface: the strike through "Code Villain" on the
   homepage, the bar on a social card.
 - Small live signals: an unread dot, a running agent, a live sync.
 

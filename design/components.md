@@ -1,6 +1,6 @@
 # Components
 
-The few controls every Villain surface shares. They follow [`principles.md`](principles.md), take their colours from [`brand/color.md`](../brand/color.md), and their numbers from [`tokens/`](tokens). `@villain/ui` will implement them.
+The few controls every Code Villain surface shares. They follow [`principles.md`](principles.md), take their colours from [`brand/color.md`](../brand/color.md), and their numbers from [`tokens/`](tokens). `@villain/ui` will implement them.
 
 ## Shape
 
@@ -15,12 +15,22 @@ No borders lift a surface. Elevation is a step in tone.
 
 ## Button
 
-28px tall, the `control` type role (13px, 600), 6px corners, no border.
+In app interfaces: 28px tall, the `control` type role (13px, 600),
+6px corners, no border.
 
 - **Primary**: the one action the screen's state needs. Fill `primary`, text `on-primary`; hover `primary-hover`. One per screen.
 - **Secondary**: every other action. No fill, text `muted`; on hover, fill `hover` and text `fg`.
-- **Focus**: a 2px `accent` ring, 2px out.
+- **Focus**: a 2px `accent` ring, 2px out in app interfaces.
 - **Disabled**: 45% opacity.
+
+### Studio call to action
+
+On the site, a main call to action uses the studio `label` role
+(15px, 700, leading 1.2, tracking 0.01em), with `0.7rem 1.15rem`
+padding instead of a fixed height. It keeps the same primary colours,
+6px corners, and no border. Focus is a 2px `accent` ring, 3px out.
+The homepage’s “Read the log” link is this variant. Site navigation
+also uses `label`; it follows the layout’s navigation styling.
 
 ## Field
 

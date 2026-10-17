@@ -1,4 +1,4 @@
-# The cask in Villain-Studios/homebrew-tap, written from this file by
+# The cask in code-villain-hq/homebrew-tap, written from this file by
 # .github/workflows/tap.yml when a release is published: it fills in the
 # version and the .dmg's SHA-256 (docs/releasing.md). Change the cask here,
 # not in the tap, which is overwritten.
@@ -6,10 +6,10 @@ cask "villain-layer" do
   version "@VERSION@"
   sha256 "@SHA256@"
 
-  url "https://github.com/Villain-Studios/villain-layer/releases/download/v#{version}/Villain-Layer-#{version}-macos-universal.dmg"
-  name "Villain Layer"
+  url "https://github.com/code-villain-hq/villain-layer/releases/download/v#{version}/Villain-Layer-#{version}-macos-universal.dmg"
+  name "Layer"
   desc "Agent development environment"
-  homepage "https://github.com/Villain-Studios/villain-layer"
+  homepage "https://github.com/code-villain-hq/villain-layer"
 
   livecheck do
     url :url
@@ -20,7 +20,7 @@ cask "villain-layer" do
   # once an older one has been tried.
   depends_on macos: :tahoe
 
-  app "Villain Layer.app"
+  app "Layer.app"
 
   # Replacing the bundle under a running app kills it, and every agent
   # running in it. `uninstall quit:` would not help: quitting ends them too.
@@ -30,8 +30,8 @@ cask "villain-layer" do
     run "/bin/sh",
         args: [
           "-c",
-          "if /usr/bin/pgrep -f 'Villain Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then " \
-          "echo 'Villain Layer is running. Quit it first, from a terminal outside it: replacing " \
+          "if /usr/bin/pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then " \
+          "echo 'Layer is running. Quit it first, from a terminal outside it: replacing " \
           "the app while it runs kills it, and every agent running in it.' >&2; exit 1; fi",
         ]
   end
@@ -47,7 +47,7 @@ cask "villain-layer" do
   ]
 
   caveats <<~EOS
-    Villain Layer is not notarised by Apple yet, so macOS stops it the first
+    Layer is not notarised by Apple yet, so macOS stops it the first
     time with "Apple could not verify…". Choose Done, then System Settings →
     Privacy & Security → Open Anyway. macOS also asks for keychain access
     again after each upgrade.

@@ -14,4 +14,4 @@ In CSS, night is the default. An app's light mode sets `data-theme="day"` on its
 
 Type tokens name the faces. Each surface loads the font files itself.
 
-The space scale is not published yet. It waits on a deliberate spacing decision.
+The space scale is not published yet. A [draft proposal](../spacing.draft.md) and [interactive study](../../brand/index.html#spacing) are available for discussion.

@@ -39,7 +39,7 @@ export function botManifest(name: string): object {
   return {
     display_information: {
       name: n,
-      description: "Your Villain Layer, in Slack: mention it in a thread to hand the thread to an agent.",
+      description: "Your Layer, in Slack: mention it in a thread to hand the thread to an agent.",
       background_color: "#0c0c11",
     },
     features: {

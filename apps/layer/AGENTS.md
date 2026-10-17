@@ -1,11 +1,11 @@
-# Working on Villain Layer
+# Working on Layer
 
 This file is for anyone changing this repository, person or coding agent.
 Claude Code, Codex, Copilot, Cursor, OpenCode and Gemini all read it
 (`CLAUDE.md` and `GEMINI.md` are links to it). Read it all before your first
 change; it is short on purpose.
 
-Villain Layer is a macOS desktop app (Tauri 2: Rust backend, React 19
+Layer is a macOS desktop app (Tauri 2: Rust backend, React 19
 frontend) that runs coding-agent CLIs in terminals. Each **task** is one
 ticket, given a git worktree of every repository it touches. The app connects
 those tasks to Jira, GitHub and Slack. What it does, feature by feature, is in

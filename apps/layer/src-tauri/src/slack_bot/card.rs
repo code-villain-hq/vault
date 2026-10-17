@@ -54,7 +54,7 @@ pub fn readable(title: &str) -> String {
     let words = |s: &str| s.split(['_', '-']).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
     // claude.ai's own connectors are named `claude_ai_Slack` and the like.
     let server = server.strip_prefix("claude_ai_").unwrap_or(server);
-    let server = if server == crate::mcp::SERVER_NAME { "Villain Layer".to_string() } else { words(server) };
+    let server = if server == crate::mcp::SERVER_NAME { "Layer".to_string() } else { words(server) };
     format!("{} ({server})", words(tool))
 }
 
@@ -118,10 +118,10 @@ pub fn render(room: &str, asked: &[Asked]) -> (String, Value) {
     }
     if asked.len() > SHOWN_MAX {
         let more = asked.len() - SHOWN_MAX;
-        blocks.push(context(&format!("…and {more} more, in Villain Layer.")));
+        blocks.push(context(&format!("…and {more} more, in Layer.")));
     }
     if waiting > 0 {
-        blocks.push(context("Answer here, or in the chat in Villain Layer."));
+        blocks.push(context("Answer here, or in the chat in Layer."));
     }
     let text = format!("{head} {}", asked.iter().map(|a| readable(&a.title)).collect::<Vec<_>>().join(", "));
     (clip(&text, 300), Value::Array(blocks))
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn a_tools_name_reads_as_words_and_where_it_comes_from() {
-        assert_eq!(readable("mcp__villain-layer__browser_navigate"), "browser navigate (Villain Layer)");
+        assert_eq!(readable("mcp__villain-layer__browser_navigate"), "browser navigate (Layer)");
         assert_eq!(readable("mcp__claude_ai_Slack__slack_search_public_and_private"), "slack search public and private (Slack)");
         assert_eq!(readable("Edit src/main.rs"), "Edit src/main.rs");
         assert_eq!(readable("mcp__odd"), "mcp__odd");

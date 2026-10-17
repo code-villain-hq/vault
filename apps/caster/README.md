@@ -1,6 +1,6 @@
-<p align="center"><img src="Resources/AppIcon.svg" width="160" alt="Villain Caster icon"></p>
+<p align="center"><img src="Resources/AppIcon.svg" width="160" alt="Caster icon"></p>
 
-# Villain Caster
+# Caster
 
 Minimal Spotlight/Raycast replacement for macOS. Only the features you actually use.
 
@@ -25,7 +25,7 @@ Type `help` (or `?`) in the launcher for this list in-app.
 | `maximize` | Resize the focused window to the monitor minus the menu bar¹ |
 | `move window` | Send focused window to next display (only with 2+ monitors)¹ |
 | `sleep` / `lock` / `trash` / `dark` | Sleep Mac, lock screen, empty trash², toggle dark mode² |
-| `quit` | Quit Villain Caster |
+| `quit` | Quit Caster |
 | *(empty)* | Your 3 most-used items (frecency: usage count with 7-day half-life) |
 
 ¹ needs Accessibility permission — ² needs a one-time Automation approval
@@ -38,24 +38,24 @@ Type `help` (or `?`) in the launcher for this list in-app.
 ## Install
 
 Download `Villain-Caster-<version>-macos-arm64.zip` from
-[Releases](https://github.com/Villain-Studios/villain-caster/releases), unzip
-it and move **Villain Caster.app** to `/Applications`.
+[Releases](https://github.com/code-villain-hq/villain-caster/releases), unzip
+it and move **Caster.app** to `/Applications`.
 
 The app isn't notarized by Apple (that needs a paid developer account), so
 macOS blocks the first launch:
 
 1. Open the app once; macOS says it can't verify it — click **Done**.
 2. System Settings → Privacy & Security → scroll to Security → **Open Anyway**
-   next to "Villain Caster", and confirm.
+   next to "Caster", and confirm.
 
-Or, from Terminal: `xattr -dr com.apple.quarantine "/Applications/Villain Caster.app"`.
+Or, from Terminal: `xattr -dr com.apple.quarantine "/Applications/Caster.app"`.
 Prefer to build it yourself? See below.
 
 ## Build & run
 
 ```sh
 make run        # build + run directly (dev)
-make app        # build "build/Villain Caster.app"
+make app        # build "build/Caster.app"
 make install    # copy to /Applications and start it
 make icon       # re-render Resources/AppIcon.icns after editing AppIcon.svg
 make clean      # remove build output
@@ -77,7 +77,7 @@ Spotlight owns ⌘Space by default. Disable it first:
 System Settings → Keyboard → Keyboard Shortcuts… → Spotlight →
 uncheck "Show Spotlight search".
 
-Then start Villain Caster.
+Then start Caster.
 
 ## Keys
 
@@ -125,7 +125,7 @@ installed app.
 
 ## Autostart
 
-System Settings → General → Login Items → add `/Applications/Villain Caster.app`.
+System Settings → General → Login Items → add `/Applications/Caster.app`.
 
 ## Releasing
 
