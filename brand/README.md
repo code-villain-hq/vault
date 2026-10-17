@@ -12,6 +12,6 @@ Decisions about how Code Villain looks and sounds. The apps, the site, the blog,
 | [`promo/`](promo) | Wallpapers and other images made to share |
 | [`index.html`](index.html) | The same decisions, drawn for looking |
 
-Nightshade is the default in every app, in night and in day. An app's theme picker, like Layer's, can offer more themes; they fill the same colour names. Studio surfaces stay Nightshade night.
+Nightshade is the default in every app, in night and in day. An app's theme picker can offer more themes; they fill the same colour names. Layer has not adopted Nightshade yet. Studio surfaces stay Nightshade night.
 
 Draft for discussion: [imagery](imagery.draft.md) and [spacing](../design/spacing.draft.md), with [interactive examples on the brand page](index.html#imagery). These are proposals, not adopted rules.

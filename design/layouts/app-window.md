@@ -20,7 +20,7 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 - Items in the `ui` role, text `muted`, 6px corners. Hover fills `hover` and turns the text `fg`.
 - The current item fills `selected`, with text `fg` at 700.
 - A count shows only when it asks for something: unread, waiting in Triage. The page you're on shows no count; its list says it. Empty counts never show.
-- Unread counts carry a live dot in `accent`.
+- Unread counts carry a live dot in `signal` (see [`components.md`](../components.md#live-dot)).
 - Groups (a team, a project) get a small label in `faint`, `ui-small`. No dividers between groups.
 
 ## Top bar

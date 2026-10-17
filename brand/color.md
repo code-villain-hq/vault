@@ -2,7 +2,7 @@
 
 Nightshade.
 
-Ground: night. The studio sits on #0A0B0D.
+Ground: night. The studio sits on the apps' `bg`, #0B0B0B.
 Brand: poison. Chartreuse. #C9E265.
 Supporting: cloak. Deep violet. #5A1470.
 

@@ -7,6 +7,6 @@ The vault holds the whole studio. Apps are one part of it.
 - `content/`: blog posts and social posts. The site renders the blog. The posts live in `content/blog`.
 - `apps/<app>/`: one product. Read `apps/<app>/AGENTS.md` before working there, and run commands from that folder.
 
-Nightshade is every app's default theme, in night and day. An app's theme picker, like Layer's, can add themes that fill the same colour names. The studio surfaces — the mark, the site, the blog, social — follow `brand/` and stay night.
+Nightshade is every app's default theme, in night and day. An app's theme picker can add themes that fill the same colour names. Layer's picker predates Nightshade and still uses its own names and palette. The studio surfaces — the mark, the site, the blog, social — follow `brand/` and stay night.
 
 A change to how Code Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.

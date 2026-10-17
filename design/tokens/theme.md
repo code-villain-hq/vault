@@ -18,8 +18,8 @@ These are Code Villain's recipes, not Linear's implementation.
 
 | Input | Controls |
 | --- | --- |
-| `base` | The primary action and selection colour family. Neutral surfaces and text stay achromatic in both modes. A light base (OKLCH lightness 0.7 and up, like poison) is a fill in its own right: the action wears it as is with dark ink; a darker base is mixed into the surfaces. Accepts a six-digit hex or a palette reference such as `{poison}`. |
-| `accent` | Focus and live signals. Never mixed into neutral surfaces, body text or large fills. Accepts hex or a palette reference. |
+| `base` | The primary action, selection, and live-dot (`signal`) colour family. Neutral surfaces and text stay achromatic in both modes. A light base (OKLCH lightness 0.7 and up, like poison) is a fill in its own right: the action wears it as is with dark ink; a darker base is mixed into the surfaces. Accepts a six-digit hex or a palette reference such as `{poison}`. |
+| `accent` | Focus. Never mixed into neutral surfaces, body text or large fills. Accepts hex or a palette reference. |
 | `contrast` | A number from 0 to 100. Widens surface steps and text separation around the default of 50. The text contrast floor remains at least 4.6:1; from 50 to 100 the target rises to 7:1. |
 
 The studio palette remains the identity source. A theme's resolved values
@@ -68,15 +68,16 @@ python3 build.py
 The builder emits `color.css`, `color.swift` and `color.resolved.json` from
 the same calculation. Never edit them independently. Forge then bundles the
 outputs with `bun run design:sync` from `apps/forge`; its existing role names
-continue to work. Theme editing is a build-time capability, not a new
+continue to work. Caster copies the Swift outputs with `make design` from
+`apps/caster`. Theme editing is a build-time capability, not a new
 runtime theme picker in Forge.
 
 Drift fails the build. `python3 build.py --check` writes nothing and names
 any output that differs from a fresh build; `bun scripts/sync-design.ts
---check` does the same for Forge's bundled copy. Forge's `bun run check`
-runs both, and the `design` workflow on Forgejo runs them, with the theme
-tests, on every push that touches the tokens, the mark, the fonts or
-Forge's copy.
+--check` does the same for Forge's bundled copy, and `make design-check`
+for Caster's. Forge's `bun run check` runs the first two, and the `design`
+workflow on Forgejo runs all three, with the theme tests, on every push
+that touches the tokens, the mark, the fonts or an app's copy.
 
 Test alternate hues and contrast extremes, then inspect real Forge lists,
 boards, detail views, settings and dialogs in night and day. A numerical

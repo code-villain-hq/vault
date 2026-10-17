@@ -182,7 +182,7 @@ def generate(source):
                     if contrast(theme["fg"], theme[role]) >= minimum:
                         break
             theme["on-primary"] = readable(theme["fg"], [theme["primary"], theme["primary-hover"]], mode, minimum)
-        # The accent marks focus and live signals, never a large fill. Both modes derive from one hue.
+        # The accent marks focus, never a large fill. Both modes derive from one hue.
         theme["accent"] = readable(accent, hosts, mode, minimum)
         # Live dots wear the brand colour. They carry no text, so WCAG's 3:1
         # non-text floor keeps them nearer the seed than text would be.

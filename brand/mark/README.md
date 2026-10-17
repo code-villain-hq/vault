@@ -25,11 +25,11 @@ On a 200-unit tile:
 
 Black and white are the apps' own `bg` and `fg` from [`color.md`](../color.md): achromatic, so a mark beside an app's frame or text matches it exactly. Only the strike carries colour.
 
-The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes every mark from the font.
+The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes the tile marks (`mark.svg` and the three product marks) from the font. The logo files are kept by hand.
 
 The V alone was the mark until October 2026. It said Villain but not Code, so the C joined it after the rename.
 
-The wordmark uses Grenze Gotisch 800 at 72 units, on a `348 × 72` viewBox. The strike is 8 units tall and centred 17.28 units above the baseline. It runs past both ends of the name, with a 7-unit stroke around the outlined letters cutting a gap in the bar.
+The wordmark uses Grenze Gotisch 800 at 72 units, on a `348 × 72` viewBox. The strike is 8 units tall; its bottom edge sits 17.28 units above the baseline, its centre 21.28. It runs past both ends of the name, with a 7-unit stroke around the outlined letters cutting a gap in the bar.
 
 ## Use
 
