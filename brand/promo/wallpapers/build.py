@@ -14,17 +14,19 @@ import tempfile
 HERE = pathlib.Path(__file__).parent
 MARKS = (HERE / "../../mark").resolve()
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-GROUND, INK, POISON = "#0A0B0D", "#ECECF1", "#C9E265"
-# The rows pattern repeats the wordmark in a grey a step above night, so
-# the lit wordmark and its strike stay the one bright moment.
-TEXTURE = "#1A1B20"
+# The marks' own black and white: the apps' night `bg` and `fg`.
+GROUND, INK, POISON = "#0B0B0B", "#EBEBEB", "#C9E265"
+# The rows pattern repeats the wordmark in a grey a step above the ground,
+# so the lit wordmark and its strike stay the one bright moment. Greys stay
+# achromatic, like the apps'.
+TEXTURE = "#1B1B1B"
 # The cube pattern: tumbling blocks, no letters. Each palette lights the
 # left face, fans it into shade, and engraves a grey top over night.
 CUBES = {
     # Poison, the brand colour, fading into a dark olive.
-    "cubes-poison": dict(lit="#C9E265", shade="#252919", dark=GROUND, top_line="#2E2F3A"),
+    "cubes-poison": dict(lit="#C9E265", shade="#252919", dark=GROUND, top_line="#303030"),
     # Cloak, the supporting colour, fading into wash.
-    "cubes-cloak": dict(lit="#5A1470", shade="#1A0D24", dark=GROUND, top_line="#2E2F3A"),
+    "cubes-cloak": dict(lit="#5A1470", shade="#1A0D24", dark=GROUND, top_line="#303030"),
 }
 
 

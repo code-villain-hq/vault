@@ -12,7 +12,7 @@ a change to the mark reaches every image. Don't edit the outputs by hand.
 
 [`wallpapers/`](wallpapers) has four designs, each for three screens (the
 cubes in two palettes). The
-first three use the marks' own construction: ink letters on night, cut
+first three use the marks' own construction: `fg` letters on `bg`, cut
 into a poison strike that runs edge to edge, the way the homepage logo
 extends it.
 

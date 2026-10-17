@@ -7,7 +7,7 @@
       <use href="#letters" transform="translate(77.91 1163.20) scale(5.8209)" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
     </mask>
   </defs>
-  <rect width="1320" height="2868" fill="#0A0B0D"/>
+  <rect width="1320" height="2868" fill="#0B0B0B"/>
   <rect y="1791.86" width="1320" height="87.31" fill="#C9E265" mask="url(#cut)"/>
-  <use href="#letters" transform="translate(77.91 1163.20) scale(5.8209)" fill="#ECECF1"/>
+  <use href="#letters" transform="translate(77.91 1163.20) scale(5.8209)" fill="#EBEBEB"/>
 </svg>
