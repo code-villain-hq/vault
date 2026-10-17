@@ -69,7 +69,7 @@ kbd { font-family: var(--font-reading); font-size: var(--type-ui-small-size); fo
 .launcher-query svg { width: 1.15rem; height: 1.15rem; color: var(--muted); flex-shrink: 0; }
 .query-caret { height: 1.25rem; width: 1px; background: var(--fg); }
 .launcher-answer { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--selected); border-radius: var(--radius-md); }
-.calculator-symbol { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); background: var(--primary); font-size: var(--type-title-size); }
+.calculator-symbol { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); background: var(--primary); color: var(--on-primary); font-size: var(--type-title-size); }
 .launcher-answer div { display: grid; gap: 0.2rem; }
 .launcher-answer strong { font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }
 .launcher-answer div > span { color: var(--muted); font-size: var(--type-ui-small-size); }
