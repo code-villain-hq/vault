@@ -152,6 +152,16 @@ def generate(source):
                 text_hosts = hosts + [mix(host, theme["fg"], source["opacity"][tint])
                                       for tint in ("chip-tint", "highlight-tint") for host in hosts]
             theme[role] = readable(ink, text_hosts, mode, minimum)
+        # At the contrast extremes the floor can push muted and faint to one
+        # tone. Faint keeps the floor; muted steps further from the hosts until
+        # it stands a visible step above faint (Nightshade's default gap).
+        direction = 1 if night else -1
+        faint_lightness = oklch(theme["faint"])[0]
+        step = 0
+        while (oklch(theme["muted"])[0] - faint_lightness) * direction < .015:
+            step += 1
+            theme["muted"] = readable(tone(faint_lightness + direction * step / 1000, 0, 0),
+                                      text_hosts, mode, minimum)
         if vivid:
             # Dark ink on the light fill, in both modes. A fill too dark for
             # black ink at this contrast rises in lightness until it carries it.
