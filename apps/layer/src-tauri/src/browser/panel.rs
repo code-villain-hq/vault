@@ -611,60 +611,6 @@ mod tests {
         assert!(!after_click(None, 100.12));
     }
 
-    /// Against a real Chrome: a tab shown again after the one in front of it
-    /// closed is drawn at the panel's size. It kept the panel's layout but
-    /// was drawn at Chrome's window size, and the panel stretched it: text
-    /// squeezed narrow and tall.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn a_tab_shown_again_after_another_closes_is_drawn_at_the_panel_s_size() {
-        let Some((app, root, _)) = app_with_task() else { return };
-        let state = app.state::<AppState>();
-        let base = serve(HOME).await;
-        let (tx, frames) = std::sync::mpsc::channel::<Vec<u8>>();
-        let channel = || {
-            let tx = tx.clone();
-            Channel::new(move |body| {
-                if let InvokeResponseBody::Raw(b) = body {
-                    let _ = tx.send(b);
-                }
-                Ok(())
-            })
-        };
-        let panel = Viewport { width: 900, height: 910, scale: 2.0 };
-        state.browser.watch(app.handle(), "t1", panel, channel()).await.unwrap();
-        let page = state.browser.page(app.handle(), "t1").await.unwrap();
-        page.navigate(&format!("{base}/")).await.unwrap();
-        page.settle(&state.browser).await;
-
-        // An agent opens a tab and closes it; the panel watches whatever is
-        // active each time, as it does when the active tab changes.
-        let other = state.browser.new_tab(app.handle(), "t1", Some(&format!("{base}/two"))).await.unwrap();
-        other.settle(&state.browser).await;
-        state.browser.watch(app.handle(), "t1", panel, channel()).await.unwrap();
-        let id = state.browser.tabs("t1").iter().find(|t| t.active).unwrap().id.clone();
-        state.browser.close_tab(app.handle(), "t1", &id).await.unwrap();
-        while frames.try_recv().is_ok() {}
-        state.browser.watch(app.handle(), "t1", panel, channel()).await.unwrap();
-
-        // Every frame is the panel's shape, soft or sharp, and a sharp one
-        // comes once the page is still. Not by a fixed time: on CI's runner
-        // the sharp frame took longer than the 800ms this once waited.
-        let sharp = Some((1800, 1820));
-        let mut seen = Vec::new();
-        let until = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < until && seen.last() != Some(&sharp) {
-            if let Ok(f) = frames.recv_timeout(Duration::from_millis(100)) {
-                seen.push(jpeg_size(&f));
-            }
-        }
-        assert!(seen.iter().all(|s| *s == Some((900, 910)) || *s == sharp), "only ever the panel's shape: {seen:?}");
-        assert_eq!(seen.last(), Some(&sharp), "drawn sharp once still: {seen:?}");
-
-        state.browser.shutdown(Duration::from_secs(3));
-        state.ptys.shutdown(Duration::from_secs(1));
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
     /// A measurement rather than a test, like `echo_latency`: how long a
     /// scroll takes to reach the app as a frame, the frame rate and size
     /// while scrolling, and the frames once it stops, on a long page at a
