@@ -13,7 +13,7 @@ Four pairings went up against the test font. Code Villain picked the boldest: Gr
 
 ## Colour
 
-Nightshade stays: night `#0A0B0D`, poison chartreuse, cloak violet. Grey does the work now. On the second day the two colours swapped places. The chartreuse was in every mark and every live dot; it was the colour anyone remembered. So poison is the brand: the strike, the main action, small live dots like "agent running". Cloak supports it with depth, and a lifted violet marks focus. Links are ink, bold, underlined.
+Nightshade stays: night `#0B0B0B`, poison chartreuse, cloak violet. Grey does the work now. On the second day the two colours swapped places. The chartreuse was in every mark and every live dot; it was the colour anyone remembered. So poison is the brand: the strike, the main action, small live dots like "agent running". Cloak supports it with depth, and a lifted violet marks focus. Links are ink, bold, underlined.
 
 There is a day mode too, for the apps. Poison is light, so it stays a fill by day: the button keeps its chartreuse and takes dark ink, at 12.3:1. The swap itself was two lines in `color.json`; the generator worked out the rest.
 

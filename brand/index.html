@@ -23,13 +23,13 @@
     html {
       color-scheme: dark;
       scroll-behavior: auto;
-      scrollbar-color: var(--muted) var(--night);
+      scrollbar-color: var(--muted) var(--bg);
     }
 
     body {
       margin: 0;
-      background: var(--night);
-      color: var(--ink);
+      background: var(--bg);
+      color: var(--fg);
       font-family: var(--font-reading);
       font-size: var(--type-body-size);
       line-height: var(--type-body-leading);
@@ -39,7 +39,7 @@
 
     ::selection {
       background: var(--cloak);
-      color: var(--ink);
+      color: var(--fg);
     }
 
     :focus-visible {
@@ -80,7 +80,7 @@
       transform: translateY(-120%);
       z-index: 2;
       background: var(--panel);
-      color: var(--ink);
+      color: var(--fg);
       border-radius: var(--radius-md);
       padding: 0.5rem 0.75rem;
       text-decoration: none;
@@ -129,14 +129,14 @@
     }
 
     nav a:hover {
-      color: var(--ink);
+      color: var(--fg);
       text-decoration: underline;
       text-decoration-thickness: 2px;
       text-underline-offset: 0.28em;
     }
 
     nav a[aria-current="true"] {
-      color: var(--ink);
+      color: var(--fg);
       text-decoration: underline;
       text-decoration-thickness: 2px;
       text-underline-offset: 0.28em;
@@ -483,7 +483,7 @@
       line-height: var(--type-headline-leading);
       font-weight: 700;
       text-wrap: balance;
-      color: var(--ink);
+      color: var(--fg);
     }
 
     .short {
@@ -540,7 +540,7 @@
     .logo-night img,
     .logo-day img { display: block; max-width: 100%; height: auto; }
 
-    .logo-night { background: var(--night); }
+    .logo-night { background: var(--bg); }
     .logo-day { background: #FFFFFF; }
 
     .mark-grid figcaption {
@@ -567,7 +567,7 @@
       min-height: 18rem;
       padding: 1.5rem;
       border-radius: var(--radius-md);
-      background: var(--night);
+      background: var(--bg);
       text-align: center;
     }
 
@@ -622,7 +622,7 @@
     .frame {
       border-radius: var(--radius-md);
       overflow: hidden;
-      background: var(--night);
+      background: var(--bg);
     }
 
     .window {
