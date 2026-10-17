@@ -13,44 +13,44 @@ Four pairings went up against the test font. Code Villain picked the boldest: Gr
 
 ## Colour
 
-Nightshade stays: night `#0A0B0D`, cloak violet, poison chartreuse. What changed is how much of it shows. Grey does the work now. The violet is held to the strength of a grey, and the chartreuse got three jobs and no more: the focus ring, one brand moment per surface, and small live dots like "agent running". Links are ink, bold, underlined.
+Nightshade stays: night `#0A0B0D`, poison chartreuse, cloak violet. Grey does the work now. On the second day the two colours swapped places. The chartreuse was in every mark and every live dot; it was the colour anyone remembered. So poison is the brand: the strike, the main action, small live dots like "agent running". Cloak supports it with depth, and a lifted violet marks focus. Links are ink, bold, underlined.
 
-There is a day mode too, for the apps. By day the chartreuse darkens, because bright poison on white is 1.4:1 and nobody can read that.
+There is a day mode too, for the apps. Poison is light, so it stays a fill by day: the button keeps its chartreuse and takes dark ink, at 12.3:1. The swap itself was two lines in `color.json`; the generator worked out the rest.
 
-![Nightshade in two rows. Night: frame, panel, field, the main action's violet tone, cloak, poison. Day: the same names, filled for light.](images/2026-10-16-night-and-day.svg)
+![Nightshade in two rows. Night: frame, panel, field, the main action in poison, the selection tint, the violet focus. Day: the same names, filled for light.](images/2026-10-16-night-and-day.svg)
 
 Every surface reads the same names. An app switches to day with one attribute:
 
 ```css
 /* design/tokens/color.css, generated from color.json */
 [data-theme="day"] {
-  --bg: #F5F5F7;
+  --bg: #F5F5F5;
   --panel: #FFFFFF;
-  --primary: #E8DEEB;
-  --accent: #4C6A00;
+  --primary: #C9E265;
+  --accent: #5A1470;
 }
 ```
 
 ## The button
 
-Five directions, one shape: 28px, 13px semibold, no border. The winner is a violet tone at grey strength. In an issue, the title reads first, then the text, then the button. As it should.
+Five directions, one shape: 28px, 13px semibold, no border. It ended chartreuse with dark ink, once per screen. In an issue, the title reads first, then the text, then the button. As it should.
 
 ## The mark
 
-Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind a gothic V, cut where the letter crosses. Forge, Layer and Caster will each wear their initial the same way.
+Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind the letters, cut where they cross. It began as a gothic V. The V said Villain and nothing about Code, so the C joined it: CV, one unit apart, so their two cuts meet and the bar stops between them. Forge, Layer and Caster wear their initials the same way: F, L, C.
 
-![The mark on its night tile, and the Code Villain wordmark with the strike.](../../brand/mark/mark.svg)
+![The CV mark on its night tile, and the Code Villain wordmark with the strike.](../../brand/mark/mark.svg)
 
-The cut is one mask. The V, drawn again with a thick stroke, punches a gap in the bar wherever the two cross:
+The cut is one mask. The letters, drawn again with a thick stroke, punch a gap in the bar wherever they cross:
 
 ```svg
 <mask id="cut">
   <rect width="200" height="200" fill="#fff"/>
-  <use href="#v" stroke="#000" stroke-width="14"/>
+  <use href="#cv" stroke="#000" stroke-width="14"/>
 </mask>
 <rect y="108" width="200" height="15" fill="#C9E265" mask="url(#cut)"/>
 ```
 
 ## What it cost
 
-One day, a dozen studies, and a rule written down for every decision, so the apps can catch up without asking. The rest is in the record.
+Two days, a dozen studies, one colour swap, and a rule written down for every decision, so the apps can catch up without asking. The rest is in the record.
