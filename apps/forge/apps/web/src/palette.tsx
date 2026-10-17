@@ -1,6 +1,8 @@
 // The colours people pick from for labels, statuses and services.
 import { Popover } from "@base-ui/react/popover";
+import { Check } from "lucide-react";
 import { type PointerEvent as ReactPointerEvent, useRef, useState } from "react";
+import { contrast } from "./contrast";
 
 /** Eight hues at one OKLCH lightness (0.76), so none jumps out or disappears.
  * Teal, amber, red and blue are the brand's done, waiting, error and information
@@ -138,12 +140,14 @@ export function CustomColor({
           type="button"
           aria-label="Done"
           onClick={onDone}
-          className="flex size-6 items-center justify-center rounded-full text-white"
-          style={{ background: color }}
+          className="flex size-6 items-center justify-center rounded-full"
+          // The swatch is the chosen colour; its tick takes whichever ink reads on it.
+          style={{
+            background: color,
+            color: contrast(color, "#000000") >= contrast(color, "#ffffff") ? "#000000" : "#ffffff",
+          }}
         >
-          <svg viewBox="0 0 16 16" className="size-3.5" fill="none" aria-hidden="true">
-            <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" />
-          </svg>
+          <Check size={15} strokeWidth={1.75} aria-hidden="true" />
         </button>
         <label className="flex flex-1 items-center gap-2 text-muted">
           <span className="text-xs">HEX</span>
@@ -261,7 +265,7 @@ export function ColorButton({
       <Popover.Trigger
         aria-label={label}
         title={label}
-        className="flex size-6 shrink-0 items-center justify-center rounded-md outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
+        className="flex size-7 shrink-0 items-center justify-center rounded-md outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
       >
         <span className="size-3.5 rounded-full" style={{ background: value }} />
       </Popover.Trigger>
