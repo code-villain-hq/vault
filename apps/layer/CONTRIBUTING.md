@@ -78,8 +78,8 @@ is. Name requirement ids where they apply.
 
 ## Releases
 
-A release is a version tag on `main`, built and drafted on GitHub by
-`release.yml`. The steps, and the Apple signing it needs, are in
+A release is built on the maintainer's Mac by `bun run release` and
+published on Forgejo. The steps, and the Apple signing it needs, are in
 [`docs/releasing.md`](docs/releasing.md).
 
 ## License

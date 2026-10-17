@@ -1,91 +1,80 @@
 # Releasing
 
-A release is a version tag. Pushing `v0.2.0` runs
-[`release.yml`](../.github/workflows/release.yml): `bun run check` on the
-tagged commit, then one universal build (Apple silicon and Intel), then a
-**draft** GitHub release with `Villain-Layer-0.2.0-macos-universal.dmg`, its
-SHA-256, and notes generated from the pull requests since the last one.
-Nothing is public until you publish the draft.
+A release is built on your Mac and published on the vault's Forgejo, at
+<https://git.codevillain.eu/code-villain/vault/releases>.
+[`scripts/release.ts`](../scripts/release.ts) does it in two steps:
+
+- `bun run release` runs `bun run check`, builds the app for Apple silicon,
+  tags the commit `layer-v<version>`, and puts
+  `Layer-<version>-macos-arm64.dmg` with its SHA-256 on a **draft** release.
+  Nothing is public yet.
+- `bun run release:publish` publishes the draft and puts it in the
+  Homebrew tap ([below](#homebrew)).
+
+Tags carry the `layer-` prefix because the vault holds more than one app.
+Releases up to 0.8.0 were universal (Intel too) and are on the old GitHub
+repository; from 0.9.0 they are Apple silicon only.
 
 ## Cutting one
 
 1. **Bump the version** in `src-tauri/Cargo.toml`, and only there. The app's
-   About line, the bundle and the MCP server all read it from Cargo, and
-   the workflow refuses a tag that does not match it.
+   About line, the bundle and the MCP server all read it from Cargo, and the
+   tag is made from it.
 2. Run `cd src-tauri && cargo check`, so `Cargo.lock` follows.
-3. Commit (*Release 0.2.0.*) through a pull request as usual, and wait for
-   `check` to pass on `main`.
-4. Tag that commit and push the tag:
+3. Commit (*Release 0.9.0.*) and push `main`. The script refuses a tree with
+   uncommitted changes, a `main` that differs from `origin/main`, and a tag
+   that already exists.
+4. `bun run release`. It takes as long as `check` plus a release build.
+5. Open the draft under Releases on Forgejo, read the notes (the commits to
+   `apps/layer` since the last tag), and edit them there if needed.
+6. `bun run release:publish`.
 
-   ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
+A tag that failed can be deleted and cut again once the fix is on `main`:
+delete the draft on Forgejo, then
+`git tag -d layer-v0.9.0 && git push --delete origin layer-v0.9.0`.
 
-5. When the workflow is done, open the draft under Releases, read the
-   notes, and publish it. Publishing it runs
-   [`tap.yml`](../.github/workflows/tap.yml), which puts it in the
-   Homebrew tap ([below](#homebrew)).
+## Once per Mac
 
-A tag that failed can be deleted and pushed again once the fix is on
-`main`: `git push --delete origin v0.2.0`, then tag the new commit.
+**A Forgejo token.** On git.codevillain.eu: Settings → Applications →
+Generate new token, with *repository: read and write*. Store it in the
+keychain, where the script reads it; `-w` last makes `security` ask for it
+without echoing it or leaving it in your shell history:
+
+```bash
+security add-generic-password -s git.codevillain.eu -a release -w
+```
+
+**Git over SSH** to git.codevillain.eu, as for pushing the vault: the script
+pushes the tag and the tap with your own `git`.
 
 ## Homebrew
 
 The cask is written here, in
 [`packaging/homebrew/villain-layer.rb`](../packaging/homebrew/villain-layer.rb),
 and published to
-[code-villain-hq/homebrew-tap](https://github.com/code-villain-hq/homebrew-tap)
-by `tap.yml` when a release is published. It fills in the version and the
-.dmg's SHA-256, has `brew style` and `brew audit --online` check the
-result, and pushes it. Change the cask here: the tap's copy is overwritten.
-A prerelease is never put in the tap.
+[code-villain/homebrew-tap](https://git.codevillain.eu/code-villain/homebrew-tap)
+by `release:publish`. It fills in the version and the .dmg's SHA-256, has
+`brew style` and `brew audit --online` check the result in a throwaway tap,
+and pushes it. Change the cask here: the tap's copy is overwritten. A
+prerelease is never put in the tap.
 
-The cask refuses to upgrade or uninstall while Layer is running,
-for the same reason `release:mac` does. It requires macOS 26, the oldest
-the tests run on: `check.yml` and `release.yml` run on `macos-26`, not
-`macos-latest`, so that 26 stays tested when GitHub moves on. Lower both
-together.
+The cask refuses to upgrade or uninstall while Layer is running, for the
+same reason `release:mac` does. It requires macOS 26, the oldest the tests
+have run on, and Apple silicon.
 
-### Setting up the tap, once
+Installing it the way everyone else will:
 
-1. Create the tap. Homebrew finds it only by the `homebrew-` prefix.
+```bash
+brew tap code-villain/tap https://git.codevillain.eu/code-villain/homebrew-tap
+brew trust --cask code-villain/tap/villain-layer
+brew install --cask villain-layer
+```
 
-   ```bash
-   gh repo create code-villain-hq/homebrew-tap --public --add-readme \
-     --description "Homebrew tap for Layer"
-   ```
-
-2. Give the workflow a key that can push to the tap and nowhere else: a
-   deploy key with write access, whose private half is a secret here.
-
-   ```bash
-   ssh-keygen -t ed25519 -N "" -C "villain-layer tap.yml" -f tap-key
-   gh repo deploy-key add tap-key.pub -R code-villain-hq/homebrew-tap \
-     --allow-write --title "villain-layer tap.yml"
-   gh secret set HOMEBREW_TAP_DEPLOY_KEY -R code-villain-hq/villain-layer < tap-key
-   rm tap-key tap-key.pub
-   ```
-
-3. Put the current release in it: a release published before `tap.yml`
-   was in its tag does not run it.
-
-   ```bash
-   gh workflow run tap.yml -R code-villain-hq/villain-layer -f tag=v0.2.0
-   ```
-
-4. Try it the way everyone else will:
-
-   ```bash
-   brew tap code-villain-hq/tap
-   brew trust --cask code-villain-hq/tap/villain-layer
-   brew install --cask villain-layer
-   ```
-
-Homebrew runs nothing from a tap it has not been told to trust, and
-installing by the full name does not keep it trusted. Without `brew trust`,
-`brew upgrade` does not load the cask, and `brew uninstall` skips the check
-that the app is not running.
+The tap is not on GitHub, so `brew tap` needs its address. Homebrew runs
+nothing from a tap it has not been told to trust, and installing by the full
+name does not keep it trusted. Without `brew trust`, `brew upgrade` does not
+load the cask, and `brew uninstall` skips the check that the app is not
+running.
 
 Once releases are notarised, delete the first paragraph of the cask's
 `caveats`.
@@ -96,8 +85,8 @@ Without them, macOS stops a downloaded app with "Apple could not verify
 …", and the only way past is System Settings → Privacy & Security → Open
 Anyway. Right-click → Open no longer works for that. An unsigned app also
 asks for keychain access again after every update, because *Always Allow*
-is tied to the exact binary. The workflow signs ad hoc until the secrets
-below exist, and the release notes then tell people how to open it.
+is tied to the exact binary. The script signs ad hoc until the variables
+below are set, and the release notes then tell people how to open it.
 
 What it takes:
 
@@ -106,35 +95,29 @@ What it takes:
    *Developer ID Application: <your name> (TEAMID)*, and macOS shows that
    name. Signing as *Code Villain* needs an organisation membership, which
    needs a legal entity with a D-U-N-S number.
-2. **A Developer ID Application certificate.** Create it in Xcode (Settings
-   → Accounts → Manage Certificates → + → Developer ID Application) or on
-   developer.apple.com. Export it from Keychain Access as a `.p12`, with a
-   password.
+2. **A Developer ID Application certificate** in your login keychain. Create
+   it in Xcode (Settings → Accounts → Manage Certificates → + → Developer ID
+   Application). On this Mac it stays in the keychain: no `.p12` to export.
 3. **An app-specific password** for notarisation, from account.apple.com →
-   Sign-In and Security → App-Specific Passwords.
-4. **The repository secrets.** Set them from a terminal with `gh`, which
-   asks for each value without echoing it and without leaving it in your
-   shell history. The certificate's name and team id are printed by
-   `security find-identity -v -p codesigning`, as
+   Sign-In and Security → App-Specific Passwords. Keep it in the keychain:
+   `security add-generic-password -s notarisation -a <apple id> -w`.
+4. **Four variables** for the run, all of them or none. With some set and
+   not others the script stops, rather than ship an app that is signed but
+   not notarised, which macOS stops just the same. `security find-identity
+   -v -p codesigning` prints the identity as
    `Developer ID Application: <name> (TEAMID)`.
 
    ```bash
-   R=code-villain-hq/villain-layer
-   base64 -i ~/Desktop/developer-id.p12 | gh secret set APPLE_CERTIFICATE -R $R
-   gh secret set APPLE_CERTIFICATE_PASSWORD -R $R   # the .p12's export password
-   gh secret set APPLE_SIGNING_IDENTITY -R $R       # Developer ID Application: <name> (TEAMID)
-   gh secret set APPLE_ID -R $R                     # the membership's Apple Account email
-   gh secret set APPLE_PASSWORD -R $R               # the app-specific password
-   gh secret set APPLE_TEAM_ID -R $R                # the ten characters in the brackets
+   APPLE_SIGNING_IDENTITY="Developer ID Application: <name> (TEAMID)" \
+   APPLE_ID=<apple id> \
+   APPLE_PASSWORD="$(security find-generic-password -s notarisation -w)" \
+   APPLE_TEAM_ID=TEAMID \
+   bun run release
    ```
 
-   Then delete the `.p12` file: the secret holds it now.
-
-All six, or none. With some set and not others the workflow stops, rather
-than ship an app that is signed but not notarised, which macOS stops just
-the same. With all six, the next tag builds signed and notarised, and the
-workflow checks the result the way a Mac that downloads it will (`codesign`,
-`stapler validate`, `spctl`) before it drafts anything.
+With all four, the build is signed and notarised, and the script checks the
+result the way a Mac that downloads it will (`codesign`, `stapler
+validate`, `spctl`) before it drafts anything.
 
 Check the first one on a Mac that has never run the app: download it,
 open it, and it should start without a warning. Then check the parts that

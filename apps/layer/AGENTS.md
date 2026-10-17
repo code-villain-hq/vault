@@ -197,7 +197,8 @@ bun run dev            # Vite alone; the mock harness is at /mock.html
 bun run release:mac    # release build, installed over /Applications
 ```
 
-Releases for everyone else come from a version tag, on GitHub:
+Releases for everyone else are built on this Mac and published on Forgejo
+(`bun run release`, then `bun run release:publish`):
 [`docs/releasing.md`](docs/releasing.md).
 
 ```bash

@@ -1,23 +1,24 @@
-# The cask in code-villain-hq/homebrew-tap, written from this file by
-# .github/workflows/tap.yml when a release is published: it fills in the
+# The cask in code-villain/homebrew-tap on git.codevillain.eu, written from
+# this file by `bun run release:publish` (scripts/release.ts): it fills in the
 # version and the .dmg's SHA-256 (docs/releasing.md). Change the cask here,
 # not in the tap, which is overwritten.
 cask "villain-layer" do
   version "@VERSION@"
   sha256 "@SHA256@"
 
-  url "https://github.com/code-villain-hq/villain-layer/releases/download/v#{version}/Villain-Layer-#{version}-macos-universal.dmg"
+  url "https://git.codevillain.eu/code-villain/vault/releases/download/layer-v#{version}/Layer-#{version}-macos-arm64.dmg"
   name "Layer"
   desc "Agent development environment"
-  homepage "https://github.com/code-villain-hq/villain-layer"
+  homepage "https://git.codevillain.eu/code-villain/vault/src/branch/main/apps/layer"
 
   livecheck do
-    url :url
-    strategy :github_latest
+    url "https://git.codevillain.eu/code-villain/vault/releases"
+    regex(/layer-v?(\d+(?:\.\d+)+)/i)
   end
 
   # macOS 26 is the oldest the tests run on (check.yml pins it). Lower this
   # once an older one has been tried.
+  depends_on arch: :arm64
   depends_on macos: :tahoe
 
   app "Layer.app"

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/code-villain-hq/villain-layer/releases/latest">Download</a> ·
+  <a href="https://git.codevillain.eu/code-villain/vault/releases">Download</a> ·
   <a href="https://github.com/code-villain-hq/villain-layer/blob/main/docs/features.md">Features</a> ·
   <a href="https://github.com/code-villain-hq/villain-layer/blob/main/AGENTS.md">Contributing</a>
 </p>
@@ -29,7 +29,7 @@ Everything runs on your machine. The MCP server agents talk to runs on `127.0.0.
 
 ## Demo
 
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue)](https://github.com/code-villain-hq/villain-layer/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-blue)](https://git.codevillain.eu/code-villain/vault/releases)
 
 *Video demo and animated walkthrough: coming soon*
 
@@ -80,8 +80,8 @@ See [`docs/architecture.md`](docs/architecture.md) for details.
 ### Homebrew (recommended)
 
 ```bash
-brew tap code-villain-hq/tap
-brew trust --cask code-villain-hq/tap/villain-layer
+brew tap code-villain/tap https://git.codevillain.eu/code-villain/homebrew-tap
+brew trust --cask code-villain/tap/villain-layer
 brew install --cask villain-layer
 ```
 
@@ -89,7 +89,7 @@ Updates: `brew upgrade --cask villain-layer`. Quit the app first, and run it fro
 
 ### Direct download
 
-Download the `.dmg` from the [latest release](https://github.com/code-villain-hq/villain-layer/releases/latest). Runs on Apple Silicon and Intel.
+Download the `.dmg` from the [latest release](https://git.codevillain.eu/code-villain/vault/releases). Runs on Macs with Apple silicon.
 
 macOS will block the first launch with "Apple could not verify…" because releases aren't notarized. Open System Settings → Privacy & Security → **Open Anyway**. Once is enough.
 
@@ -125,7 +125,7 @@ Installs to `/Applications/Layer.app`. A self-built copy opens without the secur
   - Settings showing credential configuration
 -->
 
-*Screenshots will be added in a future update. See [releases](https://github.com/code-villain-hq/villain-layer/releases) for the current state.*
+*Screenshots will be added in a future update. See [releases](https://git.codevillain.eu/code-villain/vault/releases) for the current state.*
 
 ## Getting started
 
@@ -215,6 +215,6 @@ Unless you explicitly state otherwise, any contribution you intentionally submit
 
 <p align="center">
   <a href="https://github.com/code-villain-hq/villain-layer">GitHub</a> ·
-  <a href="https://github.com/code-villain-hq/villain-layer/releases">Releases</a> ·
+  <a href="https://git.codevillain.eu/code-villain/vault/releases">Releases</a> ·
   <a href="https://github.com/code-villain-hq/villain-layer/issues">Issues</a>
 </p>
