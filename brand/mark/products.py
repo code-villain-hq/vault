@@ -27,9 +27,9 @@ TEMPLATE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role
       <use href="#{id}" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
     </mask>
   </defs>
-  <rect width="200" height="200" rx="45" fill="#0A0B0D"/>
+  <rect width="200" height="200" rx="45" fill="#0B0B0B"/>
   <rect y="108" width="200" height="15" fill="#C9E265" mask="url(#cut)"/>
-  <use href="#{id}" fill="#ECECF1"/>
+  <use href="#{id}" fill="#EBEBEB"/>
 </svg>
 """
 
