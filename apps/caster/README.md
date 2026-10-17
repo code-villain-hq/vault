@@ -4,9 +4,9 @@
 
 Minimal Spotlight/Raycast replacement for macOS. Only the features you actually use.
 
-A menu bar app that opens a Liquid Glass launcher panel on ⌘Space. No file
-search on purpose, no API keys, no accounts, no telemetry, no dependencies
-beyond AppKit.
+A menu bar app that opens a launcher panel on ⌘Space, in Code Villain's
+Nightshade look, night or day with your system. No file search on purpose,
+no API keys, no accounts, no telemetry, no dependencies beyond AppKit.
 
 ## Features
 
@@ -58,6 +58,7 @@ make run        # build + run directly (dev)
 make app        # build "build/Caster.app"
 make install    # copy to /Applications and start it
 make icon       # re-render Resources/AppIcon.icns after editing AppIcon.svg
+make design     # refresh the tokens, fonts and mark copied from the vault
 make clean      # remove build output
 ```
 
@@ -89,10 +90,10 @@ Then start Caster.
 | Esc | close |
 | ⌘S / ⌘⇧S | save screenshot of the panel to Desktop³ |
 
-³ with Screen Recording permission the glass blur is captured; without it you
-get a flat render of the panel
+³ with Screen Recording permission the desktop around the panel is captured;
+without it you get the panel on its own
 
-Left-click the mask in the menu bar to toggle the panel; right-click it for
+Left-click the C in the menu bar to toggle the panel; right-click it for
 Settings… and Quit.
 
 ## Permissions
@@ -102,7 +103,7 @@ Settings… and Quit.
 | Accessibility | `maximize`, `move window` |
 | Automation → Finder | `trash`, reopening Finder windows |
 | Automation → System Events | `dark` |
-| Screen Recording (optional) | ⌘S screenshots with blur |
+| Screen Recording (optional) | ⌘S screenshots with the desktop behind |
 
 Each one is requested only the first time you use the feature that needs it.
 
@@ -150,4 +151,5 @@ please open an issue before starting on a new feature. Commit messages follow
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Caster bundles Atkinson Hyperlegible Next under the SIL Open
+Font License ([Resources/Fonts](Resources/Fonts)).

@@ -4,10 +4,13 @@ import Carbon.HIToolbox
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: PanelController!
     private var statusItem: NSStatusItem!
+    private var menuBarAppearance: NSKeyValueObservation?
     private let hotKey = HotKeyManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Nightshade.registerFonts()
         panelController = PanelController()
+        if Preview.run(panel: panelController) { return }
         setUpStatusItem()
         setUpEditMenu()
         hotKey.onPress = { [weak self] in
@@ -22,7 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = statusItem.button else { return }
-        button.image = MenuBarIcon.image()
+        // The icon is in colour, so it is redrawn whenever the menu bar
+        // turns light or dark under a new wallpaper or mode.
+        menuBarAppearance = button.observe(\.effectiveAppearance, options: [.initial]) { button, _ in
+            button.image = MenuBarIcon.image(for: button.effectiveAppearance)
+        }
         button.target = self
         button.action = #selector(statusItemClicked)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])

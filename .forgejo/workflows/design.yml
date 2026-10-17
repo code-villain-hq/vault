@@ -1,6 +1,6 @@
 # Token drift on every push that could cause it: the theme tests, the
-# generated outputs in design/tokens against build.py, and Forge's bundled
-# copy against the vault. Each check writes nothing and fails with the fix.
+# generated outputs in design/tokens against build.py, and Forge's and
+# Caster's bundled copies against the vault. Each check writes nothing and fails with the fix.
 name: design
 
 on:
@@ -12,6 +12,11 @@ on:
       - "apps/forge/apps/web/src/design/**"
       - "apps/forge/apps/web/public/icon.svg"
       - "apps/forge/scripts/sync-design.ts"
+      - "apps/caster/Sources/VillainCaster/Design/**"
+      - "apps/caster/Sources/VillainCaster/MenuBarIcon.swift"
+      - "apps/caster/Resources/Fonts/**"
+      - "apps/caster/Resources/AppIcon.svg"
+      - "apps/caster/Makefile"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -25,3 +30,5 @@ jobs:
         working-directory: design/tokens
       - run: bun scripts/sync-design.ts --check
         working-directory: apps/forge
+      - run: make design-check
+        working-directory: apps/caster

@@ -1,39 +1,28 @@
 import AppKit
 
+// Forge's command menu (apps/forge/apps/web/src/command-menu.tsx) scaled
+// up a step: a launcher sits alone on the desktop, not inside an app.
 private let panelWidth: CGFloat = 640
-private let inputHeight: CGFloat = 60
-private let rowHeight: CGFloat = 50
-private let maxVisibleRows = 8
-private let listTopPadding: CGFloat = 8
-private let listBottomPadding: CGFloat = 14
-private let listSidePadding: CGFloat = 14
-private let inputSidePadding: CGFloat = 20
-private let panelCornerRadius: CGFloat = 18
+private let inputHeight: CGFloat = 56
+private let rowHeight: CGFloat = 40
+private let maxVisibleRows = 10
+private let listInset: CGFloat = 8
+/// Row content sits this far in from the row's edge.
+private let rowContentInset: CGFloat = 10
+private let iconSize: CGFloat = 20
+/// An NSTextField draws its text 2pt inside its frame.
+private let inputSidePadding: CGFloat = listInset + rowContentInset - 2
+/// The query at the brand's body size; rows a step under it.
+private let inputFont = Nightshade.font(TypeTokens.ui, size: TypeTokens.body.size)
+private let rowFont = Nightshade.font(TypeTokens.ui, size: 15)
 private let screenshotPadding: CGFloat = 48
 
-/// Clips Liquid Glass to a rounded shape. Declares corners via the macOS 27
-/// cornerConfiguration API and applies a matching layer mask so glass bloom
-/// can't draw a square halo on light desktops.
-private final class GlassClipView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-        layer?.cornerRadius = panelCornerRadius
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var cornerConfiguration: NSViewCornerConfiguration? {
-        .uniformCorners(radius: .fixed(panelCornerRadius))
-    }
-
-    override func viewDidChangeEffectiveCornerRadii() {
-        super.viewDidChangeEffectiveCornerRadii()
-        layer?.cornerRadius = effectiveCornerRadii?.topLeft ?? panelCornerRadius
+/// The panel itself: a solid `dialog` tone with `radius-lg` corners. No
+/// border and no shadow: the tone alone sets it off.
+private final class PanelBackground: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        Nightshade.dialog.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: Nightshade.radiusLg, yRadius: Nightshade.radiusLg).fill()
     }
 }
 
@@ -88,16 +77,10 @@ final class LauncherPanel: NSPanel {
 
 final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate {
     private let panel: LauncherPanel
-    /// Rounded clip host — Liquid Glass blooms past its cornerRadius into a
-    /// rectangular rim that reads as a square halo on light desktops.
-    private let glassHost = GlassClipView()
-    private let glass = NSGlassEffectView()
-    /// Field/list live here; NSGlassEffectView only glass-treats contentView.
-    private let chrome = NSView()
+    private let chrome = PanelBackground()
     private let field = NSTextField()
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
-    private let divider = NSBox()
     private let inlineResultField = NSTextField(labelWithString: "")
     private let engine = QueryEngine()
     private var results: [ResultItem] = []
@@ -107,10 +90,14 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private var copyWhenReady = false
     /// Query restored on next open when the panel closed without executing.
     private var storedText: String?
-    /// Input line height for vertical centering — a taller frame makes
-    /// NSTextField top-align its text. Font is fixed, so compute once.
-    private lazy var fieldHeight: CGFloat = ceil(field.cell?.cellSize(forBounds:
-        NSRect(x: 0, y: 0, width: 100, height: 100)).height ?? 30)
+    /// One line of the input, for vertical centering: a taller frame makes
+    /// NSTextField top-align its text. Measured on a sample line, not the
+    /// field, whose wrapped placeholder would measure several lines.
+    private let fieldHeight: CGFloat = {
+        let sample = NSTextField(labelWithString: "Hg")
+        sample.font = inputFont
+        return ceil(sample.cell?.cellSize.height ?? 20)
+    }()
 
     override init() {
         panel = LauncherPanel(
@@ -128,8 +115,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         engine.refreshApps()
     }
 
-    /// ⌘S / ⌘⇧S → Desktop PNG of the panel region (padded). Screen grab keeps
-    /// composited glass; window-only capture would lose the blur to alpha.
+    /// ⌘S / ⌘⇧S → Desktop PNG of the panel region (padded), with the desktop
+    /// and the panel's shadow around it. Without Screen Recording only the
+    /// panel itself is drawn.
     private func captureScreenshot() {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
@@ -164,16 +152,21 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     }
 
     private func captureViewRender(to url: URL) {
-        let bounds = chrome.bounds
-        guard let rep = chrome.bitmapImageRepForCachingDisplay(in: bounds) else { return }
-        chrome.cacheDisplay(in: bounds, to: rep)
-        guard let data = rep.representation(using: .png, properties: [:]) else { return }
         do {
-            try data.write(to: url)
-            showScreenshotFeedback("📸 saved (no blur — grant Screen Recording)")
+            try renderPNG(to: url)
+            showScreenshotFeedback("📸 saved (panel only — grant Screen Recording)")
         } catch {
             NSLog("Caster screenshot failed: \(error)")
         }
+    }
+
+    /// The panel drawn on its own, corners transparent.
+    func renderPNG(to url: URL) throws {
+        let bounds = chrome.bounds
+        guard let rep = chrome.bitmapImageRepForCachingDisplay(in: bounds),
+              let data = { chrome.cacheDisplay(in: bounds, to: rep); return rep.representation(using: .png, properties: [:]) }()
+        else { throw CocoaError(.fileWriteUnknown) }
+        try data.write(to: url)
     }
 
     private func showScreenshotFeedback(_ message: String) {
@@ -192,28 +185,25 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         ]
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false // system shadow sits in clear corner pockets
+        // The system shadow brings a light rim with it: a border.
+        panel.hasShadow = false
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         panel.delegate = self
 
-        glassHost.autoresizingMask = [.width, .height]
-        glassHost.invalidateCornerConfiguration()
         chrome.autoresizingMask = [.width, .height]
-
-        // .regular keeps text legible; .clear washes out on bright desktops.
-        glass.style = .regular
-        glass.cornerRadius = panelCornerRadius
-        glass.autoresizingMask = [.width, .height]
-        glass.effectIsInteractive = true
-        glass.contentView = chrome
-        glassHost.addSubview(glass)
-        panel.contentView = glassHost
+        panel.contentView = chrome
     }
 
     private func configureField() {
-        field.font = .systemFont(ofSize: 24, weight: .light)
-        field.placeholderString = "Search apps, calculate, convert…"
+        // The query is the panel's one input, so it sits on the dialog tone
+        // like an inline editor, without a field fill.
+        field.font = inputFont
+        field.textColor = Nightshade.fg
+        field.placeholderAttributedString = NSAttributedString(
+            string: "Search apps, calculate, convert…",
+            attributes: [.font: inputFont, .foregroundColor: Nightshade.faint]
+        )
         field.isBezeled = false
         field.isBordered = false
         field.drawsBackground = false
@@ -222,16 +212,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         field.delegate = self
         chrome.addSubview(field)
 
-        // Soft hairline — system .separator reads near-black on Liquid Glass.
-        divider.boxType = .custom
-        divider.titlePosition = .noTitle
-        divider.borderWidth = 0
-        divider.fillColor = NSColor.labelColor.withAlphaComponent(0.1)
-        divider.isHidden = true
-        chrome.addSubview(divider)
-
-        inlineResultField.font = .systemFont(ofSize: 24, weight: .light)
-        inlineResultField.textColor = .secondaryLabelColor
+        inlineResultField.font = inputFont
+        inlineResultField.textColor = Nightshade.muted
         inlineResultField.alignment = .right
         inlineResultField.lineBreakMode = .byTruncatingHead
         inlineResultField.isHidden = true
@@ -240,7 +222,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
 
     private func configureTable() {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("result"))
-        column.width = panelWidth - listSidePadding * 2
+        column.width = panelWidth - listInset * 2
         tableView.addTableColumn(column)
         tableView.headerView = nil
         tableView.backgroundColor = .clear
@@ -257,10 +239,10 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         tableView.action = #selector(rowClicked)
 
         scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = true
+        // No scroller: a legacy one (a mouse attached, or "always show")
+        // takes a strip off every row. Arrows and the wheel still scroll.
+        scrollView.hasVerticalScroller = false
         scrollView.drawsBackground = false
-        scrollView.autohidesScrollers = true
-        scrollView.scrollerStyle = .overlay
         scrollView.verticalScrollElasticity = .none
         scrollView.automaticallyAdjustsContentInsets = false
         scrollView.contentInsets = NSEdgeInsets()
@@ -277,7 +259,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         }
     }
 
-    func show() {
+    /// `present: false` lays the panel out without ordering it in or taking
+    /// keys, for the preview.
+    func show(present: Bool = true) {
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
         let top = visible.minY + visible.height * 0.72
@@ -292,9 +276,17 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         // delivers synchronously at least once, so the panel appears at its
         // final size.
         runQuery()
+        guard present else { return }
         panel.makeKeyAndOrderFront(nil)
         // Focusing selects any restored text, so typing replaces it.
         panel.makeFirstResponder(field)
+        (field.currentEditor() as? NSTextView)?.insertionPointColor = Nightshade.fg
+    }
+
+    /// Opens with `text` typed, as if restored.
+    func show(query text: String, present: Bool = true) {
+        storedText = text
+        show(present: present)
     }
 
     func hide() {
@@ -322,9 +314,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private func relayout() {
         let rows = min(results.count, maxVisibleRows)
         let visibleListHeight = CGFloat(rows) * rowHeight
-        let listAreaHeight: CGFloat = rows > 0
-            ? 1 + listTopPadding + visibleListHeight + listBottomPadding
-            : 0
+        // Space, not a line, separates the query from the list.
+        let listAreaHeight: CGFloat = rows > 0 ? visibleListHeight + listInset : 0
         let totalHeight = inputHeight + listAreaHeight
 
         var frame = panel.frame
@@ -334,10 +325,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         if frame != panel.frame {
             panel.setFrame(frame, display: true)
         }
-        let bounds = NSRect(origin: .zero, size: frame.size)
-        glassHost.frame = bounds
-        glass.frame = bounds
-        chrome.frame = bounds
+        chrome.frame = NSRect(origin: .zero, size: frame.size)
 
         let fieldY = totalHeight - inputHeight + (inputHeight - fieldHeight) / 2
         if inlineResultField.isHidden {
@@ -352,11 +340,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             field.frame = NSRect(x: inputSidePadding, y: fieldY,
                                  width: panelWidth - inputSidePadding * 2 - labelWidth - 12, height: fieldHeight)
         }
-        divider.frame = NSRect(x: listSidePadding, y: totalHeight - inputHeight - 1,
-                               width: panelWidth - listSidePadding * 2, height: 1)
-        divider.isHidden = rows == 0
-        scrollView.frame = NSRect(x: listSidePadding, y: listBottomPadding,
-                                  width: panelWidth - listSidePadding * 2, height: visibleListHeight)
+        scrollView.frame = NSRect(x: listInset, y: listInset,
+                                  width: panelWidth - listInset * 2, height: visibleListHeight)
         scrollView.isHidden = rows == 0
         // Keep the table exactly as wide as the visible clip area, otherwise
         // the selection highlight extends under the clipped edge and its
@@ -497,39 +482,38 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     }
 }
 
-/// Glassy rounded highlight — plain white (dark) / black (light) at low
-/// alpha, no border, like system glass selections. Keeps normal text colors.
+/// The active option: `fg` at `highlight-tint`, `radius-md`, no border.
+/// The text keeps its colours.
 final class ResultRowView: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         guard isSelected else { return }
-        let rect = bounds.insetBy(dx: 2, dy: 3)
-        let isDark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let fill = isDark
-            ? NSColor.white.withAlphaComponent(0.13)
-            : NSColor.black.withAlphaComponent(0.07)
-        fill.setFill()
-        NSBezierPath(roundedRect: rect, xRadius: 9, yRadius: 9).fill()
+        Nightshade.highlight.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: Nightshade.radiusMd, yRadius: Nightshade.radiusMd).fill()
+    }
+
+    // Keep the row's own colours when selected; the default emphasis would
+    // switch the text to white.
+    override var isEmphasized: Bool {
+        get { false }
+        set {}
     }
 }
 
+/// One line, like Forge's command rows: icon, title in `fg`, then the
+/// detail in `muted`.
 final class ResultCell: NSTableCellView {
     private let iconView = NSImageView()
-    private let titleField = NSTextField(labelWithString: "")
-    private let subtitleField = NSTextField(labelWithString: "")
+    private let label = NSTextField(labelWithString: "")
 
     init(identifier: NSUserInterfaceItemIdentifier) {
         super.init(frame: .zero)
         self.identifier = identifier
-
-        titleField.font = .systemFont(ofSize: 16)
-        titleField.lineBreakMode = .byTruncatingTail
-        subtitleField.font = .systemFont(ofSize: 13)
-        subtitleField.textColor = .secondaryLabelColor
-        subtitleField.lineBreakMode = .byTruncatingMiddle
-
+        label.lineBreakMode = .byTruncatingTail
+        iconView.imageScaling = .scaleProportionallyDown
+        // Symbols draw in `muted`; app icons keep their own colours.
+        iconView.contentTintColor = Nightshade.muted
         addSubview(iconView)
-        addSubview(titleField)
-        addSubview(subtitleField)
+        addSubview(label)
     }
 
     required init?(coder: NSCoder) {
@@ -538,26 +522,29 @@ final class ResultCell: NSTableCellView {
 
     func configure(with item: ResultItem) {
         iconView.image = item.icon
-        titleField.stringValue = item.title
-        subtitleField.stringValue = item.subtitle ?? ""
-        subtitleField.isHidden = item.subtitle == nil
+        let text = NSMutableAttributedString(string: item.title, attributes: [
+            .font: rowFont,
+            .foregroundColor: Nightshade.fg,
+        ])
+        if let subtitle = item.subtitle {
+            text.append(NSAttributedString(string: "   " + subtitle, attributes: [
+                .font: rowFont,
+                .foregroundColor: Nightshade.muted,
+            ]))
+        }
+        label.attributedStringValue = text
         needsLayout = true
     }
 
     override func layout() {
         super.layout()
         let hasIcon = iconView.image != nil
-        let iconSize: CGFloat = 24
-        iconView.frame = NSRect(x: 12, y: (bounds.height - iconSize) / 2,
+        iconView.frame = NSRect(x: rowContentInset, y: (bounds.height - iconSize) / 2,
                                 width: hasIcon ? iconSize : 0, height: iconSize)
-        let textX: CGFloat = hasIcon ? 12 + iconSize + 10 : 14
-        let textWidth = bounds.width - textX - 14
-        if subtitleField.isHidden {
-            titleField.frame = NSRect(x: textX, y: (bounds.height - 21) / 2, width: textWidth, height: 21)
-        } else {
-            titleField.frame = NSRect(x: textX, y: bounds.height / 2 - 1, width: textWidth, height: 21)
-            subtitleField.frame = NSRect(x: textX, y: bounds.height / 2 - 18, width: textWidth, height: 17)
-        }
+        let textX: CGFloat = hasIcon ? rowContentInset + iconSize + 10 : rowContentInset
+        let height = ceil(label.cell?.cellSize.height ?? 18)
+        label.frame = NSRect(x: textX, y: (bounds.height - height) / 2,
+                             width: bounds.width - textX - rowContentInset, height: height)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
