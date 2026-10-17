@@ -64,7 +64,7 @@ function NoteText({
             Suggest a change
           </button>
         )}
-        <span style={{ color: "var(--dimmer)", fontSize: 11 }}>⌘↵ to {saveLabel.toLowerCase()}</span>
+        <span style={{ color: "var(--faint)", fontSize: 11 }}>⌘↵ to {saveLabel.toLowerCase()}</span>
       </div>
     </>
   );

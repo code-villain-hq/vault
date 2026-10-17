@@ -4,6 +4,7 @@ import { api, errMessage } from "../../lib/api";
 import type { ProfileView } from "../../lib/types-profiles";
 import { useStore } from "../../store";
 import { Confirm, Field, Floating, Modal } from "../ui";
+import { ChevronIcon } from "../icons";
 
 /**
  * The window's profile, at the foot of the sidebar (§25), and the way to the
@@ -38,7 +39,7 @@ export function ProfileMenu() {
     if (menu) return setMenu(null);
     load();
     const r = button.current?.getBoundingClientRect();
-    if (r) setMenu({ x: r.left, y: r.top - 4 });
+    if (r) setMenu({ x: r.left, y: r.bottom + 4 });
   }
 
   function open(p: ProfileView) {
@@ -59,14 +60,13 @@ export function ProfileMenu() {
       >
         <Initial profile={me} />
         <span className="profile-name">{me?.name ?? "Profile"}</span>
-        <span className="profile-chev" aria-hidden>⌃</span>
+        <span className="profile-chev" aria-hidden><ChevronIcon /></span>
       </button>
 
       {menu && (
         <Floating
           x={menu.x}
           y={menu.y}
-          above
           onClose={() => setMenu(null)}
           ignore={button}
           className="ctx-menu profile-menu"

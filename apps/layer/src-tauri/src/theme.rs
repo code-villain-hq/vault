@@ -10,20 +10,41 @@ use tauri::{window::Color, AppHandle, Manager, Runtime, Theme, Window};
 
 use crate::commands::AppState;
 
-/// `--bg` of each theme, in `src/theme.css`.
-const DARK: Color = Color(0x0c, 0x0c, 0x11, 0xff);
-const LIGHT: Color = Color(0xff, 0xff, 0xff, 0xff);
+/// The themes `UiPrefs::theme` may name, as `src/theme.css` (and the vault's
+/// generated colours it imports, for night and day) names them.
+pub const THEMES: &[&str] = &["night", "day", "tokyo-night", "cursor-dark", "cursor-light", "ayu-dark", "ayu-light", "system"];
+
+/// The default: Nightshade's night, the studio's theme.
+pub fn night() -> String {
+    "night".into()
+}
+
+/// A saved theme under its current name: Dark and Light became Nightshade's
+/// night and day, and a config saved before still opens in its own mode.
+pub fn saved_name<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let name = <String as serde::Deserialize>::deserialize(d)?;
+    Ok(match name.as_str() {
+        "dark" => night(),
+        "light" => "day".into(),
+        _ => name,
+    })
+}
+
+/// `--bg` of each theme: Nightshade's from the vault's generated colours
+/// (`src/design/color.css`), the others from `src/theme.css`.
+const NIGHT: Color = Color(0x0b, 0x0b, 0x0b, 0xff);
+const DAY: Color = Color(0xf5, 0xf5, 0xf5, 0xff);
 const TOKYO_NIGHT: Color = Color(0x1a, 0x1b, 0x26, 0xff);
-const CURSOR_DARK: Color = Color(0x18, 0x18, 0x18, 0xff);
-const CURSOR_LIGHT: Color = Color(0xfc, 0xfc, 0xfc, 0xff);
-const AYU_DARK: Color = Color(0x10, 0x14, 0x1c, 0xff);
-const AYU_LIGHT: Color = Color(0xfc, 0xfc, 0xfc, 0xff);
+const CURSOR_DARK: Color = Color(0x14, 0x14, 0x14, 0xff);
+const CURSOR_LIGHT: Color = Color(0xf3, 0xf3, 0xf3, 0xff);
+const AYU_DARK: Color = Color(0x0d, 0x10, 0x17, 0xff);
+const AYU_LIGHT: Color = Color(0xf3, 0xf4, 0xf5, 0xff);
 
 /// The themes drawn dark on light, which macOS must draw its own parts of
 /// the window for (scrollbars, dialogs, `prefers-color-scheme`) in light.
-const LIGHT_THEMES: &[&str] = &["light", "cursor-light", "ayu-light"];
+const LIGHT_THEMES: &[&str] = &["day", "cursor-light", "ayu-light"];
 
-/// Give the app the appearance `choice` names (one of `config::THEMES`),
+/// Give the app the appearance `choice` names (one of `THEMES`),
 /// and paint the window to match.
 pub fn apply<R: Runtime>(app: &AppHandle<R>, choice: &str) {
     let Some(window) = app.get_webview_window("main") else { return };
@@ -59,8 +80,8 @@ fn background(choice: &str, light: bool) -> Color {
         "cursor-light" => CURSOR_LIGHT,
         "ayu-dark" => AYU_DARK,
         "ayu-light" => AYU_LIGHT,
-        _ if light => LIGHT,
-        _ => DARK,
+        _ if light => DAY,
+        _ => NIGHT,
     }
 }
 
@@ -72,13 +93,13 @@ mod tests {
     /// as Dark, or a window that flashes another theme's colour at launch.
     #[test]
     fn every_theme_the_settings_take_is_drawn_and_painted_in_its_own_background() {
-        let css = include_str!("../../src/theme.css");
+        let css = [include_str!("../../src/design/color.css"), include_str!("../../src/theme.css")].concat();
         let listed = include_str!("../../src/lib/theme.ts");
-        for name in crate::config::THEMES.iter().filter(|t| **t != "system") {
+        for name in THEMES.iter().filter(|t| **t != "system") {
             let at = css.find(&format!("[data-theme=\"{name}\"]")).unwrap_or_else(|| panic!("{name} not in theme.css"));
             let bg = css[at..].split("--bg:").nth(1).and_then(|b| b.split(';').next()).unwrap().trim();
-            let Color(r, g, b, _) = background(name, *name == "light");
-            assert_eq!(bg, format!("#{r:02x}{g:02x}{b:02x}"), "{name}'s window and page backgrounds differ");
+            let Color(r, g, b, _) = background(name, *name == "day");
+            assert_eq!(bg.to_lowercase(), format!("#{r:02x}{g:02x}{b:02x}"), "{name}'s window and page backgrounds differ");
             assert!(listed.contains(&format!("id: \"{name}\"")), "{name} not offered in lib/theme.ts");
             // A light page in a window macOS draws dark has dark scrollbars
             // and dialogs, and xterm leaves faint colours faint on it.

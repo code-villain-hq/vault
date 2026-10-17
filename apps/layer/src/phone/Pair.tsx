@@ -32,7 +32,7 @@ export function Pair() {
   const ready = code.replace(/\D/g, "").length === 6 && !busy;
   return (
     <div className="pair">
-      <div className="brand">villain<span>·</span>layer</div>
+      <div className="brand">Layer</div>
       <p>
         On the Mac, open the app's <b>Settings</b>, then <b>Phone</b>, and choose <b>Pair a phone</b>. Type the code
         it shows.

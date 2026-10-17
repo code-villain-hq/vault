@@ -37,22 +37,22 @@ export function hierarchyClass(types: TypeMap, name: string): string {
 
 /** Used only when Jira gave us no icon — never in place of one it did. */
 function Fallback({ level, size }: { level: number; size: number }) {
-  const color = level >= 1 ? "var(--accent)" : level <= -1 ? "var(--dimmer)" : "var(--dim)";
+  const color = level >= 1 ? "var(--fg)" : level <= -1 ? "var(--faint)" : "var(--muted)";
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" style={{ flex: "none", display: "block" }}>
       <rect width="16" height="16" rx="3.5" fill={color} opacity="0.85" />
       {level >= 1 ? (
-        <path d="M9.4 2.6 4.8 9.1h2.6l-.6 4.5 4.6-6.7H8.8z" fill="#fff" />
+        <path d="M9.4 2.6 4.8 9.1h2.6l-.6 4.5 4.6-6.7H8.8z" fill="var(--panel)" />
       ) : level <= -1 ? (
         <path
           d="M4.6 4v4.2a1.6 1.6 0 0 0 1.6 1.6h5"
           fill="none"
-          stroke="#fff"
+          stroke="var(--panel)"
           strokeWidth="1.6"
           strokeLinecap="round"
         />
       ) : (
-        <circle cx="8" cy="8" r="2.6" fill="#fff" />
+        <circle cx="8" cy="8" r="2.6" fill="var(--panel)" />
       )}
     </svg>
   );

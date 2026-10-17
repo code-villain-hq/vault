@@ -57,7 +57,7 @@ Everything runs on your machine. The MCP server agents talk to runs on `127.0.0.
 
 **Attention tracking**: Dock badge counts agents waiting on you. Banner notifications for new review requests and tickets. Each agent's status dot updates in real time as it reports working, asking, or done.
 
-**Themes**: Dark, Light, Tokyo Night, Cursor Dark/Light, Ayu Dark/Light, or match system appearance. Applies to the app and any paired phone immediately.
+**Themes**: Nightshade (the Code Villain theme, night and day), Tokyo Night, Cursor Dark/Light, Ayu Dark/Light, or match system appearance. Applies to the app and any paired phone immediately.
 
 Full feature list with requirements in [`docs/features.md`](docs/features.md).
 

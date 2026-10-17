@@ -2,7 +2,7 @@ import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useStore } from "../store";
-import { CloseIcon } from "./icons";
+import { CloseIcon, PanelIcon } from "./icons";
 
 export function Modal({
   title, children, footer, toolbar, onClose, wide, tall,
@@ -77,26 +77,11 @@ export function SidebarToggle() {
   return (
     <button
       className="icon-btn flat"
-      title={hidden ? "Show tasks" : "Hide tasks"}
+      title={hidden ? "Show the sidebar" : "Hide the sidebar"}
+      aria-label={hidden ? "Show the sidebar" : "Hide the sidebar"}
       onClick={toggle}
     >
-      <svg
-        width="19"
-        height="19"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-        style={{ display: "block" }}
-        aria-hidden="true"
-      >
-        <rect x="3" y="4" width="18" height="16" rx="2.5" />
-        <line x1="9.5" y1="4" x2="9.5" y2="20" />
-        {!hidden && (
-          <rect x="3" y="4" width="6.5" height="16" fill="currentColor" opacity="0.35" stroke="none" />
-        )}
-      </svg>
+      <PanelIcon />
     </button>
   );
 }

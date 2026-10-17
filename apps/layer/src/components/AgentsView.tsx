@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { markStopping, useStore } from "../store";
 import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
 import { Ago } from "./Ago";
-import { SidebarToggle, Spinner } from "./ui";
+import { Spinner } from "./ui";
 
 /**
  * Every agent, one card each.
@@ -61,11 +61,10 @@ export function AgentsView() {
   return (
     <div className="wide">
       <div className="wide-head">
-        <SidebarToggle />
         <h2>Agents</h2>
         <span className="sub">
           {waiting > 0 && (
-            <span style={{ color: "var(--amber)" }}>{waiting} need{waiting === 1 ? "s" : ""} you · </span>
+            <span style={{ color: "var(--status-warn-ink)" }}>{waiting} need{waiting === 1 ? "s" : ""} you · </span>
           )}
           {live} running · {ids.length - live} exited — pick a task
           on the left to work on one
@@ -119,14 +118,14 @@ const AgentCard = memo(function AgentCard({
         <div className="name" title={pane.topic ?? undefined}>
           {pane.topic ?? agent?.name ?? pane.title}
           {pane.notice && (
-            <span style={{ color: "var(--amber)", marginLeft: 6 }} title={pane.notice}>
+            <span style={{ color: "var(--status-warn-ink)", marginLeft: 6 }} title={pane.notice}>
               {pane.notice === "trust_prompt" ? "?" : "⚑"}
             </span>
           )}
         </div>
         <div
           className="where"
-          style={pane.notice || needsYou(pane) ? { color: "var(--amber)" } : undefined}
+          style={pane.notice || needsYou(pane) ? { color: "var(--status-warn-ink)" } : undefined}
         >
           {pane.topic && `${agent?.name ?? pane.title} · `}
           {st.label}

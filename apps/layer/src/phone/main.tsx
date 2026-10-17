@@ -4,12 +4,13 @@ import "@xterm/xterm/css/xterm.css";
 import "../theme.css";
 import "./phone.css";
 import { App } from "./App";
+import { fontsReady } from "../lib/terminal";
 import { paintRemembered } from "../lib/theme";
 
 paintRemembered();
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+void fontsReady().then(() => ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
-);
+));

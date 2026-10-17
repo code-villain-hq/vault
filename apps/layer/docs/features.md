@@ -1013,7 +1013,7 @@ Known gaps:
 
 | Setting | Default | What it does |
 |---|---|---|
-| Theme | Dark | Dark, Light, or Match the Mac (SET-5) |
+| Theme | Nightshade Night | Nightshade Night or Day, another theme, or Match the Mac (SET-5) |
 | Interface scale | 100% | 80–160% |
 | New reviews and tickets | on | banners while the window is away (NOTE-*); the message center keeps them either way (MSG-2) |
 | Agents waiting on you | on | banners and the dock count; the message center keeps them either way (MSG-2) |
@@ -1059,15 +1059,20 @@ Known gaps:
   second one is supported.
 - **SET-5** The theme MUST reach everything the app draws: every view,
   the terminals, the window behind the page before it has drawn, and a
-  paired phone's page. The themes are Dark, Light, Tokyo Night, Cursor
-  Dark, Cursor Light, Ayu Dark and Ayu Light, each picked from a small
-  picture of the app drawn in it, beside Match the Mac. Match the Mac MUST switch between Light and Dark as the Mac's
+  paired phone's page. The themes are Nightshade Night, Nightshade Day,
+  Tokyo Night, Cursor Dark, Cursor Light, Ayu Dark and Ayu Light, each
+  picked from a small picture of the app drawn in it, beside Match the Mac.
+  Match the Mac MUST switch between Nightshade's night and day as the Mac's
   appearance changes, without a restart; a phone under Match the Mac
   follows its own appearance. The app MUST open in the theme it was last in, not
-  flash another first. Dark is the default, so an update does not repaint
-  the app. A colour is a token in `theme.css`, with a value for every
-  theme, never written into a rule: one written there is a colour no
-  theme reaches. What an agent prints in a terminal keeps its own colours;
+  flash another first. Nightshade Night is the default, as in every Code
+  Villain app; a theme saved as Dark or Light opens as Nightshade's night
+  or day. Every theme fills the studio's colour names (`brand/color.md`):
+  Nightshade's values come from the vault's `design/tokens`, bundled by
+  `bun run design:sync`, and `bun run check` fails while the bundled copy
+  differs; the others are in `theme.css`. A colour is one of those names,
+  or a color-mix of them, never written into a rule: one written there is
+  a colour no theme reaches. What an agent prints in a terminal keeps its own colours;
   on a light theme, xterm darkens any too faint to read (4.5:1), and answers an
   agent that asks the terminal for its background.
 

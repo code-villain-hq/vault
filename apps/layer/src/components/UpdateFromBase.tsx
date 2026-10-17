@@ -7,10 +7,10 @@ import { Combo, Modal, Spinner } from "./ui";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
 
 const OUTCOME_DOT: Record<RepoUpdate["outcome"], string> = {
-  up_to_date: "var(--dimmer)",
-  updated: "var(--green)",
-  conflicts: "var(--red)",
-  failed: "var(--amber)",
+  up_to_date: "var(--faint)",
+  updated: "var(--status-ok-ink)",
+  conflicts: "var(--status-danger-ink)",
+  failed: "var(--status-warn-ink)",
 };
 
 /** What each way does, said where the choice is made. */
@@ -302,7 +302,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
           <span
             className="dot"
             style={{
-              background: aborted.has(r.checkout_id) ? "var(--dimmer)" : OUTCOME_DOT[r.outcome],
+              background: aborted.has(r.checkout_id) ? "var(--faint)" : OUTCOME_DOT[r.outcome],
               marginTop: 6,
             }}
           />

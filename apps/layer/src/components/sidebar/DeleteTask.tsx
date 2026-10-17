@@ -94,7 +94,7 @@ export function DeleteTask({ task, onCancel, onDelete }: {
                 ))}
               </select>
             )}
-            {ticketError && <div className="hint" style={{ color: "var(--red)" }}>{ticketError}</div>}
+            {ticketError && <div className="hint" style={{ color: "var(--status-danger-ink)" }}>{ticketError}</div>}
             {merged && !ticketError && <div className="hint">A pull request of this task has merged.</div>}
           </div>
         )}

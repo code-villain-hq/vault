@@ -11,7 +11,6 @@ import { RepoPicker } from "../RepoPicker";
 import { FinishTask } from "../FinishTask";
 import { DeleteTask } from "./DeleteTask";
 import { TaskRow } from "./TaskRow";
-import { ProfileMenu } from "./ProfileMenu";
 
 /**
  * The overview is a place, not merely what you see before choosing.
@@ -40,7 +39,7 @@ function FleetRow({ selected, onSelect }: { selected: boolean; onSelect: () => v
       </div>
       <div className="ws-meta">
         {waiting > 0 ? (
-          <span style={{ color: "var(--amber)" }}>
+          <span style={{ color: "var(--status-warn-ink)" }}>
             {waiting} need{waiting === 1 ? "s" : ""} you
           </span>
         ) : (
@@ -319,7 +318,7 @@ export function Sidebar() {
                 No repositories yet —{" "}
                 <a
                   href="#"
-                  style={{ color: "var(--accent)" }}
+                 
                   onClick={(e) => { e.preventDefault(); setView("repos"); }}
                 >
                   add some in the Repos tab
@@ -331,7 +330,7 @@ export function Sidebar() {
                 No tasks yet. A task starts from a ticket —{" "}
                 <a
                   href="#"
-                  style={{ color: "var(--accent)" }}
+                 
                   onClick={(e) => { e.preventDefault(); setView("tickets"); }}
                 >
                   pick one in Tickets
@@ -373,7 +372,6 @@ export function Sidebar() {
         ))}
 
       </div>
-      <ProfileMenu />
 
       {menu && (
         <ContextMenu

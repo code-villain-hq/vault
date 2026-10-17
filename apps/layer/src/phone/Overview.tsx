@@ -115,7 +115,7 @@ export function Overview({
   return (
     <div className="screen">
       <header className="bar">
-        <div className="brand">villain<span>·</span>layer</div>
+        <div className="brand">Layer</div>
         <div className="spacer" />
         <span className={`dot ${live ? "live" : "gone"}`} title={live ? "Connected to the Mac" : "Not connected"} />
       </header>

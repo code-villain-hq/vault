@@ -319,7 +319,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
             title={row.title || undefined}
             onClick={() => setShown(row.checkout_id)}
           >
-            <span style={{ color: "var(--dim)" }}>{row.repo}</span>
+            <span style={{ color: "var(--muted)" }}>{row.repo}</span>
             {row.number > 0 && ` #${row.number}`}
             <span className="badge" title={`${n} of ${list.length} picked`}>{n}/{list.length}</span>
           </button>
@@ -330,7 +330,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
 
   return (
     <Modal title={title} wide tall onClose={() => !busy && onClose()} footer={footer} toolbar={tabs || undefined}>
-      {error && <div className="muted" style={{ color: "var(--red)" }}>{error}</div>}
+      {error && <div className="muted" style={{ color: "var(--status-danger-ink)" }}>{error}</div>}
       {!rows && !error && (
         <div className="row muted"><Spinner /> Reading reviews and checks…</div>
       )}
@@ -381,7 +381,7 @@ function PrItems({ row, list, open, resolved, picked, onToggle, onAll }: {
     <div className="fb-repo" ref={top}>
       <div className="row fb-pr">
         <h3>
-          <span style={{ color: "var(--dim)" }}>{row.repo}</span>
+          <span style={{ color: "var(--muted)" }}>{row.repo}</span>
           {row.number > 0 && ` #${row.number} ${row.title}`}
         </h3>
         <div className="spacer" />
@@ -400,7 +400,7 @@ function PrItems({ row, list, open, resolved, picked, onToggle, onAll }: {
           </button>
         )}
       </div>
-      {row.error && <div className="muted" style={{ color: "var(--red)" }}>{row.error}</div>}
+      {row.error && <div className="muted" style={{ color: "var(--status-danger-ink)" }}>{row.error}</div>}
       {!row.error && list.length > 0 && list.length === resolved && (
         <div className="muted fb-note">
           Nothing to answer here: every review thread has been resolved.

@@ -262,8 +262,8 @@ export function StartWorkDialog({
               whiteSpace: "pre-wrap",
               maxHeight: 220,
               overflowY: "auto",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
+              background: "var(--dialog-field)",
+              borderRadius: "var(--radius-md)",
               padding: 10,
               userSelect: "text",
             }}

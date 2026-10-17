@@ -279,13 +279,13 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             {p.notice && (
               <span
                 title={p.notice === "trust_prompt" ? "Waiting: trust this folder?" : "Usage limit"}
-                style={{ color: "var(--amber)" }}
+                style={{ color: "var(--status-warn-ink)" }}
               >
                 {p.notice === "trust_prompt" ? "?" : "⚑"}
               </span>
             )}
             {!p.running && p.exit_code !== null && (
-              <span style={{ color: "var(--dimmer)" }}>({p.exit_code})</span>
+              <span style={{ color: "var(--faint)" }}>({p.exit_code})</span>
             )}
             {canRestart(p, agents) && !closing.has(p.id) && !restarting.has(p.id) && (
               <RestartButton pane={p} onRestart={restart} />

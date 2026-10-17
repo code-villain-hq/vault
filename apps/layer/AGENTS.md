@@ -191,6 +191,7 @@ beside the code, with a reason: `// guard: allow <rule> — <why>`.
 bun install
 bun run check          # everything below, in order; must pass before a commit
 bun run guard          # scripts/guard.ts alone, about a second
+bun run design:sync    # copy the vault's design tokens and fonts into src/design
 bun run build          # tsc && vite build
 bun run dev:app        # the app, as a dev build under its own identity
 bun run dev            # Vite alone; the mock harness is at /mock.html
@@ -242,7 +243,8 @@ build does the same.
 | `src-tauri/src/secrets.rs` | tokens in the keychain |
 | `src-tauri/src/profiles.rs`, `profiles/` | profiles (§25): which one this process is, its lock, the registry `profiles.json`, launching another copy |
 | `src-tauri/src/shellenv.rs` | the login shell's environment, for spawned processes |
-| `src/App.tsx` | the shell and the top bar |
+| `src/App.tsx` | the shell: the frame's sidebar (views, profile, tasks) and top bar |
+| `src/theme.css`, `src/design/` | the studio's colour, type and radius names, from the vault's `design/tokens` (`bun run design:sync`; never edit `src/design/` by hand) |
 | `src/Watchers.tsx` | `Watchers`: every poll and event listener, and the toasts they raise |
 | `src/store.ts` | all frontend state and its refresh actions |
 | `src/lib/derive.ts` | pure helpers over that state (`paneState`, `needsYou`, …) |

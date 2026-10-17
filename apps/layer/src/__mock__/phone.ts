@@ -36,7 +36,7 @@ const groups: Group[] = [
   { id: "t-docs", name: "Setup guide typos", key: "ACME-140", panes: [] },
 ];
 
-const theme = (params.get("theme") ?? "dark") as Overview["theme"];
+const theme = (params.get("theme") ?? "night") as Overview["theme"];
 const world: Overview = { device: "iPhone", typing: params.get("typing") !== "0", theme, groups };
 const calls: { path: string; body: unknown }[] = [];
 const streams = new Map<string, Set<ReadableStreamDefaultController<Uint8Array>>>();

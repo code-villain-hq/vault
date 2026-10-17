@@ -197,7 +197,7 @@ export function Settings() {
                 Stored in your macOS keychain, never in config files.{" "}
                 <a
                   href="#"
-                  style={{ color: "var(--accent)" }}
+                 
                   onClick={(e) => {
                     e.preventDefault();
                     void openUrl("https://id.atlassian.com/manage-profile/security/api-tokens");
@@ -337,7 +337,7 @@ export function Settings() {
               </>
             }
           >
-            <div style={{ fontFamily: "var(--mono)", fontSize: 12 }}>Layer {version ?? "…"}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>Layer {version ?? "…"}</div>
           </Field>
           <Field label="Detected agents">
             <div className="col">
@@ -345,7 +345,7 @@ export function Settings() {
                 <div key={a.id} className="row" style={{ fontSize: 12 }}>
                   <span className={`dot ${a.installed ? "live" : ""}`} />
                   <span style={{ width: 110 }}>{a.name}</span>
-                  <span className="muted" style={{ fontFamily: "var(--mono)", fontSize: 11 }}>
+                  <span className="muted" style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
                     {a.path ?? "not found on PATH"}
                   </span>
                 </div>

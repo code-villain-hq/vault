@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "./lib/api";
 import { selectedTask, useStore, type View } from "./store";
@@ -19,89 +19,123 @@ import { ReviewsView } from "./components/ReviewsView";
 import { UsageView } from "./components/UsageView";
 import { Settings } from "./components/Settings";
 import { UpdateFromBase } from "./components/UpdateFromBase";
-import { CupIcon, GearIcon } from "./components/icons";
+import { ChatIcon, CupIcon, GearIcon, RepoIcon, ReviewIcon, TicketIcon, UsageIcon, WorkIcon } from "./components/icons";
+import { ProfileMenu } from "./components/sidebar/ProfileMenu";
 import { PhoneBadge } from "./components/PhoneSettings";
 import { SidebarToggle } from "./components/ui";
 import { MessageCenter } from "./components/MessageCenter";
 import { Watchers } from "./Watchers";
 import { goTo } from "./lib/goto";
 
-/** The view switcher, with a count on each view worth one. */
-function TopBar() {
+/**
+ * The views, in the sidebar. A count shows only where it asks for
+ * something: agents waiting on you, reviews asked of you, repositories to
+ * fix. A running agent is a live dot, not a number.
+ */
+function Nav() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
-  const toggleSettings = useStore((s) => s.toggleSettings);
-  const watchFailing = useStore((s) => s.watchFailing);
   // Counts, not the lists: a number that has not changed is not a redraw.
-  // Chats have their own badge, so they must not be counted as work as well.
+  // Chats have their own row, so they must not be counted as work as well.
   const running = useStore(
-    (s) => s.panes.filter((p) => p.kind === "agent" && p.running && p.task_id !== CHAT_TASK_ID).length,
+    (s) => s.panes.some((p) => p.kind === "agent" && p.running && p.task_id !== CHAT_TASK_ID),
   );
-  const chats = useStore((s) => s.panes.filter((p) => p.task_id === CHAT_TASK_ID).length);
+  const chatting = useStore((s) => s.panes.some((p) => p.task_id === CHAT_TASK_ID && p.running));
   // The dock icon's number, with a place in the window that says what it is.
   const waiting = useStore((s) => s.panes.filter(needsYou).length);
-  const issueCount = useStore((s) => s.issues.length);
-  const projectCount = useStore((s) => s.projects.length);
   const repoTroubles = useStore(
     (s) => s.projects.filter((p) => repoTrouble(p, s.repoHealth[p.id], s.tasks)).length,
   );
   // Two strings rather than one object, so an unchanged count is no redraw.
   const toReview = useStore((s) => reviewCounts(s.reviewQueue).toReview);
   const yours = useStore((s) => reviewCounts(s.reviewQueue).yours);
-  // Both of the view's counts, in its tabs' order: one sum hid which side
-  // was waiting, and the top bar showed only the first.
-  const reviews = [toReview, yours].some((n) => n && n !== "0")
-    ? {
-      badge: yours === undefined ? toReview : `${toReview ?? "–"} · ${yours}`,
-      title: `${toReview ?? "?"} to review · ${yours ?? "?"} opened by you`,
-    }
-    : {};
 
-  const tabs: { id: View; label: string; badge?: number | string; title?: string }[] = [
-    { id: "work", label: "Work", badge: running || undefined },
-    { id: "tickets", label: "Tickets", badge: issueCount || undefined },
-    { id: "reviews", label: "Reviews", ...reviews },
-    { id: "chat", label: "Chat", badge: chats || undefined },
-    { id: "runs", label: "Usage" },
-    { id: "repos", label: "Repos", badge: projectCount || undefined },
+  const items: {
+    id: View;
+    label: string;
+    icon: ReactNode;
+    count?: string | number;
+    title?: string;
+    /** Whether the count is news (a live dot beside it), or only a number. */
+    news?: boolean;
+    live?: boolean;
+  }[] = [
+    {
+      id: "work",
+      label: "Work",
+      icon: <WorkIcon />,
+      count: waiting || undefined,
+      title: `${waiting} agent${waiting === 1 ? " needs" : "s need"} you — asking for something, or finished and not looked at yet`,
+      news: true,
+      live: running,
+    },
+    { id: "tickets", label: "Tickets", icon: <TicketIcon /> },
+    {
+      id: "reviews",
+      label: "Reviews",
+      icon: <ReviewIcon />,
+      count: toReview && toReview !== "0" ? toReview : undefined,
+      title: `${toReview ?? "?"} to review · ${yours ?? "?"} opened by you`,
+      news: true,
+    },
+    { id: "chat", label: "Chat", icon: <ChatIcon />, live: chatting },
+    { id: "runs", label: "Usage", icon: <UsageIcon /> },
+    {
+      id: "repos",
+      label: "Repos",
+      icon: <RepoIcon />,
+      count: repoTroubles || undefined,
+      title: "Repositories with a problem the Repos view can fix",
+    },
   ];
 
   return (
-    // The native title bar is hidden under this one (`titleBarStyle:
-    // Overlay`), so this is what the window is moved by. Tauri's attribute,
-    // not CSS: `-webkit-app-region` is Chromium's, and macOS's WebKit
-    // ignores it, which left a window nothing could grab. "deep" makes the
-    // bar's empty parts drag; its buttons stay buttons.
-    <div className="topbar" data-tauri-drag-region="deep">
-      <div className="topbar-left">
-        <div className="brand">villain<span>·</span>layer</div>
+    <nav className="frame-nav" aria-label="Views">
+      {items.map((t) => (
+        <button
+          key={t.id}
+          className={`nav-item${view === t.id ? " active" : ""}`}
+          aria-current={view === t.id ? "page" : undefined}
+          onClick={() => setView(t.id)}
+        >
+          {t.icon}
+          <span className="nav-label">{t.label}</span>
+          {/* The page you are on says its own count. */}
+          {t.count !== undefined && view !== t.id ? (
+            <span className="nav-count" title={t.title}>
+              {t.news && <span className="live-dot" aria-hidden />}
+              {t.count}
+            </span>
+          ) : (
+            t.live && <span className="live-dot" title="Running" />
+          )}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * The frame's left side (design/layouts/app-window.md): the product's name,
+ * the profile, the views, and on Work the tasks. The native title bar is
+ * hidden under it (`titleBarStyle: Overlay`), so its top row is what the
+ * window is moved by. Tauri's attribute, not CSS: `-webkit-app-region` is
+ * Chromium's, and macOS's WebKit ignores it, which left a window nothing
+ * could grab. "deep" makes the empty parts drag; buttons stay buttons.
+ */
+function FrameSidebar() {
+  const view = useStore((s) => s.view);
+  const toggleSettings = useStore((s) => s.toggleSettings);
+  const watchFailing = useStore((s) => s.watchFailing);
+  return (
+    <aside className="frame-side">
+      <div className="frame-brand" data-tauri-drag-region="deep">
+        <span className="wordmark">Layer</span>
       </div>
-      <div className="topbar-center">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            className={`viewtab${view === t.id ? " active" : ""}`}
-            onClick={() => setView(t.id)}
-          >
-            {t.label}
-            {t.badge !== undefined && <span className="badge" title={t.title}>{t.badge}</span>}
-            {t.id === "repos" && repoTroubles > 0 && (
-              <span className="badge warn" title="Repositories with a problem the Repos view can fix">
-                {repoTroubles} to fix
-              </span>
-            )}
-            {t.id === "work" && waiting > 0 && (
-              <span
-                className="badge warn"
-                title={`${waiting} agent${waiting === 1 ? " needs" : "s need"} you — asking for something, or finished and not looked at yet`}
-              >
-                {waiting} need{waiting === 1 ? "s" : ""} you
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      <div className="topbar-right">
+      <ProfileMenu />
+      <Nav />
+      {view === "work" ? <Sidebar /> : <div className="frame-fill" data-tauri-drag-region="deep" />}
+      <div className="frame-foot">
         {watchFailing && (
           <span className="watch-chip" title="Task and pane polls are failing">
             couldn&apos;t refresh
@@ -109,12 +143,46 @@ function TopBar() {
         )}
         <PhoneBadge />
         <KeepAwake />
+        <div className="spacer" />
         <MessageCenter />
-        <button className="icon-btn" title="Settings" onClick={() => toggleSettings(true)}>
+        <button className="icon-btn" title="Settings" aria-label="Settings" onClick={() => toggleSettings(true)}>
           <GearIcon />
         </button>
       </div>
-    </div>
+    </aside>
+  );
+}
+
+const VIEW_NAMES: Record<View, string> = {
+  work: "Work",
+  tickets: "Tickets",
+  reviews: "Reviews",
+  chat: "Chat",
+  runs: "Usage",
+  repos: "Repos",
+};
+
+/** Where you are: the view, and on Work the task. It also moves the window. */
+function TopBar() {
+  const view = useStore((s) => s.view);
+  const task = useStore(selectedTask);
+  const select = useStore((s) => s.select);
+  const here = view === "work" ? (task?.name ?? "All agents") : null;
+  return (
+    <header className="topbar" data-tauri-drag-region="deep">
+      <SidebarToggle />
+      <nav className="crumbs" aria-label="Breadcrumb">
+        {here ? (
+          <>
+            <button className="crumb" onClick={() => select(null)}>{VIEW_NAMES[view]}</button>
+            <span className="crumb-sep" aria-hidden>/</span>
+            <span className="crumb here" aria-current="page">{here}</span>
+          </>
+        ) : (
+          <span className="crumb here" aria-current="page">{VIEW_NAMES[view]}</span>
+        )}
+      </nav>
+    </header>
   );
 }
 
@@ -194,7 +262,6 @@ function TaskMain({ task }: { task: TaskView }) {
   return (
     <>
       <div className="ws-header">
-        <SidebarToggle />
         <h1>{task.name}</h1>
         <span className="branch">{task.branch}</span>
         <div className="chips">
@@ -203,7 +270,7 @@ function TaskMain({ task }: { task: TaskView }) {
               key={c.id}
               className="chip"
               title={c.broken ?? c.path}
-              style={!c.exists || c.broken ? { color: "var(--red)" } : undefined}
+              style={!c.exists || c.broken ? { color: "var(--status-danger-ink)" } : undefined}
             >
               {c.project_name}
             </span>
@@ -335,15 +402,18 @@ export default function App() {
   const scale = useStore((s) => s.settings?.ui.scale ?? 1);
 
   return (
-    <div className="shell" style={{ ["--ui-scale" as string]: scale }}>
+    <div
+      className={`shell${sidebarHidden ? " no-sidebar" : ""}`}
+      style={{ ["--ui-scale" as string]: scale }}
+    >
       <Watchers />
-      <TopBar />
+      <FrameSidebar />
+      <SidebarGrip />
 
+      <div className="frame-main">
+      <TopBar />
       <div className="views">
         {view === "work" && (
-          <div className={`app${sidebarHidden ? " no-sidebar" : ""}`}>
-            <Sidebar />
-            <SidebarGrip />
             <div className="main">
               {task ? (
                 <TaskMain key={task.id} task={task} />
@@ -354,7 +424,6 @@ export default function App() {
                 <AgentsView />
               )}
             </div>
-          </div>
         )}
 
         {view === "tickets" && <TicketsView />}
@@ -362,6 +431,7 @@ export default function App() {
         {view === "chat" && <ChatView />}
         {view === "runs" && <UsageView />}
         {view === "repos" && <ReposView />}
+      </div>
       </div>
 
       {settingsOpen && <Settings />}

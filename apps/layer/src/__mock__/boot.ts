@@ -15,7 +15,7 @@
  *   &tab=spec|terminals|diff|pr
  *   &loop=checking|held|passed|gave_up   the task's agents on a loop (§21)
  *   &spec=split            ACME-123 with a spec per repository from before (SPEC-25)
- *   &theme=dark|light|tokyo-night|cursor-dark|cursor-light|ayu-dark|ayu-light|system   the saved theme (SET-5)
+ *   &theme=night|day|tokyo-night|cursor-dark|cursor-light|ayu-dark|ayu-light|system   the saved theme (SET-5)
  *
  * From the console, or a browser tool's JavaScript:
  *
