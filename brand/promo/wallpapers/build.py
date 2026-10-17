@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 HERE = pathlib.Path(__file__).parent
-MARK = (HERE / "../../../brand/mark/mark.svg").resolve().read_text()
+MARK = (HERE / "../../mark/mark.svg").resolve().read_text()
 V = re.search(r'<path id="v" d="([^"]+)"', MARK).group(1)
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 

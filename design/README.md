@@ -10,6 +10,5 @@ Caster is AppKit. Forge, Layer, and the site are web. Each one builds its screen
 | [`components.md`](components.md) | Button, field, link, pill, chip, row |
 | [`tokens/`](tokens) | The numbers: color, type, shape |
 | [`layouts/`](layouts) | Reference layouts: the app window and the blog; a social card to come |
-| [`promo/`](promo) | Wallpapers and other images made to share |
 
 A [spacing proposal](spacing.draft.md) is available as a draft, with [interactive examples](../brand/index.html#spacing). No space tokens are published yet.
