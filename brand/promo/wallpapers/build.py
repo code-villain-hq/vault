@@ -54,15 +54,15 @@ PLACEMENT = {
     ("wordmark", "desktop-5k"): (0.50, 0.50, 0.46),
     ("wordmark", "macbook"): (0.50, 0.50, 0.50),
     ("wordmark", "phone"): (0.50, 0.58, 0.80),
-    # Rows of grey wordmarks, with the lit one in a row of its own.
+    # Rows of grey wordmarks running up to the lit one and its strike.
     ("rows", "desktop-5k"): (0.50, 0.50, 0.46),
     ("rows", "macbook"): (0.50, 0.50, 0.50),
     ("rows", "phone"): (0.50, 0.58, 0.80),
 }
 
 
-def rows(design, width, height, clear_top, clear_bottom):
-    """Staggered rows of the wordmark, leaving the lit row's band clear."""
+def rows(design, width, height):
+    """Staggered rows of the wordmark across the whole screen."""
     left, right, top, bottom = outline_box(design["d"])
     scale = max(width, height) * 0.15 / (right - left)
     word, tall = (right - left) * scale, (bottom - top) * scale
@@ -70,8 +70,6 @@ def rows(design, width, height, clear_top, clear_bottom):
     uses = []
     for row in range(-1, int(height / step) + 2):
         y = row * step
-        if y + tall > clear_top - step * 0.4 and y < clear_bottom + step * 0.4:
-            continue
         offset = (word + gap) / 2 if row % 2 else 0
         for column in range(-1, int(width / (word + gap)) + 2):
             x = column * (word + gap) + offset
@@ -87,7 +85,15 @@ def svg(design, width, height, cx, cy, size):
     x = cx * width - (left + right) / 2 * scale
     y = cy * height - (strike_top + strike_height / 2) * scale
     place = f"translate({x:.2f} {y:.2f}) scale({scale:.4f})"
-    texture = rows(design, width, height, y + top * scale, y + bottom * scale) if design.get("rows") else ""
+    texture = rows(design, width, height) if design.get("rows") else ""
+    if texture:
+        # The rows run up to the lit wordmark and its strike: the brand's cut,
+        # drawn in the ground colour, clears a thin gap around both.
+        half_cut = design["cut"] / 2 * scale
+        texture += (f'<rect y="{y + strike_top * scale - half_cut:.2f}" width="{width}" '
+                    f'height="{strike_height * scale + 2 * half_cut:.2f}" fill="{GROUND}"/>'
+                    f'<use href="#letters" transform="{place}" fill="{GROUND}" stroke="{GROUND}" '
+                    f'stroke-width="{design["cut"]}" stroke-linejoin="round"/>')
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>Code Villain</title>
   <defs>

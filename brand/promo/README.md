@@ -19,8 +19,8 @@ strike that runs edge to edge, the way the homepage logo extends it.
 - **Wordmark**: "Code Villain" from [`mark/logo-night.svg`](../mark/logo-night.svg),
   centred. The strike shows between the letters, as in the logo.
 - **Rows**: the wordmark design on a wall of staggered grey wordmarks, a
-  step above night. The lit name sits in a cleared row of its own, so it
-  reads as one name called out of many.
+  step above night. They run up to the lit name and its strike, with the
+  brand's thin cut around both, so it reads as one name called out of many.
 
 | Screen | Size |
 | --- | --- |
