@@ -1,0 +1,60 @@
+/* Generated from type.json. */
+:root {
+  --font-display: "Grenze Gotisch", ui-serif, Georgia, serif;
+  --font-reading: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
+
+  --type-splash-size: clamp(4.5rem, 14.5vw, 11.5rem);
+  --type-splash-weight: 800;
+  --type-splash-leading: 0.95;
+
+  --type-display-size: clamp(2.25rem, 6vw, 3.5rem);
+  --type-display-weight: 700;
+  --type-display-leading: 1.1;
+
+  --type-headline-size: clamp(1.75rem, 3.4vw, 2.125rem);
+  --type-headline-weight: 700;
+  --type-headline-leading: 1.18;
+
+  --type-title-size: 1.3125rem;
+  --type-title-weight: 700;
+  --type-title-leading: 1.25;
+
+  --type-label-size: 1.0625rem;
+  --type-label-weight: 700;
+  --type-label-leading: 1.2;
+  --type-label-tracking: 0.01em;
+
+  --type-body-size: 1.0625rem;
+  --type-body-weight: 400;
+  --type-body-leading: 1.6;
+  --type-body-measure: 66ch;
+
+  --type-small-size: 0.875rem;
+  --type-small-weight: 400;
+  --type-small-leading: 1.5;
+
+  --type-code-size: 0.875rem;
+  --type-code-weight: 400;
+  --type-code-leading: 1.6;
+
+  --type-query-size: 1.3125rem;
+  --type-query-weight: 400;
+  --type-query-leading: 1.25;
+
+  --type-ui-size: 0.875rem;
+  --type-ui-weight: 400;
+  --type-ui-leading: 1.45;
+
+  --type-ui-small-size: 0.8125rem;
+  --type-ui-small-weight: 400;
+  --type-ui-small-leading: 1.4;
+
+  --type-control-size: 0.8125rem;
+  --type-control-weight: 600;
+  --type-control-leading: 1;
+
+  --type-ui-code-size: 0.8125rem;
+  --type-ui-code-weight: 400;
+  --type-ui-code-leading: 1.6;
+}
