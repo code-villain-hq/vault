@@ -23,15 +23,17 @@ jobs:
       # Line numbers for a failing test's backtrace, without the rest of the
       # debug info: less to compile and link.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      # The git tests commit in temp repos and need an identity. Not
-      # `git config --global`: on this Mac that is the owner's own config.
-      GIT_AUTHOR_NAME: ci
-      GIT_AUTHOR_EMAIL: ci@localhost
-      GIT_COMMITTER_NAME: ci
-      GIT_COMMITTER_EMAIL: ci@localhost
     steps:
       - uses: actions/checkout@v4
       - run: bun install --frozen-lockfile
+      # The git tests commit in temp repos and need an identity: a global
+      # config of the job's own, since on this Mac `git config --global`
+      # would be the owner's. Not GIT_AUTHOR_*/GIT_COMMITTER_*: those beat
+      # the identity a test sets in its repo, and two tests check that one.
       # Every job gets a fresh checkout; the Rust build is kept between them
       # so a push recompiles what changed, not the whole app.
-      - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/layer-target" bun run check
+      - run: |
+          export GIT_CONFIG_GLOBAL="$(mktemp)"
+          git config --global user.name ci
+          git config --global user.email ci@localhost
+          CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/layer-target" bun run check
