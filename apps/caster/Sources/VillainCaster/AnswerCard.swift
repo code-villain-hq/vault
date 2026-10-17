@@ -14,7 +14,7 @@ final class AnswerCard: NSView {
     private static let tile: CGFloat = 44
     private static let key: CGFloat = 30
     private static let valueFont = Nightshade.font(TypeTokens.title)
-    private static let detailFont = Nightshade.font(TypeTokens.ui, size: 15)
+    private static let detailFont = Nightshade.font(TypeTokens.body)
 
     func configure(with answer: Answer) {
         self.answer = answer

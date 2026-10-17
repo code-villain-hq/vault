@@ -39,15 +39,16 @@
     "display":  {"face": "display", "weight": 700, "size": {"min": 36, "fluid": "6vw", "max": 56}, "lineHeight": 1.1, "tracking": 0},
     "headline": {"face": "display", "weight": 700, "size": {"min": 28, "fluid": "3.4vw", "max": 34}, "lineHeight": 1.18, "tracking": 0},
     "title":    {"face": "reading", "weight": 700, "size": 21, "lineHeight": 1.25, "tracking": 0},
-    "label":    {"face": "reading", "weight": 700, "size": 15, "lineHeight": 1.2, "tracking": 0.01},
+    "label":    {"face": "reading", "weight": 700, "size": 17, "lineHeight": 1.2, "tracking": 0.01},
     "body":     {"face": "reading", "weight": 400, "size": 17, "lineHeight": 1.6, "tracking": 0, "measure": "66ch"},
     "small":    {"face": "reading", "weight": 400, "size": 14, "lineHeight": 1.5, "tracking": 0},
     "code":     {"face": "mono", "weight": 400, "size": 14, "lineHeight": 1.6, "tracking": 0},
+    "query":    {"face": "reading", "weight": 400, "size": 21, "lineHeight": 1.25, "tracking": 0},
     "ui":       {"face": "reading", "weight": 400, "size": 14, "lineHeight": 1.45, "tracking": 0},
     "ui-small": {"face": "reading", "weight": 400, "size": 13, "lineHeight": 1.4, "tracking": 0},
     "control":  {"face": "reading", "weight": 600, "size": 13, "lineHeight": 1, "tracking": 0},
     "ui-code":  {"face": "mono", "weight": 400, "size": 13, "lineHeight": 1.6, "tracking": 0}
   },
-  "groups": {"studio": ["splash", "display", "headline", "title", "label", "body", "small", "code"], "interface": ["title", "ui", "ui-small", "control", "ui-code"]},
+  "groups": {"studio": ["splash", "display", "headline", "title", "label", "body", "small", "code"], "interface": ["title", "query", "ui", "ui-small", "control", "ui-code"]},
   "units": {"size": "px; fluid sizes clamp between min and max", "tracking": "em"}
 }

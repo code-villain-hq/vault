@@ -12,9 +12,9 @@ private let rowContentInset: CGFloat = 10
 private let iconSize: CGFloat = 22
 /// An NSTextField draws its text 2pt inside its frame.
 private let inputSidePadding: CGFloat = listInset + rowContentInset - 2
-/// The query at the title size, rows at the body size: read at a glance.
-private let inputFont = Nightshade.font(TypeTokens.ui, size: TypeTokens.title.size)
-private let rowFont = Nightshade.font(TypeTokens.ui, size: TypeTokens.body.size)
+/// The query in its role; rows at the body size (brand/type.md).
+private let inputFont = Nightshade.font(TypeTokens.query)
+private let rowFont = Nightshade.font(TypeTokens.body)
 private let screenshotPadding: CGFloat = 48
 
 /// The panel itself: a solid `dialog` tone with `radius-lg` corners. No

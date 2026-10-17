@@ -2,7 +2,8 @@
 .hero { position: relative; overflow: hidden; }
 .splash { margin: 0; padding: clamp(1.5rem, 3vw, 2.25rem) var(--gutter); }
 .splash svg { display: block; width: clamp(18rem, 42vw, 36rem); max-width: 100%; height: auto; overflow: visible; }
-.home-nav { position: absolute; right: var(--gutter); bottom: clamp(1.5rem, 3vw, 2.25rem); display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.75rem; font-size: var(--type-label-size); font-weight: var(--type-label-weight); line-height: var(--type-label-leading); letter-spacing: var(--type-label-tracking); }
+/* The nav has its own row above the logo, so the strike never runs behind it. */
+.home-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.5rem 1.75rem; padding: clamp(1rem, 2vw, 1.5rem) var(--gutter) 0; font-size: var(--type-label-size); font-weight: var(--type-label-weight); line-height: var(--type-label-leading); letter-spacing: var(--type-label-tracking); }
 .home-nav a { padding-block: 0.4rem; color: var(--muted); }
 .home-nav a:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 0.22em; }
 .page-width { width: min(80rem, calc(100% - var(--gutter) * 2)); margin-inline: auto; }
@@ -89,7 +90,7 @@ kbd { font-family: var(--font-reading); font-size: var(--type-ui-small-size); fo
   .product-head { min-height: 0; }
 }
 @media (max-width: 700px) {
-  .home-nav { position: static; padding: 0 var(--gutter) 0.75rem; gap: 0.5rem 1.5rem; }
+  .home-nav { justify-content: flex-start; gap: 0.5rem 1.5rem; }
 }
 @media (max-width: 480px) {
   .capture-stage { padding: 16px; }

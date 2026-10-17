@@ -26,7 +26,7 @@ In app interfaces: 28px tall, the `control` type role (13px, 600),
 ### Studio call to action
 
 On the site, a main call to action uses the studio `label` role
-(15px, 700, leading 1.2, tracking 0.01em), with `0.7rem 1.15rem`
+(17px, 700, leading 1.2, tracking 0.01em), with `0.7rem 1.15rem`
 padding instead of a fixed height. It keeps the same primary colours,
 6px corners, and no border. Focus is a 2px `accent` ring, 3px out.
 No page uses it yet. Site navigation also uses `label`; it follows the

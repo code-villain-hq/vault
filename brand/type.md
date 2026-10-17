@@ -44,7 +44,7 @@ size. App windows are denser and use the interface roles.
 | display  | Grenze   | 700    | 36–56px  | 1.1     | Page and post titles.        |
 | headline | Grenze   | 700    | 28–34px  | 1.18    | Section titles.              |
 | title    | Atkinson | 700    | 21px     | 1.25    | Card titles, product names.  |
-| label    | Atkinson | 700    | 15px     | 1.2     | Site buttons and nav.        |
+| label    | Atkinson | 700    | 17px     | 1.2     | Site buttons and nav.        |
 | body     | Atkinson | 400    | 17px     | 1.6     | Reading text. 66ch measure.  |
 | small    | Atkinson | 400    | 14px     | 1.5     | Captions, dates, meta.       |
 | code     | Mono     | 400    | 14px     | 1.6     | Code blocks, terminal text.  |
@@ -54,10 +54,14 @@ size. App windows are denser and use the interface roles.
 | Role     | Face     | Weight | Size | Leading | Use                                  |
 | -------- | -------- | ------ | ---- | ------- | ------------------------------------ |
 | title    | Atkinson | 700    | 21px | 1.25    | View and issue titles.               |
+| query    | Atkinson | 400    | 21px | 1.25    | The query in a launcher or command menu. |
 | ui       | Atkinson | 400    | 14px | 1.45    | Rows, nav, descriptions, fields.     |
 | ui-small | Atkinson | 400    | 13px | 1.4     | Meta, ids, counts, captions.         |
 | control  | Atkinson | 600    | 13px | 1       | Buttons, chips. Status pills at 700. |
 | ui-code  | Mono     | 400    | 13px | 1.6     | Code, terminal, ids in mono.         |
+
+A launcher sits alone on the desktop rather than inside an app, so
+Caster's rows and answers take the studio `body` size under its `query`.
 
 Grenze appears in an app only at 28px and up: the app's name in the
 sidebar, an empty state's headline.

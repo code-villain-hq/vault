@@ -20,7 +20,7 @@
   --type-title-weight: 700;
   --type-title-leading: 1.25;
 
-  --type-label-size: 0.9375rem;
+  --type-label-size: 1.0625rem;
   --type-label-weight: 700;
   --type-label-leading: 1.2;
   --type-label-tracking: 0.01em;
@@ -37,6 +37,10 @@
   --type-code-size: 0.875rem;
   --type-code-weight: 400;
   --type-code-leading: 1.6;
+
+  --type-query-size: 1.3125rem;
+  --type-query-weight: 400;
+  --type-query-leading: 1.25;
 
   --type-ui-size: 0.875rem;
   --type-ui-weight: 400;
