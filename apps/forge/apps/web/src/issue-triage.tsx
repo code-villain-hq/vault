@@ -115,10 +115,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
   });
 
   return (
-    <section
-      aria-label="Triage"
-      className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
-    >
+    <section aria-label="Triage" className="flex flex-col gap-3 rounded-lg bg-surface p-4">
       <div>
         <h2 className="font-medium">Needs triage</h2>
         <p className="text-xs text-muted">
@@ -136,7 +133,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
             <Menu.Root>
               <Menu.Trigger
                 aria-label="Accept to another status"
-                className="flex h-8 items-center rounded-r-md border-l border-white/25 bg-accent-fill px-2 text-white outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent"
+                className="flex ui-control h-7 items-center rounded-r-md bg-primary px-2 text-on-primary outline-none hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <svg
                   aria-hidden="true"
@@ -149,7 +146,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-                  <Menu.Popup className="min-w-48 rounded-md border border-line bg-surface p-1 shadow-lg shadow-black/10 outline-none">
+                  <Menu.Popup className="app-menu min-w-48 rounded-md bg-surface p-1 outline-none">
                     {elsewhere.map((state) => (
                       <Menu.Item
                         key={state.id}
@@ -175,7 +172,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
           }))}
           selected={[]}
           onSelect={markDuplicate}
-          triggerClassName="h-8 rounded-md border border-line bg-surface px-3 font-medium"
+          triggerClassName="ui-chip h-7 px-3"
         >
           Duplicate of…
           <Key>2</Key>
@@ -185,7 +182,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
           <Key>3</Key>
         </Button>
       </div>
-      <div className="border-t border-line pt-3">
+      <div className="pt-3">
         <TriageSuggestion issueId={issue.id} />
       </div>
     </section>
@@ -277,10 +274,7 @@ function DecisionBar({
   });
 
   return (
-    <section
-      aria-label="Triage"
-      className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent/5 p-4"
-    >
+    <section aria-label="Triage" className="flex flex-col gap-3 rounded-lg bg-surface p-4">
       <div>
         <h2 className="font-medium">{agent.name} needs your decision</h2>
         <p className="text-xs text-muted">
@@ -290,10 +284,7 @@ function DecisionBar({
         </p>
       </div>
       {asked && (
-        <figure
-          aria-label="Proposed decisions"
-          className="rounded-md border border-line bg-surface px-3 py-2"
-        >
+        <figure aria-label="Proposed decisions" className="rounded-md bg-surface px-3 py-2">
           <Markdown text={asked} />
         </figure>
       )}

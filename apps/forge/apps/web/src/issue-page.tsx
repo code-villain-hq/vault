@@ -114,6 +114,7 @@ function IssueDetail({ issue, onDeleted }: { issue: Issue; onDeleted: () => void
     <>
       <PageHeader
         title={identifier(issue, teamsById)}
+        headingTitle={issue.title}
         // Where the issue sits: its team, and its parent for a sub-issue.
         parent={
           team && (
@@ -237,7 +238,7 @@ function Fields({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-            <Menu.Popup className="min-w-56 rounded-md border border-line bg-surface p-1 shadow-lg shadow-black/10 outline-none">
+            <Menu.Popup className="app-menu min-w-56 rounded-md bg-surface p-1 outline-none">
               <Menu.Item className={menuItem} onClick={() => setChoosingParent(true)}>
                 {issue.parent_id ? "Change parent issue…" : "Make it a sub-issue of…"}
               </Menu.Item>
@@ -359,7 +360,7 @@ function TitleField({ issue }: { issue: Issue }) {
       // An emptied title isn't saved, so the field shows the title again.
       onBlur={() => (title.value.trim() ? title.onBlur() : title.commit(issue.title))}
       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-      className="field-sizing-content resize-none bg-transparent text-2xl font-semibold tracking-tight outline-none"
+      className="field-sizing-content resize-none overflow-hidden bg-transparent text-title font-bold outline-none"
     />
   );
 }
@@ -889,7 +890,7 @@ function Activity({
             />
           ),
         )}
-        <div className="rounded-lg border border-line-strong bg-surface focus-within:border-accent">
+        <div className="rounded-lg ui-field bg-surface">
           <MentionTextarea
             aria-label="Write a comment"
             placeholder="Leave a comment… (@ to mention, ⌘↵ to send)"
@@ -1000,7 +1001,7 @@ function CommentView({
               value={draft}
               onChange={setDraft}
               onUploading={setUploading}
-              className="field-sizing-content min-h-12 resize-none rounded-md border border-line-strong bg-surface px-2 py-1 outline-none focus:border-accent"
+              className="field-sizing-content min-h-12 resize-none rounded-md ui-field bg-surface px-2 py-1 outline-none"
             />
             <div className="flex gap-2">
               <Button
@@ -1076,7 +1077,7 @@ function ParentPicker({ issue, onClose }: { issue: Issue; onClose: () => void })
 
 const LINK_STATES: Record<string, { label: string; className: string }> = {
   open: { label: "Open", className: "text-ok" },
-  merged: { label: "Merged", className: "text-accent" },
+  merged: { label: "Merged", className: "text-ok" },
   closed: { label: "Closed", className: "text-faint" },
   pushed: { label: "Commit", className: "text-muted" },
 };

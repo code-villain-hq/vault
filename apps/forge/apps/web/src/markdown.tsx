@@ -130,7 +130,7 @@ export function MarkdownField({
             e.stopPropagation();
             e.currentTarget.blur();
           }}
-          className="field-sizing-content min-h-40 resize-none rounded-md border border-line-strong bg-surface p-3 font-mono text-[13.5px] leading-relaxed outline-none focus:border-accent"
+          className="field-sizing-content min-h-40 resize-none rounded-md ui-field bg-surface p-3 font-mono text-xs leading-relaxed outline-none"
         />
       ) : (
         // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: the Edit button above does the same from the keyboard

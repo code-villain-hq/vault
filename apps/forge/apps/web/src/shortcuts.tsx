@@ -106,7 +106,7 @@ export function Shortcuts() {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-[10vh] left-1/2 z-40 max-h-[80vh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-xl border border-line bg-surface p-5 shadow-2xl shadow-black/30 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <Dialog.Popup className="app-dialog fixed top-[10vh] left-1/2 z-40 max-h-[80vh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-lg bg-surface p-5 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           <Dialog.Title className="mb-4 font-medium">Keyboard shortcuts</Dialog.Title>
           <div className="flex flex-col gap-5">
             {SECTIONS.map((section) => (
@@ -123,7 +123,7 @@ export function Shortcuts() {
                           ) : (
                             <kbd
                               key={key}
-                              className="min-w-5 rounded border border-line bg-bg px-1 py-0.5 text-center font-sans text-fg"
+                              className="min-w-5 rounded bg-bg px-1 py-0.5 text-center font-sans text-fg"
                             >
                               {key}
                             </kbd>

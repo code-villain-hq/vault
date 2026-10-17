@@ -83,7 +83,7 @@ function SpecChangeStanding({ issue }: { issue: Issue }) {
   return (
     <div className="flex flex-col gap-2">
       {(first.length > 0 || outdated.length > 0 || taken.length > 0 || exists.length > 0) && (
-        <div className="flex flex-col gap-1 rounded-md border border-line px-3 py-2 text-sm">
+        <div className="flex flex-col gap-1 rounded-md px-3 py-2 text-sm">
           <p className="font-medium text-warn">
             {started ? "Its spec change has to be settled" : "This issue can't start yet"}
           </p>
@@ -155,7 +155,7 @@ function ChangedAfterStart({ change }: { change: SpecChange }) {
     then.no_change_reason === null &&
     (then.replaces_decision_ids ?? []).length === 0;
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-line px-3 py-2 text-sm">
+    <div className="flex flex-col gap-1 rounded-md px-3 py-2 text-sm">
       <p className="font-medium text-warn">Changed after work started</p>
       <p className="text-xs text-muted">
         {nothingThen
@@ -164,7 +164,9 @@ function ChangedAfterStart({ change }: { change: SpecChange }) {
       </p>
       {!nothingThen && (
         <details>
-          <summary className="cursor-pointer text-xs text-accent">See what it said then</summary>
+          <summary className="cursor-pointer text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4">
+            See what it said then
+          </summary>
           <div className="mt-2 flex flex-col gap-3">
             {[...(then.replaces_decision_ids ?? [])].sort().join() !==
               [...change.replaces_decision_ids].sort().join() && (
@@ -317,7 +319,9 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
           {verb} also adds a new spec, “{part.title}”.
         </h3>
         <details className="text-sm">
-          <summary className="cursor-pointer text-xs text-accent">Read the new spec</summary>
+          <summary className="cursor-pointer text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4">
+            Read the new spec
+          </summary>
           <div className="mt-2">
             <Markdown text={part.text} />
           </div>
@@ -340,7 +344,9 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
           {removed.length > 0 && <NameList change="Removes" names={removed} />}
         </ul>
         <details className="text-sm">
-          <summary className="cursor-pointer text-xs text-accent">See the full change</summary>
+          <summary className="cursor-pointer text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4">
+            See the full change
+          </summary>
           <div className="mt-2">
             <TextDiff label={`What changes in ${title}`} before={part.before} after={part.after} />
           </div>

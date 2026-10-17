@@ -206,7 +206,7 @@ function Card({
       }}
       onClick={onOpen}
       onMouseMove={onFocus}
-      className={`flex cursor-default flex-col gap-1.5 rounded-md border bg-surface p-2.5 shadow-sm ${focused ? "border-accent/60" : "border-line"}`}
+      className={`flex cursor-default flex-col gap-1.5 rounded-md p-2.5 ${focused ? "bg-selected" : "bg-surface hover:bg-hover"}`}
     >
       <div className="flex items-center gap-2 text-xs text-muted">
         <span className="font-mono">{identifier}</span>

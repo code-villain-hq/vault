@@ -266,7 +266,7 @@ export function IssueList({
 
   let index = -1;
   return (
-    <div ref={listRef}>
+    <div ref={listRef} className="px-2 pb-2">
       {sections.map((group) => {
         const project =
           projectChips && group.project ? projects.find((p) => p.id === group.project) : undefined;
@@ -405,7 +405,7 @@ function IssueRow({
       onClick={onOpen}
       onMouseMove={onFocus}
       style={depth > 0 ? { paddingLeft: `${0.5 + depth * 1.5}rem` } : undefined}
-      className={`group flex h-10 cursor-default items-center gap-2 pr-4 pl-2 ${selected ? "bg-accent/10" : focused ? "bg-hover" : ""}`}
+      className={`group flex h-10 cursor-default items-center gap-2 rounded-md pr-4 pl-2 ${selected ? "bg-selected" : focused ? "bg-hover" : ""}`}
     >
       <input
         type="checkbox"
@@ -416,7 +416,7 @@ function IssueRow({
           onSelect(e.shiftKey);
         }}
         onChange={() => {}}
-        className={`size-3.5 shrink-0 accent-(--accent) ${selected || selecting ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+        className={`size-3.5 shrink-0 accent-(--fg) ${selected || selecting ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
       />
       <PriorityPicker issue={issue} />
       <span className="w-16 shrink-0 font-mono text-xs text-muted">{identifier}</span>
@@ -560,7 +560,7 @@ export function EmptyState({ text, offerCreate = true }: { text: string; offerCr
         <button
           type="button"
           onClick={() => newIssue()}
-          className="rounded-md border border-line px-3 py-1.5 hover:bg-hover hover:text-fg"
+          className="ui-control h-7 rounded-md bg-primary px-3 text-on-primary outline-none hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
         >
           Create an issue <kbd className="ml-1 text-faint">C</kbd>
         </button>

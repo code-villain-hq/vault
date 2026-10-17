@@ -70,7 +70,7 @@ export function CommandMenu() {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-line bg-surface shadow-2xl shadow-black/30 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <Dialog.Popup className="app-dialog fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           <Dialog.Title className="sr-only">Command menu</Dialog.Title>
           {open && <Commands onDone={() => setOpen(false)} />}
         </Dialog.Popup>
@@ -357,7 +357,7 @@ function Commands({ onDone }: { onDone: () => void }) {
         aria-expanded="true"
         aria-controls="command-list"
         aria-activedescendant={results[active] ? `command-${results[active].id}` : undefined}
-        className="h-12 w-full border-b border-line bg-transparent px-4 text-[15px] outline-none placeholder:text-faint"
+        className="h-12 w-full bg-transparent px-4 text-[15px] outline-none placeholder:text-faint"
       />
       <div
         ref={listRef}

@@ -432,8 +432,8 @@ function IconPicker({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Popover.Popup className="flex w-[27rem] flex-col rounded-lg border border-line bg-surface shadow-lg shadow-black/10 outline-none">
-            <div className="border-b border-line px-4 py-4">
+          <Popover.Popup className="app-menu flex w-[27rem] flex-col rounded-lg bg-surface outline-none">
+            <div className="px-4 py-4">
               {mixing ? (
                 <CustomColor
                   value={color}
@@ -462,7 +462,7 @@ function IconPicker({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search icons…"
               aria-label="Search icons"
-              className="h-11 border-b border-line bg-transparent px-4 outline-none placeholder:text-faint"
+              className="h-11 bg-transparent px-4 outline-none placeholder:text-faint"
             />
             <div className="grid max-h-72 grid-cols-12 gap-0.5 overflow-y-auto px-3 py-2.5">
               {shown.map((name) => (
@@ -565,7 +565,7 @@ function NewServiceForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setName(e.target.value)}
           placeholder="Service name"
           aria-label="Service name"
-          className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+          className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <textarea
           value={description}
@@ -586,13 +586,13 @@ function NewServiceForm({ onDone }: { onDone: () => void }) {
           ]}
           selected={[teamId]}
           onSelect={setTeamId}
-          triggerClassName="h-7 px-2 border border-line rounded-md text-xs"
+          triggerClassName="ui-chip h-7 px-2"
         >
           {team?.name ?? "Team"}
         </Picker>
       </div>
 
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
         <Button type="submit" disabled={!name.trim()}>
           Create service
@@ -619,7 +619,7 @@ function ChipPopover({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Popover.Popup className="flex w-80 flex-col gap-2 rounded-lg border border-line bg-surface p-3 shadow-lg shadow-black/10 outline-none">
+          <Popover.Popup className="app-menu flex w-80 flex-col gap-2 rounded-lg bg-surface p-3 outline-none">
             <span className="text-xs font-medium text-muted">{label}</span>
             {panel}
           </Popover.Popup>
@@ -676,7 +676,7 @@ function ServiceProperties({ service }: { service: Service }) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
-              className="h-8 w-full rounded-md border border-line-strong bg-transparent px-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint focus:border-accent"
+              className="h-8 w-full rounded-md ui-field bg-surface px-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint"
             />
             <datalist id="forge-repositories">
               {repositories.map((r) => (
@@ -705,7 +705,7 @@ function ServiceProperties({ service }: { service: Service }) {
               if (paths.join("\n") !== service.paths.join("\n"))
                 sync.update("Service", service.id, { paths });
             }}
-            className="field-sizing-content min-h-20 w-full resize-none rounded-md border border-line-strong bg-transparent p-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint focus:border-accent"
+            className="field-sizing-content min-h-20 w-full resize-none rounded-md ui-field bg-surface p-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint"
           />
         }
       >
@@ -752,7 +752,7 @@ export function SpecRow({ spec }: { spec: Spec }) {
       <Link
         to="/$workspace/spec/$spec"
         params={{ workspace: workspace.url_key, spec: spec.id }}
-        className="flex h-9 items-center gap-3 rounded-lg px-3 hover:bg-hover"
+        className="flex h-9 items-center gap-3 rounded-md px-3 hover:bg-hover"
       >
         <span className="min-w-0 flex-1 truncate">{spec.title}</span>
         {spec.status !== "active" && <span className="text-xs text-faint">{status?.label}</span>}
@@ -777,7 +777,7 @@ export function DecisionRow({
       <Link
         to="/$workspace/decision/$decision"
         params={{ workspace: workspace.url_key, decision: decision.id }}
-        className="flex h-9 items-center gap-3 rounded-lg px-3 hover:bg-hover"
+        className="flex h-9 items-center gap-3 rounded-md px-3 hover:bg-hover"
       >
         <span
           className="min-w-0 flex-1 truncate"
@@ -1006,7 +1006,7 @@ export function DomainPage() {
         ) : (
           <div className="flex items-center gap-3 px-8 pt-6 pb-2">
             <IconTile icon="folder" color="var(--muted)" />
-            <h2 className="text-2xl font-semibold tracking-tight">No domain</h2>
+            <h2 className="text-title font-bold">No domain</h2>
           </div>
         )}
         <ul className="flex flex-col gap-0.5 p-2 px-5">
@@ -1079,7 +1079,7 @@ function NewDomainForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setName(e.target.value)}
             placeholder="Domain name, such as Accounts"
             aria-label="Domain name"
-            className="min-w-0 flex-1 bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent text-title font-bold outline-none placeholder:text-faint"
           />
         </div>
         {taken && <p className="text-xs text-warn">There's already a domain with that name.</p>}
@@ -1092,7 +1092,7 @@ function NewDomainForm({ onDone }: { onDone: () => void }) {
           className="resize-none bg-transparent outline-none placeholder:text-faint"
         />
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
         <Button type="submit" disabled={!name.trim() || taken}>
           Create domain
@@ -1268,7 +1268,7 @@ function NewSpecForm({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Spec title, such as “Invite links”"
           aria-label="Spec title"
-          className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+          className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <p className="text-muted">You write what it says on its page, in OpenSpec's convention.</p>
       </div>
@@ -1276,7 +1276,7 @@ function NewSpecForm({
         <DomainPicker
           value={domainId}
           onChange={setDomainId}
-          triggerClassName="h-7 px-2 border border-line rounded-md text-xs"
+          triggerClassName="ui-chip h-7 px-2"
           empty="Domain"
         />
         <Picker
@@ -1291,7 +1291,7 @@ function NewSpecForm({
           onSelect={(id) =>
             setServiceIds((ids) => (ids.includes(id) ? ids.filter((s) => s !== id) : [...ids, id]))
           }
-          triggerClassName="h-7 px-2 border border-line rounded-md text-xs"
+          triggerClassName="ui-chip h-7 px-2"
         >
           {chosen.length === 0
             ? "Services"
@@ -1299,7 +1299,7 @@ function NewSpecForm({
           {chosen.length === 1 && chosen[0]?.name}
         </Picker>
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
         <Button type="submit" disabled={!title.trim()}>
           Create spec
@@ -1364,67 +1364,70 @@ export function SpecPage() {
       </PageHeader>
       <main className="min-h-0 flex-1 overflow-y-auto">
         <article className="spec-doc flex flex-col">
-        <EditableHeader
-          name={spec.title}
-          description=""
-          onName={(title) => sync.update("Spec", spec.id, { title })}
-          onDescription={() => {}}
-          hideDescription
-          properties={
-            <div className="-ml-1 flex flex-wrap items-center gap-1">
-              <StatusChip
-                statuses={SPEC_STATUSES}
-                value={spec.status}
-                onChange={(status) =>
-                  sync.update("Spec", spec.id, { status: status as SpecStatus })
-                }
-              />
-              <DomainPicker
-                value={spec.domain_id ?? null}
-                onChange={(domain_id) => sync.update("Spec", spec.id, { domain_id })}
-                triggerClassName={chip}
-                empty={
-                  <>
-                    <Folders className="size-3.5" aria-hidden="true" />
-                    Domain
-                  </>
-                }
-              />
-              <ServicesChip
-                value={servicesOf(spec)}
-                onChange={(service_ids) => sync.update("Spec", spec.id, { service_ids })}
-              />
-              <ProjectChip
-                value={spec.project_id}
-                onChange={(project_id) => sync.update("Spec", spec.id, { project_id })}
-              />
-            </div>
-          }
-        />
-        <div className="px-8 pb-16">
-          <div className="border-t border-line pt-6">
-          <ChangesOnTheWay spec={spec} />
-          <MarkdownField
-            label="Spec"
-            hideLabel
-            value={spec.body}
-            onSave={(body) => sync.update("Spec", spec.id, { body })}
-            empty="Write how this should work, in Markdown."
-            notes={(body) => <ConventionWarnings body={body} />}
-            view={(body) => <SpecText spec={spec} body={body} versions={versions} />}
+          <EditableHeader
+            name={spec.title}
+            description=""
+            onName={(title) => sync.update("Spec", spec.id, { title })}
+            onDescription={() => {}}
+            hideDescription
+            properties={
+              <div className="-ml-1 flex flex-wrap items-center gap-1">
+                <StatusChip
+                  statuses={SPEC_STATUSES}
+                  value={spec.status}
+                  onChange={(status) =>
+                    sync.update("Spec", spec.id, { status: status as SpecStatus })
+                  }
+                />
+                <DomainPicker
+                  value={spec.domain_id ?? null}
+                  onChange={(domain_id) => sync.update("Spec", spec.id, { domain_id })}
+                  triggerClassName={chip}
+                  empty={
+                    <>
+                      <Folders className="size-3.5" aria-hidden="true" />
+                      Domain
+                    </>
+                  }
+                />
+                <ServicesChip
+                  value={servicesOf(spec)}
+                  onChange={(service_ids) => sync.update("Spec", spec.id, { service_ids })}
+                />
+                <ProjectChip
+                  value={spec.project_id}
+                  onChange={(project_id) => sync.update("Spec", spec.id, { project_id })}
+                />
+              </div>
+            }
           />
-          <SpecHistory versions={versions} />
-          <p className="mt-6 flex items-center gap-2 text-xs text-faint">
-            <Avatar user={author} size="size-4" />
-            <span>
-              Written by {author?.name ?? "someone"} ·{" "}
-              <time dateTime={spec.updated_at} title={new Date(spec.updated_at).toLocaleString()}>
-                updated {timeAgo(spec.updated_at)}
-              </time>
-            </span>
-          </p>
+          <div className="px-8 pb-16">
+            <div className="pt-6">
+              <ChangesOnTheWay spec={spec} />
+              <MarkdownField
+                label="Spec"
+                hideLabel
+                value={spec.body}
+                onSave={(body) => sync.update("Spec", spec.id, { body })}
+                empty="Write how this should work, in Markdown."
+                notes={(body) => <ConventionWarnings body={body} />}
+                view={(body) => <SpecText spec={spec} body={body} versions={versions} />}
+              />
+              <SpecHistory versions={versions} />
+              <p className="mt-6 flex items-center gap-2 text-xs text-faint">
+                <Avatar user={author} size="size-4" />
+                <span>
+                  Written by {author?.name ?? "someone"} ·{" "}
+                  <time
+                    dateTime={spec.updated_at}
+                    title={new Date(spec.updated_at).toLocaleString()}
+                  >
+                    updated {timeAgo(spec.updated_at)}
+                  </time>
+                </span>
+              </p>
+            </div>
           </div>
-        </div>
         </article>
       </main>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
@@ -1556,8 +1559,8 @@ function VersionAuthor({ version }: { version: SpecVersion }) {
 function SpecHistory({ versions }: { versions: SpecVersion[] | null | undefined }) {
   if (versions === undefined) return null;
   return (
-    <section className="mt-10 border-t border-line pt-6">
-      <h2 className="mb-3 text-[13px] font-medium text-muted">History</h2>
+    <section className="mt-10 pt-6">
+      <h2 className="mb-3 text-xs font-medium text-muted">History</h2>
       {versions === null ? (
         <p className="text-xs text-muted">The history shows once Forge is reachable.</p>
       ) : (
@@ -1617,7 +1620,7 @@ function ConventionWarnings({ body }: { body: string }) {
   const warnings = conventionWarnings(body);
   if (warnings.length === 0) return null;
   return (
-    <div className="rounded-md border border-line px-3 py-2 text-xs">
+    <div className="rounded-md px-3 py-2 text-xs">
       <p className="text-warn">
         This spec doesn't follow OpenSpec's convention for behaviour specs yet. It's saved anyway.
       </p>
@@ -1705,8 +1708,8 @@ function Requirements({
     .map(([n, label]) => `${n} ${label.toLowerCase()}`)
     .join(" · ");
   return (
-    <section className="mt-8 mb-2 border-t border-line pt-6">
-      <h2 className="mb-2 flex items-baseline gap-2 text-[13px] font-medium text-muted">
+    <section className="mt-8 mb-2 pt-6">
+      <h2 className="mb-2 flex items-baseline gap-2 text-xs font-medium text-muted">
         Requirements
         <span className="text-xs font-normal text-faint">{summary}</span>
       </h2>
@@ -1735,10 +1738,7 @@ function Requirements({
                   {shown ? (
                     <Dot color={shown.color} />
                   ) : (
-                    <span
-                      className="size-2 shrink-0 rounded-full border border-line-strong"
-                      aria-hidden="true"
-                    />
+                    <span className="size-2 shrink-0 rounded-full ui-field" aria-hidden="true" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{requirement.name}</span>
                   {coming.map(({ key, issue, touch }) => (
@@ -1939,7 +1939,7 @@ function NewDecisionForm({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Decision title, such as “Email and password login first”"
           aria-label="Decision title"
-          className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+          className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <textarea
           value={decided}
@@ -1953,7 +1953,7 @@ function NewDecisionForm({
       <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
         <ServiceChip value={serviceId} onChange={setServiceId} />
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
         <Button type="submit" disabled={!title.trim()}>
           Record decision

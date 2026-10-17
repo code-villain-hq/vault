@@ -33,16 +33,16 @@ import { useIsAdmin, useRecords, useWorkspace } from "./workspace";
 
 const PROJECT_STATUSES: { value: ProjectStatus; label: string; color: string }[] = [
   { value: "planned", label: "Planned", color: "var(--faint)" },
-  { value: "started", label: "In progress", color: "var(--warn)" },
+  { value: "started", label: "In progress", color: "var(--info)" },
   { value: "paused", label: "Paused", color: "var(--muted)" },
-  { value: "completed", label: "Completed", color: "var(--accent)" },
+  { value: "completed", label: "Completed", color: "var(--ok)" },
   { value: "canceled", label: "Canceled", color: "var(--faint)" },
 ];
 
 const INITIATIVE_STATUSES: { value: InitiativeStatus; label: string; color: string }[] = [
   { value: "planned", label: "Planned", color: "var(--faint)" },
-  { value: "active", label: "Active", color: "var(--warn)" },
-  { value: "completed", label: "Completed", color: "var(--accent)" },
+  { value: "active", label: "Active", color: "var(--info)" },
+  { value: "completed", label: "Completed", color: "var(--ok)" },
 ];
 
 /** Share of a project's issues that are closed (completed or canceled). */
@@ -55,10 +55,7 @@ function ProgressBar({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-2 text-xs text-muted">
       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-line">
-        <span
-          className="block h-full rounded-full bg-accent"
-          style={{ width: `${value * 100}%` }}
-        />
+        <span className="block h-full rounded-full bg-ok" style={{ width: `${value * 100}%` }} />
       </span>
       {Math.round(value * 100)}%
     </span>
@@ -207,7 +204,7 @@ function NewPlanForm({ kind, onDone }: { kind: "Project" | "Initiative"; onDone:
           onChange={(e) => setName(e.target.value)}
           placeholder={kind === "Project" ? "Project name, such as Launch" : "Initiative name"}
           aria-label={`${kind} name`}
-          className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+          className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <textarea
           value={description}
@@ -218,7 +215,7 @@ function NewPlanForm({ kind, onDone }: { kind: "Project" | "Initiative"; onDone:
           className="resize-none bg-transparent outline-none placeholder:text-faint"
         />
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
         <Button type="submit" disabled={!name.trim()}>
           Create {noun}
@@ -380,7 +377,7 @@ export function EditableHeader({
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          className="min-w-0 flex-1 bg-transparent text-2xl font-semibold tracking-tight outline-none"
+          className="min-w-0 flex-1 bg-transparent text-title font-bold outline-none"
         />
       </div>
       {!hideDescription && (

@@ -143,7 +143,7 @@ export function AgentsSettingsPage() {
                     onChange={(e) => setTyped(e.target.value)}
                     placeholder="Agent name, such as Claude Code (laptop)"
                     aria-label="Agent name"
-                    className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+                    className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
                   />
                   {taken ? (
                     <p className="text-warn">
@@ -157,7 +157,7 @@ export function AgentsSettingsPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+                <div className="flex items-center justify-end gap-3 px-4 py-3">
                   <Button type="submit" disabled={!name.trim() || Boolean(taken)}>
                     Create agent
                   </Button>
@@ -283,7 +283,7 @@ function AgentRow({
               if (e.key === "Enter") save();
               if (e.key === "Escape") setRenaming(null);
             }}
-            className="h-7 flex-1 rounded-md border border-line-strong bg-surface px-2 font-medium outline-none focus:border-accent"
+            className="h-7 flex-1 rounded-md ui-field bg-surface px-2 font-medium outline-none"
           />
         )}
         {isAdmin && renaming === null && (
@@ -412,7 +412,7 @@ function Runner({
           onKeyDown={(e) => {
             if (e.key === "Escape") setEditing(null);
           }}
-          className="h-7 flex-1 rounded-md border border-line-strong bg-surface px-2 font-mono outline-none focus:border-accent"
+          className="h-7 flex-1 rounded-md ui-field bg-surface px-2 font-mono outline-none"
         />
         <Button type="submit" className="h-7 px-2 text-xs" disabled={!editing.trim()}>
           Save
@@ -430,7 +430,7 @@ function Runner({
         <span className="text-muted">Not woken: it finds its work by checking in.</span>
         <button
           type="button"
-          className="font-medium text-accent hover:underline"
+          className="font-bold text-fg underline decoration-fg/45 underline-offset-4 hover:decoration-fg"
           onClick={() => setEditing("")}
         >
           Wake it when there's work
@@ -492,14 +492,12 @@ function Runner({
 function SecretNotice({ name, secret }: { name: string; secret: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-lg border border-accent/40 bg-accent/5 p-4">
+    <div className="mt-4 flex flex-col gap-3 rounded-lg bg-surface p-4">
       <p>
         The runner secret for <span className="font-medium">{name}</span>. Copy it now: it won't be
         shown again.
       </p>
-      <code className="block break-all rounded-md border border-line bg-surface p-3 font-mono text-xs">
-        {secret}
-      </code>
+      <code className="block break-all rounded-md bg-surface p-3 font-mono text-xs">{secret}</code>
       <p className="text-xs text-muted">
         Forge POSTs JSON like{" "}
         <span className="font-mono">
@@ -529,16 +527,14 @@ function TokenNotice({ name, token }: { name: string; token: string }) {
   const command = `claude mcp add --transport http forge ${url} --header "Authorization: Bearer ${token}"`;
   const [copied, setCopied] = useState(false);
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-lg border border-accent/40 bg-accent/5 p-4">
+    <div className="mt-4 flex flex-col gap-3 rounded-lg bg-surface p-4">
       <p>
         A new key for <span className="font-medium">{name}</span>,{" "}
         <span className="font-mono">{keyName(token.slice(-4))}</span>. Copy it now: it won't be
         shown again.
       </p>
       <p className="text-xs text-muted">To connect Claude Code, run:</p>
-      <code className="block break-all rounded-md border border-line bg-surface p-3 font-mono text-xs">
-        {command}
-      </code>
+      <code className="block break-all rounded-md bg-surface p-3 font-mono text-xs">{command}</code>
       <p className="text-xs text-muted">
         Other MCP clients: server <span className="font-mono">{url}</span>, header{" "}
         <span className="font-mono">Authorization: Bearer {"<key>"}</span>.

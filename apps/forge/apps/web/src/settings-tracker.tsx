@@ -78,7 +78,7 @@ function NewTeamForm({ onDone }: { onDone: () => void }) {
           }}
           placeholder="Team name, such as Design"
           aria-label="Team name"
-          className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+          className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <p className="text-muted">Each team has its own issues and workflow.</p>
         <label className="flex items-center gap-2 text-xs text-muted">
@@ -89,13 +89,13 @@ function NewTeamForm({ onDone }: { onDone: () => void }) {
             value={key}
             onChange={(e) => setKey(e.target.value.toUpperCase())}
             placeholder="KEY"
-            className="w-16 rounded-md border border-line-strong bg-transparent px-2 py-1 font-mono text-fg uppercase outline-none placeholder:text-faint focus:border-accent"
+            className="w-16 rounded-md ui-field bg-surface px-2 py-1 font-mono text-fg uppercase outline-none placeholder:text-faint"
           />
           <span className="font-mono">-1, -2, …</span>
         </label>
         <ErrorMessage>{error}</ErrorMessage>
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <Button type="submit" disabled={!name.trim() || !key}>
           Create team
         </Button>
@@ -130,7 +130,7 @@ function TeamSettings({ teamId, editable }: { teamId: string; editable: boolean 
             const name = e.target.value.trim();
             if (name && name !== team.name) sync.update("Team", team.id, { name });
           }}
-          className="flex-1 bg-transparent text-lg font-medium outline-none"
+          className="flex-1 bg-transparent text-title font-bold outline-none"
         />
         <label className="flex items-center gap-2 text-xs text-muted">
           Key
@@ -280,12 +280,12 @@ function NewLabelForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setName(e.target.value)}
             placeholder="Label name, such as Bug"
             aria-label="Label name"
-            className="min-w-0 flex-1 bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent text-title font-bold outline-none placeholder:text-faint"
           />
         </div>
         <ColorChoice large value={color} onChange={setColor} />
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <Button type="submit" disabled={!name.trim()}>
           Create label
         </Button>

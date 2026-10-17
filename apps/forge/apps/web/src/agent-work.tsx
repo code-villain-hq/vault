@@ -17,7 +17,7 @@ function WorkDot({ stopped, className = "" }: { stopped: boolean; className?: st
   return (
     <span
       aria-hidden="true"
-      className={`size-2 shrink-0 rounded-full ${stopped ? "bg-warn" : "animate-pulse bg-ok"} ${className}`}
+      className={`size-2 shrink-0 rounded-full ${stopped ? "bg-warn" : "animate-pulse bg-accent"} ${className}`}
     />
   );
 }

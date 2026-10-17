@@ -5,6 +5,7 @@ The strike. A gothic V with a poison bar behind it, cut where the letter crosses
 | File | What it is |
 | --- | --- |
 | [`mark.svg`](mark.svg) | The V on its night tile. The app icon shape and the favicon. |
+| [`forge.svg`](forge.svg) | Forge's outlined F on the same night tile with the strike. |
 | [`logo-night.svg`](logo-night.svg) | “Code Villain” with the strike, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 | [`logo-home.svg`](logo-home.svg) | Homepage variant on night: cropped lettering with an extended strike. |
@@ -48,7 +49,7 @@ Today's icons stay until each app moves over:
 
 | App | Icon now |
 | --- | --- |
-| Forge | `apps/forge/apps/web/public/icon.svg`: an F on `#5b5bd6` |
+| Forge | Web: `apps/forge/apps/web/public/icon.svg`, copied from `forge.svg`. Native icon bundles use the same outlined mark. |
 | Layer | `apps/layer/src-tauri/icons/icon.svg`: a mask on stacked layers |
 | Caster | `apps/caster/Resources/AppIcon.svg`: a lens with Layer's mask |
 

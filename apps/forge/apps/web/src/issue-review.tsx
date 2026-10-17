@@ -45,10 +45,7 @@ export function ReviewBar({ issue }: { issue: Issue }) {
   };
 
   return (
-    <section
-      aria-label="Review"
-      className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
-    >
+    <section aria-label="Review" className="flex flex-col gap-3 rounded-lg bg-surface p-4">
       <div>
         <h2 className="font-medium">Ready for your review</h2>
         <p className="text-xs text-muted">
@@ -65,7 +62,7 @@ export function ReviewBar({ issue }: { issue: Issue }) {
       {notes && assignee && (
         <button
           type="button"
-          className="self-start text-xs text-accent hover:underline"
+          className="self-start text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4 hover:decoration-fg"
           onClick={() =>
             document
               .getElementById(`comment-${notes.id}`)
@@ -75,7 +72,7 @@ export function ReviewBar({ issue }: { issue: Issue }) {
           Read {assignee.name}'s notes on what changed ↓
         </button>
       )}
-      <div className="border-t border-line pt-3">
+      <div className="pt-3">
         <SpecChangeSummary
           issue={issue}
           verb={pullRequests.length > 0 ? "Merging" : "Approving"}
@@ -102,7 +99,7 @@ export function ReviewBar({ issue }: { issue: Issue }) {
                 setSendingBack(false);
               }
             }}
-            className="field-sizing-content min-h-16 resize-none rounded-md border border-line-strong bg-surface px-3 py-2 outline-none placeholder:text-faint focus:border-accent"
+            className="field-sizing-content min-h-16 resize-none rounded-md ui-field bg-surface px-3 py-2 outline-none placeholder:text-faint"
           />
           <div className="flex gap-2">
             <Button disabled={!feedback.trim() || !working} onClick={sendBack}>

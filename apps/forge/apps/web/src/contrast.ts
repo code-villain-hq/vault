@@ -2,9 +2,18 @@
 // nearest shade of the same colour with enough contrast (WCAG) on Forge's
 // backgrounds, separately for light and dark mode.
 
-/** The panel, surface and hover backgrounds of each theme; keep in step with styles.css. */
-const LIGHT = ["#ffffff", "#f4f4f6", "#ececf0"];
-const DARK = ["#141417", "#1a1a1e", "#222228"];
+import colors from "./design/color.json";
+
+/** Include selection as well as neutral surfaces when shading user-chosen colors. */
+const grounds = (theme: typeof colors.night) => [
+  theme.bg,
+  theme.panel,
+  theme.surface,
+  theme.hover,
+  theme.selected,
+];
+const LIGHT = grounds(colors.day);
+const DARK = grounds(colors.night);
 
 function channels(hex: string): number[] {
   return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));

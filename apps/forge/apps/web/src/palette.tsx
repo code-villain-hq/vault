@@ -198,7 +198,7 @@ export function CustomColor({
           }}
         >
           <span
-            className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+            className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
             style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: color }}
           />
         </div>
@@ -226,7 +226,7 @@ export function CustomColor({
           }}
         >
           <span
-            className="pointer-events-none absolute left-1/2 h-1.5 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white shadow"
+            className="pointer-events-none absolute left-1/2 h-1.5 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white"
             style={{ top: `${(hsv.h / 360) * 100}%` }}
           />
         </div>
@@ -264,7 +264,7 @@ export function ColorButton({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Popover.Popup className="w-80 rounded-lg border border-line bg-surface p-4 shadow-lg shadow-black/10 outline-none">
+          <Popover.Popup className="app-menu w-80 rounded-lg bg-surface p-4 outline-none">
             <ColorChoice large value={value} onChange={onChange} />
           </Popover.Popup>
         </Popover.Positioner>

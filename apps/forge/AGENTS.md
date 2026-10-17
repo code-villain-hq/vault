@@ -8,6 +8,42 @@ is and why", "Product: concepts", "Architecture overview"). Decisions are
 records there too (the early ones keep their numbers, "D1: …" to "D35: …");
 record a new one with `save_decision` when you settle something.
 
+## Shared design and brand
+
+The vault's [`design/`](../../design/README.md) holds the shared design
+system. Read [`design/principles.md`](../../design/principles.md) before
+any UI change and name the principle the change serves. Color and type
+tokens live in [`design/tokens/`](../../design/tokens/README.md); the JSON
+is their source, and `build.py` generates CSS and Swift. Reference layouts
+and component rules live alongside the tokens.
+
+[`brand/`](../../brand/README.md) holds the studio's identity and voice,
+including [`color.md`](../../brand/color.md) and
+[`type.md`](../../brand/type.md). Forge uses Nightshade in night and day,
+Atkinson Hyperlegible Next for interface text, Atkinson Hyperlegible Mono
+for code, and Grenze Gotisch only for display headings at 28px and above.
+Use cloak for primary actions and selection; reserve poison for focus and
+small live signals. Links use ink, bold and underlined.
+
+The sidebar wordmark uses Grenze Gotisch 700 at 28px, following
+[`design/layouts/app-window.md`](../../design/layouts/app-window.md).
+It always reads "Forge"; the workspace picker is a separate control.
+The frame uses `bg` for the sidebar and toolbar and `panel` for content;
+below 560px the sidebar becomes a horizontal navigation row. The shared
+control rules are in [`design/components.md`](../../design/components.md):
+28px buttons, tinted chips and status pills, fields with focus rings, and
+elevation through tone. Shape tokens are bundled with color and type.
+The Forge mark is the outlined gothic F with the strike from
+[`brand/mark/forge.svg`](../../brand/mark/forge.svg); `design:sync` copies it
+to the web icon. Don't substitute a typed initial or the old blue F.
+
+The web app bundles snapshots in `apps/web/src/design/` so standalone and
+Docker builds include the same tokens and licensed fonts. Run
+`bun run design:sync` from this folder after changing shared tokens or
+the fonts in `apps/site/assets/fonts/`; don't edit the snapshots by hand.
+A studio-wide visual change starts in `brand/` or `design/`, then Forge
+implements it. Product behavior stays here.
+
 Specs change only when the work is done (decision "Specs change only when the
 work is done"). Don't edit a spec: before you start an issue, write its spec
 change with `save_spec_change` (decision "A spec change is written first, and

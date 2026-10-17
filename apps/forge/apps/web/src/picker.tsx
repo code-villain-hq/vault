@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { CheckIcon } from "./icons";
 
 export interface PickerOption {
@@ -35,6 +35,7 @@ export function Picker({
   multiple = false,
   children,
   triggerClassName = "",
+  triggerStyle,
   triggerId,
   defaultOpen,
   onOpenChange,
@@ -48,6 +49,7 @@ export function Picker({
   multiple?: boolean;
   children: ReactNode;
   triggerClassName?: string;
+  triggerStyle?: CSSProperties;
   /** For a shortcut that opens the menu by clicking its trigger. */
   triggerId?: string;
   /** Open as soon as it appears, e.g. when another menu asked for it. */
@@ -60,7 +62,8 @@ export function Picker({
         <Menu.Trigger
           id={triggerId}
           aria-label={label}
-          className={`flex items-center gap-1.5 rounded outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover ${triggerClassName}`}
+          style={triggerStyle}
+          className={`flex items-center gap-1.5 outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover ${triggerClassName.includes("ui-chip") || triggerClassName.includes("ui-status") ? "" : "rounded-md"} ${triggerClassName}`}
           onClick={(event) => event.stopPropagation()}
         >
           {children}
@@ -69,14 +72,14 @@ export function Picker({
           {/* Layers: sticky headers 10, floating bars 30, dialogs 40, menus 50 (menus open from dialogs too). */}
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
             <Menu.Popup
-              className="w-60 origin-(--transform-origin) rounded-md border border-line bg-surface shadow-lg shadow-black/10 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+              className="app-menu w-60 origin-(--transform-origin) rounded-md bg-surface outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
               onClick={(event) => event.stopPropagation()}
             >
               <Menu.Input
                 aria-label={`Search ${label.toLowerCase()}`}
                 placeholder={`${label}…`}
                 onKeyDown={chooseFirstMatch}
-                className="h-9 w-full border-b border-line bg-transparent px-3 outline-none placeholder:text-faint"
+                className="h-9 w-full bg-transparent px-3 outline-none placeholder:text-faint"
               />
               <Menu.Empty className="px-3 py-2 text-muted">No matches</Menu.Empty>
               <Menu.List className="max-h-72 overflow-y-auto p-1">

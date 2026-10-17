@@ -27,15 +27,19 @@ export function SyncIndicator() {
 
 function Pill({ tone, label }: { tone: "ok" | "warn" | "danger" | "muted"; label: string }) {
   const dot = {
-    ok: "bg-ok",
+    ok: "bg-accent",
     warn: "bg-warn",
     danger: "bg-danger",
     muted: "bg-faint animate-pulse",
   }[tone];
   return (
-    <span className="flex items-start gap-2 text-xs text-muted" role="status">
+    <span
+      className="sync-indicator flex min-w-0 items-start gap-2 text-xs text-muted"
+      role="status"
+      title={label}
+    >
       <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${dot}`} />
-      {label}
+      <span className="sync-label">{label}</span>
     </span>
   );
 }

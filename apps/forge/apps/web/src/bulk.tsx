@@ -45,7 +45,7 @@ export function BulkBar({ issues, onClear }: { issues: Issue[]; onClear: () => v
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
-      <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-line bg-surface px-2 py-1.5 shadow-xl shadow-black/20">
+      <div className="pointer-events-auto flex items-center gap-1 rounded-lg bg-surface px-2 py-1.5">
         <span className="px-2 text-xs font-medium">{issues.length} selected</span>
         <Picker
           label="Status"

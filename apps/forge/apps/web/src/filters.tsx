@@ -122,14 +122,14 @@ export function FilterBar({
       {active.map(({ field, name }) => {
         const chosen = options[field].filter((o) => filters[field]?.includes(o.value));
         return (
-          <span key={field} className="flex items-center rounded-md bg-hover">
+          <span key={field} className="flex items-center ui-chip">
             <Picker
               label={name}
               options={options[field]}
               selected={filters[field] ?? []}
               multiple
               onSelect={(value) => onChange(toggle(filters, field, value))}
-              triggerClassName="h-6 pl-2 pr-1 hover:bg-transparent hover:text-fg"
+              triggerClassName="h-7 pl-2 pr-1 hover:bg-transparent hover:text-fg"
             >
               <span className="text-muted">{name}</span>
               <span className="text-faint">{chosen.length > 1 ? "is any of" : "is"}</span>
@@ -139,7 +139,7 @@ export function FilterBar({
               type="button"
               aria-label={`Remove the ${name.toLowerCase()} filter`}
               onClick={() => onChange({ ...filters, [field]: [] })}
-              className="flex h-6 items-center rounded-r-md px-1.5 text-faint outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex h-7 items-center rounded-r-full px-1.5 text-faint outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
             >
               ×
             </button>

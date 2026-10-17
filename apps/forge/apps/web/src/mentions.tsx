@@ -190,7 +190,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
           <div
             role="listbox"
             aria-label="People to mention"
-            className="absolute top-full left-0 z-20 mt-1 w-60 rounded-md border border-line bg-surface p-1 shadow-lg shadow-black/10"
+            className="absolute top-full left-0 z-20 mt-1 w-60 rounded-md bg-surface p-1"
           >
             {matches.map((person, i) => (
               <div

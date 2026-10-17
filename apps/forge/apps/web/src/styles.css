@@ -1,49 +1,14 @@
 @import "tailwindcss";
 
-/* Colours are placeholders until Forge has a visual identity. */
-:root {
-  /* Text colours meet WCAG AA (4.5:1) on every background, from faint up. */
-  /* The frame and sidebar; pages sit on a lighter panel. */
-  --bg: #f4f4f6;
-  --panel: #ffffff;
-  --surface: #ffffff;
-  --line: #e4e4e9;
-  --fg: #18181d;
-  --muted: #52525c;
-  --faint: #696970;
-  --hover: #ececf0;
-  /* A group's heading in a list: a band instead of a line. */
-  --band: #f6f6f8;
-  --accent: #5b5bd6;
-  /* Filled with white text on it (buttons, badges): 5.4:1. */
-  --accent-fill: #5b5bd6;
-  /* Outlines of fields people type in: 3:1 against the panel. */
-  --line-strong: #87878d;
-  --danger: #ba3d35;
-  --ok: #36754e;
-  --warn: #8f5f0c;
-  color-scheme: light;
-}
+@import "./design/color.css";
+@import "./design/type.css";
+@import "./design/shape.css";
+@import "./design/fonts/fonts.css";
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c0c0e;
-    --panel: #141417;
-    --surface: #1a1a1e;
-    --line: #26262c;
-    --fg: #ececf1;
-    --muted: #a6a6b0;
-    --faint: #8b8b93;
-    --hover: #222228;
-    --band: #1b1b20;
-    --accent: #8080f2;
-    --accent-fill: #5b5bd6;
-    --line-strong: #6c6c72;
-    --danger: #ef6a5f;
-    --ok: #63b383;
-    --warn: #e0a43a;
-    color-scheme: dark;
-  }
+/* Forge-specific roles derived from Nightshade's shared tokens. */
+:root {
+  --band: var(--surface);
+  --line-strong: var(--faint);
 }
 
 @theme inline {
@@ -57,16 +22,184 @@
   --color-hover: var(--hover);
   --color-band: var(--band);
   --color-accent: var(--accent);
-  --color-accent-fill: var(--accent-fill);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-selected: var(--selected);
+  --color-info: var(--info);
   --color-line-strong: var(--line-strong);
   --color-danger: var(--danger);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
-  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: var(--font-reading);
   /* Secondary text: 13px, a step under the 14px body. */
-  --text-xs: 0.8125rem;
-  --text-xs--line-height: calc(1.125 / 0.8125);
+  --text-xs: var(--type-ui-small-size);
+  --text-xs--line-height: var(--type-ui-small-leading);
+  --text-sm: var(--type-ui-size);
+  --text-sm--line-height: var(--type-ui-leading);
+  --text-title: var(--type-title-size);
+  --text-title--line-height: var(--type-title-leading);
+  --font-weight-medium: var(--type-control-weight);
+  --font-weight-semibold: var(--type-title-weight);
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+@utility ui-control {
+  font-size: var(--type-control-size);
+  font-weight: var(--type-control-weight);
+  line-height: var(--type-control-leading);
+}
+
+@utility ui-chip {
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  color: var(--muted);
+  font-size: var(--type-control-size);
+  font-weight: var(--type-control-weight);
+  line-height: var(--type-control-leading);
+}
+
+@utility ui-status {
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--status-color, var(--muted)) 13%, transparent);
+  /* Day-mode ink darkens to keep AA contrast on the 13% tint. */
+  color: light-dark(
+    color-mix(in srgb, var(--status-color, var(--muted)) 90%, black),
+    var(--status-color, var(--muted))
+  );
+  font-size: var(--type-control-size);
+  font-weight: 700;
+  line-height: var(--type-control-leading);
+}
+
+@utility ui-field {
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: var(--fg);
+  outline: none;
+  &::placeholder {
+    color: var(--faint);
+  }
+  &:hover {
+    background: var(--hover);
+  }
+  &:focus,
+  &:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+
+/* Tone, not lines; chrome dims, content leads. */
+.app-menu {
+  max-width: calc(100vw - 1rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.app-dialog {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.app-topbar {
+  background: var(--bg);
+}
+.workspace-content > main {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.app-sidebar .nav-link.active .nav-count {
+  display: none;
+}
+.app-sidebar .ui-field {
+  background: var(--panel);
+}
+
+/* The shared frame becomes a horizontal navigation row below 560px. */
+@media (width < 560px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .app-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+  }
+  .sidebar-navigation {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .app-sidebar nav,
+  .sidebar-section-items,
+  .sidebar-actions {
+    display: contents;
+  }
+  .app-sidebar .nav-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .app-brand,
+  .sidebar-group-label,
+  .app-sidebar nav > span {
+    display: none;
+  }
+  .workspace-switcher {
+    flex: 0 0 auto;
+    max-width: 9rem;
+  }
+  .sidebar-footer {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0 0.5rem;
+    background: var(--bg);
+  }
+  .sidebar-footer .sync-label {
+    max-inline-size: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workspace-content {
+    margin-inline: 0.5rem;
+  }
+  .app-topbar {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+  }
+  .app-topbar > nav {
+    max-width: 100%;
+  }
+  .app-topbar > div {
+    width: 100%;
+    margin-left: 0;
+  }
+  .workspace-content main > div,
+  .workspace-content main > article {
+    padding-inline: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+  [role="dialog"],
+  [role="alertdialog"],
+  [role="menu"] {
+    transition: opacity 0.1s;
+  }
 }
 
 html,
@@ -80,15 +213,22 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
-  font-size: 14px;
-  /* A touch heavier than regular reads better, most of all on dark. */
-  font-weight: 450;
-  font-feature-settings: "cv11";
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  caret-color: var(--fg);
+  scrollbar-color: var(--line-strong) var(--bg);
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--primary-hover);
+  color: var(--fg);
 }
 
 /* Rendered Markdown: specs, decisions, descriptions. */
 .markdown {
+  max-inline-size: var(--type-body-measure);
   line-height: 1.65;
 }
 .markdown > * + * {
@@ -97,8 +237,8 @@ body {
 .markdown h1,
 .markdown h2,
 .markdown h3 {
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: 0;
   margin-top: 1.4em;
 }
 .markdown h1 {
@@ -120,29 +260,32 @@ body {
 }
 .markdown img {
   max-width: 100%;
-  border-radius: 6px;
-  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
 }
 .markdown .mention {
-  color: var(--accent);
-  font-weight: 500;
+  color: var(--fg);
+  font-weight: 700;
 }
 .markdown a {
-  color: var(--accent);
+  color: var(--fg);
+  font-weight: 700;
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
   text-underline-offset: 3px;
+}
+.markdown a:hover {
+  text-decoration-color: var(--fg);
 }
 .markdown code {
   font-family: var(--font-mono);
   font-size: 0.9em;
   background: var(--hover);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0.1em 0.35em;
 }
 .markdown pre {
   background: var(--hover);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0.8em 1em;
   overflow-x: auto;
 }
@@ -166,14 +309,14 @@ body {
 
 /* Spec page: title is the only large type; section labels stay quiet. */
 .spec-doc .markdown {
-  font-size: 15px;
+  font-size: var(--type-ui-size);
   line-height: 1.6;
 }
 .spec-doc .markdown h1,
 .spec-doc .markdown h2,
 .spec-doc .markdown h3 {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--type-ui-small-size);
+  font-weight: 600;
   letter-spacing: 0;
   color: var(--muted);
   margin-top: 0;
@@ -182,7 +325,6 @@ body {
 .spec-doc .markdown > h2:not(:first-child) {
   margin-top: 1.75rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--line);
 }
 .spec-doc .markdown p {
   color: var(--fg);

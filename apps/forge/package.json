@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "design:sync": "bun scripts/sync-design.ts",
     "db": "docker compose up -d --wait",
     "db:reset": "docker compose down -v && docker compose up -d --wait",
     "seed": "bun scripts/seed-dev.ts",

@@ -5,14 +5,14 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import type { User } from "@forge/types";
 import { CalendarDays, Ellipsis, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { formatDate } from "./data";
 import { Avatar } from "./icons";
 import { Picker } from "./picker";
 
 /** A property chip under a page's title: quiet until hovered. */
 export const chip =
-  "flex h-7 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover";
+  "ui-chip flex h-7 max-w-64 items-center gap-1.5 px-2 outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover";
 
 /** A status's coloured dot. */
 export function Dot({ color }: { color: string }) {
@@ -54,7 +54,7 @@ export function CreateDialog({
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-line bg-surface shadow-2xl shadow-black/30 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+        <Dialog.Popup className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
           {open && children}
         </Dialog.Popup>
       </Dialog.Portal>
@@ -81,7 +81,7 @@ export function MoreMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Menu.Popup className="min-w-44 rounded-md border border-line bg-surface p-1 shadow-lg shadow-black/10 outline-none">
+          <Menu.Popup className="app-menu min-w-44 rounded-md bg-surface p-1 outline-none">
             {items.map((item) => (
               <Menu.Item
                 key={item.label}
@@ -119,7 +119,8 @@ export function StatusChip({
       }))}
       selected={[value]}
       onSelect={onChange}
-      triggerClassName={chip}
+      triggerClassName="ui-status flex h-7 max-w-64 items-center gap-1.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      triggerStyle={{ "--status-color": current?.color } as CSSProperties}
     >
       {current && <Dot color={current.color} />}
       {current?.label}

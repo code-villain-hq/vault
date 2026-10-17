@@ -217,7 +217,7 @@ function InviteSection({
             value={link}
             aria-label="Invite link"
             onFocus={(e) => e.target.select()}
-            className="h-8 min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-2 font-mono text-xs text-muted outline-none"
+            className="h-8 min-w-0 flex-1 rounded-md ui-field bg-surface px-2 font-mono text-xs text-muted outline-none"
           />
           <Button variant="secondary" onClick={() => void copy()}>
             {copied ? "Copied" : "Copy"}
@@ -299,7 +299,7 @@ function RoleSelect({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <Select.Popup className="min-w-(--anchor-width) rounded-md border border-line bg-surface p-1 shadow-lg shadow-black/10 outline-none">
+          <Select.Popup className="app-menu min-w-(--anchor-width) rounded-md bg-surface p-1 outline-none">
             <Select.List>
               {ROLES.map((role) => (
                 <Select.Item
@@ -339,7 +339,7 @@ function GitHubConnection() {
           <p className="mb-3 text-muted">Connect your GitHub account to sign in with it.</p>
           <a
             href={`/api/auth/github/connect?redirect=${encodeURIComponent(location.pathname)}`}
-            className="inline-flex h-8 items-center rounded-md border border-line px-3 hover:bg-hover"
+            className="ui-control inline-flex h-7 items-center rounded-md px-3 hover:bg-hover"
           >
             Connect GitHub
           </a>
@@ -375,7 +375,7 @@ function WorkspaceName() {
           onChange={(e) => setValue(e.target.value)}
           onBlur={() => void save()}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          className="-ml-2 h-8 w-full rounded px-2 outline-none hover:bg-hover focus:bg-hover"
+          className="-ml-2 h-8 w-full rounded-md px-2 ui-field"
         />
       </label>
       <ErrorMessage>{error}</ErrorMessage>
@@ -406,7 +406,7 @@ function NameField({ name }: { name: string }) {
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => void save()}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="h-8 w-full rounded px-2 -ml-2 outline-none hover:bg-hover focus:bg-hover"
+        className="h-8 w-full rounded-md px-2 -ml-2 ui-field"
       />
       <ErrorMessage>{error}</ErrorMessage>
     </>

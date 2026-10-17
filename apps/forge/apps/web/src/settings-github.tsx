@@ -63,7 +63,7 @@ export function GitHubSettingsPage() {
           </section>
 
           {status && !status.configured && (
-            <section className="flex flex-col gap-2 rounded-lg border border-line p-4">
+            <section className="flex flex-col gap-2 rounded-lg p-4">
               <h3 className="font-medium">This server isn't set up for GitHub yet</h3>
               <p className="text-muted">Whoever runs the server creates a GitHub App and sets:</p>
               <pre className="overflow-x-auto rounded-md bg-hover p-3 font-mono text-xs">
@@ -99,7 +99,7 @@ export function GitHubSettingsPage() {
               {status.install_url ? (
                 <a
                   href={status.install_url}
-                  className="inline-flex h-8 items-center self-start rounded-md bg-accent-fill px-3 font-medium text-white hover:brightness-110"
+                  className="ui-control inline-flex h-7 items-center self-start rounded-md bg-primary px-3 font-medium text-on-primary hover:bg-primary-hover"
                 >
                   {status.installations.length
                     ? "Add an organisation or repositories"

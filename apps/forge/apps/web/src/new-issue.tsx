@@ -57,7 +57,7 @@ export function NewIssueProvider({
       <Dialog.Root open={open !== null} onOpenChange={(isOpen) => !isOpen && setOpen(null)}>
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-          <Dialog.Popup className="fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-line bg-surface shadow-2xl shadow-black/30 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Dialog.Popup className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             {open && <NewIssueForm defaults={open} onDone={() => setOpen(null)} />}
           </Dialog.Popup>
         </Dialog.Portal>
@@ -106,7 +106,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
     onDone();
   };
 
-  const chip = "h-7 px-2 border border-line rounded-md text-xs";
+  const chip = "ui-chip h-7 px-2";
 
   return (
     <form
@@ -131,7 +131,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
             setStateId("");
             setLabelIds([]);
           }}
-          triggerClassName="h-6 px-2 border border-line rounded-md"
+          triggerClassName="ui-chip h-7 px-2"
         >
           {team?.key ?? "Team"}
         </Picker>
@@ -149,7 +149,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Issue title"
           aria-label="Issue title"
-          className="bg-transparent text-lg font-medium outline-none placeholder:text-faint"
+          className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <textarea
           value={description}
@@ -240,7 +240,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
         </Picker>
       </div>
 
-      <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-3">
+      <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
         <Button type="submit" disabled={!title.trim() || !team}>
           Create issue

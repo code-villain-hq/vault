@@ -6,11 +6,11 @@ type ButtonVariant = "primary" | "secondary" | "danger";
 /** A button's look, for links that act as one. */
 export function buttonClass(variant: ButtonVariant = "primary"): string {
   const look = {
-    primary: "bg-accent-fill text-white hover:brightness-110",
-    secondary: "border border-line bg-surface hover:bg-hover",
-    danger: "border border-line bg-surface text-danger hover:bg-hover",
+    primary: "bg-primary text-on-primary hover:bg-primary-hover",
+    secondary: "text-muted hover:bg-hover hover:text-fg",
+    danger: "text-danger hover:bg-hover",
   }[variant];
-  return `inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-md px-3 font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 ${look}`;
+  return `ui-control inline-flex h-7 shrink-0 items-center justify-center gap-2 rounded-md px-3 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:opacity-45 ${look}`;
 }
 
 export function Button({
@@ -32,11 +32,7 @@ export function TextField({
       <label htmlFor={id} className="text-xs font-medium text-muted">
         {label}
       </label>
-      <input
-        id={id}
-        {...props}
-        className="h-9 rounded-md border border-line-strong bg-surface px-3 outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/25"
-      />
+      <input id={id} {...props} className="ui-field h-9 rounded-md px-3" />
       {hint && <p className="text-xs text-faint">{hint}</p>}
     </div>
   );
@@ -62,7 +58,9 @@ export function AuthScreen({ title, children }: { title: string; children: React
     <div className="flex min-h-full items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <Logo className="mx-auto mb-6 size-9" />
-        <h1 className="mb-6 text-center text-lg font-semibold tracking-tight">{title}</h1>
+        <h1 className="mb-6 text-center font-display text-[28px] leading-[1.18] font-bold">
+          {title}
+        </h1>
         {children}
       </div>
     </div>

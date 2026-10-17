@@ -147,7 +147,7 @@ export function InboxPage() {
             return (
               <li
                 key={key}
-                className="group flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-hover"
+                className="group flex items-center gap-3 rounded-md px-3 py-2 hover:bg-hover"
               >
                 <span
                   className={`size-1.5 shrink-0 rounded-full ${isUnread ? "bg-accent" : ""}`}

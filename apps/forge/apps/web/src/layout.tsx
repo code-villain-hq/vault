@@ -38,7 +38,7 @@ import { Redirect } from "./redirect";
 import { defaultWorkspace, rememberWorkspace, signOut, useSession } from "./session";
 import { openShortcuts, Shortcuts } from "./shortcuts";
 import { SyncIndicator } from "./sync-indicator";
-import { AuthScreen, Button, Splash } from "./ui";
+import { AuthScreen, Button, Logo, Splash } from "./ui";
 import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /** `/`: opens the workspace used last, or asks to sign in. */
@@ -100,32 +100,39 @@ export function NotFound() {
  */
 export function PageHeader({
   title,
+  headingTitle,
   parent,
   meta,
   children,
 }: {
   title: string;
+  /** The page heading when the toolbar uses a shorter identifier. */
+  headingTitle?: string;
   /** The page this one sits in, shown before the title, e.g. Specs for a domain. */
   parent?: ReactNode;
   meta?: ReactNode;
   children?: ReactNode;
 }) {
+  const { workspace } = useWorkspace();
   return (
-    // A container, so crowded headers can drop words they can do without.
-    <header className="@container flex h-11 shrink-0 items-center gap-3 px-4">
-      {parent && (
-        <span className="flex shrink-0 items-center gap-2 text-muted">
-          {parent}
-          <span className="text-faint">›</span>
-        </span>
-      )}
-      <h1 className="shrink-0 font-medium">{title}</h1>
-      {meta}
-      {/* Room above and below, so focus rings aren't clipped where it scrolls. */}
-      <div className="ml-auto flex min-w-0 items-center gap-4 overflow-x-auto py-1 [scrollbar-width:none]">
-        {children}
-      </div>
-    </header>
+    <>
+      <header className="app-topbar @container flex min-h-11 shrink-0 items-center gap-3 px-4">
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
+          {parent ?? workspace.name}
+          <span aria-hidden="true" className="text-faint">
+            ›
+          </span>
+          <span className="truncate font-medium text-fg" aria-current="page">
+            {title}
+          </span>
+        </nav>
+        {meta && <div className="flex min-w-0 items-center gap-3 overflow-hidden">{meta}</div>}
+        <div className="ml-auto flex min-w-0 items-center gap-3 overflow-x-auto py-1 [scrollbar-width:none]">
+          {children}
+        </div>
+      </header>
+      <h1 className="sr-only">{headingTitle ?? title}</h1>
+    </>
   );
 }
 
@@ -144,9 +151,9 @@ function Shell() {
   useDesktopNotifications();
   return (
     <NewIssueProvider pageDefaults={pageDefaults}>
-      <div className="flex h-full bg-bg">
+      <div className="app-shell flex h-full bg-bg">
         <Sidebar />
-        <div className="my-2 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-line/40 bg-panel shadow-sm shadow-black/5">
+        <div className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-panel">
           <Outlet />
         </div>
       </div>
@@ -157,7 +164,7 @@ function Shell() {
 }
 
 const navLink =
-  "flex h-7 items-center gap-2.5 rounded-md px-2 text-fg/85 hover:bg-hover hover:text-fg [&.active]:bg-hover [&.active]:text-fg [&_svg]:text-muted";
+  "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-current";
 
 const iconButton =
   "flex size-7 shrink-0 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent";
@@ -171,9 +178,24 @@ function Sidebar() {
   const inSettings = pathname.includes("/settings/");
   if (!inSettings) lastAppPath = pathname;
   return (
-    <aside className="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto p-2">
-      {inSettings ? <SettingsNav /> : <AppNav />}
-      <div className="mt-auto flex items-center gap-2 px-2 pb-1">
+    <aside
+      className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto p-2"
+      aria-label="Sidebar"
+    >
+      <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
+        <div className="sidebar-heading flex shrink-0 items-center gap-1">
+          <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
+            <Logo />
+            <span className="font-display text-[28px] leading-[1.18] font-bold">Forge</span>
+          </div>
+          <SidebarActions />
+        </div>
+        <div className="workspace-switcher">
+          <WorkspaceMenu />
+        </div>
+        {inSettings ? <SettingsNav /> : <AppNav />}
+      </div>
+      <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
         <SyncIndicator />
         <button
           type="button"
@@ -189,6 +211,33 @@ function Sidebar() {
   );
 }
 
+/** Global actions stay beside the app identity, above the workspace picker. */
+function SidebarActions() {
+  const newIssue = useNewIssue();
+  return (
+    <div className="sidebar-actions flex items-center gap-1">
+      <button
+        type="button"
+        aria-label="Search and commands"
+        title="Search and commands (⌘K)"
+        onClick={openCommandMenu}
+        className={iconButton}
+      >
+        <Search size={15} strokeWidth={1.75} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="New issue"
+        title="New issue (C)"
+        onClick={() => newIssue()}
+        className={iconButton}
+      >
+        <SquarePen size={15} strokeWidth={1.75} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 /** Where people work: their inbox and issues, the workspace, its knowledge and teams. */
 function AppNav() {
   const { workspace } = useWorkspace();
@@ -196,36 +245,15 @@ function AppNav() {
   const teams = useTeams();
   const triage = useTriageCount();
   const unread = useUnreadCount();
-  const newIssue = useNewIssue();
   return (
     <>
-      <div className="flex items-center gap-1">
-        <WorkspaceMenu />
-        <button
-          type="button"
-          aria-label="Search and commands"
-          title="Search and commands (⌘K)"
-          onClick={openCommandMenu}
-          className={iconButton}
-        >
-          <Search size={15} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="New issue"
-          title="New issue (C)"
-          onClick={() => newIssue()}
-          className={iconButton}
-        >
-          <SquarePen size={15} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-      </div>
       <nav className="flex flex-col gap-0.5">
         <Link to="/$workspace/inbox" params={params} className={navLink}>
           <NavIcon icon={Inbox} />
           Inbox
           {unread > 0 && (
-            <span className="ml-auto rounded-full bg-accent-fill px-1.5 text-[12px] font-medium text-white">
+            <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-faint">
+              <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
               {unread}
             </span>
           )}
@@ -237,7 +265,9 @@ function AppNav() {
         <Link to="/$workspace/triage" params={params} className={navLink}>
           <NavIcon icon={Funnel} />
           Triage
-          {triage > 0 && <span className="ml-auto text-xs text-faint">{triage}</span>}
+          {triage > 0 && (
+            <span className="nav-count ml-auto text-xs font-normal text-faint">{triage}</span>
+          )}
         </Link>
       </nav>
       <Section id="workspace" title="Workspace">
@@ -339,7 +369,7 @@ function DomainsNav() {
             key={domain.id}
             to="/$workspace/domains/$domain"
             params={{ ...params, domain: domain.id }}
-            className={`${navLink} pl-[2.1rem] text-fg/75`}
+            className={`${navLink} pl-[2.1rem]`}
           >
             <ServiceIcon service={domain} className="size-3.5" />
             <span className="truncate">{domain.name}</span>
@@ -421,12 +451,12 @@ function Section({ id, title, children }: { id: string; title: string; children:
     }
   };
   return (
-    <nav className="flex flex-col gap-0.5">
+    <nav className="sidebar-section flex flex-col gap-0.5">
       <button
         type="button"
         aria-expanded={open}
         onClick={toggle}
-        className="group flex h-6 items-center gap-1 self-start rounded px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
+        className="sidebar-group-label group flex h-6 items-center gap-1 self-start rounded px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
       >
         {title}
         <ChevronDown
@@ -436,7 +466,9 @@ function Section({ id, title, children }: { id: string; title: string; children:
           className={`transition-transform ${open ? "" : "-rotate-90"}`}
         />
       </button>
-      {open && children}
+      <div className={`sidebar-section-items flex-col gap-0.5 ${open ? "flex" : "hidden"}`}>
+        {children}
+      </div>
     </nav>
   );
 }
@@ -463,9 +495,12 @@ function WorkspaceMenu() {
 
   return (
     <Menu.Root>
-      <Menu.Trigger className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover">
+      <Menu.Trigger
+        aria-label={`Workspace: ${workspace.name}`}
+        className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
+      >
         <WorkspaceBadge name={workspace.name} />
-        <span className="truncate font-medium">{workspace.name}</span>
+        <span className="truncate">{workspace.name}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 16 16"
@@ -477,7 +512,7 @@ function WorkspaceMenu() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Menu.Popup className="min-w-52 origin-(--transform-origin) rounded-md border border-line bg-surface p-1 shadow-lg shadow-black/10 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Menu.Popup className="app-menu min-w-52 origin-(--transform-origin) rounded-md bg-surface p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             <div className="truncate px-2 py-1.5 text-xs text-faint">{me.user.email}</div>
             {others.map((other) => (
               <Menu.Item
@@ -526,7 +561,7 @@ function WorkspaceMenu() {
 
 function WorkspaceBadge({ name }: { name: string }) {
   return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-accent-fill text-[12px] font-semibold text-white">
+    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-primary text-[12px] font-semibold text-on-primary">
       {name.trim().charAt(0).toUpperCase()}
     </span>
   );
