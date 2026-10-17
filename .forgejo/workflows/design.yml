@@ -1,0 +1,27 @@
+# Token drift on every push that could cause it: the theme tests, the
+# generated outputs in design/tokens against build.py, and Forge's bundled
+# copy against the vault. Each check writes nothing and fails with the fix.
+name: design
+
+on:
+  push:
+    paths:
+      - "design/tokens/**"
+      - "brand/mark/**"
+      - "apps/site/assets/fonts/**"
+      - "apps/forge/apps/web/src/design/**"
+      - "apps/forge/apps/web/public/icon.svg"
+      - "apps/forge/scripts/sync-design.ts"
+      - ".forgejo/workflows/design.yml"
+
+jobs:
+  drift:
+    runs-on: macos
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s . -p 'test_*.py'
+        working-directory: design/tokens
+      - run: python3 build.py --check
+        working-directory: design/tokens
+      - run: bun scripts/sync-design.ts --check
+        working-directory: apps/forge

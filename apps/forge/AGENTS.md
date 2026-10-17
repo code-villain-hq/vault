@@ -60,6 +60,7 @@ The web app bundles snapshots in `apps/web/src/design/` so standalone and
 Docker builds include the same tokens and licensed fonts. Run
 `bun run design:sync` from this folder after changing shared tokens or
 the fonts in `apps/site/assets/fonts/`; don't edit the snapshots by hand.
+`bun run check` fails when they or the shared outputs have drifted.
 A studio-wide visual change starts in `brand/` or `design/`, then Forge
 implements it. Product behavior stays here.
 

@@ -18,13 +18,36 @@ const files = [
   ].map((name) => [`apps/site/assets/fonts/${name}`, `fonts/${name}`]),
 ];
 
-await mkdir(new URL("fonts/", destination), { recursive: true });
-for (const [source, target] of files) {
-  if (!source || !target) throw new Error("missing design source or destination");
-  await Bun.write(new URL(target, destination), Bun.file(new URL(source, vault)));
+const copies = [
+  ...files.map(([source, target]) => {
+    if (!source || !target) throw new Error("missing design source or destination");
+    return [new URL(source, vault), new URL(target, destination)] as const;
+  }),
+  [
+    new URL("brand/mark/forge.svg", vault),
+    new URL("../apps/web/public/icon.svg", import.meta.url),
+  ] as const,
+];
+
+// `--check` writes nothing and fails if the bundled copy has drifted from the vault.
+if (process.argv.includes("--check")) {
+  const forge = new URL("../", import.meta.url).pathname;
+  const stale: string[] = [];
+  for (const [source, target] of copies) {
+    const copy = Bun.file(target);
+    const same =
+      (await copy.exists()) &&
+      Buffer.from(await copy.arrayBuffer()).equals(
+        Buffer.from(await Bun.file(source).arrayBuffer()),
+      );
+    if (!same) stale.push(target.pathname.slice(forge.length));
+  }
+  if (stale.length) {
+    console.error(`Out of date with the vault: ${stale.join(", ")}. Run bun run design:sync.`);
+    process.exit(1);
+  }
+} else {
+  await mkdir(new URL("fonts/", destination), { recursive: true });
+  for (const [source, target] of copies) await Bun.write(target, Bun.file(source));
+  console.log("Synced shared color/type/shape tokens, licensed fonts, and the Forge mark.");
 }
-await Bun.write(
-  new URL("../apps/web/public/icon.svg", import.meta.url),
-  Bun.file(new URL("brand/mark/forge.svg", vault)),
-);
-console.log("Synced shared color/type/shape tokens, licensed fonts, and the Forge mark.");

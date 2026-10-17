@@ -1,11 +1,29 @@
 """Regenerate the CSS and Swift for color, type, and shape from their JSON.
 
 Run from this folder: python3 build.py
+`python3 build.py --check` writes nothing and fails if an output is stale.
 A stopgap until @villain/tokens builds these with Style Dictionary.
 """
 import json
 import re
+import sys
 from theme import generate
+
+check = "--check" in sys.argv[1:]
+stale = []
+
+
+def emit(name, text):
+    """Write a generated file, or in check mode note it if it differs."""
+    if not check:
+        open(name, "w").write(text)
+        return
+    try:
+        current = open(name).read()
+    except FileNotFoundError:
+        current = None
+    if current != text:
+        stale.append(name)
 
 camel = lambda k: re.sub(r"-(\w)", lambda m: m.group(1).upper(), k)
 
@@ -16,7 +34,7 @@ t = json.load(open("type.json"))
 c = generate(c)
 
 # Apps that need numerical colour values consume the same resolved aliases as CSS/Swift.
-open("color.resolved.json", "w").write(json.dumps(c, indent=2) + "\n")
+emit("color.resolved.json", json.dumps(c, indent=2) + "\n")
 
 # Palette colours that share a name with a semantic token are covered by it in CSS.
 palette_only = [k for k in c["palette"] if k not in c["night"]]
@@ -28,7 +46,7 @@ css += [f"  --{k}: {v};" for k, v in c["night"].items()]
 css += ["}", "", '[data-theme="day"] {', "  color-scheme: light;"]
 css += [f"  --{k}: {v};" for k, v in c["day"].items()]
 css += ["}", ""]
-open("color.css", "w").write("\n".join(css))
+emit("color.css", "\n".join(css))
 
 sw = ["import Foundation", "", "// Generated from color.json.", "enum ColorTokens {", "  enum Palette {"]
 sw += [f'    static let {camel(k)} = "{v}"' for k, v in c["palette"].items()]
@@ -43,14 +61,14 @@ for mode in ("night", "day"):
     args = ",\n    ".join(f'{camel(k)}: "{v}"' for k, v in c[mode].items())
     sw += [f"  static let {mode} = Theme(\n    {args}\n  )", ""]
 sw[-1] = "}"
-open("color.swift", "w").write("\n".join(sw) + "\n")
+emit("color.swift", "\n".join(sw) + "\n")
 
-open("shape.css", "w").write(
+emit("shape.css",
     "/* Generated from shape.json. */\n:root {\n"
     + "".join(f"  --radius-{k}: {v}px;\n" for k, v in s["radius"].items())
     + "}\n"
 )
-open("shape.swift", "w").write(
+emit("shape.swift",
     "import Foundation\n\n// Generated from shape.json.\nenum ShapeTokens {\n"
     + "".join(f"  static let radius{k.capitalize()}: Double = {v}\n" for k, v in s["radius"].items())
     + "}\n"
@@ -71,7 +89,7 @@ for role, r in t["roles"].items():
     if "measure" in r:
         css.append(f"  --type-{role}-measure: {r['measure']};")
 css += ["}", ""]
-open("type.css", "w").write("\n".join(css))
+emit("type.css", "\n".join(css))
 
 # Swift: app windows use the largest size of each fluid range.
 swift_role = lambda k: {"display": "displayTitle"}.get(k, camel(k))
@@ -83,4 +101,7 @@ for role, r in t["roles"].items():
     size = r["size"]["max"] if isinstance(r["size"], dict) else r["size"]
     sw.append(f"  static let {swift_role(role)} = Role(face: {r['face']}, weight: {r['weight']}, size: {size}, lineHeight: {r['lineHeight']}, trackingEm: {r['tracking']})")
 sw.append("}")
-open("type.swift", "w").write("\n".join(sw) + "\n")
+emit("type.swift", "\n".join(sw) + "\n")
+
+if stale:
+    sys.exit("Stale generated tokens: " + ", ".join(stale) + ". Run python3 build.py from design/tokens.")

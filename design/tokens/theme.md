@@ -69,9 +69,15 @@ outputs with `bun run design:sync` from `apps/forge`; its existing role names
 continue to work. Theme editing is a build-time capability, not a new
 runtime theme picker in Forge.
 
+Drift fails the build. `python3 build.py --check` writes nothing and names
+any output that differs from a fresh build; `bun scripts/sync-design.ts
+--check` does the same for Forge's bundled copy. Forge's `bun run check`
+runs both, and the `design` workflow on Forgejo runs them, with the theme
+tests, on every push that touches the tokens, the mark, the fonts or
+Forge's copy.
+
 Test alternate hues and contrast extremes, then inspect real Forge lists,
 boards, detail views, settings and dialogs in night and day. A numerical
 contrast pass establishes readability; the real views establish whether
 hierarchy and restraint still feel right. Bring broader visual changes back
-for discussion. Mobile redesign and token-drift automation remain separate
-work.
+for discussion. Mobile redesign remains separate work.

@@ -25,6 +25,14 @@ const steps: [string, () => Promise<unknown>][] = [
       }
     },
   ],
+  // Shared tokens are generated, and Forge bundles a copy: neither may drift.
+  [
+    "design tokens are current",
+    async () => {
+      await $`python3 build.py --check`.cwd(`${root}../../design/tokens`);
+      await $`bun scripts/sync-design.ts --check`.cwd(root);
+    },
+  ],
   ["biome", () => $`bunx biome check .`.cwd(root)],
   ["typecheck", () => $`bun run typecheck`.cwd(root)],
   ["bun test", () => $`bun test`.cwd(root)],
