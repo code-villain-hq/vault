@@ -216,7 +216,9 @@ async function publish() {
   if (Bun.spawnSync(["git", "diff", "--cached", "--quiet"], { cwd: tap }).exitCode === 0) {
     return console.log("The tap already has this cask.");
   }
-  run(["git", "commit", "--quiet", "-m", `villain-layer ${version}`], { cwd: tap });
+  // As the vault's author, not whoever the global git config names.
+  const author = ["user.name", "user.email"].flatMap((key) => ["-c", `${key}=${read(["git", "config", key])}`]);
+  run(["git", ...author, "commit", "--quiet", "-m", `villain-layer ${version}`], { cwd: tap });
   run(["git", "push", "--quiet"], { cwd: tap });
   console.log(`The tap has Layer ${version}.`);
 }
