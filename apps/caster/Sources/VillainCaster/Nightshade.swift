@@ -16,6 +16,10 @@ enum Nightshade {
     static let primaryHover = color(\.primaryHover)
     static let onPrimary = color(\.onPrimary)
     static let accent = color(\.accent)
+    /// The selected row: a faint poison tint.
+    static let selected = color(\.selected)
+    /// A key hint's fill: `fg` at `chip-tint`, like a chip.
+    static let chip = color(\.fg, alpha: ColorTokens.Opacity.chipTint)
     /// The active option in a command list: `fg` at `highlight-tint`.
     static let highlight = color(\.fg, alpha: ColorTokens.Opacity.highlightTint)
     /// The field's focus glow: `accent` at 22%.
@@ -68,6 +72,7 @@ enum Nightshade {
 
     // MARK: - Shape
 
+    static let radiusSm = CGFloat(ShapeTokens.radiusSm)
     static let radiusMd = CGFloat(ShapeTokens.radiusMd)
     static let radiusLg = CGFloat(ShapeTokens.radiusLg)
 }

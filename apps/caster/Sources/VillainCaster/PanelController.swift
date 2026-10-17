@@ -81,12 +81,14 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private let field = NSTextField()
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
+    /// Screenshot feedback, at the right of the input.
     private let inlineResultField = NSTextField(labelWithString: "")
+    private let answerCard = AnswerCard()
     private let engine = QueryEngine()
     private var results: [ResultItem] = []
-    private var inlineCopyValue: String?
-    /// ⏎ pressed while an inline lookup (currency) was still loading: copy
-    /// the value when it arrives instead of silently copying nothing.
+    private var answer: Answer?
+    /// ⏎ pressed while a lookup (currency) was still loading: copy the
+    /// value when it arrives instead of silently copying nothing.
     private var copyWhenReady = false
     /// Query restored on next open when the panel closed without executing.
     private var storedText: String?
@@ -218,6 +220,10 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         inlineResultField.lineBreakMode = .byTruncatingHead
         inlineResultField.isHidden = true
         chrome.addSubview(inlineResultField)
+
+        answerCard.isHidden = true
+        answerCard.onActivate = { [weak self] in self?.executeSelected() }
+        chrome.addSubview(answerCard)
     }
 
     private func configureTable() {
@@ -295,11 +301,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     }
 
     /// Text worth restoring next time: an unfinished search. One-shot
-    /// lookups (math/currency/time — inline visible — weather, help) are not.
+    /// lookups (math/currency/time — an answer showing — weather, help) are not.
     private func restorableText() -> String? {
         let text = field.stringValue.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty,
-              inlineResultField.isHidden,
+              answer == nil,
               !Weather.matches(text),
               !Help.matches(text)
         else { return nil }
@@ -314,8 +320,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private func relayout() {
         let rows = min(results.count, maxVisibleRows)
         let visibleListHeight = CGFloat(rows) * rowHeight
-        // Space, not a line, separates the query from the list.
-        let listAreaHeight: CGFloat = rows > 0 ? visibleListHeight + listInset : 0
+        // Space, not a line, separates the query from the list or the answer.
+        let listAreaHeight: CGFloat = answer != nil ? AnswerCard.height + listInset
+            : rows > 0 ? visibleListHeight + listInset : 0
         let totalHeight = inputHeight + listAreaHeight
 
         var frame = panel.frame
@@ -340,6 +347,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             field.frame = NSRect(x: inputSidePadding, y: fieldY,
                                  width: panelWidth - inputSidePadding * 2 - labelWidth - 12, height: fieldHeight)
         }
+        answerCard.frame = NSRect(x: listInset, y: listInset,
+                                  width: panelWidth - listInset * 2, height: AnswerCard.height)
+        answerCard.isHidden = answer == nil
         scrollView.frame = NSRect(x: listInset, y: listInset,
                                   width: panelWidth - listInset * 2, height: visibleListHeight)
         scrollView.isHidden = rows == 0
@@ -362,24 +372,22 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         copyWhenReady = false
         engine.query(field.stringValue) { [weak self] output in
             guard let self else { return }
-            if self.copyWhenReady, case .inline(_, let copyValue?) = output {
+            if self.copyWhenReady, case .answer(let answer) = output, let copyValue = answer.copyValue {
                 self.copyWhenReady = false
                 Clipboard.copy(copyValue)
             }
+            self.inlineResultField.isHidden = true
             switch output {
             case .empty:
                 self.results = []
-                self.inlineCopyValue = nil
-                self.inlineResultField.isHidden = true
+                self.answer = nil
             case .list(let items):
                 self.results = items
-                self.inlineCopyValue = nil
-                self.inlineResultField.isHidden = true
-            case .inline(let display, let copyValue):
+                self.answer = nil
+            case .answer(let answer):
                 self.results = []
-                self.inlineCopyValue = copyValue
-                self.inlineResultField.stringValue = display
-                self.inlineResultField.isHidden = false
+                self.answer = answer
+                self.answerCard.configure(with: answer)
             }
             self.tableView.reloadData()
             if !self.results.isEmpty {
@@ -421,14 +429,12 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     }
 
     private func executeSelected() {
-        if let copyValue = inlineCopyValue {
-            hide()
-            storedText = nil
-            Clipboard.copy(copyValue)
-            return
-        }
-        if !inlineResultField.isHidden, engine.isLoading {
-            copyWhenReady = true
+        if let answer {
+            if let copyValue = answer.copyValue {
+                Clipboard.copy(copyValue)
+            } else if engine.isLoading {
+                copyWhenReady = true
+            }
             hide()
             storedText = nil
             return

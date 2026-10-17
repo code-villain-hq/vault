@@ -4,8 +4,46 @@ import AppKit
 enum QueryOutput {
     case empty
     case list([ResultItem])
-    /// Shown inline to the right of the input; `copyValue` is what ⏎ copies.
-    case inline(display: String, copyValue: String?)
+    /// One answer, shown as a card under the input; ⏎ copies it.
+    case answer(Answer)
+}
+
+/// A calculated answer: what the calculator, currency, and time lookups give.
+struct Answer {
+    enum Kind {
+        case calculator, currency, time
+
+        var label: String {
+            switch self {
+            case .calculator: "Calculator"
+            case .currency: "Currency"
+            case .time: "World clock"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .calculator: "equal"
+            case .currency: "arrow.left.arrow.right"
+            case .time: "clock"
+            }
+        }
+    }
+
+    let kind: Kind
+    let value: String
+    /// Under the value; the kind's label when there is nothing more to say.
+    let detail: String
+    /// What ⏎ copies; nil while loading or when there is no answer.
+    let copyValue: String?
+
+    init(_ kind: Kind, value: String, detail: String? = nil, copyValue: String?) {
+        self.kind = kind
+        // Lookups write their answers as "= value"; the card's tile says "=".
+        self.value = value.hasPrefix("= ") ? String(value.dropFirst(2)) : value
+        self.detail = detail ?? kind.label
+        self.copyValue = copyValue
+    }
 }
 
 /// A built-in action that competes with apps in the fuzzy search.
@@ -117,17 +155,21 @@ final class QueryEngine {
         }
 
         if let currencyQuery = CurrencyQuery.parse(text) {
-            deliver(.inline(display: "= …", copyValue: nil))
+            deliver(.answer(Answer(.currency, value: "…", copyValue: nil)))
             debounced(gen) { finish in
                 Currency.convert(currencyQuery) { display, copyValue in
-                    finish(.inline(display: display, copyValue: copyValue))
+                    finish(.answer(Answer(.currency, value: copyValue == nil ? "No rate" : display,
+                                          copyValue: copyValue)))
                 }
             } deliver: { deliver($0) }
             return
         }
 
         if let time = TimeLookup.lookup(text) {
-            deliver(.inline(display: time.display, copyValue: time.copyValue))
+            // "= 05:28 Sun · Tokyo +7 h": the time large, the rest beneath it.
+            let rest = time.display.dropFirst("= \(time.copyValue) ".count)
+            deliver(.answer(Answer(.time, value: time.copyValue, detail: String(rest),
+                                   copyValue: time.copyValue)))
             return
         }
 
@@ -145,7 +187,7 @@ final class QueryEngine {
         }
 
         if let value = Calculator.evaluate(text) {
-            deliver(.inline(display: "= \(value)", copyValue: value))
+            deliver(.answer(Answer(.calculator, value: value, copyValue: value)))
             return
         }
 
