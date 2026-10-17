@@ -373,7 +373,7 @@ export function ServicePage() {
 
 /** The first colour of the palette no service has yet, so new services look different. */
 function unusedColor(taken: { color: string }[]): string {
-  return COLORS.find((c) => !taken.some((t) => t.color === c)) ?? COLORS[0] ?? "#5b5bd6";
+  return COLORS.find((c) => !taken.some((t) => t.color === c)) ?? COLORS[0] ?? "#9fa9ff";
 }
 
 /** An icon in its colour on a faint tile of the same colour. */

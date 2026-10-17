@@ -253,7 +253,7 @@ function NewLabelForm({ onDone }: { onDone: () => void }) {
   const labels = useLabels();
   const [name, setName] = useState("");
   const [color, setColor] = useState(
-    () => COLORS.find((c) => !labels.some((l) => l.color === c)) ?? COLORS[0] ?? "#5b5bd6",
+    () => COLORS.find((c) => !labels.some((l) => l.color === c)) ?? COLORS[0] ?? "#9fa9ff",
   );
 
   return (

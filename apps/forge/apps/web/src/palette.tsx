@@ -2,15 +2,18 @@
 import { Popover } from "@base-ui/react/popover";
 import { type PointerEvent as ReactPointerEvent, useRef, useState } from "react";
 
+/** Eight hues at one OKLCH lightness (0.76), so none jumps out or disappears.
+ * Teal, amber, red and blue are the brand's done, waiting, error and information
+ * colours. Same order as the earlier palette, so a past pick maps by position. */
 export const COLORS = [
-  "#5b5bd6",
-  "#4cb782",
-  "#f2c94c",
-  "#f2994a",
-  "#d1453b",
-  "#bb87fc",
-  "#4ea7fc",
-  "#8a8a94",
+  "#9fa9ff", // indigo
+  "#5bc8a6", // teal
+  "#e0a53b", // amber
+  "#f2994a", // orange
+  "#ff8b7c", // red
+  "#d691f0", // violet
+  "#7fb3fb", // blue
+  "#b0b0bd", // grey
 ];
 
 /** A row of swatches to pick one of the colours. */
@@ -46,7 +49,7 @@ export function ColorChoice({
 
 /** The swatch that stands for "any colour". */
 export const RAINBOW =
-  "conic-gradient(#f2994a, #f2c94c, #4cb782, #4ea7fc, #5b5bd6, #bb87fc, #d1453b, #f2994a)";
+  "conic-gradient(#f2994a, #e0a53b, #5bc8a6, #7fb3fb, #9fa9ff, #d691f0, #ff8b7c, #f2994a)";
 
 type Hsv = { h: number; s: number; v: number };
 
