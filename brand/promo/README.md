@@ -10,12 +10,15 @@ a change to the mark reaches every image. Don't edit the outputs by hand.
 
 ## Wallpapers
 
-[`wallpapers/`](wallpapers) has two designs, each for three screens. Both
+[`wallpapers/`](wallpapers) has three designs, each for three screens. Both
 use the marks' own construction: ink letters on night, cut into a poison
 strike that runs edge to edge, the way the homepage logo extends it.
 
 - **Mark**: CV from [`mark/mark.svg`](../mark/mark.svg), right of centre on
   desktop, clear of windows' usual middle; low on the phone, under the clock.
+- **Waves**: the mark as above, on seigaiha, the traditional Japanese wave
+  pattern, drawn in a grey a step above night as quiet texture. The letters'
+  cut clears the waves around them, so the mark still leads.
 - **Wordmark**: "Code Villain" from [`mark/logo-night.svg`](../mark/logo-night.svg),
   centred. The strike shows between the letters, as in the logo.
 

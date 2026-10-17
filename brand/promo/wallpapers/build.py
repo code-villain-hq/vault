@@ -14,6 +14,9 @@ HERE = pathlib.Path(__file__).parent
 MARKS = (HERE / "../../mark").resolve()
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 GROUND, INK, POISON = "#0A0B0D", "#ECECF1", "#C9E265"
+# Seigaiha, the traditional wave pattern, as quiet texture: grey rings a
+# step above night, so the mark and its strike stay the one bright moment.
+WAVE = "#17181C"
 
 
 def path(file, name):
@@ -27,10 +30,12 @@ def outline_box(d):
 
 
 # Each design in its source's units: the letters, the strike's top and
-# height, and the cut around the letters. Outlines are measured from the path.
+# height, and the cut around the letters, and whether its size is a share of
+# the screen's height or width. Outlines are measured from the path.
 DESIGNS = {
-    "mark": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14),
-    "wordmark": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7),
+    "mark": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14, by="height"),
+    "waves": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14, by="height", waves=True),
+    "wordmark": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7, by="width"),
 }
 
 # Per design and format: (width, height, centre x, strike centre y, size).
@@ -45,6 +50,10 @@ PLACEMENT = {
     ("mark", "desktop-5k"): (0.66, 0.56, 0.36),
     ("mark", "macbook"): (0.66, 0.56, 0.34),
     ("mark", "phone"): (0.50, 0.64, 0.17),
+    # The waves wallpaper keeps the mark's placement; the letters' cut clears the waves around them.
+    ("waves", "desktop-5k"): (0.66, 0.56, 0.36),
+    ("waves", "macbook"): (0.66, 0.56, 0.34),
+    ("waves", "phone"): (0.50, 0.64, 0.17),
     # The wordmark is centred, as on the homepage, with room around it.
     ("wordmark", "desktop-5k"): (0.50, 0.50, 0.46),
     ("wordmark", "macbook"): (0.50, 0.50, 0.50),
@@ -52,24 +61,44 @@ PLACEMENT = {
 }
 
 
+def waves(width, height):
+    """Rows of overlapping fans, each lower row drawn over the one above."""
+    radius = max(width, height) / 26
+    rings = "".join(f'<circle r="{radius * f:.1f}" fill="none" stroke="{WAVE}" stroke-width="{radius * 0.07:.1f}"/>'
+                    for f in (0.93, 0.7, 0.47))
+    motif = f'<g id="wave"><circle r="{radius:.1f}" fill="{GROUND}"/>{rings}</g>'
+    uses = []
+    for row in range(int(height / (radius / 2)) + 3):
+        y = row * radius / 2
+        offset = radius if row % 2 else 0
+        for column in range(-1, int(width / (2 * radius)) + 2):
+            uses.append(f'<use href="#wave" x="{column * 2 * radius + offset:.1f}" y="{y:.1f}"/>')
+    return motif, "".join(uses)
+
+
 def svg(design, width, height, cx, cy, size):
     left, right, top, bottom = outline_box(design["d"])
     strike_top, strike_height = design["strike"]
-    vertical = design is DESIGNS["mark"]
-    scale = size * (height / (bottom - top) if vertical else width / (right - left))
+    scale = size * (height / (bottom - top) if design["by"] == "height" else width / (right - left))
     x = cx * width - (left + right) / 2 * scale
     y = cy * height - (strike_top + strike_height / 2) * scale
     place = f"translate({x:.2f} {y:.2f}) scale({scale:.4f})"
+    motif, texture = waves(width, height) if design.get("waves") else ("", "")
+    if texture:
+        # Clear the waves around the letters by drawing the cut in the ground
+        # colour: a mask over thousands of shapes renders unreliably.
+        texture += (f'<use href="#letters" transform="{place}" fill="{GROUND}" stroke="{GROUND}" '
+                    f'stroke-width="{design["cut"]}" stroke-linejoin="round"/>')
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>Code Villain</title>
   <defs>
-    <path id="letters" d="{design["d"]}"/>
+    <path id="letters" d="{design["d"]}"/>{motif}
     <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="{width}" height="{height}">
       <rect width="{width}" height="{height}" fill="#fff"/>
       <use href="#letters" transform="{place}" fill="#000" stroke="#000" stroke-width="{design["cut"]}" stroke-linejoin="round"/>
     </mask>
   </defs>
-  <rect width="{width}" height="{height}" fill="{GROUND}"/>
+  <rect width="{width}" height="{height}" fill="{GROUND}"/>{texture}
   <rect y="{y + strike_top * scale:.2f}" width="{width}" height="{strike_height * scale:.2f}" fill="{POISON}" mask="url(#cut)"/>
   <use href="#letters" transform="{place}" fill="{INK}"/>
 </svg>
@@ -85,6 +114,7 @@ for (name, size_name), (cx, cy, size) in PLACEMENT.items():
         subprocess.run(
             [CHROME, "--headless=new", f"--user-data-dir={profile}", "--hide-scrollbars",
              "--force-device-scale-factor=1", f"--window-size={width},{height}",
+             "--virtual-time-budget=10000",
              f"--screenshot={HERE / f'{stem}.png'}", source.as_uri()],
             check=True, capture_output=True,
         )
