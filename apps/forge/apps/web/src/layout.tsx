@@ -153,7 +153,7 @@ function Shell() {
     <NewIssueProvider pageDefaults={pageDefaults}>
       <div className="app-shell flex h-full bg-bg">
         <Sidebar />
-        <div className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-panel">
+        <div className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
           <Outlet />
         </div>
       </div>

@@ -109,7 +109,11 @@
 .app-topbar {
   background: var(--bg);
 }
-.workspace-content > main {
+:where(.workspace-content) > :where(main, div, p, section) {
+  background: var(--panel);
+}
+/* The first content region owns the corner; the frame shows behind its radius. */
+:where(.workspace-content) > h1 + :where(main, div, p, section) {
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
 }
