@@ -56,3 +56,6 @@ apps/forge/data/
 .claude/settings.local.json
 .claude/worktrees/
 .serena/
+
+# Impeccable working state
+.impeccable/
