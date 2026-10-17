@@ -149,13 +149,15 @@ impl Validate for WorkflowStatePatch {
 /// The workflow every new team starts with: name, type and colour.
 pub fn default_workflow() -> [(&'static str, StateType, &'static str); 7] {
     [
+        // Coloured by meaning, in the palette's colours (apps/web/src/palette.tsx):
+        // orange triage, blue in progress, amber in review, teal done.
         ("Triage", StateType::Triage, "#f2994a"),
-        ("Backlog", StateType::Backlog, "#8a8a94"),
-        ("Todo", StateType::Unstarted, "#b5b5bd"),
-        ("In Progress", StateType::Started, "#f2c94c"),
-        ("In Review", StateType::Started, "#4cb782"),
-        ("Done", StateType::Completed, "#5b5bd6"),
-        ("Canceled", StateType::Canceled, "#8a8a94"),
+        ("Backlog", StateType::Backlog, "#b0b0bd"),
+        ("Todo", StateType::Unstarted, "#d2d2dc"),
+        ("In Progress", StateType::Started, "#7fb3fb"),
+        ("In Review", StateType::Started, "#e0a53b"),
+        ("Done", StateType::Completed, "#5bc8a6"),
+        ("Canceled", StateType::Canceled, "#b0b0bd"),
     ]
 }
 

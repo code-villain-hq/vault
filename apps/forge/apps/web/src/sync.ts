@@ -114,7 +114,7 @@ export function createSyncClient(options: {
         ...timestamps(),
       }),
       Comment: () => ({ author_id: options.userId, ...timestamps() }),
-      Label: () => ({ team_id: null, color: "#8a8a94", ...timestamps() }),
+      Label: () => ({ team_id: null, color: "#b0b0bd", ...timestamps() }),
       Project: () => ({
         description: "",
         status: "planned",
@@ -134,7 +134,7 @@ export function createSyncClient(options: {
       IssueRelation: () => timestamps(),
       Service: () => ({
         icon: "server",
-        color: "#8a8a94",
+        color: "#b0b0bd",
         description: "",
         team_id: null,
         repository: null,
@@ -143,7 +143,7 @@ export function createSyncClient(options: {
         current_state_updated_at: null,
         ...timestamps(),
       }),
-      Domain: () => ({ description: "", icon: "folder", color: "#8a8a94", ...timestamps() }),
+      Domain: () => ({ description: "", icon: "folder", color: "#b0b0bd", ...timestamps() }),
       Spec: () => ({
         body: "",
         status: "draft",
@@ -165,7 +165,7 @@ export function createSyncClient(options: {
         created_by: options.userId,
         ...timestamps(),
       }),
-      WorkflowState: () => ({ color: "#8a8a94", position: 0, ...timestamps() }),
+      WorkflowState: () => ({ color: "#b0b0bd", position: 0, ...timestamps() }),
     },
     onReject: (_transaction, error) => options.onRefused(error.message),
   });
