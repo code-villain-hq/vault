@@ -15,4 +15,5 @@ jobs:
         working-directory: apps/caster
     steps:
       - uses: actions/checkout@v4
+      - run: make design-check
       - run: make build

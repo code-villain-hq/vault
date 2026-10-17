@@ -10,6 +10,9 @@ enum QueryOutput {
 
 /// A built-in action that competes with apps in the fuzzy search.
 private struct Command {
+    /// Usage history key: the title before titles went sentence case, so
+    /// existing rankings carry over.
+    let id: String
     let title: String
     let subtitle: String
     let icon: NSImage?
@@ -19,8 +22,9 @@ private struct Command {
     let isAvailable: () -> Bool
     let run: () -> Void
 
-    init(title: String, subtitle: String, symbol: String, isDestructive: Bool = false,
+    init(id: String? = nil, title: String, subtitle: String, symbol: String, isDestructive: Bool = false,
          isAvailable: @escaping () -> Bool, run: @escaping () -> Void) {
+        self.id = id ?? title
         self.title = title
         self.subtitle = subtitle
         self.icon = symbolIcon(symbol, title)
@@ -33,7 +37,8 @@ private struct Command {
 /// SF Symbol at result-list size; build once, not per keystroke.
 func symbolIcon(_ name: String, _ description: String) -> NSImage? {
     NSImage(systemSymbolName: name, accessibilityDescription: description)?
-        .withSymbolConfiguration(.init(pointSize: 16, weight: .regular))
+        // The size and weight of the row text beside it (design/components.md).
+        .withSymbolConfiguration(.init(pointSize: 15, weight: .regular))
 }
 
 final class QueryEngine {
@@ -48,12 +53,12 @@ final class QueryEngine {
     private static let snippetIcon = symbolIcon("doc.on.clipboard", "Snippet")
 
     private let commands: [Command] = [
-        Command(title: "Maximize Window",
+        Command(id: "Maximize Window", title: "Maximize window",
                 subtitle: "Monitor size minus the menu bar",
                 symbol: "macwindow",
                 isAvailable: { true },
                 run: { WindowManager.maximizeFocusedWindow() }),
-        Command(title: "Move Window to Next Display",
+        Command(id: "Move Window to Next Display", title: "Move window to next display",
                 subtitle: "Send the focused window to the other monitor",
                 symbol: "rectangle.on.rectangle",
                 isAvailable: { WindowManager.hasSecondDisplay },
@@ -63,18 +68,18 @@ final class QueryEngine {
                 symbol: "moon.zzz",
                 isAvailable: { true },
                 run: { SystemActions.sleep() }),
-        Command(title: "Lock Screen",
+        Command(id: "Lock Screen", title: "Lock screen",
                 subtitle: "Sleep displays and lock the session",
                 symbol: "lock",
                 isAvailable: { true },
                 run: { SystemActions.lockScreen() }),
-        Command(title: "Empty Trash",
+        Command(id: "Empty Trash", title: "Empty trash",
                 subtitle: "Ask Finder to empty the trash",
                 symbol: "trash",
                 isDestructive: true,
                 isAvailable: { true },
                 run: { SystemActions.emptyTrash() }),
-        Command(title: "Toggle Dark Mode",
+        Command(id: "Toggle Dark Mode", title: "Toggle dark mode",
                 subtitle: "Switch between light and dark appearance",
                 symbol: "circle.lefthalf.filled",
                 isAvailable: { true },
@@ -222,7 +227,7 @@ final class QueryEngine {
             icon: command.icon,
             title: command.title,
             subtitle: command.subtitle,
-            usageKey: "command:\(command.title)",
+            usageKey: "command:\(command.id)",
             action: command.run
         )
     }

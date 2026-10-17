@@ -6,12 +6,14 @@ BUNDLE = build/$(APP_NAME).app
 # across rebuilds; ad-hoc ("-") re-prompts after every install.
 SIGN_IDENTITY = $(shell security find-identity -v -p codesigning 2>/dev/null | grep -q "VillainCaster Dev" && echo "VillainCaster Dev" || echo -)
 
-.PHONY: build run app icon install release clean
+.PHONY: build run app icon install release clean design design-check
 
 build:
 	swift build -c release
 
 run: build
+	rm -rf .build/release/Fonts
+	cp -R Resources/Fonts .build/release/Fonts
 	./.build/release/$(APP)
 
 app: build
@@ -21,6 +23,7 @@ app: build
 	mkdir -p "$(BUNDLE)/Contents/Resources"
 	cp Resources/Info.plist "$(BUNDLE)/Contents/"
 	cp Resources/AppIcon.icns "$(BUNDLE)/Contents/Resources/"
+	cp -R Resources/Fonts "$(BUNDLE)/Contents/Resources/Fonts"
 	codesign --force --sign "$(SIGN_IDENTITY)" "$(BUNDLE)"
 	@echo "Built $(BUNDLE)"
 
@@ -63,6 +66,35 @@ release: app
 	rm -f "$(ZIP)"
 	ditto -c -k --keepParent "$(BUNDLE)" "$(ZIP)"
 	@echo "Wrote $(ZIP)"
+
+# Caster keeps its own copy of the vault's design sources, so it builds on
+# its own: the generated Swift tokens, Atkinson Hyperlegible Next with its
+# license, and the C mark. `make design` refreshes the copy; `make
+# design-check` writes nothing and fails if it has drifted.
+VAULT = ../..
+DESIGN = Sources/VillainCaster/Design
+FONTS = Resources/Fonts
+DESIGN_COPIES = \
+	$(VAULT)/design/tokens/color.swift:$(DESIGN)/color.swift \
+	$(VAULT)/design/tokens/type.swift:$(DESIGN)/type.swift \
+	$(VAULT)/design/tokens/shape.swift:$(DESIGN)/shape.swift \
+	$(VAULT)/apps/site/assets/fonts/atkinson-hyperlegible-next.ttf:$(FONTS)/atkinson-hyperlegible-next.ttf \
+	$(VAULT)/apps/site/assets/fonts/atkinson-hyperlegible-next-OFL.txt:$(FONTS)/atkinson-hyperlegible-next-OFL.txt \
+	$(VAULT)/brand/mark/caster.svg:Resources/AppIcon.svg
+# The menu bar draws the C from the mark's own outline.
+MARK_PATH = $(shell sed -n 's/.*id="c" d="\([^"]*\)".*/\1/p' $(VAULT)/brand/mark/caster.svg)
+
+design:
+	mkdir -p $(DESIGN) $(FONTS)
+	@for pair in $(DESIGN_COPIES); do cp "$${pair%%:*}" "$${pair#*:}"; done
+	@echo "Synced tokens, fonts and the mark. If Resources/AppIcon.svg changed, run make icon."
+
+design-check:
+	@stale=""; for pair in $(DESIGN_COPIES); do \
+		cmp -s "$${pair%%:*}" "$${pair#*:}" || stale="$$stale $${pair#*:}"; \
+	done; \
+	grep -qF "$(MARK_PATH)" Sources/VillainCaster/MenuBarIcon.swift || stale="$$stale Sources/VillainCaster/MenuBarIcon.swift"; \
+	if [ -n "$$stale" ]; then echo "Out of date with the vault:$$stale. Run make design (and copy the mark's C path into MenuBarIcon.swift)."; exit 1; fi
 
 clean:
 	rm -rf .build build
