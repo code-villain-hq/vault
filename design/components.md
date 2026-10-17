@@ -64,6 +64,17 @@ No dividers. 6px corners inside a list inset from the panel edge. Hover fills `h
 
 The active option in a menu or command list (the one the arrow keys move) uses a translucent `fg` tint at `highlight-tint` (8%), like a chip. A solid `hover` can match its host: in night, `dialog` and `hover` are the same tone. The tint stands apart on every host, and `fg`, `muted` and `faint` are checked on its composites.
 
+## Icon
+
+Interface icons are line icons from one set per toolkit: Lucide on the web, SF Symbols in AppKit. A curated picker set may come from Tabler's outline icons, like Forge's service icons. Don't mix sets on one screen, and don't draw one-off icons when the set has one.
+
+- **Size**: 15px beside text in rows, buttons, and nav, and inside the 28px icon button; 12px inside chips and pills. In AppKit, a symbol takes the point size of the text beside it.
+- **Stroke**: 1.75 on the web. SF Symbols use the weight of the text beside them.
+- **Colour**: `muted` by default, `fg` on hover and when current, `faint` for decoration. A status icon wears its `status-<name>-ink`. Never poison or cloak: poison is the strike and live dots, cloak is focus.
+- **Name**: an icon with no visible label carries an accessible name.
+
+Product marks and the menu bar glyph are brand, not interface icons. They follow [`brand/mark/`](../brand/mark/README.md).
+
 ## Live dot
 
 A small round `signal` dot for something happening now: unread, a running agent, a live sync. It wears the brand colour: `signal` is poison, moved only as far as the 3:1 non-text floor, so by day it stays nearer chartreuse than text would.
