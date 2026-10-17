@@ -14,7 +14,7 @@ a change to the mark reaches every image. Don't edit the outputs by hand.
 use the marks' own construction: ink letters on night, cut into a poison
 strike that runs edge to edge, the way the homepage logo extends it.
 
-- **V**: the V from [`mark/mark.svg`](../mark/mark.svg), right of centre on
+- **Mark**: CV from [`mark/mark.svg`](../mark/mark.svg), right of centre on
   desktop, clear of windows' usual middle; low on the phone, under the clock.
 - **Wordmark**: "Code Villain" from [`mark/logo-night.svg`](../mark/logo-night.svg),
   centred. The strike shows between the letters, as in the logo.

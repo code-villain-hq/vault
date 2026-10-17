@@ -20,27 +20,31 @@ def path(file, name):
     return re.search(rf'<path id="{name}" d="([^"]+)"', (MARKS / file).read_text()).group(1)
 
 
-# Each design in its source's units: the letters, their outline (left, right,
-# top, bottom), the strike's top and height, and the cut around the letters.
+def outline_box(d):
+    numbers = [float(n) for n in re.findall(r"-?\d+\.?\d*", d)]
+    xs, ys = numbers[0::2], numbers[1::2]
+    return min(xs), max(xs), min(ys), max(ys)
+
+
+# Each design in its source's units: the letters, the strike's top and
+# height, and the cut around the letters. Outlines are measured from the path.
 DESIGNS = {
-    "v": dict(d=path("mark.svg", "v"), box=(53.65, 141.7, 58.7, 153.65),
-              strike=(108, 15), cut=14),
-    "wordmark": dict(d=path("logo-night.svg", "lettering"), box=(10, 337.48, 10, 61.58),
-                     strike=(35.48, 8), cut=7),
+    "mark": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14),
+    "wordmark": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7),
 }
 
 # Per design and format: (width, height, centre x, strike centre y, size).
-# Size is the V's height, or the wordmark's width, as a fraction of the screen.
+# Size is the mark's height, or the wordmark's width, as a fraction of the screen.
 FORMATS = {
     "desktop-5k": (5120, 2880),
     "macbook": (3456, 2234),
     "phone": (1320, 2868),
 }
 PLACEMENT = {
-    # The V sits right of centre, clear of windows' usual middle; low on a phone, under the clock.
-    ("v", "desktop-5k"): (0.66, 0.56, 0.44),
-    ("v", "macbook"): (0.66, 0.56, 0.42),
-    ("v", "phone"): (0.50, 0.64, 0.26),
+    # The mark sits right of centre, clear of windows' usual middle; low on a phone, under the clock.
+    ("mark", "desktop-5k"): (0.66, 0.56, 0.36),
+    ("mark", "macbook"): (0.66, 0.56, 0.34),
+    ("mark", "phone"): (0.50, 0.64, 0.17),
     # The wordmark is centred, as on the homepage, with room around it.
     ("wordmark", "desktop-5k"): (0.50, 0.50, 0.46),
     ("wordmark", "macbook"): (0.50, 0.50, 0.50),
@@ -49,9 +53,9 @@ PLACEMENT = {
 
 
 def svg(design, width, height, cx, cy, size):
-    left, right, top, bottom = design["box"]
+    left, right, top, bottom = outline_box(design["d"])
     strike_top, strike_height = design["strike"]
-    vertical = design is DESIGNS["v"]
+    vertical = design is DESIGNS["mark"]
     scale = size * (height / (bottom - top) if vertical else width / (right - left))
     x = cx * width - (left + right) / 2 * scale
     y = cy * height - (strike_top + strike_height / 2) * scale

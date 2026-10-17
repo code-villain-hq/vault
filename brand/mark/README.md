@@ -1,10 +1,10 @@
 # Mark
 
-The strike. A gothic V with a poison bar behind it, cut where the letter crosses. Code Villain keeps the V as its compact mark; the full wordmark reads “Code Villain”. Naming rules live in [`../name.md`](../name.md).
+The strike. A gothic C and V with a poison bar behind them, cut where the letters cross: Code Villain's initials as its compact mark. The full wordmark reads “Code Villain”. Naming rules live in [`../name.md`](../name.md).
 
 | File | What it is |
 | --- | --- |
-| [`mark.svg`](mark.svg) | The V on its night tile. The app icon shape and the favicon. |
+| [`mark.svg`](mark.svg) | CV on its night tile. The app icon shape and the favicon. |
 | [`forge.svg`](forge.svg) | Forge's outlined F on the same night tile with the strike. |
 | [`layer.svg`](layer.svg) | Layer's L, built the same way. |
 | [`caster.svg`](caster.svg) | Caster's C, built the same way. |
@@ -19,11 +19,13 @@ Every letter is outlined from Grenze Gotisch 800. The files render without any f
 On a 200-unit tile:
 
 - **Tile**: night `#0A0B0D`, corner radius 45.
-- **V**: Grenze Gotisch 800, 150 units, centred, baseline at 152. Ink `#ECECF1`.
-- **Bar**: poison `#C9E265`, 15 units tall, top at 108, edge to edge. It sits behind the V.
-- **Cut**: the V cuts the bar with a 7-unit gap on each side of its strokes.
+- **Letters**: Grenze Gotisch 800. A product mark is its initial at 150 units, centred on its advance, baseline at 152. The studio mark is C and V at 0.88 of that, 1 unit apart, the pair centred with its middle at y=104.5. Ink `#ECECF1`.
+- **Bar**: poison `#C9E265`, 15 units tall, top at 108, edge to edge. It sits behind the letters.
+- **Cut**: the letters cut the bar with a 7-unit gap on each side of their strokes. In CV the two cuts meet, so the bar stops between the letters and the pair reads as one.
 
-The bar is low and heavy: it crosses the V below the middle, where the strokes come together.
+The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes every mark from the font.
+
+The V alone was the mark until October 2026. It said Villain but not Code, so the C joined it after the rename.
 
 The wordmark uses Grenze Gotisch 800 at 72 units, on a `348 × 72` viewBox. The strike is 8 units tall and centred 17.28 units above the baseline. It runs past both ends of the name, with a 7-unit stroke around the outlined letters cutting a gap in the bar.
 
