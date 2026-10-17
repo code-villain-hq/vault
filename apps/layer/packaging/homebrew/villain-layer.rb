@@ -16,7 +16,7 @@ cask "villain-layer" do
     regex(/layer-v?(\d+(?:\.\d+)+)/i)
   end
 
-  # macOS 26 is the oldest the tests run on (check.yml pins it). Lower this
+  # macOS 26 is the oldest Layer has been tested on. Lower this
   # once an older one has been tried.
   depends_on arch: :arm64
   depends_on macos: :tahoe

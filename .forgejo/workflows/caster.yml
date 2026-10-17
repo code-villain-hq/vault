@@ -1,0 +1,18 @@
+# Caster's build on every push that touches it.
+name: caster
+
+on:
+  push:
+    paths:
+      - "apps/caster/**"
+      - ".forgejo/workflows/caster.yml"
+
+jobs:
+  build:
+    runs-on: macos
+    defaults:
+      run:
+        working-directory: apps/caster
+    steps:
+      - uses: actions/checkout@v4
+      - run: make build

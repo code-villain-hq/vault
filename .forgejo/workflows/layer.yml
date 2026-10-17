@@ -1,0 +1,37 @@
+# `bun run check` for Layer on every push that touches it: the guard, the
+# frontend's tests, tsc, the frontend build, clippy and the Rust tests. It
+# runs on the MacBook's runner (label `macos`), because the app and its PTY
+# tests are macOS-only.
+#
+# On push only, never on pull_request: the runner is the Mac itself, and a
+# pull request from someone else's fork would run their code there.
+name: layer
+
+on:
+  push:
+    paths:
+      - "apps/layer/**"
+      - ".forgejo/workflows/layer.yml"
+
+jobs:
+  check:
+    runs-on: macos
+    defaults:
+      run:
+        working-directory: apps/layer
+    env:
+      # Line numbers for a failing test's backtrace, without the rest of the
+      # debug info: less to compile and link.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      # The git tests commit in temp repos and need an identity. Not
+      # `git config --global`: on this Mac that is the owner's own config.
+      GIT_AUTHOR_NAME: ci
+      GIT_AUTHOR_EMAIL: ci@localhost
+      GIT_COMMITTER_NAME: ci
+      GIT_COMMITTER_EMAIL: ci@localhost
+    steps:
+      - uses: actions/checkout@v4
+      - run: bun install --frozen-lockfile
+      # Every job gets a fresh checkout; the Rust build is kept between them
+      # so a push recompiles what changed, not the whole app.
+      - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/layer-target" bun run check

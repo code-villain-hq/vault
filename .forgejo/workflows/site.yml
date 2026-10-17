@@ -1,0 +1,22 @@
+# The website's build on every push that could change it: build.py checks
+# every local HTML and CSS dependency and fails on a missing one.
+name: site
+
+on:
+  push:
+    paths:
+      - "apps/site/**"
+      - "design/tokens/**"
+      - "brand/mark/**"
+      - "content/blog/**"
+      - ".forgejo/workflows/site.yml"
+
+jobs:
+  build:
+    runs-on: macos
+    defaults:
+      run:
+        working-directory: apps/site
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 build.py
