@@ -3,24 +3,36 @@
 Nightshade.
 
 Ground: night. The studio sits on #0A0B0D.
-Brand: cloak. Deep violet. #5A1470.
-Accent: poison. Chartreuse. #C9E265.
+Brand: poison. Chartreuse. #C9E265.
+Supporting: cloak. Deep violet. #5A1470.
 
-Grey does most of the work. Cloak is the brand, held to the strength
-of a grey: the main action's fill, the selected row. Poison is an
-accent, never the main thing.
+Grey does most of the work. Poison is the brand: the colour people
+remember, carried by the strike in every mark. Cloak supports it with
+depth and mood, and a lifted violet marks focus.
+
+Until October 2026 the roles were the other way round. Poison was
+already what people saw in every mark, so the brand now says so.
 
 ## Where poison goes
 
-- The focus ring.
 - One brand moment per surface: the strike through "Code Villain" on the
   homepage, the bar on a social card.
-- Small live signals: an unread dot, a running agent, a live sync.
 - The strike inside a product mark, wherever that product is shown.
+- The main action's fill, once per screen, with dark ink.
+- A faint tint for the selected row and the current nav item.
 
-Poison never colours links, labels, chips, or body copy. It never
-fills a large area, and it never sits on the cloak. Links are ink,
-bold, and underlined.
+Poison never colours links, labels, chips, or body copy, and it never
+fills a large area beyond that one action. Links are ink, bold, and
+underlined.
+
+## Where cloak goes
+
+- The focus ring, lifted to a readable violet on night.
+- Small live signals: an unread dot, a running agent, a live sync.
+- Depth on studio surfaces, such as the cube wallpaper.
+
+Cloak never sits under poison text, and neither colour tints the
+large neutral surfaces of an app.
 
 ## Night and day
 
@@ -40,27 +52,30 @@ hand-tuned night/day colour lists.
 | field         | `#1B1B1B` | `#F0F0F0` | Form controls in content.               |
 | field-hover   | `#1D1D1D` | `#EBEBEB` | Their hover.                            |
 | dialog-field  | `#141414` | `#F0F0F0` | Form controls inside a dialog.          |
-| dialog-field-hover | `#1B1B1B` | `#EBEBEB` | Their hover.                       |
+| dialog-field-hover | `#1B1B1B` | `#EBEBEB` | Their hover.                            |
 | hover         | `#1D1D1D` | `#EBEBEB` | Hover background.                       |
-| selected      | `#1B0D1F` | `#F3EFF5` | Selected row, current nav item.         |
+| selected      | `#1C1E13` | `#F6FAE6` | Selected row, current nav item: a poison tint. |
 | line          | `#2B2B2B` | `#E1E1E1` | Tables and menus only.                  |
 | fg            | `#EBEBEB` | `#181818` | Text and links.                         |
 | muted         | `#9B9B9B` | `#555555` | Secondary text, quiet buttons, chips.   |
 | faint         | `#969696` | `#5E5E5E` | Ids, counts, placeholders.              |
-| primary       | `#34183D` | `#E8DEEB` | The main action's fill.                 |
-| primary-hover | `#3B1846` | `#DBCBE0` | Its hover.                              |
-| on-primary    | `#EBEBEB` | `#181818` | Text on the main action.                |
-| accent        | `#C9E265` | `#607000` | Poison: focus and the brand moment.     |
-| signal        | `#C9E265` | `#7C9000` | Poison for live dots, at 3:1.           |
+| primary       | `#C9E265` | `#C9E265` | The main action's fill: poison.         |
+| primary-hover | `#B6CE50` | `#B6CE50` | Its hover.                              |
+| on-primary    | `#0B0B0B` | `#181818` | Dark text on the main action.           |
+| accent        | `#AF6BC8` | `#5A1470` | Cloak, lifted: focus.                   |
+| signal        | `#8F4CA7` | `#5A1470` | Cloak for live dots, at 3:1.            |
 | danger        | `#F27A6B` | `#B54338` | Errors, blocked.                        |
 | ok            | `#5CC9A7` | `#00775D` | Done, passing.                          |
 | warn          | `#E9AE45` | `#8C6100` | Waiting, in review.                     |
 | info          | `#7AAEF5` | `#396AAB` | In progress, neutral notices.           |
 
-By day, bright poison on white is 1.4:1, so the accent darkens to
-a readable shade of poison. Live dots carry no text, so `signal` stops
-at WCAG's 3:1 non-text floor and stays brighter. Ok is teal, so it never reads as poison. Greys stay
-achromatic in both modes; violet means the main action and selection.
+Poison is light, so it is a fill in its own right: the main action
+wears it as is in both modes, with dark ink at better than 12:1. By
+day its edge against white is only 1.4:1, so the button reads by
+colour; it is the one fill of its kind on the screen. Cloak is dark, so
+at night the accent lifts it to a readable violet; by day cloak itself
+is readable. Ok is teal, so it never reads as poison. Greys stay
+achromatic in both modes.
 
 Every text colour meets WCAG AA (4.5:1) on panel, in both modes.
 

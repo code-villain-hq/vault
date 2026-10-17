@@ -42,6 +42,10 @@ class ThemeTests(unittest.TestCase):
                 for host in hosts:
                     pill = mix(host, hue, result["opacity"]["status-tint"])
                     self.assertGreaterEqual(contrast(theme[f"status-{status}-ink"], pill), minimum)
+            # Secondary and tertiary text keep distinct tones at the default
+            # contrast. (At 0 and 100 they can still merge; not solved yet.)
+            if result["theme"]["contrast"] == 50:
+                self.assertNotEqual(theme["muted"], theme["faint"], mode)
             self.assertNotEqual(theme["dialog-field"], theme["dialog"])
             self.assertNotEqual(theme["dialog-field-hover"], theme["dialog"])
             self.assertEqual(set(theme), set(result["night"]))

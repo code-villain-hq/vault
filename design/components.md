@@ -66,4 +66,4 @@ The active option in a menu or command list (the one the arrow keys move) uses a
 
 ## Live dot
 
-A small round `signal` dot for something happening now: unread, a running agent, a live sync. One of the three places poison goes. `signal` is poison moved only to the 3:1 non-text floor, so by day the dot stays nearer chartreuse than the text-strength `accent`.
+A small round `signal` dot for something happening now: unread, a running agent, a live sync. `signal` is cloak lifted only to the 3:1 non-text floor, so at night the dot stays nearer the deep violet than the text-strength `accent`.

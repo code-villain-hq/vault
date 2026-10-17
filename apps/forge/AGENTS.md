@@ -29,8 +29,9 @@ including [`color.md`](../../brand/color.md) and
 [`type.md`](../../brand/type.md). Forge uses Nightshade in night and day,
 Atkinson Hyperlegible Next for interface text, Atkinson Hyperlegible Mono
 for code, and Grenze Gotisch only for display headings at 28px and above.
-Use cloak for primary actions and selection; reserve poison for focus and
-small live signals (`bg-signal` for live dots). Links use ink, bold and
+Poison is the brand: it fills the primary action (with dark ink) and
+tints selection. Cloak, lifted, marks focus and small live signals
+(`bg-signal` for live dots). Links use ink, bold and
 underlined.
 
 The sidebar wordmark uses Grenze Gotisch 700 at 28px, following

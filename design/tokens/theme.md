@@ -10,15 +10,15 @@ These are Code Villain's recipes, not Linear's implementation.
 ```json
 "theme": {
   "name": "Nightshade",
-  "base": "{cloak}",
-  "accent": "{poison}",
+  "base": "{poison}",
+  "accent": "{cloak}",
   "contrast": 50
 }
 ```
 
 | Input | Controls |
 | --- | --- |
-| `base` | The primary action and selection colour family. Neutral surfaces and text stay achromatic in both modes. Accepts a six-digit hex or a palette reference such as `{cloak}`. |
+| `base` | The primary action and selection colour family. Neutral surfaces and text stay achromatic in both modes. A light base (OKLCH lightness 0.7 and up, like poison) is a fill in its own right: the action wears it as is with dark ink; a darker base is mixed into the surfaces. Accepts a six-digit hex or a palette reference such as `{poison}`. |
 | `accent` | Focus and live signals. Never mixed into neutral surfaces, body text or large fills. Accepts hex or a palette reference. |
 | `contrast` | A number from 0 to 100. Widens surface steps and text separation around the default of 50. The text contrast floor remains at least 4.6:1; from 50 to 100 the target rises to 7:1. |
 
@@ -36,8 +36,10 @@ inputs every time someone changes a theme.
    defines frame, panel, surface, hover and line. Base and accent colours
    never tint these large surfaces. Contrast widens the steps while keeping the frame anchored
    and the day panel white.
-2. Mix the base into the appropriate ground for primary, primary hover and
-   selection. The base hue never turns into a large, fully saturated fill.
+2. Derive primary, primary hover and selection from the base. A dark base
+   is mixed into the appropriate ground; a light base is the primary fill
+   itself, lifted if needed so dark ink reads on it, and only a faint tint
+   of it marks selection. Neither turns into a large, fully saturated area.
 3. Derive dialog and field aliases from that hierarchy. Fields inset into
    a dialog keep a different tone from the dialog itself.
 4. Calculate text, icon and accent colours against every supported host;

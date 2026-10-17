@@ -108,6 +108,10 @@ def generate(source):
         channels(value)
         return value
     base, accent = seed("base"), seed("accent")
+    base_lightness, base_chroma, base_hue = oklch(base)
+    # Above this lightness a base can't be mixed into dark surfaces as a fill;
+    # it becomes the fill itself (Nightshade's poison is 0.87).
+    vivid = base_lightness >= 0.7
     amount = (strength - 50) / 50
     minimum = source["contrast"]["text"] + max(0, amount) * (7 - source["contrast"]["text"])
     result = {key: value for key, value in source.items() if key != "semantics"}
@@ -122,9 +126,16 @@ def generate(source):
             # Keep the frame anchored, and the day content white.
             shift = 0 if role in ("bg", "panel") else amount * (.012 if night else -.012)
             theme[role] = tone(level + shift, 0, 0)
-        theme["primary"] = mix(theme["surface"] if night else theme["panel"], base, .40 if night else .14)
-        theme["primary-hover"] = mix(theme["surface"] if night else theme["panel"], base, .50 if night else .22)
-        theme["selected"] = mix(theme["bg"] if night else theme["panel"], base, .20 if night else .07)
+        if vivid:
+            # A light base is a fill in its own right: the action wears it as
+            # is, with dark ink, and selection takes a faint tint of it.
+            theme["primary"] = base
+            theme["primary-hover"] = tone(base_lightness - .06, base_chroma, base_hue)
+            theme["selected"] = mix(theme["bg"] if night else theme["panel"], base, .09 if night else .16)
+        else:
+            theme["primary"] = mix(theme["surface"] if night else theme["panel"], base, .40 if night else .14)
+            theme["primary-hover"] = mix(theme["surface"] if night else theme["panel"], base, .50 if night else .22)
+            theme["selected"] = mix(theme["bg"] if night else theme["panel"], base, .20 if night else .07)
         theme.update({
             "dialog": theme["hover"] if night else theme["panel"],
             "field": theme["surface"], "field-hover": theme["hover"],
@@ -141,16 +152,27 @@ def generate(source):
                 text_hosts = hosts + [mix(host, theme["fg"], source["opacity"][tint])
                                       for tint in ("chip-tint", "highlight-tint") for host in hosts]
             theme[role] = readable(ink, text_hosts, mode, minimum)
-        # Extreme seed colours must not make the primary action unreadable.
-        ground = theme["surface"] if night else theme["panel"]
-        for role in ("primary", "primary-hover"):
-            original = theme[role]
-            for step in range(101):
-                theme[role] = mix(original, ground, step / 100)
-                if contrast(theme["fg"], theme[role]) >= minimum:
-                    break
-        theme["on-primary"] = readable(theme["fg"], [theme["primary"], theme["primary-hover"]], mode, minimum)
-        # Poison remains focus/live, never a large fill. Both modes derive from one hue.
+        if vivid:
+            # Dark ink on the light fill, in both modes. A fill too dark for
+            # black ink at this contrast rises in lightness until it carries it.
+            for role, start in (("primary", base_lightness), ("primary-hover", base_lightness - .06)):
+                level = start
+                while contrast("#000000", theme[role]) < minimum and level < 1:
+                    level += .005
+                    theme[role] = tone(level, base_chroma, base_hue)
+            dark = theme["bg"] if night else theme["fg"]
+            theme["on-primary"] = readable(dark, [theme["primary"], theme["primary-hover"]], "day", minimum)
+        else:
+            # Extreme seed colours must not make the primary action unreadable.
+            ground = theme["surface"] if night else theme["panel"]
+            for role in ("primary", "primary-hover"):
+                original = theme[role]
+                for step in range(101):
+                    theme[role] = mix(original, ground, step / 100)
+                    if contrast(theme["fg"], theme[role]) >= minimum:
+                        break
+            theme["on-primary"] = readable(theme["fg"], [theme["primary"], theme["primary-hover"]], mode, minimum)
+        # The accent marks focus and live signals, never a large fill. Both modes derive from one hue.
         theme["accent"] = readable(accent, hosts, mode, minimum)
         # Live dots carry no text: WCAG's 3:1 non-text floor keeps them nearer the seed.
         theme["signal"] = readable(accent, hosts, mode, source["contrast"]["signal"])

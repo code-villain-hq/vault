@@ -28,8 +28,8 @@
   },
   "theme": {
     "name": "Nightshade",
-    "base": "{cloak}",
-    "accent": "{poison}",
+    "base": "{poison}",
+    "accent": "{cloak}",
     "contrast": 50
   }
 }
