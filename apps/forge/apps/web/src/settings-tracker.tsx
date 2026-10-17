@@ -89,7 +89,7 @@ function NewTeamForm({ onDone }: { onDone: () => void }) {
             value={key}
             onChange={(e) => setKey(e.target.value.toUpperCase())}
             placeholder="KEY"
-            className="w-16 rounded-md ui-field bg-surface px-2 py-1 font-mono text-fg uppercase outline-none placeholder:text-faint"
+            className="w-16 rounded-md ui-field px-2 py-1 font-mono text-fg uppercase outline-none placeholder:text-faint"
           />
           <span className="font-mono">-1, -2, …</span>
         </label>

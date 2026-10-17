@@ -4,10 +4,8 @@ import { mkdir } from "node:fs/promises";
 const vault = new URL("../../../", import.meta.url);
 const destination = new URL("../apps/web/src/design/", import.meta.url);
 const files = [
-  ...["color.css", "color.json", "type.css", "shape.css"].map((name) => [
-    `design/tokens/${name}`,
-    name,
-  ]),
+  ["design/tokens/color.resolved.json", "color.json"],
+  ...["color.css", "type.css", "shape.css"].map((name) => [`design/tokens/${name}`, name]),
   ...[
     "fonts.css",
     "grenze-gotisch.ttf",

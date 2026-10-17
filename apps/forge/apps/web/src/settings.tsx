@@ -217,7 +217,7 @@ function InviteSection({
             value={link}
             aria-label="Invite link"
             onFocus={(e) => e.target.select()}
-            className="h-8 min-w-0 flex-1 rounded-md ui-field bg-surface px-2 font-mono text-xs text-muted outline-none"
+            className="h-8 min-w-0 flex-1 rounded-md ui-field px-2 font-mono text-xs text-muted outline-none"
           />
           <Button variant="secondary" onClick={() => void copy()}>
             {copied ? "Copied" : "Copy"}

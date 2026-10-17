@@ -33,6 +33,16 @@ below 560px the sidebar becomes a horizontal navigation row. The shared
 control rules are in [`design/components.md`](../../design/components.md):
 28px buttons, tinted chips and status pills, fields with focus rings, and
 elevation through tone. Shape tokens are bundled with color and type.
+Tint recipes stay translucent: `status-tint` and `chip-tint` blend with
+their host. Status text uses separate shared ink tokens; custom workflow
+colours use `statusStyle` to check ink against the composite without
+changing the stored hue. Dialogs use `dialog`, with `dialog-field` and
+`dialog-field-hover` for form controls inside them. The toolbar names the
+view; do not add a duplicate visible content heading. Preserve an accessible
+`h1`, and keep a record's actual title visible.
+Forge is the proving ground for these shared rules. Implement the system
+and test it in real views; bring broader changes to the overall design
+back for discussion rather than introducing product-specific exceptions.
 The Forge mark is the outlined gothic F with the strike from
 [`brand/mark/forge.svg`](../../brand/mark/forge.svg); `design:sync` copies it
 to the web icon. Don't substitute a typed initial or the old blue F.

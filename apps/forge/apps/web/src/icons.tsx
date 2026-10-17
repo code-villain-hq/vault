@@ -12,9 +12,9 @@ function Svg(props: SVGProps<SVGSVGElement>) {
 }
 
 /** A workflow state's icon, telling its team's review status apart. */
-export function StateIcon({ state }: { state: WorkflowState }) {
+export function StateIcon({ state, color }: { state: WorkflowState; color?: string }) {
   const review = useReviewStateIds().has(state.id);
-  return <StatusIcon type={state.type} color={state.color} review={review} />;
+  return <StatusIcon type={state.type} color={color ?? state.color} review={review} />;
 }
 
 /**

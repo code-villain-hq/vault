@@ -28,7 +28,12 @@
     "danger": "#F27A6B",
     "ok": "#5CC9A7",
     "warn": "#E9AE45",
-    "info": "#7AAEF5"
+    "info": "#7AAEF5",
+    "dialog": "{hover}",
+    "field": "{surface}",
+    "field-hover": "{hover}",
+    "dialog-field": "{panel}",
+    "dialog-field-hover": "{surface}"
   },
   "day": {
     "bg": "#F5F5F7",
@@ -47,6 +52,18 @@
     "danger": "#B5382C",
     "ok": "#1B7357",
     "warn": "#8A5A00",
-    "info": "#2F62B8"
+    "info": "#2F62B8",
+    "dialog": "{panel}",
+    "field": "{surface}",
+    "field-hover": "{hover}",
+    "dialog-field": "{surface}",
+    "dialog-field-hover": "{hover}"
+  },
+  "opacity": {
+    "status-tint": 0.13,
+    "chip-tint": 0.07
+  },
+  "contrast": {
+    "status-text": 4.6
   }
 }

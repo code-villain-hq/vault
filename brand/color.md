@@ -31,7 +31,12 @@ surface draws from these names, in both modes.
 | ------------- | --------- | --------- | --------------------------------------- |
 | bg            | `#0A0B0D` | `#F5F5F7` | The frame: sidebar, top bar, page.      |
 | panel         | `#12131A` | `#FFFFFF` | Where content sits.                     |
-| surface       | `#191A23` | `#F0F0F2` | Fields, notes, raised cards.            |
+| surface       | `#191A23` | `#F0F0F2` | Notes, raised cards.                    |
+| dialog        | `#1B1C26` | `#FFFFFF` | A dialog above the content.             |
+| field         | `#191A23` | `#F0F0F2` | Form controls in content.               |
+| field-hover   | `#1B1C26` | `#EAEAED` | Their hover.                            |
+| dialog-field  | `#12131A` | `#F0F0F2` | Form controls inside a dialog.          |
+| dialog-field-hover | `#191A23` | `#EAEAED` | Their hover.                       |
 | hover         | `#1B1C26` | `#EAEAED` | Hover background.                       |
 | selected      | `#1A0D24` | `#F3EAF7` | Selected row, current nav item.         |
 | line          | `#2A2B36` | `#E3E3E7` | Tables and menus only.                  |
@@ -52,6 +57,13 @@ deep poison. Ok is teal, so it never reads as poison. Day greys carry
 no violet; violet means the main action and selection.
 
 Every text colour meets WCAG AA (4.5:1) on panel, in both modes.
+
+Tinted elements blend with the surface beneath them. Status pills use the
+semantic hue at 13% opacity; quiet chips use `fg` at 7%. Preserve that
+compositing rather than substituting a solid background. Status text and
+dots use separate `status-<name>-ink` tokens so the fill keeps its hue while
+the ink stays readable on the resulting tint. The recipes and supported
+hosts are defined in [`design/components.md`](../design/components.md).
 
 ## The palette
 

@@ -14,7 +14,9 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 
 ## Sidebar
 
-- The app's name at the top in Grenze Gotisch, 28px. The only Grenze in the frame.
+- The fixed product wordmark at the top in Grenze Gotisch, 28px, weight 700. The only Grenze in the frame. It reads "Forge" in Forge regardless of the workspace name.
+- Global Search and the product's create action (New issue in Forge) sit together at the right of the wordmark row, as quiet 28px icon buttons with accessible names. They do not occupy a separate row between the workspace and navigation.
+- The workspace picker is a separate row below the product identity and above navigation. It shows the workspace's avatar and name; switching workspace never renames the product wordmark.
 - Items in the `ui` role, text `muted`, 6px corners. Hover fills `hover` and turns the text `fg`.
 - The current item fills `selected`, with text `fg` at 700.
 - A count shows only when it asks for something: unread, waiting in Triage. The page you're on shows no count; its list says it. Empty counts never show.
@@ -28,12 +30,13 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 
 ## Content
 
-- A view header: the title in the `title` role, then its count in `faint`. No line under it.
+- The top-bar breadcrumb names the view. Do not repeat that generic title as a large heading in the content: Inbox should not open with another visible "Inbox". Keep one accessible `h1` for the page, visually hidden when the toolbar already provides its visible name.
+- A record's actual title remains visible in the `title` role (and editable where supported). Its identifier may appear in the breadcrumb. The accessible heading names the record, not only its identifier.
 - Lists inset 0.5rem from the panel's edge. Rows have 6px corners and no dividers; hover and selection are tone steps.
 - The view leads with one primary action at most. Everything else is a secondary button.
 
 ## Narrow windows
 
-Under 560px the sidebar becomes a row of items across the top, without the app's name or group labels. The content keeps its 0.5rem inset on both sides.
+The current fallback under 560px turns the sidebar into a row of items across the top, without the app's name or group labels. The content keeps its 0.5rem inset on both sides. This is not a finished mobile layout; the mobile redesign is deferred. Live sync and help controls must remain visible outside the navigation scroller.
 
 The [night-and-day page](https://claude.ai/artifact/GWrPzZDeYbkcRKiMW7E9gy) draws this frame in both modes.

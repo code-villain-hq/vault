@@ -28,7 +28,17 @@
     "danger": "#F27A6B",
     "ok": "#5CC9A7",
     "warn": "#E9AE45",
-    "info": "#7AAEF5"
+    "info": "#7AAEF5",
+    "dialog": "#1B1C26",
+    "field": "#191A23",
+    "field-hover": "#1B1C26",
+    "dialog-field": "#12131A",
+    "dialog-field-hover": "#191A23",
+    "status-ok-ink": "#5CC9A7",
+    "status-warn-ink": "#E9AE45",
+    "status-danger-ink": "#F27A6B",
+    "status-info-ink": "#7AAEF5",
+    "status-neutral-ink": "#9B9BA8"
   },
   "day": {
     "bg": "#F5F5F7",
@@ -47,6 +57,23 @@
     "danger": "#B5382C",
     "ok": "#1B7357",
     "warn": "#8A5A00",
-    "info": "#2F62B8"
+    "info": "#2F62B8",
+    "dialog": "#FFFFFF",
+    "field": "#F0F0F2",
+    "field-hover": "#EAEAED",
+    "dialog-field": "#F0F0F2",
+    "dialog-field-hover": "#EAEAED",
+    "status-ok-ink": "#19694F",
+    "status-warn-ink": "#805400",
+    "status-danger-ink": "#A53328",
+    "status-info-ink": "#2C5BAB",
+    "status-neutral-ink": "#55555D"
+  },
+  "opacity": {
+    "status-tint": 0.13,
+    "chip-tint": 0.07
+  },
+  "contrast": {
+    "status-text": 4.6
   }
 }

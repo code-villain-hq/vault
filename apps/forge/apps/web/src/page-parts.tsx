@@ -5,7 +5,8 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import type { User } from "@forge/types";
 import { CalendarDays, Ellipsis, Plus } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
+import { statusStyle } from "./contrast";
 import { formatDate } from "./data";
 import { Avatar } from "./icons";
 import { Picker } from "./picker";
@@ -120,9 +121,9 @@ export function StatusChip({
       selected={[value]}
       onSelect={onChange}
       triggerClassName="ui-status flex h-7 max-w-64 items-center gap-1.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      triggerStyle={{ "--status-color": current?.color } as CSSProperties}
+      triggerStyle={statusStyle(current?.color)}
     >
-      {current && <Dot color={current.color} />}
+      {current && <Dot color="currentColor" />}
       {current?.label}
     </Picker>
   );

@@ -2,6 +2,7 @@
 // nearest shade of the same colour with enough contrast (WCAG) on Forge's
 // backgrounds, separately for light and dark mode.
 
+import type { CSSProperties } from "react";
 import colors from "./design/color.json";
 
 /** Include selection as well as neutral surfaces when shading user-chosen colors. */
@@ -11,6 +12,11 @@ const grounds = (theme: typeof colors.night) => [
   theme.surface,
   theme.hover,
   theme.selected,
+  theme.dialog,
+  theme.field,
+  theme["field-hover"],
+  theme["dialog-field"],
+  theme["dialog-field-hover"],
 ];
 const LIGHT = grounds(colors.day);
 const DARK = grounds(colors.night);
@@ -64,4 +70,31 @@ export function readable(hex: string, minimum = 3): string {
   const light = shadeFor(hex, LIGHT, "#000000", minimum);
   const dark = shadeFor(hex, DARK, "#ffffff", minimum);
   return `light-dark(${light}, ${dark})`;
+}
+
+/** Translucent status fill, with ink checked against the resulting composite. */
+export function statusStyle(color = "var(--muted)"): CSSProperties & {
+  "--status-color": string;
+  "--status-ink": string;
+} {
+  const semantic = /^var\(--(ok|warn|danger|info|muted|faint)\)$/.exec(color)?.[1];
+  if (semantic) {
+    const name = semantic === "muted" || semantic === "faint" ? "neutral" : semantic;
+    return {
+      "--status-color": name === "neutral" ? "var(--muted)" : color,
+      "--status-ink": `var(--status-${name}-ink)`,
+    };
+  }
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return statusStyle();
+  const ink = (grounds: string[], toward: string) =>
+    shadeFor(
+      color,
+      grounds.map((ground) => mix(ground, color, colors.opacity["status-tint"])),
+      toward,
+      colors.contrast["status-text"],
+    );
+  return {
+    "--status-color": color,
+    "--status-ink": `light-dark(${ink(LIGHT, "#000000")}, ${ink(DARK, "#ffffff")})`,
+  };
 }

@@ -55,7 +55,7 @@
 
 @utility ui-chip {
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
   color: var(--muted);
   font-size: var(--type-control-size);
   font-weight: var(--type-control-weight);
@@ -64,12 +64,16 @@
 
 @utility ui-status {
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--status-color, var(--muted)) 13%, transparent);
-  /* Day-mode ink darkens to keep AA contrast on the 13% tint. */
-  color: light-dark(
-    color-mix(in srgb, var(--status-color, var(--muted)) 90%, black),
-    var(--status-color, var(--muted))
-  );
+  background: color-mix(in srgb, var(--status-color, var(--muted)) var(--status-tint), transparent);
+  color: var(--status-ink, var(--status-neutral-ink));
+  &:hover,
+  &[data-popup-open] {
+    background: color-mix(
+      in srgb,
+      var(--status-color, var(--muted)) var(--status-tint),
+      transparent
+    );
+  }
   font-size: var(--type-control-size);
   font-weight: 700;
   line-height: var(--type-control-leading);
@@ -77,14 +81,14 @@
 
 @utility ui-field {
   border: 1px solid transparent;
-  background: var(--surface);
+  background: var(--field);
   color: var(--fg);
   outline: none;
   &::placeholder {
     color: var(--faint);
   }
   &:hover {
-    background: var(--hover);
+    background: var(--field-hover);
   }
   &:focus,
   &:focus-within {
@@ -101,12 +105,15 @@
   background: var(--surface);
 }
 .app-dialog {
+  --field: var(--dialog-field);
+  --field-hover: var(--dialog-field-hover);
   max-height: calc(100dvh - 2rem);
   overflow-y: auto;
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--dialog);
 }
 .app-topbar {
+  --field: var(--panel);
   background: var(--bg);
 }
 :where(.workspace-content) > :where(main, div, p, section) {
@@ -120,8 +127,8 @@
 .app-sidebar .nav-link.active .nav-count {
   display: none;
 }
-.app-sidebar .ui-field {
-  background: var(--panel);
+.app-sidebar {
+  --field: var(--panel);
 }
 
 /* The shared frame becomes a horizontal navigation row below 560px. */

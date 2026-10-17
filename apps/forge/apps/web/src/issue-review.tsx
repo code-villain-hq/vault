@@ -99,7 +99,7 @@ export function ReviewBar({ issue }: { issue: Issue }) {
                 setSendingBack(false);
               }
             }}
-            className="field-sizing-content min-h-16 resize-none rounded-md ui-field bg-surface px-3 py-2 outline-none placeholder:text-faint"
+            className="field-sizing-content min-h-16 resize-none rounded-md ui-field px-3 py-2 outline-none placeholder:text-faint"
           />
           <div className="flex gap-2">
             <Button disabled={!feedback.trim() || !working} onClick={sendBack}>

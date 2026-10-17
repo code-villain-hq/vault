@@ -1,9 +1,9 @@
 // Pickers for an issue's fields. Each comes compact (an icon, for list rows)
 // or as a chip (icon and text, in the row of fields on the issue page).
 import type { Issue } from "@forge/types";
-import { type CSSProperties, useMemo } from "react";
+import { useMemo } from "react";
 import { AvatarWorkDot } from "./agent-work";
-import { readable } from "./contrast";
+import { statusStyle } from "./contrast";
 import { byId, PRIORITY_LABELS, useLabels, useStates, useTeamStates, useUsers } from "./data";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon, ServiceIcon, StateIcon } from "./icons";
 import { chip } from "./page-parts";
@@ -40,15 +40,11 @@ export function StatusPicker({ issue, variant = "compact" }: { issue: Issue; var
           ? "ui-status flex h-7 items-center gap-1.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-accent"
           : compactTrigger
       }
-      triggerStyle={
-        variant === "chip"
-          ? ({
-              "--status-color": current ? readable(current.color, 6) : "var(--muted)",
-            } as CSSProperties)
-          : undefined
-      }
+      triggerStyle={variant === "chip" ? statusStyle(current?.color) : undefined}
     >
-      {current && <StateIcon state={current} />}
+      {current && (
+        <StateIcon state={current} color={variant === "chip" ? "currentColor" : undefined} />
+      )}
       {variant === "chip" && <ChipText>{current?.name ?? "Status"}</ChipText>}
     </Picker>
   );

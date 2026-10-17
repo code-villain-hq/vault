@@ -34,7 +34,11 @@ also uses `label`; it follows the layout’s navigation styling.
 
 ## Field
 
-A tone step with no border, in the `ui` type role: fill `surface`, text `fg`, placeholder `faint`. In the frame (top bar, sidebar), the fill is `panel`. Hover fills `hover`. Focus draws one ring on the edge: border `accent` plus a 3px glow of `accent` at 22%.
+A tone step with no border, in the `ui` type role: fill `field`, text `fg`, placeholder `faint`. Hover fills `field-hover`. In the frame (top bar, sidebar), the fill is `panel`. Inside a dialog, use `dialog-field` and `dialog-field-hover` instead: a field must remain distinct from its host in both modes. Focus draws one ring on the edge: border `accent` plus a 3px glow of `accent` at 22%.
+
+## Dialog
+
+Fill `dialog`, `radius-lg`, with a dimmed backdrop. No elevation border or shadow. By night the dialog sits above `surface` and its fields sit below it in tone; by day it is white with grey fields. These roles are explicit so a field never accidentally takes its dialog's fill. Inline title and prose editors can remain transparent; they belong to the document rather than a boxed form.
 
 ## Link
 
@@ -42,11 +46,17 @@ Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. 
 
 ## Status pill
 
-Round. The status colour (`ok`, `warn`, `danger`, `info`) as text and a leading dot, on a 13% tint of itself. The `control` role at 700.
+Round, in the `control` role at 700. Composite the status colour (`ok`, `warn`, `danger`, `info`, or a user-chosen hue) at `status-tint` (13%) over the actual surface. Keep this fill translucent; do not bake it against one background.
+
+Text and the leading dot use `status-<name>-ink`; `status-neutral-ink` covers quiet states, whose tint source is `muted`. The ink is checked at 4.5:1 or better against the composite on frame, panel, surface, hover, selection, dialog, and field tones in both modes. Do not use the adjusted ink as the tint source: that would change the fill's hue and strength. Hover and open states keep the same tint and ink.
+
+For user-chosen colours, keep the chosen hue as the tint source and adjust its ink toward black by day or white by night until it meets the same contrast requirement on all supported hosts. This changes presentation, never the stored colour.
 
 ## Chip
 
-Round. Text `muted` in the `control` role, on `fg` at 7%. A label is detail, not a signal.
+Round. Text `muted` in the `control` role, on a translucent `fg` tint at `chip-tint` (7%). A label is detail, not a signal.
+
+Tints are recipes, not precomputed solid colours. Chips and status pills blend with their host; the base surface provides the ground. When a tint carries text, check the resulting composite in each supported context and adjust the ink rather than removing the tint.
 
 ## Row
 

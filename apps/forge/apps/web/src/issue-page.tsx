@@ -890,7 +890,7 @@ function Activity({
             />
           ),
         )}
-        <div className="rounded-lg ui-field bg-surface">
+        <div className="rounded-lg ui-field">
           <MentionTextarea
             aria-label="Write a comment"
             placeholder="Leave a comment… (@ to mention, ⌘↵ to send)"
@@ -1001,7 +1001,7 @@ function CommentView({
               value={draft}
               onChange={setDraft}
               onUploading={setUploading}
-              className="field-sizing-content min-h-12 resize-none rounded-md ui-field bg-surface px-2 py-1 outline-none"
+              className="field-sizing-content min-h-12 resize-none rounded-md ui-field px-2 py-1 outline-none"
             />
             <div className="flex gap-2">
               <Button

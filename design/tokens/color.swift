@@ -15,6 +15,15 @@ enum ColorTokens {
     static let line = "#2A2B36"
   }
 
+  enum Opacity {
+    static let statusTint: Double = 0.13
+    static let chipTint: Double = 0.07
+  }
+
+  enum Contrast {
+    static let statusText: Double = 4.6
+  }
+
   struct Theme {
     let bg: String
     let panel: String
@@ -33,6 +42,16 @@ enum ColorTokens {
     let ok: String
     let warn: String
     let info: String
+    let dialog: String
+    let field: String
+    let fieldHover: String
+    let dialogField: String
+    let dialogFieldHover: String
+    let statusOkInk: String
+    let statusWarnInk: String
+    let statusDangerInk: String
+    let statusInfoInk: String
+    let statusNeutralInk: String
   }
 
   static let night = Theme(
@@ -52,7 +71,17 @@ enum ColorTokens {
     danger: "#F27A6B",
     ok: "#5CC9A7",
     warn: "#E9AE45",
-    info: "#7AAEF5"
+    info: "#7AAEF5",
+    dialog: "#1B1C26",
+    field: "#191A23",
+    fieldHover: "#1B1C26",
+    dialogField: "#12131A",
+    dialogFieldHover: "#191A23",
+    statusOkInk: "#5CC9A7",
+    statusWarnInk: "#E9AE45",
+    statusDangerInk: "#F27A6B",
+    statusInfoInk: "#7AAEF5",
+    statusNeutralInk: "#9B9BA8"
   )
 
   static let day = Theme(
@@ -72,6 +101,16 @@ enum ColorTokens {
     danger: "#B5382C",
     ok: "#1B7357",
     warn: "#8A5A00",
-    info: "#2F62B8"
+    info: "#2F62B8",
+    dialog: "#FFFFFF",
+    field: "#F0F0F2",
+    fieldHover: "#EAEAED",
+    dialogField: "#F0F0F2",
+    dialogFieldHover: "#EAEAED",
+    statusOkInk: "#19694F",
+    statusWarnInk: "#805400",
+    statusDangerInk: "#A53328",
+    statusInfoInk: "#2C5BAB",
+    statusNeutralInk: "#55555D"
   )
 }

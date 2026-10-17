@@ -63,7 +63,7 @@ export function Picker({
           id={triggerId}
           aria-label={label}
           style={triggerStyle}
-          className={`flex items-center gap-1.5 outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover ${triggerClassName.includes("ui-chip") || triggerClassName.includes("ui-status") ? "" : "rounded-md"} ${triggerClassName}`}
+          className={`flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-accent ${triggerClassName.includes("ui-status") ? "" : "hover:bg-hover data-popup-open:bg-hover"} ${triggerClassName.includes("ui-chip") || triggerClassName.includes("ui-status") ? "" : "rounded-md"} ${triggerClassName}`}
           onClick={(event) => event.stopPropagation()}
         >
           {children}

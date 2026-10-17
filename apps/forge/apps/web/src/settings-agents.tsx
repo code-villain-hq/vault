@@ -283,7 +283,7 @@ function AgentRow({
               if (e.key === "Enter") save();
               if (e.key === "Escape") setRenaming(null);
             }}
-            className="h-7 flex-1 rounded-md ui-field bg-surface px-2 font-medium outline-none"
+            className="h-7 flex-1 rounded-md ui-field px-2 font-medium outline-none"
           />
         )}
         {isAdmin && renaming === null && (
@@ -412,7 +412,7 @@ function Runner({
           onKeyDown={(e) => {
             if (e.key === "Escape") setEditing(null);
           }}
-          className="h-7 flex-1 rounded-md ui-field bg-surface px-2 font-mono outline-none"
+          className="h-7 flex-1 rounded-md ui-field px-2 font-mono outline-none"
         />
         <Button type="submit" className="h-7 px-2 text-xs" disabled={!editing.trim()}>
           Save

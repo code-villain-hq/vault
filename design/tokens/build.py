@@ -12,10 +12,58 @@ c = json.load(open("color.json"))
 s = json.load(open("shape.json"))
 t = json.load(open("type.json"))
 
+# Resolve role aliases before calculating ink against translucent status fills.
+def resolve(theme, key, path=()):
+    if key in path:
+        raise ValueError(f"Circular colour alias: {path + (key,)}")
+    value = theme[key]
+    if value.startswith("{") and value.endswith("}"):
+        return resolve(theme, value[1:-1], path + (key,))
+    return value
+
+def channels(hex):
+    return [int(hex[i:i + 2], 16) for i in (1, 3, 5)]
+
+def mix(ground, source, opacity):
+    return "#" + "".join(
+        f"{int(a * (1 - opacity) + b * opacity + 0.5):02X}"
+        for a, b in zip(channels(ground), channels(source))
+    )
+
+def luminance(hex):
+    srgb = [x / 255 for x in channels(hex)]
+    linear = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in srgb]
+    return sum(x * weight for x, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+def contrast(a, b):
+    low, high = sorted((luminance(a), luminance(b)))
+    return (high + 0.05) / (low + 0.05)
+
+for mode in ("night", "day"):
+    theme = c[mode] = {key: resolve(c[mode], key) for key in c[mode]}
+    hosts = [theme[key] for key in (
+        "bg", "panel", "surface", "hover", "selected", "dialog", "field",
+        "field-hover", "dialog-field", "dialog-field-hover",
+    )]
+    for status in ("ok", "warn", "danger", "info", "neutral"):
+        hue = theme["muted" if status == "neutral" else status]
+        composites = [mix(host, hue, c["opacity"]["status-tint"]) for host in hosts]
+        for step in range(101):
+            ink = mix(hue, "#FFFFFF" if mode == "night" else "#000000", step / 100)
+            if all(contrast(ink, bg) >= c["contrast"]["status-text"] for bg in composites):
+                theme[f"status-{status}-ink"] = ink
+                break
+        else:
+            raise ValueError(f"No readable ink for {mode} {status}")
+
+# Apps that need numerical colour values consume the same resolved aliases as CSS/Swift.
+open("color.resolved.json", "w").write(json.dumps(c, indent=2) + "\n")
+
 # Palette colours that share a name with a semantic token are covered by it in CSS.
 palette_only = [k for k in c["palette"] if k not in c["night"]]
 css = ['/* Generated from color.json. Night is the default; set data-theme="day" for the apps\' light mode. */', ":root {"]
 css += [f"  --{k}: {c['palette'][k]};" for k in palette_only]
+css += [f"  --{k}: {v * 100:g}%;" for k, v in c["opacity"].items()]
 css += ["}", "", ":root,", '[data-theme="night"] {', "  color-scheme: dark;"]
 css += [f"  --{k}: {v};" for k, v in c["night"].items()]
 css += ["}", "", '[data-theme="day"] {', "  color-scheme: light;"]
@@ -25,6 +73,10 @@ open("color.css", "w").write("\n".join(css))
 
 sw = ["import Foundation", "", "// Generated from color.json.", "enum ColorTokens {", "  enum Palette {"]
 sw += [f'    static let {camel(k)} = "{v}"' for k, v in c["palette"].items()]
+sw += ["  }", "", "  enum Opacity {"]
+sw += [f"    static let {camel(k)}: Double = {v}" for k, v in c["opacity"].items()]
+sw += ["  }", "", "  enum Contrast {"]
+sw += [f"    static let {camel(k)}: Double = {v}" for k, v in c["contrast"].items()]
 sw += ["  }", "", "  struct Theme {"]
 sw += [f"    let {camel(k)}: String" for k in c["night"]]
 sw += ["  }", ""]

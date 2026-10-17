@@ -676,7 +676,7 @@ function ServiceProperties({ service }: { service: Service }) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
-              className="h-8 w-full rounded-md ui-field bg-surface px-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint"
+              className="h-8 w-full rounded-md ui-field px-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint"
             />
             <datalist id="forge-repositories">
               {repositories.map((r) => (
@@ -705,7 +705,7 @@ function ServiceProperties({ service }: { service: Service }) {
               if (paths.join("\n") !== service.paths.join("\n"))
                 sync.update("Service", service.id, { paths });
             }}
-            className="field-sizing-content min-h-20 w-full resize-none rounded-md ui-field bg-surface p-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint"
+            className="field-sizing-content min-h-20 w-full resize-none rounded-md ui-field p-2 font-mono text-xs outline-none placeholder:font-sans placeholder:text-faint"
           />
         }
       >
