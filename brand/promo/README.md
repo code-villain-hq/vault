@@ -10,17 +10,21 @@ a change to the mark reaches every image. Don't edit the outputs by hand.
 
 ## Wallpapers
 
-[`wallpapers/`](wallpapers): the V from [`mark/mark.svg`](../mark/mark.svg)
-in ink on night, with its poison strike run edge to edge, the way the
-homepage logo extends it. The V sits right of centre on desktop, clear of
-the menu bar and windows' usual centre; on the phone it sits low, under
-the clock.
+[`wallpapers/`](wallpapers) has two designs, each for three screens. Both
+use the marks' own construction: ink letters on night, cut into a poison
+strike that runs edge to edge, the way the homepage logo extends it.
 
-| File | Size |
+- **V**: the V from [`mark/mark.svg`](../mark/mark.svg), right of centre on
+  desktop, clear of windows' usual middle; low on the phone, under the clock.
+- **Wordmark**: "Code Villain" from [`mark/logo-night.svg`](../mark/logo-night.svg),
+  centred. The strike shows between the letters, as in the logo.
+
+| Screen | Size |
 | --- | --- |
-| `code-villain-desktop-5k` | 5120 × 2880, 16:9 displays |
-| `code-villain-macbook` | 3456 × 2234, MacBook Pro 16" |
-| `code-villain-phone` | 1320 × 2868, phones |
+| `desktop-5k` | 5120 × 2880, 16:9 displays |
+| `macbook` | 3456 × 2234, MacBook Pro 16" |
+| `phone` | 1320 × 2868, phones |
 
-Each comes as an SVG and a PNG. To regenerate, run `python3 build.py`
-from `wallpapers/`; it needs Google Chrome to render the PNGs.
+Files are named `code-villain-<design>-<screen>`, as SVG and PNG. To
+regenerate, run `python3 build.py` from `wallpapers/`; it needs Google
+Chrome to render the PNGs.
