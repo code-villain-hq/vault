@@ -30,7 +30,7 @@ export function WorkspaceHome() {
   );
 }
 
-const VIEWS: { id: string; label: string; types: StateType[] }[] = [
+const VIEWS: { id: ViewId; label: string; types: StateType[] }[] = [
   {
     id: "all",
     label: "All issues",
@@ -40,6 +40,8 @@ const VIEWS: { id: string; label: string; types: StateType[] }[] = [
   { id: "backlog", label: "Backlog", types: ["backlog"] },
 ];
 
+type ViewId = "all" | "active" | "backlog";
+const VIEW_IDS: readonly ViewId[] = ["all", "active", "backlog"];
 const LAYOUTS = ["list", "board"] as const;
 const GROUPINGS: readonly GroupBy[] = ["status", "service"];
 
@@ -49,7 +51,8 @@ export function TeamIssuesPage() {
   const issues = useRecords("Issue");
   const states = useStates();
   const newIssue = useNewIssue();
-  const [view, setView] = useState("active");
+  // Each team opens on the view last chosen for it on this device.
+  const [view, setView] = useRemembered(`forge:view:${key}`, VIEW_IDS, "active");
   const [layout, setLayout] = useRemembered("forge:layout", LAYOUTS, "list");
   const [groupBy, setGroupBy] = useRemembered("forge:group-by", GROUPINGS, "status");
   const [filters, setFilters] = useState<Filters>({});
@@ -110,24 +113,27 @@ export function TeamIssuesPage() {
   );
 }
 
-/** A choice remembered on this device; `fallback` until there is one, or without storage. */
+/** A choice remembered on this device; `fallback` until there is one, or without storage.
+ * The key can change while the page stays (another team's page): the choice is read again. */
 function useRemembered<T extends string>(
   key: string,
   choices: readonly T[],
   fallback: T,
 ): [T, (value: T) => void] {
-  const [value, setValue] = useState<T>(() => {
+  const read = (): T => {
     try {
       const saved = localStorage.getItem(key);
       return choices.find((choice) => choice === saved) ?? fallback;
     } catch {
       return fallback;
     }
-  });
+  };
+  const [state, setState] = useState(() => ({ key, value: read() }));
+  const value = state.key === key ? state.value : read();
   return [
     value,
     (next) => {
-      setValue(next);
+      setState({ key, value: next });
       try {
         localStorage.setItem(key, next);
       } catch {
@@ -178,7 +184,7 @@ function Toggle<T extends string>({
   );
 }
 
-function ViewTabs({ view, onChange }: { view: string; onChange: (view: string) => void }) {
+function ViewTabs({ view, onChange }: { view: ViewId; onChange: (view: ViewId) => void }) {
   return (
     <div role="tablist" className="flex items-center gap-1">
       {VIEWS.map((v) => (
