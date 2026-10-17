@@ -16,11 +16,11 @@ strike that runs edge to edge, the way the homepage logo extends it.
 
 - **Mark**: CV from [`mark/mark.svg`](../mark/mark.svg), right of centre on
   desktop, clear of windows' usual middle; low on the phone, under the clock.
-- **Waves**: the mark as above, on seigaiha, the traditional Japanese wave
-  pattern, drawn in a grey a step above night as quiet texture. The letters'
-  cut clears the waves around them, so the mark still leads.
 - **Wordmark**: "Code Villain" from [`mark/logo-night.svg`](../mark/logo-night.svg),
   centred. The strike shows between the letters, as in the logo.
+- **Rows**: the wordmark design on a wall of staggered grey wordmarks, a
+  step above night. The lit name sits in a cleared row of its own, so it
+  reads as one name called out of many.
 
 | Screen | Size |
 | --- | --- |

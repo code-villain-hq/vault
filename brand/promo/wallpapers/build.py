@@ -14,9 +14,9 @@ HERE = pathlib.Path(__file__).parent
 MARKS = (HERE / "../../mark").resolve()
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 GROUND, INK, POISON = "#0A0B0D", "#ECECF1", "#C9E265"
-# Seigaiha, the traditional wave pattern, as quiet texture: grey rings a
-# step above night, so the mark and its strike stay the one bright moment.
-WAVE = "#17181C"
+# The rows pattern repeats the wordmark in a grey a step above night, so
+# the lit wordmark and its strike stay the one bright moment.
+TEXTURE = "#1A1B20"
 
 
 def path(file, name):
@@ -34,8 +34,8 @@ def outline_box(d):
 # the screen's height or width. Outlines are measured from the path.
 DESIGNS = {
     "mark": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14, by="height"),
-    "waves": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14, by="height", waves=True),
     "wordmark": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7, by="width"),
+    "rows": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7, by="width", rows=True),
 }
 
 # Per design and format: (width, height, centre x, strike centre y, size).
@@ -50,30 +50,34 @@ PLACEMENT = {
     ("mark", "desktop-5k"): (0.66, 0.56, 0.36),
     ("mark", "macbook"): (0.66, 0.56, 0.34),
     ("mark", "phone"): (0.50, 0.64, 0.17),
-    # The waves wallpaper keeps the mark's placement; the letters' cut clears the waves around them.
-    ("waves", "desktop-5k"): (0.66, 0.56, 0.36),
-    ("waves", "macbook"): (0.66, 0.56, 0.34),
-    ("waves", "phone"): (0.50, 0.64, 0.17),
     # The wordmark is centred, as on the homepage, with room around it.
     ("wordmark", "desktop-5k"): (0.50, 0.50, 0.46),
     ("wordmark", "macbook"): (0.50, 0.50, 0.50),
     ("wordmark", "phone"): (0.50, 0.58, 0.80),
+    # Rows of grey wordmarks, with the lit one in a row of its own.
+    ("rows", "desktop-5k"): (0.50, 0.50, 0.46),
+    ("rows", "macbook"): (0.50, 0.50, 0.50),
+    ("rows", "phone"): (0.50, 0.58, 0.80),
 }
 
 
-def waves(width, height):
-    """Rows of overlapping fans, each lower row drawn over the one above."""
-    radius = max(width, height) / 26
-    rings = "".join(f'<circle r="{radius * f:.1f}" fill="none" stroke="{WAVE}" stroke-width="{radius * 0.07:.1f}"/>'
-                    for f in (0.93, 0.7, 0.47))
-    motif = f'<g id="wave"><circle r="{radius:.1f}" fill="{GROUND}"/>{rings}</g>'
+def rows(design, width, height, clear_top, clear_bottom):
+    """Staggered rows of the wordmark, leaving the lit row's band clear."""
+    left, right, top, bottom = outline_box(design["d"])
+    scale = max(width, height) * 0.15 / (right - left)
+    word, tall = (right - left) * scale, (bottom - top) * scale
+    step, gap = tall * 1.3, word * 0.08
     uses = []
-    for row in range(int(height / (radius / 2)) + 3):
-        y = row * radius / 2
-        offset = radius if row % 2 else 0
-        for column in range(-1, int(width / (2 * radius)) + 2):
-            uses.append(f'<use href="#wave" x="{column * 2 * radius + offset:.1f}" y="{y:.1f}"/>')
-    return motif, "".join(uses)
+    for row in range(-1, int(height / step) + 2):
+        y = row * step
+        if y + tall > clear_top - step * 0.4 and y < clear_bottom + step * 0.4:
+            continue
+        offset = (word + gap) / 2 if row % 2 else 0
+        for column in range(-1, int(width / (word + gap)) + 2):
+            x = column * (word + gap) + offset
+            uses.append(f'<use href="#letters" transform="translate({x - left * scale:.1f} {y - top * scale:.1f}) '
+                        f'scale({scale:.4f})" fill="{TEXTURE}"/>')
+    return "".join(uses)
 
 
 def svg(design, width, height, cx, cy, size):
@@ -83,16 +87,11 @@ def svg(design, width, height, cx, cy, size):
     x = cx * width - (left + right) / 2 * scale
     y = cy * height - (strike_top + strike_height / 2) * scale
     place = f"translate({x:.2f} {y:.2f}) scale({scale:.4f})"
-    motif, texture = waves(width, height) if design.get("waves") else ("", "")
-    if texture:
-        # Clear the waves around the letters by drawing the cut in the ground
-        # colour: a mask over thousands of shapes renders unreliably.
-        texture += (f'<use href="#letters" transform="{place}" fill="{GROUND}" stroke="{GROUND}" '
-                    f'stroke-width="{design["cut"]}" stroke-linejoin="round"/>')
+    texture = rows(design, width, height, y + top * scale, y + bottom * scale) if design.get("rows") else ""
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>Code Villain</title>
   <defs>
-    <path id="letters" d="{design["d"]}"/>{motif}
+    <path id="letters" d="{design["d"]}"/>
     <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="{width}" height="{height}">
       <rect width="{width}" height="{height}" fill="#fff"/>
       <use href="#letters" transform="{place}" fill="#000" stroke="#000" stroke-width="{design["cut"]}" stroke-linejoin="round"/>
