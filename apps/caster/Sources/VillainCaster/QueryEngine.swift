@@ -309,7 +309,7 @@ final class QueryEngine {
                       Snippets.value(for: defaultsKey) != nil else { continue }
                 items.append(snippetItem(field))
             }
-            if items.count == 3 { break }
+            if items.count == 5 { break }
         }
         return items
     }

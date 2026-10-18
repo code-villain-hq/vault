@@ -26,7 +26,7 @@ Type `help` (or `?`) in the launcher for this list in-app.
 | `move window` | Send focused window to next display (only with 2+ monitors)¹ |
 | `sleep` / `lock` / `trash` / `dark` | Sleep Mac, lock screen, empty trash², toggle dark mode² |
 | `quit` | Quit Caster |
-| *(empty)* | Your 3 most-used items (frecency: usage count with 7-day half-life) |
+| *(empty)* | Your 5 most-used items (frecency: usage count with 7-day half-life) |
 
 ¹ needs Accessibility permission — ² needs a one-time Automation approval
 
