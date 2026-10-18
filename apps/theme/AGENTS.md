@@ -1,6 +1,6 @@
 # Code Villain theme: notes for coding agents
 
-The studio's editor and terminal theme, in night and day: a VS Code (and Cursor) extension, a Neovim colorscheme, and WezTerm colour schemes. Its colours are the Nightshade palette for code. Run commands from this folder.
+The studio's editor and terminal theme, in night and day: a VS Code (and Cursor) extension, a Neovim colorscheme, WezTerm colour schemes, and a starship prompt. Its colours are the Nightshade palette for code. Run commands from this folder.
 
 The colours are generated from the vault's tokens: `design/tokens/syntax.resolved.json` for code and `color.resolved.json` for the editor's frame. Never edit `vscode/themes/*.json`, `nvim/lua/code-villain/palette.lua` or `wezterm/*.toml` by hand. To change colours or which scopes get which colour, edit `design/tokens/syntax.json`, run `python3 build.py` there, then:
 
@@ -36,5 +36,7 @@ WezTerm: point `color_scheme_dirs` at this folder's `wezterm/` and pick the sche
 config.color_scheme_dirs = { wezterm.home_dir .. "/code/villain/villain-vault/apps/theme/wezterm" }
 config.color_scheme = wezterm.gui.get_appearance():find("Dark") and "Code Villain Night" or "Code Villain Day"
 ```
+
+The shell prompt: `starship/code-villain.toml` is a starship theme (zephyr's layout) written only in ANSI colour names, so the terminal's scheme colours it in night and day, and green is poison. It is written by hand, since it has no colours of its own to generate. Link it as `~/.config/starship/code-villain.toml`, then with zephyr's prompt plugin set `zstyle ':zephyr:plugin:prompt' theme starship code-villain` (or point `STARSHIP_CONFIG` at it).
 
 For Cursor, reload the window and pick "Code Villain Night" or "Code Villain Day" with ⌘K ⌘T. After a rebuild, raise `version` in `vscode/package.json` and install again.
