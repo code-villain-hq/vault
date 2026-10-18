@@ -27,7 +27,7 @@ There are two ways for the phone to reach the Mac. Use either, or both.
 
 A phone you no longer use: **Forget** in the list. It is out at once.
 
-**Keep the Mac awake.** Turn on the cup in the top bar. With a way in on,
+**Keep the Mac awake.** Turn on the cup at the foot of the sidebar. With a way in on,
 it holds the Mac awake while any agent is running, not only while one is
 working, so one waiting on you is still there to answer. Closing the lid
 still sleeps the Mac; leave it open, or use it closed only on power with an

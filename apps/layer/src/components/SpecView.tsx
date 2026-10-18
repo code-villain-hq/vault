@@ -127,6 +127,7 @@ export function SpecView({ task }: { task: TaskView }) {
     .filter((p) => edits[slotKey(p.part, p.checkout_id)] !== undefined)
     .map((p) => ({ part: p.part, checkoutId: p.checkout_id }));
   const toApprove = all.filter((f) => edits[slotKey(f.part, f.checkoutId)] !== undefined || (partView(spec, f.part, f.checkoutId)?.stale && editorText(state, f.part, f.checkoutId).trim()));
+  const canApprove = !drafting && !busy && toApprove.length > 0;
 
   async function quick() {
     setBusy(true);
@@ -212,7 +213,9 @@ export function SpecView({ task }: { task: TaskView }) {
 
   return (
     <div className="spec">
-      <SpecStartAgent task={task} spec={spec} agentId={agentId} setAgentId={setAgentId} />
+      {/* One primary on the screen: approving what is waiting comes before
+          starting an agent on it. */}
+      <SpecStartAgent task={task} spec={spec} agentId={agentId} setAgentId={setAgentId} quiet={canApprove} />
       <div className="spec-steps">
         {PARTS.map((p, i) => {
           const vs = filesOf(spec, p).map((f) => partView(spec, f.part, f.checkoutId)!);
@@ -288,8 +291,8 @@ export function SpecView({ task }: { task: TaskView }) {
           </button>
         )}
         <button
-          className="btn btn-sm btn-primary"
-          disabled={!!drafting || busy || toApprove.length === 0}
+          className={`btn btn-sm${canApprove ? " btn-primary" : ""}`}
+          disabled={!canApprove}
           title={repos.some((r) => r.in_repo) ? `Write it ${current === "tasks" || !many ? "to its repository" : "to every repository"} and commit it on the task's branch` : "Keep it as the approved spec"}
           onClick={() => tryApprove(toApprove)}
         >

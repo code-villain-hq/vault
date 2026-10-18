@@ -75,7 +75,7 @@ export function IssueTypeIcon({
         height={size}
         alt={type.name}
         title={type.name}
-        style={{ flex: "none", display: "block", borderRadius: 3 }}
+        style={{ flex: "none", display: "block", borderRadius: "var(--radius-sm)" }}
       />
     );
   }

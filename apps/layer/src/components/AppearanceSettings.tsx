@@ -195,7 +195,7 @@ function ThemePicker({ value, onPick }: { value: ThemeChoice; onPick: (theme: Th
   );
 }
 
-/** The app in miniature: top bar, task list, a page with text, statuses and a button. */
+/** The app in miniature: the frame and its sidebar, a page with text, statuses and a button. */
 function Preview({ theme, half }: { theme: Theme; half?: boolean }) {
   return (
     <div className={`theme-preview${half ? " left-half" : ""}`} data-theme={theme} aria-hidden>

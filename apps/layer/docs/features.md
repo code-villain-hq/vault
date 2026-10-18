@@ -434,7 +434,7 @@ shows as a banner above the terminals.
   as it happens, not at the next poll.
 - **STATE-6** A usage-limit notice MUST NOT fire on prose that merely
   mentions limits. It clears when the agent next reports working.
-- **STATE-7** With **Keep awake** on (the cup in the top bar), the Mac
+- **STATE-7** With **Keep awake** on (the cup at the sidebar's foot), the Mac
   MUST NOT idle-sleep while at least one agent, in a task or a chat, is
   working, and MUST be free to sleep again within one attention pass (5 s)
   of the last one stopping. Asking, done, idle and shells do not count. The
@@ -799,9 +799,10 @@ The Reviews view has two tabs, one for each side of a review. "To review"
 lists open PRs waiting on your review, excluding your own, and, when a
 review team is set, those waiting on that team. "Opened by you" lists the
 open PRs you opened, and where each one stands. The tab last used is kept;
-a banner or message about a review request opens "To review". The top
-bar's Reviews tab carries both counts, as its tabs show them, `1 · 7`: it
-used to show only the first, so seven PRs of yours read as none.
+a banner or message about a review request opens "To review". The
+sidebar's Reviews item counts only what waits on your review, since that is
+what asks something of you; its tooltip and the view's tabs give both
+counts, so PRs of yours are never read as none.
 
 - **REV-1** A failed team lookup MUST NOT hide your own list. It shows as
   an error on the team section.
@@ -1019,7 +1020,7 @@ Known gaps:
 | Agents waiting on you | on | banners and the dock count; the message center keeps them either way (MSG-2) |
 | Put terminals back when the app reopens | on | PANE-7 |
 | Let agents read terminal output | **off** | MCP `pane_output`, `handoff_prompt` |
-| Keep awake (the cup in the top bar) | off | STATE-7, PHONE-8 |
+| Keep awake (the cup at the sidebar's foot) | off | STATE-7, PHONE-8 |
 | Remote access: Tailscale | off | PHONE-1, PHONE-2 |
 | Remote access: Home network and router VPN | off | PHONE-1, PHONE-2 |
 | Remote access: Let phones type into agents | off | PHONE-7 |
@@ -1131,17 +1132,23 @@ Code: `previous.rs`, `secrets.rs` (`adopt`).
 
 ## 15. The window
 
-The window has no native title bar: the app's top bar takes its place,
-under the traffic lights.
+The window has no native title bar. It is the studio's frame
+(`design/layouts/app-window.md`): a sidebar down the left, with the Layer
+wordmark beside the traffic lights, then the profile, the views, and on
+Work the tasks; a top bar across the rest that says where you are; and the
+view in an inset panel. A view's count shows only when it asks for
+something: agents that need you on Work, reviews waiting on you on
+Reviews, repositories to fix on Repos. A running agent or chat is a live
+dot. The sidebar can be hidden from the top bar, views and all.
 
 - **WIN-1** The window MUST move when you drag any empty part of the top
-  bar, and zoom when you double-click it, as a native title bar does. Its
-  tabs and buttons stay clickable. This is Tauri's `data-tauri-drag-region`
+  bar or the sidebar's wordmark row, and zoom when you double-click it, as a
+  native title bar does. Their buttons stay clickable. This is Tauri's `data-tauri-drag-region`
   with the `core:window:allow-start-dragging` permission; the CSS
   `-webkit-app-region` does nothing in macOS's WebKit, and a window built on
   it could not be moved at all.
 
-Code: `App.tsx` (`TopBar`), `src-tauri/capabilities/default.json`.
+Code: `App.tsx` (`FrameSidebar`, `Nav`, `TopBar`), `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 
@@ -1246,7 +1253,7 @@ the home network). How to set either up is in `docs/phone.md`.
   awake while any agent runs, not only while one works: one asking for
   permission is exactly the one you would answer from the phone. Closing
   the lid still sleeps the Mac.
-- **PHONE-9** The top bar MUST show a phone once a phone is paired: green,
+- **PHONE-9** The sidebar's foot MUST show a phone once a phone is paired: green,
   naming it, while a paired phone has the app open; grey otherwise, saying
   whether phone access is off. A click opens Settings → Remote access.
 
@@ -2025,7 +2032,7 @@ Known gaps:
 ## 22. Usage
 
 Every agent's process is a run, from its start to its exit, and every task
-finished or deleted is kept as it ended. The Usage view in the top bar
+finished or deleted is kept as it ended. The Usage view in the sidebar
 says what agents used and what came of it over the last 7, 30 or 90 days:
 the tokens, the time agents spent working and waiting on you, the tasks
 finished and how long the typical one took from start to finish; a bar a
@@ -2467,7 +2474,8 @@ window of its own. Here that window is its own copy of the app, with its own
 Dock icon, so a profile for work and one for your own projects run side by
 side and never see each other.
 
-The profile button at the foot of the sidebar names the window's profile.
+The profile button under the Layer wordmark, at the top of the sidebar,
+names the window's profile.
 Its menu lists every profile and says which are open. Choosing one opens it
 in a new window, or brings forward the window it already has. The menu also
 makes a new profile, and renames or deletes one.

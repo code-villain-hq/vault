@@ -2,18 +2,18 @@
    repository), the editor, and beside it the requirements and the tasks. */
 .spec { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .spec-repos { display: flex; gap: 4px; padding: 8px 14px 0; }
-.spec-repo { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-md); background: transparent; font-family: var(--font-mono); font-size: 13px; }
+.spec-repo { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-md); background: transparent; font-family: var(--font-mono); font-size: var(--type-ui-small-size); }
 .spec-repo.active { background: var(--selected); }
-.spec-repo .muted { font-size: 11px; color: var(--muted); }
+.spec-repo .muted { font-size: var(--type-ui-small-size); color: var(--muted); }
 .spec-steps { display: flex; align-items: center; gap: 6px; padding: 8px 14px; flex-wrap: wrap; }
 .spec-step { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: var(--radius-md); background: transparent; }
 .spec-step.active { background: var(--selected); }
-.spec-num { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
+.spec-num { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: var(--type-ui-small-size); color: var(--muted); }
 .spec-num.done { color: var(--status-ok-ink); background: color-mix(in srgb, var(--ok) var(--status-tint), transparent); }
-.spec-state { font-size: 11px; color: var(--muted); }
+.spec-state { font-size: var(--type-ui-small-size); color: var(--muted); }
 .spec-state.approved { color: var(--status-ok-ink); }
 .spec-state.draft, .spec-state.changed, .spec-state.out-of-date { color: var(--status-warn-ink); }
-.spec-home { font-family: var(--font-mono); font-size: 12px; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spec-home { font-family: var(--font-mono); font-size: var(--type-ui-small-size); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spec-tell { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: color-mix(in srgb, var(--warn) var(--status-tint), transparent); }
 .spec-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; flex-wrap: wrap; }
 .spec-body { flex: 1; min-height: 0; display: flex; }
@@ -30,11 +30,11 @@
 .spec-side p { margin: 0; line-height: 1.45; }
 .spec-reqs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .spec-reqs li { line-height: 1.45; }
-.spec-reqs b { font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-right: 6px; }
-.spec-verdict { font-size: 11px; margin-right: 6px; padding: 0 5px; border-radius: 4px; border: 1px solid currentColor; }
-.spec-verdict.met { color: var(--status-ok-ink); }
-.spec-verdict.not-met { color: var(--status-danger-ink); }
-.spec-verdict.unclear { color: var(--status-warn-ink); }
+.spec-reqs b { font-family: var(--font-mono); font-size: var(--type-ui-small-size); color: var(--faint); margin-right: 6px; }
+.spec-verdict { font-size: var(--type-ui-small-size); font-weight: 700; margin-right: 6px; padding: 0 6px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--status-color, var(--muted)) var(--status-tint), transparent); }
+.spec-verdict.met { color: var(--status-ok-ink); --status-color: var(--ok); }
+.spec-verdict.not-met { color: var(--status-danger-ink); --status-color: var(--danger); }
+.spec-verdict.unclear { color: var(--status-warn-ink); --status-color: var(--warn); }
 .spec-check { margin-top: 10px; align-items: center; gap: 8px; }
 .spec-stale { color: var(--status-warn-ink); }
 .spec-tasks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
@@ -45,13 +45,13 @@
 /* Start agent, once for the task, above its files (SPEC-12). */
 .spec-start-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; flex-wrap: wrap; background: var(--panel); }
 .spec-start-bar select { width: auto; max-width: 260px; }
-.spec-working { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.spec-working { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
 /* What needs the user first: specs from before, a copy changed outside the
    app, an agent's proposal (SPEC-22, SPEC-24, SPEC-25). */
 .spec-banner { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: color-mix(in srgb, var(--info) var(--status-tint), transparent); line-height: 1.45; }
 .spec-banner > span { flex: 1; }
 .spec-banner.warn { background: color-mix(in srgb, var(--warn) 10%, transparent); }
-.spec-tag { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-right: 6px; }
+.spec-tag { font-family: var(--font-mono); font-size: var(--type-ui-small-size); color: var(--muted); margin-right: 6px; }
 .spec-checks { display: flex; flex-direction: column; }
 .spec-checks .spec-check { margin-top: 8px; }
 .spec-start p { max-width: 560px; }
@@ -64,16 +64,16 @@
 .spec-question { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface); }
 .spec-question.answered { border-color: var(--line); background: transparent; }
 .spec-question-text { display: flex; gap: 6px; align-items: baseline; line-height: 1.45; }
-.spec-question-text b { font-family: var(--font-mono); font-size: 11px; color: var(--faint); flex: none; }
+.spec-question-text b { font-family: var(--font-mono); font-size: var(--type-ui-small-size); color: var(--faint); flex: none; }
 .spec-question-text span:nth-child(2) { flex: 1; }
 .spec-question-done { color: var(--status-ok-ink); flex: none; }
 .spec-options { display: flex; flex-wrap: wrap; gap: 4px; }
 /* A drafted answer is a sentence: a button's nowrap ran it out of the panel, cut off. */
-.spec-option { max-width: 100%; padding: 2px 8px; border-radius: var(--radius-md); background: transparent; font-size: 12px; line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.spec-option { max-width: 100%; padding: 2px 8px; border-radius: var(--radius-md); background: transparent; font-size: var(--type-ui-small-size); line-height: 1.4; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .spec-option:hover:not(:disabled) { background: var(--hover); }
 /* As specific as the plain button's hover, which otherwise greys a picked answer while the pointer is still on it. */
 .spec-option.active, .spec-option.active:hover:not(:disabled) { background: var(--selected); color: var(--fg); }
-.spec-question input { font-size: 12px; padding: 4px 8px; }
+.spec-question input { font-size: var(--type-ui-small-size); padding: 4px 8px; }
 .spec-applied { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--info) var(--status-tint), transparent); line-height: 1.45; }
 .spec-applied span { flex: 1; }
 .spec-apply { align-items: center; gap: 8px; }

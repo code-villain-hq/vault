@@ -408,7 +408,7 @@ export function PrPanel({
                     : "var(--faint)",
             }}
           />
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, width: 140 }}>{r.repo}</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--type-ui-small-size)", width: 140 }}>{r.repo}</span>
           <span>
             {r.pr && r.pr.state === "open"
               ? `PR #${r.pr.number} open`
@@ -463,7 +463,10 @@ export function PrPanel({
         </button>
         {entries > 0 && (
           <button
-            className="btn btn-sm btn-primary"
+            // The primary only while a repository still waits for its pull
+            // request; under review, the feedback is what needs acting on.
+            className={`btn btn-sm${pending.length > 0 && review === "incomplete" ? " btn-primary" : ""}`}
+            aria-label="Open a pull request"
             disabled={pending.length === 0}
             title={
               pending.length === 0
@@ -505,7 +508,7 @@ export function PrPanel({
               : " No repository has changes to open one with."}
           </div>
           <button
-            className="btn btn-primary"
+            className={`btn${pending.length > 0 ? " btn-primary" : ""}`}
             disabled={pending.length === 0}
             onClick={() => { setLeftOut([]); setCreating(true); }}
           >

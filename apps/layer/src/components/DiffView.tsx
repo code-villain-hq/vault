@@ -869,7 +869,7 @@ export function DiffView({ task }: { task: TaskView }) {
             </>
           }
         >
-          <p style={{ marginTop: 0, color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0, color: "var(--muted)", fontSize: "var(--type-ui-small-size)", lineHeight: 1.5 }}>
             Nothing is running in this task. Pick an agent to start — your{" "}
             {queued.length} queued note{queued.length === 1 ? "" : "s"} become its opening prompt.
           </p>

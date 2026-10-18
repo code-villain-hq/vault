@@ -214,7 +214,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               {busy ? (
                 <button className="btn btn-sm" onClick={stop}>Stop</button>
               ) : (
-                <button className="btn btn-sm btn-primary" disabled={over || (!draft.trim() && images.length === 0)} onClick={() => void send()}>Send</button>
+                <button className={`btn btn-sm${over || (!draft.trim() && images.length === 0) ? "" : " btn-primary"}`} disabled={over || (!draft.trim() && images.length === 0)} onClick={() => void send()}>Send</button>
               )}
             </div>
           </div>

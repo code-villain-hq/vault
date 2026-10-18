@@ -392,10 +392,10 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             </p>
             {offerResume.length > 0 && (
               <div className="row" style={{ marginBottom: 6 }}>
-                {offerResume.map((r) => (
+                {offerResume.map((r, i) => (
                   <button
                     key={r.agent_id}
-                    className="btn btn-primary"
+                    className={`btn${i === 0 ? " btn-primary" : ""}`}
                     onClick={() => void resume(r.agent_id)}
                   >
                     ⟲ Resume {r.name}
@@ -503,7 +503,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
               onChange={chooseAcp}
             />
           )}
-          <div className="muted" style={{ fontSize: 11 }}>
+          <div className="muted" style={{ fontSize: "var(--type-ui-small-size)" }}>
             Starts in <code>{scope
               ? task.checkouts.find((c) => c.id === scope)?.path
               : task.root}</code>

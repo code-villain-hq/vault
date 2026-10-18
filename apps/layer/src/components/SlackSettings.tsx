@@ -220,7 +220,7 @@ export function SlackSettings() {
             rows={16}
             value={JSON.stringify(botManifest(name), null, 2)}
             onFocus={(e) => e.currentTarget.select()}
-            style={{ marginTop: 10, fontSize: 11 }}
+            style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}
           />
         )}
       </div>

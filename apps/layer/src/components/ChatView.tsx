@@ -221,8 +221,9 @@ export function ChatView() {
             </p>
             <div className="row">
               {installed.length === 0 && <span>No agent CLIs found on your PATH.</span>}
-              {installed.map((a) => (
-                <button key={a.id} className="btn btn-primary" onClick={() => void start(a.id)}>
+              {/* One primary: the first agent; the others are a choice beside it. */}
+              {installed.map((a, i) => (
+                <button key={a.id} className={`btn${i === 0 ? " btn-primary" : ""}`} onClick={() => void start(a.id)}>
                   Start {a.name}
                 </button>
               ))}

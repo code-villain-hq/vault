@@ -208,7 +208,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
     <Modal title="Update from base" onClose={() => !busy && onClose()} footer={footer}>
       {results === null && conflicted.length === 0 && (
         <>
-          <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: 13 }}>
+          <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}>
             Fetches each base first.{" "}
             {only ? HOW[only] : HOW_BOTH} Push afterwards to
             update the PRs. Each repo starts the way its team updates branches; hover to see why.
@@ -322,7 +322,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
       {conflicted.length > 0 && (
         <div style={{ marginTop: results ? 14 : 0 }}>
-          <p className="muted" style={{ lineHeight: 1.55, fontSize: 13, marginTop: 0 }}>
+          <p className="muted" style={{ lineHeight: 1.55, fontSize: "var(--type-ui-small-size)", marginTop: 0 }}>
             {results
               ? "What stopped is left in progress where it stopped, so the conflicts can be resolved."
               : "An earlier update is still in progress."}{" "}
