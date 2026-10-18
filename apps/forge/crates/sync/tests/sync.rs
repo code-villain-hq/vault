@@ -2320,6 +2320,71 @@ async fn review_notifications_do_not_repeat(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_new_reviewer_hears_though_an_older_request_is_unread(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let carol = add_person(&pool, &f, "Carol").await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    let id = new_issue(
+        &pool,
+        &f,
+        json!({ "state_id": f.state("In Progress"), "reviewer_id": bob.user_id }),
+    )
+    .await;
+    move_to(&pool, claude, id, f.state("In Review")).await;
+    let choose = |reviewer: Actor| {
+        apply(
+            &pool,
+            f.actor,
+            vec![update(
+                ModelKind::Issue,
+                id,
+                json!({ "reviewer_id": reviewer.user_id }),
+            )],
+        )
+    };
+
+    // Carol, then Bob again, neither having read theirs.
+    choose(carol).await.unwrap();
+    choose(bob).await.unwrap();
+
+    assert_eq!(reviews(&pool, bob, id).await.len(), 2);
+    assert_eq!(reviews(&pool, carol, id).await.len(), 1);
+    choose(carol).await.unwrap();
+    assert_eq!(reviews(&pool, carol, id).await.len(), 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn accepting_straight_into_review_makes_you_the_reviewer(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let carol = add_person(&pool, &f, "Carol").await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    // Carol accepted it once before it went back to Triage.
+    let id = new_issue(&pool, &f, json!({ "state_id": f.state("Triage") })).await;
+    move_to(&pool, carol, id, f.state("Todo")).await;
+    move_to(&pool, carol, id, f.state("Triage")).await;
+
+    move_to(&pool, bob, id, f.state("In Review")).await;
+
+    assert_eq!(
+        issue(&pool, f.actor, id).await.reviewer_id,
+        Some(bob.user_id)
+    );
+    // He moved it himself, so nobody hears.
+    assert!(reviews(&pool, bob, id).await.is_empty());
+    assert!(reviews(&pool, carol, id).await.is_empty());
+
+    // An agent taking it straight into review isn't a reviewer: the creator is.
+    let other = new_issue(&pool, &f, json!({ "state_id": f.state("Triage") })).await;
+    move_to(&pool, claude, other, f.state("In Review")).await;
+    assert_eq!(
+        issue(&pool, f.actor, other).await.reviewer_id,
+        Some(f.actor.user_id)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_reviewer_is_a_person_and_hears_comments(pool: PgPool) {
     let f = seed(&pool).await;
     let bob = add_person(&pool, &f, "Bob").await;

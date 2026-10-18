@@ -194,7 +194,7 @@ async fn apply_operation(
             let before = current(db, actor, *model, *id).await?;
             let mut data = data.clone();
             if *model == ModelKind::Issue {
-                review::fill_in(db, actor.workspace_id, *id, before.as_ref(), &mut data).await?;
+                review::fill_in(db, actor, *id, before.as_ref(), &mut data).await?;
             }
             let record = update(db, actor, *model, *id, &data)
                 .await?
@@ -737,7 +737,7 @@ async fn add_server_fields(
                 row.insert("state_id".into(), json!(state));
             }
             let id = uuid_field(row, "id")?;
-            review::fill_in(db, actor.workspace_id, id, None, row).await?;
+            review::fill_in(db, actor, id, None, row).await?;
         }
         ModelKind::Comment => {
             row.insert("author_id".into(), json!(actor.user_id));

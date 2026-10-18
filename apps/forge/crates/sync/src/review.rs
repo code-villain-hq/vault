@@ -2,7 +2,7 @@
 //! in when the issue enters review without one, and tells the reviewer it's
 //! ready ("Reviewer filled in at review" and "Ready for review").
 
-use forge_domain::AGENT_EMAIL_DOMAIN;
+use forge_domain::{AGENT_EMAIL_DOMAIN, Actor};
 use serde_json::{Map, Value, json};
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -31,12 +31,13 @@ pub(crate) async fn review_state(
 
 /// Before a write to an issue: when it takes the issue into review and
 /// leaves it without a reviewer, makes the person who last accepted it out
-/// of Triage its reviewer, or else its creator if a person created it.
-/// `before` is the issue as it was (`None` when it's being created) and
-/// `data` the fields written.
+/// of Triage its reviewer (the actor, when this write takes it straight out
+/// of Triage), or else its creator if a person created it. `before` is the
+/// issue as it was (`None` when it's being created) and `data` the fields
+/// written.
 pub(crate) async fn fill_in(
     db: &mut PgConnection,
-    workspace_id: Uuid,
+    actor: Actor,
     issue_id: Uuid,
     before: Option<&Value>,
     data: &mut Map<String, Value>,
@@ -54,8 +55,23 @@ pub(crate) async fn fill_in(
     {
         return Ok(());
     }
-    let creator = field("created_by");
-    if let Some(reviewer) = fallback(db, workspace_id, issue_id, creator).await? {
+    let from_triage = match before.and_then(|b| uuid_at(b, "state_id")) {
+        Some(from) => sqlx::query_scalar::<_, bool>(
+            "SELECT type = 'triage' FROM workflow_states WHERE id = $1",
+        )
+        .bind(from)
+        .fetch_optional(&mut *db)
+        .await?
+        .unwrap_or(false),
+        None => false,
+    };
+    let reviewer = if from_triage && is_person(db, actor.workspace_id, actor.user_id).await? {
+        Some(actor.user_id)
+    } else {
+        let creator = field("created_by");
+        fallback(db, actor.workspace_id, issue_id, creator).await?
+    };
+    if let Some(reviewer) = reviewer {
         data.insert("reviewer_id".into(), json!(reviewer));
     }
     Ok(())
@@ -89,21 +105,33 @@ async fn fallback(
     if accepted.is_some() {
         return Ok(accepted);
     }
-    Ok(sqlx::query_scalar(
-        "SELECT u.id FROM users u JOIN workspace_members m ON m.user_id = u.id \
-         AND m.workspace_id = $1 WHERE u.id = $2 AND u.kind = 'person'",
+    Ok(match creator {
+        Some(creator) if is_person(db, workspace_id, creator).await? => Some(creator),
+        _ => None,
+    })
+}
+
+/// Whether someone is a person (not an agent) in the workspace.
+async fn is_person(
+    db: &mut PgConnection,
+    workspace_id: Uuid,
+    user: Uuid,
+) -> Result<bool, SyncError> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM users u JOIN workspace_members m ON m.user_id = u.id \
+         AND m.workspace_id = $1 WHERE u.id = $2 AND u.kind = 'person')",
     )
     .bind(workspace_id)
-    .bind(creator)
-    .fetch_optional(&mut *db)
+    .bind(user)
+    .fetch_one(&mut *db)
     .await?)
 }
 
 /// Who hears that an issue is ready for review after a change: its
 /// reviewer when it enters review (or, without one, the admins who are
 /// people), or a new reviewer while it's in review. Never whoever made the
-/// change, nor, unless it was sent back since, anyone with an unread review
-/// notification for it already.
+/// change, nor, unless they're newly its reviewer or it was sent back since,
+/// anyone with an unread review notification for it already.
 pub(crate) async fn to_notify(
     db: &mut PgConnection,
     workspace_id: Uuid,
@@ -142,10 +170,12 @@ pub(crate) async fn to_notify(
         }
     };
     people.retain(|p| *p != actor);
-    // Sent back and resubmitted: asked again, read or not. Only Forge
-    // bouncing it (for conflicts or failing checks) and returning it, or a
-    // change of reviewer, waits for the unread one.
-    if moved && sent_back(db, workspace_id, issue, state).await? {
+    // A new reviewer is asked, read or not, and so is the reviewer when it was
+    // sent back and resubmitted. Only Forge bouncing it (for conflicts or
+    // failing checks) and returning it waits for the unread one.
+    if (new_reviewer && reviewer.is_some())
+        || (moved && sent_back(db, workspace_id, issue, state).await?)
+    {
         return Ok(people);
     }
     let waiting: Vec<Uuid> = sqlx::query_scalar(
