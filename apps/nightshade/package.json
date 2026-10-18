@@ -1,0 +1,13 @@
+{
+  "name": "nightshade",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "check": "bun build.ts --check",
+    "specimen": "bun specimen.ts"
+  },
+  "devDependencies": {
+    "shiki": "4.5.0"
+  }
+}

@@ -1,6 +1,6 @@
 # Token drift on every push that could cause it: the theme tests, the
 # generated outputs in design/tokens against build.py, and Forge's, Layer's
-# and Caster's bundled copies against the vault. Each check writes nothing and fails with the fix.
+# Caster's and the editor themes' copies against the vault. Each check writes nothing and fails with the fix.
 name: design
 
 on:
@@ -19,6 +19,7 @@ on:
       - "apps/caster/Resources/Fonts/**"
       - "apps/caster/Resources/AppIcon.svg"
       - "apps/caster/Makefile"
+      - "apps/nightshade/**"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -36,3 +37,5 @@ jobs:
         working-directory: apps/layer
       - run: make design-check
         working-directory: apps/caster
+      - run: bun build.ts --check
+        working-directory: apps/nightshade
