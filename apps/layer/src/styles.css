@@ -448,9 +448,8 @@ body.dragging * { pointer-events: none; }
 .diff-line { display: flex; white-space: pre; line-height: 1.55; width: 100%; }
 .diff-line .ln {
   flex: none;
-  width: 46px;
-  text-align: right;
-  padding-right: 10px;
+  display: flex;
+  padding-right: 4px;
   color: var(--faint);
   user-select: none;
   cursor: pointer;
@@ -463,22 +462,26 @@ body.dragging * { pointer-events: none; }
      translucent gutter would let the scrolled code show through it. */
   background: var(--panel);
 }
+.diff-line .ln > span { width: 4.5ch; text-align: right; }
 .diff-line .ln:hover { color: var(--fg); }
-.diff-line .tx { flex: 1; padding-right: 12px; }
-/* The code palette's diff lines (design/tokens/theme.md, Code): ok and danger
-   at status-tint, as a recipe over the host so every theme gets its own; the
-   text in the status inks, which are checked on that tint. */
-.diff-line.add { background: color-mix(in srgb, var(--ok) var(--status-tint), transparent); }
-.diff-line.add .tx { color: var(--add-text); }
-.diff-line.del { background: color-mix(in srgb, var(--danger) var(--status-tint), transparent); }
-.diff-line.del .tx { color: var(--del-text); }
+.diff-line .sg { flex: none; width: 2.5ch; text-align: center; user-select: none; }
+.diff-line .tx { flex: 1; padding-right: 12px; color: var(--syntax-text); }
+/* The editor's diff (DIFF-9, design/tokens/theme.md, Code): added and removed
+   lines on the code palette's diff tints, the code in its syntax colours
+   (DiffCode.tsx), the changed words on the stronger tint. The tints are
+   opaque, so the pinned gutter takes them too. */
+.diff-line.add, .diff-line.add .ln { background: var(--code-diff-added); }
+.diff-line.del, .diff-line.del .ln { background: var(--code-diff-removed); }
+.diff-line.add .sg { color: var(--syntax-inserted); }
+.diff-line.del .sg { color: var(--syntax-deleted); }
+.diff-line mark { color: inherit; background: transparent; border-radius: var(--radius-sm); }
+.diff-line.add mark { background: var(--code-diff-added-text); }
+.diff-line.del mark { background: var(--code-diff-removed-text); }
 .diff-line.hunk { background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); color: var(--muted); }
 .diff-line.meta { color: var(--faint); }
 .diff-line.commented { background: color-mix(in srgb, var(--warn) 8%, transparent); }
 /* The lines a note being written covers (DIFF-8): one, or a shift-clicked range. */
 .diff-line.picked { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
-/* A removed line's number is the old file's: dimmer, so the two columns' worth read apart. */
-.diff-line .ln.old { color: var(--faint); }
 
 /* A width of its own, and held in view. Inside `.diff-lines`, which is as wide
    as its longest line, a note was sized as one unwrapped line — a long one

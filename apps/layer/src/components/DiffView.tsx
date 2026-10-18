@@ -9,6 +9,7 @@ import type {
 } from "../lib/types";
 import { lineOf, parseDiff, toTree, type DiffLine, type Node } from "../lib/diff";
 import { NoteCard, NoteEditor } from "./DiffNote";
+import { DiffCode, useDiffColours } from "./DiffCode";
 import { ChevronIcon } from "./icons";
 import { Field, Modal, Spinner } from "./ui";
 import { dragGrip } from "../lib/drag";
@@ -255,6 +256,7 @@ export function DiffView({ task }: { task: TaskView }) {
     [parsed, wholeFile],
   );
   const hidden = parsed.length - lines.length;
+  const { runs, marks } = useDiffColours(lines, selected && selected.slice(selected.indexOf(":") + 1));
   const fileNotes = useMemo(
     () => notes.filter((d) => selected && `${d.checkoutId}:${d.path}` === selected),
     [notes, selected],
@@ -628,14 +630,25 @@ export function DiffView({ task }: { task: TaskView }) {
                 (inRange ? " picked" : "")
               }
             >
+              {/* The old version's number, then the new one's, as the editor numbers a diff. */}
               <span
-                className={`ln${l.kind === "del" ? " old" : ""}`}
+                className="ln"
                 title={at ? "Click to comment; shift-click another line to comment on the range" : undefined}
                 onClick={(e) => pickLineRef.current(l, e.shiftKey)}
               >
-                {l.newLine ?? l.oldLine ?? ""}
+                <span>{l.oldLine ?? ""}</span>
+                <span>{l.newLine ?? ""}</span>
               </span>
-              <span className="tx">{l.text || " "}</span>
+              {l.kind === "add" || l.kind === "del" || l.kind === "ctx" ? (
+                <>
+                  <span className="sg">{l.kind === "add" ? "+" : l.kind === "del" ? "−" : ""}</span>
+                  <span className="tx">
+                    <DiffCode text={l.text.slice(1) || " "} runs={runs?.[i]} mark={marks.get(i)} />
+                  </span>
+                </>
+              ) : (
+                <span className="tx">{l.text || " "}</span>
+              )}
             </div>
 
             {anchored.map((d) => (
@@ -658,7 +671,7 @@ export function DiffView({ task }: { task: TaskView }) {
           </div>
         );
       }),
-    [lines, fileNotes, composing, task.id, dropNotes, editNote],
+    [lines, runs, marks, fileNotes, composing, task.id, dropNotes, editNote],
   );
 
   // A worktree git cannot read has no changes to list, which looked exactly

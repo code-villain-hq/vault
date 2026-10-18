@@ -116,3 +116,72 @@ export function toTree(files: ChangedFile[]): Node[] {
 
   return sort(root.children.map(squash));
 }
+
+/**
+ * Each hunk's two sides as code, as indices into `lines`: the old version
+ * (context and removed lines) and the new one (context and added). Coloured
+ * a side at a time, a string or comment spanning lines reads as one, as it
+ * does in the editor; a line at a time, the rest of a block comment was
+ * coloured as code.
+ */
+export function hunkSides(lines: DiffLine[]): { old: number[]; new: number[] }[] {
+  const out: { old: number[]; new: number[] }[] = [];
+  let at: { old: number[]; new: number[] } | null = null;
+  lines.forEach((l, i) => {
+    if (l.kind === "hunk") {
+      at = { old: [], new: [] };
+      out.push(at);
+    } else if (!at) {
+      return;
+    } else if (l.kind === "ctx") {
+      at.old.push(i);
+      at.new.push(i);
+    } else if (l.kind === "del") {
+      at.old.push(i);
+    } else if (l.kind === "add") {
+      at.new.push(i);
+    }
+  });
+  return out;
+}
+
+const WORD = /[\p{L}\p{N}_$]/u;
+const isWord = (c: string | undefined) => c !== undefined && WORD.test(c);
+
+/**
+ * Where the changed words sit in a replaced line, as [start, end) in the
+ * line's code (after its +/- sign). Removed lines pair in order with the
+ * added lines right after them; what a pair shares at the start and the end
+ * is left unmarked, and a cut inside a word moves to the word's edge. A line
+ * rewritten nearly throughout gets no mark: the whole line is the change.
+ */
+export function wordMarks(lines: DiffLine[]): Map<number, [number, number]> {
+  const marks = new Map<number, [number, number]>();
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].kind !== "del") { i++; continue; }
+    const dels: number[] = [];
+    while (i < lines.length && lines[i].kind === "del") dels.push(i++);
+    const adds: number[] = [];
+    while (i < lines.length && lines[i].kind === "add") adds.push(i++);
+    for (let k = 0; k < Math.min(dels.length, adds.length); k++) {
+      const a = lines[dels[k]].text.slice(1);
+      const b = lines[adds[k]].text.slice(1);
+      if (a === b) continue;
+      const most = Math.min(a.length, b.length);
+      let start = 0;
+      while (start < most && a[start] === b[start]) start++;
+      let tail = 0;
+      while (tail < most - start && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+      while (start > 0 && isWord(a[start - 1]) && (isWord(a[start]) || isWord(b[start]))) start--;
+      while (tail > 0 && isWord(a[a.length - tail]) && (isWord(a[a.length - 1 - tail]) || isWord(b[b.length - 1 - tail]))) tail--;
+      const old: [number, number] = [start, a.length - tail];
+      const now: [number, number] = [start, b.length - tail];
+      const share = (r: [number, number], line: string) => (r[1] - r[0]) / Math.max(line.trim().length, 1);
+      if (share(old, a) > 0.6 || share(now, b) > 0.6) continue;
+      if (old[1] > old[0]) marks.set(dels[k], old);
+      if (now[1] > now[0]) marks.set(adds[k], now);
+    }
+  }
+  return marks;
+}

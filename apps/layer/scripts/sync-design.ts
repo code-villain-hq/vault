@@ -8,7 +8,7 @@ const destination = new URL("../src/design/", import.meta.url);
 const files = [
   ["design/tokens/color.resolved.json", "color.json"],
   ["design/tokens/syntax.resolved.json", "syntax.json"],
-  ...["color.css", "type.css", "shape.css"].map((name) => [`design/tokens/${name}`, name]),
+  ...["color.css", "syntax.css", "type.css", "shape.css"].map((name) => [`design/tokens/${name}`, name]),
   ["design/components.css", "components.css"],
   ...[
     "fonts.css",
@@ -44,5 +44,5 @@ if (process.argv.includes("--check")) {
 } else {
   await mkdir(new URL("fonts/", destination), { recursive: true });
   for (const [source, target] of copies) await Bun.write(target, Bun.file(source));
-  console.log("Synced the shared colour, code, type and shape tokens and the licensed fonts.");
+  console.log("Synced the shared colour, code, type and shape tokens, the shared controls and the licensed fonts.");
 }

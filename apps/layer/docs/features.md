@@ -516,8 +516,15 @@ new one. Commit commits every repo with changes, with one message.
   side stretches the note being written over every line between. Both go
   to an agent as `file:12-16` or `file:3 (removed)`, with the lines they
   read.
+- **DIFF-9** A patch MUST read as it does in Cursor or VS Code with the
+  Code Villain theme: the code coloured by the same TextMate grammars and
+  theme scopes, added and removed lines on the editor's diff tints, the
+  changed words of a replaced line marked, and each line numbered in the
+  old and the new version. A file in a language Layer does not bundle, or
+  too large to colour quickly, is drawn uncoloured on the same tints.
 
-Code: `commands/diff.rs`, `git.rs`, `DiffView.tsx`, `DiffNote.tsx`.
+Code: `commands/diff.rs`, `git.rs`, `DiffView.tsx`, `DiffNote.tsx`,
+`DiffCode.tsx` and `lib/highlight.ts` (DIFF-9).
 
 Known gaps:
 - Notes do not survive a restart of the app.
