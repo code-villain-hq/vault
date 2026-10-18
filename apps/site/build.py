@@ -17,6 +17,8 @@ OUTPUT = SITE / 'dist'
 REPLACEMENTS = {
     '../../../brand/mark/': '/assets/brand/',
     '../../brand/mark/': '/assets/brand/',
+    '../../../design/components.css': '/assets/components.css',
+    '../../design/components.css': '/assets/components.css',
     '../../../design/tokens/': '/assets/tokens/',
     '../../design/tokens/': '/assets/tokens/',
     '../forge/apps/web/public/icon.svg': '/assets/products/forge.svg',
@@ -91,6 +93,7 @@ def main() -> None:
         copy(path, 'assets/brand/' + path.name)
     for path in (VAULT / 'design/tokens').glob('*.css'):
         copy(path, 'assets/tokens/' + path.name)
+    copy(VAULT / 'design/components.css', 'assets/components.css')
     for path in (VAULT / 'content/blog/images').glob('*.svg'):
         copy(path, 'assets/blog/' + path.name)
     for product, path in {

@@ -40,8 +40,7 @@
 .capture-stack { display: flex; flex-direction: column; justify-content: center; gap: 16px; background: var(--panel); min-height: calc(((100cqw - 2rem) / 2.2 * 1.2 - 48px) * 836 / 1280 + 48px); }
 @media (max-width: 800px) { .capture-stack { min-height: 0; } }
 .home-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: 3.5rem 2.5rem; color: var(--faint); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
-.home-foot a { display: inline-flex; gap: 0.75rem; align-items: center; color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent); text-underline-offset: 0.22em; }
-.home-foot a:hover { text-decoration-color: var(--fg); }
+.home-foot a { display: inline-flex; gap: 0.75rem; align-items: center; }
 .arrow { width: 1rem; height: 1rem; }
 @media (max-width: 800px) {
   .showcase { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
