@@ -100,5 +100,14 @@ def resolve(source, theme_source, color):
             "muted": readable(theme["muted"], hosts, mode, minimum),
             **{name: inks[name] for name in SEMANTIC},
         })
-        result[mode] = {"syntax": syntax, "ui": ui}
+        # The terminal's 16 colours, one table for every terminal: the syntax
+        # hues, so the shell and the editor speak one set. Black and white are
+        # greys that read in each mode; bright black is the comment grey.
+        terminal = [inks["danger"], syntax["string"], syntax["constant"], syntax["function"],
+                    syntax["keyword"], syntax["property"]]
+        ansi = {
+            "normal": [theme["surface"] if night else theme["fg"], *terminal, syntax["bracket"]],
+            "bright": [ui["line-number"], *terminal, syntax["text"]],
+        }
+        result[mode] = {"syntax": syntax, "ui": ui, "ansi": ansi}
     return result

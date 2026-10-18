@@ -19,6 +19,7 @@ enum ColorTokens {
     static let statusTint: Double = 0.13
     static let chipTint: Double = 0.07
     static let highlightTint: Double = 0.08
+    static let backdropTint: Double = 0.4
   }
 
   enum Contrast {

@@ -14,7 +14,8 @@
   "opacity": {
     "status-tint": 0.13,
     "chip-tint": 0.07,
-    "highlight-tint": 0.08
+    "highlight-tint": 0.08,
+    "backdrop-tint": 0.4
   },
   "contrast": {
     "text": 4.6,

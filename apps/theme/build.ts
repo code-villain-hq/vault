@@ -11,21 +11,9 @@ type Mode = "night" | "day";
 const modes: Mode[] = ["night", "day"];
 const NONE = "#00000000";
 
-/**
- * The terminal's 16 colours, one table for every terminal the theme dresses:
- * WezTerm, VS Code's and Cursor's, and Neovim's. The colours are the syntax
- * hues, so the shell and the editor speak one set; black and white are greys
- * that read on the ground in each mode, and bright black is the comment grey.
- */
+/** The terminal's 16 colours: one table in design/tokens for every terminal. */
 function ansi(mode: Mode): { normal: string[]; bright: string[] } {
-  const s: Record<string, string> = syntax[mode].syntax;
-  const u: Record<string, string> = syntax[mode].ui;
-  const t: Record<string, string> = color[mode];
-  const hues = [u.danger, s.string, s.constant, s.function, s.keyword, s.property];
-  return {
-    normal: [mode === "night" ? t.surface : t.fg, ...hues, s.bracket],
-    bright: [u["line-number"], ...hues, s.text],
-  };
+  return syntax[mode].ansi;
 }
 
 /** VS Code: TextMate scopes from the shared table, then semantic tokens and the workbench. */

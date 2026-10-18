@@ -72,6 +72,7 @@ css = ['/* Generated from syntax.json. Night is the default; set data-theme="day
 for mode, selector in (("night", ':root,\n[data-theme="night"]'), ("day", '[data-theme="day"]')):
     css += [selector + " {"]
     css += [f"  --syntax-{k}: {v};" for k, v in x[mode]["syntax"].items()]
+    css += [f"  --ansi-{i}: {v};" for i, v in enumerate(x[mode]["ansi"]["normal"] + x[mode]["ansi"]["bright"])]
     css += [f"  --code-{k}: {v};" for k, v in x[mode]["ui"].items()]
     css += ["}", ""]
 emit("syntax.css", "\n".join(css))

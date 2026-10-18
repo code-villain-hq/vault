@@ -38,6 +38,14 @@ class SyntaxTests(unittest.TestCase):
                 if spec["tone"] in GREYS:
                     ink = syntax[role]
                     self.assertTrue(ink[1:3] == ink[3:5] == ink[5:7], (mode, role, ink))
+            # The terminal's colours read on the code ground; night's black is
+            # the one that isn't meant to.
+            ansi = result[mode]["ansi"]
+            self.assertEqual((len(ansi["normal"]), len(ansi["bright"])), (8, 8))
+            for i, ink in enumerate(ansi["normal"] + ansi["bright"]):
+                if mode == "night" and i == 0:
+                    continue
+                self.assertGreaterEqual(contrast(ink, ui["background"]), result["contrast"], (mode, "ansi", i))
             # Even colour: the hues share one lightness.
             levels = [oklch(syntax[spec["tone"]])[0] for spec in syntax_source["roles"].values() if spec["tone"] in HUES]
             self.assertLess(max(levels) - min(levels), .01, mode)
