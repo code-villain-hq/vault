@@ -6,7 +6,7 @@ use forge_server::config::Config;
 use forge_server::drift::{self, DriftSettings};
 use forge_server::github::GitHubApp;
 use forge_server::github::login::GitHubLogin;
-use forge_server::{AppState, accounts, app, notify, runners};
+use forge_server::{AppState, accounts, app, forgejo, notify, runners};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
             tokio::spawn(notify::listen(state.pool.clone(), state.wake.clone()));
             tokio::spawn(drift::worker(state.clone()));
             tokio::spawn(runners::worker(state.clone()));
+            tokio::spawn(forgejo::worker(state.clone()));
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
             // With each connection's address, for limits per client.

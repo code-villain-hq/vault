@@ -8,6 +8,7 @@ pub mod auth;
 pub mod config;
 pub mod drift;
 pub mod error;
+pub mod forgejo;
 pub mod github;
 pub mod invites;
 pub mod limits;

@@ -19,7 +19,7 @@ use std::sync::LazyLock;
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
-use forge_domain::{Actor, ModelKind, Operation, PullRequestBlocker};
+use forge_domain::{Actor, LinkProvider, ModelKind, Operation, PullRequestBlocker};
 use hmac::{Hmac, KeyInit, Mac};
 use regex::Regex;
 use serde_json::{Value, json};
@@ -183,13 +183,13 @@ pub async fn handle(state: &AppState, event: &str, payload: &Value) -> Result<()
     Ok(())
 }
 
-static IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b([a-z][a-z0-9]{0,4})-(\d{1,7})\b").expect("a valid pattern")
 });
 
 /// An identifier right after one of GitHub's closing words: "Fixes FOR-12",
 /// "closed: FOR-3".
-static CLOSING: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static CLOSING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(?:\s*:\s*|\s+)([a-z][a-z0-9]{0,4})-(\d{1,7})\b",
     )
@@ -198,7 +198,7 @@ static CLOSING: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Identifiers in some text, as (team key, number): every one, or only those
 /// after a closing word.
-fn identifiers(text: &str, pattern: &Regex) -> BTreeSet<(String, i32)> {
+pub(crate) fn identifiers(text: &str, pattern: &Regex) -> BTreeSet<(String, i32)> {
     pattern
         .captures_iter(text)
         .map(|c| (c[1].to_uppercase(), c[2].parse().unwrap_or(0)))
@@ -206,18 +206,18 @@ fn identifiers(text: &str, pattern: &Regex) -> BTreeSet<(String, i32)> {
 }
 
 /// An issue a pull request or commit names.
-struct Mention {
-    issue: Uuid,
-    team: Uuid,
-    state: Uuid,
-    state_type: String,
+pub(crate) struct Mention {
+    pub(crate) issue: Uuid,
+    pub(crate) team: Uuid,
+    pub(crate) state: Uuid,
+    pub(crate) state_type: String,
     /// Works on it (GitHub's rule: named in the branch, or after a closing
     /// word), so it moves with the pull request. Otherwise it's only linked.
-    works_on: bool,
+    pub(crate) works_on: bool,
 }
 
 /// The workspace's issues among some identifiers.
-async fn mentioned(
+pub(crate) async fn mentioned(
     db: &PgPool,
     workspace_id: Uuid,
     named: BTreeSet<(String, i32)>,
@@ -453,7 +453,8 @@ async fn open_pull_requests(
 ) -> Result<Vec<i64>, AppError> {
     let open: Vec<i32> = sqlx::query_scalar(
         "SELECT DISTINCT number FROM issue_links WHERE workspace_id = $1 AND kind = 'pull_request' \
-         AND repository = $2 AND state = 'open' AND works_on AND number IS NOT NULL",
+         AND repository = $2 AND state = 'open' AND works_on AND number IS NOT NULL \
+         AND provider = 'github'",
     )
     .bind(workspace_id)
     .bind(repository)
@@ -524,6 +525,7 @@ fn recheck(
             if let Err(e) = settle(
                 &state.pool,
                 workspace_id,
+                LinkProvider::Github,
                 &repository,
                 number,
                 now,
@@ -576,7 +578,16 @@ fn await_checks(
             if now.awaiting_checks {
                 continue;
             }
-            if let Err(e) = settle(&state.pool, workspace_id, &repository, number, now, false).await
+            if let Err(e) = settle(
+                &state.pool,
+                workspace_id,
+                LinkProvider::Github,
+                &repository,
+                number,
+                now,
+                false,
+            )
+            .await
             {
                 tracing::warn!(repository, number, error = ?e, "couldn't settle a pull request");
             }
@@ -613,6 +624,7 @@ struct PullRequestLink {
 pub async fn settle(
     pool: &PgPool,
     workspace_id: Uuid,
+    provider: LinkProvider,
     repository: &str,
     number: i64,
     now: PullRequestNow,
@@ -627,11 +639,12 @@ pub async fn settle(
          FROM issue_links l JOIN issues i ON i.id = l.issue_id \
          JOIN workflow_states s ON s.id = i.state_id \
          WHERE l.workspace_id = $1 AND l.kind = 'pull_request' AND l.repository = $2 \
-         AND l.number = $3 AND l.state = 'open'",
+         AND l.number = $3 AND l.state = 'open' AND l.provider = $4",
     )
     .bind(workspace_id)
     .bind(repository)
     .bind(i32::try_from(number).unwrap_or(0))
+    .bind(provider_name(provider))
     .fetch_all(pool)
     .await?;
     if links.is_empty() {
@@ -644,7 +657,10 @@ pub async fn settle(
     });
 
     let mut db = pool.begin().await?;
-    let agent = github_agent(&mut db, workspace_id).await?;
+    let agent = match provider {
+        LinkProvider::Github => github_agent(&mut db, workspace_id).await?,
+        LinkProvider::Forgejo => crate::forgejo::forgejo_agent(&mut db, workspace_id).await?,
+    };
     for PullRequestLink {
         link,
         issue,
@@ -702,8 +718,16 @@ pub async fn settle(
     Ok(())
 }
 
+/// A provider as its links store it.
+pub(crate) fn provider_name(provider: LinkProvider) -> &'static str {
+    match provider {
+        LinkProvider::Github => "github",
+        LinkProvider::Forgejo => "forgejo",
+    }
+}
+
 /// Links a pull request or commit to an issue, or updates the link.
-async fn upsert_link(
+pub(crate) async fn upsert_link(
     db: &mut PgConnection,
     agent: Actor,
     issue: Uuid,
@@ -722,9 +746,19 @@ async fn upsert_link(
             id,
             // A pull request edited to say "Fixes FOR-12" starts working on
             // the issue, and stops when the closing word goes.
-            data: object(
-                json!({ "title": link["title"], "state": link["state"], "works_on": link["works_on"] }),
-            ),
+            // Forgejo's links also say what their checks are and whether
+            // they're drafts.
+            data: {
+                let mut data = object(
+                    json!({ "title": link["title"], "state": link["state"], "works_on": link["works_on"] }),
+                );
+                for field in ["checks", "draft"] {
+                    if let Some(value) = link.get(field) {
+                        data.insert(field.into(), value.clone());
+                    }
+                }
+                data
+            },
         },
         None => {
             let mut data = object(link);
@@ -741,7 +775,7 @@ async fn upsert_link(
 }
 
 /// Where a pull request moves the issues it works on.
-enum Target {
+pub(crate) enum Target {
     /// The team's first started status (In Progress).
     Started,
     /// The review status: the last started one (In Review), as the issue
@@ -752,7 +786,7 @@ enum Target {
 }
 
 /// The team's status a target stands for.
-async fn status_for(
+pub(crate) async fn status_for(
     db: &mut PgConnection,
     team: Uuid,
     target: &Target,
@@ -773,7 +807,7 @@ async fn status_for(
         .await?)
 }
 
-async fn move_issue(
+pub(crate) async fn move_issue(
     db: &mut PgConnection,
     agent: Actor,
     issue: Uuid,

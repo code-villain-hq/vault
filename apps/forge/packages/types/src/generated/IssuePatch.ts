@@ -4,4 +4,4 @@
  * What a client sends to change an issue. Only the fields present change;
  * null clears a field that can be empty.
  */
-export type IssuePatch = { title?: string, description?: string, state_id?: string, priority?: number, assignee_id?: string | null, reviewer_id?: string | null, parent_id?: string | null, project_id?: string | null, service_id?: string | null, label_ids?: Array<string>, due_date?: string | null, sort_order?: number, };
+export type IssuePatch = { title?: string, description?: string, state_id?: string, priority?: number, assignee_id?: string | null, reviewer_id?: string | null, no_code?: boolean, parent_id?: string | null, project_id?: string | null, service_id?: string | null, label_ids?: Array<string>, due_date?: string | null, sort_order?: number, };

@@ -24,6 +24,30 @@ pub enum IssueLinkState {
     Pushed,
 }
 
+/// The code host a link came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum LinkProvider {
+    #[default]
+    Github,
+    Forgejo,
+}
+
+/// What a Forgejo pull request's checks (the commit statuses on its latest
+/// commit) say.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum PullRequestChecks {
+    /// It has none: "No checks reported". Doesn't hold the issue back, and
+    /// isn't shown as passed.
+    None,
+    Running,
+    Failed,
+    Passed,
+}
+
 /// What keeps an open pull request from being merged. Until it's gone, the
 /// issues it works on aren't ready for review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -40,7 +64,7 @@ pub enum PullRequestBlocker {
 
 /// A pull request or commit that mentions an issue (for example `FOR-12` in
 /// a branch name, title or commit message). Written by the GitHub
-/// connection; read-only for clients.
+/// or Forgejo connection; read-only for clients.
 ///
 /// It works on the issue when the issue is named in its branch or after a
 /// closing word ("Fixes FOR-12"), as on GitHub; otherwise it only mentions it.
@@ -69,6 +93,14 @@ pub struct IssueLink {
     /// Forge is holding the issue back from review because of the blocker:
     /// it moves the issue to review once the blocker is gone.
     pub held: bool,
+    /// Where it lives: GitHub or Forgejo.
+    pub provider: LinkProvider,
+    /// For a Forgejo pull request: what its checks say. None for GitHub's,
+    /// and for commits.
+    pub checks: Option<PullRequestChecks>,
+    /// A pull request that is still a draft (kept for Forgejo's, to see it
+    /// marked ready).
+    pub draft: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -90,6 +122,12 @@ pub struct IssueLinkCreate {
     pub blocker: Option<PullRequestBlocker>,
     #[serde(default)]
     pub held: bool,
+    #[serde(default)]
+    pub provider: LinkProvider,
+    #[serde(default)]
+    pub checks: Option<PullRequestChecks>,
+    #[serde(default)]
+    pub draft: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -100,6 +138,8 @@ pub struct IssueLinkPatch {
     pub works_on: Option<bool>,
     pub blocker: Option<Option<PullRequestBlocker>>,
     pub held: Option<bool>,
+    pub checks: Option<Option<PullRequestChecks>>,
+    pub draft: Option<bool>,
 }
 
 impl Validate for IssueLinkCreate {

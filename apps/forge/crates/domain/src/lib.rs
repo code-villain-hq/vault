@@ -47,7 +47,8 @@ pub use knowledge::{
     Service, ServiceCreate, ServicePatch, Spec, SpecCreate, SpecPatch, SpecStatus,
 };
 pub use link::{
-    IssueLink, IssueLinkCreate, IssueLinkKind, IssueLinkPatch, IssueLinkState, PullRequestBlocker,
+    IssueLink, IssueLinkCreate, IssueLinkKind, IssueLinkPatch, IssueLinkState, LinkProvider,
+    PullRequestBlocker, PullRequestChecks,
 };
 pub use mention::mentions;
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};

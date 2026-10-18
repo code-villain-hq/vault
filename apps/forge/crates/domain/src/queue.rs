@@ -155,6 +155,7 @@ mod tests {
             priority,
             assignee_id: Some(AGENT),
             reviewer_id: None,
+            no_code: false,
             parent_id: None,
             project_id: None,
             service_id: None,

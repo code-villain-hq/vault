@@ -16,6 +16,11 @@ description: string, state_id: string, priority: number, assignee_id: string | n
  */
 reviewer_id: string | null, 
 /**
+ * Its work changes no code, so its review needs no pull request (the
+ * "No code" mark).
+ */
+no_code: boolean, 
+/**
  * The issue this is a sub-issue of.
  */
 parent_id: string | null, project_id: string | null, 

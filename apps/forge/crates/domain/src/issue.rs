@@ -27,6 +27,10 @@ pub struct Issue {
     /// The person asked to review it: never an agent. Filled in by the
     /// server when the issue enters review without one.
     pub reviewer_id: Option<Uuid>,
+    /// Its work changes no code, so its review needs no pull request (the
+    /// "No code" mark).
+    #[serde(default)]
+    pub no_code: bool,
     /// The issue this is a sub-issue of.
     pub parent_id: Option<Uuid>,
     pub project_id: Option<Uuid>,
@@ -56,6 +60,7 @@ pub struct IssueCreate {
     pub priority: Option<Priority>,
     pub assignee_id: Option<Uuid>,
     pub reviewer_id: Option<Uuid>,
+    pub no_code: Option<bool>,
     pub parent_id: Option<Uuid>,
     pub project_id: Option<Uuid>,
     pub service_id: Option<Uuid>,
@@ -76,6 +81,7 @@ pub struct IssuePatch {
     pub priority: Option<Priority>,
     pub assignee_id: Option<Option<Uuid>>,
     pub reviewer_id: Option<Option<Uuid>>,
+    pub no_code: Option<bool>,
     pub parent_id: Option<Option<Uuid>>,
     pub project_id: Option<Option<Uuid>>,
     pub service_id: Option<Option<Uuid>>,

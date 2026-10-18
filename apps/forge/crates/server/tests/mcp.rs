@@ -1514,15 +1514,37 @@ async fn agents_say_what_they_are_working_on(pool: PgPool) {
     assert!(record["working_seen_at"].is_string(), "{record}");
 
     // Finishing one it isn't on changes nothing.
-    let not_on = finish_work(pool, s.agent, issue_ref("FOR-2"))
+    let not_on = finish_work(pool, s.agent, finishing("FOR-2"))
         .await
         .unwrap();
     assert!(not_on.contains("weren't"), "{not_on}");
     assert_eq!(working_on(pool, s.agent).await.as_deref(), Some("FOR-1"));
-    finish_work(pool, s.agent, issue_ref("FOR-1"))
+    finish_work(pool, s.agent, finishing("FOR-1"))
         .await
         .unwrap();
     assert_eq!(working_on(pool, s.agent).await, None);
+
+    // Work that changes no code is handed over with the No code mark.
+    start_work(pool, s.agent, issue_ref("FOR-1")).await.unwrap();
+    let marked = finish_work(
+        pool,
+        s.agent,
+        FinishWork {
+            identifier: "FOR-1".into(),
+            no_code: Some(true),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(marked.contains("no code"), "{marked}");
+    let issue = parse(get_issue(pool, s.agent, issue_ref("FOR-1")).await.unwrap());
+    assert_eq!(issue["no_code"], true, "{issue}");
+    assert!(
+        issue["history"]
+            .to_string()
+            .contains("marked it as needing no code"),
+        "{issue}"
+    );
 
     // Moving it along keeps the work going; into review ends it.
     start_work(pool, s.agent, issue_ref("FOR-1")).await.unwrap();
@@ -1624,11 +1646,11 @@ async fn the_same_work_is_not_done_twice(pool: PgPool) {
 
     // Once the other finishes, it's free.
     start_work(pool, chat, issue_ref("FOR-2")).await.unwrap();
-    finish_work(pool, chat, issue_ref("FOR-2")).await.unwrap();
+    finish_work(pool, chat, finishing("FOR-2")).await.unwrap();
     start_work(pool, chat, issue_ref("FOR-1"))
         .await
         .unwrap_err();
-    finish_work(pool, s.agent, issue_ref("FOR-1"))
+    finish_work(pool, s.agent, finishing("FOR-1"))
         .await
         .unwrap();
     start_work(pool, chat, issue_ref("FOR-1")).await.unwrap();
@@ -1650,6 +1672,13 @@ async fn the_same_work_is_not_done_twice(pool: PgPool) {
     start_work(pool, chat, issue_ref("FOR-2")).await.unwrap();
     assert_eq!(working_on(pool, s.agent).await.as_deref(), Some("FOR-1"));
     assert_eq!(working_on(pool, chat).await.as_deref(), Some("FOR-2"));
+}
+
+fn finishing(identifier: &str) -> FinishWork {
+    FinishWork {
+        identifier: identifier.into(),
+        no_code: None,
+    }
 }
 
 fn issue_ref(identifier: &str) -> IssueRef {
@@ -2601,7 +2630,7 @@ async fn issues_never_hold_each_other_back(pool: PgPool) {
 
     // FOR-1 writes a new spec, is canceled, and FOR-2 writes it meanwhile:
     // reopened, FOR-1 comes after FOR-2 for it.
-    finish_work(pool, s.agent, issue_ref("FOR-2"))
+    finish_work(pool, s.agent, finishing("FOR-2"))
         .await
         .unwrap();
     let quotas = |identifier: &'static str| SaveSpecChange {
