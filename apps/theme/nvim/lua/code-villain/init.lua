@@ -46,7 +46,10 @@ local function groups(p)
     CurSearch = { link = "IncSearch" },
     Substitute = { link = "IncSearch" },
     MatchParen = { fg = ui("match"), bold = true },
-    NonText = { fg = ui("guide") },
+    -- Plugins draw readable text in NonText (snacks: hidden and ignored
+    -- paths, picker directories, counts, key hints), so it takes the comment
+    -- grey, which reads at 4.6:1. Only whitespace markers stay faint.
+    NonText = { fg = p.comment },
     Whitespace = { fg = ui("guide") },
     SpecialKey = { fg = ui("guide") },
     EndOfBuffer = { fg = bg },
