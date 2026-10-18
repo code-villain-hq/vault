@@ -94,19 +94,23 @@ for discussion. Mobile redesign remains separate work.
 highlighting and an editor's own moments. [`syntax.py`](syntax.py) does the
 calculation, `build.py` writes `syntax.resolved.json` and `syntax.css`, and
 [`test_syntax.py`](test_syntax.py) holds it to these rules. The editor
-themes in [`apps/nightshade`](../../apps/nightshade) and Layer's diff are
+Code Villain theme in [`apps/theme`](../../apps/theme) and Layer's diff are
 built from the resolved file.
 
 - Code sits on `panel`. Every token reads at the text floor (4.6:1) on it and
   on everything drawn under code: the cursor line, a selection, a search
   match, a float, and the added, removed and changed tints of a diff.
-- Grey carries the structure, in three steps: names in `fg`, keywords and
-  operators one step back, punctuation and comments two. Greys stay
-  achromatic. A higher contrast keeps the steps apart.
-- Four hues carry what a reader looks for: strings, constants, functions
-  and types. Three take the semantic seeds' hues (teal, amber, blue); types
-  have their own rose. All four share one OKLCH lightness, the first at
+- Six hues carry what a reader scans for, chosen the way tokyonight
+  chooses: keywords in violet; properties, fields, imported names,
+  operators and built-in types in cyan; strings in teal; constants in
+  amber; functions in blue; the language's own names (`this`, `self`, tags)
+  in rose. Teal, amber and blue are the semantic seeds' hues. The violet
+  sits at 288°, clear of cloak, and strings stay teal because tokyonight's
+  lime would sit on poison. All six share one OKLCH lightness, the first at
   which each reads on every host, so no token is louder than another.
+- Names and type names stay in `fg`. Grey steps back from them for
+  brackets, then for punctuation and comments; comments are italic. Greys
+  stay achromatic. A higher contrast keeps the steps apart.
 - Poison never colours a token. In an editor it is the search match (a
   faint tint) and the current match (the fill, with `on-primary` ink): the
   one poison fill on the screen. Cloak is the cursor and the bracket under

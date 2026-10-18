@@ -1,10 +1,12 @@
 """Nightshade for code: syntax and editor colours, from the resolved theme.
 
-Code sits on `panel`. Grey carries the structure (keywords, operators,
-punctuation, comments); four hues carry what a reader looks for (strings,
-constants, functions, types), all at one OKLCH lightness so no token shouts.
-Poison and cloak keep their meanings: cloak is the cursor and focus, poison
-the search match and live signals. Neither colours a token.
+Code sits on `panel`. Six hues carry what a reader scans for: keywords,
+properties (with operators and built-in types), strings, constants,
+functions, and the language's own names like `this`. All share one OKLCH
+lightness, so no token shouts. Names and type names stay in `fg`; grey
+steps back for brackets, then punctuation and comments. Poison and cloak
+keep their meanings: cloak is the cursor and focus, poison the search match
+and live signals. Neither colours a token.
 """
 from theme import contrast, mix, oklch, readable, tone
 

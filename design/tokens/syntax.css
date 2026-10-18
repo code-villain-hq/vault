@@ -2,14 +2,18 @@
 :root,
 [data-theme="night"] {
   --syntax-text: #EBEBEB;
-  --syntax-keyword: #B7B7B7;
-  --syntax-operator: #B7B7B7;
+  --syntax-type: #EBEBEB;
+  --syntax-keyword: #BAB4FB;
+  --syntax-operator: #68CFE4;
+  --syntax-property: #68CFE4;
+  --syntax-builtin: #68CFE4;
+  --syntax-special: #F3A3BC;
+  --syntax-bracket: #B7B7B7;
   --syntax-punctuation: #9E9E9E;
   --syntax-comment: #9E9E9E;
   --syntax-string: #76D3B4;
   --syntax-constant: #E1B671;
   --syntax-function: #94C0FE;
-  --syntax-type: #F3A3BC;
   --syntax-heading: #EBEBEB;
   --syntax-link: #EBEBEB;
   --syntax-emphasis: #EBEBEB;
@@ -50,14 +54,18 @@
 
 [data-theme="day"] {
   --syntax-text: #181818;
-  --syntax-keyword: #3D3D3D;
-  --syntax-operator: #3D3D3D;
+  --syntax-type: #181818;
+  --syntax-keyword: #5B5197;
+  --syntax-operator: #006979;
+  --syntax-property: #006979;
+  --syntax-builtin: #006979;
+  --syntax-special: #8D3F5C;
+  --syntax-bracket: #3D3D3D;
   --syntax-punctuation: #616161;
   --syntax-comment: #616161;
   --syntax-string: #006E55;
   --syntax-constant: #7B5500;
   --syntax-function: #305D9A;
-  --syntax-type: #8D3F5C;
   --syntax-heading: #181818;
   --syntax-link: #181818;
   --syntax-emphasis: #181818;

@@ -14,7 +14,7 @@ SYNTAX = json.loads((HERE / "syntax.json").read_text())
 HOSTS = ("background", "float", "cursorline", "selection", "search", "diff-added", "diff-removed",
          "diff-changed", "diff-added-text", "diff-removed-text", "diff-changed-text")
 GREYS = ("fg", "structure", "quiet")
-HUES = ("string", "constant", "function", "type")
+HUES = ("string", "constant", "function", "keyword", "property", "special")
 
 
 def hue_distance(a, b):
@@ -41,8 +41,8 @@ class SyntaxTests(unittest.TestCase):
             # Even colour: the hues share one lightness.
             levels = [oklch(syntax[spec["tone"]])[0] for spec in syntax_source["roles"].values() if spec["tone"] in HUES]
             self.assertLess(max(levels) - min(levels), .01, mode)
-            # Structure sits between the names and the punctuation.
-            fg, structure, quiet = (oklch(syntax[role])[0] for role in ("text", "keyword", "punctuation"))
+            # Brackets sit between the names and the punctuation.
+            fg, structure, quiet = (oklch(syntax[role])[0] for role in ("text", "bracket", "punctuation"))
             if mode == "night":
                 self.assertTrue(fg > structure > quiet, mode)
             else:

@@ -12,6 +12,7 @@
     "diff-text": 0.2
   },
   "styles": {
+    "comment": "italic",
     "heading": "bold",
     "link": "underline",
     "emphasis": "italic",
@@ -22,14 +23,22 @@
     "text": [
       "variable",
       "variable.other",
+      "variable.other.readwrite",
       "variable.parameter",
-      "variable.other.property",
-      "meta.object-literal.key",
       "entity.name.namespace",
-      "entity.other.attribute-name",
-      "support.variable.property",
       "source",
       "text"
+    ],
+    "type": [
+      "entity.name.type",
+      "entity.name.class",
+      "entity.name.struct",
+      "entity.name.enum",
+      "entity.name.trait",
+      "entity.name.interface",
+      "entity.other.inherited-class",
+      "support.class",
+      "meta.type.annotation entity.name.type"
     ],
     "keyword": [
       "keyword",
@@ -37,12 +46,16 @@
       "storage.type",
       "storage.modifier",
       "keyword.control",
-      "variable.language",
-      "keyword.other.unit",
+      "keyword.operator.expression",
+      "keyword.operator.new",
+      "keyword.operator.word",
+      "keyword.operator.logical.python",
+      "keyword.other",
       "meta.decorator",
       "entity.name.function.decorator",
       "meta.attribute.rust",
       "punctuation.definition.attribute",
+      "punctuation.decorator",
       "markup.list punctuation.definition.list",
       "punctuation.definition.list.begin"
     ],
@@ -52,9 +65,42 @@
       "punctuation.separator.key-value",
       "storage.type.function.arrow"
     ],
+    "property": [
+      "variable.other.property",
+      "variable.other.object.property",
+      "meta.object-literal.key",
+      "support.variable.property",
+      "support.type.property-name",
+      "entity.other.attribute-name",
+      "variable.other.readwrite.alias"
+    ],
+    "builtin": [
+      "support.type",
+      "support.type.primitive",
+      "support.type.builtin",
+      "entity.name.type.primitive",
+      "storage.type.primitive",
+      "storage.type.built-in",
+      "keyword.other.unit"
+    ],
+    "special": [
+      "variable.language",
+      "entity.name.tag",
+      "support.class.component"
+    ],
+    "bracket": [
+      "meta.brace",
+      "punctuation.section",
+      "punctuation.definition.block",
+      "punctuation.definition.parameters",
+      "punctuation.definition.typeparameters",
+      "punctuation.definition.array",
+      "punctuation.definition.binding-pattern"
+    ],
     "punctuation": [
       "punctuation",
-      "meta.brace",
+      "punctuation.separator",
+      "punctuation.terminator",
       "punctuation.definition.tag",
       "punctuation.definition.heading",
       "punctuation.definition.bold",
@@ -100,20 +146,6 @@
       "entity.name.function.macro",
       "support.function.macro"
     ],
-    "type": [
-      "entity.name.type",
-      "entity.name.class",
-      "entity.name.struct",
-      "entity.name.enum",
-      "entity.name.trait",
-      "entity.name.interface",
-      "entity.other.inherited-class",
-      "support.type",
-      "support.class",
-      "entity.name.tag",
-      "support.class.component",
-      "meta.type.annotation entity.name.type"
-    ],
     "heading": [
       "markup.heading",
       "entity.name.section"
@@ -154,14 +186,18 @@
   "night": {
     "syntax": {
       "text": "#EBEBEB",
-      "keyword": "#B7B7B7",
-      "operator": "#B7B7B7",
+      "type": "#EBEBEB",
+      "keyword": "#BAB4FB",
+      "operator": "#68CFE4",
+      "property": "#68CFE4",
+      "builtin": "#68CFE4",
+      "special": "#F3A3BC",
+      "bracket": "#B7B7B7",
       "punctuation": "#9E9E9E",
       "comment": "#9E9E9E",
       "string": "#76D3B4",
       "constant": "#E1B671",
       "function": "#94C0FE",
-      "type": "#F3A3BC",
       "heading": "#EBEBEB",
       "link": "#EBEBEB",
       "emphasis": "#EBEBEB",
@@ -205,14 +241,18 @@
   "day": {
     "syntax": {
       "text": "#181818",
-      "keyword": "#3D3D3D",
-      "operator": "#3D3D3D",
+      "type": "#181818",
+      "keyword": "#5B5197",
+      "operator": "#006979",
+      "property": "#006979",
+      "builtin": "#006979",
+      "special": "#8D3F5C",
+      "bracket": "#3D3D3D",
       "punctuation": "#616161",
       "comment": "#616161",
       "string": "#006E55",
       "constant": "#7B5500",
       "function": "#305D9A",
-      "type": "#8D3F5C",
       "heading": "#181818",
       "link": "#181818",
       "emphasis": "#181818",
