@@ -20,9 +20,10 @@ Each kind of control has its own look, so a glance tells them apart:
 - A **button** changes something here. It is a block: filled, 6px corners.
 - A **link** goes somewhere: another view, another app, a web page. It is underlined.
 - A **tab** switches what one place shows. It is text, with a line under the current one.
-- A **chip** or **status pill** says something. It is round, and usually not clickable. A pill that opens its own fix (a conflict count) is the one exception.
+- A **segmented control** picks one value of a few. It is a track, with the chosen option filled.
+- A **chip** or **status pill** says something. It is round. It is clickable only where it holds what it says: a record's property under its title opens that property's picker, and a pill that names a problem (a conflict count) opens its fix.
 
-Opening a ticket, a pull request or a folder in another app is a link, not a button. Muted text with nothing under it and no fill is never clickable, except an icon button.
+Opening a ticket, a pull request or a folder in another app is a link, not a button. The one exception: when the screen's one action happens elsewhere (merge on GitHub), it stays the primary button, with ↗. Muted text with nothing under it and no fill is never clickable, except an icon button.
 
 ## Button
 
@@ -55,7 +56,7 @@ Fill `dialog`, `radius-lg`, over a backdrop of black at `backdrop-tint` (40%). N
 
 ## Link
 
-Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. Links are never coloured. A link that leaves the app, to another app or a web page, ends in ↗. Beside buttons in a header, a link takes the `control` size.
+Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. Links are never coloured. A link that leaves the app, to another app or a web page, ends in ↗. A link that stands among controls, not in prose, takes the `control` size.
 
 ## Status pill
 
@@ -73,7 +74,11 @@ Tints are recipes, not precomputed solid colours. Chips and status pills blend w
 
 ## Tabs
 
-Switch what one place shows: a task's Spec, Agents, Diff and Pull requests, or an app's views across its top bar. Tabs sit 20px apart. Each is text in the `control` role, `muted`, `fg` on hover. The current tab is `fg` at 700 with a 2px `fg` line under it, and no fill, so a tab never looks like a button or a selected row. A count beside a label is `faint` in `ui-small` at 400. Mark the strip `role="tablist"` and the current tab `aria-selected="true"`.
+Switch what one place shows: a task's Spec, Agents, Diff and Pull requests, or an app's views across its top bar. Tabs sit 20px apart. Each is text in the `control` role, `muted`, `fg` on hover. The current tab is `fg` at 700 with a 2px `fg` line under it, and no fill, so a tab never looks like a button or a selected row. A count beside a label is `faint` in `ui-small` at 400. Mark the strip `role="tablist"` and the current tab `aria-selected="true"`; views in a top bar are navigation, so there the current one carries `aria-current="page"`. Top-bar views take the `ui` role, like nav items, and their line sits on the bar's bottom edge.
+
+## Segmented control
+
+Pick one value of a few: merge or rebase, an interface scale. One track of `fg` at `chip-tint`, `radius-md`, 2px inside. Each option is text in the `control` role, `muted`, 24px tall; the chosen one is filled `fg` at `button-hover-tint` with `fg` text at 700 and `radius-sm`. Not a row of buttons with one in `selected`: beside filled buttons, the chosen one would look the weakest. Mark the chosen option `aria-pressed="true"`.
 
 ## Row
 

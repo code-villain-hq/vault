@@ -206,7 +206,7 @@ Flat. Depth is tone: bg → panel → surface → dialog. No shadows or borders 
 ## Components
 
 - **App button**: 28px, `control` role, no border. Primary: poison fill with dark ink, one per screen. Secondary: `fg` text on `fg` at 10% (16% on hover). Icon buttons stay unfilled. Focus: 2px accent ring, 2px out.
-- **Button, link, tab, chip**: a button changes something (filled block); a link goes somewhere (underlined, ↗ when it leaves the app); a tab switches the view (text, a 2px `fg` line under the current one); a chip says something (round).
+- **Button, link, tab, chip**: a button changes something (filled block); a link goes somewhere (underlined, ↗ when it leaves the app); a tab switches the view (text, a 2px `fg` line under the current one); a segmented control picks one value (a track, the chosen option filled); a chip says something (round).
 - **Studio call to action**: `label` role (17px/700), `0.7rem 1.15rem` padding, 6px corners, the primary colours, no border.
 - **Field**: a tone step with no border; focus draws an accent border plus a 3px accent glow at 22%.
 - **Dialog**: `dialog` fill, `radius-lg`, a backdrop of black at `backdrop-tint`.
