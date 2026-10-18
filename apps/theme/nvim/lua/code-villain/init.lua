@@ -1,6 +1,7 @@
--- Nightshade for Neovim: Code Villain's theme, night and day.
+-- Code Villain for Neovim: the studio's theme, night and day, in the
+-- Nightshade palette.
 --
--- Colours come from palette.lua, which apps/nightshade/build.ts generates
+-- Colours come from palette.lua, which apps/theme/build.ts generates
 -- from design/tokens; this file only says which highlight group takes which
 -- role. `background` picks the mode: dark is night, light is day.
 --
@@ -381,13 +382,13 @@ end
 --- The palette for a mode: "night" or "day". Defaults to `background`.
 function M.palette(mode)
   mode = mode or (vim.o.background == "light" and "day" or "night")
-  return require("nightshade.palette")[mode]
+  return require("code-villain.palette")[mode]
 end
 
 function M.load()
   if vim.g.colors_name then vim.cmd("hi clear") end
   vim.o.termguicolors = true
-  vim.g.colors_name = "nightshade"
+  vim.g.colors_name = "code-villain"
   local p = M.palette()
   for name, spec in pairs(groups(p)) do
     vim.api.nvim_set_hl(0, name, spec)

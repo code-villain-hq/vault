@@ -1,6 +1,6 @@
 {
   "$schema": "vscode://schemas/color-theme",
-  "name": "Code Villain Nightshade Night",
+  "name": "Code Villain Night",
   "type": "dark",
   "semanticHighlighting": true,
   "semanticTokenColors": {
@@ -8,25 +8,25 @@
       "foreground": "#EBEBEB"
     },
     "type": {
-      "foreground": "#F3A3BC"
+      "foreground": "#EBEBEB"
     },
     "class": {
-      "foreground": "#F3A3BC"
+      "foreground": "#EBEBEB"
     },
     "enum": {
-      "foreground": "#F3A3BC"
+      "foreground": "#EBEBEB"
     },
     "interface": {
-      "foreground": "#F3A3BC"
+      "foreground": "#EBEBEB"
     },
     "struct": {
-      "foreground": "#F3A3BC"
+      "foreground": "#EBEBEB"
     },
     "typeParameter": {
-      "foreground": "#F3A3BC"
+      "foreground": "#EBEBEB"
     },
     "builtinType": {
-      "foreground": "#F3A3BC"
+      "foreground": "#68CFE4"
     },
     "parameter": {
       "foreground": "#EBEBEB"
@@ -35,13 +35,13 @@
       "foreground": "#EBEBEB"
     },
     "property": {
-      "foreground": "#EBEBEB"
+      "foreground": "#68CFE4"
     },
     "enumMember": {
       "foreground": "#E1B671"
     },
     "event": {
-      "foreground": "#EBEBEB"
+      "foreground": "#68CFE4"
     },
     "function": {
       "foreground": "#94C0FE"
@@ -62,10 +62,10 @@
       "foreground": "#76D3B4"
     },
     "keyword": {
-      "foreground": "#B7B7B7"
+      "foreground": "#BAB4FB"
     },
     "selfKeyword": {
-      "foreground": "#B7B7B7"
+      "foreground": "#F3A3BC"
     },
     "number": {
       "foreground": "#E1B671"
@@ -74,10 +74,10 @@
       "foreground": "#E1B671"
     },
     "operator": {
-      "foreground": "#B7B7B7"
+      "foreground": "#68CFE4"
     },
     "decorator": {
-      "foreground": "#B7B7B7"
+      "foreground": "#BAB4FB"
     },
     "lifetime": {
       "foreground": "#E1B671"
@@ -218,10 +218,10 @@
     "terminal.ansiBrightYellow": "#E1B671",
     "terminal.ansiBlue": "#94C0FE",
     "terminal.ansiBrightBlue": "#94C0FE",
-    "terminal.ansiMagenta": "#F3A3BC",
-    "terminal.ansiBrightMagenta": "#F3A3BC",
-    "terminal.ansiCyan": "#76D3B4",
-    "terminal.ansiBrightCyan": "#76D3B4",
+    "terminal.ansiMagenta": "#BAB4FB",
+    "terminal.ansiBrightMagenta": "#BAB4FB",
+    "terminal.ansiCyan": "#68CFE4",
+    "terminal.ansiBrightCyan": "#68CFE4",
     "terminal.ansiWhite": "#B7B7B7",
     "terminal.ansiBrightWhite": "#EBEBEB",
     "editor.background": "#141414",
@@ -312,14 +312,28 @@
       "scope": [
         "variable",
         "variable.other",
+        "variable.other.readwrite",
         "variable.parameter",
-        "variable.other.property",
-        "meta.object-literal.key",
         "entity.name.namespace",
-        "entity.other.attribute-name",
-        "support.variable.property",
         "source",
         "text"
+      ],
+      "settings": {
+        "foreground": "#EBEBEB"
+      }
+    },
+    {
+      "name": "type",
+      "scope": [
+        "entity.name.type",
+        "entity.name.class",
+        "entity.name.struct",
+        "entity.name.enum",
+        "entity.name.trait",
+        "entity.name.interface",
+        "entity.other.inherited-class",
+        "support.class",
+        "meta.type.annotation entity.name.type"
       ],
       "settings": {
         "foreground": "#EBEBEB"
@@ -333,17 +347,21 @@
         "storage.type",
         "storage.modifier",
         "keyword.control",
-        "variable.language",
-        "keyword.other.unit",
+        "keyword.operator.expression",
+        "keyword.operator.new",
+        "keyword.operator.word",
+        "keyword.operator.logical.python",
+        "keyword.other",
         "meta.decorator",
         "entity.name.function.decorator",
         "meta.attribute.rust",
         "punctuation.definition.attribute",
+        "punctuation.decorator",
         "markup.list punctuation.definition.list",
         "punctuation.definition.list.begin"
       ],
       "settings": {
-        "foreground": "#B7B7B7"
+        "foreground": "#BAB4FB"
       }
     },
     {
@@ -355,6 +373,62 @@
         "storage.type.function.arrow"
       ],
       "settings": {
+        "foreground": "#68CFE4"
+      }
+    },
+    {
+      "name": "property",
+      "scope": [
+        "variable.other.property",
+        "variable.other.object.property",
+        "meta.object-literal.key",
+        "support.variable.property",
+        "support.type.property-name",
+        "entity.other.attribute-name",
+        "variable.other.readwrite.alias"
+      ],
+      "settings": {
+        "foreground": "#68CFE4"
+      }
+    },
+    {
+      "name": "builtin",
+      "scope": [
+        "support.type",
+        "support.type.primitive",
+        "support.type.builtin",
+        "entity.name.type.primitive",
+        "storage.type.primitive",
+        "storage.type.built-in",
+        "keyword.other.unit"
+      ],
+      "settings": {
+        "foreground": "#68CFE4"
+      }
+    },
+    {
+      "name": "special",
+      "scope": [
+        "variable.language",
+        "entity.name.tag",
+        "support.class.component"
+      ],
+      "settings": {
+        "foreground": "#F3A3BC"
+      }
+    },
+    {
+      "name": "bracket",
+      "scope": [
+        "meta.brace",
+        "punctuation.section",
+        "punctuation.definition.block",
+        "punctuation.definition.parameters",
+        "punctuation.definition.typeparameters",
+        "punctuation.definition.array",
+        "punctuation.definition.binding-pattern"
+      ],
+      "settings": {
         "foreground": "#B7B7B7"
       }
     },
@@ -362,7 +436,8 @@
       "name": "punctuation",
       "scope": [
         "punctuation",
-        "meta.brace",
+        "punctuation.separator",
+        "punctuation.terminator",
         "punctuation.definition.tag",
         "punctuation.definition.heading",
         "punctuation.definition.bold",
@@ -383,7 +458,8 @@
         "comment.block.documentation"
       ],
       "settings": {
-        "foreground": "#9E9E9E"
+        "foreground": "#9E9E9E",
+        "fontStyle": "italic"
       }
     },
     {
@@ -434,26 +510,6 @@
       ],
       "settings": {
         "foreground": "#94C0FE"
-      }
-    },
-    {
-      "name": "type",
-      "scope": [
-        "entity.name.type",
-        "entity.name.class",
-        "entity.name.struct",
-        "entity.name.enum",
-        "entity.name.trait",
-        "entity.name.interface",
-        "entity.other.inherited-class",
-        "support.type",
-        "support.class",
-        "entity.name.tag",
-        "support.class.component",
-        "meta.type.annotation entity.name.type"
-      ],
-      "settings": {
-        "foreground": "#F3A3BC"
       }
     },
     {

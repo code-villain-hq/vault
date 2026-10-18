@@ -19,7 +19,7 @@ on:
       - "apps/caster/Resources/Fonts/**"
       - "apps/caster/Resources/AppIcon.svg"
       - "apps/caster/Makefile"
-      - "apps/nightshade/**"
+      - "apps/theme/**"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -38,4 +38,4 @@ jobs:
       - run: make design-check
         working-directory: apps/caster
       - run: bun build.ts --check
-        working-directory: apps/nightshade
+        working-directory: apps/theme

@@ -1,20 +1,31 @@
-# Nightshade editor themes: notes for coding agents
+# Code Villain theme: notes for coding agents
 
-Nightshade for code editors: VS Code (and Cursor) themes in night and day, and a palette for Neovim. Run commands from this folder.
+The studio's editor theme, in night and day: a VS Code (and Cursor) extension and a Neovim colorscheme. Its colours are the Nightshade palette for code. Run commands from this folder.
 
-Everything here is generated from the vault's tokens: `design/tokens/syntax.resolved.json` for code and `color.resolved.json` for the editor's frame. Never edit `vscode/themes/*.json` or `nvim/lua/nightshade/palette.lua` by hand. Change the tokens (`design/tokens/syntax.json`, then `python3 build.py` there), then:
+The colours are generated from the vault's tokens: `design/tokens/syntax.resolved.json` for code and `color.resolved.json` for the editor's frame. Never edit `vscode/themes/*.json` or `nvim/lua/code-villain/palette.lua` by hand. To change colours or which scopes get which colour, edit `design/tokens/syntax.json`, run `python3 build.py` there, then:
 
 ```sh
-bun build.ts           # write the themes and the Neovim palette
+bun build.ts           # write the VS Code themes and the Neovim palette
 bun build.ts --check   # write nothing; fail if an output has drifted (CI runs this)
 bun install && bun specimen.ts   # draw the vault's own code in both modes, for review
 ```
 
-`vscode/` is a complete extension (its `package.json` lists both themes). Cursor and VS Code load only extensions they installed themselves; a folder linked into `~/.cursor/extensions` is ignored. Package it and install the `.vsix`:
+`nvim/lua/code-villain/init.lua` is written by hand. It maps Neovim's highlight groups (editor, legacy syntax, Treesitter, LSP semantic tokens, diagnostics, and plugins) onto the palette's roles, following tokyonight's choices of what gets which kind of colour. `background` picks the mode: dark is night, light is day.
 
-```sh
-cd vscode && bunx --bun @vscode/vsce@3.6.0 package --allow-missing-repository --skip-license -o /tmp/nightshade.vsix
-cursor --install-extension /tmp/nightshade.vsix   # or: code --install-extension
+## Installing
+
+Neovim, with lazy.nvim:
+
+```lua
+{ dir = "~/code/villain/villain-vault/apps/theme/nvim", name = "code-villain", lazy = false, priority = 1000,
+  config = function() vim.cmd.colorscheme("code-villain") end }
 ```
 
-Then reload the window and pick "Code Villain Nightshade Night" or "Day" with ⌘K ⌘T. After a rebuild, raise `version` in `vscode/package.json` and install again.
+Cursor and VS Code load only extensions they installed themselves; a folder linked into `~/.cursor/extensions` is ignored. Package `vscode/` and install the `.vsix`:
+
+```sh
+cd vscode && bunx --bun @vscode/vsce@3.6.0 package --allow-missing-repository --skip-license -o /tmp/code-villain.vsix
+cursor --install-extension /tmp/code-villain.vsix   # or: code --install-extension
+```
+
+Then reload the window and pick "Code Villain Night" or "Code Villain Day" with ⌘K ⌘T. After a rebuild, raise `version` in `vscode/package.json` and install again.

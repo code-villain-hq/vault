@@ -1,15 +1,15 @@
 {
-  "name": "nightshade",
-  "displayName": "Nightshade",
-  "description": "Code Villain's Nightshade theme, in night and day, generated from the vault's design tokens.",
-  "version": "0.1.0",
+  "name": "code-villain-theme",
+  "displayName": "Code Villain",
+  "description": "Code Villain's theme, in night and day, generated from the vault's design tokens.",
+  "version": "0.2.0",
   "publisher": "code-villain",
   "engines": { "vscode": "^1.80.0" },
   "categories": ["Themes"],
   "contributes": {
     "themes": [
-      { "label": "Code Villain Nightshade Night", "uiTheme": "vs-dark", "path": "./themes/nightshade-night.json" },
-      { "label": "Code Villain Nightshade Day", "uiTheme": "vs", "path": "./themes/nightshade-day.json" }
+      { "label": "Code Villain Night", "uiTheme": "vs-dark", "path": "./themes/code-villain-night.json" },
+      { "label": "Code Villain Day", "uiTheme": "vs", "path": "./themes/code-villain-day.json" }
     ]
   }
 }

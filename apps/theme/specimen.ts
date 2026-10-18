@@ -1,4 +1,4 @@
-// A specimen of Nightshade on the vault's own code, night and day, for
+// A specimen of the Code Villain theme on the vault's own code, night and day, for
 // reviewing a palette change. Writes specimen.html (self-contained, so it can
 // be shared as is). Run `bun run build` first: it reads the VS Code themes.
 import { createHighlighter } from "shiki";
@@ -8,7 +8,7 @@ const here = new URL("./", import.meta.url);
 const text = (path: string) => Bun.file(new URL(path, vault)).text();
 const lines = async (path: string, from: number, to: number) =>
   (await text(path)).split("\n").slice(from - 1, to).join("\n");
-const theme = async (mode: string) => JSON.parse(await Bun.file(new URL(`vscode/themes/nightshade-${mode}.json`, here)).text());
+const theme = async (mode: string) => JSON.parse(await Bun.file(new URL(`vscode/themes/code-villain-${mode}.json`, here)).text());
 const syntax = JSON.parse(await text("design/tokens/syntax.resolved.json"));
 const color = JSON.parse(await text("design/tokens/color.resolved.json"));
 
@@ -21,6 +21,7 @@ async function slice(path: string, start: string, count: number) {
 }
 
 const samples = [
+  { title: "TypeScript", file: "apps/layer/src/store.ts", lang: "ts", code: await slice("apps/layer/src/store.ts", "import { keep, only", 40) },
   { title: "TypeScript", file: "apps/layer/src/lib/diff.ts", lang: "ts", code: await slice("apps/layer/src/lib/diff.ts", "/** Parse a unified patch", 33) },
   { title: "Rust", file: "apps/layer/src-tauri/src/git.rs", lang: "rust", code: await slice("apps/layer/src-tauri/src/git.rs", "pub fn baseline", 31) },
   { title: "Python", file: "design/tokens/theme.py", lang: "python", code: await slice("design/tokens/theme.py", "def mix(", 26) },
@@ -66,7 +67,7 @@ const style = (t: { color?: string; fontStyle?: number }) => {
 };
 
 function block(code: string, lang: string, mode: string, extra?: (line: number) => string) {
-  const { tokens } = highlighter.codeToTokens(code, { lang, theme: `Code Villain Nightshade ${mode === "night" ? "Night" : "Day"}` });
+  const { tokens } = highlighter.codeToTokens(code, { lang, theme: `Code Villain ${mode === "night" ? "Night" : "Day"}` });
   return tokens
     .map((line, i) => {
       const body = line.map((t) => `<span style="${style(t)}">${esc(t.content)}</span>`).join("");
@@ -76,7 +77,7 @@ function block(code: string, lang: string, mode: string, extra?: (line: number) 
 }
 
 function diffBlock(mode: string) {
-  const name = `Code Villain Nightshade ${mode === "night" ? "Night" : "Day"}`;
+  const name = `Code Villain ${mode === "night" ? "Night" : "Day"}`;
   const old = highlighter.codeToTokens(before, { lang: "ts", theme: name }).tokens;
   const neu = highlighter.codeToTokens(after, { lang: "ts", theme: name }).tokens;
   return rows
@@ -119,12 +120,12 @@ function editorBlock(mode: string) {
 
 const swatches = (mode: string) => {
   const s = syntax[mode].syntax;
-  const roles = ["text", "keyword", "punctuation", "string", "constant", "function", "type"];
+  const roles = ["text", "keyword", "property", "string", "constant", "function", "special", "bracket", "punctuation"];
   const seen = new Set<string>();
   return roles
     .filter((r) => !seen.has(s[r]) && seen.add(s[r]))
     .map((r) => {
-      const name = { keyword: "keyword · operator", punctuation: "punctuation · comment", text: "text · names" }[r] ?? r;
+      const name = { text: "names · types", property: "property · operator · built-in type", special: "this · self · tags", punctuation: "punctuation · comment" }[r] ?? r;
       return `<div class="sw"><i style="background:${s[r]}"></i><b>${name}</b><code>${s[r]}</code></div>`;
     })
     .join("");
@@ -159,7 +160,7 @@ const column = (mode: string) => `
 
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nightshade for code</title>
+<title>Code Villain theme</title>
 <style>
 @font-face { font-family: "Atkinson Hyperlegible Mono"; src: url(data:font/ttf;base64,${font}); }
 @font-face { font-family: "Atkinson Hyperlegible Next"; src: url(data:font/ttf;base64,${reading}); font-weight: 200 800; }
@@ -195,8 +196,8 @@ mark.cur { background: var(--cur); color: var(--on-cur) !important; }
 .cursorline .c::before { content: ""; }
 </style></head>
 <body>
-<header><h1>Nightshade for code</h1>
-<p>Grey carries the structure: keywords and operators one step back from the names, punctuation and comments two. Four hues at one lightness carry what you look for. Poison is only the search match; cloak is the cursor and focus.</p></header>
+<header><h1>Code Villain theme</h1>
+<p>Six hues at one lightness carry what you scan for, the way tokyonight chooses: keywords, properties and operators, strings, constants, functions, and the language’s own names. Names and types stay in the text colour; grey steps back for brackets, then punctuation and comments. Poison is only the search match; cloak is the cursor and focus.</p></header>
 <main>${column("night")}${column("day")}</main>
 </body></html>
 `;

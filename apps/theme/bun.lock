@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "nightshade",
+      "name": "code-villain-theme",
       "devDependencies": {
         "shiki": "4.5.0",
       },
