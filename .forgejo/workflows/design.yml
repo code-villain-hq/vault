@@ -1,5 +1,5 @@
 # Token drift on every push that could cause it: the theme tests, the
-# generated outputs in design/tokens against build.py, and Forge's, Layer's
+# generated outputs in design/tokens against build.py, and Forge's, Layer's,
 # Caster's and the editor themes' copies against the vault. Each check writes nothing and fails with the fix.
 name: design
 
