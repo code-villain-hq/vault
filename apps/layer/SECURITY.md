@@ -8,10 +8,7 @@ privately.
 
 ## Reporting a vulnerability
 
-- **Report a vulnerability** on the repository's
-  [Security tab](https://github.com/code-villain-hq/villain-layer/security/advisories/new),
-  or
-- email **codevillain@proton.me**.
+Email **codevillain@proton.me**.
 
 Please do not open a public issue for it. Say which version you ran
 (Settings → General → Version), what an attacker needs (a ticket they

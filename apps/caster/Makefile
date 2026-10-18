@@ -52,7 +52,7 @@ install: app
 	open "/Applications/$(APP_NAME).app"
 	@echo "Installed and started /Applications/$(APP_NAME).app"
 
-# Zip for a GitHub release. Not notarized (no paid Apple Developer ID), so
+# Zip for a Forgejo release. Not notarized (no paid Apple Developer ID), so
 # first launch needs Privacy & Security → Open Anyway. Signed with the stable
 # "VillainCaster Dev" identity when present so users' permission grants
 # survive updates.

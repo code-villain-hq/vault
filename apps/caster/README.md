@@ -37,9 +37,10 @@ Type `help` (or `?`) in the launcher for this list in-app.
 
 ## Install
 
-Download `Villain-Caster-<version>-macos-arm64.zip` from
-[Releases](https://github.com/code-villain-hq/villain-caster/releases), unzip
-it and move **Caster.app** to `/Applications`.
+Download `Villain-Caster-<version>-macos-arm64.zip` from the vault's
+[Releases](https://git.codevillain.eu/code-villain/vault/releases) (tagged
+`caster-v<version>`), unzip it and move **Caster.app** to `/Applications`.
+None is published there yet, so [build from source](#build--run) for now.
 
 The app isn't notarized by Apple (that needs a paid developer account), so
 macOS blocks the first launch:
@@ -137,10 +138,10 @@ Maintainers only. Bump `CFBundleShortVersionString` / `CFBundleVersion` in
 make release    # → build/Villain-Caster-<version>-macos-arm64.zip
 ```
 
-and attach the zip to a GitHub release tagged `v<version>`. Sign with the
-same `VillainCaster Dev` certificate every time: macOS keys permission grants
-to the signature, so users keep them across updates. Builds aren't notarized
-(that needs a paid Apple Developer ID).
+and attach the zip to a release on the vault's Forgejo tagged
+`caster-v<version>`. Sign with the same `VillainCaster Dev` certificate every
+time: macOS keys permission grants to the signature, so users keep them across
+updates. Builds aren't notarized (that needs a paid Apple Developer ID).
 
 ## Contributing
 

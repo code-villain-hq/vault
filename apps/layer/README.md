@@ -11,8 +11,8 @@
 
 <p align="center">
   <a href="https://git.codevillain.eu/code-villain/vault/releases">Download</a> ·
-  <a href="https://github.com/code-villain-hq/villain-layer/blob/main/docs/features.md">Features</a> ·
-  <a href="https://github.com/code-villain-hq/villain-layer/blob/main/AGENTS.md">Contributing</a>
+  <a href="https://git.codevillain.eu/code-villain/vault/src/branch/main/apps/layer/docs/features.md">Features</a> ·
+  <a href="https://git.codevillain.eu/code-villain/vault/src/branch/main/apps/layer/AGENTS.md">Contributing</a>
 </p>
 
 ---
@@ -103,8 +103,8 @@ macOS will block the first launch with "Apple could not verify…" because relea
 ### Build from source
 
 ```bash
-git clone https://github.com/code-villain-hq/villain-layer.git
-cd villain-layer
+git clone https://git.codevillain.eu/code-villain/vault.git
+cd vault/apps/layer
 bun install
 bun run release:mac
 ```
@@ -214,7 +214,7 @@ Unless you explicitly state otherwise, any contribution you intentionally submit
 ---
 
 <p align="center">
-  <a href="https://github.com/code-villain-hq/villain-layer">GitHub</a> ·
+  <a href="https://git.codevillain.eu/code-villain/vault/src/branch/main/apps/layer">Source</a> ·
   <a href="https://git.codevillain.eu/code-villain/vault/releases">Releases</a> ·
-  <a href="https://github.com/code-villain-hq/villain-layer/issues">Issues</a>
+  <a href="https://git.codevillain.eu/code-villain/vault/issues">Issues</a>
 </p>
