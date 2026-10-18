@@ -828,6 +828,10 @@ body.dragging * { pointer-events: none; }
   --field: var(--dialog-field);
   --field-hover: var(--dialog-field-hover);
   background: var(--dialog);
+  /* Its own text colour: a dialog opened from a banner sits inside it in the
+     page, and took the banner's warning colour for every word. */
+  color: var(--fg);
+  font-weight: 400;
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 540px;
