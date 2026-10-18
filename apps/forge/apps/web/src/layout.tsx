@@ -35,6 +35,7 @@ import { useStates, useTeams } from "./data";
 import { Initial, NavIcon, ServiceIcon } from "./icons";
 import { useDesktopNotifications, useUnreadCount } from "./inbox";
 import { type NewIssueDefaults, NewIssueProvider, useNewIssue } from "./new-issue";
+import { isDesktop } from "./platform";
 import { Redirect } from "./redirect";
 import { defaultWorkspace, rememberWorkspace, signOut, useSession } from "./session";
 import { openShortcuts, Shortcuts } from "./shortcuts";
@@ -117,7 +118,12 @@ export function PageHeader({
   const { workspace } = useWorkspace();
   return (
     <>
-      <header className="app-topbar @container flex min-h-11 shrink-0 items-center gap-3 px-4">
+      {/* In the desktop app the native title bar is hidden, so this bar and the
+          sidebar's top row are what the window is moved by. */}
+      <header
+        className="app-topbar @container flex min-h-11 shrink-0 items-center gap-3 px-4"
+        data-tauri-drag-region="deep"
+      >
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
           {parent ?? workspace.name}
           <span aria-hidden="true" className="text-faint">
@@ -179,14 +185,24 @@ function Sidebar() {
   if (!inSettings) lastAppPath = pathname;
   return (
     <aside
-      className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto p-2"
+      className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
       aria-label="Sidebar"
     >
       <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-        <div className="sidebar-heading flex shrink-0 items-center gap-1">
-          <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
-            <span className="font-display text-wordmark font-bold">Forge</span>
-          </div>
+        {/* The top row lines up with the page's toolbar. In the desktop app
+            macOS draws the traffic lights here (`titleBarStyle: Overlay`), in
+            the wordmark's place; its empty part moves the window. */}
+        <div
+          className="sidebar-heading sticky top-0 z-10 flex h-11 shrink-0 items-center gap-1 bg-bg"
+          data-tauri-drag-region="deep"
+        >
+          {isDesktop ? (
+            <div className="min-w-0 flex-1" />
+          ) : (
+            <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
+              <span className="font-display text-wordmark font-bold">Forge</span>
+            </div>
+          )}
           <SidebarActions />
         </div>
         <div className="workspace-switcher">

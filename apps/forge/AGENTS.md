@@ -36,6 +36,8 @@ underlined.
 The sidebar wordmark uses Grenze Gotisch 700 at 28px, following
 [`design/layouts/app-window.md`](../../design/layouts/app-window.md).
 It always reads "Forge"; the workspace picker is a separate control.
+The desktop app hides the native title bar and shows the traffic lights in
+the wordmark's place (`isDesktop` in `layout.tsx`).
 The frame uses `bg` for the sidebar and toolbar and `panel` for content;
 below 560px the sidebar becomes a horizontal navigation row. The shared
 control rules are in [`design/components.md`](../../design/components.md):

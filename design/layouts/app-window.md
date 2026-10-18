@@ -14,8 +14,9 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 
 ## Sidebar
 
-- The fixed product wordmark at the top in Grenze Gotisch, 28px, weight 700. The only Grenze in the frame. It reads "Forge" in Forge regardless of the workspace name.
-- Global Search and the product's create action (New issue in Forge) sit together at the right of the wordmark row, as quiet 28px icon buttons with accessible names. They do not occupy a separate row between the workspace and navigation.
+- The top row is as tall as the top bar and lines up with it. In the browser it starts with the fixed product wordmark in Grenze Gotisch, 28px, weight 700: the only Grenze in the frame, reading "Forge" in Forge regardless of the workspace name.
+- In the desktop app the native title bar is hidden and macOS's traffic lights take the wordmark's place, as in Layer; Grenze beside them clashed. The empty part of the top row and of the top bar move the window.
+- Global Search and the product's create action (New issue in Forge) sit together at the right of the top row, as quiet 28px icon buttons with accessible names. They do not occupy a separate row between the workspace and navigation.
 - The workspace picker is a separate row below the product identity and above navigation. It shows the workspace's avatar and name; switching workspace never renames the product wordmark.
 - Items in the `ui` role, text `muted`, 6px corners. Hover fills `hover` and turns the text `fg`.
 - The current item fills `selected`, with text `fg` at 700.
