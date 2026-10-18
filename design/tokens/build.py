@@ -1,4 +1,4 @@
-"""Regenerate the CSS and Swift for color, type, and shape from their JSON.
+"""Regenerate the CSS and Swift for color, type, and shape, and the syntax colours, from their JSON.
 
 Run from this folder: python3 build.py
 `python3 build.py --check` writes nothing and fails if an output is stale.
@@ -8,6 +8,7 @@ import json
 import re
 import sys
 from theme import generate
+from syntax import resolve
 
 check = "--check" in sys.argv[1:]
 stale = []
@@ -31,6 +32,7 @@ c = json.load(open("color.json"))
 s = json.load(open("shape.json"))
 t = json.load(open("type.json"))
 
+source = c
 c = generate(c)
 
 # Apps that need numerical colour values consume the same resolved aliases as CSS/Swift.
@@ -62,6 +64,17 @@ for mode in ("night", "day"):
     sw += [f"  static let {mode} = Theme(\n    {args}\n  )", ""]
 sw[-1] = "}"
 emit("color.swift", "\n".join(sw) + "\n")
+
+# Code: syntax and editor colours, for the editor themes and code in the apps.
+x = resolve(json.load(open("syntax.json")), source, c)
+emit("syntax.resolved.json", json.dumps(x, indent=2) + "\n")
+css = ['/* Generated from syntax.json. Night is the default; set data-theme="day" for the apps\' light mode. */']
+for mode, selector in (("night", ':root,\n[data-theme="night"]'), ("day", '[data-theme="day"]')):
+    css += [selector + " {"]
+    css += [f"  --syntax-{k}: {v};" for k, v in x[mode]["syntax"].items()]
+    css += [f"  --code-{k}: {v};" for k, v in x[mode]["ui"].items()]
+    css += ["}", ""]
+emit("syntax.css", "\n".join(css))
 
 emit("shape.css",
     "/* Generated from shape.json. */\n:root {\n"

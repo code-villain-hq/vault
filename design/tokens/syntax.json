@@ -1,0 +1,40 @@
+{
+  "name": "Nightshade",
+  "hues": {
+    "string": "{ok}",
+    "constant": "{warn}",
+    "function": "{info}",
+    "type": "#E07FA0"
+  },
+  "levels": {
+    "night": {"hue": 0.8, "chroma": 0.1, "structure": 0.78, "quiet": 0.7},
+    "day": {"hue": 0.5, "chroma": 0.11, "structure": 0.36, "quiet": 0.5}
+  },
+  "opacity": {
+    "cursorline": 0.05,
+    "selection": 0.12,
+    "search": {"night": 0.16, "day": 0.32},
+    "diff": 0.13,
+    "diff-text": 0.2
+  },
+  "roles": {
+    "text": {"tone": "fg", "scopes": ["variable", "variable.other", "variable.parameter", "variable.other.property", "meta.object-literal.key", "entity.name.namespace", "entity.other.attribute-name", "support.variable.property", "source", "text"]},
+    "keyword": {"tone": "structure", "scopes": ["keyword", "storage", "storage.type", "storage.modifier", "keyword.control", "variable.language", "keyword.other.unit", "meta.decorator", "entity.name.function.decorator", "meta.attribute.rust", "punctuation.definition.attribute", "markup.list punctuation.definition.list", "punctuation.definition.list.begin"]},
+    "operator": {"tone": "structure", "scopes": ["keyword.operator", "punctuation.accessor", "punctuation.separator.key-value", "storage.type.function.arrow"]},
+    "punctuation": {"tone": "quiet", "scopes": ["punctuation", "meta.brace", "punctuation.definition.tag", "punctuation.definition.heading", "punctuation.definition.bold", "punctuation.definition.italic", "punctuation.definition.markdown", "punctuation.definition.raw"]},
+    "comment": {"tone": "quiet", "scopes": ["comment", "punctuation.definition.comment", "markup.quote", "comment.block.documentation"]},
+    "string": {"tone": "string", "scopes": ["string", "string.quoted", "string.template", "markup.inline.raw", "markup.fenced_code", "markup.raw", "constant.other.symbol"]},
+    "constant": {"tone": "constant", "scopes": ["constant", "constant.numeric", "constant.language", "constant.character", "constant.other", "variable.other.constant", "variable.other.enummember", "support.constant", "constant.character.escape", "string.regexp", "punctuation.definition.template-expression", "punctuation.section.embedded", "entity.name.lifetime", "storage.modifier.lifetime"]},
+    "function": {"tone": "function", "scopes": ["entity.name.function", "support.function", "meta.function-call entity.name.function", "entity.name.function.macro", "support.function.macro"]},
+    "type": {"tone": "type", "scopes": ["entity.name.type", "entity.name.class", "entity.name.struct", "entity.name.enum", "entity.name.trait", "entity.name.interface", "entity.other.inherited-class", "support.type", "support.class", "entity.name.tag", "support.class.component", "meta.type.annotation entity.name.type"]},
+    "heading": {"tone": "fg", "style": "bold", "scopes": ["markup.heading", "entity.name.section"]},
+    "link": {"tone": "fg", "style": "underline", "scopes": ["markup.underline.link", "string.other.link", "markup.link"]},
+    "emphasis": {"tone": "fg", "style": "italic", "scopes": ["markup.italic"]},
+    "strong": {"tone": "fg", "style": "bold", "scopes": ["markup.bold"]},
+    "deprecated": {"tone": "quiet", "style": "strikethrough", "scopes": ["markup.strikethrough"]},
+    "invalid": {"tone": "danger", "scopes": ["invalid", "invalid.illegal"]},
+    "inserted": {"tone": "ok", "scopes": ["markup.inserted", "punctuation.definition.inserted"]},
+    "deleted": {"tone": "danger", "scopes": ["markup.deleted", "punctuation.definition.deleted"]},
+    "changed": {"tone": "info", "scopes": ["markup.changed", "punctuation.definition.changed", "meta.diff.range", "meta.diff.header"]}
+  }
+}
