@@ -51,8 +51,9 @@ services:
       FORGE_TRUST_FORWARDED_FOR: ${FORGE_TRUST_FORWARDED_FOR:-}
     volumes:
       - forge-data:/var/lib/forge
-      # The folder containing Forge, read-only, so services can point at repositories in it.
-      - ..:/repos:ro
+      # The folder containing the vault, read-only, so services can point at
+      # repositories in it (Forge's own services use villain-vault).
+      - ../../..:/repos:ro
 
 volumes:
   postgres-data:

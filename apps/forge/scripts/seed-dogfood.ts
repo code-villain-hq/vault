@@ -1,12 +1,14 @@
 // Describes Forge's own code as services in the local "Forge" workspace, so
-// drift checks can run on this repository: each service names its folder
-// (relative to the folder containing Forge, so it works in development and
-// in Docker) and its paths. Safe to run again: existing services with the
-// same name are updated. Needs `bun run dev` (or `bun run app` with
-// FORGE_URL=http://localhost:7390) and `bun run seed`.
+// drift checks can run on the vault: each service names its folder
+// (relative to the folder containing the vault, so it works in development
+// and in Docker) and its paths, which start at the vault's root. Safe to run
+// again: existing services with the same name are updated. Needs `bun run
+// dev` (or `bun run app` with FORGE_URL=http://localhost:7390) and `bun run
+// seed`.
 import { account, BASE, call, DEV_ADMIN } from "./seed-dev";
 
-const REPOSITORY = "villain-forge";
+const REPOSITORY = "villain-vault";
+const FORGE = "apps/forge/";
 
 const SERVICES: { name: string; description: string; paths: string[] }[] = [
   {
@@ -79,7 +81,11 @@ const team =
 const existing: { id: string; name: string }[] = bootstrap.records.Service;
 
 const operations = SERVICES.map((service) => {
-  const data = { ...service, repository: REPOSITORY };
+  const data = {
+    ...service,
+    repository: REPOSITORY,
+    paths: service.paths.map((path) => FORGE + path),
+  };
   const found = existing.find((s) => s.name.toLowerCase() === service.name.toLowerCase());
   return found
     ? { action: "update", model: "Service", id: found.id, data }
@@ -98,7 +104,7 @@ const result = await call(
 if (result.status !== 200)
   throw new Error(`couldn't save the services: ${JSON.stringify(result.body)}`);
 
-console.log(`${SERVICES.length} services describe this repository in "${workspace.name}".`);
+console.log(`${SERVICES.length} services describe Forge in "${workspace.name}".`);
 console.log(
   `With ANTHROPIC_API_KEY set on the server, open ${BASE}/${workspace.url_key}/services and press "Check for drift".`,
 );
