@@ -816,6 +816,40 @@ async fn removing_someone_unassigns_them_and_tells_clients(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn removing_someone_takes_them_off_reviews(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, acme) = app.signup("Ada", "Acme").await;
+    let bob = app
+        .join("Bob", &app.invite(&ada, &acme, "member").await)
+        .await;
+    let bob_id = app.get("/api/me", &bob).await.body["user"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let bootstrap = format!("/api/w/{acme}/sync/bootstrap");
+    let team = app.get(&bootstrap, &ada).await.body["records"]["Team"][0]["id"].clone();
+    let ask = json!({ "id": uuid::Uuid::now_v7(), "operations": [
+        { "action": "create", "model": "Issue", "id": uuid::Uuid::now_v7(), "data": { "team_id": team, "title": "For Bob to review", "reviewer_id": bob_id } }
+    ]});
+    let created = app
+        .post(&format!("/api/w/{acme}/sync/transactions"), Some(&ada), ask)
+        .await;
+    assert_eq!(created.status, StatusCode::OK, "{}", created.body);
+
+    let removed = app
+        .call(
+            "DELETE",
+            &format!("/api/w/{acme}/members/{bob_id}"),
+            Some(&ada),
+            None,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    let records = app.get(&bootstrap, &ada).await.body["records"].clone();
+    assert_eq!(records["Issue"][0]["reviewer_id"], Value::Null);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn the_server_can_serve_the_web_app(pool: PgPool) {
     use axum::body::Body;
     use axum::http::Request;

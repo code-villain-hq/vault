@@ -2058,3 +2058,260 @@ async fn deleting_a_spec_is_not_a_change_after_work_started(pool: PgPool) {
     // Its history goes with it.
     assert!(spec_versions(&pool, f.actor, gone).await.unwrap().is_none());
 }
+
+/// An agent in the fixture's workspace.
+async fn add_agent(pool: &PgPool, f: &Fixture, name: &str) -> Actor {
+    let agent = Actor {
+        user_id: Uuid::now_v7(),
+        workspace_id: f.actor.workspace_id,
+    };
+    sqlx::query("INSERT INTO users (id, email, name, kind) VALUES ($1, $1::text, $2, 'agent')")
+        .bind(agent.user_id)
+        .bind(name)
+        .execute(pool)
+        .await
+        .unwrap();
+    add_member(pool, agent.workspace_id, agent.user_id, "member").await;
+    agent
+}
+
+async fn move_to(pool: &PgPool, actor: Actor, id: Uuid, state: Uuid) {
+    apply(
+        pool,
+        actor,
+        vec![update(ModelKind::Issue, id, json!({ "state_id": state }))],
+    )
+    .await
+    .unwrap();
+}
+
+async fn reviews(pool: &PgPool, viewer: Actor, id: Uuid) -> Vec<Value> {
+    notifications(pool, viewer)
+        .await
+        .into_iter()
+        .filter(|n| n["type"] == "review" && n["issue_id"] == json!(id))
+        .collect()
+}
+
+async fn read_all(pool: &PgPool, viewer: Actor) {
+    for n in notifications(pool, viewer).await {
+        let id: Uuid = n["id"].as_str().unwrap().parse().unwrap();
+        apply(
+            pool,
+            viewer,
+            vec![update(
+                ModelKind::Notification,
+                id,
+                json!({ "read_at": "2026-10-18T08:00:00Z" }),
+            )],
+        )
+        .await
+        .unwrap();
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn entering_review_asks_whoever_accepted_the_issue_out_of_triage(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    let id = new_issue(&pool, &f, json!({ "state_id": f.state("Triage") })).await;
+    move_to(&pool, bob, id, f.state("Todo")).await;
+    move_to(&pool, claude, id, f.state("In Progress")).await;
+
+    move_to(&pool, claude, id, f.state("In Review")).await;
+
+    assert_eq!(
+        issue(&pool, f.actor, id).await.reviewer_id,
+        Some(bob.user_id)
+    );
+    let for_bob = reviews(&pool, bob, id).await;
+    assert_eq!(for_bob.len(), 1);
+    assert_eq!(for_bob[0]["actor_id"], json!(claude.user_id));
+    assert!(reviews(&pool, f.actor, id).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn without_an_accepter_the_creator_reviews_if_a_person_made_it(pool: PgPool) {
+    let f = seed(&pool).await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    let id = new_issue(&pool, &f, json!({ "state_id": f.state("Todo") })).await;
+
+    move_to(&pool, claude, id, f.state("In Review")).await;
+
+    assert_eq!(
+        issue(&pool, f.actor, id).await.reviewer_id,
+        Some(f.actor.user_id)
+    );
+    assert_eq!(reviews(&pool, f.actor, id).await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn with_nobody_to_ask_the_admins_who_are_people_hear(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    sqlx::query("UPDATE workspace_members SET role = 'admin' WHERE user_id = $1")
+        .bind(claude.user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = Uuid::now_v7();
+    apply(
+        &pool,
+        claude,
+        vec![create(
+            ModelKind::Issue,
+            id,
+            json!({ "team_id": f.team, "title": "Agent's own", "state_id": f.state("Todo") }),
+        )],
+    )
+    .await
+    .unwrap();
+
+    move_to(&pool, claude, id, f.state("In Review")).await;
+
+    assert_eq!(issue(&pool, f.actor, id).await.reviewer_id, None);
+    assert_eq!(reviews(&pool, f.actor, id).await.len(), 1);
+    assert!(reviews(&pool, bob, id).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_chosen_reviewer_stays_and_moving_it_yourself_tells_nobody(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let id = new_issue(
+        &pool,
+        &f,
+        json!({ "state_id": f.state("Todo"), "reviewer_id": bob.user_id }),
+    )
+    .await;
+
+    move_to(&pool, bob, id, f.state("In Review")).await;
+
+    assert_eq!(
+        issue(&pool, f.actor, id).await.reviewer_id,
+        Some(bob.user_id)
+    );
+    assert!(reviews(&pool, bob, id).await.is_empty());
+    assert!(reviews(&pool, f.actor, id).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn review_notifications_do_not_repeat(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let carol = add_person(&pool, &f, "Carol").await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    let id = new_issue(
+        &pool,
+        &f,
+        json!({ "state_id": f.state("In Progress"), "reviewer_id": bob.user_id }),
+    )
+    .await;
+    move_to(&pool, claude, id, f.state("In Review")).await;
+    assert_eq!(reviews(&pool, bob, id).await.len(), 1);
+
+    // Bounced back and returned while Bob hasn't read it: still one.
+    move_to(&pool, claude, id, f.state("In Progress")).await;
+    move_to(&pool, claude, id, f.state("In Review")).await;
+    assert_eq!(reviews(&pool, bob, id).await.len(), 1);
+
+    // Edits while it stays in review send nothing.
+    read_all(&pool, bob).await;
+    apply(
+        &pool,
+        claude,
+        vec![update(ModelKind::Issue, id, json!({ "title": "Better" }))],
+    )
+    .await
+    .unwrap();
+    assert_eq!(reviews(&pool, bob, id).await.len(), 1);
+
+    // Sent back, then resubmitted: a fresh one.
+    move_to(&pool, bob, id, f.state("In Progress")).await;
+    move_to(&pool, claude, id, f.state("In Review")).await;
+    assert_eq!(reviews(&pool, bob, id).await.len(), 2);
+
+    // A new reviewer during review hears; the old one doesn't.
+    read_all(&pool, bob).await;
+    apply(
+        &pool,
+        f.actor,
+        vec![update(
+            ModelKind::Issue,
+            id,
+            json!({ "reviewer_id": carol.user_id }),
+        )],
+    )
+    .await
+    .unwrap();
+    assert_eq!(reviews(&pool, carol, id).await.len(), 1);
+    assert_eq!(reviews(&pool, bob, id).await.len(), 2);
+
+    // Outside review, choosing a reviewer tells nobody yet.
+    let later = new_issue(&pool, &f, json!({})).await;
+    apply(
+        &pool,
+        f.actor,
+        vec![update(
+            ModelKind::Issue,
+            later,
+            json!({ "reviewer_id": bob.user_id }),
+        )],
+    )
+    .await
+    .unwrap();
+    assert!(reviews(&pool, bob, later).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_reviewer_is_a_person_and_hears_comments(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let claude = add_agent(&pool, &f, "Claude Code").await;
+    let id = new_issue(&pool, &f, json!({})).await;
+
+    invalid(
+        apply(
+            &pool,
+            f.actor,
+            vec![update(
+                ModelKind::Issue,
+                id,
+                json!({ "reviewer_id": claude.user_id }),
+            )],
+        )
+        .await,
+    );
+
+    // Agents may set it.
+    apply(
+        &pool,
+        claude,
+        vec![update(
+            ModelKind::Issue,
+            id,
+            json!({ "reviewer_id": bob.user_id }),
+        )],
+    )
+    .await
+    .unwrap();
+    apply(
+        &pool,
+        f.actor,
+        vec![create(
+            ModelKind::Comment,
+            Uuid::now_v7(),
+            json!({ "issue_id": id, "body": "Have a look" }),
+        )],
+    )
+    .await
+    .unwrap();
+    assert!(
+        notifications(&pool, bob)
+            .await
+            .iter()
+            .any(|n| n["type"] == "comment" && n["issue_id"] == json!(id))
+    );
+}

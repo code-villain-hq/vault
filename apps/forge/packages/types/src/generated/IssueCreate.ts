@@ -4,4 +4,4 @@
  * What a client sends to create an issue. The id travels with the
  * operation. Without a state, the issue starts in the team's backlog.
  */
-export type IssueCreate = { team_id: string, title: string, description?: string, state_id?: string, priority?: number, assignee_id?: string, parent_id?: string, project_id?: string, service_id?: string, label_ids?: Array<string>, due_date?: string, sort_order?: number, };
+export type IssueCreate = { team_id: string, title: string, description?: string, state_id?: string, priority?: number, assignee_id?: string, reviewer_id?: string, parent_id?: string, project_id?: string, service_id?: string, label_ids?: Array<string>, due_date?: string, sort_order?: number, };

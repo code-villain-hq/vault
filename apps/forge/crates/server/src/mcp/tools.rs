@@ -99,6 +99,7 @@ fn issue_summary(s: &Snapshot, issue: &Issue) -> Value {
         "status_type": state.map(|st| st.kind),
         "priority": PRIORITIES[issue.priority.clamp(0, 4) as usize],
         "assignee": s.user_name(issue.assignee_id),
+        "reviewer": s.user_name(issue.reviewer_id),
     });
     // Only issues waiting for an agent have a place in its queue.
     if let Some(position) = s.queue.get(&issue.id) {
@@ -522,6 +523,8 @@ fn describe_change(s: &Snapshot, change: &IssueChange) -> String {
             )
         }
         IssueChange::Assignee { to, .. } => format!("assigned it to {}", user(to)),
+        IssueChange::Reviewer { to: None, .. } => "removed the reviewer".into(),
+        IssueChange::Reviewer { to, .. } => format!("asked {} to review it", user(to)),
         IssueChange::Labels { added, removed } => {
             let mut parts = Vec::new();
             if !added.is_empty() {
@@ -562,6 +565,8 @@ pub struct CreateIssue {
     pub priority: Option<String>,
     /// Name or email; "me" for yourself.
     pub assignee: Option<String>,
+    /// The person asked to review it (never an agent): name or email.
+    pub reviewer: Option<String>,
     /// Label names.
     pub labels: Option<Vec<String>>,
     /// Project id or name.
@@ -689,6 +694,9 @@ pub async fn create_issue(pool: &PgPool, actor: Actor, input: CreateIssue) -> To
     if let Some(assignee) = input.assignee.as_deref().filter(|a| !is_none(a)) {
         data.insert("assignee_id".into(), json!(s.user(assignee)?.id));
     }
+    if let Some(reviewer) = input.reviewer.as_deref().filter(|r| !is_none(r)) {
+        data.insert("reviewer_id".into(), json!(s.user(reviewer)?.id));
+    }
     if let Some(labels) = &input.labels {
         let ids = labels
             .iter()
@@ -742,6 +750,8 @@ pub struct UpdateIssue {
     pub priority: Option<String>,
     /// Name or email; "me" for yourself; "none" to unassign.
     pub assignee: Option<String>,
+    /// The person asked to review it (never an agent): name or email; "none" to remove.
+    pub reviewer: Option<String>,
     /// Label names; replaces the issue's labels.
     pub labels: Option<Vec<String>>,
     /// Project id or name; "none" to remove.
@@ -778,6 +788,14 @@ pub async fn update_issue(pool: &PgPool, actor: Actor, input: UpdateIssue) -> To
             Some(s.user(assignee)?.id)
         };
         data.insert("assignee_id".into(), json!(id));
+    }
+    if let Some(reviewer) = &input.reviewer {
+        let id = if is_none(reviewer) {
+            None
+        } else {
+            Some(s.user(reviewer)?.id)
+        };
+        data.insert("reviewer_id".into(), json!(id));
     }
     if let Some(labels) = &input.labels {
         let ids = labels

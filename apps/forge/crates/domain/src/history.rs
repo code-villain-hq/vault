@@ -41,6 +41,10 @@ pub enum IssueChange {
         from: Option<Uuid>,
         to: Option<Uuid>,
     },
+    Reviewer {
+        from: Option<Uuid>,
+        to: Option<Uuid>,
+    },
     Labels {
         added: Vec<Uuid>,
         removed: Vec<Uuid>,
@@ -154,6 +158,12 @@ fn diff(a: &Issue, b: &Issue) -> Vec<IssueChange> {
             to: b.assignee_id,
         });
     }
+    if a.reviewer_id != b.reviewer_id {
+        out.push(IssueChange::Reviewer {
+            from: a.reviewer_id,
+            to: b.reviewer_id,
+        });
+    }
     let added: Vec<Uuid> = (b.label_ids.iter())
         .filter(|l| !a.label_ids.contains(l))
         .copied()
@@ -252,6 +262,7 @@ mod tests {
             state_id: Uuid::from_u128(1),
             priority: 0,
             assignee_id: None,
+            reviewer_id: None,
             parent_id: None,
             project_id: None,
             service_id: None,

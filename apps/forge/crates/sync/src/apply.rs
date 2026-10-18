@@ -3,7 +3,7 @@ use serde_json::{Map, Value, json};
 use sqlx::{AssertSqlSafe, PgConnection, PgPool};
 use uuid::Uuid;
 
-use crate::{NOTIFY_CHANNEL, SyncError, spec_change, work};
+use crate::{NOTIFY_CHANNEL, SyncError, review, spec_change, work};
 
 /// Who a transaction comes from. Some writes are only for the server: creating
 /// teams (with their workflow), and changes it makes on its own behalf.
@@ -192,7 +192,11 @@ async fn apply_operation(
                 return Ok(None);
             }
             let before = current(db, actor, *model, *id).await?;
-            let record = update(db, actor, *model, *id, data)
+            let mut data = data.clone();
+            if *model == ModelKind::Issue {
+                review::fill_in(db, actor.workspace_id, *id, before.as_ref(), &mut data).await?;
+            }
+            let record = update(db, actor, *model, *id, &data)
                 .await?
                 .ok_or_else(|| SyncError::NotFound(model.name().into()))?;
             check_rules(db, actor, *model, *id).await?;
@@ -381,6 +385,11 @@ async fn notify_people(
                 notifications.push((assignee, "assigned", issue, None, None));
                 wakes.push((assignee, "assigned", issue));
             }
+            for person in
+                review::to_notify(db, actor.workspace_id, actor.user_id, before, after).await?
+            {
+                notifications.push((person, "review", issue, None, None));
+            }
 
             let (old_state, new_state) = (
                 before.and_then(|b| uuid_at(b, "state_id")),
@@ -452,10 +461,12 @@ async fn notify_people(
             {
                 wakes.push((assignee, "comment", issue));
             }
-            // Everyone involved in the issue: its creator, assignee and commenters.
+            // Everyone involved in the issue: its creator, assignee, reviewer
+            // and commenters.
             let people: Vec<Uuid> = sqlx::query_scalar(
                 "SELECT created_by FROM issues WHERE id = $1 \
                  UNION SELECT assignee_id FROM issues WHERE id = $1 AND assignee_id IS NOT NULL \
+                 UNION SELECT reviewer_id FROM issues WHERE id = $1 AND reviewer_id IS NOT NULL \
                  UNION SELECT author_id FROM comments WHERE issue_id = $1",
             )
             .bind(issue)
@@ -725,6 +736,8 @@ async fn add_server_fields(
                     .ok_or_else(|| SyncError::Invalid("the team has no backlog state".into()))?;
                 row.insert("state_id".into(), json!(state));
             }
+            let id = uuid_field(row, "id")?;
+            review::fill_in(db, actor.workspace_id, id, None, row).await?;
         }
         ModelKind::Comment => {
             row.insert("author_id".into(), json!(actor.user_id));
@@ -928,6 +941,20 @@ async fn check_rules(
     .await?;
     if unknown_labels > 0 {
         return Err(SyncError::Invalid("label not found".into()));
+    }
+
+    // Reviewing is a person's call.
+    let agent_reviews: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM issues i JOIN users u ON u.id = i.reviewer_id \
+         WHERE i.id = $1 AND u.kind = 'agent')",
+    )
+    .bind(id)
+    .fetch_one(&mut *db)
+    .await?;
+    if agent_reviews {
+        return Err(SyncError::Invalid(
+            "A reviewer is a person, not an agent.".into(),
+        ));
     }
 
     // An issue can't end up as its own ancestor.

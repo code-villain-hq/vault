@@ -24,6 +24,9 @@ pub struct Issue {
     pub state_id: Uuid,
     pub priority: Priority,
     pub assignee_id: Option<Uuid>,
+    /// The person asked to review it: never an agent. Filled in by the
+    /// server when the issue enters review without one.
+    pub reviewer_id: Option<Uuid>,
     /// The issue this is a sub-issue of.
     pub parent_id: Option<Uuid>,
     pub project_id: Option<Uuid>,
@@ -52,6 +55,7 @@ pub struct IssueCreate {
     pub state_id: Option<Uuid>,
     pub priority: Option<Priority>,
     pub assignee_id: Option<Uuid>,
+    pub reviewer_id: Option<Uuid>,
     pub parent_id: Option<Uuid>,
     pub project_id: Option<Uuid>,
     pub service_id: Option<Uuid>,
@@ -71,6 +75,7 @@ pub struct IssuePatch {
     pub state_id: Option<Uuid>,
     pub priority: Option<Priority>,
     pub assignee_id: Option<Option<Uuid>>,
+    pub reviewer_id: Option<Option<Uuid>>,
     pub parent_id: Option<Option<Uuid>>,
     pub project_id: Option<Option<Uuid>>,
     pub service_id: Option<Option<Uuid>>,

@@ -152,7 +152,7 @@ impl Forge {
     }
 
     #[tool(
-        description = "Change an issue's fields: title, description, status, priority, assignee, labels, project, service, parent, due date."
+        description = "Change an issue's fields: title, description, status, priority, assignee, reviewer (the person asked to review it), labels, project, service, parent, due date."
     )]
     async fn update_issue(
         &self,

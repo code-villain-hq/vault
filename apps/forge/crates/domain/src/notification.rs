@@ -22,6 +22,8 @@ pub enum NotificationType {
     /// Another open issue's spec change wants to change a requirement that
     /// an issue of yours changes first. Its issue is the other one.
     SpecConflict,
+    /// An issue you're asked to review is ready for it.
+    Review,
 }
 
 /// Something that happened that one person should know about. Only that
