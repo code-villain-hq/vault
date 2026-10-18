@@ -1,0 +1,35 @@
+{
+  "tool": "Built-in image_gen",
+  "sources": [
+    {
+      "file": "sources/fold.png",
+      "kind": "generated raster source",
+      "prompt": "Use case: stylized-concept. Asset type: exploratory desktop wallpaper sketch for Code Villain, a gothic coding studio. Produce a single wide landscape wallpaper, about 16:9, edge to edge, no mockup, no panel layout, no captions, no text, no letters, no logos, no watermark. Palette: night #0B0B0B dominates; achromatic charcoal #1B1B1B and #303030; optional deep cloak violet #5A1470 and wash #1A0D24. Sophisticated restrained graphic print, etched linework and subtly tactile paper grain, crisp structural silhouette, exceptionally deliberate composition. Borrow the existing wallpaper family's engraved hatching and geometric depth but create a new composition. At least half the image should be quiet dark space usable behind desktop windows. No chrome, neon, sci-fi HUD, purple haze, glossy plastic, decorative symbols, or rainbow gradients. Concept FOLD: one monumental folded ribbon or angular draped sheet, sculptural but graphic, sweeping diagonally across the bottom right quadrant, one angular peak rising just right of center. Outer faces are near-black charcoal; a deep violet #5A1470 inside face folds into almost-black #1A0D24 shadow. Extremely fine engraved parallel contours follow the fold and tighten toward its pinch, recalling old geometric engraving. This is a single asymmetric large shape, not repeating tiles. The upper half and left third stay mostly #0B0B0B. Beautiful quiet tension, no glow, no chartreuse."
+    },
+    {
+      "file": "code-villain-fold-poison.png",
+      "kind": "generated raster source and final wallpaper",
+      "references": [
+        "sources/fold.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Edit the supplied wallpaper. Add exactly one perfectly straight horizontal poison chartreuse #C9E265 line running uninterrupted from the left edge to the right edge, centered at y=54.8% of image height. The line is solid flat color, crisp, thin but clearly visible, approximately 7 pixels tall relative to this 1672x941 image. It crosses in front of the engraved folds at that height, without bending or following their contours. No glow, no bloom, no light spill, no gradient, no shadow. Preserve the entire original image composition, black background, fine gray engraved texture, violet folded shape, every fold and position, grain, framing and aspect ratio. Only add this horizontal line. No text, no logos, no extra colored elements."
+    },
+    {
+      "file": "code-villain-cubes-cloak-engraved.png",
+      "kind": "generated raster wallpaper",
+      "references": [
+        "code-villain-cubes-cloak-macbook.png",
+        "sources/fold.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1 is the EDIT TARGET: Code Villain's repeating isometric cube wallpaper. Image 2 is ONLY the material and engraving style reference: the Fold wallpaper.\nTransfer the fine, organic, tactile intaglio engraving of image 2 onto the cube geometry of image 1. Preserve image 1's overall composition, cube count, cube scale, positions, interlocking tessellation, and face orientations. Keep the same wide aspect ratio.\nReplace the broad mechanical vector stripes with hundreds of delicate, closely spaced etched hairlines. The marks must feel like the actual Fold reference: gently flowing etched contours with subtle natural irregularity, fine dark paper tooth, and finely modulated charcoal ink. Gray threads across top faces, rich dark violet threads across left faces; right faces almost black. All the tonal shading should arise from the beautiful density of the engraved lines. Keep the planar cube shapes clearly legible. Fine variation from cube to cube.\nUse the Fold reference's quieter palette and soft black depth: night #0B0B0B, gray engraved ink, deep cloak #5A1470 dissolving into #1A0D24. Violet should be subdued and dark, not large flat bright purple fills.\nThe previous failed treatment added coarse black blotches and artificial distress: absolutely avoid dirty patches, black spots, scuffs, grunge overlays, scratches across the image, jittered zigzags, dotted dashes, coarse noise, fabric weave, glossy surfaces, glow, and perfect regular computer-drawn pinstripes.\nOnly change the surface rendering and shading, not the cube composition. No letters, no logo, no poison line, no text. Render one complete wallpaper, no mockup."
+    }
+  ],
+  "composition": {
+    "file": "code-villain-fold-poison-wordmark.png",
+    "script": "build_fold.py",
+    "references": [
+      "code-villain-fold-poison.png",
+      "../../mark/logo-night.svg"
+    ]
+  }
+}

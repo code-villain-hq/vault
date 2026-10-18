@@ -5,8 +5,10 @@ later. They are studio surfaces, so they stay Nightshade night and follow
 the rest of [`brand/`](../README.md): the strike is each image's one brand
 moment, and nothing else uses poison.
 
-Each image is generated from the brand sources by a script beside it, so
-a change to the mark reaches every image. Don't edit the outputs by hand.
+The original wallpaper set is generated from the brand sources by a script
+beside it, so a change to the mark reaches every image. Don't edit those
+outputs by hand. The engraved editions below use generated raster sources;
+the Fold wordmark is composed from the original outlined brand lettering.
 
 ## Wallpapers
 
@@ -39,3 +41,19 @@ extends it.
 Files are named `code-villain-<design>-<screen>`, as SVG and PNG. To
 regenerate, run `python3 build.py` from `wallpapers/`; it needs Google
 Chrome to render the PNGs.
+
+## Engraved editions
+
+The selected Fold and cube studies live directly in `wallpapers/`:
+
+| File | Size | Design |
+| --- | --- | --- |
+| [`code-villain-fold-poison.png`](wallpapers/code-villain-fold-poison.png) | 1672 × 941 | Engraved violet folds with a poison line |
+| [`code-villain-fold-poison-wordmark.png`](wallpapers/code-villain-fold-poison-wordmark.png) | 1672 × 941 | The same image with the wordmark on the left |
+| [`code-villain-cubes-cloak-engraved.png`](wallpapers/code-villain-cubes-cloak-engraved.png) | 1560 × 1008 | The original cube geometry with Fold's engraved texture |
+
+These retain their generated resolution. Their source image and imagegen
+prompts are in [`wallpapers/sources/`](wallpapers/sources/). Rebuild the
+Fold wordmark's SVG and PNG with `python3 build_fold.py` from `wallpapers/`;
+it needs Google Chrome. The original `build.py` does not overwrite these
+editions.
