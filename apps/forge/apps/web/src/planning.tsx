@@ -55,7 +55,11 @@ function ProgressBar({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-2 text-xs text-muted">
       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-line">
-        <span className="block h-full rounded-full bg-ok" style={{ width: `${value * 100}%` }} />
+        {/* Progress is detail, not a signal: grey until the work is all done. */}
+        <span
+          className={`block h-full rounded-full ${value === 1 ? "bg-ok" : "bg-muted"}`}
+          style={{ width: `${value * 100}%` }}
+        />
       </span>
       {Math.round(value * 100)}%
     </span>
@@ -114,7 +118,7 @@ export function ProjectsPage() {
                 <Link
                   to="/$workspace/project/$project"
                   params={{ workspace: workspace.url_key, project: project.id }}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-hover"
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
                 >
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-hover">
                     <ProjectIcon />
@@ -309,7 +313,7 @@ export function ProjectPage() {
                 onSelect={(value) => update({ initiative_id: value || null })}
                 triggerClassName={chip}
               >
-                <Mountain className="size-3.5" aria-hidden="true" />
+                <Mountain size={15} strokeWidth={1.75} aria-hidden="true" />
                 <span className="truncate">
                   {initiatives.find((i) => i.id === project.initiative_id)?.name ?? "Initiative"}
                 </span>
@@ -429,10 +433,10 @@ export function InitiativesPage() {
                   <Link
                     to="/$workspace/initiative/$initiative"
                     params={{ workspace: workspace.url_key, initiative: initiative.id }}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-hover"
+                    className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
                   >
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-hover text-muted">
-                      <Mountain className="size-4" aria-hidden="true" />
+                      <Mountain size={15} strokeWidth={1.75} aria-hidden="true" />
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate font-medium">{initiative.name}</span>
@@ -550,7 +554,7 @@ export function InitiativePage() {
                 <Link
                   to="/$workspace/project/$project"
                   params={{ workspace: ws, project: project.id }}
-                  className="flex h-10 items-center gap-3 rounded-lg px-3 hover:bg-hover"
+                  className="flex h-10 items-center gap-3 rounded-md px-3 hover:bg-hover"
                 >
                   <ProjectIcon />
                   <span className="min-w-0 flex-1 truncate">{project.name}</span>

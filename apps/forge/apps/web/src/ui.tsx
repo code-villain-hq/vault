@@ -8,7 +8,7 @@ export function buttonClass(variant: ButtonVariant = "primary"): string {
   const look = {
     primary: "bg-primary text-on-primary hover:bg-primary-hover",
     secondary: "text-muted hover:bg-hover hover:text-fg",
-    danger: "text-danger hover:bg-hover",
+    danger: "text-danger-ink hover:bg-hover",
   }[variant];
   return `ui-control inline-flex h-7 shrink-0 items-center justify-center gap-2 rounded-md px-3 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:opacity-45 ${look}`;
 }
@@ -41,7 +41,7 @@ export function TextField({
 export function ErrorMessage({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-danger">
+    <p role="alert" className="tint-danger rounded-md px-3 py-2">
       {children}
     </p>
   );
@@ -58,9 +58,7 @@ export function AuthScreen({ title, children }: { title: string; children: React
     <div className="flex min-h-full items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <Logo className="mx-auto mb-4 size-20" />
-        <h1 className="mb-6 text-center font-display text-[28px] leading-[1.18] font-bold">
-          {title}
-        </h1>
+        <h1 className="mb-6 text-center text-title font-semibold">{title}</h1>
         {children}
       </div>
     </div>

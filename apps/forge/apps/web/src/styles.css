@@ -22,6 +22,8 @@
   --color-hover: var(--hover);
   /* Translucent, so the active option shows on any host, dialogs included. */
   --color-highlight: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
+  /* The quiet chip tint, for initials and other detail that isn't a signal. */
+  --color-chip: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
   --color-band: var(--band);
   --color-accent: var(--accent);
   --color-signal: var(--signal);
@@ -29,11 +31,16 @@
   --color-primary-hover: var(--primary-hover);
   --color-on-primary: var(--on-primary);
   --color-selected: var(--selected);
-  --color-info: var(--info);
   --color-line-strong: var(--line-strong);
   --color-danger: var(--danger);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
+  --color-info: var(--info);
+  /* Status text: checked on the status tint as well as on plain tones. */
+  --color-danger-ink: var(--status-danger-ink);
+  --color-ok-ink: var(--status-ok-ink);
+  --color-warn-ink: var(--status-warn-ink);
+  --color-info-ink: var(--status-info-ink);
   --font-sans: var(--font-reading);
   /* Secondary text: 13px, a step under the 14px body. */
   --text-xs: var(--type-ui-small-size);
@@ -42,6 +49,8 @@
   --text-sm--line-height: var(--type-ui-leading);
   --text-title: var(--type-title-size);
   --text-title--line-height: var(--type-title-leading);
+  --text-query: var(--type-query-size);
+  --text-query--line-height: var(--type-query-leading);
   --font-weight-medium: var(--type-control-weight);
   --font-weight-semibold: var(--type-title-weight);
 }
@@ -82,6 +91,32 @@
   line-height: var(--type-control-leading);
 }
 
+/* Links are ink, bold and underlined; the underline firms on hover. */
+@utility ui-link {
+  color: var(--fg);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 3px;
+  &:hover {
+    text-decoration-color: var(--fg);
+  }
+}
+
+/* A status-tinted note or diff run: the status recipe, not a block colour. */
+@utility tint-danger {
+  background: color-mix(in srgb, var(--danger) var(--status-tint), transparent);
+  color: var(--status-danger-ink);
+}
+@utility tint-ok {
+  background: color-mix(in srgb, var(--ok) var(--status-tint), transparent);
+  color: var(--status-ok-ink);
+}
+@utility tint-warn {
+  background: color-mix(in srgb, var(--warn) var(--status-tint), transparent);
+  color: var(--status-warn-ink);
+}
+
 @utility ui-field {
   border: 1px solid transparent;
   background: var(--field);
@@ -106,6 +141,11 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
+}
+/* The dimmed backdrop behind a dialog. design/ has no token for it yet, so
+   this one value stands in for every dialog until it does. */
+.app-backdrop {
+  background: rgb(0 0 0 / 40%);
 }
 .app-dialog {
   --field: var(--dialog-field);
@@ -235,8 +275,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Neutral, so the text stays readable by night and day; poison never backs text. */
 ::selection {
-  background: var(--primary-hover);
+  background: color-mix(in srgb, var(--fg) 25%, transparent);
   color: var(--fg);
 }
 
@@ -281,14 +322,7 @@ body {
   font-weight: 700;
 }
 .markdown a {
-  color: var(--fg);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
-  text-underline-offset: 3px;
-}
-.markdown a:hover {
-  text-decoration-color: var(--fg);
+  @apply ui-link;
 }
 .markdown code {
   font-family: var(--font-mono);

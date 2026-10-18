@@ -62,7 +62,7 @@ export function ReviewBar({ issue }: { issue: Issue }) {
       {notes && assignee && (
         <button
           type="button"
-          className="self-start text-xs font-bold text-fg underline decoration-fg/45 underline-offset-4 hover:decoration-fg"
+          className="ui-link self-start text-xs"
           onClick={() =>
             document
               .getElementById(`comment-${notes.id}`)
@@ -113,9 +113,15 @@ export function ReviewBar({ issue }: { issue: Issue }) {
       ) : pullRequests.length > 0 ? (
         <div className="flex flex-col gap-3">
           <ul className="flex flex-col gap-2">
-            {pullRequests.map((pr) => (
+            {pullRequests.map((pr, i) => (
               <li key={pr.id} className="flex min-w-0 items-center gap-3">
-                <a href={pr.url} target="_blank" rel="noreferrer" className={buttonClass()}>
+                {/* One primary action: the first pull request; any others stay secondary. */}
+                <a
+                  href={pr.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonClass(i === 0 ? "primary" : "secondary")}
+                >
                   Review and merge {pr.number ? `PR #${pr.number}` : "the pull request"} on GitHub ↗
                 </a>
                 {pullRequests.length > 1 && (
@@ -128,14 +134,9 @@ export function ReviewBar({ issue }: { issue: Issue }) {
             <Button variant="secondary" disabled={!working} onClick={() => setSendingBack(true)}>
               Send back…
             </Button>
-            <button
-              type="button"
-              disabled={!done}
-              onClick={approve}
-              className="text-xs text-muted hover:text-fg hover:underline disabled:opacity-50"
-            >
+            <Button variant="secondary" disabled={!done} onClick={approve}>
               Mark done without merging
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

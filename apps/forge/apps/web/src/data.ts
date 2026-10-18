@@ -131,16 +131,6 @@ export function byPriority(a: Issue, b: Issue) {
 
 export const PRIORITY_LABELS = ["No priority", "Urgent", "High", "Medium", "Low"];
 
-/**
- * A stable colour for a person, from their id: the same lightness for every
- * hue (OKLCH), dark enough for white initials to read (over 4.5:1).
- */
-export function personColor(id: string) {
-  let hash = 0;
-  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) | 0;
-  return `oklch(50% 0.11 ${Math.abs(hash) % 360})`;
-}
-
 export function formatDate(date: string | null) {
   if (!date) return "";
   return new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, {

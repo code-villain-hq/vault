@@ -96,9 +96,8 @@ export function TriageSuggestion({ issueId }: { issueId: string }) {
   if (!aiConfigured) return null;
   return (
     <div className="flex items-center gap-3 text-xs">
-      <button
-        type="button"
-        className="text-muted hover:text-fg disabled:opacity-50"
+      <Button
+        variant="secondary"
         disabled={asking}
         onClick={() => {
           setError(null);
@@ -109,12 +108,12 @@ export function TriageSuggestion({ issueId }: { issueId: string }) {
         }}
       >
         {last ? "Ask Forge AI again" : "Ask Forge AI to triage"}
-      </button>
-      {last?.status === "failed" && <span className="text-danger">{last.error}</span>}
+      </Button>
+      {last?.status === "failed" && <span className="text-danger-ink">{last.error}</span>}
       {last?.status === "succeeded" && last.suggestions === 0 && (
         <span className="text-faint">Nothing to suggest last time.</span>
       )}
-      {error && <span className="text-danger">{error}</span>}
+      {error && <span className="text-danger-ink">{error}</span>}
     </div>
   );
 }
@@ -135,24 +134,16 @@ function TriageCard({ suggestion }: { suggestion: Suggestion }) {
           <span key={change}>{change}</span>
         ))}
         <span className="ml-auto flex gap-2">
-          <button type="button" className="text-muted hover:text-fg" onClick={() => setWhy(!why)}>
+          <Button variant="secondary" onClick={() => setWhy(!why)}>
             {why ? "Hide why" : "Why?"}
-          </button>
+          </Button>
           {!nothing && (
-            <Button
-              className="h-6 px-2 text-xs"
-              disabled={busy}
-              onClick={() => void resolve("accept")}
-            >
+            // Secondary: the triage bar's Accept is the action this state needs.
+            <Button variant="secondary" disabled={busy} onClick={() => void resolve("accept")}>
               Apply
             </Button>
           )}
-          <Button
-            variant="secondary"
-            className="h-6 px-2 text-xs"
-            disabled={busy}
-            onClick={() => void resolve("dismiss")}
-          >
+          <Button variant="secondary" disabled={busy} onClick={() => void resolve("dismiss")}>
             {nothing ? "Done" : "Dismiss"}
           </Button>
         </span>
@@ -221,19 +212,11 @@ function DescriptionProposal({ suggestion, issue }: { suggestion: Suggestion; is
           description
         </h3>
         <span className="ml-auto flex gap-2">
-          <Button
-            className="h-7 px-2.5 text-xs"
-            disabled={busy}
-            onClick={() => void resolve("accept")}
-          >
+          {/* An issue can carry several proposals; none claims the one primary action. */}
+          <Button variant="secondary" disabled={busy} onClick={() => void resolve("accept")}>
             Accept
           </Button>
-          <Button
-            variant="secondary"
-            className="h-7 px-2.5 text-xs"
-            disabled={busy}
-            onClick={() => void resolve("dismiss")}
-          >
+          <Button variant="secondary" disabled={busy} onClick={() => void resolve("dismiss")}>
             Dismiss
           </Button>
         </span>
@@ -286,9 +269,9 @@ export function TextDiff({
             key={index}
             className={`whitespace-pre-wrap px-3 ${
               line.kind === "added"
-                ? "bg-ok/10"
+                ? "tint-ok"
                 : line.kind === "removed"
-                  ? `bg-danger/10 text-muted ${line.words ? "" : "line-through"}`
+                  ? `tint-danger ${line.words ? "" : "line-through"}`
                   : "text-muted"
             }`}
           >
@@ -306,9 +289,10 @@ export function TextDiff({
                     key={at}
                     className={
                       word.kind === "added"
-                        ? "rounded-sm bg-ok/25 text-fg"
+                        ? // The word's tint over its line's: the status recipe, twice.
+                          "tint-ok rounded-sm"
                         : word.kind === "removed"
-                          ? "rounded-sm bg-danger/20 line-through"
+                          ? "tint-danger rounded-sm line-through"
                           : undefined
                     }
                   >
@@ -338,9 +322,7 @@ export function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   return (
     <article className="flex flex-col gap-3 rounded-lg bg-surface p-4">
       <header className="flex items-start gap-3">
-        <span className="mt-0.5 rounded bg-selected px-1.5 py-0.5 text-[12px] font-medium text-fg">
-          Drift
-        </span>
+        <span className="ui-chip mt-0.5 px-2 py-1">Drift</span>
         <div className="min-w-0 flex-1">
           <h3 className="font-medium">{suggestion.title}</h3>
           <p className="text-xs text-muted">
@@ -408,21 +390,13 @@ export function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
       )}
       <ErrorMessage>{error}</ErrorMessage>
       <div className="flex gap-2">
+        {/* Cards come in lists, so none of them claims the one primary action. */}
         {suggestion.changes.length > 0 && (
-          <Button
-            className="h-7 px-2.5 text-xs"
-            disabled={busy}
-            onClick={() => void resolve("accept")}
-          >
+          <Button variant="secondary" disabled={busy} onClick={() => void resolve("accept")}>
             Accept
           </Button>
         )}
-        <Button
-          variant="secondary"
-          className="h-7 px-2.5 text-xs"
-          disabled={busy}
-          onClick={() => void resolve("dismiss")}
-        >
+        <Button variant="secondary" disabled={busy} onClick={() => void resolve("dismiss")}>
           {suggestion.changes.length > 0 ? "Dismiss" : "Done"}
         </Button>
       </div>
@@ -466,7 +440,6 @@ export function DriftChecks({
         <h2 className="text-xs font-medium text-muted">Drift checks</h2>
         <Button
           variant="secondary"
-          className="h-7 px-2.5 text-xs"
           disabled={busy || !hasRepository}
           title={hasRepository ? undefined : "Give the service a repository first"}
           onClick={() => void start()}
@@ -500,9 +473,9 @@ function RunRow({ run }: { run: AiRun }) {
   }[run.status];
   const tone = {
     queued: "text-faint",
-    running: "text-warn",
-    succeeded: "text-ok",
-    failed: "text-danger",
+    running: "text-warn-ink",
+    succeeded: "text-ok-ink",
+    failed: "text-danger-ink",
   }[run.status];
   return (
     <li className="rounded-md">
@@ -528,7 +501,7 @@ function RunRow({ run }: { run: AiRun }) {
       </button>
       {open && (run.summary || run.error) && (
         <div className="px-3 py-2">
-          {run.error && <p className="mb-2 text-danger">{run.error}</p>}
+          {run.error && <p className="mb-2 text-danger-ink">{run.error}</p>}
           <Markdown text={run.summary} />
         </div>
       )}

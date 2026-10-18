@@ -1,6 +1,7 @@
 import { Select } from "@base-ui/react/select";
 import type { CreatedInvite, Invite, Me, MemberInfo, Role } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
+import { ChevronsUpDown } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
 import { GITHUB_PROBLEMS, useGitHubLogin } from "./auth";
@@ -97,7 +98,7 @@ export function MembersPage() {
                       return (
                         <li
                           key={member.user.id}
-                          className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-hover"
+                          className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-hover"
                         >
                           <Avatar
                             user={{ ...member.user, kind: agent ? "agent" : "person" }}
@@ -235,7 +236,7 @@ function InviteSection({
             {invites.map((invite) => (
               <li
                 key={invite.id}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-hover"
+                className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-hover"
               >
                 <div className="flex-1">
                   <span className="capitalize">{invite.role}</span>
@@ -288,9 +289,7 @@ function RoleSelect({
       >
         <Select.Value />
         <Select.Icon className="text-faint">
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5" fill="currentColor">
-            <path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" />
-          </svg>
+          <ChevronsUpDown size={15} strokeWidth={1.75} aria-hidden="true" />
         </Select.Icon>
       </Select.Trigger>
       <Select.Portal>
@@ -305,7 +304,7 @@ function RoleSelect({
                 <Select.Item
                   key={role.value}
                   value={role.value}
-                  className="flex cursor-default items-center rounded px-2 py-1.5 outline-none select-none data-highlighted:bg-hover"
+                  className="flex cursor-default items-center rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight"
                 >
                   <Select.ItemText>{role.label}</Select.ItemText>
                 </Select.Item>
@@ -468,7 +467,7 @@ export function AccountPage() {
                 You joined with GitHub. A password lets you sign in without it too.
               </p>
             )}
-            {done && <p className="mb-3 text-ok">Password saved.</p>}
+            {done && <p className="mb-3 text-ok-ink">Password saved.</p>}
             {!changing ? (
               <Button
                 variant="secondary"

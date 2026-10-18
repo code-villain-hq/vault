@@ -129,14 +129,14 @@ export function GitHubSettingsPage() {
                       <li
                         key={repo.full_name}
                         title={`github:${repo.full_name}`}
-                        className="flex items-center gap-3 rounded-lg px-3 py-1.5 hover:bg-hover"
+                        className="flex items-center gap-3 rounded-md px-3 py-1.5 hover:bg-hover"
                       >
                         {/* The account is the heading; the repository's own name is enough. */}
                         <span className="flex-1 truncate">
                           {repo.full_name.split("/").slice(1).join("/") || repo.full_name}
                         </span>
                         <span
-                          className={`text-xs ${repo.mirror_error ? "text-danger" : "text-faint"}`}
+                          className={`text-xs ${repo.mirror_error ? "text-danger-ink" : "text-faint"}`}
                           // Why it failed, or when it was last updated, on hover.
                           title={
                             repo.mirror_error ??

@@ -1,9 +1,9 @@
 import type { StateType, WorkflowState } from "@forge/types";
 import { IconServer } from "@tabler/icons-react";
-import type { LucideIcon } from "lucide-react";
+import { Box, Check, type LucideIcon } from "lucide-react";
 import type { SVGProps } from "react";
 import { readable } from "./contrast";
-import { personColor, useReviewStateIds } from "./data";
+import { useReviewStateIds } from "./data";
 import { ICONS } from "./icon-set";
 
 /** A decorative 14×14 icon; the control around it carries the label. */
@@ -106,7 +106,7 @@ export function PriorityIcon({ priority }: { priority: number }) {
   if (priority === 1) {
     return (
       <Svg>
-        <rect x="1" y="1" width="12" height="12" rx="3" fill="var(--danger)" />
+        <rect x="1" y="1" width="12" height="12" rx="3" fill="var(--status-danger-ink)" />
         <path
           d="M7 3.75v4M7 9.75v.5"
           stroke="var(--surface)"
@@ -134,7 +134,34 @@ export function PriorityIcon({ priority }: { priority: number }) {
   );
 }
 
-/** A person's initial in a coloured circle (a square for agents); dashed for nobody. */
+/**
+ * A neutral initial on the chip tint, in the control role: round for a
+ * person, square for an agent or a workspace. Grey does the work; a
+ * person's avatar is detail, not a signal.
+ */
+export function Initial({
+  name,
+  square = false,
+  size = "size-5",
+  title,
+}: {
+  name: string;
+  square?: boolean;
+  size?: string;
+  title?: string;
+}) {
+  return (
+    <span
+      className={`${size} ui-control flex shrink-0 items-center justify-center bg-chip text-muted ${square ? "rounded-sm" : "rounded-full"}`}
+      aria-hidden="true"
+      title={title}
+    >
+      {name.trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+/** A person's initial (a square for agents); dashed for nobody. */
 export function Avatar({
   user,
   size = "size-5",
@@ -151,14 +178,12 @@ export function Avatar({
     );
   }
   return (
-    <span
-      className={`${size} flex shrink-0 items-center justify-center text-[10px] font-semibold text-white ${user.kind === "agent" ? "rounded-md" : "rounded-full"}`}
-      style={{ background: personColor(user.id) }}
-      aria-hidden="true"
+    <Initial
+      name={user.name}
+      square={user.kind === "agent"}
+      size={size}
       title={user.kind === "agent" ? `${user.name} (agent)` : user.name}
-    >
-      {user.name.trim().charAt(0).toUpperCase()}
-    </span>
+    />
   );
 }
 
@@ -172,38 +197,21 @@ export function LabelDot({ color }: { color: string }) {
   );
 }
 
-export function ProjectIcon({ className = "size-3.5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 14 14" className={`${className} shrink-0`} aria-hidden="true" fill="none">
-      <rect x="1.5" y="1.5" width="11" height="11" rx="3" stroke="var(--muted)" strokeWidth="1.3" />
-      <path d="M4.5 7h5M7 4.5v5" stroke="var(--muted)" strokeWidth="1.3" />
-    </svg>
-  );
+export function ProjectIcon() {
+  return <Box size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-muted" />;
 }
 
 export function CheckIcon() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="size-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      aria-hidden="true"
-    >
-      <path d="m3 8.5 3.5 3.5L13 4.5" />
-    </svg>
-  );
+  return <Check size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />;
 }
 
-/** A service: two stacked boxes, like servers. */
 /**
  * A service's own icon in its own colour, so it's recognisable wherever it
  * shows; a plain grey one for no service.
  */
 export function ServiceIcon({
   service,
-  className = "size-3.5",
+  className = "size-[15px]",
 }: {
   service?: { icon: string; color: string } | null;
   className?: string;
@@ -215,7 +223,7 @@ export function ServiceIcon({
       className={`${className} shrink-0`}
       // Its own colour, shaded where needed to stand out in this theme.
       color={service ? readable(service.color) : "var(--muted)"}
-      stroke={2}
+      stroke={1.75}
     />
   );
 }

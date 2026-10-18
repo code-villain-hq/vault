@@ -14,7 +14,7 @@ type Variant = "compact" | "chip";
 
 // The issue page's chips look like every record page's.
 const chipTrigger = chip;
-const compactTrigger = "size-6 shrink-0 justify-center";
+const compactTrigger = "size-7 shrink-0 justify-center";
 
 /** A chip's text; fainter while the field is empty, so set fields stand out. */
 function ChipText({ empty, children }: { empty?: boolean; children: React.ReactNode }) {
@@ -137,7 +137,7 @@ export function LabelsPicker({ issue, variant = "compact" }: { issue: Issue; var
       }))}
       selected={issue.label_ids}
       onSelect={toggle}
-      triggerClassName={variant === "chip" ? `${chipTrigger} gap-3` : "px-1 h-6"}
+      triggerClassName={variant === "chip" ? `${chipTrigger} gap-3` : "px-1 h-7"}
     >
       {variant === "chip" ? (
         chosen.length === 0 ? (
@@ -198,7 +198,7 @@ export function ProjectPicker({ issue, variant = "compact" }: { issue: Issue; va
       ]}
       selected={[issue.project_id ?? ""]}
       onSelect={(value) => sync.update("Issue", issue.id, { project_id: value || null })}
-      triggerClassName={variant === "chip" ? chipTrigger : "h-6 px-1.5"}
+      triggerClassName={variant === "chip" ? chipTrigger : "h-7 px-1.5"}
     >
       {variant === "chip" ? (
         <>
@@ -225,7 +225,7 @@ export function ServicePicker({ issue, variant = "chip" }: { issue: Issue; varia
       ]}
       selected={[issue.service_id ?? ""]}
       onSelect={(value) => sync.update("Issue", issue.id, { service_id: value || null })}
-      triggerClassName={variant === "chip" ? chipTrigger : "h-6 px-1.5"}
+      triggerClassName={variant === "chip" ? chipTrigger : "h-7 px-1.5"}
     >
       {variant === "chip" ? (
         <>

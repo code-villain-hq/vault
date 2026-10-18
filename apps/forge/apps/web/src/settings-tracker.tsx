@@ -152,7 +152,7 @@ function TeamSettings({ teamId, editable }: { teamId: string; editable: boolean 
         {states.map((state) => (
           <li
             key={state.id}
-            className="flex items-center gap-3 rounded-lg px-3 py-1.5 hover:bg-hover"
+            className="flex items-center gap-3 rounded-md px-3 py-1.5 hover:bg-hover"
           >
             <StateIcon state={state} />
             <input
@@ -202,7 +202,7 @@ export function LabelsSettingsPage() {
             {labels.map((label) => (
               <li
                 key={label.id}
-                className="flex items-center gap-3 rounded-lg px-3 py-1.5 hover:bg-hover"
+                className="flex items-center gap-3 rounded-md px-3 py-1.5 hover:bg-hover"
               >
                 <ColorButton
                   label={`Colour of ${label.name}`}

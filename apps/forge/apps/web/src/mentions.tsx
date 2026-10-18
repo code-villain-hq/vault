@@ -182,7 +182,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
           }}
         />
         {(uploading > 0 || problem) && (
-          <p className={`mt-1 text-xs ${problem ? "text-danger" : "text-muted"}`}>
+          <p className={`mt-1 text-xs ${problem ? "text-danger-ink" : "text-muted"}`}>
             {problem ?? `Uploading ${uploading === 1 ? "a file" : `${uploading} files`}…`}
           </p>
         )}
@@ -204,7 +204,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
                   choose(person);
                 }}
                 onMouseMove={() => setActive(i)}
-                className={`flex cursor-default items-center gap-2 rounded px-2 py-1.5 ${i === active ? "bg-highlight" : ""}`}
+                className={`flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 ${i === active ? "bg-highlight" : ""}`}
               >
                 <Avatar user={person} size="size-4" />
                 <span className="truncate">{person.name}</span>

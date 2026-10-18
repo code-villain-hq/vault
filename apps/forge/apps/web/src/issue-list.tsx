@@ -1,5 +1,6 @@
 import type { Issue, Service, WorkflowState } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
+import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { BulkBar } from "./bulk";
 import {
@@ -340,16 +341,15 @@ function ServiceHeading({ service }: { service: Service | undefined }) {
   );
 }
 
-/** A small arrow: right when closed, down when open. */
+/** A small arrow inside the sub-issue chip: right when closed, down when open. */
 function Disclosure({ open }: { open: boolean }) {
   return (
-    <svg
-      viewBox="0 0 10 10"
-      className={`size-2.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+    <ChevronRight
+      size={12}
+      strokeWidth={1.75}
       aria-hidden="true"
-    >
-      <path d="M3.5 2 7 5 3.5 8" fill="none" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
+      className={`shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+    />
   );
 }
 
@@ -443,7 +443,7 @@ function IssueRow({
             e.stopPropagation();
             fold.toggle();
           }}
-          className="flex h-6 shrink-0 items-center gap-1 rounded px-1 text-xs text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
         >
           <Disclosure open={fold.open} />
           <span className="sr-only">Sub-issues done:</span>

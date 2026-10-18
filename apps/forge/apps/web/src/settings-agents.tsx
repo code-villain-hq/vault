@@ -146,7 +146,7 @@ export function AgentsSettingsPage() {
                     className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
                   />
                   {taken ? (
-                    <p className="text-warn">
+                    <p className="text-warn-ink">
                       There's already an agent called “{taken.name}”. To connect it somewhere else,
                       give it a new key from its ⋯ menu, or give this agent another name.
                     </p>
@@ -266,7 +266,7 @@ function AgentRow({
   };
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg px-3 py-3 hover:bg-hover">
+    <li className="flex flex-col gap-2 rounded-md px-3 py-3 hover:bg-hover">
       <div className="flex items-center gap-3">
         <Avatar user={{ ...agent, kind: "agent" }} size="size-6" />
         {renaming === null ? (
@@ -310,7 +310,7 @@ function AgentRow({
             <span className="w-24 text-faint">older key</span>
           )}
           {inUse(token) ? (
-            <span className="flex items-center gap-1.5 text-ok">
+            <span className="flex items-center gap-1.5 text-ok-ink">
               <span className="size-1.5 rounded-full bg-ok" aria-hidden="true" />
               In use · {timeAgo(token.last_used_at ?? "")}
             </span>
@@ -323,7 +323,7 @@ function AgentRow({
           {isAdmin && (
             <button
               type="button"
-              className="ml-auto text-faint hover:text-danger"
+              className="ml-auto text-faint hover:text-danger-ink"
               onClick={() => onRevoke(token)}
             >
               Revoke
@@ -364,12 +364,12 @@ function outcome(wakeup: WakeupInfo) {
       return { text: "Waiting until it's free", tone: "text-muted" };
     case "pending":
       return wakeup.last_error
-        ? { text: `Retrying: ${wakeup.last_error} (${tries})`, tone: "text-warn" }
+        ? { text: `Retrying: ${wakeup.last_error} (${tries})`, tone: "text-warn-ink" }
         : { text: "Sending…", tone: "text-muted" };
     case "failed":
       return {
         text: `Gave up: ${wakeup.last_error ?? "no answer"} (${tries})`,
-        tone: "text-danger",
+        tone: "text-danger-ink",
       };
   }
 }
@@ -428,11 +428,7 @@ function Runner({
     return isAdmin ? (
       <div className="ml-9 flex items-center gap-3 text-xs">
         <span className="text-muted">Not woken: it finds its work by checking in.</span>
-        <button
-          type="button"
-          className="font-bold text-fg underline decoration-fg/45 underline-offset-4 hover:decoration-fg"
-          onClick={() => setEditing("")}
-        >
+        <button type="button" className="ui-link" onClick={() => setEditing("")}>
           Wake it when there's work
         </button>
       </div>
@@ -458,7 +454,7 @@ function Runner({
             <button type="button" className="text-faint hover:text-fg" onClick={onNewSecret}>
               New secret
             </button>
-            <button type="button" className="text-faint hover:text-danger" onClick={onRemove}>
+            <button type="button" className="text-faint hover:text-danger-ink" onClick={onRemove}>
               Stop
             </button>
           </span>

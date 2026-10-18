@@ -184,7 +184,7 @@ export function ServicesPage() {
               <Link
                 to="/$workspace/service/$service"
                 params={{ workspace: workspace.url_key, service: service.id }}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-hover"
+                className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
               >
                 <IconTile
                   icon={service.icon}
@@ -391,7 +391,7 @@ function IconTile({
   return (
     <span
       className={`flex ${size} shrink-0 items-center justify-center rounded-md`}
-      style={{ background: `color-mix(in srgb, ${color} 16%, transparent)` }}
+      style={{ background: `color-mix(in srgb, ${color} var(--status-tint), transparent)` }}
     >
       <ServiceIcon service={{ icon, color }} className={iconSize} />
     </span>
@@ -654,7 +654,7 @@ function ServiceProperties({ service }: { service: Service }) {
         onSelect={(value) => sync.update("Service", service.id, { team_id: value || null })}
         triggerClassName={chip}
       >
-        <UsersRound className="size-3.5" aria-hidden="true" />
+        <UsersRound size={15} strokeWidth={1.75} aria-hidden="true" />
         {team?.name ?? "Team"}
       </Picker>
       <ChipPopover
@@ -686,7 +686,7 @@ function ServiceProperties({ service }: { service: Service }) {
           </>
         }
       >
-        <GitBranch className="size-3.5" aria-hidden="true" />
+        <GitBranch size={15} strokeWidth={1.75} aria-hidden="true" />
         <span className="truncate">{repository ?? "Repository"}</span>
       </ChipPopover>
       <ChipPopover
@@ -709,7 +709,7 @@ function ServiceProperties({ service }: { service: Service }) {
           />
         }
       >
-        <FolderCode className="size-3.5" aria-hidden="true" />
+        <FolderCode size={15} strokeWidth={1.75} aria-hidden="true" />
         {service.paths.length === 0
           ? "Paths"
           : service.paths.length === 1
@@ -819,7 +819,7 @@ function DecisionListItem({ decision }: { decision: Decision }) {
         to="/$workspace/decision/$decision"
         params={{ workspace: workspace.url_key, decision: decision.id }}
         title={decision.decided_on ? `Decided ${formatDate(decision.decided_on)}` : undefined}
-        className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-hover"
+        className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
       >
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-medium">{decision.title}</span>
@@ -905,7 +905,7 @@ function DomainRow({ domain, specs }: { domain: Domain | null; specs: Spec[] }) 
       <Link
         to="/$workspace/domains/$domain"
         params={{ workspace: workspace.url_key, domain: domain?.id ?? NO_DOMAIN }}
-        className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-hover"
+        className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
       >
         <IconTile
           icon={domain?.icon ?? "folder"}
@@ -1082,7 +1082,7 @@ function NewDomainForm({ onDone }: { onDone: () => void }) {
             className="min-w-0 flex-1 bg-transparent text-title font-bold outline-none placeholder:text-faint"
           />
         </div>
-        {taken && <p className="text-xs text-warn">There's already a domain with that name.</p>}
+        {taken && <p className="text-xs text-warn-ink">There's already a domain with that name.</p>}
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -1167,7 +1167,7 @@ function SpecListItem({
       <Link
         to="/$workspace/spec/$spec"
         params={{ workspace: workspace.url_key, spec: spec.id }}
-        className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-hover"
+        className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
       >
         {withDomain && (
           <span title={domain?.name ?? "No domain"}>
@@ -1184,7 +1184,7 @@ function SpecListItem({
           {about && <span className="truncate text-xs text-muted">{about}</span>}
         </span>
         {pending.length > 0 && (
-          <span className="shrink-0 text-xs text-warn">
+          <span className="shrink-0 text-xs text-warn-ink">
             {pending.length === 1 ? "1 change on the way" : `${pending.length} changes on the way`}
           </span>
         )}
@@ -1385,7 +1385,7 @@ export function SpecPage() {
                   triggerClassName={chip}
                   empty={
                     <>
-                      <Folders className="size-3.5" aria-hidden="true" />
+                      <Folders size={15} strokeWidth={1.75} aria-hidden="true" />
                       Domain
                     </>
                   }
@@ -1444,7 +1444,7 @@ function IssueName({ issue }: { issue: Issue }) {
     <Link
       to="/$workspace/issue/$identifier"
       params={{ workspace: workspace.url_key, identifier: id }}
-      className="hover:underline"
+      className="ui-link"
     >
       <span className="text-muted">{id}</span> {issue.title}
     </Link>
@@ -1621,7 +1621,7 @@ function ConventionWarnings({ body }: { body: string }) {
   if (warnings.length === 0) return null;
   return (
     <div className="rounded-md px-3 py-2 text-xs">
-      <p className="text-warn">
+      <p className="text-warn-ink">
         This spec doesn't follow OpenSpec's convention for behaviour specs yet. It's saved anyway.
       </p>
       <ul className="mt-1 list-disc pl-4 text-muted">
@@ -1719,7 +1719,7 @@ function Requirements({
         </p>
       )}
       {rewritten && (
-        <p className="mb-2 text-xs text-danger">
+        <p className="mb-2 text-xs text-danger-ink">
           An open issue rewrites this spec while another one changes it. Only one issue changes a
           spec's requirements at a time: the one that came after can't start until they settle it.
         </p>
@@ -1747,7 +1747,7 @@ function Requirements({
                   {coming.map(({ key, issue, touch }) => (
                     <span
                       key={key}
-                      className={`shrink-0 text-xs ${clash ? "text-danger" : "text-warn"}`}
+                      className={`shrink-0 text-xs ${clash ? "text-danger-ink" : "text-warn-ink"}`}
                     >
                       {identifier(issue, teams)} will {UPCOMING[touch.upcoming]} this
                     </span>
@@ -1764,14 +1764,14 @@ function Requirements({
                 <div className="flex flex-col gap-2 px-3 pb-3 pl-7 text-sm">
                   <Markdown text={requirementBody(requirement)} />
                   {clash && (
-                    <p className="text-xs text-danger">
+                    <p className="text-xs text-danger-ink">
                       Only one issue changes a requirement at a time. The ones that came after the
                       first can't start until they settle it.
                     </p>
                   )}
                   {coming.map(({ key, issue, touch }) => (
                     <div key={key} className="flex flex-col gap-1">
-                      <p className="text-xs text-warn">
+                      <p className="text-xs text-warn-ink">
                         <IssueName issue={issue} />{" "}
                         {touch.upcoming === "change"
                           ? "will change it, once it's done:"
@@ -1818,23 +1818,23 @@ function Requirements({
         {added.map(({ key, issue, requirement }) => (
           <li key={key}>
             <details>
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted hover:bg-hover [&::-webkit-details-marker]:hidden">
-                <span aria-hidden="true" className="w-2 shrink-0 text-center text-warn">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-hover [&::-webkit-details-marker]:hidden">
+                <span aria-hidden="true" className="w-2 shrink-0 text-center text-warn-ink">
                   +
                 </span>
                 <span className="min-w-0 flex-1 truncate">{requirement.name}</span>
                 <span
-                  className={`shrink-0 text-xs ${conflicted.has(requirement.name) ? "text-danger" : "text-warn"}`}
+                  className={`shrink-0 text-xs ${conflicted.has(requirement.name) ? "text-danger-ink" : "text-warn-ink"}`}
                 >
                   {identifier(issue, teams)} will add this
                 </span>
               </summary>
               <div className="flex flex-col gap-2 px-3 pb-3 pl-7 text-sm">
-                <p className="text-xs text-warn">
+                <p className="text-xs text-warn-ink">
                   <IssueName issue={issue} /> will add it, once it's done.
                 </p>
                 {conflicted.has(requirement.name) && (
-                  <p className="text-xs text-danger">
+                  <p className="text-xs text-danger-ink">
                     Another open issue adds or changes a requirement with this name. Only one issue
                     changes a requirement at a time: the one that came after can't start until they
                     settle it.
@@ -2057,7 +2057,7 @@ export function DecisionPage() {
                 }
                 triggerClassName={chip}
               >
-                <Replace className="size-3.5" aria-hidden="true" />
+                <Replace size={15} strokeWidth={1.75} aria-hidden="true" />
                 <span className="truncate">
                   {replacement ? `Superseded by ${replacement.title}` : "Superseded by…"}
                 </span>
@@ -2072,7 +2072,7 @@ export function DecisionPage() {
               <Link
                 to="/$workspace/decision/$decision"
                 params={{ workspace: ws, decision: replacement.id }}
-                className="text-fg underline underline-offset-4"
+                className="ui-link"
               >
                 {replacement.title}
               </Link>

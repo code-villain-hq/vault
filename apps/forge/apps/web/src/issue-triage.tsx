@@ -4,6 +4,7 @@
 // bar asks for that decision instead.
 import { Menu } from "@base-ui/react/menu";
 import type { Issue, StateType, Suggestion, User, WorkflowState } from "@forge/types";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, messageOf } from "./api";
 import {
@@ -22,13 +23,13 @@ import { Markdown } from "./markdown";
 import { isTyping } from "./new-issue";
 import { Picker } from "./picker";
 import { DescriptionDiff, proposedDescription, TriageSuggestion } from "./suggestions";
-import { Button, ErrorMessage } from "./ui";
+import { Button, buttonClass, ErrorMessage } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
 const DUPLICATE_TRIGGER = "triage-duplicate";
 
 const menuItem =
-  "flex cursor-default items-center gap-2 rounded px-2 py-1.5 outline-none select-none data-highlighted:bg-hover";
+  "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
 
 /** The first of a team's statuses of a type. */
 function firstOf(states: WorkflowState[], type: StateType) {
@@ -133,16 +134,10 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
             <Menu.Root>
               <Menu.Trigger
                 aria-label="Accept to another status"
-                className="flex ui-control h-7 items-center rounded-r-md bg-primary px-2 text-on-primary outline-none hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-accent"
+                // The other half of the one primary action, not a second one.
+                className={`${buttonClass()} ml-px rounded-l-none px-2`}
               >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 16 16"
-                  className="size-3.5"
-                  fill="currentColor"
-                >
-                  <path d="M4 6h8l-4 5z" />
-                </svg>
+                <ChevronDown size={15} strokeWidth={1.75} aria-hidden="true" />
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
@@ -172,7 +167,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
           }))}
           selected={[]}
           onSelect={markDuplicate}
-          triggerClassName="ui-chip h-7 px-3"
+          triggerClassName={buttonClass("secondary")}
         >
           Duplicate of…
           <Key>2</Key>
@@ -284,7 +279,7 @@ function DecisionBar({
         </p>
       </div>
       {asked && (
-        <figure aria-label="Proposed decisions" className="rounded-md bg-surface px-3 py-2">
+        <figure aria-label="Proposed decisions" className="rounded-md bg-panel px-3 py-2">
           <Markdown text={asked} />
         </figure>
       )}
