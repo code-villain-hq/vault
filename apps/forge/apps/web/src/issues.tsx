@@ -163,7 +163,7 @@ function Toggle<T extends string>({
       {showLabel && (
         <span className="text-xs whitespace-nowrap text-muted @max-3xl:hidden">{label}</span>
       )}
-      <fieldset className="flex items-center gap-0.5" aria-label={label}>
+      <fieldset className="ui-segmented" aria-label={label}>
         {options.map((option) => (
           <button
             key={option}
@@ -174,7 +174,7 @@ function Toggle<T extends string>({
               // Hand the keyboard back to the list or board.
               event.currentTarget.blur();
             }}
-            className={`ui-control h-7 rounded-md px-2 capitalize outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${value === option ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
+            className="ui-segment capitalize"
           >
             {option}
           </button>
@@ -186,7 +186,7 @@ function Toggle<T extends string>({
 
 function ViewTabs({ view, onChange }: { view: ViewId; onChange: (view: ViewId) => void }) {
   return (
-    <div role="tablist" className="flex items-center gap-1">
+    <div role="tablist" className="ui-tabs self-stretch">
       {VIEWS.map((v) => (
         <button
           key={v.id}
@@ -194,7 +194,7 @@ function ViewTabs({ view, onChange }: { view: ViewId; onChange: (view: ViewId) =
           role="tab"
           aria-selected={view === v.id}
           onClick={() => onChange(v.id)}
-          className={`ui-control h-7 rounded-md px-2.5 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${view === v.id ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
+          className="ui-tab"
         >
           {v.label}
         </button>

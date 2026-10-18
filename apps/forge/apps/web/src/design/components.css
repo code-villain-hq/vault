@@ -23,7 +23,10 @@
     line-height: var(--type-control-leading);
   }
 
-  /* Button: 28px, the control role, 6px corners, no border. */
+  /*
+   * Button: 28px, the control role, 6px corners, no border. A block, so it
+   * never reads as a tab, a link or a label: fg at button-tint, fg text.
+   */
   .ui-button {
     display: inline-flex;
     flex-shrink: 0;
@@ -34,8 +37,8 @@
     padding: 0 0.75rem;
     border: 0;
     border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--muted);
+    background: color-mix(in srgb, var(--fg) var(--button-tint), transparent);
+    color: var(--fg);
     font-family: inherit;
     font-size: var(--type-control-size);
     font-weight: var(--type-control-weight);
@@ -44,7 +47,7 @@
     cursor: pointer;
   }
   .ui-button:hover:not(:disabled) {
-    background: var(--hover);
+    background: color-mix(in srgb, var(--fg) var(--button-hover-tint), transparent);
     color: var(--fg);
   }
   .ui-button:focus-visible {
@@ -64,17 +67,25 @@
     background: var(--primary-hover);
     color: var(--on-primary);
   }
-  /* A destructive secondary action: status ink, never a red block. */
+  /* A destructive secondary action: the same fill, status ink; never a red block. */
   .ui-button-danger {
     color: var(--status-danger-ink);
   }
   .ui-button-danger:hover:not(:disabled) {
     color: var(--status-danger-ink);
   }
-  /* A quiet 28px square for an icon; it needs an accessible name. */
+  /*
+   * A quiet 28px square for an icon; the icon marks it as a control, so it
+   * has no fill until hover. It needs an accessible name.
+   */
   .ui-icon-button {
     width: 28px;
     padding: 0;
+    background: transparent;
+    color: var(--muted);
+  }
+  .ui-icon-button:hover:not(:disabled) {
+    background: var(--hover);
   }
 
   /* Field: a tone step with no border; one ring on the edge when focused. */
@@ -110,6 +121,118 @@
   }
   .ui-link:hover {
     text-decoration-color: var(--fg);
+  }
+  /*
+   * A link that opens another app is a <button>. It keeps the link's look,
+   * at the control size: it stands among controls, not in prose.
+   */
+  button.ui-link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: var(--type-control-size);
+    line-height: var(--type-control-leading);
+    cursor: pointer;
+  }
+  button.ui-link:hover:not(:disabled) {
+    background: transparent;
+    color: var(--fg);
+  }
+
+  /*
+   * Tabs: switch what one place shows. Text, and a 2px fg line under the
+   * current tab; no fill, so a tab never looks like a button. Put
+   * role="tablist" on the strip and aria-selected="true" on the current tab.
+   */
+  .ui-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 20px;
+  }
+  .ui-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: inset 0 -2px 0 transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: var(--type-control-size);
+    font-weight: var(--type-control-weight);
+    line-height: var(--type-control-leading);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .ui-tab:hover {
+    color: var(--fg);
+  }
+  .ui-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .ui-tab[aria-selected="true"],
+  .ui-tab[aria-current="page"],
+  .ui-tab.is-active {
+    box-shadow: inset 0 -2px 0 var(--fg);
+    color: var(--fg);
+    font-weight: 700;
+  }
+  /* A count beside a tab's label. */
+  .ui-tab-count {
+    color: var(--faint);
+    font-size: var(--type-ui-small-size);
+    font-weight: 400;
+  }
+
+  /*
+   * Segmented control: one value of a few. A track on the chip tint; the
+   * chosen option (aria-pressed="true") wears the button's hover fill.
+   */
+  .ui-segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
+  }
+  .ui-segment {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 0.6rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: var(--type-control-size);
+    font-weight: var(--type-control-weight);
+    line-height: var(--type-control-leading);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .ui-segment:hover:not(:disabled) {
+    background: transparent;
+    color: var(--fg);
+  }
+  .ui-segment:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .ui-segment:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .ui-segment[aria-pressed="true"],
+  .ui-segment[aria-pressed="true"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--fg) var(--button-hover-tint), transparent);
+    color: var(--fg);
+    font-weight: 700;
   }
 
   /* Chip: detail, not a signal. Muted text on fg at chip-tint. */

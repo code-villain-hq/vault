@@ -39,7 +39,7 @@ It always reads "Forge"; the workspace picker is a separate control.
 The frame uses `bg` for the sidebar and toolbar and `panel` for content;
 below 560px the sidebar becomes a horizontal navigation row. The shared
 control rules are in [`design/components.md`](../../design/components.md):
-28px buttons, tinted chips and status pills, fields with focus rings, and
+28px buttons (secondary ones filled), underlined links, tabs with a line under the current one, segmented controls, tinted chips and status pills, fields with focus rings, and
 elevation through tone. They're implemented once in
 [`design/components.css`](../../design/components.css), synced into
 `src/design/`: use its `ui-*` classes (`buttonClass()` composes

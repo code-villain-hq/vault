@@ -7,6 +7,7 @@ import { Avatar, LabelDot, PriorityIcon, ProjectIcon } from "./icons";
 import { FIELDS, type FilterField, type Filters, toggle } from "./issue-filter";
 import { isTyping } from "./new-issue";
 import { Picker, type PickerOption } from "./picker";
+import { buttonClass } from "./ui";
 import { useRecords } from "./workspace";
 
 /** What each field can be filtered by. */
@@ -100,7 +101,7 @@ export function FilterButton({
         const [field, ...rest] = value.split(":");
         onChange(toggle(filters, field as FilterField, rest.join(":")));
       }}
-      triggerClassName="h-7 px-2 text-xs text-muted hover:text-fg"
+      triggerClassName={buttonClass("secondary")}
     >
       Filter <kbd className="text-faint">F</kbd>
     </Picker>

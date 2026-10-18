@@ -115,12 +115,13 @@ export function ReviewBar({ issue }: { issue: Issue }) {
           <ul className="flex flex-col gap-2">
             {pullRequests.map((pr, i) => (
               <li key={pr.id} className="flex min-w-0 items-center gap-3">
-                {/* One primary action: the first pull request; any others stay secondary. */}
+                {/* One primary action: the first pull request, a button though it leaves for
+                    GitHub. Any others are plain links. */}
                 <a
                   href={pr.url}
                   target="_blank"
                   rel="noreferrer"
-                  className={buttonClass(i === 0 ? "primary" : "secondary")}
+                  className={i === 0 ? buttonClass("primary") : "ui-link ui-control"}
                 >
                   Review and merge {pr.number ? `PR #${pr.number}` : "the pull request"} on GitHub ↗
                 </a>
