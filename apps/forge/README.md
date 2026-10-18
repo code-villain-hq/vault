@@ -59,8 +59,8 @@ Docker setup below.
 
 To try drift checks, start the server with `ANTHROPIC_API_KEY` set, give a
 service a repository in the folder containing the vault (for example
-`villain-vault`, with paths like `apps/forge/crates/**`) and some path globs, and press "Check for
-drift".
+`villain-vault`) and some path globs from its root (like
+`apps/forge/crates/**`), and press "Check for drift".
 
 ## Running it for the team
 

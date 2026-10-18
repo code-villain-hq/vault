@@ -91,8 +91,8 @@ issue is done.
   server plus built web app). `bun run app:logs` follows it.
 - `bun run seed`: local test accounts (admin and member of "Forge"); the
   password is in `scripts/seed-dev.ts`. Needs `bun run dev` running.
-  `bun run seed:dogfood` then describes this repository as services, for
-  drift checks on Forge itself.
+  `bun run seed:dogfood` then describes Forge's code in the vault as
+  services, for drift checks on Forge itself.
 - `bun run dev:fake-ai`: `bun run dev` with the AI features on, against a
   stand-in model (no API key, no cost).
 - `bun run runner:install`: on the PO's Mac, install the launch agent that
