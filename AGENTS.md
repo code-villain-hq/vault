@@ -10,3 +10,9 @@ The vault holds the whole studio. Apps are one part of it.
 Nightshade is every app's default theme, in night and day. An app's theme picker, like Layer's, can add themes that fill the same colour names. The studio surfaces — the mark, the site, the blog, social — follow `brand/` and stay night.
 
 A change to how Code Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.
+
+## Specs are checked against the code
+
+Forge's specs live in Forge, not in this repository. A scheduled drift check (Claude Code on the studio's Mac) reads each new commit on `main`. For every Forge service a commit touches, it compares the service's specs with the code. Where a spec no longer says what the code does, it files `Spec drift: "<spec>" no longer matches the code` in that team's Triage, or comments on the one already open.
+
+So when a change alters behaviour a spec describes, write the spec change with it: on the issue's spec change, or by asking the PO. Otherwise the change comes back as a drift issue. The check never edits specs, code or other issues.
