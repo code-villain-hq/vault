@@ -339,6 +339,7 @@ async fn tools_act_as_the_agent(pool: PgPool) {
                 status: Some("todo".into()),
                 priority: Some("High".into()),
                 assignee: Some("me".into()),
+                reviewer: None,
                 labels: None,
                 project: None,
                 service: None,
@@ -368,6 +369,7 @@ async fn tools_act_as_the_agent(pool: PgPool) {
             identifier: "FOR-1".into(),
             status: Some("In Progress".into()),
             assignee: Some("Ada".into()),
+            reviewer: None,
             title: None,
             description: None,
             priority: None,
@@ -564,6 +566,7 @@ async fn tools_keep_specs_and_decisions(pool: PgPool) {
             status: None,
             priority: None,
             assignee: None,
+            reviewer: None,
             labels: None,
             project: None,
             parent: None,
@@ -784,6 +787,7 @@ async fn get_issue_includes_project_and_workspace_knowledge(pool: PgPool) {
             status: None,
             priority: None,
             assignee: None,
+            reviewer: None,
             labels: None,
             parent: None,
             due_date: None,
@@ -1051,6 +1055,7 @@ async fn agents_propose_descriptions_and_people_decide(pool: PgPool) {
             status: None,
             priority: None,
             assignee: Some("me".into()),
+            reviewer: None,
             labels: None,
             project: None,
             service: None,
@@ -1160,6 +1165,7 @@ async fn tools_explain_what_went_wrong(pool: PgPool) {
         status: None,
         priority: None,
         assignee: None,
+        reviewer: None,
         labels: None,
         project: None,
         service: None,
@@ -1225,6 +1231,7 @@ fn new_issue(title: &str, status: &str, confirm_new: Option<bool>) -> CreateIssu
         description: None,
         priority: None,
         assignee: None,
+        reviewer: None,
         labels: None,
         project: None,
         service: None,
@@ -1332,6 +1339,7 @@ async fn agents_see_similar_open_issues_before_filing(pool: PgPool) {
                 description: None,
                 priority: None,
                 assignee: None,
+                reviewer: None,
                 labels: None,
                 project: None,
                 service: None,
@@ -1442,6 +1450,7 @@ async fn move_issue(
             identifier: identifier.into(),
             status: status.map(Into::into),
             assignee: assignee.map(Into::into),
+            reviewer: None,
             title: None,
             description: None,
             priority: None,
@@ -1469,6 +1478,7 @@ async fn agents_say_what_they_are_working_on(pool: PgPool) {
                 title: title.into(),
                 status: Some("Todo".into()),
                 assignee: Some("me".into()),
+                reviewer: None,
                 description: None,
                 priority: None,
                 labels: None,
@@ -1572,6 +1582,7 @@ async fn the_same_work_is_not_done_twice(pool: PgPool) {
                 title: title.into(),
                 status: Some("Todo".into()),
                 assignee: Some("me".into()),
+                reviewer: None,
                 description: None,
                 priority: None,
                 labels: None,
@@ -1664,6 +1675,7 @@ async fn any_call_shows_the_agent_is_still_working(pool: PgPool) {
             title: "Long build".into(),
             status: None,
             assignee: Some("me".into()),
+            reviewer: None,
             description: None,
             priority: None,
             labels: None,
@@ -1728,6 +1740,7 @@ fn update(identifier: &str) -> UpdateIssue {
         identifier: identifier.into(),
         status: None,
         assignee: None,
+        reviewer: None,
         title: None,
         description: None,
         priority: None,
@@ -2137,6 +2150,7 @@ async fn agents_take_their_issues_in_queue_order(pool: PgPool) {
             CreateIssue {
                 priority: Some(priority.into()),
                 assignee: Some("me".into()),
+                reviewer: None,
                 ..new_issue(title, if started { "Todo" } else { status }, Some(true))
             },
         )
@@ -2287,6 +2301,7 @@ async fn work_starts_only_once_the_spec_change_is_written(pool: PgPool) {
             s.agent,
             CreateIssue {
                 assignee: Some("me".into()),
+                reviewer: None,
                 ..new_issue(title, "Todo", Some(true))
             },
         )
@@ -2409,6 +2424,7 @@ async fn only_one_issue_changes_a_requirement_at_a_time(pool: PgPool) {
             s.agent,
             CreateIssue {
                 assignee: Some("Ada".into()),
+                reviewer: None,
                 ..new_issue(title, "Todo", Some(true))
             },
         )
@@ -2650,6 +2666,7 @@ async fn a_spec_change_changed_after_work_started_shows(pool: PgPool) {
             s.agent,
             CreateIssue {
                 assignee: Some("me".into()),
+                reviewer: None,
                 ..new_issue(title, "Todo", Some(true))
             },
         )
@@ -2727,6 +2744,7 @@ async fn widening_a_part_later_never_jumps_the_queue(pool: PgPool) {
             s.agent,
             CreateIssue {
                 assignee: Some("Ada".into()),
+                reviewer: None,
                 ..new_issue(title, "Todo", Some(true))
             },
         )
@@ -2786,6 +2804,7 @@ async fn becoming_a_rewrite_later_never_jumps_the_queue(pool: PgPool) {
             s.agent,
             CreateIssue {
                 assignee: Some("Ada".into()),
+                reviewer: None,
                 ..new_issue(title, "Todo", Some(true))
             },
         )
@@ -2836,6 +2855,7 @@ async fn a_reopened_issue_joins_the_queue_anew(pool: PgPool) {
             s.agent,
             CreateIssue {
                 assignee: Some("Ada".into()),
+                reviewer: None,
                 ..new_issue(title, "Todo", Some(true))
             },
         )
@@ -2913,6 +2933,7 @@ async fn a_reopened_issue_whose_spec_change_took_effect_can_start(pool: PgPool) 
         s.agent,
         CreateIssue {
             assignee: Some("me".into()),
+            reviewer: None,
             ..new_issue("Replace a decision", "Todo", Some(true))
         },
     )
@@ -2945,6 +2966,7 @@ async fn a_done_issue_is_reopened_before_it_starts_again(pool: PgPool) {
         s.agent,
         CreateIssue {
             assignee: Some("me".into()),
+            reviewer: None,
             ..new_issue("Old work", "Todo", Some(true))
         },
     )

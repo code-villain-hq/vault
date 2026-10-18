@@ -5,6 +5,7 @@
 import type { Issue, WorkflowState } from "@forge/types";
 import { useMemo, useState } from "react";
 import { pullRequestsToMerge, reviewStateOf, useTeamStates, useUsers } from "./data";
+import { ReviewerPicker } from "./issue-fields";
 import { SpecChangeSummary } from "./issue-spec-change";
 import { Button, buttonClass } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
@@ -16,11 +17,14 @@ export function useReviewState(teamId: string): WorkflowState | undefined {
 }
 
 export function ReviewBar({ issue }: { issue: Issue }) {
-  const { sync } = useWorkspace();
+  const { sync, me } = useWorkspace();
   const states = useTeamStates(issue.team_id);
   const done = states.find((s) => s.type === "completed");
   const working = states.find((s) => s.type === "started");
-  const assignee = useUsers().find((u) => u.id === issue.assignee_id);
+  const users = useUsers();
+  const assignee = users.find((u) => u.id === issue.assignee_id);
+  const reviewer = users.find((u) => u.id === issue.reviewer_id);
+  const mine = reviewer?.id === me.user.id;
   // The handoff: the latest comment from whoever did the work.
   const notes = useRecords("Comment")
     .filter((c) => c.issue_id === issue.id && c.author_id === issue.assignee_id)
@@ -47,10 +51,19 @@ export function ReviewBar({ issue }: { issue: Issue }) {
   return (
     <section aria-label="Review" className="flex flex-col gap-3 rounded-lg bg-surface p-4">
       <div>
-        <h2 className="font-medium">Ready for your review</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-medium">
+            {mine
+              ? "Ready for your review"
+              : reviewer
+                ? `Waiting for ${reviewer.name}'s review`
+                : "No reviewer yet: choose one"}
+          </h2>
+          {!reviewer && <ReviewerPicker issue={issue} variant="chip" />}
+        </div>
         <p className="text-xs text-muted">
           {assignee
-            ? `${assignee.name} is done and asks you to check it.`
+            ? `${assignee.name} is done and asks ${mine ? "you" : (reviewer?.name ?? "someone")} to check it.`
             : "This is done and waits for someone to check it."}{" "}
           {pullRequests.length === 0
             ? `Approve it to move it to ${doneName}, or send it back with what needs to change.`

@@ -96,12 +96,13 @@ pub async fn remove(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Clears someone from everything they're assigned to, lead or own, through
+/// Clears someone from everything they're assigned to, asked to review, lead or own, through
 /// the sync engine, before they leave the workspace.
 async fn unassign(db: &mut PgConnection, actor: Actor, user_id: Uuid) -> Result<(), AppError> {
     let mut operations = Vec::new();
     for (model, table, field) in [
         (ModelKind::Issue, "issues", "assignee_id"),
+        (ModelKind::Issue, "issues", "reviewer_id"),
         (ModelKind::Project, "projects", "lead_id"),
         (ModelKind::Initiative, "initiatives", "owner_id"),
     ] {

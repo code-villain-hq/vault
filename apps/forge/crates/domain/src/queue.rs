@@ -154,6 +154,7 @@ mod tests {
             state_id: TODO,
             priority,
             assignee_id: Some(AGENT),
+            reviewer_id: None,
             parent_id: None,
             project_id: None,
             service_id: None,
@@ -199,6 +200,7 @@ mod tests {
         let with = |state_id: Uuid, assignee: Option<Uuid>| Issue {
             state_id,
             assignee_id: assignee,
+            reviewer_id: None,
             ..issue(1, 0, 0)
         };
         assert!(in_queue(&with(TODO, Some(AGENT)), &states, &users));

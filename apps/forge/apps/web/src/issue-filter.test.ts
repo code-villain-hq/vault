@@ -6,6 +6,7 @@ const issue = (id: string, fields: Partial<Issue>): Issue =>
   ({
     id,
     assignee_id: null,
+    reviewer_id: null,
     priority: 0,
     label_ids: [],
     project_id: null,
@@ -15,7 +16,7 @@ const issue = (id: string, fields: Partial<Issue>): Issue =>
 
 const issues = [
   issue("a", { assignee_id: "ada", priority: 1, label_ids: ["bug"] }),
-  issue("b", { assignee_id: "bob", priority: 2, label_ids: ["bug", "ui"] }),
+  issue("b", { assignee_id: "bob", reviewer_id: "ada", priority: 2, label_ids: ["bug", "ui"] }),
   issue("c", { priority: 1, project_id: "p" }),
 ];
 const ids = (list: Issue[]) => list.map((i) => i.id);
@@ -28,6 +29,7 @@ test("no filters keep everything", () => {
 test("values of one field are alternatives", () => {
   expect(ids(applyFilters(issues, { assignee: ["ada", "bob"] }))).toEqual(["a", "b"]);
   expect(ids(applyFilters(issues, { label: ["ui"] }))).toEqual(["b"]);
+  expect(ids(applyFilters(issues, { reviewer: ["ada"] }))).toEqual(["b"]);
 });
 
 test("different fields all have to match", () => {
@@ -37,6 +39,7 @@ test("different fields all have to match", () => {
 test("empty stands for none", () => {
   expect(ids(applyFilters(issues, { assignee: [""] }))).toEqual(["c"]);
   expect(ids(applyFilters(issues, { project: [""] }))).toEqual(["a", "b"]);
+  expect(ids(applyFilters(issues, { reviewer: [""] }))).toEqual(["a", "c"]);
 });
 
 test("toggling adds and removes a value", () => {

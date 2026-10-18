@@ -26,6 +26,16 @@ function useOptions(): Record<FilterField, PickerOption[]> {
           icon: <Avatar user={u} size="size-4" />,
         })),
       ],
+      reviewer: [
+        { value: "", label: "No reviewer", icon: <Avatar user={undefined} size="size-4" /> },
+        ...users
+          .filter((u) => u.kind === "person")
+          .map((u) => ({
+            value: u.id,
+            label: u.name,
+            icon: <Avatar user={u} size="size-4" />,
+          })),
+      ],
       priority: [1, 2, 3, 4, 0].map((p) => ({
         value: String(p),
         label: PRIORITY_LABELS[p] ?? "",

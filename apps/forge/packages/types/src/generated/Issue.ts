@@ -11,6 +11,11 @@ number: number, title: string,
  */
 description: string, state_id: string, priority: number, assignee_id: string | null, 
 /**
+ * The person asked to review it: never an agent. Filled in by the
+ * server when the issue enters review without one.
+ */
+reviewer_id: string | null, 
+/**
  * The issue this is a sub-issue of.
  */
 parent_id: string | null, project_id: string | null, 

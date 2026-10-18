@@ -120,6 +120,40 @@ export function AssigneePicker({
   );
 }
 
+/** The person asked to review the issue; never an agent. */
+export function ReviewerPicker({
+  issue,
+  variant = "compact",
+}: {
+  issue: Issue;
+  variant?: Variant;
+}) {
+  const { sync } = useWorkspace();
+  const people = useUsers().filter((u) => u.kind === "person");
+  const reviewer = people.find((u) => u.id === issue.reviewer_id);
+  return (
+    <Picker
+      label="Reviewer"
+      options={[
+        { value: "", label: "No reviewer", icon: <Avatar user={undefined} size="size-4" /> },
+        ...people.map((u) => ({
+          value: u.id,
+          label: u.name,
+          icon: <Avatar user={u} size="size-4" />,
+        })),
+      ]}
+      selected={[issue.reviewer_id ?? ""]}
+      onSelect={(value) => sync.update("Issue", issue.id, { reviewer_id: value || null })}
+      triggerClassName={variant === "chip" ? chipTrigger : compactTrigger}
+    >
+      <Avatar user={reviewer} size={variant === "chip" ? "size-4" : "size-5"} />
+      {variant === "chip" && (
+        <ChipText empty={!reviewer}>{reviewer ? `Review: ${reviewer.name}` : "Reviewer"}</ChipText>
+      )}
+    </Picker>
+  );
+}
+
 export function LabelsPicker({ issue, variant = "compact" }: { issue: Issue; variant?: Variant }) {
   const { sync } = useWorkspace();
   const labels = useLabels().filter((l) => !l.team_id || l.team_id === issue.team_id);
