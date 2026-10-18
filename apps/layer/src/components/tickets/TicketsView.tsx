@@ -287,15 +287,15 @@ export function TicketsView() {
     <div className="wide">
       <div className="wide-head">
         <h2>Tickets</h2>
-        <div className="subtabs">
+        <div className="ui-tabs subtabs" role="tablist">
           <button
-            className={sub === "mine" ? "active" : ""}
+            className="ui-tab" role="tab" aria-selected={sub === "mine"}
             onClick={() => setSub("mine")}
           >
-            Mine<span className="badge">{issues.length}</span>
+            Mine<span className="ui-tab-count">{issues.length}</span>
           </button>
           <button
-            className={sub === "browse" ? "active" : ""}
+            className="ui-tab" role="tab" aria-selected={sub === "browse"}
             onClick={() => setSub("browse")}
             title="Search the whole board, not just what is assigned to you"
           >
@@ -494,7 +494,7 @@ export function TicketsView() {
               )}
               {epic.key && jiraBase && (
                 <button
-                  className="ui-button"
+                  className="ui-link"
                   title={`Open ${epic.key} in Jira`}
                   onClick={(e) => {
                     e.stopPropagation();

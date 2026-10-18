@@ -59,7 +59,7 @@ export function ReadTicketDialog({
         <>
           <button className="ui-button" onClick={onClose}>Close</button>
           <button
-            className="ui-button"
+            className="ui-link"
             onClick={() => void openUrl(issue.url).catch(fail)}
             title="The same ticket, on the website"
           >

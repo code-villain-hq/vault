@@ -136,7 +136,7 @@ export function Settings() {
       tall
       onClose={() => toggleSettings(false)}
       toolbar={
-        <div className="section-tabs">
+        <div className="ui-tabs section-tabs" role="tablist">
           {/* Named for what each does, not the product behind it (SET-6). */}
           {([
             ["appearance", "Appearance"],
@@ -150,7 +150,7 @@ export function Settings() {
           ] as [Section, string][]).map(([id, label]) => (
             <button
               key={id}
-              className={section === id ? "active" : ""}
+              className="ui-tab" role="tab" aria-selected={section === id}
               onClick={() => setSection(id)}
             >
               {label}

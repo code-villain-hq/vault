@@ -64,7 +64,7 @@ function ReviewCard({
         <span className="when">{ago(pr.updated_at)}</span>
         <button
           type="button"
-          className="ui-button"
+          className="ui-link"
           title={pr.url}
           onClick={(e) => { e.stopPropagation(); open(); }}
         >
@@ -175,7 +175,7 @@ function AuthoredCard({
         <span className="when">{ago(pr.updated_at)}</span>
         <button
           type="button"
-          className="ui-button"
+          className="ui-link"
           title={pr.url}
           onClick={(e) => { e.stopPropagation(); openGitHub(); }}
         >
@@ -354,12 +354,12 @@ export function ReviewsView() {
         <button type="button" className="ui-button" onClick={() => void refresh()}>Refresh</button>
       </div>
 
-      <div className="tabs sub-tabs">
-        <button type="button" className={side === "review" ? "active" : ""} onClick={() => setSide("review")}>
-          To review{toReview !== undefined && <span className="badge">{toReview}</span>}
+      <div className="ui-tabs sub-tabs" role="tablist">
+        <button type="button" className="ui-tab" role="tab" aria-selected={side === "review"} onClick={() => setSide("review")}>
+          To review{toReview !== undefined && <span className="ui-tab-count">{toReview}</span>}
         </button>
-        <button type="button" className={side === "authored" ? "active" : ""} onClick={() => setSide("authored")}>
-          Opened by you{yours !== undefined && <span className="badge">{yours}</span>}
+        <button type="button" className="ui-tab" role="tab" aria-selected={side === "authored"} onClick={() => setSide("authored")}>
+          Opened by you{yours !== undefined && <span className="ui-tab-count">{yours}</span>}
         </button>
       </div>
 

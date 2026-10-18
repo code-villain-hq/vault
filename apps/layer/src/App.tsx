@@ -21,6 +21,7 @@ import { Settings } from "./components/Settings";
 import { UpdateFromBase } from "./components/UpdateFromBase";
 import { CupIcon, GearIcon } from "./components/icons";
 import { PhoneBadge } from "./components/PhoneSettings";
+import { statusClass } from "./components/tickets/status";
 import { SidebarToggle } from "./components/ui";
 import { MessageCenter } from "./components/MessageCenter";
 import { Watchers } from "./Watchers";
@@ -102,11 +103,11 @@ function TopBar() {
     // bar's empty parts drag; its buttons stay buttons.
     <header className="topbar" data-tauri-drag-region="deep">
       <div className="topbar-left" />
-      <nav className="topbar-center" aria-label="Views">
+      <nav className="topbar-center ui-tabs" aria-label="Views">
         {tabs.map((t) => (
           <button
             key={t.id}
-            className={`viewtab${view === t.id ? " active" : ""}`}
+            className="ui-tab viewtab"
             aria-current={view === t.id ? "page" : undefined}
             onClick={() => setView(t.id)}
           >
@@ -263,44 +264,54 @@ function TaskMain({ task }: { task: TaskView }) {
           >
             Update from base
           </button>
-          {cursorIde && (
-            <button
-              className="ui-button"
-              title={`Open ${task.root} in Cursor`}
-              onClick={() => void api.openInCursor(task.root).catch(fail)}
-            >
-              Cursor ↗
-            </button>
-          )}
-          {task.issue_url && (
-            <button
-              className="ui-button"
-              title={ticket ? `${task.issue_key} is ${ticket.status} in Jira` : undefined}
-              onClick={() => void openUrl(task.issue_url!)}
-            >
-              {task.issue_key}{ticket && <span className="muted"> · {ticket.status}</span>} ↗
-            </button>
-          )}
         </div>
+        {/* Elsewhere: links, not buttons (design/components.md). */}
+        {(cursorIde || task.issue_url) && (
+          <div className="ws-links">
+            {cursorIde && (
+              <button
+                className="ui-link"
+                title={`Open ${task.root} in Cursor`}
+                onClick={() => void api.openInCursor(task.root).catch(fail)}
+              >
+                Cursor ↗
+              </button>
+            )}
+            {task.issue_url && (
+              <button
+                className="ui-link"
+                title={`Open ${task.issue_key} in Jira`}
+                onClick={() => void openUrl(task.issue_url!)}
+              >
+                {task.issue_key} ↗
+              </button>
+            )}
+            {ticket && (
+              <span className={`ui-status status-pill ${statusClass(ticket.status_category)}`}>{ticket.status}</span>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="tabs">
-        <button className={tab === "spec" ? "active" : ""} onClick={() => setTab("spec")}>
-          Spec{specBadge && <span className="badge">{specBadge}</span>}
+      <div className="ui-tabs task-tabs" role="tablist">
+        <button className="ui-tab" role="tab" aria-selected={tab === "spec"} onClick={() => setTab("spec")}>
+          Spec{specBadge && <span className="ui-tab-count">{specBadge}</span>}
         </button>
         <button
-          className={tab === "terminals" ? "active" : ""}
+          className="ui-tab"
+          role="tab"
+          aria-selected={tab === "terminals"}
           onClick={() => setTab("terminals")}
         >
-          Agents<span className="badge">{paneCount}</span>
+          Agents<span className="ui-tab-count">{paneCount}</span>
         </button>
-        <button className={tab === "diff" ? "active" : ""} onClick={() => setTab("diff")}>
-          Diff{changed > 0 && <span className="badge">{changed}</span>}
+        <button className="ui-tab" role="tab" aria-selected={tab === "diff"} onClick={() => setTab("diff")}>
+          Diff{changed > 0 && <span className="ui-tab-count">{changed}</span>}
         </button>
-        <button className={tab === "pr" ? "active" : ""} onClick={() => setTab("pr")}>
+        <button className="ui-tab" role="tab" aria-selected={tab === "pr"} onClick={() => setTab("pr")}>
           Pull requests
           {task.checkouts.length > 1 && (
-            <span className="badge">{task.checkouts.length}</span>
+            <span className="ui-tab-count">{task.checkouts.length}</span>
           )}
         </button>
       </div>

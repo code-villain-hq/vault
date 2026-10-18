@@ -62,8 +62,8 @@ textarea { font-family: var(--font-mono); }
   --field: var(--panel);
   --field-hover: var(--hover);
 }
-/* A choice among buttons: the chosen one is selected, not a second primary. */
-.ui-button.on { color: var(--fg); background: var(--selected); }
+/* An icon that toggles a mode (the phone): on, it is selected. */
+.ui-icon-button.on { color: var(--fg); background: var(--selected); }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: var(--radius-sm); }
 ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
@@ -219,31 +219,14 @@ body.dragging * { pointer-events: none; }
   color: var(--faint);
 }
 .spacer { flex: 1; }
+/* Elsewhere: Cursor and the ticket, as links beside the header's buttons. */
+.ws-links { display: flex; align-items: center; gap: 12px; margin-left: 6px; }
 .chips { display: flex; gap: 5px; align-items: center; }
 
 
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0 16px 8px;
-}
-.tabs button {
-  color: var(--muted);
-  padding: 0 10px;
-  height: 28px;
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-}
-.tabs button:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
-.tabs button.active { color: var(--fg); background: var(--selected); }
+.task-tabs { padding: 0 16px 6px; }
 /* The same strip inside a padded view (Reviews), without the full-bleed panel. */
-.tabs.sub-tabs { padding: 0; margin: 0 0 14px; }
-.tabs .badge {
-  margin-left: 6px;
-  font-size: var(--type-ui-small-size);
-  font-weight: 400;
-  color: var(--faint);
-}
+.ui-tabs.sub-tabs { margin: 0 0 10px; }
 .content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 
 /* ------------------------------------------------------------- terminals */
@@ -799,24 +782,10 @@ body.dragging * { pointer-events: none; }
   font-weight: 600;
 }
 .field .hint { font-size: var(--type-ui-small-size); color: var(--faint); margin-top: 4px; line-height: 1.45; }
-.section-tabs { display: flex; gap: 2px; margin-bottom: 14px; }
-.section-tabs button {
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-  height: 28px;
-  padding: 0 10px;
-  color: var(--muted);
-}
-.section-tabs button.active { color: var(--fg); background: var(--selected); }
+.section-tabs { flex-wrap: wrap; column-gap: 18px; margin-bottom: 14px; }
 
 /* Merge or rebase, one repo at a time (UPD-7). */
-.by-toggle { display: inline-flex; gap: 2px; }
-.by-toggle button {
-  padding: 2px 8px;
-  font-size: var(--type-ui-small-size);
-  color: var(--muted);
-}
-.by-toggle button.active { color: var(--fg); background: var(--selected); }
+.by-toggle .ui-segment { height: 20px; padding: 0 8px; font-size: var(--type-ui-small-size); }
 .repo-line select.update-by { width: auto; min-width: 150px; padding: 2px 6px; font-size: var(--type-ui-small-size); color: var(--muted); }
 
 /* ---------------------------------------------------------------- toasts */
@@ -1055,22 +1024,15 @@ body.dragging * { pointer-events: none; }
   background: var(--bg);
 }
 .topbar-left { display: flex; align-items: center; min-width: 0; }
-.topbar-center { display: flex; align-items: center; gap: 2px; }
+.topbar-center { align-self: stretch; }
 .topbar-right { display: flex; align-items: center; gap: 2px; justify-content: flex-end; }
+/* A tab in the top bar (design/components.md): the ui role, like a nav item,
+   with its line on the bar's bottom edge. */
 .viewtab {
-  display: flex;
-  align-items: center;
   gap: 7px;
-  height: 30px;
-  padding: 0 12px;
-  color: var(--muted);
-  /* A nav item (design/layouts/app-window.md): the ui role, the current one
-     at 700. */
   font-size: var(--type-ui-size);
   font-weight: var(--type-ui-weight);
 }
-.viewtab:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
-.viewtab.active { background: var(--selected); color: var(--fg); font-weight: 700; }
 /* Each label holds its bold width, so the centred tabs do not shift when
    the current one changes. */
 .viewtab-label { display: inline-flex; flex-direction: column; }
@@ -1269,8 +1231,7 @@ body.dragging * { pointer-events: none; }
   text-overflow: ellipsis;
 }
 .chat-item-sub { font-size: var(--type-ui-small-size); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chat-item-slack { color: var(--muted); cursor: pointer; }
-.chat-item-slack:hover { text-decoration: underline; }
+.chat-item-slack { cursor: pointer; }
 .chat-item .x { display: inline-flex; color: var(--faint); line-height: 1; opacity: 0; }
 .chat-item:hover .x, .chat-item.active .x { opacity: 1; }
 .chat-item .x:hover { color: var(--status-danger-ink); }
@@ -1666,6 +1627,7 @@ input.mono { font-family: var(--font-mono); }
 /* The pane bar's single launcher. Wider than its glyph so it stays an easy
    target; the menu itself is what says more than one thing can start. */
 .btn-add {
+  width: auto;
   padding: 4px 10px;
   display: inline-flex;
   align-items: center;
@@ -1673,26 +1635,8 @@ input.mono { font-family: var(--font-mono); }
   min-width: 32px;
 }
 
-/* Tickets (and Diff scope): equal sub-tabs in a shared track. */
-.subtabs {
-  display: flex;
-  gap: 2px;
-  margin-left: 6px;
-}
-.subtabs button {
-  height: 28px;
-  padding: 0 10px;
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-  color: var(--muted);
-  border-radius: var(--radius-md);
-}
-.subtabs button:hover:not(:disabled) { color: var(--fg); background: var(--hover); }
-.subtabs button.active {
-  color: var(--fg);
-  background: var(--selected);
-}
-.subtabs .badge { margin-left: 6px; font-size: var(--type-ui-small-size); font-weight: 400; color: var(--faint); }
+/* Tickets (and Diff scope): tabs beside the view's own tools. */
+.subtabs { margin-left: 6px; }
 
 .browse-bar {
   display: flex;

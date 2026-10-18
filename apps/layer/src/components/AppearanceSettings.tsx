@@ -82,13 +82,12 @@ export function AppearanceSettings() {
           value={ui.scale}
           onChange={(e) => slideUi({ scale: Number(e.target.value) })}
         />
-        <div className="row" style={{ marginTop: 6 }}>
+        <div className="ui-segmented" style={{ marginTop: 6 }}>
           {[0.9, 1.0, 1.15, 1.3, 1.45].map((v) => (
             <button
               key={v}
-              className={`ui-button${
-                Math.abs(ui.scale - v) < 0.001 ? " on" : ""
-              }`}
+              className="ui-segment"
+              aria-pressed={Math.abs(ui.scale - v) < 0.001}
               onClick={() => void saveUi({ scale: v })}
             >
               {Math.round(v * 100)}%

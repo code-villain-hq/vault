@@ -308,20 +308,20 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
   );
 
   const tabs = built.length > 1 && (
-    <div className="tabs fb-tabs">
+    <div className="ui-tabs fb-tabs" role="tablist">
       {built.map(({ row, list }) => {
         const n = list.filter((e) => picked.has(e.key)).length;
         return (
           <button
             key={row.checkout_id}
             type="button"
-            className={row.checkout_id === current?.row.checkout_id ? "active" : ""}
+            className="ui-tab" role="tab" aria-selected={row.checkout_id === current?.row.checkout_id}
             title={row.title || undefined}
             onClick={() => setShown(row.checkout_id)}
           >
             <span style={{ color: "var(--muted)" }}>{row.repo}</span>
             {row.number > 0 && ` #${row.number}`}
-            <span className="badge" title={`${n} of ${list.length} picked`}>{n}/{list.length}</span>
+            <span className="ui-tab-count" title={`${n} of ${list.length} picked`}>{n}/{list.length}</span>
           </button>
         );
       })}

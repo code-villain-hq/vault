@@ -50,7 +50,7 @@ export function LoopButton({ pane, task }: { pane: PaneInfo | undefined; task: T
   return (
     <>
       <button
-        className="ui-button btn-add"
+        className="ui-button ui-icon-button btn-add"
         title={`Put ${paneName(pane)} on a loop: its checks run each time it ends a turn`}
         onClick={() => setAsking(true)}
       >

@@ -39,9 +39,9 @@ export const UsageChart = memo(function UsageChart({ days }: { days: UsageDay[] 
   return (
     <div className="run-chart">
       <div className="run-chart-head">
-        <div className="tabs sub-tabs">
+        <div className="ui-tabs sub-tabs" role="tablist">
           {MEASURES.map((m) => (
-            <button key={m.id} type="button" className={measure === m.id ? "active" : ""} onClick={() => setMeasure(m.id)}>
+            <button key={m.id} type="button" className="ui-tab" role="tab" aria-selected={measure === m.id} onClick={() => setMeasure(m.id)}>
               {m.label}
             </button>
           ))}

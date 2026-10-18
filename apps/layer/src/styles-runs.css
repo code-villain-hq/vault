@@ -8,7 +8,7 @@
 /* A bar a day, one measure at a time; the line beside the tabs says what
    the hovered day, or else the period, came to. */
 .run-chart-head { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
-.run-chart-head .tabs.sub-tabs { margin: 0; }
+.run-chart-head .ui-tabs.sub-tabs { margin: 0; }
 .run-chart-readout { margin-left: auto; color: var(--muted); font-size: var(--type-ui-small-size); font-variant-numeric: tabular-nums; }
 .run-days { display: flex; align-items: flex-end; gap: 2px; height: 96px; padding: 0 2px; }
 /* The whole column takes the hover, not only the bar: a short day is still easy to point at. */

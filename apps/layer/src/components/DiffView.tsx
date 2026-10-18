@@ -554,11 +554,11 @@ export function DiffView({ task }: { task: TaskView }) {
   );
 
   const scopeTabs = (
-    <div className="subtabs">
+    <div className="ui-tabs subtabs" role="tablist">
       {(["uncommitted", "branch"] as DiffScope[]).map((v) => (
         <button
           key={v}
-          className={scope === v ? "active" : ""}
+          className="ui-tab" role="tab" aria-selected={scope === v}
           title={
             v === "uncommitted"
               ? "Everything not yet committed — what git status shows"

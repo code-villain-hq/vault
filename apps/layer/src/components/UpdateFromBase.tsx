@@ -243,7 +243,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                     <div className="spacer" />
                     {/* Inside the label, so a click here would tick the repo too. */}
                     <span
-                      className="by-toggle"
+                      className="ui-segmented by-toggle"
                       title={way(c.project_id).why}
                       onClick={(e) => e.preventDefault()}
                     >
@@ -251,7 +251,8 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                         <button
                           key={b}
                           type="button"
-                          className={(by[c.id] ?? "merge") === b ? "active" : ""}
+                          className="ui-segment"
+                          aria-pressed={(by[c.id] ?? "merge") === b}
                           disabled={!c.exists || busy}
                           onClick={() => setBy((m) => ({ ...m, [c.id]: b }))}
                         >

@@ -133,7 +133,7 @@ export function ChatView() {
           <BrowserToggle open={browserOpen} view={browser} whose="the chats'" onToggle={() => showBrowser(!browserOpen)} />
           <button
             ref={addRef}
-            className="ui-button btn-add"
+            className="ui-button ui-icon-button btn-add"
             title="New chat"
             onClick={() =>
               setMenu((open) => {
@@ -164,7 +164,7 @@ export function ChatView() {
                     return thread && (
                       <>
                         <span
-                          className="chat-item-slack"
+                          className="ui-link chat-item-slack"
                           title={`Its replies go to the Slack thread in ${thread.label}`}
                           onClick={(e) => { e.stopPropagation(); if (thread.link) void openUrl(thread.link); }}
                         >

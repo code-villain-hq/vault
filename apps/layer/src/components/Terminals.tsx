@@ -337,7 +337,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         <BrowserToggle open={browserOpen} view={browser} whose="this task's" onToggle={() => showBrowser(!browserOpen)} />
         <button
           ref={addRef}
-          className="ui-button btn-add"
+          className="ui-button ui-icon-button btn-add"
           title="New pane"
           onClick={() =>
             setAddMenu((open) => {

@@ -15,6 +15,8 @@
     "status-tint": 0.13,
     "chip-tint": 0.07,
     "highlight-tint": 0.08,
+    "button-tint": 0.1,
+    "button-hover-tint": 0.16,
     "backdrop-tint": 0.4
   },
   "contrast": {
@@ -51,7 +53,7 @@
     "ok": "#5CC9A7",
     "warn": "#E9AE45",
     "info": "#7AAEF5",
-    "status-danger-ink": "#F27A6B",
+    "status-danger-ink": "#FF8878",
     "status-ok-ink": "#5CC9A7",
     "status-warn-ink": "#E9AE45",
     "status-info-ink": "#7AAEF5",
@@ -81,7 +83,7 @@
     "ok": "#00775D",
     "warn": "#8C6100",
     "info": "#396AAB",
-    "status-danger-ink": "#A7362D",
+    "status-danger-ink": "#9B2A22",
     "status-ok-ink": "#006A53",
     "status-warn-ink": "#7D5600",
     "status-info-ink": "#2E5E9E",
