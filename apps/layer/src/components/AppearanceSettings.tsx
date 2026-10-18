@@ -206,7 +206,7 @@ function Preview({ theme, half }: { theme: Theme; half?: boolean }) {
           <i className="text" style={{ width: "80%" }} />
           <i style={{ width: "55%" }} />
           <div className="tp-dots">
-            {["--green", "--amber", "--red", "--blue"].map((c) => <b key={c} style={{ background: `var(${c})` }} />)}
+            {["ok", "warn", "danger", "info"].map((c) => <b key={c} style={{ background: `var(--status-${c}-ink)` }} />)}
           </div>
           <span className="tp-button" />
         </div>

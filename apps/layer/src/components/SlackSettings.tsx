@@ -29,7 +29,7 @@ export function SlackSettings() {
   const bot = settings?.slack_bot ?? null;
   const conversational = agents.filter((a) => a.installed && a.acp);
 
-  const [name, setName] = useState(bot?.bot_name || "layer");
+  const [name, setName] = useState(bot?.bot_name || "Layer");
   const [showManifest, setShowManifest] = useState(false);
   const [botToken, setBotToken] = useState("");
   const [appToken, setAppToken] = useState("");

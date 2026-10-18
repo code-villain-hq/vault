@@ -26,8 +26,6 @@
   /* A button that destroys something, and the text on it. */
   --danger-fill: var(--danger);
   --on-danger: var(--bg);
-  /* The dimming behind a dialog, as a share of this. */
-  --shade: #000;
 }
 
 /* The themes beside Nightshade, from their authors' palettes, fitted to
@@ -204,14 +202,19 @@
 
 /* A profile's colour (PROF-6): the disc its initial sits on, in the sidebar
    and on its Dock icon (`profiles/mac.rs`, `COLOURS`, in this order). The
-   Dock is drawn in no theme, so one set for all of them. */
+   Dock is drawn in no theme, so one set for all of them. Even colour
+   (design/principles.md): every hue at OKLCH lightness 0.74, chroma 0.13
+   (the slate 0.03), so no profile is louder than another, and each carries
+   its initial in --profile-ink, Nightshade night's bg, at 7:1 or better:
+   fixed like the discs, since a theme's on-primary may be white. */
 :root {
-  --profile-0: #db4d5c;
-  --profile-1: #3d8fe6;
-  --profile-2: #40b373;
-  --profile-3: #ed9e33;
-  --profile-4: #9466e0;
-  --profile-5: #2eadb8;
-  --profile-6: #e566b3;
-  --profile-7: #738094;
+  --profile-0: #F28881;
+  --profile-1: #70ADFB;
+  --profile-2: #69C27E;
+  --profile-3: #DA9E3F;
+  --profile-4: #B897F0;
+  --profile-5: #11C2CA;
+  --profile-6: #E887B6;
+  --profile-7: #9EACBE;
+  --profile-ink: #0B0B0B;
 }

@@ -44,8 +44,8 @@ details.acp-tool > summary::-webkit-details-marker { display: none; }
 .acp-diff-path { padding: 3px 8px; color: var(--muted); font-size: calc(var(--acp-text) * 0.85); }
 .acp-diff pre { margin: 0; max-height: 320px; overflow: auto; font-size: calc(var(--acp-text) * 0.89); line-height: 1.45; }
 .acp-diff pre > div { padding: 0 8px; white-space: pre; }
-.acp-diff .add { background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.acp-diff .del { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.acp-diff .add { background: color-mix(in srgb, var(--ok) var(--status-tint), transparent); }
+.acp-diff .del { background: color-mix(in srgb, var(--danger) var(--status-tint), transparent); }
 .acp-diff .ctx { color: var(--muted); }
 .acp-plan { padding: 8px 12px; background: var(--surface); border-radius: var(--radius-md); }
 .acp-step { display: flex; gap: 8px; line-height: 1.6; }
@@ -71,6 +71,6 @@ details.acp-tool > summary::-webkit-details-marker { display: none; }
 .acp-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .acp-setting { display: flex; align-items: center; gap: 6px; font-size: var(--type-ui-small-size); color: var(--muted); }
 .acp-setting select { width: auto; font-size: var(--type-ui-small-size); padding: 2px 6px; border-color: transparent; background: transparent; }
-.acp-setting select:hover:not(:disabled) { border-color: var(--line); }
+.acp-setting select:hover:not(:disabled) { background: var(--field-hover); }
 .acp-commands { display: flex; flex-direction: column; border-radius: var(--radius-md); overflow: hidden; }
 .acp-command { text-align: left; padding: 4px 10px; border: 0; border-radius: 0; background: transparent; font-size: calc(var(--acp-text) * 0.93); }

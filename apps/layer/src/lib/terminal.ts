@@ -1,38 +1,35 @@
 import type { ITheme } from "@xterm/xterm";
 import { isLight, type Theme } from "./theme";
-import nightshade from "../design/color.json";
+import code from "../design/syntax.json";
+
+/**
+ * Nightshade's terminal in one mode, from the vault's code palette
+ * (design/tokens/theme.md, Code). The terminal sits in the content panel,
+ * which is the code ground, so it is drawn in that, with the code's text,
+ * cursor and selection. The sixteen colours are the code palette's: the
+ * syntax hues at one lightness, kept apart from the brand's poison. By day
+ * "white" is a grey: programs print it meaning "readable", assuming a dark
+ * background, as every light terminal's palette does.
+ */
+function nightshade(mode: typeof code.night): ITheme {
+  const [black, red, green, yellow, blue, magenta, cyan, white] = mode.ansi.normal;
+  const [brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite] =
+    mode.ansi.bright;
+  return {
+    background: mode.ui.background,
+    foreground: mode.syntax.text,
+    cursor: mode.ui.cursor,
+    cursorAccent: mode.ui.background,
+    selectionBackground: mode.ui.selection,
+    black, red, green, yellow, blue, magenta, cyan, white,
+    brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite,
+  };
+}
 
 /** What every terminal in the app draws with, per theme: the window's and the phone's (SET-5). */
 const PALETTES: Record<Theme, ITheme> = {
-  // Nightshade: the terminal sits in the content panel, so it is drawn in
-  // the panel's colour, with the text's for the cursor. The sixteen colours
-  // are the ones programs expect, kept apart from the brand's poison.
-  night: {
-    background: nightshade.night.panel,
-    foreground: nightshade.night.fg,
-    cursor: nightshade.night.fg,
-    cursorAccent: nightshade.night.panel,
-    selectionBackground: "#3d3d3d",
-    black: nightshade.night.surface, red: "#f87171", green: "#4ade80", yellow: "#fbbf24",
-    blue: "#60a5fa", magenta: "#c084fc", cyan: "#22d3ee", white: nightshade.night.fg,
-    brightBlack: "#6b6b6b", brightRed: "#fca5a5", brightGreen: "#86efac",
-    brightYellow: "#fcd34d", brightBlue: "#93c5fd", brightMagenta: "#d8b4fe",
-    brightCyan: "#67e8f9", brightWhite: "#ffffff",
-  },
-  // "White" is a grey: programs print it meaning "readable", assuming a dark
-  // background, as every light terminal's palette does.
-  day: {
-    background: nightshade.day.panel,
-    foreground: nightshade.day.fg,
-    cursor: nightshade.day.fg,
-    cursorAccent: nightshade.day.panel,
-    selectionBackground: "#dadada",
-    black: nightshade.day.fg, red: "#dc2626", green: "#15803d", yellow: "#a16207",
-    blue: "#2563eb", magenta: "#7e22ce", cyan: "#0e7490", white: "#6a6a6a",
-    brightBlack: "#8c8c8c", brightRed: "#b91c1c", brightGreen: "#166534",
-    brightYellow: "#854d0e", brightBlue: "#1d4ed8", brightMagenta: "#6b21a8",
-    brightCyan: "#155e75", brightWhite: "#9a9a9a",
-  },
+  night: nightshade(code.night),
+  day: nightshade(code.day),
   "tokyo-night": {
     background: "#1f2335",
     foreground: "#c0caf5",

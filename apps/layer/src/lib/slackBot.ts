@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./api";
 import type { SlackBotView } from "./types";
+import nightshade from "../design/color.json";
 
 /**
  * The Slack bot's connection and threads (§24), kept current by
@@ -35,12 +36,13 @@ export const BOT_NAME_MAX = 35;
  * (BOT-7), which come over the same socket.
  */
 export function botManifest(name: string): object {
-  const n = name.trim().slice(0, BOT_NAME_MAX) || "layer";
+  const n = name.trim().slice(0, BOT_NAME_MAX) || "Layer";
   return {
     display_information: {
       name: n,
       description: "Your Layer, in Slack: mention it in a thread to hand the thread to an agent.",
-      background_color: "#0b0b0b",
+      // The app's tile in Slack, in the studio's ground (brand/color.md).
+      background_color: nightshade.night.bg,
     },
     features: {
       app_home: { home_tab_enabled: false, messages_tab_enabled: true, messages_tab_read_only_enabled: false },

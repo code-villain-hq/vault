@@ -47,7 +47,7 @@ export function RestartButton({ pane, onRestart }: { pane: PaneInfo; onRestart: 
         : "Resume the conversation"}
       onClick={(e) => { e.stopPropagation(); onRestart(pane); }}
     >
-      <ReloadIcon size={13} />
+      <ReloadIcon />
     </span>
   );
 }

@@ -110,7 +110,7 @@ function TopBar() {
             aria-current={view === t.id ? "page" : undefined}
             onClick={() => setView(t.id)}
           >
-            {t.label}
+            <span className="viewtab-label" data-label={t.label}>{t.label}</span>
             {t.count !== undefined ? (
               <span className="viewtab-count" title={t.title}>
                 {t.news && <span className="live-dot" aria-hidden />}

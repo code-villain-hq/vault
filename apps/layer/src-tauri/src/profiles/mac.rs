@@ -22,17 +22,23 @@ pub fn bring_forward(pid: i32) -> bool {
 }
 
 /// The colours an initial can sit on (PROF-10), in the order of
-/// `--profile-<n>` in `theme.css`, which the sidebar draws with.
+/// `--profile-<n>` in `theme.css`, which the sidebar draws with: one OKLCH
+/// lightness, light enough for the initial in `INK`.
 pub const COLOURS: [(f64, f64, f64); 8] = [
-    (0.86, 0.30, 0.36),
-    (0.24, 0.56, 0.90),
-    (0.25, 0.70, 0.45),
-    (0.93, 0.62, 0.20),
-    (0.58, 0.40, 0.88),
-    (0.18, 0.68, 0.72),
-    (0.90, 0.40, 0.70),
-    (0.45, 0.50, 0.58),
+    (0.949, 0.533, 0.506),
+    (0.439, 0.678, 0.984),
+    (0.412, 0.761, 0.494),
+    (0.855, 0.620, 0.247),
+    (0.722, 0.592, 0.941),
+    (0.067, 0.761, 0.792),
+    (0.910, 0.529, 0.714),
+    (0.620, 0.675, 0.745),
 ];
+
+/// The initial, and the ring that cuts its disc out of the icon: Nightshade
+/// night `bg`, the icon tile's own black (brand/color.md), as `on-primary`
+/// is in the sidebar. White read at under 3:1 on the discs.
+const INK: (f64, f64, f64) = (11.0 / 255.0, 11.0 / 255.0, 11.0 / 255.0);
 
 /// The colour of a profile that has not had one chosen: one of the first
 /// six, by its id, so it keeps it when renamed. Six, not all of them: the
@@ -73,7 +79,8 @@ fn marked(plain: &NSImage, initial: &str, (r, g, b): (f64, f64, f64)) -> Retaine
 
     let disc = side * 0.44;
     let at = NSPoint::new(side - disc - side * 0.02, side * 0.02);
-    NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0).setFill();
+    let ink = NSColor::colorWithSRGBRed_green_blue_alpha(INK.0, INK.1, INK.2, 1.0);
+    ink.setFill();
     NSBezierPath::bezierPathWithOvalInRect(NSRect::new(at, NSSize::new(disc, disc))).fill();
     let inset = disc * 0.06;
     NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, 1.0).setFill();
@@ -84,9 +91,8 @@ fn marked(plain: &NSImage, initial: &str, (r, g, b): (f64, f64, f64)) -> Retaine
     .fill();
 
     let font = NSFont::boldSystemFontOfSize(disc * 0.58);
-    let white = NSColor::whiteColor();
     let keys = unsafe { [NSFontAttributeName, NSForegroundColorAttributeName] };
-    let values: [&AnyObject; 2] = [&font, &white];
+    let values: [&AnyObject; 2] = [&font, &ink];
     let attributes = NSDictionary::from_slices(&keys, &values);
     let text = NSString::from_str(initial);
     // SAFETY: the attributes are a font and a colour, under the keys for them.

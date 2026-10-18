@@ -38,7 +38,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  color: var(--on-primary);
+  color: var(--profile-ink);
   font-size: var(--type-ui-small-size);
   font-weight: 700;
   line-height: 1;
@@ -82,7 +82,7 @@
   background: none;
   cursor: pointer;
 }
-.profile-recolour .profile-initial { width: 34px; height: 34px; font-size: 16px; }
+.profile-recolour .profile-initial { width: 34px; height: 34px; font-size: var(--type-ui-size); }
 .profile-recolour:hover .profile-initial,
 .profile-recolour:focus-visible .profile-initial {
   box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--line);

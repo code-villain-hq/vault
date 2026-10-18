@@ -30,7 +30,7 @@ function Svg({ size, stroke = 1.75, children }: { size: number; stroke?: number;
   );
 }
 
-export function GearIcon({ size = 20 }: { size?: number }) {
+export function GearIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size}>
       <circle cx="12" cy="12" r="3.2" />
@@ -40,7 +40,7 @@ export function GearIcon({ size = 20 }: { size?: number }) {
 }
 
 /** A bell, for the message center. */
-export function BellIcon({ size = 20 }: { size?: number }) {
+export function BellIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size}>
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -50,7 +50,7 @@ export function BellIcon({ size = 20 }: { size?: number }) {
 }
 
 /** A cup, for keeping the Mac awake. */
-export function CupIcon({ size = 20 }: { size?: number }) {
+export function CupIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size}>
       <path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z" />
@@ -61,7 +61,7 @@ export function CupIcon({ size = 20 }: { size?: number }) {
 }
 
 /** A phone, for phone access (PHONE-*). */
-export function PhoneIcon({ size = 20 }: { size?: number }) {
+export function PhoneIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size}>
       <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
@@ -79,7 +79,7 @@ export function ChevronIcon({ size = 12 }: { size?: number }) {
   );
 }
 
-export function CloseIcon({ size = 14 }: { size?: number }) {
+export function CloseIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size} stroke={2.2}>
       <path d="M6 6l12 12M18 6L6 18" />
@@ -87,7 +87,7 @@ export function CloseIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function PlusIcon({ size = 16 }: { size?: number }) {
+export function PlusIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size} stroke={2.2}>
       <path d="M12 5v14M5 12h14" />
@@ -96,7 +96,7 @@ export function PlusIcon({ size = 16 }: { size?: number }) {
 }
 
 /** Hand a pane's work to another agent. */
-export function SwapIcon({ size = 14 }: { size?: number }) {
+export function SwapIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size} stroke={2}>
       <path d="M4 8h15l-4-4M20 16H5l4 4" />
@@ -104,7 +104,7 @@ export function SwapIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function ExternalIcon({ size = 14 }: { size?: number }) {
+export function ExternalIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size} stroke={2}>
       <path d="M8 16L17 7M9 7h8v8" />
@@ -112,7 +112,7 @@ export function ExternalIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-export function CopyIcon({ size = 14 }: { size?: number }) {
+export function CopyIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size} stroke={2}>
       <rect x="8" y="8" width="12" height="12" rx="2" />

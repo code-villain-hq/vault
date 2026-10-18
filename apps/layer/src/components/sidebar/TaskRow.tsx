@@ -134,7 +134,7 @@ export const TaskRow = memo(function TaskRow({
                 onRemoveRepo(c.id, c.project_name, lose, task.checkouts.length === 1);
               }}
             >
-              <CloseIcon size={13} />
+              <CloseIcon />
             </span>
           </div>
         );

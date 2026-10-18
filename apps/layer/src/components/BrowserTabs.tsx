@@ -38,12 +38,12 @@ export function BrowserTabs({
             disabled={locked}
             onClick={(e) => { e.stopPropagation(); onClose(t.id); }}
           >
-            <CloseIcon size={12} />
+            <CloseIcon />
           </button>
         </div>
       ))}
       <button className="btn btn-sm btn-icon browser-tab-new" title="New tab" disabled={locked} onClick={onNew}>
-        <PlusIcon size={13} />
+        <PlusIcon />
       </button>
     </div>
   );

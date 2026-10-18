@@ -206,7 +206,7 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
   return (
     <div className={`loop-bar ${tone}`}>
       <div className="loop-line">
-        <LoopIcon size={14} />
+        <LoopIcon />
         <b>Loop</b>
         {view.phase === "checking" && <Spinner />}
         <span className="loop-what" title={what(view, paneName(pane))}>{what(view, paneName(pane))}</span>
