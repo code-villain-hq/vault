@@ -311,7 +311,7 @@ function AgentRow({
           )}
           {inUse(token) ? (
             <span className="flex items-center gap-1.5 text-ok-ink">
-              <span className="size-1.5 rounded-full bg-ok" aria-hidden="true" />
+              <span className="size-1.5 rounded-full bg-ok-ink" aria-hidden="true" />
               In use · {timeAgo(token.last_used_at ?? "")}
             </span>
           ) : (
@@ -493,7 +493,7 @@ function SecretNotice({ name, secret }: { name: string; secret: string }) {
         The runner secret for <span className="font-medium">{name}</span>. Copy it now: it won't be
         shown again.
       </p>
-      <code className="block break-all rounded-md bg-surface p-3 font-mono text-xs">{secret}</code>
+      <code className="block break-all rounded-md bg-panel p-3 font-mono text-xs">{secret}</code>
       <p className="text-xs text-muted">
         Forge POSTs JSON like{" "}
         <span className="font-mono">
@@ -530,7 +530,7 @@ function TokenNotice({ name, token }: { name: string; token: string }) {
         shown again.
       </p>
       <p className="text-xs text-muted">To connect Claude Code, run:</p>
-      <code className="block break-all rounded-md bg-surface p-3 font-mono text-xs">{command}</code>
+      <code className="block break-all rounded-md bg-panel p-3 font-mono text-xs">{command}</code>
       <p className="text-xs text-muted">
         Other MCP clients: server <span className="font-mono">{url}</span>, header{" "}
         <span className="font-mono">Authorization: Bearer {"<key>"}</span>.

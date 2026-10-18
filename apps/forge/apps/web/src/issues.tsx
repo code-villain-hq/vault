@@ -174,7 +174,7 @@ function Toggle<T extends string>({
               // Hand the keyboard back to the list or board.
               event.currentTarget.blur();
             }}
-            className={`h-7 rounded-md px-2 text-xs capitalize ${value === option ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
+            className={`ui-control h-7 rounded-md px-2 capitalize outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${value === option ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
           >
             {option}
           </button>
@@ -194,7 +194,7 @@ function ViewTabs({ view, onChange }: { view: ViewId; onChange: (view: ViewId) =
           role="tab"
           aria-selected={view === v.id}
           onClick={() => onChange(v.id)}
-          className={`h-7 rounded-md px-2.5 text-xs whitespace-nowrap ${view === v.id ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
+          className={`ui-control h-7 rounded-md px-2.5 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${view === v.id ? "bg-hover text-fg" : "text-muted hover:text-fg"}`}
         >
           {v.label}
         </button>

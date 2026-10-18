@@ -72,7 +72,7 @@ export function Picker({
           {/* Layers: sticky headers 10, floating bars 30, dialogs 40, menus 50 (menus open from dialogs too). */}
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
             <Menu.Popup
-              className="app-menu w-60 origin-(--transform-origin) rounded-md bg-surface outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+              className="app-menu w-60 origin-(--transform-origin) outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
               onClick={(event) => event.stopPropagation()}
             >
               <Menu.Input

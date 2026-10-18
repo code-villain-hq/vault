@@ -391,7 +391,7 @@ function SettingsNav() {
           event.preventDefault();
           router.history.push(back);
         }}
-        className={`${navLink} h-9 text-muted`}
+        className={`${navLink} text-muted`}
       >
         <NavIcon icon={ArrowLeft} />
         Back to app
@@ -454,7 +454,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
         type="button"
         aria-expanded={open}
         onClick={toggle}
-        className="sidebar-group-label group flex h-6 items-center gap-1 self-start rounded-md px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
+        className="sidebar-group-label group flex h-7 items-center gap-1 self-start rounded-md px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
       >
         {title}
         <ChevronDown
@@ -508,7 +508,7 @@ function WorkspaceMenu() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Menu.Popup className="app-menu min-w-52 origin-(--transform-origin) rounded-md bg-surface p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Menu.Popup className="app-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             <div className="truncate px-2 py-1.5 text-xs text-faint">{me.user.email}</div>
             {others.map((other) => (
               <Menu.Item

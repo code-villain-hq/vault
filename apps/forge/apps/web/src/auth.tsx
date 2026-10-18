@@ -99,14 +99,9 @@ function GitHubButton({ label, query }: { label: string; query: Record<string, s
   );
 }
 
+/** Space, not rules, between the two ways in (tone, not lines). */
 function Or() {
-  return (
-    <div className="my-5 flex items-center gap-3 text-xs text-faint">
-      <span className="h-px flex-1 bg-line" />
-      or
-      <span className="h-px flex-1 bg-line" />
-    </div>
-  );
+  return <p className="my-5 text-center text-xs text-faint">or</p>;
 }
 
 /** Only same-site paths, so a link can't send people elsewhere after signing in. */

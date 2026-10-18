@@ -43,7 +43,11 @@ export function StatusPicker({ issue, variant = "compact" }: { issue: Issue; var
       triggerStyle={variant === "chip" ? statusStyle(current?.color) : undefined}
     >
       {current && (
-        <StateIcon state={current} color={variant === "chip" ? "currentColor" : undefined} />
+        <StateIcon
+          state={current}
+          color={variant === "chip" ? "currentColor" : undefined}
+          size={variant === "chip" ? 12 : 15}
+        />
       )}
       {variant === "chip" && <ChipText>{current?.name ?? "Status"}</ChipText>}
     </Picker>
@@ -70,7 +74,7 @@ export function PriorityPicker({
       onSelect={(value) => sync.update("Issue", issue.id, { priority: Number(value) })}
       triggerClassName={variant === "chip" ? chipTrigger : compactTrigger}
     >
-      <PriorityIcon priority={issue.priority} />
+      <PriorityIcon priority={issue.priority} size={variant === "chip" ? 12 : 15} />
       {variant === "chip" && (
         <ChipText empty={issue.priority === 0}>
           {issue.priority === 0 ? "Priority" : PRIORITY_LABELS[issue.priority]}
@@ -202,7 +206,7 @@ export function ProjectPicker({ issue, variant = "compact" }: { issue: Issue; va
     >
       {variant === "chip" ? (
         <>
-          <ProjectIcon />
+          <ProjectIcon size={12} />
           <ChipText empty={!project}>{project?.name ?? "Project"}</ChipText>
         </>
       ) : (
@@ -229,7 +233,7 @@ export function ServicePicker({ issue, variant = "chip" }: { issue: Issue; varia
     >
       {variant === "chip" ? (
         <>
-          <ServiceIcon service={service} />
+          <ServiceIcon service={service} className="size-3" />
           <ChipText empty={!service}>{service?.name ?? "Service"}</ChipText>
         </>
       ) : (

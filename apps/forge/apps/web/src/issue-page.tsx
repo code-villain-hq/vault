@@ -234,7 +234,7 @@ function Fields({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-            <Menu.Popup className="app-menu min-w-56 rounded-md bg-surface p-1 outline-none">
+            <Menu.Popup className="app-menu min-w-56 p-1 outline-none">
               <Menu.Item className={menuItem} onClick={() => setChoosingParent(true)}>
                 {issue.parent_id ? "Change parent issue…" : "Make it a sub-issue of…"}
               </Menu.Item>
@@ -507,7 +507,7 @@ function Knowledge({ issue }: { issue: Issue }) {
             <Link
               to="/$workspace/decisions"
               params={{ workspace: workspace.url_key }}
-              className="self-start text-xs text-faint hover:text-fg"
+              className="ui-link self-start text-xs"
             >
               And the {plural(wide, "decision")} for the whole workspace
             </Link>
@@ -904,11 +904,8 @@ function Activity({
             className="field-sizing-content min-h-16 w-full resize-none bg-transparent px-3 py-2 outline-none placeholder:text-faint"
           />
           <div className="flex justify-end px-2 pb-2">
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={!body.trim() || uploading}
-              onClick={send}
-            >
+            {/* The screen's one primary belongs to its state (Accept, the pull request). */}
+            <Button variant="secondary" disabled={!body.trim() || uploading} onClick={send}>
               Comment
             </Button>
           </div>
@@ -1003,7 +1000,7 @@ function CommentView({
             />
             <div className="flex gap-2">
               <Button
-                className="h-7 px-2 text-xs"
+                variant="secondary"
                 disabled={!draft.trim() || uploading}
                 onClick={() => {
                   sync.update("Comment", comment.id, { body: draft.trim() });
@@ -1012,11 +1009,7 @@ function CommentView({
               >
                 Save
               </Button>
-              <Button
-                variant="secondary"
-                className="h-7 px-2 text-xs"
-                onClick={() => setEditing(false)}
-              >
+              <Button variant="secondary" onClick={() => setEditing(false)}>
                 Cancel
               </Button>
             </div>

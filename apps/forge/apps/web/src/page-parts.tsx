@@ -16,15 +16,17 @@ import { Picker } from "./picker";
 export const chip =
   "ui-chip flex h-7 max-w-64 items-center gap-1.5 px-2 outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover";
 
-/** A status's coloured dot. */
+/**
+ * A status's dot in its status ink: `status-<name>-ink` for the shared
+ * colours, and for a chosen hue the ink `statusStyle` checks for it.
+ * Inside a pill, `currentColor` takes the pill's ink.
+ */
 export function Dot({ color }: { color: string }) {
-  return (
-    <span
-      className="size-2 shrink-0 rounded-full"
-      style={{ background: color }}
-      aria-hidden="true"
-    />
-  );
+  const style =
+    color === "currentColor"
+      ? { background: color }
+      : { ...statusStyle(color), background: "var(--status-ink)" };
+  return <span className="size-2 shrink-0 rounded-full" style={style} aria-hidden="true" />;
 }
 
 /** A page's "+": a plain icon that opens its New dialog. */
@@ -59,7 +61,7 @@ export function CreateDialog({
         <Dialog.Backdrop className="app-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup
           finalFocus={finalFocus}
-          className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+          className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
         >
           {open && children}
         </Dialog.Popup>
@@ -87,7 +89,7 @@ export function MoreMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Menu.Popup className="app-menu min-w-44 rounded-md bg-surface p-1 outline-none">
+          <Menu.Popup className="app-menu min-w-44 p-1 outline-none">
             {items.map((item) => (
               <Menu.Item
                 key={item.label}
@@ -184,7 +186,7 @@ export function DateChip({
 }) {
   return (
     <label className={`${chip} relative`} title={label}>
-      <CalendarDays size={15} strokeWidth={1.75} aria-hidden="true" />
+      <CalendarDays size={12} strokeWidth={1.75} aria-hidden="true" />
       {value ? formatDate(value) : label}
       <input
         type="date"

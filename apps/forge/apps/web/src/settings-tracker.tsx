@@ -144,7 +144,7 @@ function TeamSettings({ teamId, editable }: { teamId: string; editable: boolean 
               const key = e.target.value.toUpperCase();
               if (key && key !== team.key) sync.update("Team", team.id, { key });
             }}
-            className="w-14 rounded-md bg-transparent px-2 py-1 font-mono text-fg uppercase outline-none hover:bg-hover focus:bg-hover"
+            className="ui-field h-7 w-14 rounded-md px-2 font-mono uppercase"
           />
         </label>
       </div>

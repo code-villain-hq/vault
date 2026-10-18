@@ -298,7 +298,7 @@ function RoleSelect({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <Select.Popup className="app-menu min-w-(--anchor-width) rounded-md bg-surface p-1 outline-none">
+          <Select.Popup className="app-menu min-w-(--anchor-width) p-1 outline-none">
             <Select.List>
               {ROLES.map((role) => (
                 <Select.Item

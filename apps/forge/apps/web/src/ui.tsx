@@ -57,7 +57,8 @@ export function AuthScreen({ title, children }: { title: string; children: React
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
-        <Logo className="mx-auto mb-4 size-20" />
+        {/* Clear space: a quarter of the mark's 80px height. */}
+        <Logo className="mx-auto mb-5 size-20" />
         <h1 className="mb-6 text-center text-title font-semibold">{title}</h1>
         {children}
       </div>
@@ -69,7 +70,7 @@ export function AuthScreen({ title, children }: { title: string; children: React
 export function Splash() {
   return (
     <div className="flex h-full items-center justify-center">
-      <Logo className="size-8 animate-pulse opacity-60" />
+      <Logo className="size-8 animate-breathe" />
     </div>
   );
 }

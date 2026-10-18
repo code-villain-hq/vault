@@ -271,7 +271,7 @@ export function ColorButton({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Popover.Popup className="app-menu w-80 rounded-lg bg-surface p-4 outline-none">
+          <Popover.Popup className="app-menu w-80 p-4 outline-none">
             <ColorChoice large value={value} onChange={onChange} />
           </Popover.Popup>
         </Popover.Positioner>

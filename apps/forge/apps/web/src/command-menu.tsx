@@ -74,7 +74,7 @@ export function CommandMenu() {
         <Dialog.Backdrop className="app-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup
           finalFocus={finalFocus}
-          className="app-dialog fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+          className="app-dialog fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
         >
           <Dialog.Title className="sr-only">Command menu</Dialog.Title>
           {open && <Commands onDone={() => setOpen(false)} />}

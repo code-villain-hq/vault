@@ -61,7 +61,7 @@ export function NewIssueProvider({
           <Dialog.Backdrop className="app-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
           <Dialog.Popup
             finalFocus={finalFocus}
-            className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+            className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
           >
             {open && <NewIssueForm defaults={open} onDone={() => setOpen(null)} />}
           </Dialog.Popup>
@@ -178,7 +178,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
           onSelect={setStateId}
           triggerClassName={chip}
         >
-          {state && <StateIcon state={state} />}
+          {state && <StateIcon state={state} size={12} />}
           {state?.name ?? "Status"}
         </Picker>
         <Picker
@@ -192,7 +192,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
           onSelect={(value) => setPriority(Number(value))}
           triggerClassName={chip}
         >
-          <PriorityIcon priority={priority} />
+          <PriorityIcon priority={priority} size={12} />
           {PRIORITY_LABELS[priority]}
         </Picker>
         <Picker
@@ -240,7 +240,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
           onSelect={setProjectId}
           triggerClassName={chip}
         >
-          <ProjectIcon />
+          <ProjectIcon size={12} />
           {projects.find((p) => p.id === projectId)?.name ?? "Project"}
         </Picker>
       </div>

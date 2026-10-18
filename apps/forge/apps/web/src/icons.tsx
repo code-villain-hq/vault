@@ -1,21 +1,69 @@
 import type { StateType, WorkflowState } from "@forge/types";
 import { IconServer } from "@tabler/icons-react";
-import { Box, Check, type LucideIcon } from "lucide-react";
-import type { SVGProps } from "react";
+import {
+  Box,
+  Check,
+  Circle,
+  CircleArrowRight,
+  CircleCheck,
+  CircleDashed,
+  CircleDot,
+  CircleX,
+  type LucideIcon,
+  Minus,
+  SignalHigh,
+  SignalLow,
+  SignalMedium,
+  SquareExclamationPoint,
+} from "lucide-react";
 import { readable } from "./contrast";
 import { useReviewStateIds } from "./data";
 import { ICONS } from "./icon-set";
 
-/** A decorative 14×14 icon; the control around it carries the label. */
-function Svg(props: SVGProps<SVGSVGElement>) {
-  return <svg viewBox="0 0 14 14" className="size-3.5 shrink-0" aria-hidden="true" {...props} />;
-}
+/** Lucide's size and stroke: 15px beside text, 12px inside chips and pills. */
+type IconSize = 12 | 15;
+const STROKE = 1.75;
 
 /** A workflow state's icon, telling its team's review status apart. */
-export function StateIcon({ state, color }: { state: WorkflowState; color?: string }) {
+export function StateIcon({
+  state,
+  color,
+  size,
+}: {
+  state: WorkflowState;
+  color?: string;
+  size?: IconSize;
+}) {
   const review = useReviewStateIds().has(state.id);
-  return <StatusIcon type={state.type} color={color ?? state.color} review={review} />;
+  return <StatusIcon type={state.type} color={color ?? state.color} review={review} size={size} />;
 }
+
+/** Lucide has no half-full circle, so "started" is drawn on its grid and stroke. */
+function Started({ color, size }: { color: string; size: IconSize }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      className="shrink-0"
+      aria-hidden="true"
+      fill="none"
+      stroke={color}
+      strokeWidth={STROKE}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6a6 6 0 0 1 0 12z" fill={color} stroke="none" />
+    </svg>
+  );
+}
+
+const STATE_ICONS: Record<Exclude<StateType, "started">, LucideIcon> = {
+  triage: CircleArrowRight,
+  backlog: CircleDashed,
+  unstarted: Circle,
+  completed: CircleCheck,
+  canceled: CircleX,
+};
 
 /**
  * A workflow state's icon: its type decides the shape, its colour the
@@ -28,109 +76,36 @@ export function StatusIcon({
   type,
   color: chosen,
   review = false,
+  size = 15,
 }: {
   type: StateType;
   color: string;
   review?: boolean;
+  size?: IconSize;
 }) {
   // The team's colour, adjusted where needed to stand out from the background.
   const color = readable(chosen);
-  if (review) {
-    return (
-      <Svg fill="none" stroke={color} strokeWidth="1.5">
-        <circle cx="7" cy="7" r="5.5" />
-        <circle cx="7" cy="7" r="2.5" fill={color} stroke="none" />
-      </Svg>
-    );
-  }
-  switch (type) {
-    case "triage":
-      return (
-        <Svg>
-          <circle cx="7" cy="7" r="6.25" fill={color} />
-          <path d="M4 7h6M8 5l2 2-2 2" fill="none" stroke="var(--surface)" strokeWidth="1.4" />
-        </Svg>
-      );
-    case "backlog":
-      return (
-        <Svg fill="none" stroke={color} strokeWidth="1.5" strokeDasharray="2 2">
-          <circle cx="7" cy="7" r="5.5" />
-        </Svg>
-      );
-    case "unstarted":
-      return (
-        <Svg fill="none" stroke={color} strokeWidth="1.5">
-          <circle cx="7" cy="7" r="5.5" />
-        </Svg>
-      );
-    case "started":
-      return (
-        <Svg fill="none" stroke={color} strokeWidth="1.5">
-          <circle cx="7" cy="7" r="5.5" />
-          <path d="M7 3.5a3.5 3.5 0 0 1 0 7z" fill={color} stroke="none" />
-        </Svg>
-      );
-    case "completed":
-      return (
-        <Svg>
-          <circle cx="7" cy="7" r="6.25" fill={color} />
-          <path
-            d="m4.5 7.2 1.7 1.7 3.3-3.6"
-            fill="none"
-            stroke="var(--surface)"
-            strokeWidth="1.5"
-          />
-        </Svg>
-      );
-    case "canceled":
-      return (
-        <Svg>
-          <circle cx="7" cy="7" r="6.25" fill={color} />
-          <path d="m5 5 4 4M9 5l-4 4" stroke="var(--surface)" strokeWidth="1.5" />
-        </Svg>
-      );
-  }
+  if (type === "started" && !review) return <Started color={color} size={size} />;
+  const Icon = review ? CircleDot : STATE_ICONS[type as Exclude<StateType, "started">];
+  return (
+    <Icon size={size} strokeWidth={STROKE} color={color} aria-hidden="true" className="shrink-0" />
+  );
 }
 
 /** 0 = none, 1 = urgent, 2 = high, 3 = medium, 4 = low. */
-export function PriorityIcon({ priority }: { priority: number }) {
-  if (priority === 0) {
-    return (
-      <Svg fill="var(--faint)">
-        <rect x="2" y="6.25" width="2.5" height="1.5" rx=".5" />
-        <rect x="5.75" y="6.25" width="2.5" height="1.5" rx=".5" />
-        <rect x="9.5" y="6.25" width="2.5" height="1.5" rx=".5" />
-      </Svg>
-    );
-  }
-  if (priority === 1) {
-    return (
-      <Svg>
-        <rect x="1" y="1" width="12" height="12" rx="3" fill="var(--status-danger-ink)" />
-        <path
-          d="M7 3.75v4M7 9.75v.5"
-          stroke="var(--surface)"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-      </Svg>
-    );
-  }
-  const filled = 5 - priority; // high = 3 bars, medium = 2, low = 1
+export function PriorityIcon({ priority, size = 15 }: { priority: number; size?: IconSize }) {
+  const [Icon, color] =
+    priority === 1
+      ? [SquareExclamationPoint, "var(--status-danger-ink)"]
+      : priority === 2
+        ? [SignalHigh, "var(--muted)"]
+        : priority === 3
+          ? [SignalMedium, "var(--muted)"]
+          : priority === 4
+            ? [SignalLow, "var(--muted)"]
+            : [Minus, "var(--faint)"];
   return (
-    <Svg>
-      {[0, 1, 2].map((i) => (
-        <rect
-          key={i}
-          x={2 + i * 3.75}
-          y={9 - i * 3}
-          width="2.5"
-          height={3 + i * 3}
-          rx=".5"
-          fill={i < filled ? "var(--muted)" : "var(--line)"}
-        />
-      ))}
-    </Svg>
+    <Icon size={size} strokeWidth={STROKE} color={color} aria-hidden="true" className="shrink-0" />
   );
 }
 
@@ -197,8 +172,10 @@ export function LabelDot({ color }: { color: string }) {
   );
 }
 
-export function ProjectIcon() {
-  return <Box size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-muted" />;
+export function ProjectIcon({ size = 15 }: { size?: IconSize }) {
+  return (
+    <Box size={size} strokeWidth={STROKE} aria-hidden="true" className="shrink-0 text-muted" />
+  );
 }
 
 export function CheckIcon() {

@@ -233,7 +233,12 @@ export function DescriptionDiff({ issue, suggestion }: { issue: Issue; suggestio
   const proposed = proposedDescription(suggestion) ?? "";
   // Against the description as it is now, which is what accepting replaces.
   return (
-    <TextDiff label="What changes in the description" before={issue.description} after={proposed} />
+    <TextDiff
+      label="What changes in the description"
+      before={issue.description}
+      after={proposed}
+      onSurface
+    />
   );
 }
 
@@ -242,10 +247,13 @@ export function TextDiff({
   label,
   before,
   after,
+  onSurface = false,
 }: {
   label: string;
   before: string;
   after: string;
+  /** Inside a surface card, step down to panel so the block still reads as one. */
+  onSurface?: boolean;
 }) {
   const diff = useMemo(
     () => foldDiff(wordPairs(lineDiff(before.trim(), after.trim()))),
@@ -255,7 +263,7 @@ export function TextDiff({
   return (
     <figure
       aria-label={label}
-      className="overflow-x-auto rounded-md bg-surface py-1 font-mono text-xs leading-relaxed"
+      className={`overflow-x-auto rounded-md py-1 font-mono text-xs leading-relaxed ${onSurface ? "bg-panel" : "bg-surface"}`}
     >
       {diff.map((line, index) =>
         "skipped" in line ? (
@@ -331,7 +339,7 @@ export function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
               <Link
                 to="/$workspace/service/$service"
                 params={{ workspace: workspace.url_key, service: service.id }}
-                className="hover:text-fg"
+                className="ui-link"
               >
                 {service.name}
               </Link>
@@ -345,7 +353,7 @@ export function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
                     workspace: workspace.url_key,
                     identifier: identifier(issue, teamsById),
                   }}
-                  className="hover:text-fg"
+                  className="ui-link"
                 >
                   {identifier(issue, teamsById)}
                 </Link>
@@ -357,7 +365,7 @@ export function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
                 <Link
                   to="/$workspace/spec/$spec"
                   params={{ workspace: workspace.url_key, spec: spec.id }}
-                  className="hover:text-fg"
+                  className="ui-link"
                 >
                   {suggestion.requirement ? `Requirement: ${suggestion.requirement}` : spec.title}
                 </Link>

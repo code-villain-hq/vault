@@ -141,7 +141,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-                  <Menu.Popup className="app-menu min-w-48 rounded-md bg-surface p-1 outline-none">
+                  <Menu.Popup className="app-menu min-w-48 p-1 outline-none">
                     {elsewhere.map((state) => (
                       <Menu.Item
                         key={state.id}

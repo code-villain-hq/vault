@@ -432,7 +432,7 @@ function IconPicker({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Popover.Popup className="app-menu flex w-[27rem] flex-col rounded-lg bg-surface outline-none">
+          <Popover.Popup className="app-menu flex w-[27rem] flex-col outline-none">
             <div className="px-4 py-4">
               {mixing ? (
                 <CustomColor
@@ -473,7 +473,7 @@ function IconPicker({
                   aria-label={`Icon ${name}`}
                   aria-pressed={name === icon}
                   onClick={() => onChange({ icon: name })}
-                  className={`flex size-8 items-center justify-center rounded-md hover:bg-hover ${name === icon ? "bg-hover" : ""}`}
+                  className={`flex size-8 items-center justify-center rounded-md outline-none hover:bg-highlight focus-visible:ring-2 focus-visible:ring-accent ${name === icon ? "bg-highlight" : ""}`}
                 >
                   <ServiceIcon service={{ icon: name, color }} className="size-5" />
                 </button>
@@ -619,7 +619,7 @@ function ChipPopover({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Popover.Popup className="app-menu flex w-80 flex-col gap-2 rounded-lg bg-surface p-3 outline-none">
+          <Popover.Popup className="app-menu flex w-80 flex-col gap-2 p-3 outline-none">
             <span className="text-xs font-medium text-muted">{label}</span>
             {panel}
           </Popover.Popup>
@@ -1129,7 +1129,7 @@ function DomainPicker({
     >
       {current ? (
         <>
-          <ServiceIcon service={current} />
+          <ServiceIcon service={current} className="size-3" />
           {current.name}
         </>
       ) : (
@@ -1295,7 +1295,7 @@ function NewSpecForm({
         >
           {chosen.length === 0
             ? "Services"
-            : chosen.map((s) => <ServiceIcon key={s.id} service={s} />)}
+            : chosen.map((s) => <ServiceIcon key={s.id} service={s} className="size-3" />)}
           {chosen.length === 1 && chosen[0]?.name}
         </Picker>
       </div>
@@ -2134,13 +2134,13 @@ function ServicesChip({ value, onChange }: { value: string[]; onChange: (ids: st
     >
       {chosen.length === 0 ? (
         <>
-          <ServiceIcon />
+          <ServiceIcon className="size-3" />
           Services
         </>
       ) : (
         <>
           {chosen.map((s) => (
-            <ServiceIcon key={s.id} service={s} />
+            <ServiceIcon key={s.id} service={s} className="size-3" />
           ))}
           <span className="truncate">
             {chosen.length <= 2
@@ -2174,7 +2174,7 @@ function ServiceChip({
       onSelect={(id) => onChange(id || null)}
       triggerClassName={chip}
     >
-      <ServiceIcon service={current} />
+      <ServiceIcon service={current} className="size-3" />
       {current?.name ?? "Service"}
     </Picker>
   );

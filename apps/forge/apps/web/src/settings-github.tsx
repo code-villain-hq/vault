@@ -3,7 +3,7 @@ import { api, messageOf } from "./api";
 import { timeAgo } from "./data";
 import { PageHeader } from "./layout";
 import { publicUrl } from "./server";
-import { Button, ErrorMessage } from "./ui";
+import { Button, buttonClass, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 export interface GitHubStatus {
@@ -97,10 +97,7 @@ export function GitHubSettingsPage() {
           {status?.configured && (
             <section className="flex flex-col gap-4">
               {status.install_url ? (
-                <a
-                  href={status.install_url}
-                  className="ui-control inline-flex h-7 items-center self-start rounded-md bg-primary px-3 font-medium text-on-primary hover:bg-primary-hover"
-                >
+                <a href={status.install_url} className={`${buttonClass()} self-start`}>
                   {status.installations.length
                     ? "Add an organisation or repositories"
                     : "Connect GitHub"}

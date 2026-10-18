@@ -55,6 +55,16 @@
   --font-weight-semibold: var(--type-title-weight);
 }
 
+/* Loading: the mark breathes in size, never fading the strike below full strength. */
+@theme {
+  --animate-breathe: breathe 1.6s ease-in-out infinite;
+  @keyframes breathe {
+    50% {
+      transform: scale(0.9);
+    }
+  }
+}
+
 @utility font-display {
   font-family: var(--font-display);
 }
@@ -142,10 +152,9 @@
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-/* The dimmed backdrop behind a dialog. design/ has no token for it yet, so
-   this one value stands in for every dialog until it does. */
+/* The dimmed backdrop behind a dialog. */
 .app-backdrop {
-  background: rgb(0 0 0 / 40%);
+  background: rgb(0 0 0 / var(--backdrop-tint));
 }
 .app-dialog {
   --field: var(--dialog-field);
@@ -246,7 +255,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-pulse {
+  .animate-pulse,
+  .animate-breathe {
     animation: none;
   }
   [role="dialog"],
