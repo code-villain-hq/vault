@@ -1,40 +1,43 @@
 import type { ITheme } from "@xterm/xterm";
 import { isLight, type Theme } from "./theme";
+import nightshade from "../design/color.json";
 
 /** What every terminal in the app draws with, per theme: the window's and the phone's (SET-5). */
 const PALETTES: Record<Theme, ITheme> = {
-  dark: {
-    background: "#0c0c11",
-    foreground: "#dcdce6",
-    cursor: "#a78bfa",
-    cursorAccent: "#0c0c11",
-    selectionBackground: "#332f55",
-    black: "#1c1c27", red: "#f87171", green: "#4ade80", yellow: "#fbbf24",
-    blue: "#60a5fa", magenta: "#a78bfa", cyan: "#22d3ee", white: "#dcdce6",
-    brightBlack: "#55555f", brightRed: "#fca5a5", brightGreen: "#86efac",
-    brightYellow: "#fcd34d", brightBlue: "#93c5fd", brightMagenta: "#c4b5fd",
-    brightCyan: "#67e8f9", brightWhite: "#f4f4f8",
+  // Nightshade: the terminal sits in the content panel, so it is drawn in
+  // the panel's colour, with the text's for the cursor. The sixteen colours
+  // are the ones programs expect, kept apart from the brand's poison.
+  night: {
+    background: nightshade.night.panel,
+    foreground: nightshade.night.fg,
+    cursor: nightshade.night.fg,
+    cursorAccent: nightshade.night.panel,
+    selectionBackground: "#3d3d3d",
+    black: nightshade.night.surface, red: "#f87171", green: "#4ade80", yellow: "#fbbf24",
+    blue: "#60a5fa", magenta: "#c084fc", cyan: "#22d3ee", white: nightshade.night.fg,
+    brightBlack: "#6b6b6b", brightRed: "#fca5a5", brightGreen: "#86efac",
+    brightYellow: "#fcd34d", brightBlue: "#93c5fd", brightMagenta: "#d8b4fe",
+    brightCyan: "#67e8f9", brightWhite: "#ffffff",
   },
   // "White" is a grey: programs print it meaning "readable", assuming a dark
   // background, as every light terminal's palette does.
-  light: {
-    background: "#ffffff",
-    foreground: "#1c1c24",
-    cursor: "#6d28d9",
-    cursorAccent: "#ffffff",
-    selectionBackground: "#ddd6fe",
-    black: "#1c1c24", red: "#dc2626", green: "#15803d", yellow: "#a16207",
-    blue: "#2563eb", magenta: "#7c3aed", cyan: "#0e7490", white: "#6a6a77",
-    brightBlack: "#8c8c99", brightRed: "#b91c1c", brightGreen: "#166534",
-    brightYellow: "#854d0e", brightBlue: "#1d4ed8", brightMagenta: "#6d28d9",
-    brightCyan: "#155e75", brightWhite: "#9a9aa6",
+  day: {
+    background: nightshade.day.panel,
+    foreground: nightshade.day.fg,
+    cursor: nightshade.day.fg,
+    cursorAccent: nightshade.day.panel,
+    selectionBackground: "#dadada",
+    black: nightshade.day.fg, red: "#dc2626", green: "#15803d", yellow: "#a16207",
+    blue: "#2563eb", magenta: "#7e22ce", cyan: "#0e7490", white: "#6a6a6a",
+    brightBlack: "#8c8c8c", brightRed: "#b91c1c", brightGreen: "#166534",
+    brightYellow: "#854d0e", brightBlue: "#1d4ed8", brightMagenta: "#6b21a8",
+    brightCyan: "#155e75", brightWhite: "#9a9a9a",
   },
-  // folke's tokyonight_night terminal colours, on the page's own --bg.
   "tokyo-night": {
-    background: "#1a1b26",
+    background: "#1f2335",
     foreground: "#c0caf5",
     cursor: "#c0caf5",
-    cursorAccent: "#1a1b26",
+    cursorAccent: "#1f2335",
     selectionBackground: "#283457",
     black: "#15161e", red: "#f7768e", green: "#9ece6a", yellow: "#e0af68",
     blue: "#7aa2f7", magenta: "#bb9af7", cyan: "#7dcfff", white: "#a9b1d6",
@@ -105,7 +108,21 @@ export function terminalTheme(theme: Theme): { theme: ITheme; minimumContrastRat
   return { theme: PALETTES[theme], minimumContrastRatio: isLight(theme) ? 4.5 : 1 };
 }
 
-export const TERMINAL_FONT = '"SF Mono", "JetBrains Mono", Menlo, monospace';
+export const TERMINAL_FONT = '"Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace';
+
+/**
+ * The studio's faces, loaded before the first render. xterm measures its
+ * cell from the font it is given when it opens; measured on the fallback, a
+ * terminal kept the fallback's cell after the bundled mono arrived. Never
+ * waits long: past a second the page draws with what it has.
+ */
+export function fontsReady(): Promise<unknown> {
+  const faces = ['13px "Atkinson Hyperlegible Mono"', '14px "Atkinson Hyperlegible Next"', '700 28px "Grenze Gotisch"'];
+  return Promise.race([
+    Promise.all(faces.map((f) => document.fonts.load(f))).catch(() => {}),
+    new Promise((done) => setTimeout(done, 1000)),
+  ]);
+}
 
 /** A pane's output as the backend sends it, base64, back to bytes. */
 export function decode(b64: string): Uint8Array {

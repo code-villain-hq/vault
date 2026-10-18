@@ -12,11 +12,13 @@ import { Confirm } from "../ui";
  * two agents set off on the same steps. So it names the agents already at
  * work in the task, and asks before starting another.
  */
-export function SpecStartAgent({ task, spec, agentId, setAgentId }: {
+export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false }: {
   task: TaskView;
   spec: TaskSpec;
   agentId: string | null;
   setAgentId: (id: string) => void;
+  /** Something else on the screen is the action to take first. */
+  quiet?: boolean;
 }) {
   const agents = useStore((s) => s.agents);
   const panes = useStore((s) => s.panes);
@@ -74,7 +76,7 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId }: {
         </select>
       )}
       <button
-        className="btn btn-sm btn-primary"
+        className={`btn btn-sm${quiet || !agentId || total === 0 || left === 0 ? "" : " btn-primary"}`}
         disabled={!agentId || total === 0 || left === 0 || starting}
         title={total === 0 ? "Approve the tasks first" : left === 0 ? "Every step is done" : "It works through the approved steps in order, ticking each off as it finishes it"}
         onClick={() => (working.length > 0 ? setConfirming(true) : void start())}

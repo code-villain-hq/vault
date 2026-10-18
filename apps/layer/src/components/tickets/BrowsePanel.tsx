@@ -121,7 +121,7 @@ export function BrowsePanel({
             ))}
           </div>
           {found.more && (
-            <div className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>
+            <div className="muted" style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}>
               Jira had more than these. Add a word to the search, or narrow it
               by type.
             </div>

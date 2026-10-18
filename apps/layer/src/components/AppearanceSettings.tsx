@@ -65,7 +65,7 @@ export function AppearanceSettings() {
     <>
       <Field
         label="Theme"
-        hint="Match the Mac switches between Light and Dark as the Mac does. A paired phone draws in the same theme, or under Match the Mac in its own appearance. In a terminal an agent picks its own colours: if one stays dark, change its theme (Claude Code: /theme)."
+        hint="Match the Mac switches between Nightshade's night and day as the Mac does. A paired phone draws in the same theme, or under Match the Mac in its own appearance. In a terminal an agent picks its own colours: if one stays dark, change its theme (Claude Code: /theme)."
       >
         <ThemePicker value={ui.theme} onPick={(theme) => void saveUi({ theme })} />
       </Field>
@@ -87,7 +87,7 @@ export function AppearanceSettings() {
             <button
               key={v}
               className={`btn btn-sm${
-                Math.abs(ui.scale - v) < 0.001 ? " btn-primary" : ""
+                Math.abs(ui.scale - v) < 0.001 ? " on" : ""
               }`}
               onClick={() => void saveUi({ scale: v })}
             >
@@ -186,10 +186,10 @@ function ThemePicker({ value, onPick }: { value: ThemeChoice; onPick: (theme: Th
         "system",
         "Match the Mac",
         <>
-          <Preview theme="dark" />
-          <Preview theme="light" half />
+          <Preview theme="night" />
+          <Preview theme="day" half />
         </>,
-        "Light or Dark",
+        "Nightshade, night or day",
       )}
     </div>
   );

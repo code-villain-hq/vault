@@ -170,7 +170,7 @@ export function StartWorkDialog({
         </>
       }
     >
-      <h3 style={{ margin: "0 0 10px", fontSize: 15, lineHeight: 1.4 }}>{issue.summary}</h3>
+      <h3 style={{ margin: "0 0 10px", fontSize: "var(--type-ui-size)", fontWeight: 700, lineHeight: 1.4 }}>{issue.summary}</h3>
 
       <div className="row" style={{ marginBottom: 14, flexWrap: "wrap" }}>
         <span className="chip chip-type">
@@ -262,8 +262,8 @@ export function StartWorkDialog({
               whiteSpace: "pre-wrap",
               maxHeight: 220,
               overflowY: "auto",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
+              background: "var(--dialog-field)",
+              borderRadius: "var(--radius-md)",
               padding: 10,
               userSelect: "text",
             }}

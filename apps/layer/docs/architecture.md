@@ -501,8 +501,13 @@ middleware on every route), then a paired phone's bearer token (the
 - **UI kit**: `ui.tsx`. `Modal` (Esc and backdrop close it, `busy` blocks
   that), `Field`, `Combo`, `Confirm` (never `window.confirm`: the webview
   returns true without drawing anything), `ContextMenu`, `Switch`,
-  `Spinner`, `BusyOverlay`. One stylesheet, `styles.css`, with theme tokens
-  on `:root` (dark only) and plain kebab-case classes.
+  `Spinner`, `BusyOverlay`. Stylesheets `styles*.css` with plain
+  kebab-case classes, drawn in the studio's colour, type and radius names:
+  `theme.css` imports them from `src/design/` (the vault's `design/tokens`
+  and fonts, copied by `bun run design:sync`) and fills them for the other
+  themes. The frame keeps Layer's full-width top bar with the views as tabs (an
+  exception to `design/layouts/app-window.md`), in `bg` with Work's task
+  list; each view is an inset `panel`.
 
 ## Why it is shaped this way
 
@@ -607,7 +612,7 @@ picks it up.
   seconds where `lib/time.ts` says "just now" for 5.
 - `DiffView` has its own "which agent gets this" flow instead of
   `useAgentTarget`.
-- The terminal theme in `Terminal.tsx` repeats the CSS tokens' values.
+- The terminal palettes in `lib/terminal.ts` repeat the other themes' CSS values; Nightshade's come from the bundled `design/color.json`.
 - Tests for tasks, Jira, panes and Slack live in `commands/mod.rs` instead
   of beside their code.
 - Context files (`AGENTS.md`/`CLAUDE.md` in a task folder) are written with

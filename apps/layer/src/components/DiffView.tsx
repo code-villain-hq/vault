@@ -328,8 +328,8 @@ export function DiffView({ task }: { task: TaskView }) {
           {notesPerFile.has(fileKey(f)) && (
             <span className="badge" title="Notes on this file: open it to keep or drop them">●&nbsp;{notesPerFile.get(fileKey(f))}</span>
           )}
-          <span className="n" style={{ color: "var(--green)" }}>+{f.additions}</span>
-          <span className="n" style={{ color: "var(--red)" }}>-{f.deletions}</span>
+          <span className="n" style={{ color: "var(--status-ok-ink)" }}>+{f.additions}</span>
+          <span className="n" style={{ color: "var(--status-danger-ink)" }}>-{f.deletions}</span>
         </div>
       );
     });
@@ -543,13 +543,13 @@ export function DiffView({ task }: { task: TaskView }) {
   const summaryBar = (
     <div className="diff-summary" title={summary.detail}>
       <b>{summary.label}</b>
-      <span style={{ color: "var(--dim)" }}>{summary.what}</span>
+      <span style={{ color: "var(--muted)" }}>{summary.what}</span>
       <div className="spacer" />
-      <span style={{ color: "var(--dim)" }}>
+      <span style={{ color: "var(--muted)" }}>
         {files.length} file{files.length === 1 ? "" : "s"}
       </span>
-      <span style={{ color: "var(--green)" }}>+{summary.adds}</span>
-      <span style={{ color: "var(--red)" }}>−{summary.dels}</span>
+      <span style={{ color: "var(--status-ok-ink)" }}>+{summary.adds}</span>
+      <span style={{ color: "var(--status-danger-ink)" }}>−{summary.dels}</span>
     </div>
   );
 
@@ -731,7 +731,7 @@ export function DiffView({ task }: { task: TaskView }) {
                   >
                     <span className={`chev${closed ? "" : " open"}`}><ChevronIcon /></span>
                     {g.checkout.project_name}
-                    <span style={{ color: "var(--dimmer)" }}>· {g.files.length}</span>
+                    <span style={{ color: "var(--faint)" }}>· {g.files.length}</span>
                   </div>
                 )}
                 {!closed && renderNodes(g.tree, 0, g.checkout.id)}
@@ -869,7 +869,7 @@ export function DiffView({ task }: { task: TaskView }) {
             </>
           }
         >
-          <p style={{ marginTop: 0, color: "var(--dim)", fontSize: 13, lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0, color: "var(--muted)", fontSize: "var(--type-ui-small-size)", lineHeight: 1.5 }}>
             Nothing is running in this task. Pick an agent to start — your{" "}
             {queued.length} queued note{queued.length === 1 ? "" : "s"} become its opening prompt.
           </p>

@@ -36,9 +36,9 @@ function latestByAuthor(reviews: Review[]): Review[] {
 }
 
 function reviewColor(state: string) {
-  if (state === "APPROVED") return "var(--green)";
-  if (state === "CHANGES_REQUESTED") return "var(--red)";
-  return "var(--dim)";
+  if (state === "APPROVED") return "var(--status-ok-ink)";
+  if (state === "CHANGES_REQUESTED") return "var(--status-danger-ink)";
+  return "var(--muted)";
 }
 
 const REVIEW_WORDS: Record<string, string> = {
@@ -50,22 +50,22 @@ const REVIEW_WORDS: Record<string, string> = {
 
 /** Where the task as a whole stands, in one line. */
 const TASK_REVIEW: Record<TaskReview, { word: string; color: string; hint: string }> = {
-  none: { word: "", color: "var(--dim)", hint: "" },
+  none: { word: "", color: "var(--muted)", hint: "" },
   incomplete: {
-    word: "Partly up for review", color: "var(--amber)",
+    word: "Partly up for review", color: "var(--status-warn-ink)",
     hint: "Some repositories with changes have no pull request yet",
   },
-  open: { word: "In review", color: "var(--blue)", hint: "Waiting on reviewers: nobody has decided yet" },
+  open: { word: "In review", color: "var(--status-info-ink)", hint: "Waiting on reviewers: nobody has decided yet" },
   commented: {
-    word: "In review, with comments", color: "var(--blue)",
+    word: "In review, with comments", color: "var(--status-info-ink)",
     hint: "Reviewers have commented, but nobody has approved or asked for changes yet",
   },
   changes_requested: {
-    word: "Changes requested", color: "var(--red)",
+    word: "Changes requested", color: "var(--status-danger-ink)",
     hint: "A reviewer asked for changes on at least one pull request",
   },
-  approved: { word: "Approved", color: "var(--green)", hint: "Every pull request is approved" },
-  merged: { word: "Merged", color: "var(--green)", hint: "Every pull request has merged" },
+  approved: { word: "Approved", color: "var(--status-ok-ink)", hint: "Every pull request is approved" },
+  merged: { word: "Merged", color: "var(--status-ok-ink)", hint: "Every pull request has merged" },
 };
 
 /**
@@ -103,10 +103,10 @@ function failed(c: CheckRun) {
 }
 
 function checkColor(c: CheckRun) {
-  if (c.status !== "completed") return "var(--amber)";
-  if (c.conclusion === "success") return "var(--green)";
-  if (c.conclusion === "skipped" || c.conclusion === "neutral") return "var(--dim)";
-  return "var(--red)";
+  if (c.status !== "completed") return "var(--status-warn-ink)";
+  if (c.conclusion === "success") return "var(--status-ok-ink)";
+  if (c.conclusion === "skipped" || c.conclusion === "neutral") return "var(--muted)";
+  return "var(--status-danger-ink)";
 }
 
 export function PrPanel({
@@ -402,13 +402,13 @@ export function PrPanel({
             style={{
               background:
                 r.pr && r.pr.state === "open"
-                  ? "var(--green)"
+                  ? "var(--status-ok-ink)"
                   : r.changed > 0
-                    ? "var(--amber)"
-                    : "var(--dimmer)",
+                    ? "var(--status-warn-ink)"
+                    : "var(--faint)",
             }}
           />
-          <span style={{ fontFamily: "var(--mono)", fontSize: 11.5, width: 140 }}>{r.repo}</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--type-ui-small-size)", width: 140 }}>{r.repo}</span>
           <span>
             {r.pr && r.pr.state === "open"
               ? `PR #${r.pr.number} open`
@@ -463,7 +463,10 @@ export function PrPanel({
         </button>
         {entries > 0 && (
           <button
-            className="btn btn-sm btn-primary"
+            // The primary only while a repository still waits for its pull
+            // request; under review, the feedback is what needs acting on.
+            className={`btn btn-sm${pending.length > 0 && review === "incomplete" ? " btn-primary" : ""}`}
+            aria-label="Open a pull request"
             disabled={pending.length === 0}
             title={
               pending.length === 0
@@ -481,7 +484,7 @@ export function PrPanel({
 
       {review === "merged" && (
         <div className="card row">
-          <span className="dot" style={{ background: "var(--green)" }} />
+          <span className="dot" style={{ background: "var(--status-ok-ink)" }} />
           <span className="muted" style={{ flex: 1, lineHeight: 1.5 }}>
             Every pull request has merged
             {pending.length > 0
@@ -505,7 +508,7 @@ export function PrPanel({
               : " No repository has changes to open one with."}
           </div>
           <button
-            className="btn btn-primary"
+            className={`btn${pending.length > 0 ? " btn-primary" : ""}`}
             disabled={pending.length === 0}
             onClick={() => { setLeftOut([]); setCreating(true); }}
           >
@@ -532,7 +535,7 @@ export function PrPanel({
             >
               {foldable && <span className={`chev${shown ? " open" : ""}`}><ChevronIcon /></span>}
               <h3 style={{ margin: 0 }}>
-                <span style={{ color: "var(--dim)" }}>{row.repo}</span> #{pr.number} {pr.title}
+                <span style={{ color: "var(--muted)" }}>{row.repo}</span> #{pr.number} {pr.title}
               </h3>
               <div className="spacer" />
               {pr.draft && <span className="chip">draft</span>}
@@ -666,7 +669,7 @@ export function PrPanel({
               <div key={`${row.checkout_id}:${pr.number}`} className="check">
                 <span
                   className="dot"
-                  style={{ background: pr.merged ? "var(--green)" : "var(--dim)" }}
+                  style={{ background: pr.merged ? "var(--status-ok-ink)" : "var(--muted)" }}
                 />
                 <span className="name">
                   {row.repo} #{pr.number}
@@ -698,7 +701,7 @@ export function PrPanel({
           <h3>Repos that could not be read</h3>
           {rows.filter((r) => r.error).map((r) => (
             <div key={r.checkout_id} className="check">
-              <span className="dot" style={{ background: "var(--red)" }} />
+              <span className="dot" style={{ background: "var(--status-danger-ink)" }} />
               <span className="name">{r.repo}</span>
               <span className="muted">{r.error}</span>
             </div>

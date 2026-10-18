@@ -247,9 +247,10 @@ pub struct SavedLoop {
 pub struct UiPrefs {
     pub scale: f32,
     /// The app's colours (SET-5): a palette `THEMES` names, or "system" for
-    /// the Mac's own appearance, followed as it changes. Dark by default: it is what
-    /// the app has always been, and an update should not repaint it.
-    #[serde(default = "dark")]
+    /// the Mac's own appearance, followed as it changes. Nightshade's night
+    /// by default, the studio's theme. "dark" and "light", the names before
+    /// Nightshade, read as its night and day.
+    #[serde(default = "crate::theme::night", deserialize_with = "crate::theme::saved_name")]
     pub theme: String,
     pub terminal_font_size: u16,
     /// The text of an agent's conversation over ACP (ACP-15), which is the
@@ -292,18 +293,12 @@ pub struct UiPrefs {
     pub keep_awake: bool,
 }
 
-fn dark() -> String {
-    "dark".into()
-}
-
-/// The themes `UiPrefs::theme` may name, as `src/theme.css` names them.
-pub const THEMES: &[&str] = &["dark", "light", "tokyo-night", "cursor-dark", "cursor-light", "ayu-dark", "ayu-light", "system"];
 
 impl Default for UiPrefs {
     fn default() -> Self {
         Self {
             scale: 1.0,
-            theme: dark(),
+            theme: crate::theme::night(),
             terminal_font_size: 13,
             conversation_font_size: 14,
             restore_panes: true,
@@ -714,8 +709,16 @@ mod tests {
         assert_eq!(cfg.ui.terminal_font_size, UiPrefs::default().terminal_font_size);
         // Saved before conversations had a text size of their own (ACP-15).
         assert_eq!(cfg.ui.conversation_font_size, 14);
-        // Saved before there was a choice of theme: as it always looked (SET-5).
-        assert_eq!(cfg.ui.theme, "dark");
+        // Saved before there was a choice of theme: the studio's (SET-5).
+        assert_eq!(cfg.ui.theme, "night");
+    }
+
+    #[test]
+    fn a_theme_saved_as_dark_or_light_opens_in_nightshades_night_or_day() {
+        for (saved, now) in [("dark", "night"), ("light", "day"), ("ayu-light", "ayu-light")] {
+            let cfg: AppConfig = serde_json::from_str(&format!(r#"{{"version":2,"ui":{{"theme":"{saved}"}}}}"#)).unwrap();
+            assert_eq!(cfg.ui.theme, now);
+        }
     }
 
     #[test]

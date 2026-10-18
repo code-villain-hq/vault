@@ -12,8 +12,8 @@ button, and nav item.
 All three are free under the SIL Open Font License. The site serves
 them from [`apps/site/assets/fonts/`](../apps/site/assets/fonts/), with
 the licenses alongside them. The brand page reuses the same local
-font stylesheet. Forge bundles all three; Caster bundles Atkinson
-Hyperlegible Next, the only face it sets.
+font stylesheet. Forge and Layer bundle all three; Caster bundles
+Atkinson Hyperlegible Next, the only face it sets.
 
 ## Faces
 

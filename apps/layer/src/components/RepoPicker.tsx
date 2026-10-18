@@ -59,7 +59,7 @@ export function RepoPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <span className="muted" style={{ whiteSpace: "nowrap", fontSize: 11 }}>
+          <span className="muted" style={{ whiteSpace: "nowrap", fontSize: "var(--type-ui-small-size)" }}>
             {picked.length} selected
           </span>
           {picked.length > 0 && (

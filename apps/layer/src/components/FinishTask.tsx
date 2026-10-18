@@ -115,7 +115,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
         </>
       }
     >
-      <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: 13 }}>
+      <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}>
         Every pull request for <code>{task.branch}</code> has merged. This puts the task away:
       </p>
       <ul className="finish-list">

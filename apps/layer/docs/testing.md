@@ -76,7 +76,7 @@ harness is already served. Don't start a second server.
 | `task` | a task id from `src/__mock__/world.ts` (`t-login`, `t-audit`) | none, which is the All agents overview |
 | `tab` | `spec`, `terminals`, `diff`, `pr` | `terminals` |
 | `loop` | `checking`, `held`, `passed`, `gave_up`: the selected task's agents on a loop (§21) | none |
-| `theme` | a saved theme (SET-5): `dark`, `light`, `tokyo-night`, `system`, … | the app's default |
+| `theme` | a saved theme (SET-5): `night`, `day`, `tokyo-night`, `system`, … | the app's default |
 
 For example: `/mock.html?task=t-login&tab=pr` is the PR panel with a failing
 check and a change request.

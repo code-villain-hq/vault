@@ -209,20 +209,21 @@ export function ChatView() {
               An agent with no worktree attached — for asking questions, drafting a
               ticket before it exists, or pulling context together from elsewhere.
             </p>
-            <p style={{ color: "var(--dimmer)" }}>
+            <p style={{ color: "var(--faint)" }}>
               It starts with a <code>CLAUDE.md</code> describing your repos, the tasks
               in flight and which integrations the app is connected to — so it knows
               what you are working on without being told.
             </p>
-            <p style={{ color: "var(--dimmer)" }}>
+            <p style={{ color: "var(--faint)" }}>
               It also reaches Jira, Slack and GitHub through this app's own
               connections, so it can search tickets, file one, or start work on it
               without you configuring anything separately.
             </p>
             <div className="row">
               {installed.length === 0 && <span>No agent CLIs found on your PATH.</span>}
-              {installed.map((a) => (
-                <button key={a.id} className="btn btn-primary" onClick={() => void start(a.id)}>
+              {/* One primary: the first agent; the others are a choice beside it. */}
+              {installed.map((a, i) => (
+                <button key={a.id} className={`btn${i === 0 ? " btn-primary" : ""}`} onClick={() => void start(a.id)}>
                   Start {a.name}
                 </button>
               ))}

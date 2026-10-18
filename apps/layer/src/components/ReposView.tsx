@@ -220,7 +220,9 @@ export function ReposView() {
         >
           {syncingAll ? <span className="btn-busy"><Spinner />Syncing…</span> : "Sync all"}
         </button>
-        <button className="btn btn-primary" onClick={() => setAdding(true)}>
+        {/* The primary while nothing needs fixing; a repository in trouble
+            has its own fix, and that is the one action to lead with. */}
+        <button className={`btn${troubled > 0 ? "" : " btn-primary"}`} onClick={() => setAdding(true)}>
           Add repositories
         </button>
       </div>

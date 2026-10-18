@@ -112,10 +112,10 @@ export function TicketFlowSettings() {
             </select>
           );
           return (
-            <div key={p} style={{ marginBottom: 14, fontSize: 13 }}>
+            <div key={p} style={{ marginBottom: 14, fontSize: "var(--type-ui-small-size)" }}>
               <b className="mono">{p}</b>
               {typeof list === "string" ? (
-                <div style={{ color: "var(--red)", marginTop: 6 }}>{list}</div>
+                <div style={{ color: "var(--status-danger-ink)", marginTop: 6 }}>{list}</div>
               ) : !list ? (
                 <div className="muted" style={{ marginTop: 6 }}>Reading its statuses…</div>
               ) : (

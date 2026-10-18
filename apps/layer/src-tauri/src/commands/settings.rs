@@ -82,7 +82,7 @@ pub fn set_ui_prefs(app: AppHandle, state: State<AppState>, ui: UiPrefs) -> Resu
     // Clamp rather than reject: the UI sends slider values.
     let ui = UiPrefs {
         scale: ui.scale.clamp(0.8, 1.6),
-        theme: if crate::config::THEMES.contains(&ui.theme.as_str()) {
+        theme: if crate::theme::THEMES.contains(&ui.theme.as_str()) {
             ui.theme
         } else {
             crate::config::UiPrefs::default().theme

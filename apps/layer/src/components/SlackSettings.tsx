@@ -102,7 +102,7 @@ export function SlackSettings() {
   }
 
   const link = (href: string, text: string) => (
-    <a href="#" style={{ color: "var(--accent)" }} onClick={(e) => { e.preventDefault(); void openUrl(href); }}>
+    <a href="#" onClick={(e) => { e.preventDefault(); void openUrl(href); }}>
       {text}
     </a>
   );
@@ -129,7 +129,7 @@ export function SlackSettings() {
             </button>
           </div>
           {status?.error && (
-            <div className="hint" style={{ color: "var(--red)", marginTop: 8 }}>{status.error}</div>
+            <div className="hint" style={{ color: "var(--status-danger-ink)", marginTop: 8 }}>{status.error}</div>
           )}
           <div className="switch-list" style={{ marginTop: 10 }}>
             <Switch
@@ -220,7 +220,7 @@ export function SlackSettings() {
             rows={16}
             value={JSON.stringify(botManifest(name), null, 2)}
             onFocus={(e) => e.currentTarget.select()}
-            style={{ marginTop: 10, fontSize: 11 }}
+            style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}
           />
         )}
       </div>

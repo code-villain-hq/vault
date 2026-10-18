@@ -40,7 +40,7 @@ export function botManifest(name: string): object {
     display_information: {
       name: n,
       description: "Your Layer, in Slack: mention it in a thread to hand the thread to an agent.",
-      background_color: "#0c0c11",
+      background_color: "#0b0b0b",
     },
     features: {
       app_home: { home_tab_enabled: false, messages_tab_enabled: true, messages_tab_read_only_enabled: false },

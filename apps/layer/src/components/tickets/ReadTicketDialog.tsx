@@ -74,7 +74,7 @@ export function ReadTicketDialog({
         </>
       }
     >
-      <h3 style={{ margin: "0 0 10px", fontSize: 15, lineHeight: 1.4 }}>
+      <h3 style={{ margin: "0 0 10px", fontSize: "var(--type-ui-size)", fontWeight: 700, lineHeight: 1.4 }}>
         {issue.summary}
       </h3>
 

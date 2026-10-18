@@ -387,7 +387,7 @@ export * from "./types-loop";
 // Where each integration is and how it is set.
 export * from "./types-integrations";
 
-export type ThemeChoice = "dark" | "light" | "tokyo-night" | "cursor-dark" | "cursor-light" | "ayu-dark" | "ayu-light" | "system";
+export type ThemeChoice = "night" | "day" | "tokyo-night" | "cursor-dark" | "cursor-light" | "ayu-dark" | "ayu-light" | "system";
 
 export interface UiPrefs {
   scale: number;

@@ -7,10 +7,10 @@ import { Combo, Modal, Spinner } from "./ui";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
 
 const OUTCOME_DOT: Record<RepoUpdate["outcome"], string> = {
-  up_to_date: "var(--dimmer)",
-  updated: "var(--green)",
-  conflicts: "var(--red)",
-  failed: "var(--amber)",
+  up_to_date: "var(--faint)",
+  updated: "var(--status-ok-ink)",
+  conflicts: "var(--status-danger-ink)",
+  failed: "var(--status-warn-ink)",
 };
 
 /** What each way does, said where the choice is made. */
@@ -208,7 +208,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
     <Modal title="Update from base" onClose={() => !busy && onClose()} footer={footer}>
       {results === null && conflicted.length === 0 && (
         <>
-          <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: 13 }}>
+          <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}>
             Fetches each base first.{" "}
             {only ? HOW[only] : HOW_BOTH} Push afterwards to
             update the PRs. Each repo starts the way its team updates branches; hover to see why.
@@ -302,7 +302,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
           <span
             className="dot"
             style={{
-              background: aborted.has(r.checkout_id) ? "var(--dimmer)" : OUTCOME_DOT[r.outcome],
+              background: aborted.has(r.checkout_id) ? "var(--faint)" : OUTCOME_DOT[r.outcome],
               marginTop: 6,
             }}
           />
@@ -322,7 +322,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
       {conflicted.length > 0 && (
         <div style={{ marginTop: results ? 14 : 0 }}>
-          <p className="muted" style={{ lineHeight: 1.55, fontSize: 13, marginTop: 0 }}>
+          <p className="muted" style={{ lineHeight: 1.55, fontSize: "var(--type-ui-small-size)", marginTop: 0 }}>
             {results
               ? "What stopped is left in progress where it stopped, so the conflicts can be resolved."
               : "An earlier update is still in progress."}{" "}

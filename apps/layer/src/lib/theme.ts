@@ -1,18 +1,19 @@
 /**
  * Which of `theme.css`'s palettes the page draws in (SET-5): the app's and
  * the phone's. The choice is saved with the settings; "system" follows the
- * appearance of the machine showing the page, as it changes.
+ * appearance of the machine showing the page, as it changes, between
+ * Nightshade's night and day.
  */
 import { useEffect, useState } from "react";
-import { readOneOf, write } from "./persist";
+import { read, readOneOf, write } from "./persist";
 import type { ThemeChoice } from "./types";
 
 export type Theme = Exclude<ThemeChoice, "system">;
 
 /** Every palette in `theme.css`, in the order the picker shows them. */
 export const THEMES: readonly { id: Theme; name: string; light: boolean }[] = [
-  { id: "dark", name: "Dark", light: false },
-  { id: "light", name: "Light", light: true },
+  { id: "night", name: "Nightshade Night", light: false },
+  { id: "day", name: "Nightshade Day", light: true },
   { id: "tokyo-night", name: "Tokyo Night", light: false },
   { id: "cursor-dark", name: "Cursor Dark", light: false },
   { id: "cursor-light", name: "Cursor Light", light: true },
@@ -29,7 +30,7 @@ export function isLight(theme: Theme): boolean {
 }
 
 function resolve(choice: ThemeChoice, light = systemLight.matches): Theme {
-  return choice === "system" ? (light ? "light" : "dark") : choice;
+  return choice === "system" ? (light ? "day" : "night") : choice;
 }
 
 /**
@@ -37,7 +38,9 @@ function resolve(choice: ThemeChoice, light = systemLight.matches): Theme {
  * after the first paint, and a light app opened dark until they did.
  */
 function remembered(): ThemeChoice {
-  return readOneOf("theme", CHOICES, "dark");
+  // Kept here before Dark and Light became Nightshade's night and day.
+  const old = ({ dark: "night", light: "day" } as Record<string, ThemeChoice>)[read<string>("theme", "")];
+  return old ?? readOneOf("theme", CHOICES, "night");
 }
 
 /** Before the first render: the theme the page was last drawn in. */
@@ -48,7 +51,7 @@ export function paintRemembered() {
 /** The theme the page is drawn in now, for what draws itself (xterm). */
 export function currentTheme(): Theme {
   const drawn = document.documentElement.dataset.theme;
-  return THEMES.find((t) => t.id === drawn)?.id ?? "dark";
+  return THEMES.find((t) => t.id === drawn)?.id ?? "night";
 }
 
 /**

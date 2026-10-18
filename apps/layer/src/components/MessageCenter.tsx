@@ -8,7 +8,7 @@ import { BellIcon } from "./icons";
 import { Confirm, Floating } from "./ui";
 
 /**
- * The message center (MSG-5): the bell left of Settings, with the unread
+ * The message center (MSG-5): the bell left of Settings, in the top bar, with the unread
  * count, and the list of what the app told you, newest first.
  */
 export function MessageCenter() {

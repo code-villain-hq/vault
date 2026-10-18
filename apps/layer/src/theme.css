@@ -2,286 +2,204 @@
    the phone's. A colour written anywhere else is one a theme cannot reach,
    so it becomes a token here, or a color-mix of one.
 
-   Dark until told otherwise, as the app was before there was a choice.
-   `lib/theme.ts` sets data-theme on <html>, and lists the themes; `theme.rs`
-   paints the window behind the page in --bg; the terminals' palettes are in
-   `lib/terminal.ts`. Any element may carry data-theme too: the picker's
-   previews draw each theme inside a page drawn in another. */
+   The names are the studio's (brand/color.md). Nightshade, night and day,
+   comes from the vault's design/tokens through `bun run design:sync`; the
+   other themes below fill the same names. `lib/theme.ts` sets data-theme on
+   <html>, and lists the themes; `theme.rs` paints the window behind the page
+   in --bg; the terminals' palettes are in `lib/terminal.ts`. Any element may
+   carry data-theme too: the picker's previews draw each theme inside a page
+   drawn in another. */
 
+@import "./design/color.css";
+@import "./design/type.css";
+@import "./design/shape.css";
+@import "./design/fonts/fonts.css";
+
+/* Layer's own roles, made from the shared names. Declared on every themed
+   element, not only :root, so a preview drawn in another theme resolves
+   them against its own colours. */
 :root,
-[data-theme="dark"] {
-  --bg: #0c0c11;
-  --panel: #12121a;
-  --panel-2: #171722;
-  --border: #23232f;
-  --border-soft: #1c1c27;
-  --text: #dcdce6;
-  --dim: #7d7d8c;
-  --dimmer: #55555f;
-  /* The top bar's and the sub-views' tabs not chosen: a step above --dim. */
-  --tab-text: #a8a8b8;
-  --tab-count: #8a8a98;
-  --accent: #a78bfa;
-  /* A border or highlight in the accent. */
-  --accent-dim: #6d5ba8;
-  /* A primary button, under --on-accent text. One colour with --accent-dim
-     in the dark; on white, a border that soft is a fill too faint to read on. */
-  --accent-fill: #6d5ba8;
-  --on-accent: #f5f3ff;
-  --green: #4ade80;
-  --red: #f87171;
-  --amber: #fbbf24;
-  --blue: #60a5fa;
-  /* Outlines in the status colours, for chips and pills. */
-  --green-line: #26402f;
-  --red-line: #452a2a;
-  --amber-line: #45392a;
-  --blue-line: #2a3a52;
+[data-theme] {
   /* A diff's added and removed text. */
-  --add-text: #a7f3c0;
-  --del-text: #fca5a5;
+  --add-text: var(--status-ok-ink);
+  --del-text: var(--status-danger-ink);
   /* A button that destroys something, and the text on it. */
-  --danger-fill: #7f2d2d;
-  --on-danger: #ffe4e4;
-  --on-red: #2a0f0f;
-  --scroll: #2a2a38;
-  --scroll-hover: #363648;
-  /* Shadows and the dimming behind a dialog, as a share of this. */
+  --danger-fill: var(--danger);
+  --on-danger: var(--bg);
+  /* The dimming behind a dialog, as a share of this. */
   --shade: #000;
-
-  color-scheme: dark;
 }
 
-:root[data-theme="light"],
-[data-theme="light"] {
-  --bg: #ffffff;
-  --panel: #f6f6f9;
-  --panel-2: #ececf1;
-  --border: #d8d8e0;
-  --border-soft: #e6e6ec;
-  --text: #1c1c24;
-  --dim: #5e5e6c;
-  --dimmer: #8c8c99;
-  --tab-text: #44444f;
-  --tab-count: #6a6a77;
-  --accent: #6d28d9;
-  --accent-dim: #c4b5fd;
-  --accent-fill: #7c3aed;
-  --on-accent: #ffffff;
-  --green: #15803d;
-  --red: #dc2626;
-  --amber: #b45309;
-  --blue: #2563eb;
-  --green-line: #bbe3c8;
-  --red-line: #f3c7c7;
-  --amber-line: #efd5ab;
-  --blue-line: #c3d5f7;
-  --add-text: #166534;
-  --del-text: #991b1b;
-  --danger-fill: #b91c1c;
-  --on-danger: #ffffff;
-  --on-red: #ffffff;
-  --scroll: #cdcdd6;
-  --scroll-hover: #b5b5c2;
-  --shade: rgba(30, 30, 50, 0.4);
+/* The themes beside Nightshade, from their authors' palettes, fitted to
+   the studio's roles: the frame darkest by night, the content one step
+   lighter (white-ish by day), text at 4.6:1 or better on every host.
+   Tokyo Night after enkia's and folke's; Cursor from the theme files Cursor
+   ships; Ayu from teabyii's extension (1.4.0). Each one's primary is the
+   colour its buttons wear, and its live dots are that colour too. */
 
-  color-scheme: light;
-}
-
-/* Tokyo Night, after enkia's and folke's: the night variant's palette. Its
-   accent is the blue it is known by, so "blue" for a status is its cyan. */
 :root[data-theme="tokyo-night"],
 [data-theme="tokyo-night"] {
-  --bg: #1a1b26;
-  --panel: #1f2335;
-  --panel-2: #24283b;
-  --border: #2f344d;
-  --border-soft: #262a3d;
-  --text: #c0caf5;
-  --dim: #737aa2;
-  --dimmer: #565f89;
-  --tab-text: #a9b1d6;
-  --tab-count: #8b93b8;
-  --accent: #7aa2f7;
-  --accent-dim: #3d59a1;
-  --accent-fill: #3d59a1;
-  --on-accent: #f3f6ff;
-  --green: #9ece6a;
-  --red: #f7768e;
-  --amber: #e0af68;
-  --blue: #7dcfff;
-  --green-line: #374235;
-  --red-line: #4b2f3d;
-  --amber-line: #463c35;
-  --blue-line: #304356;
-  --add-text: #c3e88d;
-  --del-text: #ffa0b4;
-  --danger-fill: #914c54;
-  --on-danger: #ffe8ee;
-  --on-red: #1a1b26;
-  --scroll: #363b54;
-  --scroll-hover: #414868;
-  --shade: #000;
-
   color-scheme: dark;
+  --bg: #1A1B26;
+  --panel: #1F2335;
+  --surface: #24283B;
+  --hover: #292E42;
+  --line: #2F344D;
+  --primary: #7AA2F7;
+  --primary-hover: #6E92DE;
+  --selected: #283048;
+  --dialog: #292E42;
+  --field: #24283B;
+  --field-hover: #292E42;
+  --dialog-field: #1F2335;
+  --dialog-field-hover: #24283B;
+  --fg: #C0CAF5;
+  --muted: #A9B1D6;
+  --faint: #9299BC;
+  --on-primary: #1A1B26;
+  --accent: #BB9AF7;
+  --signal: #7AA2F7;
+  --danger: #F7768E;
+  --ok: #9ECE6A;
+  --warn: #E0AF68;
+  --info: #7DCFFF;
+  --status-danger-ink: #F8899E;
+  --status-ok-ink: #9ECE6A;
+  --status-warn-ink: #E0AF68;
+  --status-info-ink: #7DCFFF;
+  --status-neutral-ink: #A9B1D6;
 }
 
-/* Cursor Dark and Cursor Light, from the theme files Cursor ships
-   (theme-cursor), made opaque where Cursor draws its foreground through: a
-   border there is #f0f0f0 at 7% over the panel. The side panels are darker
-   than the page in the dark one, as Cursor's sidebar is beside its editor.
-   The accent is the buttons' blue, so a status's blue is the cyan. */
 :root[data-theme="cursor-dark"],
 [data-theme="cursor-dark"] {
-  --bg: #181818;
-  --panel: #141414;
-  --panel-2: #262626;
-  --border: #2f2f2f;
-  --border-soft: #242424;
-  --text: #f0f0f0;
-  --dim: #8f8f8f;
-  --dimmer: #666666;
-  --tab-text: #afafaf;
-  --tab-count: #989898;
-  --accent: #81a1c1;
-  --accent-dim: #4c5c6c;
-  /* Cursor's buttons: its blue, under near-black text. */
-  --accent-fill: #81a1c1;
-  --on-accent: #191c22;
-  --green: #70b489;
-  --red: #fc6b83;
-  --amber: #f1b467;
-  --blue: #88c0d0;
-  --green-line: #2a372f;
-  --red-line: #46292d;
-  --amber-line: #433728;
-  --blue-line: #2e3a3d;
-  --add-text: #a3ccb2;
-  --del-text: #f7a0af;
-  --danger-fill: #883149;
-  --on-danger: #ffe8ee;
-  --on-red: #141414;
-  --scroll: #323232;
-  --scroll-hover: #414141;
-  --shade: #000;
-
   color-scheme: dark;
+  --bg: #141414;
+  --panel: #181818;
+  --surface: #1F1F1F;
+  --hover: #232323;
+  --line: #2F2F2F;
+  --primary: #81A1C1;
+  --primary-hover: #7491AE;
+  --selected: #222629;
+  --dialog: #232323;
+  --field: #1F1F1F;
+  --field-hover: #232323;
+  --dialog-field: #181818;
+  --dialog-field-hover: #1F1F1F;
+  --fg: #F0F0F0;
+  --muted: #AFAFAF;
+  --faint: #989898;
+  --on-primary: #191C22;
+  --accent: #B48EAD;
+  --signal: #81A1C1;
+  --danger: #FC6B83;
+  --ok: #70B489;
+  --warn: #F1B467;
+  --info: #88C0D0;
+  --status-danger-ink: #FC6E85;
+  --status-ok-ink: #70B489;
+  --status-warn-ink: #F1B467;
+  --status-info-ink: #88C0D0;
+  --status-neutral-ink: #AFAFAF;
 }
 
 :root[data-theme="cursor-light"],
 [data-theme="cursor-light"] {
-  --bg: #fcfcfc;
-  --panel: #f3f3f3;
-  --panel-2: #e8e8e8;
-  --border: #e0e0e0;
-  --border-soft: #eaeaea;
-  --text: #141414;
-  --dim: #6c6c6c;
-  --dimmer: #949494;
-  --tab-text: #454545;
-  --tab-count: #696969;
-  --accent: #2778c1;
-  --accent-dim: #b1cee7;
-  --accent-fill: #2778c1;
-  --on-accent: #fcfcfc;
-  --green: #007041;
-  --red: #be1744;
-  --amber: #a46700;
-  --blue: #3b7e84;
-  --green-line: #bdd9cd;
-  --red-line: #ecc3ce;
-  --amber-line: #e6d7bd;
-  --blue-line: #ccdcde;
-  --add-text: #005c35;
-  --del-text: #9c1338;
-  --danger-fill: #be1744;
-  --on-danger: #ffffff;
-  --on-red: #ffffff;
-  --scroll: #dbdbdb;
-  --scroll-hover: #cecece;
-  --shade: rgba(20, 20, 20, 0.35);
-
   color-scheme: light;
+  --bg: #F3F3F3;
+  --panel: #FCFCFC;
+  --surface: #ECECEC;
+  --hover: #E8E8E8;
+  --line: #E0E0E0;
+  --primary: #2778C1;
+  --primary-hover: #236CAE;
+  --selected: #E7EFF6;
+  --dialog: #FCFCFC;
+  --field: #ECECEC;
+  --field-hover: #E8E8E8;
+  --dialog-field: #ECECEC;
+  --dialog-field-hover: #E8E8E8;
+  --fg: #141414;
+  --muted: #454545;
+  --faint: #5E5E5E;
+  --on-primary: #FFFFFF;
+  --accent: #92156A;
+  --signal: #2778C1;
+  --danger: #BE1744;
+  --ok: #007041;
+  --warn: #A46700;
+  --info: #3B7E84;
+  --status-danger-ink: #AF153F;
+  --status-ok-ink: #00693D;
+  --status-warn-ink: #835200;
+  --status-info-ink: #2F656A;
+  --status-neutral-ink: #454545;
 }
 
-/* Ayu Dark and Ayu Light, from the theme files teabyii's extension
-   publishes (1.4.0, bordered). Ayu's own grey for the UI's text is fainter
-   than the app's captions can be, and its light palette draws orange and
-   green text on white, so the text tokens are those hues taken darker or
-   brighter until they read (4:1 on the page). Its accent is its orange;
-   a status's amber is its yellow on Light and its keyword orange on Dark,
-   so that neither is mistaken for it. */
 :root[data-theme="ayu-dark"],
 [data-theme="ayu-dark"] {
-  --bg: #10141c;
-  --panel: #0d1017;
-  --panel-2: #1c212b;
-  --border: #1b1f29;
-  --border-soft: #161a23;
-  --text: #bfbdb6;
-  --dim: #6c7383;
-  --dimmer: #484f61;
-  --tab-text: #848992;
-  --tab-count: #767c89;
-  --accent: #e6b450;
-  --accent-dim: #705c33;
-  --accent-fill: #e6b450;
-  --on-accent: #0d1017;
-  --green: #70bf56;
-  --red: #f26d78;
-  --amber: #ff8f40;
-  --blue: #59c2ff;
-  --green-line: #233628;
-  --red-line: #3d262e;
-  --amber-line: #402d23;
-  --blue-line: #1f3749;
-  --add-text: #aad94c;
-  --del-text: #f699a0;
-  --danger-fill: #7f393c;
-  --on-danger: #ffe8e8;
-  --on-red: #0d1017;
-  --scroll: #2e3441;
-  --scroll-hover: #3c4353;
-  --shade: #000;
-
   color-scheme: dark;
+  --bg: #0D1017;
+  --panel: #10141C;
+  --surface: #161B25;
+  --hover: #1C212B;
+  --line: #232834;
+  --primary: #E6B450;
+  --primary-hover: #CFA248;
+  --selected: #252421;
+  --dialog: #1C212B;
+  --field: #161B25;
+  --field-hover: #1C212B;
+  --dialog-field: #10141C;
+  --dialog-field-hover: #161B25;
+  --fg: #BFBDB6;
+  --muted: #9A9DA5;
+  --faint: #888D98;
+  --on-primary: #0D1017;
+  --accent: #59C2FF;
+  --signal: #E6B450;
+  --danger: #F26D78;
+  --ok: #70BF56;
+  --warn: #FF8F40;
+  --info: #59C2FF;
+  --status-danger-ink: #F3737D;
+  --status-ok-ink: #70BF56;
+  --status-warn-ink: #FF8F40;
+  --status-info-ink: #59C2FF;
+  --status-neutral-ink: #9A9DA5;
 }
 
 :root[data-theme="ayu-light"],
 [data-theme="ayu-light"] {
-  --bg: #fcfcfc;
-  --panel: #f8f9fa;
-  --panel-2: #e4e7eb;
-  --border: #e3e6e9;
-  --border-soft: #eaedef;
-  --text: #5c6166;
-  --dim: #727d8c;
-  --dimmer: #a7afbb;
-  --tab-text: #5c6166;
-  --tab-count: #6f7a88;
-  --accent: #b16e12;
-  --accent-dim: #f8d4a1;
-  /* Ayu's buttons are its orange as it is, under dark brown text. */
-  --accent-fill: #f29718;
-  --on-accent: #3d2400;
-  --green: #4f8b31;
-  --red: #d84b4b;
-  --amber: #a47300;
-  --blue: #4280be;
-  --green-line: #d8edce;
-  --red-line: #f6d1d1;
-  --amber-line: #f8e6bd;
-  --blue-line: #cfe0f0;
-  --add-text: #3c6b26;
-  --del-text: #aa3b3b;
-  --danger-fill: #d84b4b;
-  --on-danger: #ffffff;
-  --on-red: #ffffff;
-  --scroll: #cbd0d7;
-  --scroll-hover: #b3bac4;
-  --shade: rgba(60, 70, 85, 0.3);
-
   color-scheme: light;
+  --bg: #F3F4F5;
+  --panel: #FCFCFC;
+  --surface: #EEF0F2;
+  --hover: #E8EBEE;
+  --line: #E3E6E9;
+  --primary: #F29718;
+  --primary-hover: #DA8816;
+  --selected: #FBF2E5;
+  --dialog: #FCFCFC;
+  --field: #EEF0F2;
+  --field-hover: #E8EBEE;
+  --dialog-field: #EEF0F2;
+  --dialog-field-hover: #E8EBEE;
+  --fg: #5C6166;
+  --muted: #555B62;
+  --faint: #5F6670;
+  --on-primary: #3D2400;
+  --accent: #4280BE;
+  --signal: #F29718;
+  --danger: #D84B4B;
+  --ok: #4F8B31;
+  --warn: #A47300;
+  --info: #4280BE;
+  --status-danger-ink: #A43939;
+  --status-ok-ink: #3C6A25;
+  --status-warn-ink: #7D5700;
+  --status-info-ink: #326190;
+  --status-neutral-ink: #555B62;
 }
 
 /* A profile's colour (PROF-6): the disc its initial sits on, in the sidebar

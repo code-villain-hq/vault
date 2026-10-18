@@ -68,15 +68,18 @@ python3 build.py
 The builder emits `color.css`, `color.swift` and `color.resolved.json` from
 the same calculation. Never edit them independently. Forge then bundles the
 outputs with `bun run design:sync` from `apps/forge`; its existing role names
-continue to work. Caster copies the Swift outputs with `make design` from
+continue to work. Layer bundles the same CSS, resolved JSON and fonts
+with `bun run design:sync` from `apps/layer`; its other themes fill the
+same names. Caster copies the Swift outputs with `make design` from
 `apps/caster`. Theme editing is a build-time capability, not a new
 runtime theme picker in Forge.
 
 Drift fails the build. `python3 build.py --check` writes nothing and names
 any output that differs from a fresh build; `bun scripts/sync-design.ts
---check` does the same for Forge's bundled copy, and `make design-check`
-for Caster's. Forge's `bun run check` runs the first two, and the `design`
-workflow on Forgejo runs all three, with the theme tests, on every push
+--check` does the same for Forge's and Layer's bundled copies (from each
+app's folder), and `make design-check` for Caster's. Forge's `bun run
+check` runs the first two, Layer's runs its own copy check, and the
+`design` workflow on Forgejo runs them all, with the theme tests, on every push
 that touches the tokens, the mark, the fonts or an app's copy.
 
 Test alternate hues and contrast extremes, then inspect real Forge lists,

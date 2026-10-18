@@ -4,6 +4,7 @@ import { api, errMessage } from "../../lib/api";
 import type { ProfileView } from "../../lib/types-profiles";
 import { useStore } from "../../store";
 import { Confirm, Field, Floating, Modal } from "../ui";
+import { ChevronIcon } from "../icons";
 
 /**
  * The window's profile, at the foot of the sidebar (§25), and the way to the
@@ -59,7 +60,7 @@ export function ProfileMenu() {
       >
         <Initial profile={me} />
         <span className="profile-name">{me?.name ?? "Profile"}</span>
-        <span className="profile-chev" aria-hidden>⌃</span>
+        <span className="profile-chev" aria-hidden><ChevronIcon /></span>
       </button>
 
       {menu && (

@@ -7,10 +7,10 @@ import { Spinner } from "../ui";
 
 /** What a task out for review is waiting on, in a word. */
 const REVIEW_WORD: Partial<Record<TaskReview, { text: string; color: string }>> = {
-  changes_requested: { text: "changes", color: "var(--red)" },
-  approved: { text: "approved", color: "var(--green)" },
-  merged: { text: "merged", color: "var(--green)" },
-  commented: { text: "comments", color: "var(--blue)" },
+  changes_requested: { text: "changes", color: "var(--status-danger-ink)" },
+  approved: { text: "approved", color: "var(--status-ok-ink)" },
+  merged: { text: "merged", color: "var(--status-ok-ink)" },
+  commented: { text: "comments", color: "var(--status-info-ink)" },
 };
 
 /**
@@ -104,12 +104,12 @@ export const TaskRow = memo(function TaskRow({
           <div className="spacer" />
           {multi && <span>{task.checkouts.length} repos</span>}
           {live > 0 && (
-            <span style={waiting ? { color: "var(--amber)" } : undefined}>
+            <span style={waiting ? { color: "var(--status-warn-ink)" } : undefined}>
               {live}▶
             </span>
           )}
           {totals.dirty > 0 && (
-            <span style={{ color: "var(--amber)" }}>±{totals.dirty}</span>
+            <span style={{ color: "var(--status-warn-ink)" }}>±{totals.dirty}</span>
           )}
           {verdict && <span style={{ color: verdict.color }}>{verdict.text}</span>}
         </div>
@@ -125,7 +125,7 @@ export const TaskRow = memo(function TaskRow({
               title={c.broken ?? undefined}
             />
             <span className="rname">{c.project_name}</span>
-            {d > 0 && <span style={{ color: "var(--amber)" }}>±{d}</span>}
+            {d > 0 && <span style={{ color: "var(--status-warn-ink)" }}>±{d}</span>}
             <span
               className="x"
               title="Remove repo from task"
@@ -143,7 +143,7 @@ export const TaskRow = memo(function TaskRow({
       {open && canAdd && (
         <div
           className="repo-row"
-          style={{ color: "var(--accent)", cursor: "pointer" }}
+          style={{ cursor: "pointer" }}
           onClick={() => onAddRepo(task)}
         >
           <span className="rname">+ add repo</span>

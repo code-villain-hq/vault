@@ -279,13 +279,13 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             {p.notice && (
               <span
                 title={p.notice === "trust_prompt" ? "Waiting: trust this folder?" : "Usage limit"}
-                style={{ color: "var(--amber)" }}
+                style={{ color: "var(--status-warn-ink)" }}
               >
                 {p.notice === "trust_prompt" ? "?" : "⚑"}
               </span>
             )}
             {!p.running && p.exit_code !== null && (
-              <span style={{ color: "var(--dimmer)" }}>({p.exit_code})</span>
+              <span style={{ color: "var(--faint)" }}>({p.exit_code})</span>
             )}
             {canRestart(p, agents) && !closing.has(p.id) && !restarting.has(p.id) && (
               <RestartButton pane={p} onRestart={restart} />
@@ -392,10 +392,10 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             </p>
             {offerResume.length > 0 && (
               <div className="row" style={{ marginBottom: 6 }}>
-                {offerResume.map((r) => (
+                {offerResume.map((r, i) => (
                   <button
                     key={r.agent_id}
-                    className="btn btn-primary"
+                    className={`btn${i === 0 ? " btn-primary" : ""}`}
                     onClick={() => void resume(r.agent_id)}
                   >
                     ⟲ Resume {r.name}
@@ -503,7 +503,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
               onChange={chooseAcp}
             />
           )}
-          <div className="muted" style={{ fontSize: 11 }}>
+          <div className="muted" style={{ fontSize: "var(--type-ui-small-size)" }}>
             Starts in <code>{scope
               ? task.checkouts.find((c) => c.id === scope)?.path
               : task.root}</code>

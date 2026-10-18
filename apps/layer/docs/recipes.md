@@ -143,8 +143,12 @@ Don't make the UI ask on a timer.
 5. **Errors** go to `toast("error", errMessage(e))`. For a multi-repo
    result, use `reportRepoResults`.
 6. **Styles** go in `src/styles.css`, in the section for that area, using
-   the colour tokens in `src/theme.css`. A new colour is a new token there,
-   with a value for each theme (SET-5). Plain kebab-case classes. Reuse an existing class
+   the studio's colour, type and radius names (`src/theme.css`, from the
+   vault's `design/tokens`). Follow the vault's `design/principles.md` and
+   `design/components.md`: tone, not lines; one primary action per screen;
+   chips tinted, never outlined. A colour Layer needs that the studio has
+   no name for is a color-mix of those names, or a role in `theme.css` made
+   from them (SET-5). Plain kebab-case classes. Reuse an existing class
    before adding a near-copy.
 7. **A new top-level view** goes in `VIEWS` in `store.ts` and the top bar in
    `App.tsx`, and gets an entry in `docs/features.md`.

@@ -55,16 +55,10 @@
       <article class="product product-layer" id="layer" aria-labelledby="layer-title">
         <header class="product-head"><div class="product-name"><img src="../layer/src-tauri/icons/icon.svg" width="44" height="44" alt=""><div><h3 id="layer-title">Layer</h3><p>Agent development environment for macOS</p></div></div></header>
         <figure class="product-figure">
-          <div class="stage layer-stage" role="img" aria-label="Illustrated Layer workspace with tasks, an agent terminal, and a code diff. Example content.">
-            <div class="app-window layer-window" aria-hidden="true">
-              <div class="window-top"><span class="window-controls"><i></i><i></i><i></i></span><span>Layer</span><span class="window-shortcut">Agents</span></div>
-              <div class="layer-body">
-                <aside class="app-sidebar"><strong class="app-wordmark">Layer</strong><span>All agents</span><small>Tasks</small><span class="nav-selected">Studio homepage</span><span>Command menu</span><span>Issue filters</span><small>Workspace</small><span>Repositories</span></aside>
-                <div class="agent-work"><div class="view-heading"><strong>Studio homepage</strong><span class="branch-name">studio/home</span></div><div class="mock-tabs"><span class="active">Agents</span><span>Changes</span><span>Pull requests</span></div><div class="terminal"><div class="terminal-title"><span class="status-dot done"></span> Agent terminal</div><p><span class="terminal-prompt">›</span> Give the products more room.</p><p class="terminal-muted">Reading the studio design system…</p><p class="terminal-muted">Updating the homepage…</p><div class="terminal-files"><span>index.html</span><span class="code-add">+84</span><span>home.css</span><span class="code-add">+126</span></div></div><div class="diff"><div class="diff-title">index.html <span>Changes</span></div><div class="diff-line removed"><span>−</span> &lt;section class="dispatch"&gt;</div><div class="diff-line added"><span>+</span> &lt;section class="showcase"&gt;</div><div class="diff-line added"><span>+</span> &nbsp; &lt;h2&gt;The tools&lt;/h2&gt;</div></div></div>
-              </div>
-            </div>
+          <div class="capture-stage">
+            <img src="assets/captures/layer-task.png" width="1280" height="836" alt="Layer's task view for ACME-123, “Fix login race”: the views run as tabs across the top and the tasks down the left; an agent works through its plan, shows the file it wants to write, and asks to write it.">
           </div>
-          <figcaption>Interface illustration · example task</figcaption>
+          <figcaption>Layer’s task view · example task from its test harness</figcaption>
         </figure>
         <p class="product-note">A task, its worktrees, and the agents doing the work.</p>
       </article>
@@ -72,11 +66,12 @@
       <article class="product product-caster" id="caster" aria-labelledby="caster-title">
         <header class="product-head"><div class="product-name"><img src="../caster/Resources/AppIcon.svg" width="44" height="44" alt=""><div><h3 id="caster-title">Caster</h3><p>Launcher for macOS</p></div></div></header>
         <figure class="product-figure">
-          <div class="stage caster-stage" role="img" aria-label="Illustrated Caster launcher calculating 33 divided by 3, with the result 11 and a hint that Return copies the result.">
-            <div class="caster-keys" aria-hidden="true"><kbd>⌘</kbd><kbd>Space</kbd></div>
-            <div class="launcher" aria-hidden="true"><div class="launcher-query"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><span>33 / 3</span><span class="query-caret"></span></div><div class="launcher-answer"><span class="calculator-symbol">=</span><div><strong>11</strong><span>Calculator</span></div><kbd>↵</kbd></div><div class="launcher-foot"><span>Calculator</span><span>↵ Copy result</span></div></div>
+          <div class="capture-stage capture-stack">
+            <img src="assets/captures/caster-calculator.png" width="680" height="144" alt="Caster with the query “33 / 3” and the answer 11 from its calculator.">
+            <img src="assets/captures/caster-currency.png" width="680" height="144" alt="Caster with the query “32 sek to eur” and the answer 2.87 EUR.">
+            <img src="assets/captures/caster-apps.png" width="680" height="112" alt="Caster with the query “saf” and Safari as the app to open.">
           </div>
-          <figcaption>Interface illustration · calculator example</figcaption>
+          <figcaption>Caster’s own window · a sum, a currency, an app</figcaption>
         </figure>
         <p class="product-note">Apps, calculations, and quick answers. A shortcut away.</p>
       </article>

@@ -26,44 +26,72 @@ import { MessageCenter } from "./components/MessageCenter";
 import { Watchers } from "./Watchers";
 import { goTo } from "./lib/goto";
 
-/** The view switcher, with a count on each view worth one. */
+/**
+ * The top bar (Layer's exception to design/layouts/app-window.md): the views
+ * as tabs, and the tools for the whole app. No wordmark: beside macOS's
+ * traffic lights the blackletter clashed with them, and the window already
+ * says which app it is. A count
+ * shows only where it asks for something: agents waiting on you, reviews
+ * asked of you, repositories to fix. A running agent is a live dot.
+ */
 function TopBar() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const watchFailing = useStore((s) => s.watchFailing);
   // Counts, not the lists: a number that has not changed is not a redraw.
-  // Chats have their own badge, so they must not be counted as work as well.
+  // Chats have their own tab, so they must not be counted as work as well.
   const running = useStore(
-    (s) => s.panes.filter((p) => p.kind === "agent" && p.running && p.task_id !== CHAT_TASK_ID).length,
+    (s) => s.panes.some((p) => p.kind === "agent" && p.running && p.task_id !== CHAT_TASK_ID),
   );
-  const chats = useStore((s) => s.panes.filter((p) => p.task_id === CHAT_TASK_ID).length);
+  const chatting = useStore((s) => s.panes.some((p) => p.task_id === CHAT_TASK_ID && p.running));
   // The dock icon's number, with a place in the window that says what it is.
   const waiting = useStore((s) => s.panes.filter(needsYou).length);
-  const issueCount = useStore((s) => s.issues.length);
-  const projectCount = useStore((s) => s.projects.length);
   const repoTroubles = useStore(
     (s) => s.projects.filter((p) => repoTrouble(p, s.repoHealth[p.id], s.tasks)).length,
   );
   // Two strings rather than one object, so an unchanged count is no redraw.
   const toReview = useStore((s) => reviewCounts(s.reviewQueue).toReview);
   const yours = useStore((s) => reviewCounts(s.reviewQueue).yours);
-  // Both of the view's counts, in its tabs' order: one sum hid which side
-  // was waiting, and the top bar showed only the first.
-  const reviews = [toReview, yours].some((n) => n && n !== "0")
-    ? {
-      badge: yours === undefined ? toReview : `${toReview ?? "–"} · ${yours}`,
-      title: `${toReview ?? "?"} to review · ${yours ?? "?"} opened by you`,
-    }
-    : {};
 
-  const tabs: { id: View; label: string; badge?: number | string; title?: string }[] = [
-    { id: "work", label: "Work", badge: running || undefined },
-    { id: "tickets", label: "Tickets", badge: issueCount || undefined },
-    { id: "reviews", label: "Reviews", ...reviews },
-    { id: "chat", label: "Chat", badge: chats || undefined },
+  const tabs: {
+    id: View;
+    label: string;
+    count?: string | number;
+    title?: string;
+    /** Whether the count is news (a live dot beside it), or only a number. */
+    news?: boolean;
+    live?: boolean;
+  }[] = [
+    {
+      id: "work",
+      label: "Work",
+      count: waiting || undefined,
+      title: `${waiting} agent${waiting === 1 ? " needs" : "s need"} you — asking for something, or finished and not looked at yet`,
+      news: true,
+      live: running,
+    },
+    { id: "tickets", label: "Tickets" },
+    {
+      id: "reviews",
+      label: "Reviews",
+      // Both of the view's counts, in its tabs' order: the first alone made
+      // twenty-four PRs of yours read as none. Only the first asks something
+      // of you, so only it earns the live dot.
+      count: [toReview, yours].some((n) => n && n !== "0")
+        ? (yours === undefined ? toReview : `${toReview ?? "–"} · ${yours}`)
+        : undefined,
+      title: `${toReview ?? "?"} to review · ${yours ?? "?"} opened by you`,
+      news: !!toReview && toReview !== "0",
+    },
+    { id: "chat", label: "Chat", live: chatting },
     { id: "runs", label: "Usage" },
-    { id: "repos", label: "Repos", badge: projectCount || undefined },
+    {
+      id: "repos",
+      label: "Repos",
+      count: repoTroubles || undefined,
+      title: "Repositories with a problem the Repos view can fix",
+    },
   ];
 
   return (
@@ -72,35 +100,28 @@ function TopBar() {
     // not CSS: `-webkit-app-region` is Chromium's, and macOS's WebKit
     // ignores it, which left a window nothing could grab. "deep" makes the
     // bar's empty parts drag; its buttons stay buttons.
-    <div className="topbar" data-tauri-drag-region="deep">
-      <div className="topbar-left">
-        <div className="brand">villain<span>·</span>layer</div>
-      </div>
-      <div className="topbar-center">
+    <header className="topbar" data-tauri-drag-region="deep">
+      <div className="topbar-left" />
+      <nav className="topbar-center" aria-label="Views">
         {tabs.map((t) => (
           <button
             key={t.id}
             className={`viewtab${view === t.id ? " active" : ""}`}
+            aria-current={view === t.id ? "page" : undefined}
             onClick={() => setView(t.id)}
           >
             {t.label}
-            {t.badge !== undefined && <span className="badge" title={t.title}>{t.badge}</span>}
-            {t.id === "repos" && repoTroubles > 0 && (
-              <span className="badge warn" title="Repositories with a problem the Repos view can fix">
-                {repoTroubles} to fix
+            {t.count !== undefined ? (
+              <span className="viewtab-count" title={t.title}>
+                {t.news && <span className="live-dot" aria-hidden />}
+                {t.count}
               </span>
-            )}
-            {t.id === "work" && waiting > 0 && (
-              <span
-                className="badge warn"
-                title={`${waiting} agent${waiting === 1 ? " needs" : "s need"} you — asking for something, or finished and not looked at yet`}
-              >
-                {waiting} need{waiting === 1 ? "s" : ""} you
-              </span>
+            ) : (
+              t.live && <span className="live-dot" title="Running" />
             )}
           </button>
         ))}
-      </div>
+      </nav>
       <div className="topbar-right">
         {watchFailing && (
           <span className="watch-chip" title="Task and pane polls are failing">
@@ -110,11 +131,11 @@ function TopBar() {
         <PhoneBadge />
         <KeepAwake />
         <MessageCenter />
-        <button className="icon-btn" title="Settings" onClick={() => toggleSettings(true)}>
+        <button className="icon-btn" title="Settings" aria-label="Settings" onClick={() => toggleSettings(true)}>
           <GearIcon />
         </button>
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -203,7 +224,7 @@ function TaskMain({ task }: { task: TaskView }) {
               key={c.id}
               className="chip"
               title={c.broken ?? c.path}
-              style={!c.exists || c.broken ? { color: "var(--red)" } : undefined}
+              style={!c.exists || c.broken ? { color: "var(--status-danger-ink)" } : undefined}
             >
               {c.project_name}
             </span>
