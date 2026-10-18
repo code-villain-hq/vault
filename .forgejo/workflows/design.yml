@@ -1,12 +1,19 @@
-# Token drift on every push that could cause it: the theme tests, the
-# generated outputs in design/tokens against build.py, and Forge's, Layer's,
-# Caster's and the editor themes' copies against the vault. Each check writes nothing and fails with the fix.
+# Design drift on every push that could cause it: the theme tests, the
+# generated outputs in design/tokens against build.py, Forge's, Layer's,
+# Caster's and the editor themes' copies against the vault, and the lint
+# guard over every web surface's CSS and markup (design/lint). Each check
+# writes nothing and fails with the fix.
 name: design
 
 on:
   push:
     paths:
       - "design/tokens/**"
+      - "design/components.css"
+      - "design/lint/**"
+      - "apps/site/**/*.css"
+      - "apps/forge/apps/web/src/**"
+      - "apps/layer/src/**"
       - "DESIGN.md"
       - "brand/mark/**"
       - "apps/site/assets/fonts/**"
@@ -40,3 +47,5 @@ jobs:
         working-directory: apps/caster
       - run: bun build.ts --check
         working-directory: apps/theme
+      - run: bun install --frozen-lockfile && bun run check
+        working-directory: design/lint
