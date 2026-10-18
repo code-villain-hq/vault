@@ -44,7 +44,9 @@ and one task list better than a sidebar of views.
 - The top bar spans the window in `bg`. It holds the views as tabs in the
   middle, current one filled `selected` with text `fg`, and the app's
   tools (phone, keep awake, messages, settings) at the right. A tab's count
-  follows the sidebar rule above: only when it asks for something.
+  follows the sidebar rule above, with one addition: Reviews shows both of
+  its view's counts, waiting on you and yours (`15 · 24`), with the live dot
+  only for the first.
 - No wordmark. The bar starts under macOS's traffic lights, and Grenze
   beside them clashed with them.
 - Below the bar, Work's task list runs down the left in `bg`, with the

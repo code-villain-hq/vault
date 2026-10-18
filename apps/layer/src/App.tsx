@@ -75,9 +75,14 @@ function TopBar() {
     {
       id: "reviews",
       label: "Reviews",
-      count: toReview && toReview !== "0" ? toReview : undefined,
+      // Both of the view's counts, in its tabs' order: the first alone made
+      // twenty-four PRs of yours read as none. Only the first asks something
+      // of you, so only it earns the live dot.
+      count: [toReview, yours].some((n) => n && n !== "0")
+        ? (yours === undefined ? toReview : `${toReview ?? "–"} · ${yours}`)
+        : undefined,
       title: `${toReview ?? "?"} to review · ${yours ?? "?"} opened by you`,
-      news: true,
+      news: !!toReview && toReview !== "0",
     },
     { id: "chat", label: "Chat", live: chatting },
     { id: "runs", label: "Usage" },

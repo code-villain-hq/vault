@@ -800,9 +800,9 @@ lists open PRs waiting on your review, excluding your own, and, when a
 review team is set, those waiting on that team. "Opened by you" lists the
 open PRs you opened, and where each one stands. The tab last used is kept;
 a banner or message about a review request opens "To review". The top
-bar's Reviews tab counts only what waits on your review, since that is
-what asks something of you; its tooltip and the view's tabs give both
-counts, so PRs of yours are never read as none.
+bar's Reviews tab carries both counts, as its tabs show them, `1 · 7`: it
+used to show only the first, so seven PRs of yours read as none. A live
+dot marks it only while something waits on your review.
 
 - **REV-1** A failed team lookup MUST NOT hide your own list. It shows as
   an error on the team section.
@@ -1139,8 +1139,8 @@ settings), with no wordmark beside the traffic lights. Below it, Work's
 tasks run down the left in the frame's tone, and every view sits in an
 inset panel (Layer's exception to `design/layouts/app-window.md`). A
 view's count shows only when it asks for something: agents that need you
-on Work, reviews waiting on you on Reviews, repositories to fix on Repos.
-A running agent or chat is a live dot.
+on Work, the reviews on Reviews (waiting on you, then yours), repositories
+to fix on Repos. A running agent or chat is a live dot.
 
 - **WIN-1** The window MUST move when you drag any empty part of the top
   bar, and zoom when you double-click it, as a native title bar does. Its
