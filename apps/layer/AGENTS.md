@@ -243,7 +243,7 @@ build does the same.
 | `src-tauri/src/secrets.rs` | tokens in the keychain |
 | `src-tauri/src/profiles.rs`, `profiles/` | profiles (§25): which one this process is, its lock, the registry `profiles.json`, launching another copy |
 | `src-tauri/src/shellenv.rs` | the login shell's environment, for spawned processes |
-| `src/App.tsx` | the shell: the frame's sidebar (views, profile, tasks) and top bar |
+| `src/App.tsx` | the shell and the top bar (views as tabs, app-wide tools) |
 | `src/theme.css`, `src/design/` | the studio's colour, type and radius names, from the vault's `design/tokens` (`bun run design:sync`; never edit `src/design/` by hand) |
 | `src/Watchers.tsx` | `Watchers`: every poll and event listener, and the toasts they raise |
 | `src/store.ts` | all frontend state and its refresh actions |

@@ -187,7 +187,7 @@ function Pairing({ code, seconds, onExpired }: { code: string; seconds: number; 
 }
 
 /**
- * At the sidebar's foot once a phone is paired (PHONE-9): green while one has the
+ * In the top bar once a phone is paired (PHONE-9): green while one has the
  * app open, grey otherwise. A click opens Settings → Remote access.
  */
 export function PhoneBadge() {

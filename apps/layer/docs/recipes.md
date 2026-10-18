@@ -150,8 +150,8 @@ Don't make the UI ask on a timer.
    no name for is a color-mix of those names, or a role in `theme.css` made
    from them (SET-5). Plain kebab-case classes. Reuse an existing class
    before adding a near-copy.
-7. **A new top-level view** goes in `VIEWS` in `store.ts` and the sidebar's
-   `Nav` in `App.tsx`, and gets an entry in `docs/features.md`.
+7. **A new top-level view** goes in `VIEWS` in `store.ts` and the top bar in
+   `App.tsx`, and gets an entry in `docs/features.md`.
 8. **Look at it** in the mock harness (`docs/testing.md`), including the
    empty scenario.
 

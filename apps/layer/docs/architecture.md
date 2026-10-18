@@ -137,7 +137,7 @@ for, and the reverse, and that each is in this table.
 | `loop:changed` | pane id | a pane's loop changed: started, waiting, checking, a check run, ended (`loops.rs`, LOOP-9) | `LoopBar.tsx` (`useLoop`) → `loop_view` |
 | `slackbot:changed` | none | the Slack bot's connection changed (off, connecting, connected, failing), or a thread was handed to a chat (`slack_bot/`, BOT-10) | `lib/slackBot.ts` (`useSlackBot`) → `slack_bot_view`, for Settings and the chat list |
 | `profiles:changed` | none | the profiles changed: one made, renamed or deleted in this window, or, when this window is brought forward, in another (`profiles.rs`, PROF-6) | `sidebar/ProfileMenu.tsx` → `listProfiles` |
-| `phone:changed` | none | phone access changed: a way in switched, a phone paired, forgotten, connected or gone (`phone/`) | `PhoneSettings.tsx` → `phoneStatus`, for Settings and the sidebar's phone |
+| `phone:changed` | none | phone access changed: a way in switched, a phone paired, forgotten, connected or gone (`phone/`) | `PhoneSettings.tsx` → `phoneStatus`, for Settings and the top bar's phone |
 
 What still polls, and why, is marked at each `setInterval` with
 `// guard: allow poll — <reason>`. Everything polls only while the window is
@@ -477,7 +477,7 @@ middleware on every route), then a paired phone's bearer token (the
   `sent`, which say what the window has been given.
 - **State** is one `static` (`phone()`): the ways in, the tokens read from
   the keychain once, a pairing code, and the streams open per phone (the
-  sidebar's phone). `apply` starts, stops or adjusts the server, one at a
+  top bar's phone). `apply` starts, stops or adjusts the server, one at a
   time; stopping signals the streams to end so the graceful shutdown does
   not wait on them forever.
 
@@ -505,8 +505,9 @@ middleware on every route), then a paired phone's bearer token (the
   kebab-case classes, drawn in the studio's colour, type and radius names:
   `theme.css` imports them from `src/design/` (the vault's `design/tokens`
   and fonts, copied by `bun run design:sync`) and fills them for the other
-  themes. The frame is the studio's (`design/layouts/app-window.md`): the
-  sidebar and top bar in `bg`, the view an inset `panel`.
+  themes. The frame keeps Layer's full-width top bar with the views as tabs (an
+  exception to `design/layouts/app-window.md`), in `bg` with Work's task
+  list; each view is an inset `panel`.
 
 ## Why it is shaped this way
 

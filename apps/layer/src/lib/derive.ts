@@ -380,9 +380,8 @@ export function countOf(n: number, more: boolean): string {
  * What the Reviews view's two tabs count: PRs waiting on you or your team,
  * and PRs you opened. Undefined where there is no answer yet, or an error.
  *
- * One function for the tabs and the sidebar's Reviews item. The old top
- * bar counted a team whose lookup had failed, so it said 1 while the tabs
- * said 1 and 7.
+ * One function for the tabs and the top bar. The top bar once counted a
+ * team whose lookup had failed, so it said 1 while the tabs said 1 and 7.
  */
 export function reviewCounts(q: ReviewQueue | null): { toReview?: string; yours?: string } {
   if (!q) return {};

@@ -11,6 +11,7 @@ import { RepoPicker } from "../RepoPicker";
 import { FinishTask } from "../FinishTask";
 import { DeleteTask } from "./DeleteTask";
 import { TaskRow } from "./TaskRow";
+import { ProfileMenu } from "./ProfileMenu";
 
 /**
  * The overview is a place, not merely what you see before choosing.
@@ -372,6 +373,7 @@ export function Sidebar() {
         ))}
 
       </div>
+      <ProfileMenu />
 
       {menu && (
         <ContextMenu

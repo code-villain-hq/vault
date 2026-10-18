@@ -77,8 +77,8 @@ export function SidebarToggle() {
   return (
     <button
       className="icon-btn flat"
-      title={hidden ? "Show the sidebar" : "Hide the sidebar"}
-      aria-label={hidden ? "Show the sidebar" : "Hide the sidebar"}
+      title={hidden ? "Show tasks" : "Hide tasks"}
+      aria-label={hidden ? "Show tasks" : "Hide tasks"}
       onClick={toggle}
     >
       <PanelIcon />

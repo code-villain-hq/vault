@@ -135,61 +135,42 @@ a:hover, .link:hover { text-decoration-color: var(--fg); }
    column. min() keeps a width saved on a wide window from taking more than
    half of a narrower one. */
 .shell {
-  display: grid;
-  grid-template-columns: min(var(--sidebar-w, 260px), 50%) 0 minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
   /* Chrome scales as one; the terminal has its own font size, because xterm
      measures its cell grid and a page zoom would fight it. */
   zoom: var(--ui-scale, 1);
 }
-/* Hidden rather than unmounted, so expanded groups and scroll survive. */
-.shell.no-sidebar { grid-template-columns: minmax(0, 1fr); }
-.shell.no-sidebar > .frame-side, .shell.no-sidebar > .sidebar-grip { display: none; }
 
-/* The frame (design/layouts/app-window.md): sidebar and top bar in `bg`, an
-   inverted L around the content, which is one step lighter by night and
-   white by day, inset so the frame shows around it. */
-.frame-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.views {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  overflow: hidden;
+/* The frame. Layer keeps its full-width top bar with the views as tabs, an
+   exception to design/layouts/app-window.md; below it, Work's task list sits
+   in the frame's tone like a sidebar, and every view is an inset panel, one
+   step lighter by night and white by day. */
+.views { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.views > :not(.app),
+.main {
   background: var(--panel);
   border-radius: var(--radius-lg);
-  margin: 0 8px 8px 0;
 }
-.shell.no-sidebar .views { margin-left: 8px; }
+.views > :not(.app) { flex: 1; min-width: 0; margin: 0 8px 8px; }
+.main { margin: 0 8px 8px 0; }
+.app.no-sidebar > .main { margin-left: 8px; }
 
-.frame-side {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--bg);
-  padding: 0 8px 8px;
+/* The sidebar's width is dragged (TASK-16); the grip has the empty middle
+   column. min() keeps a width saved on a wide window from taking more than
+   half of a narrower one. */
+.app {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: min(var(--sidebar-w, 260px), 50%) 0 minmax(0, 1fr);
+  height: 100%;
 }
-/* Beside the traffic lights, which macOS draws over this corner. */
-.frame-brand { flex: none; display: flex; align-items: center; height: 44px; padding-left: 74px; }
-.wordmark { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1; color: var(--fg); }
-.frame-nav { flex: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 0 4px; }
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 30px;
-  padding: 0 8px;
-  color: var(--muted);
-  text-align: left;
-}
-.nav-item:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
-.nav-item.active { background: var(--selected); color: var(--fg); font-weight: 700; }
-.nav-label { flex: 1; }
-.nav-count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-ui-small-size); color: var(--faint); font-weight: 400; }
-.frame-fill { flex: 1; }
-.frame-foot { flex: none; display: flex; align-items: center; gap: 2px; padding-top: 6px; }
+/* Hidden rather than unmounted, so expanded groups and scroll survive. */
+.app.no-sidebar { grid-template-columns: minmax(0, 1fr); }
+.app.no-sidebar > .sidebar, .app.no-sidebar > .sidebar-grip { display: none; }
 /* Wider than its zero-width column, straddling the border, above both. */
 .sidebar-grip { width: 6px; margin-left: -3px; z-index: 2; cursor: col-resize; outline: none; }
 .sidebar-grip:hover, .sidebar-grip:focus-visible, body.dragging .sidebar-grip.held { background: var(--line); outline: none; }
@@ -200,11 +181,12 @@ body.dragging * { pointer-events: none; }
 /* --------------------------------------------------------------- sidebar */
 
 .sidebar {
-  flex: 1;
-  min-height: 0;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
+  padding: 0 8px 8px;
 }
 
 .sidebar-body { flex: 1; overflow-y: auto; }
@@ -366,7 +348,7 @@ body.dragging * { pointer-events: none; }
   text-align: center;
   padding: 40px;
 }
-/* An empty state's headline: the one place below the wordmark Grenze may appear. */
+/* An empty state's headline: the one place in the window Grenze appears (28px and up). */
 .empty h2 { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1.18; color: var(--fg); margin: 0; }
 .empty p { margin: 0; max-width: 380px; line-height: 1.55; }
 .empty .row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
@@ -1130,23 +1112,32 @@ body.dragging * { pointer-events: none; }
 
 /* --------------------------------------------------------------- top bar */
 
-/* Where you are, in the frame's tone. The traffic lights are over the
-   sidebar's corner, or over this bar's while the sidebar is hidden. */
+/* Three tracks so the tabs sit on the true centre of the window, whatever
+   the traffic lights or the tools either side happen to measure. */
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 4px;
-  height: 44px;
+  height: 48px;
   flex: none;
-  padding: 0 12px 0 4px;
+  padding: 0 12px 0 84px; /* leaves room for the macOS traffic lights */
   background: var(--bg);
 }
-.shell.no-sidebar .topbar { padding-left: 80px; }
-.crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; font-size: var(--type-ui-small-size); color: var(--muted); }
-.crumb { padding: 3px 6px; color: var(--muted); }
-.crumb:hover:not(:disabled) { color: var(--fg); }
-.crumb.here { color: var(--fg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crumb-sep { color: var(--faint); }
+.topbar-left { display: flex; align-items: center; min-width: 0; }
+.topbar-center { display: flex; align-items: center; gap: 2px; }
+.topbar-right { display: flex; align-items: center; gap: 2px; justify-content: flex-end; }
+.viewtab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.viewtab:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
+.viewtab.active { background: var(--selected); color: var(--fg); }
+.viewtab-count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-ui-small-size); font-weight: 400; color: var(--faint); }
 .watch-chip { user-select: none; }
 
 /* ------------------------------------------------------------ agents view */

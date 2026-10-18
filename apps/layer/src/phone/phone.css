@@ -40,7 +40,7 @@ input {
 input::placeholder { color: var(--faint); }
 input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 
-/* The product's wordmark, as in the window's sidebar. */
+/* The product's wordmark: the phone has no traffic lights to clash with. */
 .brand { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1; }
 .spacer { flex: 1; }
 .muted { color: var(--muted); }

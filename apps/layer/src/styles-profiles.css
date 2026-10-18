@@ -1,6 +1,7 @@
 /* ----------------------------------------------- sidebar: profiles (§25) */
 
 .profile-foot {
+  padding-top: 6px;
   flex: none;
 }
 .profile-button {
@@ -27,7 +28,7 @@
   font-weight: 600;
 }
 .profile-chev { color: var(--faint); display: inline-flex; }
-.profile-chev svg { transform: rotate(90deg); }
+.profile-chev svg { transform: rotate(-90deg); }
 
 .profile-initial {
   display: inline-flex;

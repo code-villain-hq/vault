@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { markStopping, useStore } from "../store";
 import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
 import { Ago } from "./Ago";
-import { Spinner } from "./ui";
+import { SidebarToggle, Spinner } from "./ui";
 
 /**
  * Every agent, one card each.
@@ -61,6 +61,7 @@ export function AgentsView() {
   return (
     <div className="wide">
       <div className="wide-head">
+        <SidebarToggle />
         <h2>Agents</h2>
         <span className="sub">
           {waiting > 0 && (

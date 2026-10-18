@@ -1,6 +1,6 @@
 # App window
 
-The frame Forge and Layer share: a sidebar and a top bar that control the content. It follows [`../principles.md`](../principles.md) (chrome dims, content leads; tone, not lines) and uses the controls in [`../components.md`](../components.md).
+The frame Forge uses: a sidebar and a top bar that control the content. Layer keeps a full-width top bar instead; see [Layer's exception](#layers-exception). It follows [`../principles.md`](../principles.md) (chrome dims, content leads; tone, not lines) and uses the controls in [`../components.md`](../components.md).
 
 ## Regions
 
@@ -34,6 +34,24 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 - A record's actual title remains visible in the `title` role (and editable where supported). Its identifier may appear in the breadcrumb. The accessible heading names the record, not only its identifier.
 - Lists inset 0.5rem from the panel's edge. Rows have 6px corners and no dividers; hover and selection are tone steps.
 - The view leads with one primary action at most. Everything else is a secondary button.
+
+## Layer's exception
+
+Layer keeps a full-width top bar instead of the inverted L, by the PO's
+decision (Oct 18, 2026): tabs across the top suit an app with six views
+and one task list better than a sidebar of views.
+
+- The top bar spans the window in `bg`. It holds the views as tabs in the
+  middle, current one filled `selected` with text `fg`, and the app's
+  tools (phone, keep awake, messages, settings) at the right. A tab's count
+  follows the sidebar rule above: only when it asks for something.
+- No wordmark. The bar starts under macOS's traffic lights, and Grenze
+  beside them clashed with them.
+- Below the bar, Work's task list runs down the left in `bg`, with the
+  profile at its foot, as the sidebar does in Forge. Every view, Work's
+  included, is an inset `panel` with `radius-lg`.
+- Everything else here and in [`../components.md`](../components.md)
+  applies as written.
 
 ## Narrow windows
 

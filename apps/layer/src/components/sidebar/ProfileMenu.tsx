@@ -39,7 +39,7 @@ export function ProfileMenu() {
     if (menu) return setMenu(null);
     load();
     const r = button.current?.getBoundingClientRect();
-    if (r) setMenu({ x: r.left, y: r.bottom + 4 });
+    if (r) setMenu({ x: r.left, y: r.top - 4 });
   }
 
   function open(p: ProfileView) {
@@ -67,6 +67,7 @@ export function ProfileMenu() {
         <Floating
           x={menu.x}
           y={menu.y}
+          above
           onClose={() => setMenu(null)}
           ignore={button}
           className="ctx-menu profile-menu"
