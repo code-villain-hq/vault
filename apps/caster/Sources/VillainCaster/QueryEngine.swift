@@ -212,7 +212,7 @@ final class QueryEngine {
         }
         for command in commands where command.isAvailable() {
             guard let score = Fuzzy.score(query: text, target: command.title) else { continue }
-            scored.append((score + boost("command:\(command.title)"), command.title, { self.commandItem(command) }))
+            scored.append((score + boost("command:\(command.id)"), command.title, { self.commandItem(command) }))
         }
         for field in Snippets.fields {
             guard Snippets.value(for: field.defaultsKey) != nil,
@@ -299,8 +299,8 @@ final class QueryEngine {
                 if name.hasSuffix(".app") { name = String(name.dropLast(4)) }
                 items.append(appItem(AppEntry(name: name, url: URL(fileURLWithPath: path))))
             } else if key.hasPrefix("command:") {
-                let title = String(key.dropFirst(8))
-                guard let command = commands.first(where: { $0.title == title }),
+                let id = String(key.dropFirst(8))
+                guard let command = commands.first(where: { $0.id == id }),
                       !command.isDestructive, command.isAvailable() else { continue }
                 items.append(commandItem(command))
             } else if key.hasPrefix("snippet:") {
