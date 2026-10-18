@@ -1,0 +1,19 @@
+{
+  "pairs": [
+    {"pair":"horizontal-1","A":"screen-left","B":"screen-right","reason":"A projects its angular nose and pupils to the left of the hood center; B projects the nose and pupils to the right."},
+    {"pair":"horizontal-2","A":"screen-right","B":"screen-left","reason":"A's raised face opening, nose tip and pupils aim right; B's raised nose and visible cheek aim left."},
+    {"pair":"horizontal-3","A":"screen-right","B":"screen-left","reason":"A has nose and pupils right of facial center; B's angular nose, face opening and pupils face left."},
+    {"pair":"horizontal-4","A":"screen-left","B":"screen-right","reason":"A presents its nose profile toward the left edge of the hood; B presents the nose profile toward the right edge."},
+    {"pair":"horizontal-5","A":"screen-right","B":"screen-left","reason":"A's slightly lowered nose and pupils point screen-right; B's lowered face has its nose and gaze pointing screen-left."},
+    {"pair":"horizontal-6","A":"screen-left","B":"screen-right","reason":"A lowers the nose out of the left side of its hood opening; B lowers the nose out of the right side, with pupils following."},
+    {"pair":"horizontal-7","A":"screen-right","B":"screen-left","reason":"A tucks its chin but retains the nose tip and eyes right of center; B's tucked chin accompanies a leftward nose tip and gaze."},
+    {"pair":"vertical-1","A":"up","B":"down","reason":"A raises chin and nose and directs pupils toward the top of the hood opening; B bows its head and lowers nose and pupils toward the clasp."},
+    {"pair":"vertical-2","A":"up","B":"down","reason":"A lifts the chin and nose with upward pupils; B tucks its chin, lowers the nose and looks beneath the brow toward its chest."},
+    {"pair":"vertical-3","A":"down","B":"up","reason":"A angles nose and chin toward the chest with lowered eyes; B lifts nose and chin and looks upward through the upper face opening."},
+    {"pair":"vertical-4","A":"up","B":"down","reason":"A's rightward nose and chin tilt upward with higher pupils; B's rightward face dips toward the clasp with pupils lowered."},
+    {"pair":"vertical-5","A":"up","B":"down","reason":"A lifts its leftward nose and exposes more lower chin while looking upward; B lowers the leftward nose and tucks the chin."},
+    {"pair":"vertical-6","A":"up","B":"down","reason":"A raises nose and chin on its leftward face and looks up; B bows its leftward face so the nose and eyes aim downward."},
+    {"pair":"vertical-7","A":"down","B":"up","reason":"A shows a lowered nose, tucked chin and pupils toward the lower hood opening; B raises its nose and chin with upward gaze."}
+  ],
+  "visual_notes":"No visible clipping, broken identity, detached fragments or other artifacts at the displayed sheet size. Full boots, cape and hood remain intact across all shown poses."
+}

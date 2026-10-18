@@ -1,0 +1,26 @@
+{
+  "pairs": [
+    {"pair":"horizontal-1","A":"screen-left","B":"screen-right","reason":"A's nose projects left and pupils follow left; B's nose and pupils project toward the right side of the hood."},
+    {"pair":"horizontal-2","A":"screen-right","B":"screen-left","reason":"A turns the elevated nose right; B turns the elevated nose left, with pupils following each nose."},
+    {"pair":"horizontal-3","A":"screen-right","B":"screen-left","reason":"A's nose profile faces right and B's nose profile faces left; their eye lines follow the same sides."},
+    {"pair":"horizontal-4","A":"screen-left","B":"screen-right","reason":"A's nose and chin extend to viewer left of hood center; B's nose and chin extend to viewer right."},
+    {"pair":"horizontal-5","A":"screen-right","B":"screen-left","reason":"A's lowered nose is displaced right beneath the hood; B's lowered nose points toward viewer left."},
+    {"pair":"horizontal-6","A":"screen-left","B":"screen-right","reason":"A bows toward left with nose and pupils on the left; B bows toward right with nose and pupils on the right."},
+    {"pair":"horizontal-7","A":"screen-right","B":"screen-left","reason":"A's nose tip and chin angle down-right; B's nose tip and chin angle down-left."},
+    {"pair":"vertical-1","A":"up","B":"down","reason":"A's chin lifts with nose and pupils aimed above; B bows the head, lowering the nose toward the clasp under the hood brow."},
+    {"pair":"vertical-2","A":"up","B":"down","reason":"A raises chin and nose, exposing the lower face; B tucks chin and lowers nose and pupil line toward chest."},
+    {"pair":"vertical-3","A":"down","B":"up","reason":"A's hood overhangs eyes and nose drops toward chest; B's chin lifts and pupils aim above the horizontal."},
+    {"pair":"vertical-4","A":"up","B":"down","reason":"A's chin and pupil line tilt subtly upward; B's nose and pupils tilt downward with chin nearer the clasp."},
+    {"pair":"vertical-5","A":"up","B":"down","reason":"A lifts nose and chin to look above; B lowers nose and chin beneath a low hood brow."},
+    {"pair":"vertical-6","A":"up","B":"down","reason":"A's pupils and nose tip aim upward and chin lifts; B's pupils and nose aim downward while chin tucks."},
+    {"pair":"vertical-7","A":"down","B":"up","reason":"A bows with nose below the eye line and chin toward chest; B raises chin and nose slightly with gaze above horizontal."}
+  ],
+  "visual_review": {
+    "artifacts": ["qa/contact-sheet.png", "qa/final-previews/motion-stills.png"],
+    "verdict": "pass",
+    "clipping": "No visible clipped hoods, gloves, boots or cape edges. The jumping apex remains inside its cell.",
+    "identity": "Consistent silver angular face, violet hood and cape, charcoal armor, silver equipment and chartreuse clasp across inspected states.",
+    "size_and_baseline": "Comparable head/body size across states and stable grounded boot baseline in the contact sequence. Jump crouch and airborne lift are visibly intentional; landing returns to the grounded baseline. No conspicuous size or baseline pop is apparent from these ordered still sequences.",
+    "limitation": "Still-sequence inspection does not establish exact playback timing."
+  }
+}

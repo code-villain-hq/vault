@@ -1,0 +1,973 @@
+{
+  "ok": true,
+  "frames_root": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames",
+  "states": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ],
+  "errors": [],
+  "warnings": [],
+  "rows": [
+    {
+      "state": "idle",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/idle/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10149,
+          "bbox": [
+            40,
+            59,
+            152,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 151
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/idle/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10267,
+          "bbox": [
+            40,
+            57,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 143
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/idle/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10263,
+          "bbox": [
+            40,
+            58,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 143
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/idle/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10232,
+          "bbox": [
+            40,
+            57,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 153
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/idle/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10171,
+          "bbox": [
+            41,
+            57,
+            150,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 150
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/idle/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10097,
+          "bbox": [
+            40,
+            59,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 155
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10022,
+          "bbox": [
+            30,
+            55,
+            161,
+            200
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 128
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8702,
+          "bbox": [
+            39,
+            55,
+            152,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 109
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9950,
+          "bbox": [
+            29,
+            55,
+            162,
+            199
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 109
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8660,
+          "bbox": [
+            38,
+            55,
+            153,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 107
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10091,
+          "bbox": [
+            29,
+            55,
+            162,
+            200
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 110
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8717,
+          "bbox": [
+            40,
+            54,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 94
+        },
+        {
+          "index": 6,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9861,
+          "bbox": [
+            30,
+            54,
+            161,
+            200
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 119
+        },
+        {
+          "index": 7,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-right/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8478,
+          "bbox": [
+            40,
+            55,
+            151,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 101
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10019,
+          "bbox": [
+            30,
+            55,
+            161,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 119
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8704,
+          "bbox": [
+            39,
+            56,
+            152,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 99
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9955,
+          "bbox": [
+            29,
+            55,
+            161,
+            199
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 106
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8673,
+          "bbox": [
+            37,
+            55,
+            151,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 94
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10098,
+          "bbox": [
+            29,
+            55,
+            161,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 129
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8722,
+          "bbox": [
+            40,
+            55,
+            150,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 103
+        },
+        {
+          "index": 6,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9845,
+          "bbox": [
+            30,
+            55,
+            160,
+            200
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 112
+        },
+        {
+          "index": 7,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running-left/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 8475,
+          "bbox": [
+            39,
+            55,
+            151,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 101
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "expected_frames": 4,
+      "actual_frames": 4,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waving/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10662,
+          "bbox": [
+            34,
+            59,
+            158,
+            205
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 170
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waving/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10868,
+          "bbox": [
+            35,
+            59,
+            156,
+            205
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 145
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waving/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10864,
+          "bbox": [
+            35,
+            59,
+            157,
+            205
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 153
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waving/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10631,
+          "bbox": [
+            35,
+            59,
+            157,
+            205
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 144
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/jumping/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9570,
+          "bbox": [
+            29,
+            85,
+            161,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 220
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/jumping/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11349,
+          "bbox": [
+            28,
+            37,
+            163,
+            191
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 245
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/jumping/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11167,
+          "bbox": [
+            28,
+            5,
+            163,
+            152
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 224
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/jumping/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11505,
+          "bbox": [
+            28,
+            37,
+            163,
+            195
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 230
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/jumping/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11387,
+          "bbox": [
+            28,
+            59,
+            163,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 263
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9060,
+          "bbox": [
+            49,
+            60,
+            142,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 114
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9040,
+          "bbox": [
+            46,
+            66,
+            145,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 122
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9715,
+          "bbox": [
+            44,
+            64,
+            147,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 123
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9222,
+          "bbox": [
+            47,
+            67,
+            144,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 110
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9205,
+          "bbox": [
+            47,
+            67,
+            144,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 118
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9357,
+          "bbox": [
+            46,
+            65,
+            145,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 117
+        },
+        {
+          "index": 6,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9489,
+          "bbox": [
+            46,
+            59,
+            145,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 116
+        },
+        {
+          "index": 7,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/failed/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10313,
+          "bbox": [
+            40,
+            59,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 104
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waiting/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10255,
+          "bbox": [
+            41,
+            59,
+            151,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 127
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waiting/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9378,
+          "bbox": [
+            47,
+            58,
+            145,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 126
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waiting/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10590,
+          "bbox": [
+            35,
+            58,
+            157,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 140
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waiting/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10513,
+          "bbox": [
+            35,
+            58,
+            157,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 135
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waiting/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9275,
+          "bbox": [
+            48,
+            58,
+            144,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 126
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/waiting/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10123,
+          "bbox": [
+            45,
+            59,
+            147,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 114
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9870,
+          "bbox": [
+            46,
+            58,
+            146,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 187
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9943,
+          "bbox": [
+            44,
+            58,
+            148,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 188
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9804,
+          "bbox": [
+            46,
+            57,
+            146,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 202
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9848,
+          "bbox": [
+            45,
+            59,
+            147,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 237
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10477,
+          "bbox": [
+            42,
+            57,
+            150,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 196
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/running/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9775,
+          "bbox": [
+            45,
+            58,
+            147,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 180
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/review/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9374,
+          "bbox": [
+            47,
+            58,
+            146,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 141
+        },
+        {
+          "index": 1,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/review/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9371,
+          "bbox": [
+            48,
+            58,
+            144,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 158
+        },
+        {
+          "index": 2,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/review/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9446,
+          "bbox": [
+            47,
+            58,
+            146,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 152
+        },
+        {
+          "index": 3,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/review/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9244,
+          "bbox": [
+            47,
+            60,
+            145,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 171
+        },
+        {
+          "index": 4,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/review/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9128,
+          "bbox": [
+            49,
+            58,
+            143,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 137
+        },
+        {
+          "index": 5,
+          "file": "/Users/michael/.codex/visualizations/2026/10/18/01a14df3-d944-72b0-b04b-6b1eb07a484c/Pets/baron-byte-hooded-v2/qa/registered-frames/review/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9311,
+          "bbox": [
+            48,
+            58,
+            144,
+            204
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 159
+        }
+      ]
+    }
+  ]
+}

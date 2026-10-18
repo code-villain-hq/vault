@@ -1,0 +1,11 @@
+{
+  "id": "pet_6ad47f0d72f0819184ecb45d33d10d1a",
+  "name": "Baron Byte",
+  "description": "A hooded Code Villain schemer in silver armor and a violet cloak, drawn with Golden Age comic ink.",
+  "is_custom": true,
+  "is_active": true,
+  "artifact": "spritesheet.png",
+  "sha256": "471f4bef1f0094552e901e892548331ae0f27218f9ffcf03fb756551302df822",
+  "encoded_bytes": 2043466,
+  "activated_on": "2026-10-18"
+}

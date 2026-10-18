@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "directions": [
+    {"label":"000","expected":"up","observed":"up","verdict":"pass","evidence":"Chin lifts and the underside of silver nose appears above mouth; pupils aim high toward top of broad frontal hood opening."},
+    {"label":"090","expected":"right","observed":"right","verdict":"pass","evidence":"Long silver nose projects to screen-right of head center, pupils gather toward the right eye-slit edges."},
+    {"label":"180","expected":"down","observed":"down","verdict":"pass","evidence":"Chin tucked toward chartreuse clasp; lowered nose and both pupils clearly aim toward chest."},
+    {"label":"270","expected":"left","observed":"left","verdict":"pass","evidence":"Nose projects screen-left of the hood center, face and pupils follow screen-left while face remains visible."}
+  ]
+}

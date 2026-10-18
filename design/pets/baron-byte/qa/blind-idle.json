@@ -1,0 +1,19 @@
+{
+  "pairs": [
+    {"pair":"horizontal-1","A":"screen-left","B":"screen-right","reason":"A nose tip and pupils point left of facial center; B nose tip and pupils point right."},
+    {"pair":"horizontal-2","A":"screen-right","B":"screen-left","reason":"A face opens toward right hood edge with nose projecting right; B nose and pupils turn toward left hood edge."},
+    {"pair":"horizontal-3","A":"screen-right","B":"screen-left","reason":"A nose projects right and pupils follow; B nose projects left with leftward pupils."},
+    {"pair":"horizontal-4","A":"screen-left","B":"screen-right","reason":"A cheek and nose project toward left opening; B cheek and nose project toward right opening, pupils following the respective turns."},
+    {"pair":"horizontal-5","A":"screen-right","B":"screen-left","reason":"A lowered nose and pupils point right; B lowered nose and pupils point left."},
+    {"pair":"horizontal-6","A":"screen-left","B":"screen-right","reason":"A chin is tucked and nose tip projects left; B chin is tucked and nose tip projects right with pupils following."},
+    {"pair":"horizontal-7","A":"screen-right","B":"screen-left","reason":"A nose tip and gaze sit toward right hood opening; B nose tip and gaze sit toward left opening."},
+    {"pair":"vertical-1","A":"up","B":"down","reason":"A chin lifts, nose underside shows and pupils angle high; B chin tucks toward clasp and pupils point low under hood brim."},
+    {"pair":"vertical-2","A":"up","B":"down","reason":"A nose and chin lift with eyes gazing upward; B nose tilts down and chin nears clasp with lowered pupils."},
+    {"pair":"vertical-3","A":"down","B":"up","reason":"A hood covers lowered brow, nose and chin aim down; B chin and nose tip elevate with pupils high."},
+    {"pair":"vertical-4","A":"up","B":"down","reason":"A nose tip and chin are raised slightly with gaze high; B nose and chin tilt lower, gaze directed beneath level."},
+    {"pair":"vertical-5","A":"up","B":"down","reason":"A chin lifts and nose projects upward; B chin tucks toward clasp beneath lowered hood and pupils aim down."},
+    {"pair":"vertical-6","A":"up","B":"down","reason":"A chin and nose angle upward with high pupils; B nose angles down with tucked chin and low pupils."},
+    {"pair":"vertical-7","A":"down","B":"up","reason":"A hood dips over brow and chin lowers with downward nose and pupils; B nose tip and chin sit slightly raised with upward gaze."}
+  ],
+  "visual_notes":"No visible clipping, detached fragments, broken silhouettes, or identity changes. Hood, face, clasp, armor, hands and boots remain complete and consistent."
+}

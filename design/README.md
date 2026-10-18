@@ -10,5 +10,6 @@ Caster is AppKit. Forge, Layer, and the site are web. The Code Villain theme (`a
 | [`components.md`](components.md) | Button, field, link, pill, chip, row, icon |
 | [`tokens/`](tokens) | The numbers: color, type, shape |
 | [`layouts/`](layouts) | Reference layouts: the app window and the blog; a social card to come |
+| [`pets/`](pets) | Animated studio companions, source artwork, and previews |
 
 A [spacing proposal](spacing.draft.md) is available as a draft, with [interactive examples](../brand/index.html#spacing). No space tokens are published yet.

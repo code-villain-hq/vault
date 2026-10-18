@@ -1,0 +1,19 @@
+{
+  "pairs": [
+    {"pair":"Horizontal pair 1","A":"screen-left","B":"screen-right","reason":"A nose tip projects left and the eyes follow left under the hood; B nose tip and visible pupils project right."},
+    {"pair":"Horizontal pair 2","A":"screen-left","B":"screen-right","reason":"A has its angular nose and face opening toward screen-left; B turns the nose, pupils and exposed cheek toward screen-right."},
+    {"pair":"Horizontal pair 3","A":"screen-left","B":"screen-right","reason":"A nose lies left of the face center and pupils look left; B nose lies right of center and pupils look right."},
+    {"pair":"Horizontal pair 4","A":"screen-right","B":"screen-left","reason":"A presents a rightward nose profile with face at the hood's right edge; B reverses that nose profile and face opening toward the left."},
+    {"pair":"Horizontal pair 5","A":"screen-right","B":"screen-left","reason":"A lowered head still has nose and pupils aimed screen-right; B lowered nose and visible face point screen-left."},
+    {"pair":"Horizontal pair 6","A":"screen-left","B":"screen-right","reason":"A lowered nose protrudes left from the hood opening; B lowered nose protrudes right with pupils following that side."},
+    {"pair":"Horizontal pair 7","A":"screen-right","B":"screen-left","reason":"A downward tilted face retains a nose tip right of the head center; B downward tilted face retains the nose tip and gaze left of center."},
+    {"pair":"Vertical pair 1","A":"up","B":"down","reason":"A raises the chin and nose, exposing the underside of the face and directing pupils upward; B bows the head, lowers the nose toward the clasp and looks down."},
+    {"pair":"Vertical pair 2","A":"up","B":"down","reason":"A lifts the nose and chin, with pupils toward the upper hood opening; B lowers nose and chin toward the chest, eyes aimed beneath the brow."},
+    {"pair":"Vertical pair 3","A":"up","B":"down","reason":"A has an elevated nose tip and lifted chin with upward gaze; B dips the nose below eye level and folds the chin toward the chest."},
+    {"pair":"Vertical pair 4","A":"up","B":"down","reason":"A tilts the rightward face upward with nose tip lifted and visible lower chin; B tilts the rightward face downward with nose and gaze lowered."},
+    {"pair":"Vertical pair 5","A":"down","B":"up","reason":"A bends the nose and chin toward the chest beneath a low brow; B lifts its chin and nose with pupils looking toward the upper left."},
+    {"pair":"Vertical pair 6","A":"up","B":"down","reason":"A raises the leftward nose and chin and looks upward; B points the leftward nose downward with chin tucked and eyes lowered."},
+    {"pair":"Vertical pair 7","A":"up","B":"down","reason":"A leftward face shows raised nose and upward pupils above an extended chin; B leftward face has chin tucked, nose lowered and pupils directed downward."}
+  ],
+  "visual_notes": "No broken silhouettes, detached body parts, clipping, or conspicuous identity changes visible at sheet display size. Hood and face remain coherent throughout. Pair IDs transcribed exactly as displayed; sheet contains no Pxx IDs."
+}

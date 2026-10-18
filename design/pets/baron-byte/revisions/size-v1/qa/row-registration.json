@@ -1,0 +1,101 @@
+{
+  "idle": {
+    "scale": 0.7305699481865285,
+    "offset": [
+      26,
+      55
+    ],
+    "source_baseline": 201,
+    "target_baseline": 202,
+    "reference_height": 193,
+    "target_height": 141
+  },
+  "running-right": {
+    "scale": 0.75,
+    "offset": [
+      24,
+      51
+    ],
+    "source_baseline": 201,
+    "target_baseline": 202,
+    "reference_height": 188,
+    "target_height": 141
+  },
+  "running-left": {
+    "scale": 0.7663043478260869,
+    "offset": [
+      22,
+      50
+    ],
+    "source_baseline": 199,
+    "target_baseline": 202,
+    "reference_height": 184,
+    "target_height": 141
+  },
+  "waving": {
+    "scale": 0.7193877551020408,
+    "offset": [
+      27,
+      57
+    ],
+    "source_baseline": 202,
+    "target_baseline": 202,
+    "reference_height": 196,
+    "target_height": 141
+  },
+  "jumping": {
+    "scale": 1.0,
+    "offset": [
+      0,
+      0
+    ],
+    "source_baseline": 202,
+    "target_baseline": 202,
+    "reference_height": 141,
+    "target_height": 141
+  },
+  "failed": {
+    "scale": 0.7268041237113402,
+    "offset": [
+      26,
+      56
+    ],
+    "source_baseline": 201,
+    "target_baseline": 202,
+    "reference_height": 194,
+    "target_height": 141
+  },
+  "waiting": {
+    "scale": 0.7230769230769231,
+    "offset": [
+      27,
+      56
+    ],
+    "source_baseline": 202,
+    "target_baseline": 202,
+    "reference_height": 195,
+    "target_height": 141
+  },
+  "running": {
+    "scale": 0.7268041237113402,
+    "offset": [
+      26,
+      55
+    ],
+    "source_baseline": 202,
+    "target_baseline": 202,
+    "reference_height": 194,
+    "target_height": 141
+  },
+  "review": {
+    "scale": 0.7268041237113402,
+    "offset": [
+      26,
+      55
+    ],
+    "source_baseline": 202,
+    "target_baseline": 202,
+    "reference_height": 194,
+    "target_height": 141
+  }
+}

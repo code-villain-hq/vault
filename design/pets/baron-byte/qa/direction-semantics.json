@@ -1,0 +1,118 @@
+{
+  "ok": true,
+  "directions": [
+    {
+      "label": "000",
+      "expected": "up",
+      "observed": "up",
+      "verdict": "pass",
+      "evidence": "Chin lifted, underside of nose visible; both pupils high in the broadly frontal silver face."
+    },
+    {
+      "label": "022.5",
+      "expected": "up-right",
+      "observed": "up-right",
+      "verdict": "pass",
+      "evidence": "Nose ridge yaws screen-right while chin and pupils lift upward inside hood."
+    },
+    {
+      "label": "045",
+      "expected": "up-right",
+      "observed": "up-right",
+      "verdict": "warning",
+      "evidence": "Rightward nose projection and high pupils are clear; pose is close to 022.5 but remains in the correct upper-right quadrant."
+    },
+    {
+      "label": "067.5",
+      "expected": "up-right",
+      "observed": "up-right",
+      "verdict": "warning",
+      "evidence": "Nose is further right with lifted chin and upper-right pupils; angular advance from preceding pose is subtle."
+    },
+    {
+      "label": "090",
+      "expected": "right",
+      "observed": "right",
+      "verdict": "pass",
+      "evidence": "Long silver nose projects right of head center; face and pupils point horizontally screen-right."
+    },
+    {
+      "label": "112.5",
+      "expected": "down-right",
+      "observed": "down-right",
+      "verdict": "pass",
+      "evidence": "Hood/head lower toward right; nose and pupils point right with chin lowered relative to right cardinal."
+    },
+    {
+      "label": "135",
+      "expected": "down-right",
+      "observed": "down-right",
+      "verdict": "pass",
+      "evidence": "Head dips further, nose projects to screen-right below brow center and gaze points down toward that side."
+    },
+    {
+      "label": "157.5",
+      "expected": "down-right",
+      "observed": "down-right",
+      "verdict": "warning",
+      "evidence": "Chin lowered close to chest and pupils down-right; horizontal cue remains strong near down cardinal. Body remains planted."
+    },
+    {
+      "label": "180",
+      "expected": "down",
+      "observed": "down",
+      "verdict": "pass",
+      "evidence": "Frontal face pitched down, chin tucked by clasp, pupils below brow line aimed toward chest."
+    },
+    {
+      "label": "202.5",
+      "expected": "down-left",
+      "observed": "down-left",
+      "verdict": "pass",
+      "evidence": "Nose and face shift screen-left while hood opening and chin remain lowered toward chest."
+    },
+    {
+      "label": "225",
+      "expected": "down-left",
+      "observed": "down-left",
+      "verdict": "warning",
+      "evidence": "Leftward nose and lowered head clearly indicate down-left; pose is similar to preceding diagonal."
+    },
+    {
+      "label": "247.5",
+      "expected": "down-left",
+      "observed": "down-left",
+      "verdict": "warning",
+      "evidence": "Nose projects left and chin remains tucked compared with left cardinal; progression is subtle but correct quadrant."
+    },
+    {
+      "label": "270",
+      "expected": "left",
+      "observed": "left",
+      "verdict": "pass",
+      "evidence": "Nose points decisively screen-left; face and pupils align left across a level horizontal gaze."
+    },
+    {
+      "label": "292.5",
+      "expected": "up-left",
+      "observed": "up-left",
+      "verdict": "pass",
+      "evidence": "Nose projects left, chin lifts and pupils rise toward upper-left."
+    },
+    {
+      "label": "315",
+      "expected": "up-left",
+      "observed": "up-left",
+      "verdict": "pass",
+      "evidence": "Chin lifts more, underside of nose appears, and face/nose/pupils remain oriented left and up."
+    },
+    {
+      "label": "337.5",
+      "expected": "up-left",
+      "observed": "up-left",
+      "verdict": "warning",
+      "evidence": "Nearly up-facing silver face keeps nose tip screen-left of head center and eyes high-left; similar to315 but closes toward up."
+    }
+  ],
+  "continuity_review": "Normal-size review of all16 poses and loop boundaries confirms consistent planted boots, clasp and torso; original face remains visible. Foot-gap warnings at y199-200 describe intentional space between boots, not damaged material. Local diff warnings at090->112.5 and157.5->180 arise from head pitch/yaw, with only small center shifts and no body teleport, clipping, direction reversal or broken attachment."
+}

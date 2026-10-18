@@ -1,0 +1,19 @@
+{
+  "pairs": [
+    {"pair":"Horizontal pair 1","A":"screen-left","B":"screen-right","reason":"A nose projects to viewer left with pupils directed left; B nose and raised chin project to viewer right with pupils right."},
+    {"pair":"Horizontal pair 2","A":"screen-left","B":"screen-right","reason":"A face turns toward left hood opening with nose and pupils left; B nose projects toward right opening and pupils right."},
+    {"pair":"Horizontal pair 3","A":"screen-left","B":"screen-right","reason":"A nose tip points left of facial center; B nose tip points right of facial center, with pupils following each turn."},
+    {"pair":"Horizontal pair 4","A":"screen-right","B":"screen-left","reason":"A nose and face project toward right hood edge; B nose and face project toward left hood edge."},
+    {"pair":"Horizontal pair 5","A":"screen-right","B":"screen-left","reason":"A nose tip and pupils face right with chin slightly lowered; B nose tip and pupils face left with chin slightly lowered."},
+    {"pair":"Horizontal pair 6","A":"screen-left","B":"screen-right","reason":"A lowered face has nose and pupils pointing screen-left; B lowered face has nose and pupils pointing screen-right."},
+    {"pair":"Horizontal pair 7","A":"screen-right","B":"screen-left","reason":"A nose tip sits toward the right hood opening and pupils follow right; B nose tip sits toward left opening and pupils follow left."},
+    {"pair":"Vertical pair 1","A":"up","B":"down","reason":"A chin lifts, nose underside shows and pupils sit high; B chin tucks, forehead and hood cover upper face, nose and pupils aim down."},
+    {"pair":"Vertical pair 2","A":"up","B":"down","reason":"A chin and nose tilt upward with pupils high; B chin is lowered near clasp and pupils look downward beneath hood brim."},
+    {"pair":"Vertical pair 3","A":"up","B":"down","reason":"A nose tip rises with lifted chin and upper-directed pupils; B head inclines toward clasp, nose tip and pupils directed downward."},
+    {"pair":"Vertical pair 4","A":"up","B":"down","reason":"A face is slightly raised with nose and chin elevated; B face inclines downward, chin approaches clasp and pupils sit low."},
+    {"pair":"Vertical pair 5","A":"down","B":"up","reason":"A hood brim slopes over lowered face and nose/pupils aim down; B chin lifts and nose/pupils point upward."},
+    {"pair":"Vertical pair 6","A":"up","B":"down","reason":"A chin and nose angle upward with pupils toward upper hood opening; B chin tucks and pupils angle downward."},
+    {"pair":"Vertical pair 7","A":"up","B":"down","reason":"A head is slightly lifted with nose tip raised and gaze high; B head tilts down, nose tip and pupils aimed lower with chin nearer chest."}
+  ],
+  "visual_notes":"No visibly broken silhouettes, clipped limbs, detached details, or identity changes. Hood, armor, clasp, hands and boots remain consistent across displayed pairs."
+}

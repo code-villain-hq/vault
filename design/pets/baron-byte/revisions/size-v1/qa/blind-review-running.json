@@ -1,0 +1,19 @@
+{
+  "pairs": [
+    {"pair":"Horizontal pair 1","A":"screen-left","B":"screen-right","reason":"A's nose projects to viewer left of face center and pupils follow left; B's projecting nose and pupils aim to viewer right."},
+    {"pair":"Horizontal pair 2","A":"screen-left","B":"screen-right","reason":"A's nose and eye direction move left beneath the hood opening; B's angular nose protrudes right with gaze to the right."},
+    {"pair":"Horizontal pair 3","A":"screen-left","B":"screen-right","reason":"A has left-facing nose profile and pupils; B has right-facing nose profile and pupils."},
+    {"pair":"Horizontal pair 4","A":"screen-right","B":"screen-left","reason":"A's long nose projects toward the right edge of the hood; B's nose points left with the face turned left."},
+    {"pair":"Horizontal pair 5","A":"screen-right","B":"screen-left","reason":"A's lowered nose tip and pupils remain displaced right; B's lowered nose tip and pupils point left."},
+    {"pair":"Horizontal pair 6","A":"screen-left","B":"screen-right","reason":"A's bowed head exposes a leftward nose profile; B's bowed head exposes a rightward nose profile, with pupils following the respective sides."},
+    {"pair":"Horizontal pair 7","A":"screen-right","B":"screen-left","reason":"A's downward-pointing nose is offset to viewer right of the hood center; B's nose and chin angle down toward viewer left."},
+    {"pair":"Vertical pair 1","A":"up","B":"down","reason":"A lifts chin and nose toward the top of the hood, eyes aimed upward; B bows the head with hood brow over eyes and nose toward clasp."},
+    {"pair":"Vertical pair 2","A":"up","B":"down","reason":"A's chin is raised and nose elevated above neutral; B's chin tucks toward chest and pupils look down below the hood brow."},
+    {"pair":"Vertical pair 3","A":"up","B":"down","reason":"A raises nose and chin with an upward pupil line; B lowers nose and chin toward the clasp with the hood overhanging the eyes."},
+    {"pair":"Vertical pair 4","A":"up","B":"down","reason":"A's face tilts slightly upward, chin lifted and gaze above horizontal; B's nose and eye line tilt downward with chin lower toward chest."},
+    {"pair":"Vertical pair 5","A":"down","B":"up","reason":"A bows the head and directs nose below the hood opening; B lifts chin and nose upward and pupils follow above horizontal."},
+    {"pair":"Vertical pair 6","A":"up","B":"down","reason":"A's nose is elevated and chin lifts away from chest; B's nose drops toward chest and pupils aim below the low hood brow."},
+    {"pair":"Vertical pair 7","A":"up","B":"down","reason":"A has a modest upward head tilt and higher pupil line; B tucks chin, lowers nose and looks downward under the hood rim."}
+  ],
+  "visible_issues": "No broken silhouettes or conspicuous identity changes observed. Hood, cape, clasp, gloves and boots remain attached and consistent."
+}

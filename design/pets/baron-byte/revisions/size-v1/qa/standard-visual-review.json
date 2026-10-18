@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "reviewer": "parent independent follow-up",
+  "states_passed": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ],
+  "evidence": "Reviewed all source rows and rebuilt contact sheet. Running frame pairs 1/5 versus 3/7 now switch raised near/far thigh overlap and support leg; mirrored complete left frames preserve cadence with no clipped neighbors. Other seven states retained prior independent passing visual review. Shared row-wide registration gives consistent body size/baseline, actual jump lift, and coherent landing."
+}
