@@ -13,6 +13,9 @@ A change to how Code Villain feels starts in `brand/` or `design/`, then the app
 
 ## Specs are checked against the code
 
-Forge's specs live in Forge, not in this repository. A scheduled drift check (Claude Code on the studio's Mac) reads each new commit on `main`. For every Forge service a commit touches, it compares the service's specs with the code. Where a spec no longer says what the code does, it files `Spec drift: "<spec>" no longer matches the code` in that team's Triage, or comments on the one already open.
+Forge's specs live in Forge, not in this repository. A scheduled drift check (Claude Code on the studio's Mac) reads each new commit on `main`. For every Forge service a commit touches, it compares the service's specs with the code. Where the code no longer does what a requirement or scenario says, it files `Spec drift: "<spec>" no longer matches the code` in that team's Triage, or comments on the one already open. It files nothing for:
 
-So when a change alters behaviour a spec describes, write the spec change with it: on the issue's spec change, or by asking the PO. Otherwise the change comes back as a drift issue. The check never edits specs, code or other issues.
+- behaviour no requirement deals with: that is only named in the check's run summary;
+- a point that open work already covers: an issue on that service in Triage, Backlog, Todo, In Progress or In Review, about the same requirement. When a commit from another issue meets part of that work, the check says so once, in a comment on the covering issue.
+
+So when a change alters behaviour a spec describes, write the spec change with it: on the issue's spec change, or by asking the PO. Otherwise the change comes back as a drift issue. The check names other issues by key and title only, and never edits specs, code or other issues.
