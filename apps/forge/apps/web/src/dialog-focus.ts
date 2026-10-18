@@ -7,7 +7,7 @@ export function useDialogFocus(open: boolean) {
     if (open) return;
     const remember = (event: Event) => {
       if (!(event.target instanceof Element)) return;
-      if (event.target.closest('.app-dialog, [role="menu"], [role="alertdialog"]')) return;
+      if (event.target.closest('.ui-dialog, [role="menu"], [role="alertdialog"]')) return;
       const target =
         event.type === "pointerdown"
           ? event.target.closest<HTMLElement>(

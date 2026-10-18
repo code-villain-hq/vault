@@ -37,7 +37,7 @@ export function NewButton({ label, onClick }: { label: string; onClick: () => vo
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+      className="ui-button ui-icon-button"
     >
       <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
     </button>
@@ -58,10 +58,10 @@ export function CreateDialog({
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="app-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <Dialog.Backdrop className="ui-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup
           finalFocus={finalFocus}
-          className="app-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+          className="ui-dialog fixed top-[12vh] left-1/2 z-40 w-[min(40rem,calc(100vw-2rem))] -translate-x-1/2 outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
         >
           {open && children}
         </Dialog.Popup>
@@ -83,18 +83,18 @@ export function MoreMenu({
       <Menu.Trigger
         aria-label={label}
         title={label}
-        className="flex size-7 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
+        className="ui-button ui-icon-button data-popup-open:bg-hover"
       >
         <Ellipsis size={15} strokeWidth={1.75} aria-hidden="true" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Menu.Popup className="app-menu min-w-44 p-1 outline-none">
+          <Menu.Popup className="ui-menu min-w-44 p-1 outline-none">
             {items.map((item) => (
               <Menu.Item
                 key={item.label}
                 onClick={item.onSelect}
-                className={`flex cursor-default items-center rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight ${item.danger ? "text-danger-ink" : ""}`}
+                className={`ui-option flex cursor-default items-center px-2 py-1.5 outline-none select-none ${item.danger ? "text-danger-ink" : ""}`}
               >
                 {item.label}
               </Menu.Item>

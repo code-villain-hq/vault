@@ -9,7 +9,7 @@ export interface PickerOption {
 }
 
 const itemClass =
-  "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
+  "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
 
 /** Enter after typing a search picks the first match, as in a command menu. */
 function chooseFirstMatch(event: KeyboardEvent<HTMLInputElement>) {
@@ -72,7 +72,7 @@ export function Picker({
           {/* Layers: sticky headers 10, floating bars 30, dialogs 40, menus 50 (menus open from dialogs too). */}
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
             <Menu.Popup
-              className="app-menu w-60 origin-(--transform-origin) outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+              className="ui-menu w-60 origin-(--transform-origin) outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
               onClick={(event) => event.stopPropagation()}
             >
               <Menu.Input

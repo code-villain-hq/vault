@@ -22,6 +22,7 @@ import {
   StatusPicker,
 } from "./issue-fields";
 import { isTyping, useNewIssue } from "./new-issue";
+import { buttonClass } from "./ui";
 import { useIsPending, useRecords, useWorkspace } from "./workspace";
 
 /** What a list's sections are: a status each, or a service each. */
@@ -557,12 +558,8 @@ export function EmptyState({ text, offerCreate = true }: { text: string; offerCr
     <div className="flex flex-col items-center gap-3 px-4 py-20 text-center text-muted">
       <p>{text}</p>
       {offerCreate && (
-        <button
-          type="button"
-          onClick={() => newIssue()}
-          className="ui-control h-7 rounded-md bg-primary px-3 text-on-primary outline-none hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
-        >
-          Create an issue <kbd className="ml-1 text-on-primary/70">C</kbd>
+        <button type="button" onClick={() => newIssue()} className={buttonClass()}>
+          Create an issue <kbd className="text-on-primary/70">C</kbd>
         </button>
       )}
     </div>

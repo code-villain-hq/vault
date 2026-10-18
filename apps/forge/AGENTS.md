@@ -40,7 +40,11 @@ The frame uses `bg` for the sidebar and toolbar and `panel` for content;
 below 560px the sidebar becomes a horizontal navigation row. The shared
 control rules are in [`design/components.md`](../../design/components.md):
 28px buttons, tinted chips and status pills, fields with focus rings, and
-elevation through tone. Shape tokens are bundled with color and type.
+elevation through tone. They're implemented once in
+[`design/components.css`](../../design/components.css), synced into
+`src/design/`: use its `ui-*` classes (`buttonClass()` composes
+`ui-button`), never a local copy of a recipe. `design/lint` fails CI on
+literal colours, sizes or radii in CSS or classes. Shape tokens are bundled with color and type.
 Tint recipes stay translucent: `status-tint`, `chip-tint` and
 `highlight-tint` (`bg-highlight`, the active menu option) blend with their
 host. Status text uses separate shared ink tokens; custom workflow

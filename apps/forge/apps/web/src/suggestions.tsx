@@ -277,9 +277,9 @@ export function TextDiff({
             key={index}
             className={`whitespace-pre-wrap px-3 ${
               line.kind === "added"
-                ? "tint-ok"
+                ? "ui-tint-ok"
                 : line.kind === "removed"
-                  ? `tint-danger ${line.words ? "" : "line-through"}`
+                  ? `ui-tint-danger ${line.words ? "" : "line-through"}`
                   : "text-muted"
             }`}
           >
@@ -298,9 +298,9 @@ export function TextDiff({
                     className={
                       word.kind === "added"
                         ? // The word's tint over its line's: the status recipe, twice.
-                          "tint-ok rounded-sm"
+                          "ui-tint-ok rounded-sm"
                         : word.kind === "removed"
-                          ? "tint-danger rounded-sm line-through"
+                          ? "ui-tint-danger rounded-sm line-through"
                           : undefined
                     }
                   >

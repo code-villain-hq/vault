@@ -432,7 +432,7 @@ function IconPicker({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Popover.Popup className="app-menu flex w-[27rem] flex-col outline-none">
+          <Popover.Popup className="ui-menu flex w-[27rem] flex-col outline-none">
             <div className="px-4 py-4">
               {mixing ? (
                 <CustomColor
@@ -619,7 +619,7 @@ function ChipPopover({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Popover.Popup className="app-menu flex w-80 flex-col gap-2 p-3 outline-none">
+          <Popover.Popup className="ui-menu flex w-80 flex-col gap-2 p-3 outline-none">
             <span className="text-xs font-medium text-muted">{label}</span>
             {panel}
           </Popover.Popup>

@@ -167,8 +167,7 @@ function Shell() {
 const navLink =
   "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-current";
 
-const iconButton =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent";
+const iconButton = "ui-button ui-icon-button";
 
 /** A sidebar icon, in Lucide's style. */
 /** The last page outside settings, where "Back to app" returns. */
@@ -186,7 +185,7 @@ function Sidebar() {
       <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
         <div className="sidebar-heading flex shrink-0 items-center gap-1">
           <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
-            <span className="font-display text-[28px] leading-[1.18] font-bold">Forge</span>
+            <span className="font-display text-wordmark font-bold">Forge</span>
           </div>
           <SidebarActions />
         </div>
@@ -253,7 +252,7 @@ function AppNav() {
           Inbox
           {unread > 0 && (
             <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-faint">
-              <span className="size-1.5 rounded-full bg-signal" aria-hidden="true" />
+              <span className="ui-live-dot" aria-hidden="true" />
               {unread}
             </span>
           )}
@@ -350,7 +349,7 @@ function DomainsNav() {
             aria-label={open ? "Fold domains" : "Show domains"}
             aria-expanded={open}
             onClick={toggle}
-            className="absolute top-1/2 right-0 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+            className="ui-button ui-icon-button absolute top-1/2 right-0 -translate-y-1/2 text-faint hover:text-fg"
           >
             <ChevronDown
               size={15}
@@ -489,7 +488,7 @@ function WorkspaceMenu() {
   const navigate = useNavigate();
   const others = me.workspaces.filter((w) => w.id !== workspace.id);
   const item =
-    "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
+    "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
 
   return (
     <Menu.Root>
@@ -508,7 +507,7 @@ function WorkspaceMenu() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Menu.Popup className="app-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Menu.Popup className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             <div className="truncate px-2 py-1.5 text-xs text-faint">{me.user.email}</div>
             {others.map((other) => (
               <Menu.Item

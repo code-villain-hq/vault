@@ -166,7 +166,7 @@ function BoardColumn({
           aria-label={`New issue in ${state.name}`}
           title={`New issue in ${state.name}`}
           onClick={() => newIssue({ teamId: state.team_id, stateId: state.id })}
-          className="ml-auto flex size-7 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+          className="ui-button ui-icon-button ml-auto"
         >
           <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
         </button>

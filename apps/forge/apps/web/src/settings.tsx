@@ -11,7 +11,7 @@ import { PageHeader } from "./layout";
 import { MoreMenu } from "./page-parts";
 import { publicUrl } from "./server";
 import { loadSession, signedIn, signOut } from "./session";
-import { Button, ErrorMessage, TextField } from "./ui";
+import { Button, buttonClass, ErrorMessage, TextField } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
 const ROLES: { value: Role; label: string }[] = [
@@ -298,7 +298,7 @@ function RoleSelect({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <Select.Popup className="app-menu min-w-(--anchor-width) p-1 outline-none">
+          <Select.Popup className="ui-menu min-w-(--anchor-width) p-1 outline-none">
             <Select.List>
               {ROLES.map((role) => (
                 <Select.Item
@@ -338,7 +338,7 @@ function GitHubConnection() {
           <p className="mb-3 text-muted">Connect your GitHub account to sign in with it.</p>
           <a
             href={`/api/auth/github/connect?redirect=${encodeURIComponent(location.pathname)}`}
-            className="ui-control inline-flex h-7 items-center rounded-md px-3 hover:bg-hover"
+            className={buttonClass("secondary")}
           >
             Connect GitHub
           </a>

@@ -150,7 +150,7 @@ export function InboxPage() {
                 className="group flex items-center gap-3 rounded-md px-3 py-2 hover:bg-hover"
               >
                 <span
-                  className={`size-1.5 shrink-0 rounded-full ${isUnread ? "bg-signal" : ""}`}
+                  className={isUnread ? "ui-live-dot" : "size-1.5 shrink-0"}
                   aria-hidden="true"
                 />
                 {isUnread && <span className="sr-only">Unread:</span>}

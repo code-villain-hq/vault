@@ -3,14 +3,13 @@ import { useId } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "danger";
 
-/** A button's look, for links that act as one. */
+/** A button's look, for links that act as one: the shared ui-button recipe. */
 export function buttonClass(variant: ButtonVariant = "primary"): string {
-  const look = {
-    primary: "bg-primary text-on-primary hover:bg-primary-hover",
-    secondary: "text-muted hover:bg-hover hover:text-fg",
-    danger: "text-danger-ink hover:bg-hover",
+  return {
+    primary: "ui-button ui-button-primary",
+    secondary: "ui-button",
+    danger: "ui-button ui-button-danger",
   }[variant];
-  return `ui-control inline-flex h-7 shrink-0 items-center justify-center gap-2 rounded-md px-3 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:opacity-45 ${look}`;
 }
 
 export function Button({
@@ -41,7 +40,7 @@ export function TextField({
 export function ErrorMessage({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="tint-danger rounded-md px-3 py-2">
+    <p role="alert" className="ui-tint-danger rounded-md px-3 py-2">
       {children}
     </p>
   );

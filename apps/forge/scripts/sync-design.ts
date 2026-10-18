@@ -6,6 +6,7 @@ const destination = new URL("../apps/web/src/design/", import.meta.url);
 const files = [
   ["design/tokens/color.resolved.json", "color.json"],
   ...["color.css", "type.css", "shape.css"].map((name) => [`design/tokens/${name}`, name]),
+  ["design/components.css", "components.css"],
   ...[
     "fonts.css",
     "grenze-gotisch.ttf",

@@ -161,7 +161,7 @@ export function BulkBar({ issues, onClear }: { issues: Issue[]; onClear: () => v
           type="button"
           aria-label="Clear the selection"
           title="Clear the selection (Esc)"
-          className="flex size-7 items-center justify-center rounded-md text-faint hover:bg-hover hover:text-fg"
+          className="ui-button ui-icon-button text-faint hover:text-fg"
           onClick={onClear}
         >
           <X size={15} strokeWidth={1.75} aria-hidden="true" />

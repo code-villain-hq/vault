@@ -29,7 +29,7 @@ import { useRecords, useWorkspace } from "./workspace";
 const DUPLICATE_TRIGGER = "triage-duplicate";
 
 const menuItem =
-  "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
+  "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
 
 /** The first of a team's statuses of a type. */
 function firstOf(states: WorkflowState[], type: StateType) {
@@ -141,7 +141,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-                  <Menu.Popup className="app-menu min-w-48 p-1 outline-none">
+                  <Menu.Popup className="ui-menu min-w-48 p-1 outline-none">
                     {elsewhere.map((state) => (
                       <Menu.Item
                         key={state.id}

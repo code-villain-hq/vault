@@ -4,6 +4,7 @@
 @import "./design/type.css";
 @import "./design/shape.css";
 @import "./design/fonts/fonts.css";
+@import "./design/components.css";
 
 /* Forge-specific roles derived from Nightshade's shared tokens. */
 :root {
@@ -47,6 +48,8 @@
   --text-xs--line-height: var(--type-ui-small-leading);
   --text-sm: var(--type-ui-size);
   --text-sm--line-height: var(--type-ui-leading);
+  --text-wordmark: var(--type-wordmark-size);
+  --text-wordmark--line-height: var(--type-wordmark-leading);
   --text-title: var(--type-title-size);
   --text-title--line-height: var(--type-title-leading);
   --text-query: var(--type-query-size);
@@ -69,101 +72,6 @@
   font-family: var(--font-display);
 }
 
-@utility ui-control {
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-  line-height: var(--type-control-leading);
-}
-
-@utility ui-chip {
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
-  color: var(--muted);
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-  line-height: var(--type-control-leading);
-}
-
-@utility ui-status {
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--status-color, var(--muted)) var(--status-tint), transparent);
-  color: var(--status-ink, var(--status-neutral-ink));
-  &:hover,
-  &[data-popup-open] {
-    background: color-mix(
-      in srgb,
-      var(--status-color, var(--muted)) var(--status-tint),
-      transparent
-    );
-  }
-  font-size: var(--type-control-size);
-  font-weight: 700;
-  line-height: var(--type-control-leading);
-}
-
-/* Links are ink, bold and underlined; the underline firms on hover. */
-@utility ui-link {
-  color: var(--fg);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
-  text-underline-offset: 3px;
-  &:hover {
-    text-decoration-color: var(--fg);
-  }
-}
-
-/* A status-tinted note or diff run: the status recipe, not a block colour. */
-@utility tint-danger {
-  background: color-mix(in srgb, var(--danger) var(--status-tint), transparent);
-  color: var(--status-danger-ink);
-}
-@utility tint-ok {
-  background: color-mix(in srgb, var(--ok) var(--status-tint), transparent);
-  color: var(--status-ok-ink);
-}
-@utility tint-warn {
-  background: color-mix(in srgb, var(--warn) var(--status-tint), transparent);
-  color: var(--status-warn-ink);
-}
-
-@utility ui-field {
-  border: 1px solid transparent;
-  background: var(--field);
-  color: var(--fg);
-  outline: none;
-  &::placeholder {
-    color: var(--faint);
-  }
-  &:hover {
-    background: var(--field-hover);
-  }
-  &:focus,
-  &:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-  }
-}
-
-/* Tone, not lines; chrome dims, content leads. */
-.app-menu {
-  max-width: calc(100vw - 1rem);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-/* The dimmed backdrop behind a dialog. */
-.app-backdrop {
-  background: rgb(0 0 0 / var(--backdrop-tint));
-}
-.app-dialog {
-  --field: var(--dialog-field);
-  --field-hover: var(--dialog-field-hover);
-  max-height: calc(100dvh - 2rem);
-  overflow-y: auto;
-  border-radius: var(--radius-lg);
-  background: var(--dialog);
-}
 .app-topbar {
   --field: var(--panel);
   background: var(--bg);
@@ -331,8 +239,16 @@ body {
   color: var(--fg);
   font-weight: 700;
 }
+/* The shared link recipe (ui-link), for links Markdown renders. */
 .markdown a {
-  @apply ui-link;
+  color: var(--fg);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 3px;
+}
+.markdown a:hover {
+  text-decoration-color: var(--fg);
 }
 .markdown code {
   font-family: var(--font-mono);

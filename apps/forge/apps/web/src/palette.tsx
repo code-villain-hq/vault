@@ -205,7 +205,7 @@ export function CustomColor({
           }}
         >
           <span
-            className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
+            className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white" // design-lint-ignore: picker handle ring must contrast with any hue
             style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, background: color }}
           />
         </div>
@@ -233,7 +233,7 @@ export function CustomColor({
           }}
         >
           <span
-            className="pointer-events-none absolute left-1/2 h-1.5 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white"
+            className="pointer-events-none absolute left-1/2 h-1.5 w-4 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-white" // design-lint-ignore: picker handle ring must contrast with any hue
             style={{ top: `${(hsv.h / 360) * 100}%` }}
           />
         </div>
@@ -265,13 +265,13 @@ export function ColorButton({
       <Popover.Trigger
         aria-label={label}
         title={label}
-        className="flex size-7 shrink-0 items-center justify-center rounded-md outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
+        className="ui-button ui-icon-button data-popup-open:bg-hover"
       >
         <span className="size-3.5 rounded-full" style={{ background: value }} />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Popover.Popup className="app-menu w-80 p-4 outline-none">
+          <Popover.Popup className="ui-menu w-80 p-4 outline-none">
             <ColorChoice large value={value} onChange={onChange} />
           </Popover.Popup>
         </Popover.Positioner>

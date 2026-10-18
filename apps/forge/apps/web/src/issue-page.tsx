@@ -228,13 +228,13 @@ function Fields({
       <Menu.Root>
         <Menu.Trigger
           aria-label="More"
-          className="flex size-7 items-center justify-center rounded-md text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
+          className="ui-button ui-icon-button data-popup-open:bg-hover"
         >
           <Ellipsis size={15} strokeWidth={1.75} aria-hidden="true" />
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-            <Menu.Popup className="app-menu min-w-56 p-1 outline-none">
+            <Menu.Popup className="ui-menu min-w-56 p-1 outline-none">
               <Menu.Item className={menuItem} onClick={() => setChoosingParent(true)}>
                 {issue.parent_id ? "Change parent issue…" : "Make it a sub-issue of…"}
               </Menu.Item>
@@ -303,7 +303,7 @@ function Fields({
 }
 
 const menuItem =
-  "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 outline-none select-none data-highlighted:bg-highlight";
+  "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
 
 /** The due date as a chip; opens the calendar when just added from "⋯". */
 function DueDate({
