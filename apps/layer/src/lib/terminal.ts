@@ -6,8 +6,8 @@ import code from "../design/syntax.json";
  * Nightshade's terminal in one mode, from the vault's code palette
  * (design/tokens/theme.md, Code). The terminal sits in the content panel,
  * which is the code ground, so it is drawn in that, with the code's text,
- * cursor and selection. The sixteen colours are the code palette's: the
- * syntax hues at one lightness, kept apart from the brand's poison. By day
+ * cursor and selection. The sixteen colours are the code palette's shared
+ * table: the syntax hues at a calmer chroma, with poison as the green. By day
  * "white" is a grey: programs print it meaning "readable", assuming a dark
  * background, as every light terminal's palette does.
  */

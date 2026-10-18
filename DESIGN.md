@@ -165,7 +165,7 @@ Shared names, filled for night and day (full table in `brand/color.md`, numbers 
 - **backdrop-tint**: black at 40% behind a dialog.
 
 ### Named Rules
-**The Strike Rule.** Poison goes to the strike, the main action (once per screen), the selection tint, live signals, and the search match in code. Never links, labels, chips, body copy, or large fills.
+**The Strike Rule.** Poison goes to the strike, the main action (once per screen), the selection tint, live signals, the search match in code, and a terminal's green. Never links, labels, chips, body copy, or large fills.
 
 **The Cloak Rule.** Cloak is focus and depth. It never sits under poison text and never tints the large neutral surfaces.
 
@@ -212,7 +212,7 @@ Flat. Depth is tone: bg → panel → surface → dialog. No shadows or borders 
 
 ## Code
 
-Code uses the Nightshade code palette (`design/tokens/syntax.json`, rules in `design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette and one 16-colour terminal table dress the Code Villain editor theme (`apps/theme`: VS Code and Cursor, Neovim, WezTerm), the apps, and code on the site.
+Code uses the Nightshade code palette (`design/tokens/syntax.json`, rules in `design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette dresses the Code Villain editor theme (`apps/theme`: VS Code and Cursor, Neovim, WezTerm), the apps, and code on the site. Every terminal takes one 16-colour table: the same hues at a calmer chroma, with poison as the green.
 
 ## Do's and Don'ts
 

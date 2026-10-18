@@ -12,7 +12,7 @@ bun install && bun specimen.ts   # draw the vault's own code in both modes, for 
 
 `nvim/lua/code-villain/init.lua` is written by hand. It maps Neovim's highlight groups (editor, legacy syntax, Treesitter, LSP semantic tokens, diagnostics, and plugins) onto the palette's roles, following tokyonight's choices of what gets which kind of colour. `background` picks the mode: dark is night, light is day.
 
-Every terminal takes one 16-colour table, `ansi()` in `build.ts`: WezTerm, the VS Code and Cursor terminal, and Neovim's `:terminal`. Its colours are the syntax hues, so the shell and the editor match.
+Every terminal takes one 16-colour table, `ansi` in `design/tokens/syntax.resolved.json`: WezTerm, the VS Code and Cursor terminal, Neovim's `:terminal`, and Layer. Its hues are the syntax hues at a calmer chroma, and its green is poison.
 
 ## Installing
 

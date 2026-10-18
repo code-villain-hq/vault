@@ -123,5 +123,9 @@ resolved file; Layer's terminal and diff tints read it too.
 - Each role lists the TextMate scopes it colours; VS Code reads that
   table, and Neovim maps Treesitter and LSP groups onto the role names.
 - Every terminal takes one 16-colour table, `ansi` in the resolved file
-  (`--ansi-0` to `--ansi-15` in CSS): the syntax hues, greys for black
-  and white, the comment grey for bright black.
+  (`--ansi-0` to `--ansi-15` in CSS). A shell is mostly colour, so its
+  hues take the syntax lightness at a lower chroma (`terminal-chroma`):
+  grey does more of the work. Green is poison, readable on the ground (a
+  deep olive by day), the one colour that stands out, per
+  [`brand/color.md`](../../brand/color.md). Black and white are greys,
+  bright black the comment grey.

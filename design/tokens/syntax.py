@@ -6,7 +6,7 @@ functions, and the language's own names like `this`. All share one OKLCH
 lightness, so no token shouts. Names and type names stay in `fg`; grey
 steps back for brackets, then punctuation and comments. Poison and cloak
 keep their meanings: cloak is the cursor and focus, poison the search match
-and live signals. Neither colours a token.
+and live signals. Neither colours a token; in a terminal, poison is the green.
 """
 from theme import contrast, mix, oklch, readable, tone
 
@@ -100,11 +100,16 @@ def resolve(source, theme_source, color):
             "muted": readable(theme["muted"], hosts, mode, minimum),
             **{name: inks[name] for name in SEMANTIC},
         })
-        # The terminal's 16 colours, one table for every terminal: the syntax
-        # hues, so the shell and the editor speak one set. Black and white are
-        # greys that read in each mode; bright black is the comment grey.
-        terminal = [inks["danger"], syntax["string"], syntax["constant"], syntax["function"],
-                    syntax["keyword"], syntax["property"]]
+        # The terminal's 16 colours, one table for every terminal. A shell is
+        # mostly colour (listings, prompts, logs), so its hues sit at the
+        # syntax lightness but a lower chroma: grey does more of the work.
+        # Green is poison, readable on the ground: success and additions wear
+        # the brand. Black and white are greys that read in each mode; bright
+        # black is the comment grey.
+        def calm(color):
+            return readable(tone(lightness, levels["terminal-chroma"], oklch(color)[2]), hosts, mode, minimum)
+        terminal = [calm(theme["danger"]), readable(theme["primary"], hosts, mode, minimum),
+                    calm(syntax["constant"]), calm(syntax["function"]), calm(syntax["keyword"]), calm(syntax["property"])]
         ansi = {
             "normal": [theme["surface"] if night else theme["fg"], *terminal, syntax["bracket"]],
             "bright": [ui["line-number"], *terminal, syntax["text"]],

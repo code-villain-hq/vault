@@ -15,8 +15,8 @@ split = "#2B2B2B"
 scrollbar_thumb = "#2B2B2B"
 compose_cursor = "#E1B671"
 visual_bell = "#1F1F1F"
-ansi = ["#1B1B1B", "#F27A6B", "#76D3B4", "#E1B671", "#94C0FE", "#BAB4FB", "#68CFE4", "#B7B7B7"]
-brights = ["#9E9E9E", "#F27A6B", "#76D3B4", "#E1B671", "#94C0FE", "#BAB4FB", "#68CFE4", "#EBEBEB"]
+ansi = ["#1B1B1B", "#E2B0A8", "#C9E265", "#D3BA93", "#A6C0E5", "#BBB8E3", "#91C8D5", "#B7B7B7"]
+brights = ["#9E9E9E", "#E2B0A8", "#C9E265", "#D3BA93", "#A6C0E5", "#BBB8E3", "#91C8D5", "#EBEBEB"]
 
 [colors.tab_bar]
 background = "#0B0B0B"

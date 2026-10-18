@@ -2,7 +2,7 @@
   "name": "code-villain-theme",
   "displayName": "Code Villain",
   "description": "Code Villain's theme, in night and day, generated from the vault's design tokens.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "code-villain",
   "engines": { "vscode": "^1.80.0" },
   "categories": ["Themes"],

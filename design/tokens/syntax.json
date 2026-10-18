@@ -13,13 +13,15 @@
       "hue": 0.8,
       "chroma": 0.1,
       "structure": 0.78,
-      "quiet": 0.7
+      "quiet": 0.7,
+      "terminal-chroma": 0.06
     },
     "day": {
       "hue": 0.5,
       "chroma": 0.11,
       "structure": 0.36,
-      "quiet": 0.5
+      "quiet": 0.5,
+      "terminal-chroma": 0.07
     }
   },
   "opacity": {
