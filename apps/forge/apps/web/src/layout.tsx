@@ -17,6 +17,7 @@ import {
   CircleUserRound,
   Folders,
   Funnel,
+  GitMerge,
   GitPullRequest,
   Inbox,
   Layers,
@@ -434,6 +435,10 @@ function SettingsNav() {
         <Link to="/$workspace/settings/github" params={params} className={navLink}>
           <NavIcon icon={GitPullRequest} />
           GitHub
+        </Link>
+        <Link to="/$workspace/settings/forgejo" params={params} className={navLink}>
+          <NavIcon icon={GitMerge} />
+          Forgejo
         </Link>
       </nav>
       <nav aria-label="Personal settings" className="flex flex-col gap-0.5">

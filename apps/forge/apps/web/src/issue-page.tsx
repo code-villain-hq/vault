@@ -4,11 +4,12 @@ import type {
   Decision,
   Issue,
   IssueEvent,
+  IssueLink,
   IssueRelation,
   RelationType,
 } from "@forge/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ChevronRight, Ellipsis, Plus } from "lucide-react";
+import { ChevronRight, Ellipsis, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentWorkLine } from "./agent-work";
 import { type Confirmation, ConfirmDialog } from "./confirm";
@@ -17,7 +18,7 @@ import {
   byId,
   identifier,
   issueKnowledge,
-  mergeBlocker,
+  pullRequestNote,
   timeAgo,
   useIssueByIdentifier,
   useStates,
@@ -35,7 +36,7 @@ import {
   ServicePicker,
   StatusPicker,
 } from "./issue-fields";
-import { ReviewBar, useReviewState } from "./issue-review";
+import { ReviewBar, useCodeHosts, useReviewState } from "./issue-review";
 import { SpecChangeSummary, useOpenSpecChanges } from "./issue-spec-change";
 import { TriageBar } from "./issue-triage";
 import { DecisionRow, SpecRow } from "./knowledge";
@@ -227,6 +228,7 @@ function Fields({
       {(issue.due_date || addingDueDate) && (
         <DueDate issue={issue} autoOpen={addingDueDate} onDone={() => setAddingDueDate(false)} />
       )}
+      {issue.no_code && <NoCodeChip issue={issue} />}
       <Menu.Root>
         <Menu.Trigger
           aria-label="More"
@@ -243,6 +245,14 @@ function Fields({
               {!issue.due_date && (
                 <Menu.Item className={menuItem} onClick={() => setAddingDueDate(true)}>
                   Add a due date
+                </Menu.Item>
+              )}
+              {!issue.no_code && (
+                <Menu.Item
+                  className={menuItem}
+                  onClick={() => sync.update("Issue", issue.id, { no_code: true })}
+                >
+                  Mark as needing no code
                 </Menu.Item>
               )}
               {!hasChildren && (
@@ -306,6 +316,28 @@ function Fields({
 
 const menuItem =
   "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
+
+/**
+ * The No code mark: the work changes no code, so its review needs no pull
+ * request. Set from "⋯" or by an agent handing the issue over.
+ */
+function NoCodeChip({ issue }: { issue: Issue }) {
+  const { sync } = useWorkspace();
+  return (
+    <span className={chip}>
+      No code
+      <button
+        type="button"
+        aria-label="Remove the No code mark"
+        title="Remove the No code mark"
+        onClick={() => sync.update("Issue", issue.id, { no_code: false })}
+        className="-mr-1 rounded text-faint outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <X size={12} aria-hidden="true" />
+      </button>
+    </span>
+  );
+}
 
 /** The due date as a chip; opens the calendar when just added from "⋯". */
 function DueDate({
@@ -1081,13 +1113,19 @@ function Links({ issue }: { issue: Issue }) {
     .filter((l) => l.issue_id === issue.id)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   if (links.length === 0) return null;
+  return <LinkRows links={links} />;
+}
+
+function LinkRows({ links }: { links: IssueLink[] }) {
+  // Whether Forge's look at Forgejo is recent enough to vouch for its rows.
+  const { hosts, now } = useCodeHosts();
   // Said on each row only when they're in more than one repository.
   const oneRepository = links.every((l) => l.repository === links[0]?.repository);
   return (
     <Section title="Pull requests and commits">
       {links.map((link) => {
         const state = LINK_STATES[link.state];
-        const blocker = mergeBlocker(link);
+        const note = hosts && pullRequestNote(link, hosts, now);
         return (
           <a
             key={link.id}
@@ -1101,11 +1139,11 @@ function Links({ issue }: { issue: Issue }) {
               {state?.label}
             </span>
             <span className="min-w-0 flex-1 truncate">{link.title}</span>
-            {blocker && (
+            {note && (
               <span
-                className={`shrink-0 text-xs ${link.blocker === "checks_running" ? "text-muted" : "text-danger-ink"}`}
+                className={`shrink-0 text-xs ${note.tone === "danger" ? "text-danger-ink" : "text-muted"}`}
               >
-                {blocker}
+                {note.text}
               </span>
             )}
             <span className="shrink-0 font-mono text-xs text-faint">
