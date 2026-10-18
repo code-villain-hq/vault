@@ -31,6 +31,7 @@ import {
   LabelsPicker,
   PriorityPicker,
   ProjectPicker,
+  ReviewerPicker,
   ServicePicker,
   StatusPicker,
 } from "./issue-fields";
@@ -218,6 +219,7 @@ function Fields({
       <StatusPicker issue={issue} variant="chip" />
       <PriorityPicker issue={issue} variant="chip" />
       <AssigneePicker issue={issue} variant="chip" />
+      <ReviewerPicker issue={issue} variant="chip" />
       <ServicePicker issue={issue} />
       <LabelsPicker issue={issue} variant="chip" />
       <ProjectPicker issue={issue} variant="chip" />

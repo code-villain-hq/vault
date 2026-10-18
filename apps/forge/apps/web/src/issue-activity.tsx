@@ -93,7 +93,8 @@ function Change({ event, users }: { event: IssueEvent; users: Map<string, User> 
       if (event.to === event.actor_id) return <>self-assigned the issue</>;
       return <>assigned it to {name(users.get(event.to)?.name ?? "someone")}</>;
     case "reviewer":
-      if (!event.to) return <>removed {name(users.get(event.from ?? "")?.name ?? "someone")} as reviewer</>;
+      if (!event.to)
+        return <>removed {name(users.get(event.from ?? "")?.name ?? "someone")} as reviewer</>;
       if (event.to === event.actor_id) return <>took the review</>;
       return <>asked {name(users.get(event.to)?.name ?? "someone")} to review it</>;
     case "labels": {

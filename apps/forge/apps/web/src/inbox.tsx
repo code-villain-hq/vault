@@ -14,6 +14,7 @@ const VERBS: Record<Notification["type"], string> = {
   suggestion: "suggests a change to",
   mention: "mentioned you in",
   spec_conflict: "wants to change a requirement your issue changes, in",
+  review: "is ready for your review",
 };
 
 /** Newest first. */
@@ -50,8 +51,10 @@ function useDescribe() {
     const teamsById = byId(teams);
     const suggestionsById = byId(suggestions);
     return (n: Notification) => {
-      const actor = users.find((u) => u.id === n.actor_id);
       const issue = n.issue_id ? issuesById.get(n.issue_id) : undefined;
+      // A review is the assignee's: "Claude Code is ready for your review".
+      const actorId = n.type === "review" ? (issue?.assignee_id ?? n.actor_id) : n.actor_id;
+      const actor = users.find((u) => u.id === actorId);
       const suggestion = n.suggestion_id ? suggestionsById.get(n.suggestion_id) : undefined;
       const issueLabel = issue
         ? `${identifier(issue, teamsById)} ${issue.title}`
@@ -80,6 +83,7 @@ const ROW_VERBS: Record<Notification["type"], string> = {
   suggestion: "suggests a change",
   mention: "mentioned you",
   spec_conflict: "wants to change a requirement your issue changes",
+  review: "is ready for your review",
 };
 
 /**
