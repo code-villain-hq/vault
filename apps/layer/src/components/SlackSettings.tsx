@@ -7,10 +7,10 @@ import type { AgentStatus, SlackBotConfig, SlackBotStatus, SlackConfig } from ".
 import { Field, Switch } from "./ui";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
-  connected: ["connected", "add"],
-  connecting: ["connecting…", "warn"],
-  failing: ["not connected", "del"],
-  off: ["off", ""],
+  connected: ["connected", "ui-status ui-status-ok"],
+  connecting: ["connecting…", "ui-status ui-status-warn"],
+  failing: ["not connected", "ui-status ui-status-danger"],
+  off: ["off", "ui-chip"],
 };
 
 /**
@@ -102,7 +102,7 @@ export function SlackSettings() {
   }
 
   const link = (href: string, text: string) => (
-    <a href="#" onClick={(e) => { e.preventDefault(); void openUrl(href); }}>
+    <a className="ui-link" href="#" onClick={(e) => { e.preventDefault(); void openUrl(href); }}>
       {text}
     </a>
   );
@@ -121,10 +121,10 @@ export function SlackSettings() {
       {bot && (
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="row">
-            <span className={`chip ${tone}`}>{label}</span>
+            <span className={tone}>{label}</span>
             <span className="muted">@{bot.bot_name}</span>
             <div className="spacer" />
-            <button className="btn btn-sm btn-danger" onClick={() => void disconnect()}>
+            <button className="ui-button ui-button-danger" onClick={() => void disconnect()}>
               Disconnect
             </button>
           </div>
@@ -169,7 +169,7 @@ export function SlackSettings() {
             label="Who it is"
             hint="Its replies in Slack are written in this voice. It changes how it sounds, not how carefully it works. A chat already open keeps the voice it started with."
           >
-            <textarea
+            <textarea className="ui-field"
               rows={4}
               maxLength={2000}
               value={personality}
@@ -177,7 +177,7 @@ export function SlackSettings() {
               placeholder="You are Doctor Doom, monarch of Latveria. Answer as Doom: grand, imperious, speaking of yourself as Doom. Keep every fact exact."
             />
           </Field>
-          <button className="btn btn-sm" disabled={!personalityChanged} onClick={() => void savePersonality()}>
+          <button className="ui-button" disabled={!personalityChanged} onClick={() => void savePersonality()}>
             Save personality
           </button>
         </div>
@@ -186,7 +186,7 @@ export function SlackSettings() {
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Making the bot</h3>
         <Field label="Its name" hint="What you will type after the @. Slack keeps the name; change it there later.">
-          <input value={name} maxLength={BOT_NAME_MAX} onChange={(e) => setName(e.target.value)} placeholder="drdoom" />
+          <input className="ui-field" value={name} maxLength={BOT_NAME_MAX} onChange={(e) => setName(e.target.value)} placeholder="drdoom" />
         </Field>
         <div className="muted" style={{ lineHeight: 1.7 }}>
           <ol style={{ margin: "0 0 0", paddingLeft: 18 }}>
@@ -210,12 +210,12 @@ export function SlackSettings() {
           </ol>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn btn-sm" onClick={() => setShowManifest((v) => !v)}>
+          <button className="ui-button" onClick={() => setShowManifest((v) => !v)}>
             {showManifest ? "Hide manifest" : "Show app manifest"}
           </button>
         </div>
         {showManifest && (
-          <textarea
+          <textarea className="ui-field"
             readOnly
             rows={16}
             value={JSON.stringify(botManifest(name), null, 2)}
@@ -226,7 +226,7 @@ export function SlackSettings() {
       </div>
 
       <Field label="Bot token" hint="OAuth & Permissions → Bot User OAuth Token. Stored in your keychain.">
-        <input
+        <input className="ui-field"
           type="password"
           value={botToken}
           onChange={(e) => setBotToken(e.target.value)}
@@ -234,7 +234,7 @@ export function SlackSettings() {
         />
       </Field>
       <Field label="App-level token" hint="Basic Information → App-Level Tokens, with connections:write. Stored in your keychain.">
-        <input
+        <input className="ui-field"
           type="password"
           value={appToken}
           onChange={(e) => setAppToken(e.target.value)}
@@ -242,11 +242,11 @@ export function SlackSettings() {
         />
       </Field>
       <Field label="Your member ID" hint="The one person the bot takes requests from.">
-        <input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="U0123ABCD" />
+        <input className="ui-field" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="U0123ABCD" />
       </Field>
       {!bot && (
         <Field label="Agent" hint="Who a thread is handed to: an agent that runs as a conversation (ACP).">
-          <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+          <select className="ui-field" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
             {conversational.length === 0 && <option value="">No agent on your PATH runs over ACP</option>}
             {conversational.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
@@ -255,7 +255,7 @@ export function SlackSettings() {
         </Field>
       )}
       <button
-        className="btn btn-primary"
+        className="ui-button ui-button-primary"
         disabled={busy || !owner.trim() || !(bot?.agent_id || agentId) || (!bot && (!botToken.trim() || !appToken.trim()))}
         onClick={() => void connect()}
       >
@@ -284,7 +284,7 @@ function AgentAndModel({ bot, conversational, onChange }: {
   return (
     <div className="row" style={{ marginTop: 10, gap: 12, alignItems: "flex-start" }}>
       <Field label="Agent" hint="Who a thread is handed to.">
-        <select value={bot.agent_id} onChange={(e) => onChange(e.target.value, "")}>
+        <select className="ui-field" value={bot.agent_id} onChange={(e) => onChange(e.target.value, "")}>
           {!conversational.some((a) => a.id === bot.agent_id) && <option value={bot.agent_id}>{agentName}</option>}
           {conversational.map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
@@ -297,7 +297,7 @@ function AgentAndModel({ bot, conversational, onChange }: {
           ? `Open a chat with ${agentName} once and its models are listed here.`
           : "For chats opened from now on."}
       >
-        <select value={bot.model} onChange={(e) => onChange(bot.agent_id, e.target.value)}>
+        <select className="ui-field" value={bot.model} onChange={(e) => onChange(bot.agent_id, e.target.value)}>
           <option value="">{agentName} decides</option>
           {models.map((m) => (
             <option key={m.value} value={m.value}>{m.name}</option>
@@ -352,9 +352,9 @@ function Notifications({ botName }: { botName: string }) {
         hint={<>A channel name or ID. The bot posts only where it is invited: <code>/invite @{botName}</code> there first.</>}
       >
         <div className="row">
-          <input value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="#eng-agents" />
+          <input className="ui-field" value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="#eng-agents" />
           <button
-            className="btn"
+            className="ui-button"
             disabled={busy || !channel.trim() || channel.trim() === slack?.channel}
             onClick={() => void saveChannel()}
           >

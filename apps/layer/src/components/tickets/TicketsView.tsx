@@ -253,7 +253,7 @@ export function TicketsView() {
       <div className="empty">
         <h2>Jira not connected</h2>
         <p>Connect Jira to pull your assigned issues and start work from a ticket.</p>
-        <button className="btn" onClick={() => toggleSettings(true)}>Connect Jira</button>
+        <button className="ui-button" onClick={() => toggleSettings(true)}>Connect Jira</button>
       </div>
     );
   }
@@ -310,7 +310,7 @@ export function TicketsView() {
               {epics.length === 1 ? "" : "s"}
             </span>
             {issuesLoading && <Spinner />}
-            <input
+            <input className="ui-field"
               type="text"
               style={{ width: 220 }}
               placeholder="Filter by key, title, label…"
@@ -318,7 +318,7 @@ export function TicketsView() {
               onChange={(e) => setQuery(e.target.value)}
             />
             <button
-              className="btn btn-sm"
+              className="ui-button"
               disabled={epics.length === 0}
               title={allShut ? "Open every epic" : "Close every epic"}
               onClick={() =>
@@ -329,13 +329,13 @@ export function TicketsView() {
             >
               {allShut ? "Expand all" : "Collapse all"}
             </button>
-            <button type="button" className="btn btn-sm" onClick={() => setCreatingTicket(true)}>
+            <button type="button" className="ui-button" onClick={() => setCreatingTicket(true)}>
               New ticket…
             </button>
-            <button className="btn btn-sm" onClick={() => setCreatingEpic(true)}>
+            <button className="ui-button" onClick={() => setCreatingEpic(true)}>
               New epic…
             </button>
-            <button className="btn btn-sm" onClick={() => void refreshIssues()}>Refresh</button>
+            <button className="ui-button" onClick={() => void refreshIssues()}>Refresh</button>
           </>
         ) : (
           <span className="sub">
@@ -448,11 +448,11 @@ export function TicketsView() {
             >
               <span className={`chev${closed ? "" : " open"}`}><ChevronIcon /></span>
               {epic.key && <IssueTypeIcon types={types} name={epicTypeName} size={18} />}
-              {epic.key ? <span className="key-chip">{epic.key}</span> : null}
+              {epic.key ? <span className="ui-chip key-chip">{epic.key}</span> : null}
               <span className="title">{epic.summary || (epic.key ? epic.key : "No epic")}</span>
               <span className="count">{epic.issues.length}</span>
               {epic.live > 0 && (
-                <span className="chip add" title="Tickets in progress, or with a task open here">
+                <span className="ui-status ui-status-ok" title="Tickets in progress, or with a task open here">
                   {epic.live} in flight
                 </span>
               )}
@@ -464,7 +464,7 @@ export function TicketsView() {
               */}
               {epic.issue && (
                 <button
-                  className="btn btn-sm"
+                  className="ui-button"
                   onClick={(e) => {
                     e.stopPropagation();
                     const id = taskFor(epic.issue!.key);
@@ -482,7 +482,7 @@ export function TicketsView() {
               */}
               {epic.key && (
                 <button
-                  className="btn btn-sm"
+                  className="ui-button"
                   title={`File a new ticket under ${epic.key}`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -494,7 +494,7 @@ export function TicketsView() {
               )}
               {epic.key && jiraBase && (
                 <button
-                  className="btn btn-sm"
+                  className="ui-button"
                   title={`Open ${epic.key} in Jira`}
                   onClick={(e) => {
                     e.stopPropagation();

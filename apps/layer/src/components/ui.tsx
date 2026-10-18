@@ -24,16 +24,16 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <div className="overlay" onMouseDown={onClose}>
+    <div className="ui-backdrop overlay" onMouseDown={onClose}>
       <div
-        className={`modal${tall ? " tall" : ""}`}
+        className={`ui-dialog modal${tall ? " tall" : ""}`}
         style={wide ? { maxWidth: 720 } : undefined}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
           {title}
           <div className="spacer" />
-          <button className="btn-sm" onClick={onClose} title="Close"><CloseIcon /></button>
+          <button className="ui-button ui-icon-button" onClick={onClose} title="Close" aria-label="Close"><CloseIcon /></button>
         </div>
         {toolbar && <div className="modal-toolbar">{toolbar}</div>}
         <div className="modal-body">{children}</div>
@@ -76,7 +76,7 @@ export function SidebarToggle() {
   const toggle = useStore((s) => s.toggleSidebar);
   return (
     <button
-      className="icon-btn flat"
+      className="ui-button ui-icon-button flat"
       title={hidden ? "Show tasks" : "Hide tasks"}
       aria-label={hidden ? "Show tasks" : "Hide tasks"}
       onClick={toggle}
@@ -230,7 +230,7 @@ export function ContextMenu({
       y={y}
       onClose={onClose}
       ignore={ignore}
-      className="ctx-menu"
+      className="ui-menu ctx-menu"
       // Items can arrive after the menu opens — resumable agents are fetched —
       // and a taller menu needs placing again or it runs off the bottom.
       measureKey={items.length}
@@ -238,7 +238,7 @@ export function ContextMenu({
       {items.map((item, i) => (
         <button
           key={i}
-          className={`ctx-item${item.danger ? " danger" : ""}${
+          className={`ctx-item ui-option${item.danger ? " danger" : ""}${
             item.separated ? " separated" : ""
           }`}
           disabled={item.disabled}
@@ -304,9 +304,9 @@ export function Confirm({
       onClose={() => { if (!running) onCancel(); }}
       footer={
         <>
-          <button className="btn" disabled={running} onClick={onCancel}>Cancel</button>
+          <button className="ui-button" disabled={running} onClick={onCancel}>Cancel</button>
           <button
-            className={`btn ${danger ? "btn-danger-solid" : "btn-primary"}`}
+            className={`ui-button ${danger ? "ui-button-danger" : "ui-button-primary"}`}
             autoFocus
             disabled={running}
             onClick={go}
@@ -335,7 +335,7 @@ export function Confirm({
  */
 export function BusyOverlay({ title, detail }: { title: string; detail?: string }) {
   return (
-    <div className="overlay deleting-overlay" aria-busy="true">
+    <div className="ui-backdrop overlay deleting-overlay" aria-busy="true">
       <div className="deleting-card">
         <Spinner />
         <div className="deleting-copy">
@@ -350,7 +350,7 @@ export function BusyOverlay({ title, detail }: { title: string; detail?: string 
 /**
  * One input that filters a list as you type.
  *
- * The app had grown five of these, each a bare `<input list>` with its own
+ * The app had grown five of these, each a bare `<input className="ui-field" list>` with its own
  * `<datalist>`: no way to tell there was anything to pick from until you
  * typed, no keyboard selection, and a native popup that looks like nothing
  * else here. One component instead, so they behave alike and look like the
@@ -426,7 +426,7 @@ export function Combo({
 
   return (
     <div className="combo" style={width === undefined ? undefined : { width }}>
-      <input
+      <input className="ui-field"
         value={text}
         placeholder={placeholder}
         title={title}
@@ -472,7 +472,7 @@ export function Combo({
         }}
       />
       {open && (
-        <div className="combo-list">
+        <div className="ui-menu combo-list">
           {shown.length === 0 && (
             <div className="combo-empty">{empty ?? "Nothing matches"}</div>
           )}
@@ -480,7 +480,7 @@ export function Combo({
             <button
               key={o}
               type="button"
-              className={i === cursor ? "on" : undefined}
+              className={`ui-option${i === cursor ? " is-active" : ""}`}
               // Down, not click: a click fires after blur has already closed
               // the list out from under the pointer.
               onMouseDown={(e) => { e.preventDefault(); commit(o); }}

@@ -194,7 +194,7 @@ export function ReposView() {
         <div className="spacer" />
         {groups.length > 1 && (
           <button
-            className="btn btn-sm"
+            className="ui-button"
             onClick={() =>
               // Every group is written either way, or the ones never touched
               // would fall back to the default instead of following.
@@ -205,7 +205,7 @@ export function ReposView() {
           </button>
         )}
         <button
-          className="btn"
+          className="ui-button"
           disabled={projects.length === 0}
           title="Remove what tasks left behind. Shows everything first."
           onClick={() => setCleaning(true)}
@@ -213,7 +213,7 @@ export function ReposView() {
           Clean up…
         </button>
         <button
-          className="btn"
+          className="ui-button"
           disabled={projects.length === 0 || syncing.size > 0}
           title="Fetch every repo into the app's copy, and fast-forward each clone's default branch where that is safe"
           onClick={() => void sync(projects.map((p) => p.id))}
@@ -222,7 +222,7 @@ export function ReposView() {
         </button>
         {/* The primary while nothing needs fixing; a repository in trouble
             has its own fix, and that is the one action to lead with. */}
-        <button className={`btn${troubled > 0 ? "" : " btn-primary"}`} onClick={() => setAdding(true)}>
+        <button className={`ui-button${troubled > 0 ? "" : " ui-button-primary"}`} onClick={() => setAdding(true)}>
           Add repositories
         </button>
       </div>
@@ -277,9 +277,9 @@ export function ReposView() {
               <div key={p.id} className={`repo-manage${problem ? " trouble" : ""}`}>
                 <div className="repo-line">
                   <span className="rname">{p.name}</span>
-                  <span className="chip" title="Default branch">{p.default_branch}</span>
+                  <span className="ui-chip" title="Default branch">{p.default_branch}</span>
                   <Standing h={h} branch={p.default_branch} />
-                  {inUse > 0 && <span className="chip add">{inUse} task{inUse === 1 ? "" : "s"}</span>}
+                  {inUse > 0 && <span className="ui-status ui-status-ok">{inUse} task{inUse === 1 ? "" : "s"}</span>}
                   <CopyState h={h} now={now} />
                   <div className="spacer" />
                   <UpdateByPicker p={p} h={h} onChange={(by) => void setUpdateBy(p, by)} />
@@ -294,7 +294,7 @@ export function ReposView() {
                     }}
                   />
                   <button
-                    className={`btn btn-sm${showNotes ? " active" : ""}${stale ? " notes-stale" : ""}`}
+                    className={`ui-button${showNotes ? " active" : ""}${stale ? " notes-stale" : ""}`}
                     title={stale
                       ? `${stale} to check: files ${stale === 1 ? "it is" : "they are"} about changed since ${stale === 1 ? "it was" : "they were"} last checked`
                       : "What agents learned about this repository"}
@@ -306,10 +306,10 @@ export function ReposView() {
                   >
                     {noted.length ? `${noted.length} note${noted.length === 1 ? "" : "s"}` : "Notes"}
                   </button>
-                  <button className="btn btn-sm" disabled={busy} onClick={() => void sync([p.id])}>
+                  <button className="ui-button" disabled={busy} onClick={() => void sync([p.id])}>
                     {busy ? <span className="btn-busy"><Spinner />Syncing…</span> : "Sync"}
                   </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => askRemove(p)}>
+                  <button className="ui-button ui-button-danger" onClick={() => askRemove(p)}>
                     Remove
                   </button>
                 </div>
@@ -328,12 +328,12 @@ export function ReposView() {
                       {unlinked && " They are linked back when the app next starts, if the app's copy has their last commit."}
                     </span>
                     {h?.found && (
-                      <button className="btn btn-sm btn-primary" onClick={() => void locate(p, h.found ?? undefined)}>
+                      <button className="ui-button ui-button-primary" onClick={() => void locate(p, h.found ?? undefined)}>
                         Use {h.found}
                       </button>
                     )}
                     {!unlinked && (
-                      <button className="btn btn-sm" onClick={() => void locate(p)}>Locate…</button>
+                      <button className="ui-button" onClick={() => void locate(p)}>Locate…</button>
                     )}
                   </div>
                 )}
@@ -375,7 +375,7 @@ function Standing({ h, branch }: { h: RepoHealth | undefined; branch: string }) 
   if (h.ahead > 0) {
     return (
       <span
-        className="chip warn"
+        className="ui-status ui-status-warn"
         title={`Your clone's ${branch} has ${h.ahead} commit${h.ahead === 1 ? "" : "s"} origin does not${h.behind ? `, and is ${h.behind} behind` : ""}. Sync leaves it alone.`}
       >
         ↑{h.ahead}{h.behind > 0 && ` ↓${h.behind}`}
@@ -384,7 +384,7 @@ function Standing({ h, branch }: { h: RepoHealth | undefined; branch: string }) 
   }
   if (h.behind > 0) {
     return (
-      <span className="chip" title={`Your clone's ${branch} is ${h.behind} commit${h.behind === 1 ? "" : "s"} behind origin. Sync fast-forwards it.`}>
+      <span className="ui-chip" title={`Your clone's ${branch} is ${h.behind} commit${h.behind === 1 ? "" : "s"} behind origin. Sync fast-forwards it.`}>
         ↓{h.behind}
       </span>
     );
@@ -404,7 +404,7 @@ function UpdateByPicker({ p, h, onChange }: {
   const guess = updateByFor(undefined, h);
   return (
     <select
-      className="update-by"
+      className="ui-field update-by"
       value={p.update_by ?? ""}
       title={`How Update from base brings the base in. ${updateByFor(p, h).why}`}
       onChange={(e) => onChange((e.target.value || null) as UpdateBy | null)}
@@ -422,7 +422,7 @@ function CheckCommand({ p, onSave }: { p: Project; onSave: (command: string) => 
   useEffect(() => setValue(p.check ?? ""), [p.check]);
   return (
     <input
-      className="repo-check mono"
+      className="ui-field repo-check mono"
       value={value}
       placeholder="check command, for loops"
       title="What says the work here is done (bun run check, cargo test). A loop runs it after each of an agent's turns."
@@ -446,7 +446,7 @@ function SpecsPicker({ p, onChange }: { p: Project; onChange: (inApp: boolean, f
   const folders = [...new Set(["specs", "docs/specs", folder])];
   return (
     <select
-      className="update-by"
+      className="ui-field update-by"
       value={p.specs_in_app ? "" : folder}
       title="Where a task's spec is kept: committed on its branch in this folder, or by the app, outside git"
       onChange={(e) => onChange(!e.target.value, e.target.value || folder)}

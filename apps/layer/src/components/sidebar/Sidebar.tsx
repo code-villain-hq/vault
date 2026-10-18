@@ -318,6 +318,7 @@ export function Sidebar() {
               <>
                 No repositories yet —{" "}
                 <a
+                  className="ui-link"
                   href="#"
                  
                   onClick={(e) => { e.preventDefault(); setView("repos"); }}
@@ -330,6 +331,7 @@ export function Sidebar() {
               <>
                 No tasks yet. A task starts from a ticket —{" "}
                 <a
+                  className="ui-link"
                   href="#"
                  
                   onClick={(e) => { e.preventDefault(); setView("tickets"); }}
@@ -421,13 +423,13 @@ export function Sidebar() {
           footer={
             <>
               <button
-                className="btn"
+                className="ui-button"
                 onClick={() => { setAddingRepoTo(null); setAdding([]); }}
               >
                 Cancel
               </button>
               <button
-                className="btn btn-primary"
+                className="ui-button ui-button-primary"
                 disabled={busy || adding.length === 0}
                 onClick={() => void addRepos(addingRepoTo)}
               >

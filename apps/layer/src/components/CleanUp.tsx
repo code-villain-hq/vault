@@ -74,12 +74,12 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
         Removed {removed} of {Object.keys(results).length}.
       </span>
       <div className="spacer" />
-      <button className="btn btn-primary" onClick={onClose}>Done</button>
+      <button className="ui-button ui-button-primary" onClick={onClose}>Done</button>
     </>
   ) : (
     <>
-      <button className="btn" disabled={running} onClick={onClose}>Cancel</button>
-      <button className="btn btn-danger-solid" disabled={running || picked.size === 0} onClick={() => void run()}>
+      <button className="ui-button" disabled={running} onClick={onClose}>Cancel</button>
+      <button className="ui-button ui-button-danger" disabled={running || picked.size === 0} onClick={() => void run()}>
         {running ? <span className="btn-busy"><Spinner />Removing…</span> : `Remove ${picked.size}`}
       </button>
     </>
@@ -127,10 +127,10 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
                         <div className="cleanup-title">
                           {/* A name to recognise, except the records, which have none. */}
                           {i.kind === "records" ? <span>{i.title}</span> : <code>{i.title}</code>}
-                          {i.repo && <span className="chip">{i.repo}</span>}
+                          {i.repo && <span className="ui-chip">{i.repo}</span>}
                           {result && (result.ok
-                            ? <span className="chip add">removed</span>
-                            : <span className="chip del">not removed</span>)}
+                            ? <span className="ui-status ui-status-ok">removed</span>
+                            : <span className="ui-status ui-status-danger">not removed</span>)}
                         </div>
                         <div className="cleanup-detail">{result && !result.ok ? result.detail : i.detail}</div>
                       </div>

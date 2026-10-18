@@ -59,9 +59,9 @@ export function DeleteTask({ task, onCancel, onDelete }: {
       onClose={onCancel}
       footer={
         <>
-          <button className="btn" onClick={onCancel}>Cancel</button>
+          <button className="ui-button" onClick={onCancel}>Cancel</button>
           <button
-            className="btn btn-danger-solid"
+            className="ui-button ui-button-danger"
             autoFocus
             disabled={transitions === null}
             onClick={() => onDelete(dirty > 0, chosen)}
@@ -87,7 +87,7 @@ export function DeleteTask({ task, onCancel, onDelete }: {
             {transitions === null ? (
               <div className="muted">Asking Jira where it can go…</div>
             ) : (
-              <select value={pick} onChange={(e) => setPick(e.target.value)}>
+              <select className="ui-field" value={pick} onChange={(e) => setPick(e.target.value)}>
                 <option value="">Leave it as it is</option>
                 {transitions.map((t) => (
                   <option key={t.id} value={t.id}>{t.name} → {t.to_status}</option>

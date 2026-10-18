@@ -106,9 +106,9 @@ export function FileIssueDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="ui-button" onClick={onClose}>Cancel</button>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={filingBusy || !newSummary.trim() || !newType || !projectKey || missing.length > 0}
             title={
               missing.length > 0
@@ -151,7 +151,7 @@ export function FileIssueDialog({
       )}
 
       <Field label="Summary">
-        <input
+        <input className="ui-field"
           autoFocus
           value={newSummary}
           onChange={(e) => setNewSummary(e.target.value)}
@@ -165,7 +165,7 @@ export function FileIssueDialog({
           {creatable.map((t) => (
             <button
               key={t.id}
-              className={`type-pick${newType === t.name ? " active" : ""}`}
+              className={`ui-chip type-pick${newType === t.name ? " active" : ""}`}
               onClick={() => setNewType(t.name)}
             >
               <IssueTypeIcon types={types} name={t.name} size={15} />
@@ -185,7 +185,7 @@ export function FileIssueDialog({
             : "Optional. Becomes the ticket body and an agent's briefing."
         }
       >
-        <textarea
+        <textarea className="ui-field"
           rows={5}
           value={newDesc}
           onChange={(e) => setNewDesc(e.target.value)}

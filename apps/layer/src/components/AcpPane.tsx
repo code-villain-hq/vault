@@ -181,7 +181,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
                 ))}
               </div>
             )}
-            <textarea
+            <textarea className="ui-field"
               rows={3}
               value={draft}
               disabled={over}
@@ -199,7 +199,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               {(view?.settings ?? []).map((s) => (
                 <label key={s.id} className="acp-setting" title={s.options.find((o) => o.value === s.current)?.description ?? s.name}>
                   <span>{s.name}</span>
-                  <select value={s.current} disabled={over} onChange={(e) => set(s.id, e.target.value)}>
+                  <select className="ui-field" value={s.current} disabled={over} onChange={(e) => set(s.id, e.target.value)}>
                     {s.options.map((o) => <option key={o.value} value={o.value}>{o.name}</option>)}
                   </select>
                 </label>
@@ -212,9 +212,9 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               )}
               {view?.agent && <span className="muted">{view.agent}</span>}
               {busy ? (
-                <button className="btn btn-sm" onClick={stop}>Stop</button>
+                <button className="ui-button" onClick={stop}>Stop</button>
               ) : (
-                <button className={`btn btn-sm${over || (!draft.trim() && images.length === 0) ? "" : " btn-primary"}`} disabled={over || (!draft.trim() && images.length === 0)} onClick={() => void send()}>Send</button>
+                <button className={`ui-button${over || (!draft.trim() && images.length === 0) ? "" : " ui-button-primary"}`} disabled={over || (!draft.trim() && images.length === 0)} onClick={() => void send()}>Send</button>
               )}
             </div>
           </div>
@@ -284,7 +284,7 @@ const Entry = memo(function Entry({ entry, onAnswer }: {
               {entry.options.map((o) => (
                 <button
                   key={o.id}
-                  className={`btn btn-sm${o.kind === "allow_once" ? " btn-primary" : o.kind.startsWith("reject") ? " btn-danger" : ""}`}
+                  className={`ui-button${o.kind === "allow_once" ? " ui-button-primary" : o.kind.startsWith("reject") ? " ui-button-danger" : ""}`}
                   onClick={() => onAnswer(entry.index, o.id)}
                 >
                   {o.name}

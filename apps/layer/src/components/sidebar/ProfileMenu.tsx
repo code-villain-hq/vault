@@ -70,21 +70,21 @@ export function ProfileMenu() {
           above
           onClose={() => setMenu(null)}
           ignore={button}
-          className="ctx-menu profile-menu"
+          className="ui-menu ctx-menu profile-menu"
           measureKey={profiles.length}
         >
           <div className="profile-menu-head">Profiles</div>
           {profiles.map((p) => (
-            <button key={p.id} className="ctx-item profile-item" onClick={() => open(p)}>
+            <button key={p.id} className="ctx-item ui-option profile-item" onClick={() => open(p)}>
               <Initial profile={p} />
               <span className="profile-item-name">{p.name}</span>
               <span className="profile-state">{p.current ? "this window" : p.open ? "open" : ""}</span>
             </button>
           ))}
-          <button className="ctx-item separated" onClick={() => { setMenu(null); setMaking(true); }}>
+          <button className="ctx-item ui-option separated" onClick={() => { setMenu(null); setMaking(true); }}>
             New profile…
           </button>
-          <button className="ctx-item" onClick={() => { setMenu(null); setManaging(true); }}>
+          <button className="ctx-item ui-option" onClick={() => { setMenu(null); setManaging(true); }}>
             Manage profiles…
           </button>
         </Floating>
@@ -128,7 +128,7 @@ function ColourPicker({
   onClose: () => void;
 }) {
   return (
-    <Floating x={at.x} y={at.y} onClose={onClose} className="ctx-menu profile-colours">
+    <Floating x={at.x} y={at.y} onClose={onClose} className="ui-menu ctx-menu profile-colours">
       {Array.from({ length: COLOURS }, (_, i) => (
         <button
           key={i}
@@ -163,8 +163,8 @@ function NewProfile({ onClose, onMade }: { onClose: () => void; onMade: (p: Prof
       onClose={onClose}
       footer={
         <>
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={!name.trim() || busy} onClick={make}>
+          <button className="ui-button" onClick={onClose}>Cancel</button>
+          <button className="ui-button ui-button-primary" disabled={!name.trim() || busy} onClick={make}>
             {busy ? "Opening…" : "Create and open"}
           </button>
         </>
@@ -174,7 +174,7 @@ function NewProfile({ onClose, onMade }: { onClose: () => void; onMade: (p: Prof
         label="Name"
         hint="A Layer of its own, empty: its own repositories, tasks, connections and tokens. It opens in a new window, beside this one."
       >
-        <input
+        <input className="ui-field"
           value={name}
           maxLength={40}
           autoFocus
@@ -224,7 +224,7 @@ function ManageProfiles({
           : null;
 
   return (
-    <Modal title="Profiles" onClose={onClose} footer={<button className="btn" onClick={onClose}>Done</button>}>
+    <Modal title="Profiles" onClose={onClose} footer={<button className="ui-button" onClick={onClose}>Done</button>}>
       <div className="profile-rows">
         {profiles.map((p) => (
           <div key={p.id} className="profile-row">
@@ -240,7 +240,7 @@ function ManageProfiles({
             </button>
             {renaming?.id === p.id ? (
               <input
-                className="profile-rename"
+                className="ui-field profile-rename"
                 value={renaming.name}
                 maxLength={40}
                 autoFocus
@@ -260,14 +260,14 @@ function ManageProfiles({
             )}
             {renaming?.id === p.id ? (
               <>
-                <button className="btn btn-sm btn-primary" disabled={!renaming.name.trim()} onClick={rename}>Save</button>
-                <button className="btn btn-sm" onClick={() => setRenaming(null)}>Cancel</button>
+                <button className="ui-button ui-button-primary" disabled={!renaming.name.trim()} onClick={rename}>Save</button>
+                <button className="ui-button" onClick={() => setRenaming(null)}>Cancel</button>
               </>
             ) : (
               <>
-                <button className="btn btn-sm" onClick={() => setRenaming({ id: p.id, name: p.name })}>Rename</button>
+                <button className="ui-button" onClick={() => setRenaming({ id: p.id, name: p.name })}>Rename</button>
                 <button
-                  className="btn btn-sm btn-danger"
+                  className="ui-button ui-button-danger"
                   disabled={kept(p) !== null}
                   title={kept(p) ?? undefined}
                   onClick={() => setDeleting(p)}

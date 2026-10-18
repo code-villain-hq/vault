@@ -50,7 +50,7 @@ export function LoopButton({ pane, task }: { pane: PaneInfo | undefined; task: T
   return (
     <>
       <button
-        className="btn btn-sm btn-add"
+        className="ui-button btn-add"
         title={`Put ${paneName(pane)} on a loop: its checks run each time it ends a turn`}
         onClick={() => setAsking(true)}
       >
@@ -124,8 +124,8 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
       onClose={() => { if (!busy) onClose(); }}
       footer={
         <>
-          <button className="btn" disabled={busy} onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={busy || !any} onClick={() => void start()}>
+          <button className="ui-button" disabled={busy} onClick={onClose}>Cancel</button>
+          <button className="ui-button ui-button-primary" disabled={busy || !any} onClick={() => void start()}>
             {busy ? "Starting…" : "Start loop"}
           </button>
         </>
@@ -147,7 +147,7 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
           hint="Passes when it exits 0. Kept for the repository; also in Repos."
         >
           <input
-            className="mono"
+            className="ui-field mono"
             value={commands[c.project_id] ?? ""}
             placeholder="not checked (cargo test, bun run check…)"
             spellCheck={false}
@@ -160,13 +160,13 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
           label={`The agent's ${mode.name.toLowerCase()}`}
           hint={mode.options.find((o) => o.value === modeValue)?.description ?? "The agent's own setting, as under its conversation."}
         >
-          <select value={modeValue} onChange={(e) => setModeValue(e.target.value)}>
+          <select className="ui-field" value={modeValue} onChange={(e) => setModeValue(e.target.value)}>
             {mode.options.map((o) => <option key={o.value} value={o.value}>{o.name}</option>)}
           </select>
         </Field>
       )}
       <Field label="Rounds" hint="The most times failures go back to the agent before the loop gives up (1–20).">
-        <input
+        <input className="ui-field"
           type="number"
           min={1}
           max={20}
@@ -212,20 +212,20 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
         <span className="loop-what" title={what(view, paneName(pane))}>{what(view, paneName(pane))}</span>
         <div className="spacer" />
         {view.runs.length > 0 && (
-          <button className="btn btn-sm" onClick={() => setOpen((o) => !o)}>
+          <button className="ui-button" onClick={() => setOpen((o) => !o)}>
             {open ? "Hide checks" : `Checks (${view.runs.length})`}
           </button>
         )}
         {!ended && (
-          <button className="btn btn-sm" onClick={() => void api.stopLoop(pane.id).catch(fail)}>Stop</button>
+          <button className="ui-button" onClick={() => void api.stopLoop(pane.id).catch(fail)}>Stop</button>
         )}
         {ended && pane.running && (
-          <button className="btn btn-sm" onClick={() => void api.startLoop(pane.id, view.rounds).catch(fail)}>
+          <button className="ui-button" onClick={() => void api.startLoop(pane.id, view.rounds).catch(fail)}>
             Start again
           </button>
         )}
         {ended && (
-          <button className="btn btn-sm" title="Put this away" onClick={() => setDismissed(view.started_at)}>
+          <button className="ui-button" title="Put this away" onClick={() => setDismissed(view.started_at)}>
             Done
           </button>
         )}

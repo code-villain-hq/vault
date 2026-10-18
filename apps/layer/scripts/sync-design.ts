@@ -9,6 +9,7 @@ const files = [
   ["design/tokens/color.resolved.json", "color.json"],
   ["design/tokens/syntax.resolved.json", "syntax.json"],
   ...["color.css", "type.css", "shape.css"].map((name) => [`design/tokens/${name}`, name]),
+  ["design/components.css", "components.css"],
   ...[
     "fonts.css",
     "grenze-gotisch.ttf",

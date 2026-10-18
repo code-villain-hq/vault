@@ -42,7 +42,7 @@ export function BrowserTabs({
           </button>
         </div>
       ))}
-      <button className="btn btn-sm btn-icon browser-tab-new" title="New tab" disabled={locked} onClick={onNew}>
+      <button className="ui-button ui-icon-button browser-tab-new" title="New tab" disabled={locked} onClick={onNew}>
         <PlusIcon />
       </button>
     </div>

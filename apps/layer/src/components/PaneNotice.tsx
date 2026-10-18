@@ -23,7 +23,7 @@ export function PaneNotice({ pane: p, onHandoff }: { pane: PaneInfo | undefined;
         <b>{p.title}</b> looks out of budget — it reported hitting a usage limit.
       </span>
       <div className="spacer" />
-      <button className="btn btn-sm btn-primary" onClick={() => onHandoff(p)}>
+      <button className="ui-button ui-button-primary" onClick={() => onHandoff(p)}>
         Hand off to another agent…
       </button>
     </div>

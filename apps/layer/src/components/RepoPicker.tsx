@@ -53,7 +53,7 @@ export function RepoPicker({
 
       {total > 6 && (
         <div className="picker-top">
-          <input
+          <input className="ui-field"
             type="text"
             placeholder={`Filter ${total} repositories…`}
             value={query}
@@ -63,7 +63,7 @@ export function RepoPicker({
             {picked.length} selected
           </span>
           {picked.length > 0 && (
-            <button className="btn-sm" title="Clear selection" onClick={() => onChange([])}>
+            <button className="ui-button ui-icon-button" title="Clear selection" aria-label="Clear selection" onClick={() => onChange([])}>
               ✕
             </button>
           )}

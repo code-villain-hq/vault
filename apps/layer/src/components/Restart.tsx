@@ -71,7 +71,7 @@ export function PaneExited({ pane, busy, onResume }: {
         Resume picks its conversation up where it stopped.
       </span>
       <div className="spacer" />
-      <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => onResume(pane)}>
+      <button className="ui-button ui-button-primary" disabled={busy} onClick={() => onResume(pane)}>
         {busy ? "Resuming…" : "Resume"}
       </button>
     </div>

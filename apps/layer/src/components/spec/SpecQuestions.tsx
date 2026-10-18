@@ -37,7 +37,7 @@ export function SpecQuestions({ task }: { task: TaskView }) {
       {applied && (
         <div className="spec-applied">
           <span>{appliedSummary(applied.results)}</span>
-          <button className="btn btn-sm" disabled={!!drafting} onClick={() => undoAnswers(task.id)}>Undo</button>
+          <button className="ui-button" disabled={!!drafting} onClick={() => undoAnswers(task.id)}>Undo</button>
         </div>
       )}
       {qs.map((q) => (
@@ -51,7 +51,7 @@ export function SpecQuestions({ task }: { task: TaskView }) {
       {qs.length > 0 && (
         <div className="row spec-apply">
           <button
-            className="btn btn-sm"
+            className="ui-button"
             disabled={!anyAnswered || !!drafting}
             title={anyAnswered
               ? "Rewrite the requirements the answers decide, and take the answered questions out"
@@ -107,7 +107,7 @@ function QuestionCard({ question, disabled, onAnswer }: {
           })}
         </div>
       )}
-      <input
+      <input className="ui-field"
         value={own}
         disabled={disabled}
         placeholder={question.options.length > 0 ? "Or your own answer" : "Your answer"}

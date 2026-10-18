@@ -57,9 +57,9 @@ export function ReadTicketDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="btn" onClick={onClose}>Close</button>
+          <button className="ui-button" onClick={onClose}>Close</button>
           <button
-            className="btn btn-sm"
+            className="ui-button"
             onClick={() => void openUrl(issue.url).catch(fail)}
             title="The same ticket, on the website"
           >
@@ -67,7 +67,7 @@ export function ReadTicketDialog({
           </button>
           <div className="spacer" />
           {!hasTask && (
-            <button className="btn btn-primary" onClick={onStart}>
+            <button className="ui-button ui-button-primary" onClick={onStart}>
               Start work…
             </button>
           )}
@@ -79,22 +79,22 @@ export function ReadTicketDialog({
       </h3>
 
       <div className="row" style={{ marginBottom: 14, flexWrap: "wrap" }}>
-        <span className="chip chip-type">
+        <span className="ui-chip chip-type">
           <IssueTypeIcon types={types} name={issue.issue_type} size={13} />
           {issue.issue_type}
         </span>
-        <span className={`status-pill ${statusClass(issue.status_category)}`}>
+        <span className={`ui-status status-pill ${statusClass(issue.status_category)}`}>
           {issue.status}
         </span>
-        {issue.priority && <span className="chip">{issue.priority}</span>}
-        {issue.assignee && <span className="chip">{issue.assignee}</span>}
+        {issue.priority && <span className="ui-chip">{issue.priority}</span>}
+        {issue.assignee && <span className="ui-chip">{issue.assignee}</span>}
         {issue.epic_key && (
-          <span className="chip" title={issue.epic_summary ?? undefined}>
+          <span className="ui-chip" title={issue.epic_summary ?? undefined}>
             epic {issue.epic_key}
           </span>
         )}
-        {issue.components.map((c) => <span key={c} className="chip">{c}</span>)}
-        {issue.labels.map((l) => <span key={l} className="chip">{l}</span>)}
+        {issue.components.map((c) => <span key={c} className="ui-chip">{c}</span>)}
+        {issue.labels.map((l) => <span key={l} className="ui-chip">{l}</span>)}
       </div>
 
       {transitions.length > 0 && (
@@ -106,7 +106,7 @@ export function ReadTicketDialog({
             {transitions.map((t) => (
               <button
                 key={t.id}
-                className="btn btn-sm"
+                className="ui-button"
                 disabled={moving}
                 onClick={() => void doTransition(t)}
               >

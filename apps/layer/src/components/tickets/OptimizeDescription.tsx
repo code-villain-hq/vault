@@ -72,7 +72,7 @@ export function OptimizeDescription({
   return (
     <div className="row" style={{ marginTop: 8 }}>
       <button
-        className="btn btn-sm"
+        className="ui-button"
         disabled={disabled || busy || !canRun}
         title={
           description.trim()

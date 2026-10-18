@@ -104,9 +104,9 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
       onClose={() => !busy && onClose()}
       footer={
         <>
-          <button className="btn" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="ui-button" onClick={onClose} disabled={busy}>Cancel</button>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={busy || done === null}
             onClick={() => void finish()}
           >
@@ -163,7 +163,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
           {done === null ? (
             <div className="row muted"><Spinner /> Asking Jira…</div>
           ) : (
-            <select
+            <select className="ui-field"
               value={transition}
               disabled={busy || done.length === 0}
               onChange={(e) => setTransition(e.target.value)}

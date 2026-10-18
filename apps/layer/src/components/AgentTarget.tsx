@@ -66,13 +66,13 @@ export function AgentTargetFields({
       <>
         <label className="review-target">
           <span>Start</span>
-          <select value={at.agentId} onChange={(e) => at.setAgentId(e.target.value)} disabled={disabled}>
+          <select className="ui-field" value={at.agentId} onChange={(e) => at.setAgentId(e.target.value)} disabled={disabled}>
             {at.installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </label>
         <label className="review-target">
           <span>in</span>
-          <select
+          <select className="ui-field"
             value={at.scope ?? ""}
             onChange={(e) => at.setScope(e.target.value || null)}
             disabled={disabled}
@@ -88,7 +88,7 @@ export function AgentTargetFields({
   return (
     <label className="review-target">
       <span>Send to</span>
-      <select value={at.target} onChange={(e) => at.setTarget(e.target.value)} disabled={disabled}>
+      <select className="ui-field" value={at.target} onChange={(e) => at.setTarget(e.target.value)} disabled={disabled}>
         {at.running.map((p) => <option key={p.id} value={p.id}>{paneName(p)}</option>)}
       </select>
     </label>

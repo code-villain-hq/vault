@@ -34,7 +34,7 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
             requirements and a design for the whole task, and each repository's tasks with their ticks
             kept. Nothing is written until you approve it.
           </span>
-          <button className="btn btn-sm" disabled={busy} onClick={() => void merge(task.id).catch(fail)}>Merge into one</button>
+          <button className="ui-button" disabled={busy} onClick={() => void merge(task.id).catch(fail)}>Merge into one</button>
         </div>
       )}
       {view?.outside.map((o) => (
@@ -45,9 +45,9 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
           </span>
           {o.text && (
             <>
-              <button className="btn btn-sm" disabled={busy} title="Put its text in the editor, to read and approve or discard" onClick={() => onShow(o.text, o.checkout_id)}>Show it</button>
+              <button className="ui-button" disabled={busy} title="Put its text in the editor, to read and approve or discard" onClick={() => onShow(o.text, o.checkout_id)}>Show it</button>
               <button
-                className="btn btn-sm"
+                className="ui-button"
                 disabled={busy}
                 title={file.part === "tasks" ? "Approve it as these tasks" : "Approve it, and write it into every repository"}
                 onClick={() => {
@@ -62,7 +62,7 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
             </>
           )}
           <button
-            className="btn btn-sm"
+            className="ui-button"
             disabled={busy}
             title="Write what was approved back over it, and commit that"
             onClick={() => void putBack(task.id, file.part, o.checkout_id).then(() => toast("success", `Put back the approved ${word} in ${o.folder}.`)).catch(fail)}
@@ -76,9 +76,9 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
           <span>
             <b>{view.proposal.by}</b> proposes this change: {view.proposal.why}
           </span>
-          <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => onApprove([file])}>Approve it</button>
+          <button className="ui-button ui-button-primary" disabled={busy} onClick={() => onApprove([file])}>Approve it</button>
           <button
-            className="btn btn-sm"
+            className="ui-button"
             disabled={busy}
             title="Drop the change, and tell the agent"
             onClick={() => void turnDown(task.id, file).catch(fail)}

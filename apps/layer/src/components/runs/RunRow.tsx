@@ -30,14 +30,14 @@ export const RunRow = memo(function RunRow({ run, agentName, open, onToggle }: {
         <span className="run-mark" title={RESULT[result].label}>{RESULT[result].mark}</span>
         <span className="run-what"><b>{agentName}</b> · {run.task || "a task since removed"}</span>
         <span className="chips">
-          {run.repos.map((p) => <span key={p.id} className="chip">{p.name}</span>)}
+          {run.repos.map((p) => <span key={p.id} className="ui-chip">{p.name}</span>)}
           {run.asks > 0 && (
-            <span className="chip" title={`Waited on you ${formatDuration(run.waited_secs * 1000)}`}>
+            <span className="ui-chip" title={`Waited on you ${formatDuration(run.waited_secs * 1000)}`}>
               asked {run.asks}×
             </span>
           )}
-          {run.limited && <span className="chip warn">usage limit</span>}
-          {run.loop && <span className="chip">{run.loop.used}/{run.loop.rounds} rounds</span>}
+          {run.limited && <span className="ui-status ui-status-warn">usage limit</span>}
+          {run.loop && <span className="ui-chip">{run.loop.used}/{run.loop.rounds} rounds</span>}
         </span>
         <span className="spacer" />
         {run.tokens && <span className="run-tokens" title="Tokens">{formatTokens(totalTokens(run.tokens))}</span>}

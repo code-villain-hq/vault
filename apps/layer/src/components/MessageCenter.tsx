@@ -30,7 +30,7 @@ export function MessageCenter() {
     <>
       <button
         ref={bell}
-        className={`icon-btn bell${at ? " open" : ""}`}
+        className={`ui-button ui-icon-button bell${at ? " open" : ""}`}
         title={unread ? `Messages — ${unread} unread` : "Messages"}
         onClick={toggle}
       >
@@ -98,7 +98,7 @@ function MessageList({
         <span className="spacer" />
         <button
           type="button"
-          className="btn btn-sm"
+          className="ui-button"
           disabled={!unread}
           onClick={() => void api.markMessagesRead().catch(fail)}
         >
@@ -106,7 +106,7 @@ function MessageList({
         </button>
         <button
           type="button"
-          className="btn btn-sm"
+          className="ui-button"
           disabled={messages.length === 0}
           onClick={onClear}
         >

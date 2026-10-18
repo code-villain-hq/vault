@@ -111,10 +111,10 @@ export function WaitingTaskPanes({ taskId }: { taskId: string }) {
         <span key={w.id} className="waiting-pane">
           <b>{w.kind === "shell" ? "Shell" : agents.find((a) => a.id === w.agent_id)?.name ?? w.agent_id ?? "Agent"}</b>
           {w.title && ` · ${w.title}`}
-          <button className="btn btn-sm" disabled={busy !== null} onClick={() => void reopen(w)}>
+          <button className="ui-button" disabled={busy !== null} onClick={() => void reopen(w)}>
             {busy === w.id ? "Reopening…" : "Reopen"}
           </button>
-          <button className="btn btn-sm" title="Do not list it again" onClick={() => ask(w)}>Forget</button>
+          <button className="ui-button" title="Do not list it again" onClick={() => ask(w)}>Forget</button>
         </span>
       ))}
       {confirm}

@@ -172,23 +172,23 @@ export function Settings() {
           </p>
           {settings?.jira_connected && (
             <div className="row" style={{ marginBottom: 14 }}>
-              <span className="chip add">connected</span>
+              <span className="ui-status ui-status-ok">connected</span>
               <span className="muted">{settings.jira?.email}</span>
               <div className="spacer" />
-              <button className="btn btn-sm btn-danger" onClick={() => void disconnect("jira")}>
+              <button className="ui-button ui-button-danger" onClick={() => void disconnect("jira")}>
                 Disconnect
               </button>
             </div>
           )}
           <Field label="Site URL">
-            <input
+            <input className="ui-field"
               value={jiraUrl}
               onChange={(e) => setJiraUrl(e.target.value)}
               placeholder="https://your-team.atlassian.net"
             />
           </Field>
           <Field label="Account email">
-            <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} />
+            <input className="ui-field" value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} />
           </Field>
           <Field
             label="API token"
@@ -196,6 +196,7 @@ export function Settings() {
               <>
                 Stored in your macOS keychain, never in config files.{" "}
                 <a
+                  className="ui-link"
                   href="#"
                  
                   onClick={(e) => {
@@ -208,7 +209,7 @@ export function Settings() {
               </>
             }
           >
-            <input
+            <input className="ui-field"
               type="password"
               value={jiraToken}
               onChange={(e) => setJiraToken(e.target.value)}
@@ -216,21 +217,21 @@ export function Settings() {
             />
           </Field>
           <Field label="Project key" hint="Optional. Scopes the default task query.">
-            <input
+            <input className="ui-field"
               value={jiraProject}
               onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
               placeholder="ACME"
             />
           </Field>
           <Field label="JQL" hint="Optional. Overrides the default 'assigned to me, not done' query.">
-            <input
+            <input className="ui-field"
               value={jiraJql}
               onChange={(e) => setJiraJql(e.target.value)}
               placeholder="assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
             />
           </Field>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             // A blank token keeps the stored one, so once connected the
             // project key and JQL can be changed without pasting it again.
             disabled={
@@ -252,10 +253,10 @@ export function Settings() {
           </p>
           {settings?.github_connected && (
             <div className="row" style={{ marginBottom: 14 }}>
-              <span className="chip add">connected</span>
+              <span className="ui-status ui-status-ok">connected</span>
               <span className="muted">{settings.github?.api_url}</span>
               <div className="spacer" />
-              <button className="btn btn-sm btn-danger" onClick={() => void disconnect("github")}>
+              <button className="ui-button ui-button-danger" onClick={() => void disconnect("github")}>
                 Disconnect
               </button>
             </div>
@@ -264,16 +265,16 @@ export function Settings() {
             label="API URL"
             hint="github.com uses https://api.github.com. Enterprise Server uses https://ghe.example.com/api/v3."
           >
-            <input value={ghApi} onChange={(e) => setGhApi(e.target.value)} />
+            <input className="ui-field" value={ghApi} onChange={(e) => setGhApi(e.target.value)} />
           </Field>
           <Field label="Web URL" hint="Used for building links back to the browser.">
-            <input value={ghWeb} onChange={(e) => setGhWeb(e.target.value)} />
+            <input className="ui-field" value={ghWeb} onChange={(e) => setGhWeb(e.target.value)} />
           </Field>
           <Field
             label="Review team"
             hint="Optional. A second list of pull requests requested of this team, as @fe or org/fe. A bare name is looked up from the teams you belong to, which needs the read:org scope; org/fe does not."
           >
-            <input
+            <input className="ui-field"
               value={ghTeam}
               onChange={(e) => setGhTeam(e.target.value)}
               placeholder="@fe"
@@ -283,7 +284,7 @@ export function Settings() {
             label="Personal access token"
             hint="Needs repo scope. Stored in your keychain."
           >
-            <input
+            <input className="ui-field"
               type="password"
               value={ghToken}
               onChange={(e) => setGhToken(e.target.value)}
@@ -291,7 +292,7 @@ export function Settings() {
             />
           </Field>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={
               busy || !ghApi.trim() || (!ghToken.trim() && !settings?.github_connected)
             }
@@ -319,13 +320,13 @@ export function Settings() {
             }
           >
             <div className="row">
-              <input
+              <input className="ui-field"
                 value={worktreeRoot}
                 placeholder="(default: ~/.villain-worktrees)"
                 onChange={(e) => setWorktreeRoot(e.target.value)}
                 onBlur={() => void saveWorktreeRoot(worktreeRoot)}
               />
-              <button className="btn" onClick={() => void pickWorktreeRoot()}>Browse…</button>
+              <button className="ui-button" onClick={() => void pickWorktreeRoot()}>Browse…</button>
             </div>
           </Field>
           <Field

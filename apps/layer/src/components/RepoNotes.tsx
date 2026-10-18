@@ -55,23 +55,23 @@ export function RepoNotes({ project, notes, onChanged }: {
 
   const editor = (
     <div className="repo-note-edit">
-      <textarea
+      <textarea className="ui-field"
         autoFocus
         value={text}
         maxLength={NOTE_MAX}
         placeholder={`One fact about ${project.name} that holds for every task: how to run its tests, a trap in its setup, where something lives.`}
         onChange={(e) => setText(e.target.value)}
       />
-      <input
+      <input className="ui-field"
         value={paths}
         placeholder="Files or folders it is about, comma separated (optional): marks it when they change"
         onChange={(e) => setPaths(e.target.value)}
       />
       <div className="note-actions">
-        <button className="btn btn-sm btn-primary" disabled={busy || !text.trim()} onClick={save}>
+        <button className="ui-button ui-button-primary" disabled={busy || !text.trim()} onClick={save}>
           {editing === "new" ? "Add note" : "Save"}
         </button>
-        <button className="btn btn-sm" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
+        <button className="ui-button" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
         <span className="muted">{text.length}/{NOTE_MAX}</span>
       </div>
     </div>
@@ -101,20 +101,20 @@ export function RepoNotes({ project, notes, onChanged }: {
           </div>
           <div className="note-actions">
             <button
-              className="btn btn-sm"
+              className="ui-button"
               disabled={busy}
               title="You checked it against the code and it holds. Its age and changed files count from now."
               onClick={() => void run(api.checkRepoNote(n.id))}
             >
               Still true
             </button>
-            <button className="btn btn-sm" disabled={busy} onClick={() => start(n)}>Edit</button>
-            <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => setDeleting(n)}>Delete</button>
+            <button className="ui-button" disabled={busy} onClick={() => start(n)}>Edit</button>
+            <button className="ui-button ui-button-danger" disabled={busy} onClick={() => setDeleting(n)}>Delete</button>
           </div>
         </div>
       ))}
       {editing === "new" ? editor : (
-        <button className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => start()}>Add a note</button>
+        <button className="ui-button" style={{ marginTop: 6 }} onClick={() => start()}>Add a note</button>
       )}
       {deleting && (
         <Confirm

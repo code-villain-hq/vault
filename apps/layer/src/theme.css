@@ -13,6 +13,7 @@
 @import "./design/color.css";
 @import "./design/type.css";
 @import "./design/shape.css";
+@import "./design/components.css";
 @import "./design/fonts/fonts.css";
 
 /* Layer's own roles, made from the shared names. Declared on every themed
@@ -23,9 +24,6 @@
   /* A diff's added and removed text. */
   --add-text: var(--status-ok-ink);
   --del-text: var(--status-danger-ink);
-  /* A button that destroys something, and the text on it. */
-  --danger-fill: var(--danger);
-  --on-danger: var(--bg);
 }
 
 /* The themes beside Nightshade, from their authors' palettes, fitted to

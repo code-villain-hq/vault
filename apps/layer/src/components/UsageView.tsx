@@ -105,7 +105,7 @@ export function UsageView() {
         <div className="spacer" />
         {!empty && (
           <>
-            <select
+            <select className="ui-field"
               value={period}
               aria-label="Period"
               onChange={(e) => {
@@ -117,15 +117,15 @@ export function UsageView() {
             >
               {PERIODS.map((p) => <option key={p} value={p}>Last {p} days</option>)}
             </select>
-            <select value={agent ?? ""} onChange={filter(setAgent)} aria-label="Agent">
+            <select className="ui-field" value={agent ?? ""} onChange={filter(setAgent)} aria-label="Agent">
               <option value="">Every agent</option>
               {choices.agents.map((a) => <option key={a} value={a}>{agentName(a)}</option>)}
             </select>
-            <select value={repo ?? ""} onChange={filter(setRepo)} aria-label="Repository">
+            <select className="ui-field" value={repo ?? ""} onChange={filter(setRepo)} aria-label="Repository">
               <option value="">Every repository</option>
               {choices.repos.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button type="button" className="btn btn-sm btn-danger" onClick={() => setClearing(true)}>
+            <button type="button" className="ui-button ui-button-danger" onClick={() => setClearing(true)}>
               Clear…
             </button>
           </>
@@ -188,7 +188,7 @@ export function UsageView() {
           <TaskTable rows={rows} />
           <UsageBreakdown repos={perRepo} agents={perAgent} agentName={agentName} />
 
-          <button type="button" className="run-list-title link" aria-expanded={listing} onClick={() => setListing((l) => !l)}>
+          <button type="button" className="run-list-title ui-link" aria-expanded={listing} onClick={() => setListing((l) => !l)}>
             {listing ? "▾" : "▸"} Every run in these days ({shown.length})
           </button>
           {listing && (
@@ -201,7 +201,7 @@ export function UsageView() {
               {page.left > 0 && (
                 <div className="run-more">
                   <span>{page.left} older {page.left === 1 ? "run" : "runs"} not shown</span>
-                  <button type="button" className="btn btn-sm" onClick={() => setPages((n) => n + 1)}>
+                  <button type="button" className="ui-button" onClick={() => setPages((n) => n + 1)}>
                     Show {Math.min(RUN_PAGE, page.left)} more
                   </button>
                 </div>

@@ -39,12 +39,12 @@ export function BrowserToggle({ open, view, whose, onToggle }: {
 }) {
   return (
     <button
-      className={`btn btn-sm btn-add${open ? " active" : ""}`}
+      className={`ui-button btn-add${open ? " active" : ""}`}
       title={open ? `Hide ${whose} browser` : view?.tab ? `Show ${whose} browser: agents have used it` : `Show ${whose} browser`}
       onClick={onToggle}
     >
       <GlobeIcon />
-      {!open && view?.tab && <span className="browser-dot" />}
+      {!open && view?.tab && <span className="ui-live-dot browser-dot" />}
     </button>
   );
 }

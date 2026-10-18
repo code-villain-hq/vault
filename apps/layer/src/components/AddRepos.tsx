@@ -94,9 +94,9 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
       footer={
         found ? (
           <>
-            <button className="btn" onClick={onClose}>Cancel</button>
+            <button className="ui-button" onClick={onClose}>Cancel</button>
             <button
-              className="btn btn-primary"
+              className="ui-button ui-button-primary"
               disabled={busy || picked.length === 0}
               onClick={() => void register(picked)}
             >
@@ -110,13 +110,13 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
         <>
           <div className="row" style={{ gap: 10, marginBottom: 14 }}>
             <button
-              className="btn btn-primary"
+              className="ui-button ui-button-primary"
               disabled={scanning}
               onClick={() => void scan().catch(fail)}
             >
               {scanning ? "Scanning…" : "Scan a folder…"}
             </button>
-            <button className="btn" disabled={busy} onClick={() => void pickFolders().catch(fail)}>
+            <button className="ui-button" disabled={busy} onClick={() => void pickFolders().catch(fail)}>
               Pick folders…
             </button>
             {scanning && <Spinner />}
@@ -141,13 +141,13 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
             </span>
             <div className="spacer" />
             <button
-              className="btn btn-sm"
+              className="ui-button"
               onClick={() => setPicked(selectable.map((r) => r.path))}
             >
               All
             </button>
-            <button className="btn btn-sm" onClick={() => setPicked([])}>None</button>
-            <button className="btn btn-sm" onClick={() => setFound(null)}>Back</button>
+            <button className="ui-button" onClick={() => setPicked([])}>None</button>
+            <button className="ui-button" onClick={() => setFound(null)}>Back</button>
           </div>
 
           <Field
@@ -181,8 +181,8 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
                   }
                 />
                 <span style={{ flex: 1 }}>{r.name}</span>
-                {r.branch && <span className="chip">{r.branch}</span>}
-                {r.registered && <span className="chip add">added</span>}
+                {r.branch && <span className="ui-chip">{r.branch}</span>}
+                {r.registered && <span className="ui-status ui-status-ok">added</span>}
                 <span className="path" style={{ maxWidth: 240 }}>{r.path}</span>
               </label>
             ))}

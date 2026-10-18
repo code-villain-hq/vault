@@ -85,14 +85,14 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
       footer={
         <>
           <button
-            className="btn"
+            className="ui-button"
             disabled={handoffBusy}
             onClick={() => { setHandoff(null); setHandoffPrompt(""); }}
           >
             Cancel
           </button>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={handoffBusy || handoffLoading || !handoffPrompt.trim()}
             onClick={() => void runHandoff()}
           >
@@ -115,7 +115,7 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
       </div>
 
       <Field label="Continue with">
-        <select
+        <select className="ui-field"
           value={handoff.agentId}
           onChange={(e) => setHandoff({ ...handoff, agentId: e.target.value })}
         >
@@ -131,7 +131,7 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
         label="Handoff briefing"
         hint={handoffLoading ? "Gathering the diff and terminal…" : "Edit freely before sending."}
       >
-        <textarea
+        <textarea className="ui-field"
           rows={14}
           value={handoffPrompt}
           onChange={(e) => setHandoffPrompt(e.target.value)}

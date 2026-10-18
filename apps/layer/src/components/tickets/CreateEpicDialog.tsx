@@ -92,9 +92,9 @@ export function CreateEpicDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="ui-button" onClick={onClose}>Cancel</button>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={
               busy ||
               !summary.trim() ||
@@ -134,7 +134,7 @@ export function CreateEpicDialog({
       </Field>
 
       <Field label="Summary">
-        <input
+        <input className="ui-field"
           autoFocus
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
@@ -148,7 +148,7 @@ export function CreateEpicDialog({
           {epics.map((t) => (
             <button
               key={t.id}
-              className={`type-pick${epicType === t.name ? " active" : ""}`}
+              className={`ui-chip type-pick${epicType === t.name ? " active" : ""}`}
               onClick={() => setEpicType(t.name)}
             >
               <IssueTypeIcon types={types} name={t.name} size={15} />
@@ -168,7 +168,7 @@ export function CreateEpicDialog({
             : "Optional. Becomes the epic body."
         }
       >
-        <textarea
+        <textarea className="ui-field"
           rows={5}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}

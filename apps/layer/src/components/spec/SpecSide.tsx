@@ -115,7 +115,7 @@ export function SpecSide({ task, spec, current, repo, children }: {
               return (
                 <div key={r.checkout_id} className="row spec-check">
                   <button
-                    className="btn btn-sm"
+                    className="ui-button"
                     disabled={!named || busy}
                     title={named ? `Read ${r.folder}'s changes on the branch against the requirements that name it` : `No requirement names ${r.folder}`}
                     onClick={() => void check(task.id, r.checkout_id).catch(fail)}

@@ -71,7 +71,7 @@ export function AgentsView() {
           on the left to work on one
         </span>
         <div className="spacer" />
-        <button className="btn btn-sm" onClick={() => void refreshPanes()}>Refresh</button>
+        <button className="ui-button" onClick={() => void refreshPanes()}>Refresh</button>
       </div>
 
       {ids.length === 0 && (
@@ -147,7 +147,7 @@ const AgentCard = memo(function AgentCard({
       </span>
 
       <button
-        className="btn btn-sm"
+        className="ui-button"
         onClick={() => {
           if (isChat) setView("chat");
           else if (task) select(task.id);
@@ -157,7 +157,7 @@ const AgentCard = memo(function AgentCard({
       </button>
       {pane.running && (
         <button
-          className="btn btn-sm btn-danger"
+          className="ui-button ui-button-danger"
           disabled={stopping}
           onClick={() => void onStop(pane.id)}
         >

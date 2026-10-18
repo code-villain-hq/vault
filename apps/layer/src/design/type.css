@@ -38,6 +38,10 @@
   --type-code-weight: 400;
   --type-code-leading: 1.6;
 
+  --type-wordmark-size: 1.75rem;
+  --type-wordmark-weight: 700;
+  --type-wordmark-leading: 1.1;
+
   --type-query-size: 1.3125rem;
   --type-query-weight: 400;
   --type-query-leading: 1.25;

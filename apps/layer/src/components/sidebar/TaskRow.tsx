@@ -92,7 +92,7 @@ export const TaskRow = memo(function TaskRow({
             title={waiting ? "An agent here needs you: it is asking, or it finished" : undefined}
           />
           )}
-          {task.issue_key && <span className="key-chip">{task.issue_key}</span>}
+          {task.issue_key && <span className="ui-chip key-chip">{task.issue_key}</span>}
           <span className="label">
             {task.issue_key ? task.name.replace(`${task.issue_key} `, "") : task.name}
           </span>

@@ -177,7 +177,7 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
         <input type="checkbox" checked={on} onChange={onToggle} onClick={(e) => e.stopPropagation()} />
         {entry.resolved && (
           <button
-            className="btn-sm fb-fold"
+            className="ui-button ui-icon-button fb-fold"
             title={open ? "Hide the thread" : "Show the thread"}
             aria-expanded={open}
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
@@ -186,11 +186,11 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
           </button>
         )}
         <span className={item.kind === "thread" || item.kind === "check" ? "fb-head mono" : "fb-head"}>{head}</span>
-        {entry.why.map((w) => <span key={w} className="chip">{w}</span>)}
+        {entry.why.map((w) => <span key={w} className="ui-chip">{w}</span>)}
         <div className="spacer" />
         {url && (
           <button
-            className="btn-sm"
+            className="ui-button ui-icon-button"
             title="Open on GitHub"
             onClick={(e) => { e.stopPropagation(); void openUrl(url).catch(() => {}); }}
           >
@@ -290,9 +290,9 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
       {built.some((b) => b.list.length > 0) && <AgentTargetFields task={task} at={at} disabled={busy} />}
       <div className="spacer" />
       <div className="foot-buttons">
-        <button className="btn" onClick={onClose} disabled={busy}>Cancel</button>
+        <button className="ui-button" onClick={onClose} disabled={busy}>Cancel</button>
         <button
-          className="btn btn-primary"
+          className="ui-button ui-button-primary"
           disabled={busy || chosen.length === 0 || at.stuck}
           title={at.stuck ? "Install an agent CLI first" : undefined}
           onClick={() => void send()}
@@ -386,13 +386,13 @@ function PrItems({ row, list, open, resolved, picked, onToggle, onAll }: {
         </h3>
         <div className="spacer" />
         {open.length > 1 && (
-          <button className="btn-sm" onClick={() => onAll(open.map((e) => e.key), !all)}>
+          <button className="ui-button" onClick={() => onAll(open.map((e) => e.key), !all)}>
             {all ? "None" : "All"}
           </button>
         )}
         {row.url && (
           <button
-            className="btn-sm"
+            className="ui-button ui-icon-button"
             title="Open the pull request on GitHub"
             onClick={() => void openUrl(row.url).catch(() => {})}
           >

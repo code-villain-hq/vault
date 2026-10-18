@@ -575,14 +575,14 @@ export function DiffView({ task }: { task: TaskView }) {
   const commitPicker = scope === "branch" && commitOptions.length > 0 ? (
     <div className="diff-commit-picker" title="Show the files changed in one commit">
       <button
-        className="btn btn-sm"
+        className="ui-button"
         disabled={pinIndex >= commitOptions.length - 1}
         onClick={() => stepCommit(1)}
         title="Older commit"
       >
         ‹
       </button>
-      <select
+      <select className="ui-field"
         value={pin ? `${pin.checkoutId}:${pin.sha}` : ""}
         onChange={(e) => pickCommit(e.target.value)}
       >
@@ -598,7 +598,7 @@ export function DiffView({ task }: { task: TaskView }) {
         ))}
       </select>
       <button
-        className="btn btn-sm"
+        className="ui-button"
         disabled={pinIndex < 0}
         onClick={() => stepCommit(-1)}
         title="Newer commit"
@@ -700,7 +700,7 @@ export function DiffView({ task }: { task: TaskView }) {
                   ? `The working tree is clean in ${where}. Switch to Whole branch to see what has been committed.`
                   : `Nothing differs from where this branch started in ${where}. Once an agent edits files they show up here.`}
           </p>
-          <button className="btn" onClick={() => void load()}>Refresh</button>
+          <button className="ui-button" onClick={() => void load()}>Refresh</button>
         </div>
         <div className="review-tray">
           <div className="review-tray-group" title="What the list is measuring">
@@ -767,7 +767,7 @@ export function DiffView({ task }: { task: TaskView }) {
           {hidden > 0 && (
             <div className="diff-more">
               Showing the first {LINE_BUDGET.toLocaleString()} lines.
-              <button className="btn btn-sm" onClick={() => setWholeFile(true)}>
+              <button className="ui-button" onClick={() => setWholeFile(true)}>
                 Show all {parsed.length.toLocaleString()}
               </button>
             </div>
@@ -816,7 +816,7 @@ export function DiffView({ task }: { task: TaskView }) {
           {agentPanes.length > 1 && (
             <label className="review-target">
               <span>Send notes to</span>
-              <select
+              <select className="ui-field"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
               >
@@ -826,10 +826,10 @@ export function DiffView({ task }: { task: TaskView }) {
               </select>
             </label>
           )}
-          <button className="btn btn-sm" onClick={() => void load()}>Refresh</button>
-          <button className="btn btn-sm" onClick={() => setCommitting(true)}>Commit…</button>
+          <button className="ui-button" onClick={() => void load()}>Refresh</button>
+          <button className="ui-button" onClick={() => setCommitting(true)}>Commit…</button>
           <button
-            className="btn btn-sm btn-primary"
+            className="ui-button ui-button-primary"
             disabled={queued.length === 0}
             onClick={() => void send()}
             title={
@@ -856,11 +856,11 @@ export function DiffView({ task }: { task: TaskView }) {
           onClose={() => !startingBusy && setStarting(false)}
           footer={
             <>
-              <button className="btn" disabled={startingBusy} onClick={() => setStarting(false)}>
+              <button className="ui-button" disabled={startingBusy} onClick={() => setStarting(false)}>
                 Cancel
               </button>
               <button
-                className="btn btn-primary"
+                className="ui-button ui-button-primary"
                 disabled={startingBusy || !startAgentId}
                 onClick={() => void startAndSend()}
               >
@@ -874,7 +874,7 @@ export function DiffView({ task }: { task: TaskView }) {
             {queued.length} queued note{queued.length === 1 ? "" : "s"} become its opening prompt.
           </p>
           <Field label="Agent">
-            <select
+            <select className="ui-field"
               value={startAgentId}
               onChange={(e) => setStartAgentId(e.target.value)}
               disabled={startingBusy}
@@ -888,7 +888,7 @@ export function DiffView({ task }: { task: TaskView }) {
             label="Start in"
             hint="The task folder sees every repo as a sibling folder. Pinning to one hides the others from the agent."
           >
-            <select
+            <select className="ui-field"
               value={startScope ?? ""}
               onChange={(e) => setStartScope(e.target.value || null)}
               disabled={startingBusy}
@@ -912,14 +912,14 @@ export function DiffView({ task }: { task: TaskView }) {
           footer={
             <>
               <button
-                className="btn"
+                className="ui-button"
                 disabled={commitBusy}
                 onClick={() => setCommitting(false)}
               >
                 Cancel
               </button>
               <button
-                className="btn btn-primary"
+                className="ui-button ui-button-primary"
                 disabled={commitBusy || !message.trim()}
                 onClick={() => void commit()}
               >
@@ -940,7 +940,7 @@ export function DiffView({ task }: { task: TaskView }) {
                 : "Stages every change in the worktree, then commits."
             }
           >
-            <textarea
+            <textarea className="ui-field"
               rows={4}
               autoFocus
               value={message}

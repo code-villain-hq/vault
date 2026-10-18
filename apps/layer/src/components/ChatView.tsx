@@ -133,7 +133,7 @@ export function ChatView() {
           <BrowserToggle open={browserOpen} view={browser} whose="the chats'" onToggle={() => showBrowser(!browserOpen)} />
           <button
             ref={addRef}
-            className="btn btn-sm btn-add"
+            className="ui-button btn-add"
             title="New chat"
             onClick={() =>
               setMenu((open) => {
@@ -223,7 +223,7 @@ export function ChatView() {
               {installed.length === 0 && <span>No agent CLIs found on your PATH.</span>}
               {/* One primary: the first agent; the others are a choice beside it. */}
               {installed.map((a, i) => (
-                <button key={a.id} className={`btn${i === 0 ? " btn-primary" : ""}`} onClick={() => void start(a.id)}>
+                <button key={a.id} className={`ui-button${i === 0 ? " ui-button-primary" : ""}`} onClick={() => void start(a.id)}>
                   Start {a.name}
                 </button>
               ))}

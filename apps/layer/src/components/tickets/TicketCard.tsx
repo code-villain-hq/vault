@@ -50,8 +50,8 @@ export function TicketCard({
     >
       <div className="top">
         <IssueTypeIcon types={types} name={issue.issue_type} />
-        <span className="key-chip">{issue.key}</span>
-        <span className={`status-pill ${statusClass(issue.status_category)}`}>
+        <span className="ui-chip key-chip">{issue.key}</span>
+        <span className={`ui-status status-pill ${statusClass(issue.status_category)}`}>
           {issue.status}
         </span>
         {/*
@@ -59,12 +59,12 @@ export function TicketCard({
           with it. One with no task has no chip: clicking the card offers
           Start work.
         */}
-        {taskId && moving && <span className="chip add">open task →</span>}
+        {taskId && moving && <span className="ui-status ui-status-ok">open task →</span>}
         {taskId && !moving && (
           // A branch and an agent are running against a ticket the board
           // still calls Open. Say so, and offer the click that fixes it.
           <button
-            className="chip warn sync"
+            className="ui-status ui-status-warn sync"
             disabled={syncing}
             title={`Move ${issue.key} into progress in Jira`}
             onClick={(e) => { e.stopPropagation(); onSync(); }}
@@ -74,7 +74,7 @@ export function TicketCard({
         )}
         {isEpicType(types, issue.issue_type) && (
           <button
-            className="chip sync open"
+            className="ui-status ui-status-info sync"
             title={`File a new ticket under ${issue.key}`}
             onClick={(e) => {
               e.stopPropagation();
@@ -93,7 +93,7 @@ export function TicketCard({
           · {issue.assignee ?? "unassigned"}
         </span>
         {issue.components.map((c) => (
-          <span key={c} className="group-chip">{c}</span>
+          <span key={c} className="ui-chip">{c}</span>
         ))}
         {issue.created && (
           <span className="age" title={`Created ${new Date(issue.created).toLocaleString()}`}>

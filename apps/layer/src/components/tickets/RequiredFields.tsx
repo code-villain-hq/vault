@@ -108,7 +108,7 @@ export function RequiredFieldPickers({
                 return (
                   <button
                     key={v.id}
-                    className={`type-pick${on ? " active" : ""}`}
+                    className={`ui-chip type-pick${on ? " active" : ""}`}
                     onClick={() =>
                       rf.setExtra((c) => ({
                         ...c,

@@ -313,7 +313,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         {multi && (
           <>
             <span
-              className={`repo-tag${scope === null ? " active" : ""}`}
+              className={`ui-chip repo-tag${scope === null ? " active" : ""}`}
               title="New panes start at the task root, seeing every repo"
               onClick={() => setScope(null)}
             >
@@ -322,7 +322,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             {task.checkouts.map((c) => (
               <span
                 key={c.id}
-                className={`repo-tag${scope === c.id ? " active" : ""}`}
+                className={`ui-chip repo-tag${scope === c.id ? " active" : ""}`}
                 title={`New panes start inside ${c.project_name}`}
                 onClick={() => setScope(c.id)}
               >
@@ -337,7 +337,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         <BrowserToggle open={browserOpen} view={browser} whose="this task's" onToggle={() => showBrowser(!browserOpen)} />
         <button
           ref={addRef}
-          className="btn btn-sm btn-add"
+          className="ui-button btn-add"
           title="New pane"
           onClick={() =>
             setAddMenu((open) => {
@@ -395,7 +395,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 {offerResume.map((r, i) => (
                   <button
                     key={r.agent_id}
-                    className={`btn${i === 0 ? " btn-primary" : ""}`}
+                    className={`ui-button${i === 0 ? " ui-button-primary" : ""}`}
                     onClick={() => void resume(r.agent_id)}
                   >
                     ⟲ Resume {r.name}
@@ -416,14 +416,14 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 </span>
               )}
               {installed.map((a) => (
-                <button key={a.id} className="btn" onClick={() => setLaunching(a.id)}>
+                <button key={a.id} className="ui-button" onClick={() => setLaunching(a.id)}>
                   Start {a.name}
                 </button>
               ))}
-              <button className="btn" onClick={() => void launchShell()}>Open shell</button>
+              <button className="ui-button" onClick={() => void launchShell()}>Open shell</button>
               {cursorIde && (
                 <button
-                  className="btn"
+                  className="ui-button"
                   title={`Open ${task.root} in Cursor`}
                   onClick={() => void api.openInCursor(task.root).catch(fail)}
                 >
@@ -446,14 +446,14 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
           footer={
             <>
               <button
-                className="btn"
+                className="ui-button"
                 disabled={spawning}
                 onClick={() => { setLaunching(null); setPrompt(""); fetchedPrompt.current = ""; }}
               >
                 Cancel
               </button>
               <button
-                className="btn btn-primary"
+                className="ui-button ui-button-primary"
                 disabled={promptLoading || spawning}
                 onClick={() => void launchAgent(launching)}
               >
@@ -466,7 +466,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             label="Start in"
             hint="The task folder is where repositories appear, including ones added later. Starting inside one pins the agent to it, and anything added afterwards lands outside where it can see."
           >
-            <select
+            <select className="ui-field"
               value={scope ?? ""}
               onChange={(e) => setScope(e.target.value || null)}
             >
@@ -487,7 +487,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 : "Sent to the agent as it starts. Edit it, or clear it to drop in with no instruction."
             }
           >
-            <textarea
+            <textarea className="ui-field"
               rows={10}
               autoFocus
               value={prompt}

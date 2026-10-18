@@ -53,7 +53,7 @@ export function S3LogSources() {
             (<code>aws sso login</code>), then check again.
           </span>
           <div className="spacer" />
-          <button className="btn btn-sm" onClick={look}>Check again</button>
+          <button className="ui-button" onClick={look}>Check again</button>
         </div>
       )}
 
@@ -65,21 +65,21 @@ export function S3LogSources() {
                 <div className="s3-source-name">{s.name}</div>
                 <div className="mono muted">s3://{s.bucket}/{s.prefix}</div>
                 <div className="row s3-source-chips">
-                  <span className="chip">{s.profile}{s.region ? ` · ${s.region}` : ""}</span>
+                  <span className="ui-chip">{s.profile}{s.region ? ` · ${s.region}` : ""}</span>
                   {s.athena ? (
                     <>
-                      <span className="chip add" title={`Workgroup ${s.athena.workgroup}`}>Athena: {s.athena.database}.{s.athena.table}</span>
-                      <span className="chip" title="What agents' queries scanned today, of the source's daily limit. Athena charges $5 a TB.">
+                      <span className="ui-status ui-status-ok" title={`Workgroup ${s.athena.workgroup}`}>Athena: {s.athena.database}.{s.athena.table}</span>
+                      <span className="ui-chip" title="What agents' queries scanned today, of the source's daily limit. Athena charges $5 a TB.">
                         today {size(scanned?.[s.id] ?? 0)} of {s.athena.daily_limit_gb ?? DEFAULT_DAILY_GB} GB
                       </span>
                     </>
                   ) : (
-                    <span className="chip">files only</span>
+                    <span className="ui-chip">files only</span>
                   )}
                 </div>
               </div>
-              <button className="btn btn-sm" disabled={!!editing} onClick={() => setEditing(s)}>Edit</button>
-              <button className="btn btn-sm btn-danger" onClick={() => setRemoving(s)}>Remove</button>
+              <button className="ui-button" disabled={!!editing} onClick={() => setEditing(s)}>Edit</button>
+              <button className="ui-button ui-button-danger" onClick={() => setRemoving(s)}>Remove</button>
             </div>
           ))}
         </div>
@@ -94,7 +94,7 @@ export function S3LogSources() {
         />
       ) : (
         <button
-          className="btn btn-primary"
+          className="ui-button ui-button-primary"
           disabled={!setup?.cli || setup.profiles.length === 0}
           title={setup?.cli && setup.profiles.length === 0 ? "~/.aws/config names no profile yet" : undefined}
           onClick={() => setEditing(blank(setup))}
@@ -193,27 +193,27 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
   return (
     <div className="s3-editor">
       <Field label="Name" hint="What agents ask for it by, e.g. Production request logs.">
-        <input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Production request logs" autoFocus />
+        <input className="ui-field" value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Production request logs" autoFocus />
       </Field>
       <div className="row s3-editor-pair">
         <Field label="AWS profile" hint="From ~/.aws/config. SSO profiles sign in with aws sso login.">
-          <select value={s.profile} onChange={(e) => { set({ profile: e.target.value }); setFound(null); }}>
+          <select className="ui-field" value={s.profile} onChange={(e) => { set({ profile: e.target.value }); setFound(null); }}>
             {setup?.profiles.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
         </Field>
         <Field label="Region" hint={profile?.region ? `The profile's is ${profile.region}.` : "The profile sets none: give one."}>
-          <input value={s.region ?? ""} onChange={(e) => set({ region: e.target.value || null })} placeholder={profile?.region ?? "eu-central-1"} />
+          <input className="ui-field" value={s.region ?? ""} onChange={(e) => set({ region: e.target.value || null })} placeholder={profile?.region ?? "eu-central-1"} />
         </Field>
       </div>
       <div className="row s3-editor-pair">
         <Field label="Bucket">
-          <input value={s.bucket} onChange={(e) => { set({ bucket: e.target.value }); setFound(null); }} placeholder="acme-request-logs" className="mono" />
+          <input value={s.bucket} onChange={(e) => { set({ bucket: e.target.value }); setFound(null); }} placeholder="acme-request-logs" className="ui-field mono" />
         </Field>
         <Field label="Prefix" hint="Optional: agents read only under it.">
-          <input value={s.prefix} onChange={(e) => set({ prefix: e.target.value })} placeholder="all of the bucket" className="mono" />
+          <input value={s.prefix} onChange={(e) => set({ prefix: e.target.value })} placeholder="all of the bucket" className="ui-field mono" />
         </Field>
       </div>
-      <button className="btn btn-sm" disabled={!!busy || !s.bucket.trim() || !s.profile} onClick={() => void find()}>
+      <button className="ui-button" disabled={!!busy || !s.bucket.trim() || !s.profile} onClick={() => void find()}>
         {busy === "find" ? "Looking…" : "Find"}
       </button>
 
@@ -227,7 +227,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
           {found.folders.length > 0 && (
             <div className="s3-folders">
               {found.folders.slice(0, 24).map((f) => (
-                <button key={f} className="chip s3-folder mono" title="Read only under this folder" onClick={() => set({ prefix: f })}>
+                <button key={f} className="ui-chip s3-folder mono" title="Read only under this folder" onClick={() => set({ prefix: f })}>
                   {f.slice(s.prefix.length) || f}
                 </button>
               ))}
@@ -282,7 +282,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
           label="Most data scanned a day (GB)"
           hint={`Athena charges $5 a TB scanned. Past this, agents' queries are refused until tomorrow. Empty is ${DEFAULT_DAILY_GB} GB.`}
         >
-          <input
+          <input className="ui-field"
             type="number"
             min={1}
             value={athena.daily_limit_gb ?? ""}
@@ -295,13 +295,13 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
 
       <div className="row" style={{ marginTop: 12 }}>
         <button
-          className="btn btn-primary"
+          className="ui-button ui-button-primary"
           disabled={!!busy || !s.name.trim() || !s.bucket.trim() || !s.profile || (!!s.athena?.table && !athena.workgroup.trim())}
           onClick={() => void save()}
         >
           {busy === "save" ? "Checking…" : start.id ? "Save" : "Add source"}
         </button>
-        <button className="btn" disabled={busy === "save"} onClick={onDone}>Cancel</button>
+        <button className="ui-button" disabled={busy === "save"} onClick={onDone}>Cancel</button>
         {!busy && <span className="muted">{missing(s, athena.workgroup)}</span>}
       </div>
     </div>

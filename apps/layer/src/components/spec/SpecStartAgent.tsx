@@ -65,18 +65,18 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
 
   return (
     <div className="spec-start-bar">
-      <select value={agentId ?? ""} disabled={installed.length === 0} onChange={(e) => setAgentId(e.target.value)} aria-label="Agent">
+      <select className="ui-field" value={agentId ?? ""} disabled={installed.length === 0} onChange={(e) => setAgentId(e.target.value)} aria-label="Agent">
         {installed.length === 0 && <option value="">No agent CLI installed</option>}
         {installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
       </select>
       {repos.length > 1 && (
-        <select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Which repositories">
+        <select className="ui-field" value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Which repositories">
           <option value="all">Every repository, from the task folder</option>
           {repos.map((r) => <option key={r.checkout_id} value={r.checkout_id}>Only {r.folder}</option>)}
         </select>
       )}
       <button
-        className={`btn btn-sm${quiet || !agentId || total === 0 || left === 0 ? "" : " btn-primary"}`}
+        className={`ui-button${quiet || !agentId || total === 0 || left === 0 ? "" : " ui-button-primary"}`}
         disabled={!agentId || total === 0 || left === 0 || starting}
         title={total === 0 ? "Approve the tasks first" : left === 0 ? "Every step is done" : "It works through the approved steps in order, ticking each off as it finishes it"}
         onClick={() => (working.length > 0 ? setConfirming(true) : void start())}
@@ -87,7 +87,7 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
       {working.length > 0 && (
         <span className="spec-working">
           {working.length === 1 ? `${nameOf(working[0].agent_id)} is working in this task` : `${working.length} agents are working in this task`}
-          <button className="btn btn-sm" onClick={() => { showPane(working[0].id); setTab("terminals"); }}>Open</button>
+          <button className="ui-button" onClick={() => { showPane(working[0].id); setTab("terminals"); }}>Open</button>
         </span>
       )}
       {confirming && (

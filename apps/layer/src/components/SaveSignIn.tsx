@@ -51,7 +51,7 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
   return (
     <>
       <button
-        className="btn btn-sm btn-icon"
+        className="ui-button ui-icon-button"
         title="Save the sign-in typed into this page, for agents to use without seeing the password"
         disabled={disabled}
         onClick={() => void start()}
@@ -64,9 +64,9 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
           onClose={() => { if (!busy) setForm(null); }}
           footer={
             <>
-              <button className="btn" disabled={busy} onClick={() => setForm(null)}>Cancel</button>
+              <button className="ui-button" disabled={busy} onClick={() => setForm(null)}>Cancel</button>
               <button
-                className="btn btn-primary"
+                className="ui-button ui-button-primary"
                 disabled={busy || !site.trim() || !username.trim()}
                 onClick={() => void save()}
               >
@@ -79,13 +79,13 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
             label="Site"
             hint="localhost alone is every port of this machine; a site elsewhere is that host only."
           >
-            <input value={site} onChange={(e) => setSite(e.target.value)} spellCheck={false} />
+            <input className="ui-field" value={site} onChange={(e) => setSite(e.target.value)} spellCheck={false} />
           </Field>
           <Field
             label="Username"
             hint={form.username ? undefined : "The form has none: a login that asks for it on the step before."}
           >
-            <input value={username} onChange={(e) => setUsername(e.target.value)} spellCheck={false} autoFocus={!form.username} />
+            <input className="ui-field" value={username} onChange={(e) => setUsername(e.target.value)} spellCheck={false} autoFocus={!form.username} />
           </Field>
           <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
             The password is the one typed into the page's password field. It goes to the keychain;

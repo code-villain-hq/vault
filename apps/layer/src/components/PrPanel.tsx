@@ -344,7 +344,7 @@ export function PrPanel({
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub or GitHub Enterprise to open pull requests and read CI from here.</p>
-        <button className="btn" onClick={() => toggleSettings(true)}>Open settings</button>
+        <button className="ui-button" onClick={() => toggleSettings(true)}>Open settings</button>
       </div>
     );
   }
@@ -457,15 +457,15 @@ export function PrPanel({
         )}
         <div className="spacer" />
         {loading && <Spinner />}
-        <button className="btn btn-sm" onClick={() => void load()}>Refresh</button>
-        <button className="btn btn-sm" disabled={busy} onClick={() => void push()}>
+        <button className="ui-button" onClick={() => void load()}>Refresh</button>
+        <button className="ui-button" disabled={busy} onClick={() => void push()}>
           Push all
         </button>
         {entries > 0 && (
           <button
             // The primary only while a repository still waits for its pull
             // request; under review, the feedback is what needs acting on.
-            className={`btn btn-sm${pending.length > 0 && review === "incomplete" ? " btn-primary" : ""}`}
+            className={`ui-button${pending.length > 0 && review === "incomplete" ? " ui-button-primary" : ""}`}
             aria-label="Open a pull request"
             disabled={pending.length === 0}
             title={
@@ -493,7 +493,7 @@ export function PrPanel({
                 } work since. Finishing keeps ${pending.length === 1 ? "that branch" : "those branches"}.`
               : "."}
           </span>
-          <button className="btn btn-sm btn-primary" onClick={() => setFinishing(true)}>
+          <button className="ui-button ui-button-primary" onClick={() => setFinishing(true)}>
             Finish task…
           </button>
         </div>
@@ -508,7 +508,7 @@ export function PrPanel({
               : " No repository has changes to open one with."}
           </div>
           <button
-            className={`btn${pending.length > 0 ? " btn-primary" : ""}`}
+            className={`ui-button${pending.length > 0 ? " ui-button-primary" : ""}`}
             disabled={pending.length === 0}
             onClick={() => { setLeftOut([]); setCreating(true); }}
           >
@@ -538,27 +538,27 @@ export function PrPanel({
                 <span style={{ color: "var(--muted)" }}>{row.repo}</span> #{pr.number} {pr.title}
               </h3>
               <div className="spacer" />
-              {pr.draft && <span className="chip">draft</span>}
+              {pr.draft && <span className="ui-chip">draft</span>}
               {/* GitHub's own reading of the branch against its base. */}
               {(pr.mergeable_state === "dirty" || pr.mergeable_state === "behind") && (
                 <button
-                  className={`chip ${pr.mergeable_state === "dirty" ? "del" : "warn"}`}
+                  className={`ui-status ${pr.mergeable_state === "dirty" ? "ui-status-danger" : "ui-status-warn"}`}
                   title={`Bring ${pr.base} into this branch — merge or rebase`}
                   onClick={(e) => { e.stopPropagation(); onUpdateFromBase(); }}
                 >
                   {pr.mergeable_state === "dirty" ? `conflicts with ${pr.base}` : `behind ${pr.base}`}
                 </button>
               )}
-              {row.verdict === "approved" && <span className="chip add">approved</span>}
+              {row.verdict === "approved" && <span className="ui-status ui-status-ok">approved</span>}
               {row.verdict === "changes_requested" && (
-                <span className="chip del">changes requested</span>
+                <span className="ui-status ui-status-danger">changes requested</span>
               )}
               {/*
                 On the card, not once for the task: one button for every PR
                 gave no way to tell whose comments its count was.
               */}
               <button
-                className="btn btn-sm"
+                className="ui-button"
                 title="Pick this PR's review threads, comments and failing checks to hand an agent"
                 onClick={(e) => { e.stopPropagation(); setFeedback(row.checkout_id); }}
               >
@@ -567,14 +567,14 @@ export function PrPanel({
               </button>
               {/* Stopped, or opening the PR would fold the card underneath it. */}
               <button
-                className="btn-sm"
+                className="ui-button ui-icon-button"
                 title="Open on GitHub"
                 onClick={(e) => { e.stopPropagation(); openPr(pr.url); }}
               >
                 <ExternalIcon />
               </button>
               <button
-                className="btn-sm"
+                className="ui-button ui-icon-button"
                 title="Copy link"
                 onClick={(e) => { e.stopPropagation(); copyAndSay(pr.url, `the link to #${pr.number}`); }}
               >
@@ -597,8 +597,8 @@ export function PrPanel({
 
                 {pr.base !== row.base && (
                   <div className="row" style={{ marginTop: 10 }}>
-                    <span className="chip warn">targets {pr.base}</span>
-                    <button className="btn btn-sm" onClick={() => void retarget(row)}>
+                    <span className="ui-status ui-status-warn">targets {pr.base}</span>
+                    <button className="ui-button" onClick={() => void retarget(row)}>
                       Move onto {row.base}
                     </button>
                     {/*
@@ -607,7 +607,7 @@ export function PrPanel({
                       was to move it back onto a branch that is gone.
                     */}
                     <button
-                      className="btn btn-sm"
+                      className="ui-button"
                       title={`Update from base and the next PR use ${pr.base} in ${row.repo}`}
                       onClick={() => void setBase(row, pr.base)}
                     >
@@ -626,7 +626,7 @@ export function PrPanel({
                           {REVIEW_WORDS[r.state] ?? r.state.toLowerCase()}
                         </span>
                         {r.url && (
-                          <button className="btn-sm" onClick={() => openPr(r.url)}><ExternalIcon /></button>
+                          <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(r.url)}><ExternalIcon /></button>
                         )}
                       </div>
                     ))}
@@ -641,7 +641,7 @@ export function PrPanel({
                         <span className="name">{c.name}</span>
                         <span className="muted">{c.conclusion ?? c.status}</span>
                         {c.url && (
-                          <button className="btn-sm" onClick={() => openPr(c.url!)}><ExternalIcon /></button>
+                          <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(c.url!)}><ExternalIcon /></button>
                         )}
                       </div>
                     ))}
@@ -681,11 +681,11 @@ export function PrPanel({
                       ? `still open against ${pr.base}`
                       : "closed without merging"}
                 </span>
-                <button className="btn-sm" title="Open on GitHub" onClick={() => openPr(pr.url)}>
+                <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(pr.url)}>
                   <ExternalIcon />
                 </button>
                 <button
-                  className="btn-sm"
+                  className="ui-button ui-icon-button"
                   title="Copy link"
                   onClick={() => copyAndSay(pr.url, `the link to #${pr.number}`)}
                 >
@@ -719,9 +719,9 @@ export function PrPanel({
           onClose={() => setCreating(false)}
           footer={
             <>
-              <button className="btn" onClick={() => setCreating(false)}>Cancel</button>
+              <button className="ui-button" onClick={() => setCreating(false)}>Cancel</button>
               <button
-                className="btn btn-primary"
+                className="ui-button ui-button-primary"
                 disabled={busy || picked.length === 0 || !title.trim()}
                 onClick={() => void openPrs()}
               >
@@ -742,7 +742,7 @@ export function PrPanel({
           ) : (
             <>
               <Field label="Title">
-                <input value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input className="ui-field" value={title} onChange={(e) => setTitle(e.target.value)} />
               </Field>
               <Field
                 label="Description"
@@ -752,10 +752,10 @@ export function PrPanel({
                     : "Written from the diff by a fast model, as a handoff for whoever reviews this."
                 }
               >
-                <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
+                <textarea className="ui-field" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
                 <div className="row" style={{ marginTop: 8 }}>
                   <button
-                    className="btn btn-sm"
+                    className="ui-button"
                     disabled={drafting}
                     title="Write the description from the diff on this branch"
                     onClick={() => void draftWithAgent()}

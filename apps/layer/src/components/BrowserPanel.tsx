@@ -374,17 +374,17 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
         }}
       />
       <div className="browser-bar">
-        <button className="btn btn-sm btn-icon" title="Back (⌘[)" onClick={() => void go("back")} disabled={!tab || driving}>
+        <button className="ui-button ui-icon-button" title="Back (⌘[)" onClick={() => void go("back")} disabled={!tab || driving}>
           <BackIcon />
         </button>
-        <button className="btn btn-sm btn-icon" title="Forward (⌘])" onClick={() => void go("forward")} disabled={!tab || driving}>
+        <button className="ui-button ui-icon-button" title="Forward (⌘])" onClick={() => void go("forward")} disabled={!tab || driving}>
           <ForwardIcon />
         </button>
-        <button className="btn btn-sm btn-icon" title="Reload (⌘R)" onClick={() => void go("reload")} disabled={!tab || driving}>
+        <button className="ui-button ui-icon-button" title="Reload (⌘R)" onClick={() => void go("reload")} disabled={!tab || driving}>
           {view?.loading ? <Spinner /> : <ReloadIcon />}
         </button>
         <form className="browser-address" onSubmit={(e) => void open(e)}>
-          <input
+          <input className="ui-field"
             disabled={driving}
             ref={addressRef}
             value={address}
@@ -398,7 +398,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
         </form>
         {view?.held && (
           <button
-            className="btn btn-sm btn-primary"
+            className="ui-button ui-button-primary"
             title="Let this task's agents use the browser again"
             onClick={() => void hold(false)}
           >
@@ -407,14 +407,14 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
         )}
         <SaveSignIn taskId={taskId} disabled={!host || driving} />
         <button
-          className="btn btn-sm btn-icon"
+          className="ui-button ui-icon-button"
           title="Open this page in your own browser"
           disabled={!view?.url || view.url === "about:blank"}
           onClick={() => view && void openUrl(view.url)}
         >
           <ExternalIcon />
         </button>
-        <button className="btn btn-sm btn-icon" title="Hide the browser" onClick={onClose}>
+        <button className="ui-button ui-icon-button" title="Hide the browser" onClick={onClose}>
           <CloseIcon />
         </button>
       </div>
@@ -426,8 +426,8 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
             {r.reason && <> — {r.reason}</>}
           </span>
           <div className="spacer" />
-          <button className="btn btn-sm" onClick={() => void answer(r.id, false)}>No</button>
-          <button className="btn btn-sm btn-primary" onClick={() => void answer(r.id, true)}>
+          <button className="ui-button" onClick={() => void answer(r.id, false)}>No</button>
+          <button className="ui-button ui-button-primary" onClick={() => void answer(r.id, true)}>
             Allow {r.site}
           </button>
         </div>
@@ -442,15 +442,15 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
             <b>The page {view.dialog.kind === "alert" ? "says" : "asks"}:</b> {view.dialog.message}
           </span>
           {view.dialog.kind === "prompt" && (
-            <input value={promptText} onChange={(e) => setPromptText(e.target.value)} autoFocus />
+            <input className="ui-field" value={promptText} onChange={(e) => setPromptText(e.target.value)} autoFocus />
           )}
           <div className="spacer" />
           {view.dialog.kind !== "alert" && (
-            <button type="button" className="btn btn-sm" onClick={() => void answerDialog(false)}>
+            <button type="button" className="ui-button" onClick={() => void answerDialog(false)}>
               {view.dialog.kind === "beforeunload" ? "Stay" : "Cancel"}
             </button>
           )}
-          <button className="btn btn-sm btn-primary">
+          <button className="ui-button ui-button-primary">
             {view.dialog.kind === "beforeunload" ? "Leave" : "OK"}
           </button>
         </form>
@@ -466,7 +466,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
               starts the next time it is needed.
             </p>
             <div className="row">
-              <button className="btn" onClick={() => void openUrl("https://www.google.com/chrome/")}>
+              <button className="ui-button" onClick={() => void openUrl("https://www.google.com/chrome/")}>
                 Get Chrome <ExternalIcon />
               </button>
             </div>
@@ -476,7 +476,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
             <h2>The browser could not start</h2>
             <p>{error}</p>
             <div className="row">
-              <button className="btn" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+              <button className="ui-button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
             </div>
           </div>
         ) : (
@@ -505,7 +505,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
                     {last && <span className="muted"> · {last.text}</span>}
                   </span>
                   <button
-                    className="btn btn-sm btn-primary"
+                    className="ui-button ui-button-primary"
                     title="Keep agents out of this tab until you hand it back: to sign in, or to look at something"
                     onClick={() => void hold(true)}
                   >
@@ -527,7 +527,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
             the window's paste reaches it, out of sight. */}
         <textarea
           ref={keysRef}
-          className="browser-keys"
+          className="ui-field browser-keys"
           aria-label="Keys for the page"
           onKeyDown={(e) => void onKeyDown(e)}
           onKeyUp={(e) => {
@@ -577,7 +577,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
               Agents cannot use {host}
             </span>
             <button
-              className="btn btn-sm"
+              className="ui-button"
               title={`Let agents use ${hostname} and its subdomains. Settings → Browser lists the sites allowed.`}
               onClick={() => void allowHere(hostname)}
             >

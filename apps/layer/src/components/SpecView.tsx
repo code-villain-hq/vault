@@ -257,16 +257,16 @@ export function SpecView({ task }: { task: TaskView }) {
       {tell && (
         <div className="spec-tell">
           {running} agent{running === 1 ? " is" : "s are"} working in this task to the spec as it was.
-          <button className="btn btn-sm" onClick={() => {
+          <button className="ui-button" onClick={() => {
             void api.tellSpecChange(task.id, tell).then((n) => toast("success", `Told ${n} agent${n === 1 ? "" : "s"}.`)).catch(fail);
             setTell(null);
           }}>Tell them</button>
-          <button className="btn btn-sm" onClick={() => setTell(null)}>Not now</button>
+          <button className="ui-button" onClick={() => setTell(null)}>Not now</button>
         </div>
       )}
       <div className="spec-bar">
         <button
-          className="btn btn-sm"
+          className="ui-button"
           disabled={!!drafting || busy || !ready}
           title={ready ? (stale ? "Redraft every file that is out of date, in order" : draftTitle) : `Approve the ${before} first`}
           onClick={() => (stale ? void sync() : text.trim() ? setReplacing(true) : redraft())}
@@ -278,7 +278,7 @@ export function SpecView({ task }: { task: TaskView }) {
         <span className="spacer" />
         {dirty && !view.proposal && (
           <button
-            className="btn btn-sm"
+            className="ui-button"
             disabled={!!drafting || busy}
             onClick={() => edit(task.id, file, approvedText(spec, file.part, file.checkoutId))}
           >
@@ -286,12 +286,12 @@ export function SpecView({ task }: { task: TaskView }) {
           </button>
         )}
         {pendingFiles.length > 1 && (
-          <button className="btn btn-sm" disabled={!!drafting || busy} title="Approve every file drafted or changed, together" onClick={() => tryApprove(pendingFiles)}>
+          <button className="ui-button" disabled={!!drafting || busy} title="Approve every file drafted or changed, together" onClick={() => tryApprove(pendingFiles)}>
             Approve all {pendingFiles.length}
           </button>
         )}
         <button
-          className={`btn btn-sm${canApprove ? " btn-primary" : ""}`}
+          className={`ui-button${canApprove ? " ui-button-primary" : ""}`}
           disabled={!canApprove}
           title={repos.some((r) => r.in_repo) ? `Write it ${current === "tasks" || !many ? "to its repository" : "to every repository"} and commit it on the task's branch` : "Keep it as the approved spec"}
           onClick={() => tryApprove(toApprove)}
@@ -301,7 +301,7 @@ export function SpecView({ task }: { task: TaskView }) {
       </div>
       <div className="spec-body">
         <textarea
-          className="spec-editor"
+          className="ui-field spec-editor"
           value={text}
           readOnly={isDrafting}
           spellCheck={false}
@@ -371,14 +371,14 @@ function SpecStart({ kind, setKind, many, from, legacy, busy, onDraft, onQuick, 
         <label><input type="radio" checked={kind === "bugfix"} onChange={() => setKind("bugfix")} /> A bug</label>
       </div>
       <div className="row">
-        <button className="btn btn-primary" disabled={busy} onClick={onDraft}>Draft the {kind === "bugfix" ? "bug analysis" : "requirements"} from {from}</button>
-        <button className="btn" disabled={busy} onClick={onQuick} title="Requirements, design and tasks in one go, to approve together">Quick spec</button>
-        <button className="btn" disabled={busy} onClick={() => onWrite(TEMPLATE[kind])}>Write it yourself</button>
+        <button className="ui-button ui-button-primary" disabled={busy} onClick={onDraft}>Draft the {kind === "bugfix" ? "bug analysis" : "requirements"} from {from}</button>
+        <button className="ui-button" disabled={busy} onClick={onQuick} title="Requirements, design and tasks in one go, to approve together">Quick spec</button>
+        <button className="ui-button" disabled={busy} onClick={() => onWrite(TEMPLATE[kind])}>Write it yourself</button>
       </div>
       {legacy && (
         <p className="muted">
           This task has a spec from before, kept beside the task.{" "}
-          <button className="btn btn-sm" onClick={() => onWrite(legacy)}>Start from it</button>
+          <button className="ui-button" onClick={() => onWrite(legacy)}>Start from it</button>
         </p>
       )}
     </div>

@@ -5,7 +5,7 @@ import type { RepoOutgoing } from "../lib/types";
 import { Spinner } from "./ui";
 
 const NO_NOTES: ReviewNote[] = [];
-const KIND_TONE = { debug: "del", "focused test": "del", "conflict marker": "del", todo: "warn" } as const;
+const KIND_TONE = { debug: "ui-status-danger", "focused test": "ui-status-danger", "conflict marker": "ui-status-danger", todo: "ui-status-warn" } as const;
 
 /**
  * What Open pull requests is about to push, looked at first (PR-11): per
@@ -69,7 +69,7 @@ export function Outgoing({ taskId, onFlags }: { taskId: string; onFlags: (n: num
           </div>
           {r.leftovers.map((l, i) => (
             <div key={i} className="outgoing-leftover" title={l.text}>
-              <span className={`chip ${KIND_TONE[l.kind]}`}>{l.kind}</span>
+              <span className={`ui-status ${KIND_TONE[l.kind]}`}>{l.kind}</span>
               <code>{l.path}:{l.line}</code>
               <span className="text">{l.text}</span>
             </div>

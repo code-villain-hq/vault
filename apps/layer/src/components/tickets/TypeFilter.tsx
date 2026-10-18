@@ -24,7 +24,7 @@ export function TypeFilter({
           return (
             <button
               key={t.id}
-              className={`type-pick${on ? " active" : ""}`}
+              className={`ui-chip type-pick${on ? " active" : ""}`}
               onClick={() =>
                 onChange(
                   on ? kinds.filter((n) => n !== t.name) : [...kinds, t.name],
@@ -37,7 +37,7 @@ export function TypeFilter({
           );
         })}
       {kinds.length > 0 && (
-        <button className="type-pick clear" onClick={() => onChange([])}>
+        <button className="ui-chip type-pick clear" onClick={() => onChange([])}>
           Clear
         </button>
       )}

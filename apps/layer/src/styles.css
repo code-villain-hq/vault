@@ -19,116 +19,66 @@ body {
   user-select: none;
 }
 
-button {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-md);
-  padding: 5px 11px;
-  cursor: pointer;
-  white-space: nowrap;
-  flex: none;
-  transition: background 0.12s, color 0.12s;
+/* Element defaults sit in the base layer, under the shared recipes in
+   design/components.css (the `components` layer): unlayered, a bare
+   `button` or `input` rule beats any layered class, and .ui-button would
+   silently lose its fill. Layer's own rules below stay unlayered. */
+@layer base {
+  button {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    padding: 5px 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: none;
+    transition: background 0.12s, color 0.12s;
+  }
+  button:hover:not(:disabled) { background: var(--hover); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* The field's look is .ui-field; this is only its box. */
+  input, textarea, select {
+    font: inherit;
+    padding: 5px 8px;
+    width: 100%;
+    user-select: text;
+  }
+  input[type="checkbox"], input[type="radio"], input[type="range"] { box-shadow: none; accent-color: var(--fg); }
+  input[type="range"] { background: transparent; padding: 0; }
+  textarea { resize: vertical; }
 }
-button:hover:not(:disabled) { background: var(--hover); }
-button:disabled { opacity: 0.45; cursor: default; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Unlayered, or .ui-field's inherited face would win. */
+textarea { font-family: var(--font-mono); }
 
-/* Buttons (design/components.md): 28px, the control role, no border. The
-   one primary is the action the screen's state needs; the rest are quiet. */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-  line-height: var(--type-control-leading);
-  color: var(--muted);
-}
-.btn:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
-.btn-primary { background: var(--primary); color: var(--on-primary); }
-.btn-primary:hover:not(:disabled) { background: var(--primary-hover); color: var(--on-primary); }
-.btn-sm { height: 24px; padding: 0 8px; }
-.btn-danger:hover:not(:disabled) { color: var(--status-danger-ink); }
-/* Fields: a tone step, no border; focus is one ring on the edge. */
-input, textarea, select {
-  font: inherit;
-  font-size: var(--type-ui-size);
-  color: var(--fg);
-  background: var(--field);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  padding: 5px 8px;
-  width: 100%;
-  user-select: text;
-}
-input::placeholder, textarea::placeholder { color: var(--faint); }
-input:hover, textarea:hover, select:hover { background: var(--field-hover); }
-input:focus, textarea:focus, select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-input[type="checkbox"], input[type="radio"], input[type="range"] { box-shadow: none; accent-color: var(--fg); }
-input[type="range"] { background: transparent; padding: 0; }
+/* Buttons, fields, chips, status pills, links, menus and dialogs are the
+   studio's shared recipes (design/components.css, the ui-* classes). What
+   follows only adds Layer's layout to them. */
+
 /* On a raised card a field steps the other way, or it is the card's own tone. */
 .card, .review-card, .agent-card, .ticket, .acp-tool, .spec-side, .review-tray, .repo-notes {
   --field: var(--panel);
   --field-hover: var(--hover);
 }
 /* A choice among buttons: the chosen one is selected, not a second primary. */
-.btn.on { color: var(--fg); background: var(--selected); }
-textarea { resize: vertical; font-family: var(--font-mono); }
+.ui-button.on { color: var(--fg); background: var(--selected); }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: var(--radius-sm); }
 ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* A label: round, a faint tint of the text colour, quiet text. */
-.chip, .group-chip, .key-chip, .repo-tag, .type-pick {
+/* A chip or status pill's box: the shared recipe has its colours and type. */
+.ui-chip, .ui-status {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   border: 0;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
-  color: var(--muted);
   font-family: var(--font-reading);
-  font-size: var(--type-control-size);
-  font-weight: var(--type-control-weight);
-  line-height: var(--type-control-leading);
   padding: 4px 8px;
   white-space: nowrap;
 }
-/* A status: its colour at 13% under its ink (design/components.md). */
-.chip.add, .chip.del, .chip.warn, .chip.task, .chip.sync.open, .status-pill, .watch-chip {
-  --status-color: var(--muted);
-  --status-ink: var(--status-neutral-ink);
-  background: color-mix(in srgb, var(--status-color) var(--status-tint), transparent);
-  color: var(--status-ink);
-  font-weight: 700;
-}
-.chip.add, .status-pill.done { --status-color: var(--ok); --status-ink: var(--status-ok-ink); }
-.chip.del { --status-color: var(--danger); --status-ink: var(--status-danger-ink); }
-.chip.warn, .watch-chip { --status-color: var(--warn); --status-ink: var(--status-warn-ink); }
-.chip.task, .chip.sync.open, .status-pill.indeterminate { --status-color: var(--info); --status-ink: var(--status-info-ink); }
-/* Links are ink, bold, underlined; never coloured. */
-a, .link {
-  color: var(--fg);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent);
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-a:hover, .link:hover { text-decoration-color: var(--fg); }
-
-/* A live dot: something happening now, in the brand's colour. */
-.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); flex: none; }
 
 /* ---------------------------------------------------------------- layout */
 /* The sidebar's width is dragged (TASK-16); the grip has the empty middle
@@ -349,7 +299,7 @@ body.dragging * { pointer-events: none; }
   padding: 40px;
 }
 /* An empty state's headline: the one place in the window Grenze appears (28px and up). */
-.empty h2 { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1.18; color: var(--fg); margin: 0; }
+.empty h2 { font-family: var(--font-display); font-size: var(--type-wordmark-size); font-weight: var(--type-wordmark-weight); line-height: var(--type-wordmark-leading); color: var(--fg); margin: 0; }
 .empty p { margin: 0; max-width: 380px; line-height: 1.55; }
 .empty .row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 
@@ -375,7 +325,6 @@ body.dragging * { pointer-events: none; }
 .browser-tab .x:hover:not(:disabled) { color: var(--status-danger-ink); background: var(--hover); }
 .browser-tab-new { margin: 0 0 3px 2px; flex: none; }
 .browser-bar { display: flex; align-items: center; gap: 4px; padding: 5px 6px; background: var(--panel); }
-.btn-icon { display: inline-flex; align-items: center; justify-content: center; padding: 4px 6px; }
 .browser-address { flex: 1; min-width: 0; display: flex; }
 .browser-address input { flex: 1; min-width: 0; font-size: var(--type-ui-small-size); padding: 4px 8px; }
 /* Not white: the screen shows before the first frame, and a resize clears
@@ -424,7 +373,7 @@ body.dragging * { pointer-events: none; }
 .browser-driving-card > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-row { padding: 2px 0; }
 .btn-add.active { color: var(--fg); background: var(--selected); }
-.btn-add .browser-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); margin-left: 4px; }
+.btn-add .browser-dot { margin-left: 4px; }
 
 /* ------------------------------------------------------------------ diff */
 
@@ -502,7 +451,6 @@ body.dragging * { pointer-events: none; }
 .outgoing-leftover { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .outgoing-leftover code { font-family: var(--font-mono); font-size: var(--type-ui-small-size); color: var(--muted); flex: none; }
 .outgoing-leftover .text { font-family: var(--font-mono); font-size: var(--type-ui-small-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.review-tray-hint .link { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; }
 .md .suggestion { background: var(--surface); border-radius: var(--radius-md); overflow: hidden; margin: 6px 0; }
 .md .suggestion > span { display: block; padding: 3px 8px; font-size: var(--type-ui-small-size); color: var(--muted); }
 .md .suggestion pre { margin: 0; border-radius: 0; background: color-mix(in srgb, var(--ok) 10%, transparent); }
@@ -612,7 +560,7 @@ body.dragging * { pointer-events: none; }
   color: var(--muted);
 }
 .review-target select { width: auto; max-width: 200px; }
-.btn .badge,
+.ui-button .badge,
 .review-tray-actions .badge {
   margin-left: 6px;
   font-size: var(--type-ui-small-size);
@@ -669,7 +617,6 @@ body.dragging * { pointer-events: none; }
 .fb-box.on { background: var(--selected); }
 .fb-pick { cursor: pointer; gap: 8px; padding: 6px 10px; }
 .fb-pick input[type="checkbox"] { width: auto; margin: 0; flex: none; }
-.fb-fold { padding: 0 5px; font-size: var(--type-ui-small-size); line-height: 1.2; }
 .fb-content { padding: 4px 12px 12px; }
 .fb-comment + .fb-comment { margin-top: 12px; }
 .fb-author { color: var(--muted); font-size: var(--type-ui-small-size); font-weight: 600; margin-bottom: 2px; }
@@ -709,8 +656,6 @@ body.dragging * { pointer-events: none; }
 .md pre code { padding: 0; border: none; background: none; font-size: var(--type-ui-small-size); line-height: 1.45; white-space: pre; }
 .md blockquote { padding: 0 12px; color: var(--muted); }
 .md hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
-.md a { color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent); text-underline-offset: 3px; cursor: pointer; }
-.md a:hover { text-decoration-color: var(--fg); }
 .md .md-table { overflow-x: auto; }
 .md table { border-collapse: collapse; font-size: var(--type-ui-small-size); }
 .md th, .md td { padding: 4px 10px; border: 1px solid var(--line); }
@@ -755,20 +700,13 @@ body.dragging * { pointer-events: none; }
   word-break: break-all;
 }
 
-.status-pill {
-  border-radius: var(--radius-full);
-  font-size: var(--type-control-size);
-  line-height: var(--type-control-leading);
-  padding: 3px 8px;
-  white-space: nowrap;
-}
+.status-pill { padding: 3px 8px; }
 
 /* ----------------------------------------------------------------- modal */
 
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / var(--backdrop-tint));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -809,15 +747,10 @@ body.dragging * { pointer-events: none; }
   white-space: nowrap;
 }
 .modal {
-  /* Fields sit a step below the dialog, in both modes. */
-  --field: var(--dialog-field);
-  --field-hover: var(--dialog-field-hover);
-  background: var(--dialog);
   /* Its own text colour: a dialog opened from a banner sits inside it in the
      page, and took the banner's warning colour for every word. */
   color: var(--fg);
   font-weight: 400;
-  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 540px;
   max-height: 100%;
@@ -1056,10 +989,6 @@ body.dragging * { pointer-events: none; }
   font-family: var(--font-mono);
   font-size: var(--type-ui-small-size);
 }
-.diff-commit-picker .btn {
-  padding: 2px 8px;
-  line-height: 1.2;
-}
 
 .diff-repo-banner {
   flex: none;
@@ -1214,11 +1143,10 @@ body.dragging * { pointer-events: none; }
 .review-card .when { color: var(--faint); font-size: var(--type-ui-small-size); }
 .review-card .title { font-size: var(--type-ui-small-size); line-height: 1.45; }
 .review-card .by { color: var(--muted); font-size: var(--type-ui-small-size); }
-.review-card .chip.size .add { color: var(--status-ok-ink); }
-.review-card .chip.size .del { color: var(--status-danger-ink); }
+.review-card .ui-chip.size .add { color: var(--status-ok-ink); }
+.review-card .ui-chip.size .del { color: var(--status-danger-ink); }
 .review-card .chips.standing { flex-wrap: wrap; margin-top: 6px; }
-.review-card .top .btn { height: 24px; padding: 0 8px; }
-.review-card .chips .start { margin-left: auto; height: 24px; padding: 0 9px; }
+.review-card .chips .start { margin-left: auto; }
 .review-note {
   margin: 0 0 10px;
   color: var(--muted);
@@ -1361,7 +1289,6 @@ body.dragging * { pointer-events: none; }
 }
 .repo-manage:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
 .repo-line { display: flex; align-items: center; gap: 10px; }
-.repo-line .chip { white-space: nowrap; }
 .repo-manage .rname { min-width: 140px; font-weight: 700; }
 .repo-manage .rstore { color: var(--faint); font-size: var(--type-ui-small-size); white-space: nowrap; }
 .repo-manage .rstore.warn { color: var(--status-warn-ink); }
@@ -1394,7 +1321,7 @@ body.dragging * { pointer-events: none; }
 .repo-synced.failed { color: var(--status-danger-ink); }
 .repo-manage input { width: 130px; }
 .trouble-text { color: var(--status-danger-ink); }
-.repo-line .btn.notes-stale { color: var(--status-warn-ink); }
+.repo-line .ui-button.notes-stale { color: var(--status-warn-ink); }
 .repo-notes { margin: 8px 0 2px; padding: 4px 12px; background: var(--surface); border-radius: var(--radius-md); }
 .repo-note { padding: 6px 0; }
 .repo-note .note-text { white-space: pre-wrap; line-height: 1.5; color: var(--fg); }
@@ -1473,8 +1400,8 @@ body.dragging * { pointer-events: none; }
 }
 
 /* ------------------------------------------------------- message center */
-.icon-btn.bell { position: relative; }
-.icon-btn.bell.open { background: var(--hover); color: var(--fg); }
+.ui-icon-button.bell { position: relative; }
+.ui-icon-button.bell.open { background: var(--hover); color: var(--fg); }
 .bell-count {
   /* An unread dot; the count is in the button's name. */
   position: absolute;
@@ -1568,8 +1495,6 @@ body.dragging * { pointer-events: none; }
   z-index: 200;
   min-width: 210px;
   padding: 4px;
-  background: var(--surface);
-  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -1587,12 +1512,6 @@ body.dragging * { pointer-events: none; }
 .ctx-item.danger { color: var(--status-danger-ink); }
 .ctx-item.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 15%, transparent); }
 .ctx-item.separated { margin-top: 5px; border-top: 1px solid var(--line); padding-top: 8px; }
-
-.btn-danger-solid {
-  background: var(--danger-fill);
-  color: var(--on-danger);
-}
-.btn-danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-fill) 88%, var(--fg)); color: var(--on-danger); }
 
 .confirm-detail {
   margin-top: 10px;
@@ -1657,7 +1576,11 @@ body.dragging * { pointer-events: none; }
 /* The current item as the app draws it: a selected fill, its text in fg. */
 .theme-preview i.on {
   height: 8px;
-  background: linear-gradient(var(--fg), var(--fg)) 3px 50% / 55% 2px no-repeat, var(--selected);
+  background-color: var(--selected);
+  background-image: linear-gradient(var(--fg), var(--fg));
+  background-position: 3px 50%;
+  background-size: 55% 2px;
+  background-repeat: no-repeat;
 }
 .theme-preview i.text { background: var(--fg); }
 .theme-preview .tp-dots { display: flex; gap: 4px; }
@@ -1666,35 +1589,20 @@ body.dragging * { pointer-events: none; }
 /* An icon-only button needs a real target; the old ⚙ glyph was ~11px of ink. */
 /* Inside a header the control should read as part of the bar, not as a button
    competing with the title beside it. */
-.icon-btn.flat {
+.ui-icon-button.flat {
   margin-left: -4px;
 }
-
-.icon-btn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: var(--radius-md);
-  color: var(--muted);
-}
-.icon-btn:hover:not(:disabled) {
-  background: var(--hover);
-  color: var(--fg);
-}
 /* Keep awake: on is a selected button; holding the Mac up, a live dot. */
-.icon-btn.awake.on { background: var(--selected); color: var(--fg); }
-.icon-btn.awake.holding::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
+.ui-icon-button.awake { position: relative; }
+.ui-icon-button.awake.on { background: var(--selected); color: var(--fg); }
+.ui-icon-button.awake.holding::after { content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
 
 /* Phone access (PHONE-*): a phone connected, and Settings → Remote access. */
-.icon-btn.phone.on { color: var(--status-ok-ink); }
+.ui-icon-button.phone.on { color: var(--status-ok-ink); }
 .phone-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; font-size: var(--type-ui-small-size); }
 .phone-list code, .phone-code { user-select: text; font-family: var(--font-mono); }
 .phone-pairing { display: flex; flex-direction: column; gap: 4px; }
-.phone-code { font-size: 28px; color: var(--fg); }
+.phone-code { font-size: var(--type-wordmark-size); color: var(--fg); }
 .phone-error { color: var(--status-danger-ink); font-size: var(--type-ui-small-size); margin-bottom: 12px; }
 .phone-hint { color: var(--muted); font-size: var(--type-ui-small-size); }
 
@@ -1817,8 +1725,8 @@ input.mono { font-family: var(--font-mono); }
 .type-pick.clear:hover:not(:disabled) { color: var(--status-danger-ink); }
 
 /* A ticket whose board status has fallen behind the work: the chip is the fix. */
-.chip.sync { cursor: pointer; font-family: var(--font-reading); }
-.chip.sync:hover:not(:disabled) { color: var(--status-warn-ink); }
+.ui-status.sync { cursor: pointer; font-family: var(--font-reading); }
+.ui-status.sync:hover:not(:disabled) { color: var(--status-warn-ink); }
 
 /* In progress on the board, with nothing here to work in. */
 
@@ -1835,8 +1743,6 @@ input.mono { font-family: var(--font-mono); }
   max-height: 240px;
   overflow-y: auto;
   padding: 4px;
-  background: var(--surface);
-  border-radius: var(--radius-md);
 }
 .combo-list button {
   display: block;
@@ -1850,7 +1756,6 @@ input.mono { font-family: var(--font-mono); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.combo-list button.on { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
 .combo-empty { padding: 6px 8px; font-size: var(--type-ui-small-size); color: var(--faint); }
 
 /*

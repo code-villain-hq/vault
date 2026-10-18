@@ -157,9 +157,9 @@ export function StartWorkDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="btn" onClick={onClose}>Close</button>
+          <button className="ui-button" onClick={onClose}>Close</button>
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={picked.length === 0 || starting}
             onClick={() => void startWork()}
           >
@@ -173,19 +173,19 @@ export function StartWorkDialog({
       <h3 style={{ margin: "0 0 10px", fontSize: "var(--type-ui-size)", fontWeight: 700, lineHeight: 1.4 }}>{issue.summary}</h3>
 
       <div className="row" style={{ marginBottom: 14, flexWrap: "wrap" }}>
-        <span className="chip chip-type">
+        <span className="ui-chip chip-type">
           <IssueTypeIcon types={types} name={issue.issue_type} size={13} />
           {issue.issue_type}
         </span>
-        {issue.priority && <span className="chip">{issue.priority}</span>}
-        {issue.assignee && <span className="chip">{issue.assignee}</span>}
+        {issue.priority && <span className="ui-chip">{issue.priority}</span>}
+        {issue.assignee && <span className="ui-chip">{issue.assignee}</span>}
         {issue.epic_key && (
-          <span className="chip" title={issue.epic_summary ?? undefined}>
+          <span className="ui-chip" title={issue.epic_summary ?? undefined}>
             epic {issue.epic_key}
           </span>
         )}
-        {issue.components.map((c) => <span key={c} className="chip">{c}</span>)}
-        {issue.labels.map((l) => <span key={l} className="chip">{l}</span>)}
+        {issue.components.map((c) => <span key={c} className="ui-chip">{c}</span>)}
+        {issue.labels.map((l) => <span key={l} className="ui-chip">{l}</span>)}
       </div>
 
       <Field
@@ -207,7 +207,7 @@ export function StartWorkDialog({
         <div className="branch-compose">
           <span className="branch-key">{issue.key}</span>
           <span className="branch-dash">-</span>
-          <input
+          <input className="ui-field"
             value={suffix}
             onChange={(e) => setSuffix(e.target.value)}
             placeholder="optional suffix"
@@ -237,7 +237,7 @@ export function StartWorkDialog({
             : "Starts in the new worktree with the ticket as its opening prompt."
         }
       >
-        <select value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value)}>
+        <select className="ui-field" value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value)}>
           <option value="">No agent — just the worktrees</option>
           {installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>

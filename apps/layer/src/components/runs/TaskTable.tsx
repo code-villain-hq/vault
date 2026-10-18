@@ -7,11 +7,11 @@ import { sortRows, type SortKey, type TaskRow, type TaskState } from "../../lib/
 const FIRST = 25;
 
 const STATE: Record<TaskState, { label: string; tone: string; hint: string }> = {
-  open: { label: "open", tone: "", hint: "Still in the app: its length is how long it has been open" },
-  finished: { label: "finished", tone: "add", hint: "Finished with Finish task: start to finish" },
-  deleted: { label: "deleted", tone: "", hint: "Deleted: start to deletion" },
-  removed: { label: "removed", tone: "", hint: "Removed before tasks were kept as they ended, so its length is not known" },
-  chat: { label: "chats", tone: "", hint: "Every chat, together: they belong to no task" },
+  open: { label: "open", tone: "ui-chip", hint: "Still in the app: its length is how long it has been open" },
+  finished: { label: "finished", tone: "ui-status ui-status-ok", hint: "Finished with Finish task: start to finish" },
+  deleted: { label: "deleted", tone: "ui-chip", hint: "Deleted: start to deletion" },
+  removed: { label: "removed", tone: "ui-chip", hint: "Removed before tasks were kept as they ended, so its length is not known" },
+  chat: { label: "chats", tone: "ui-chip", hint: "Every chat, together: they belong to no task" },
 };
 
 const COLUMNS: { key: SortKey; label: string; hint?: string }[] = [
@@ -53,14 +53,14 @@ export const TaskTable = memo(function TaskTable({ rows }: { rows: TaskRow[] }) 
             <tr key={r.id}>
               <td className="usage-task">
                 {r.state === "open" ? (
-                  <button type="button" className="link" title="Open this task" onClick={() => goTo(`task:${r.id}`)}>
+                  <button type="button" className="ui-link" title="Open this task" onClick={() => goTo(`task:${r.id}`)}>
                     {r.name}
                   </button>
                 ) : (
                   <span>{r.name}</span>
                 )}
                 {r.key && !r.name.includes(r.key) && <span className="muted"> {r.key}</span>}
-                <span className={`chip ${STATE[r.state].tone}`} title={STATE[r.state].hint}>{STATE[r.state].label}</span>
+                <span className={STATE[r.state].tone} title={STATE[r.state].hint}>{STATE[r.state].label}</span>
               </td>
               <td title={STATE[r.state].hint}>
                 {r.tookMs === null ? "—" : r.state === "open" ? <span className="muted">{formatSpan(r.tookMs)} so far</span> : formatSpan(r.tookMs)}
@@ -74,7 +74,7 @@ export const TaskTable = memo(function TaskTable({ rows }: { rows: TaskRow[] }) 
       </table>
       {sorted.length > FIRST && (
         <div className="run-more">
-          <button type="button" className="btn btn-sm" onClick={() => setAll((a) => !a)}>
+          <button type="button" className="ui-button" onClick={() => setAll((a) => !a)}>
             {all ? `Show the first ${FIRST}` : `Show all ${sorted.length}`}
           </button>
         </div>

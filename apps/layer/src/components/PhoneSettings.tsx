@@ -112,7 +112,7 @@ export function PhoneSettings() {
             <div className="phone-list">
               {status.addresses.map((a) => (
                 <div key={a.ip} className="row">
-                  <span className="chip">{WAY[a.way]}</span>
+                  <span className="ui-chip">{WAY[a.way]}</span>
                   <code>http://{a.ip}:{status.port}</code>
                   <span className="phone-hint">{a.interface}</span>
                 </div>
@@ -141,7 +141,7 @@ export function PhoneSettings() {
         {status.pairing ? (
           <Pairing code={status.pairing.code} seconds={status.pairing.seconds_left} onExpired={reload} />
         ) : (
-          <button className="btn" disabled={!status.listening} onClick={() => void pair()}>
+          <button className="ui-button" disabled={!status.listening} onClick={() => void pair()}>
             Pair a phone
           </button>
         )}
@@ -153,7 +153,7 @@ export function PhoneSettings() {
                 <span>{d.name}</span>
                 <span className="phone-hint">paired {new Date(d.paired_at).toLocaleDateString()}</span>
                 <div className="spacer" />
-                <button className="btn btn-sm" onClick={() => void forget(d.id)}>Forget</button>
+                <button className="ui-button" onClick={() => void forget(d.id)}>Forget</button>
               </div>
             ))}
           </div>
@@ -203,7 +203,7 @@ export function PhoneBadge() {
       : `No phone has the app open. Paired: ${names(status.devices)}`;
   return (
     <button
-      className={`icon-btn phone${connected.length ? " on" : ""}`}
+      className={`ui-button ui-icon-button phone${connected.length ? " on" : ""}`}
       title={title}
       onClick={() => toggleSettings(true, "phone")}
     >

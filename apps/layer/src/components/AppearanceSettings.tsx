@@ -86,7 +86,7 @@ export function AppearanceSettings() {
           {[0.9, 1.0, 1.15, 1.3, 1.45].map((v) => (
             <button
               key={v}
-              className={`btn btn-sm${
+              className={`ui-button${
                 Math.abs(ui.scale - v) < 0.001 ? " on" : ""
               }`}
               onClick={() => void saveUi({ scale: v })}

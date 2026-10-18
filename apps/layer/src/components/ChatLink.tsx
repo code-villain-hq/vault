@@ -25,7 +25,7 @@ export function ChatLink({ task }: { task: Task }) {
         Started from the chat <b>{paneName(pane)}</b> · {state.label}
       </span>
       <div className="spacer" />
-      <button className="btn btn-sm" onClick={() => goTo(`pane:${CHAT_TASK_ID}:${pane.id}`)}>
+      <button className="ui-button" onClick={() => goTo(`pane:${CHAT_TASK_ID}:${pane.id}`)}>
         Open chat
       </button>
     </div>

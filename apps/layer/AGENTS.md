@@ -191,7 +191,7 @@ beside the code, with a reason: `// guard: allow <rule> — <why>`.
 bun install
 bun run check          # everything below, in order; must pass before a commit
 bun run guard          # scripts/guard.ts alone, about a second
-bun run design:sync    # copy the vault's design tokens and fonts into src/design
+bun run design:sync    # copy the vault's design tokens, shared components and fonts into src/design
 bun run build          # tsc && vite build
 bun run dev:app        # the app, as a dev build under its own identity
 bun run dev            # Vite alone; the mock harness is at /mock.html
@@ -245,6 +245,7 @@ build does the same.
 | `src-tauri/src/shellenv.rs` | the login shell's environment, for spawned processes |
 | `src/App.tsx` | the shell and the top bar (views as tabs, app-wide tools) |
 | `src/theme.css`, `src/design/` | the studio's colour, code, type and radius names, from the vault's `design/tokens` (`bun run design:sync`; never edit `src/design/` by hand) |
+| `src/design/components.css` | the shared controls as `ui-*` classes (buttons, fields, chips, status pills, menus, dialogs, links), from the vault's `design/components.css`: use them rather than a local recipe; `design/lint` fails CI on literal colours, sizes or radii |
 | `src/Watchers.tsx` | `Watchers`: every poll and event listener, and the toasts they raise |
 | `src/store.ts` | all frontend state and its refresh actions |
 | `src/lib/derive.ts` | pure helpers over that state (`paneState`, `needsYou`, …) |

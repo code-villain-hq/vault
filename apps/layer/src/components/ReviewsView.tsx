@@ -59,12 +59,12 @@ function ReviewCard({
       <div className="top">
         <span className="repo">{pr.repo || "pull request"}</span>
         <span className="num">#{pr.number}</span>
-        {pr.draft && <span className="chip">draft</span>}
+        {pr.draft && <span className="ui-chip">draft</span>}
         <span className="spacer" />
         <span className="when">{ago(pr.updated_at)}</span>
         <button
           type="button"
-          className="btn btn-sm"
+          className="ui-button"
           title={pr.url}
           onClick={(e) => { e.stopPropagation(); open(); }}
         >
@@ -74,14 +74,14 @@ function ReviewCard({
       <div className="title">{pr.title}</div>
       <div className="chips standing">
         {pr.author && <span className="by">{pr.author}</span>}
-        <span className="chip size" title={`${pr.changed_files} files, opened ${ago(pr.created_at)} ago`}>
+        <span className="ui-chip size" title={`${pr.changed_files} files, opened ${ago(pr.created_at)} ago`}>
           <span className="add">+{pr.additions}</span> <span className="del">−{pr.deletions}</span>
           {" · "}{pr.changed_files} {pr.changed_files === 1 ? "file" : "files"}
         </span>
-        {pr.cross_repo && <span className="chip" title="Its branch is on a fork">fork</span>}
-        {pr.checks === "failing" && <span className="chip del">checks failing</span>}
-        {pr.checks === "pending" && <span className="chip warn">checks running</span>}
-        {pr.checks === "passing" && <span className="chip add">checks pass</span>}
+        {pr.cross_repo && <span className="ui-chip" title="Its branch is on a fork">fork</span>}
+        {pr.checks === "failing" && <span className="ui-status ui-status-danger">checks failing</span>}
+        {pr.checks === "pending" && <span className="ui-status ui-status-warn">checks running</span>}
+        {pr.checks === "passing" && <span className="ui-status ui-status-ok">checks pass</span>}
         <MyReview pr={pr} />
       </div>
     </div>
@@ -91,14 +91,14 @@ function ReviewCard({
 /** Where your own review of it stands (REV-9): what this request asks of you. */
 function MyReview({ pr }: { pr: ReviewRequest }) {
   if (pr.new_since_review) {
-    return <span className="chip warn" title="Its author pushed after your last review">new commits since your review</span>;
+    return <span className="ui-status ui-status-warn" title="Its author pushed after your last review">new commits since your review</span>;
   }
   switch (pr.my_review) {
-    case "approved": return <span className="chip add">you approved</span>;
-    case "changes_requested": return <span className="chip del">you asked for changes</span>;
-    case "commented": return <span className="chip">you commented</span>;
-    case "dismissed": return <span className="chip">your review was dismissed</span>;
-    default: return <span className="chip warn">not reviewed yet</span>;
+    case "approved": return <span className="ui-status ui-status-ok">you approved</span>;
+    case "changes_requested": return <span className="ui-status ui-status-danger">you asked for changes</span>;
+    case "commented": return <span className="ui-chip">you commented</span>;
+    case "dismissed": return <span className="ui-chip">your review was dismissed</span>;
+    default: return <span className="ui-status ui-status-warn">not reviewed yet</span>;
   }
 }
 
@@ -175,7 +175,7 @@ function AuthoredCard({
         <span className="when">{ago(pr.updated_at)}</span>
         <button
           type="button"
-          className="btn btn-sm"
+          className="ui-button"
           title={pr.url}
           onClick={(e) => { e.stopPropagation(); openGitHub(); }}
         >
@@ -184,22 +184,22 @@ function AuthoredCard({
       </div>
       <div className="title">{pr.title}</div>
       <div className="chips standing">
-        {pr.checks === "failing" && <span className="chip del">checks failing</span>}
-        {pr.checks === "pending" && <span className="chip warn">checks running</span>}
-        {pr.checks === "passing" && <span className="chip add">checks pass</span>}
-        {pr.review === "changes_requested" && <span className="chip del">changes requested{who(pr.changes_by)}</span>}
-        {pr.review === "approved" && <span className="chip add">approved{who(pr.approved_by)}</span>}
-        {pr.review === "review_required" && pr.waiting_on.length === 0 && <span className="chip warn">needs a review</span>}
-        {pr.waiting_on.length > 0 && <span className="chip">waiting on {pr.waiting_on.join(", ")}</span>}
+        {pr.checks === "failing" && <span className="ui-status ui-status-danger">checks failing</span>}
+        {pr.checks === "pending" && <span className="ui-status ui-status-warn">checks running</span>}
+        {pr.checks === "passing" && <span className="ui-status ui-status-ok">checks pass</span>}
+        {pr.review === "changes_requested" && <span className="ui-status ui-status-danger">changes requested{who(pr.changes_by)}</span>}
+        {pr.review === "approved" && <span className="ui-status ui-status-ok">approved{who(pr.approved_by)}</span>}
+        {pr.review === "review_required" && pr.waiting_on.length === 0 && <span className="ui-status ui-status-warn">needs a review</span>}
+        {pr.waiting_on.length > 0 && <span className="ui-chip">waiting on {pr.waiting_on.join(", ")}</span>}
         {pr.unresolved > 0 && (
-          <span className="chip warn">{pr.unresolved}{pr.unresolved_more ? "+" : ""} unresolved</span>
+          <span className="ui-status ui-status-warn">{pr.unresolved}{pr.unresolved_more ? "+" : ""} unresolved</span>
         )}
-        {pr.conflicts && <span className="chip del">conflicts</span>}
-        {task && <span className="chip task">{task.name}</span>}
+        {pr.conflicts && <span className="ui-status ui-status-danger">conflicts</span>}
+        {task && <span className="ui-status ui-status-info">{task.name}</span>}
         {!task && (
           <button
             type="button"
-            className="btn btn-sm start"
+            className="ui-button start"
             disabled={starting}
             title={`A task on ${pr.head}, to work on it here`}
             onClick={(e) => { e.stopPropagation(); void start(); }}
@@ -332,7 +332,7 @@ export function ReviewsView() {
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub to list pull requests waiting on your review.</p>
-        <button type="button" className="btn" onClick={() => toggleSettings(true)}>Connect GitHub</button>
+        <button type="button" className="ui-button" onClick={() => toggleSettings(true)}>Connect GitHub</button>
       </div>
     );
   }
@@ -351,7 +351,7 @@ export function ReviewsView() {
         </span>
         <div className="spacer" />
         {loading && <Spinner />}
-        <button type="button" className="btn btn-sm" onClick={() => void refresh()}>Refresh</button>
+        <button type="button" className="ui-button" onClick={() => void refresh()}>Refresh</button>
       </div>
 
       <div className="tabs sub-tabs">
@@ -456,7 +456,7 @@ export function ReviewsView() {
                 Set a review team in Settings → Code — for example @fe — to list
                 pull requests requested of that team.
               </p>
-              <button type="button" className="btn btn-sm" onClick={() => toggleSettings(true)}>Settings</button>
+              <button type="button" className="ui-button" onClick={() => toggleSettings(true)}>Settings</button>
             </ReviewList>
           )}
         </>

@@ -85,7 +85,7 @@ export function TicketFlowSettings() {
           const list = statuses[p];
           const flow = settings?.jira?.flow?.[p];
           const pick = (stage: "review" | "merged", chosen: FlowStatus | null | undefined) => (
-            <select
+            <select className="ui-field"
               value={chosen?.id ?? ""}
               style={{ width: "100%" }}
               onChange={(e) => void choose(p, stage, e.target.value)}
@@ -99,7 +99,7 @@ export function TicketFlowSettings() {
           // Until chosen here, as the switch that came before said (TKT-1).
           const started = flow?.started ?? (settings?.ui.sync_jira_status === false ? { to: "leave" } : { to: "first_in_progress" });
           const start = (
-            <select
+            <select className="ui-field"
               value={started.to === "status" ? started.id : started.to === "leave" ? "leave" : ""}
               style={{ width: "100%" }}
               onChange={(e) => void chooseStart(p, e.target.value)}

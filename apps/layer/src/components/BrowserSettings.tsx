@@ -58,7 +58,7 @@ export function BrowserSettings() {
               <code>{s}</code>
               <div className="spacer" />
               <button
-                className="btn btn-sm btn-icon"
+                className="ui-button ui-icon-button"
                 title={`Stop agents using ${s}`}
                 onClick={() => void save(sites.filter((x) => x !== s))}
               >
@@ -67,13 +67,13 @@ export function BrowserSettings() {
             </div>
           ))}
           <form className="row" onSubmit={(e) => void add(e)}>
-            <input
+            <input className="ui-field"
               value={adding}
               placeholder="github.com"
               spellCheck={false}
               onChange={(e) => setAdding(e.target.value)}
             />
-            <button className="btn" disabled={!adding.trim()}>Allow</button>
+            <button className="ui-button" disabled={!adding.trim()}>Allow</button>
           </form>
         </div>
       </Field>
@@ -139,7 +139,7 @@ function SignIns() {
             <span>{s.username}</span>
             <div className="spacer" />
             <button
-              className="btn btn-sm btn-icon"
+              className="ui-button ui-icon-button"
               title={`Forget the sign-in for ${s.username} on ${s.site}`}
               onClick={() => void forget(s.id)}
             >
@@ -148,10 +148,10 @@ function SignIns() {
           </div>
         ))}
         <form className="row" onSubmit={(e) => void add(e)}>
-          <input value={site} placeholder="localhost" spellCheck={false} style={{ width: 140 }} onChange={(e) => setSite(e.target.value)} />
-          <input value={username} placeholder="username or email" spellCheck={false} onChange={(e) => setUsername(e.target.value)} />
-          <input type="password" value={password} placeholder="password" autoComplete="off" onChange={(e) => setPassword(e.target.value)} />
-          <button className="btn" disabled={busy || !site.trim() || !username.trim() || !password}>Save</button>
+          <input className="ui-field" value={site} placeholder="localhost" spellCheck={false} style={{ width: 140 }} onChange={(e) => setSite(e.target.value)} />
+          <input className="ui-field" value={username} placeholder="username or email" spellCheck={false} onChange={(e) => setUsername(e.target.value)} />
+          <input className="ui-field" type="password" value={password} placeholder="password" autoComplete="off" onChange={(e) => setPassword(e.target.value)} />
+          <button className="ui-button" disabled={busy || !site.trim() || !username.trim() || !password}>Save</button>
         </form>
       </div>
     </Field>

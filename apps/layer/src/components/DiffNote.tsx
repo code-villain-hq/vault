@@ -30,7 +30,7 @@ function NoteText({
   const box = useRef<HTMLTextAreaElement>(null);
   return (
     <>
-      <textarea
+      <textarea className="ui-field"
         ref={box}
         rows={Math.min(12, Math.max(3, text.split("\n").length + 1))}
         autoFocus
@@ -43,11 +43,11 @@ function NoteText({
         }}
       />
       <div className="actions">
-        <button className="btn btn-sm btn-primary" onClick={() => onSave(text)}>{saveLabel}</button>
-        <button className="btn btn-sm" onClick={onCancel}>Cancel</button>
+        <button className="ui-button ui-button-primary" onClick={() => onSave(text)}>{saveLabel}</button>
+        <button className="ui-button" onClick={onCancel}>Cancel</button>
         {code !== "" && !text.includes("```suggestion") && (
           <button
-            className="btn btn-sm"
+            className="ui-button"
             title="Write what the line should read; the author can apply it from GitHub"
             onClick={() => {
               const next = withSuggestion(text, code);
@@ -122,15 +122,15 @@ export function NoteCard({
     <div className="inline-comment">
       {span && (
         <div className="note-head">
-          <span className="chip">{span}</span>
+          <span className="ui-chip">{span}</span>
         </div>
       )}
       <div className="body"><Markdown text={note.body} /></div>
       <div className="actions">
-        <button className="btn btn-sm" onClick={() => setEditing(true)} title="Reword it">
+        <button className="ui-button" onClick={() => setEditing(true)} title="Reword it">
           Edit
         </button>
-        <button className="btn btn-sm btn-danger" onClick={onDrop}>
+        <button className="ui-button ui-button-danger" onClick={onDrop}>
           Remove
         </button>
       </div>

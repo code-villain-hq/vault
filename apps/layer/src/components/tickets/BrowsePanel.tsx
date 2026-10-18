@@ -58,7 +58,7 @@ export function BrowsePanel({
         onChange={onKinds}
       />
       <div className="card browse-bar">
-        <input
+        <input className="ui-field"
           type="text"
           autoFocus
           placeholder="Words to look for, or paste a key like ACME-21042…"
@@ -66,7 +66,7 @@ export function BrowsePanel({
           onChange={(e) => onBrowseText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
         />
-        <select value={whose} onChange={(e) => onWhose(e.target.value)}>
+        <select className="ui-field" value={whose} onChange={(e) => onWhose(e.target.value)}>
           <option value="notmine">Not mine</option>
           <option value="unassigned">Unassigned</option>
           <option value="anyone">Anyone</option>
@@ -81,7 +81,7 @@ export function BrowsePanel({
           Include done
         </label>
         <button
-          className="btn btn-sm btn-primary"
+          className="ui-button ui-button-primary"
           disabled={searching}
           onClick={onSearch}
         >

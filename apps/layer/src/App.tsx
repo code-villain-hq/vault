@@ -113,25 +113,25 @@ function TopBar() {
             <span className="viewtab-label" data-label={t.label}>{t.label}</span>
             {t.count !== undefined ? (
               <span className="viewtab-count" title={t.title}>
-                {t.news && <span className="live-dot" aria-hidden />}
+                {t.news && <span className="ui-live-dot" aria-hidden />}
                 {t.count}
               </span>
             ) : (
-              t.live && <span className="live-dot" title="Running" />
+              t.live && <span className="ui-live-dot" title="Running" />
             )}
           </button>
         ))}
       </nav>
       <div className="topbar-right">
         {watchFailing && (
-          <span className="watch-chip" title="Task and pane polls are failing">
+          <span className="ui-status ui-status-warn watch-chip" title="Task and pane polls are failing">
             couldn&apos;t refresh
           </span>
         )}
         <PhoneBadge />
         <KeepAwake />
         <MessageCenter />
-        <button className="icon-btn" title="Settings" aria-label="Settings" onClick={() => toggleSettings(true)}>
+        <button className="ui-button ui-icon-button" title="Settings" aria-label="Settings" onClick={() => toggleSettings(true)}>
           <GearIcon />
         </button>
       </div>
@@ -177,7 +177,7 @@ function KeepAwake() {
         : "The Mac stays awake whenever an agent is working. None is now, so it may sleep. Click to turn off.";
   return (
     <button
-      className={`icon-btn awake${on ? " on" : ""}${on && working ? " holding" : ""}`}
+      className={`ui-button ui-icon-button awake${on ? " on" : ""}${on && working ? " holding" : ""}`}
       title={title}
       aria-pressed={on}
       onClick={() => void toggle()}
@@ -222,7 +222,7 @@ function TaskMain({ task }: { task: TaskView }) {
           {task.checkouts.map((c) => (
             <span
               key={c.id}
-              className="chip"
+              className="ui-chip"
               title={c.broken ?? c.path}
               style={!c.exists || c.broken ? { color: "var(--status-danger-ink)" } : undefined}
             >
@@ -234,22 +234,22 @@ function TaskMain({ task }: { task: TaskView }) {
         <div className="chips">
           {totals.unlinked > 0 && (
             <span
-              className="chip del"
+              className="ui-status ui-status-danger"
               title={task.checkouts.filter((c) => c.broken).map((c) => `${c.project_name}: ${c.broken}`).join("\n")}
             >
               {totals.unlinked} worktree{totals.unlinked === 1 ? "" : "s"} unlinked
             </span>
           )}
           {totals.missing > 0 && (
-            <span className="chip warn">
+            <span className="ui-status ui-status-warn">
               {totals.missing} worktree{totals.missing === 1 ? "" : "s"} missing
             </span>
           )}
-          {totals.ahead > 0 && <span className="chip">↑{totals.ahead}</span>}
-          {totals.behind > 0 && <span className="chip warn">↓{totals.behind}</span>}
+          {totals.ahead > 0 && <span className="ui-chip">↑{totals.ahead}</span>}
+          {totals.behind > 0 && <span className="ui-status ui-status-warn">↓{totals.behind}</span>}
           {totals.conflicted > 0 && (
             <button
-              className="chip del"
+              className="ui-status ui-status-danger"
               title="Resolve with an agent, or abandon the update"
               onClick={() => setUpdating(true)}
             >
@@ -257,7 +257,7 @@ function TaskMain({ task }: { task: TaskView }) {
             </button>
           )}
           <button
-            className="btn btn-sm"
+            className="ui-button"
             title="Fetch each repo's base branch and merge or rebase this task's branch onto it"
             onClick={() => setUpdating(true)}
           >
@@ -265,7 +265,7 @@ function TaskMain({ task }: { task: TaskView }) {
           </button>
           {cursorIde && (
             <button
-              className="btn btn-sm"
+              className="ui-button"
               title={`Open ${task.root} in Cursor`}
               onClick={() => void api.openInCursor(task.root).catch(fail)}
             >
@@ -274,7 +274,7 @@ function TaskMain({ task }: { task: TaskView }) {
           )}
           {task.issue_url && (
             <button
-              className="btn btn-sm"
+              className="ui-button"
               title={ticket ? `${task.issue_key} is ${ticket.status} in Jira` : undefined}
               onClick={() => void openUrl(task.issue_url!)}
             >

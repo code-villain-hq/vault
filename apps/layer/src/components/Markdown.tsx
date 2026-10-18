@@ -29,7 +29,7 @@ function inlines(nodes: Inline[]): ReactNode[] {
       case "br": return <br key={i} />;
       case "link":
         return (
-          <a key={i} href={n.href} title={n.href} onClick={(e) => open(e, n.href)}>
+          <a key={i} className="ui-link" href={n.href} title={n.href} onClick={(e) => open(e, n.href)}>
             {inlines(n.c)}
           </a>
         );

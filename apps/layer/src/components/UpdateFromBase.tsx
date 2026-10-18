@@ -173,9 +173,9 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
   const footer = results === null && conflicted.length === 0 ? (
     <>
       <div className="spacer" />
-      <button className="btn" onClick={onClose} disabled={busy}>Cancel</button>
+      <button className="ui-button" onClick={onClose} disabled={busy}>Cancel</button>
       <button
-        className="btn btn-primary"
+        className="ui-button ui-button-primary"
         disabled={busy || picked.size === 0}
         onClick={() => void update()}
       >
@@ -189,10 +189,10 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
       {conflicted.length > 0 && <AgentTargetFields task={task} at={at} disabled={busy} />}
       <div className="spacer" />
       <div className="foot-buttons">
-        <button className="btn" onClick={onClose} disabled={busy}>Close</button>
+        <button className="ui-button" onClick={onClose} disabled={busy}>Close</button>
         {conflicted.length > 0 && (
           <button
-            className="btn btn-primary"
+            className="ui-button ui-button-primary"
             disabled={busy || at.stuck}
             title={at.stuck ? "Install an agent CLI first" : undefined}
             onClick={() => void handOff()}
@@ -233,13 +233,13 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                 <div className="fb-main">
                   <div className="row">
                     <span className="fb-head mono">{c.project_name}</span>
-                    {!c.exists && <span className="chip del">worktree missing</span>}
+                    {!c.exists && <span className="ui-status ui-status-danger">worktree missing</span>}
                     {gone(c.id, c.base) && (
-                      <span className="chip del" title="Not among origin's branches at the last fetch — merged and deleted, perhaps. Pick the branch it went into.">
+                      <span className="ui-status ui-status-danger" title="Not among origin's branches at the last fetch — merged and deleted, perhaps. Pick the branch it went into.">
                         not on origin
                       </span>
                     )}
-                    {edited > 0 && <span className="chip warn">uncommitted changes</span>}
+                    {edited > 0 && <span className="ui-status ui-status-warn">uncommitted changes</span>}
                     <div className="spacer" />
                     {/* Inside the label, so a click here would tick the repo too. */}
                     <span
@@ -332,7 +332,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
           {conflicted.map((c) => (
             <div key={c.id} className="check">
               <span className="name">{c.project_name}</span>
-              <button className="btn btn-sm" disabled={busy} onClick={() => void abort(c.id)}>
+              <button className="ui-button" disabled={busy} onClick={() => void abort(c.id)}>
                 Abandon {ran?.[c.id] ?? "update"}
               </button>
             </div>

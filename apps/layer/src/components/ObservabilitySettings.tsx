@@ -92,10 +92,10 @@ function GrafanaSource() {
       <h3>Grafana</h3>
       {connected && (
         <div className="row" style={{ marginBottom: 14 }}>
-          <span className="chip add">connected</span>
+          <span className="ui-status ui-status-ok">connected</span>
           <span className="muted">{settings?.grafana?.base_url}</span>
           <div className="spacer" />
-          <button className="btn btn-sm btn-danger" onClick={() => void disconnect()}>
+          <button className="ui-button ui-button-danger" onClick={() => void disconnect()}>
             Disconnect
           </button>
         </div>
@@ -108,7 +108,7 @@ function GrafanaSource() {
           label="Your services' logs"
           hint="The Loki datasource agents read when they don't name one. Grafana Cloud adds datasources of its own beside yours. One missing here is one the token may not query: give its service account access to it in Grafana."
         >
-          <select value={settings?.grafana?.datasource ?? ""} onChange={(e) => void choose(e.target.value)}>
+          <select className="ui-field" value={settings?.grafana?.datasource ?? ""} onChange={(e) => void choose(e.target.value)}>
             <option value="">Not chosen: agents name one each time</option>
             {sources.map((s) => (
               <option key={s.uid} value={s.uid}>
@@ -119,13 +119,13 @@ function GrafanaSource() {
         </Field>
       )}
       <Field label="Site URL" hint="Where you open Grafana, e.g. https://acme.grafana.net.">
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://acme.grafana.net" />
+        <input className="ui-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://acme.grafana.net" />
       </Field>
       <Field
         label="Service account token"
         hint="Administration → Users and access → Service accounts. Its role has to read and query datasources. Stored in your keychain."
       >
-        <input
+        <input className="ui-field"
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
@@ -133,7 +133,7 @@ function GrafanaSource() {
         />
       </Field>
       <button
-        className="btn btn-primary"
+        className="ui-button ui-button-primary"
         disabled={busy || !url.trim() || (!token.trim() && !connected)}
         onClick={() => void connect()}
       >

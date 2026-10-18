@@ -1,5 +1,5 @@
 export function statusClass(category: string) {
-  if (category === "done") return "done";
-  if (category === "indeterminate") return "indeterminate";
-  return "new";
+  if (category === "done") return "ui-status-ok";
+  if (category === "indeterminate") return "ui-status-info";
+  return "";
 }
