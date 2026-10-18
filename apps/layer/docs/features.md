@@ -150,8 +150,9 @@ Known gaps:
 
 A task has a name, a branch (the same in every repo), a folder, and one
 checkout per repo. The sidebar lists tasks as working, in review (has an
-open PR) or done (every PR merged). Each row shows state dots, the ticket,
-the repo count, running agents, uncommitted changes and the review verdict.
+open PR) or done (every PR merged). Each row shows state dots, the name,
+and under it the branch, which carries the ticket key, with the repo
+count, running agents, uncommitted changes and the review verdict.
 
 - **TASK-1** A task MUST have a folder, `<worktree root>/<branch, / → ->`.
   Each checkout is a subfolder named after its repo. Agents start in the

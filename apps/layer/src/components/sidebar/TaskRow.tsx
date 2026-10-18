@@ -92,14 +92,18 @@ export const TaskRow = memo(function TaskRow({
             title={waiting ? "An agent here needs you: it is asking, or it finished" : undefined}
           />
           )}
-          {task.issue_key && <span className="ui-chip key-chip">{task.issue_key}</span>}
           <span className="label">
             {task.issue_key ? task.name.replace(`${task.issue_key} `, "") : task.name}
           </span>
         </div>
+        {/* The ticket key reads here, in the branch the composer starts with it,
+            rather than in a box on the title line: there it was hard to read
+            and said the same thing twice. */}
         <div className="ws-meta">
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-            {task.branch}
+          <span className="branch">
+            {task.issue_key && !task.branch.includes(task.issue_key)
+              ? `${task.issue_key} · ${task.branch}`
+              : task.branch}
           </span>
           <div className="spacer" />
           {multi && <span>{task.checkouts.length} repos</span>}
