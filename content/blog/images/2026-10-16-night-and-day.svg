@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-label="Nightshade swatches: a night row from near-black to chartreuse and violet, and a day row from light grey to chartreuse and violet">
   <title>Nightshade, night and day</title>
   <!-- Generated from design/tokens/color.resolved.json. -->
-  <rect width="1200" height="520" rx="24" fill="#1B1B1B"/>
+  <rect width="1200" height="520" rx="24" fill="#2B2B2B"/>
   <!-- Night: bg, panel, surface, primary, selected, accent -->
   <rect x="40" y="40" width="170" height="200" rx="14" fill="#0B0B0B"/>
   <rect x="230" y="40" width="170" height="200" rx="14" fill="#141414"/>
