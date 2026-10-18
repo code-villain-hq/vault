@@ -1,8 +1,8 @@
 ---
 title: Code Villain gets a face
-date: 2026-10-16
+date: 2026-10-18
 product: Studio
-draft: true
+draft: false
 ---
 
 Code Villain had three products and no look. Forge was indigo, Layer was lavender, the homepage was a test font matched off a generated picture. The whole studio now draws from one place: `brand/` and `design/` in the vault.
@@ -51,6 +51,10 @@ The cut is one mask. The letters, drawn again with a thick stroke, punch a gap i
 <rect y="108" width="200" height="15" fill="#C9E265" mask="url(#cut)"/>
 ```
 
+## The apps
+
+Then the apps caught up. Caster, Forge and Layer read the same tokens through a copy that CI checks against the vault: a change in `design/` lands everywhere, or the build fails. Forge's issues, Layer's agents and Caster's launcher now share the tones, the type and the button. The editors followed. The Code Villain theme dresses VS Code, Cursor, Neovim and WezTerm from the same tokens, and in a shell the green is poison.
+
 ## What it cost
 
-Two days, a dozen studies, one colour swap, and a rule written down for every decision, so the apps can catch up without asking.
+Three days, a dozen studies, one colour swap, and a rule written down for every decision. The apps caught up without asking.

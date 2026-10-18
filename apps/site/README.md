@@ -2,7 +2,7 @@
 
 The Code Villain website at **https://www.codevillain.eu/**: the homepage, and the blog in [`blog/`](blog). Shared styles are in [`site.css`](site.css).
 
-The blog shows posts from [`content/blog`](../../content/blog). Each post page is written by hand from its Markdown; `build.py` packages the finished pages without generating posts. The blog index lists the real post, currently marked as a draft.
+The blog shows posts from [`content/blog`](../../content/blog). Each post page is written by hand from its Markdown; `build.py` packages the finished pages without generating posts. The blog index lists the published posts.
 
 It reads colour, type, and shape from [`design/tokens`](../../design/tokens) by relative path, so open it through the vault's preview server (`vault-static` in `.claude/launch.json`, then `/apps/site/`), not from disk. `python3 build.py` copies the public assets and rewrites their references for deployment at the domain root.
 
