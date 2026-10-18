@@ -2,7 +2,7 @@
 
 `brand/` says what Code Villain feels like. This folder turns that into principles, numbers, and reference layouts.
 
-Caster is AppKit. Forge, Layer, and the site are web. Each one builds its screens in its own toolkit, from the same principles, tokens, and layouts.
+Caster is AppKit. Forge, Layer, and the site are web. The Code Villain theme (`apps/theme`) carries the same colours into VS Code, Cursor, Neovim and WezTerm. Each one builds its screens in its own toolkit, from the same principles, tokens, and layouts.
 
 | | |
 | --- | --- |

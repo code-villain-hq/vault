@@ -1,20 +1,23 @@
 ---
 name: Code Villain
-description: Nightshade — grey does the work, cloak is the quiet brand, poison is the accent. Night by default, day for apps.
+description: Nightshade. Grey does the work, poison is the brand and the main action, cloak supports it and marks focus. Night by default, day for the apps.
 colors:
-  bg: "#0A0B0D"
-  panel: "#12131A"
-  surface: "#191A23"
-  hover: "#1B1C26"
-  selected: "#1A0D24"
-  line: "#2A2B36"
-  fg: "#ECECF1"
-  muted: "#9B9BA8"
-  faint: "#868693"
-  primary: "#331C40"
-  primary-hover: "#3A1A49"
-  on-primary: "#ECECF1"
-  accent: "#C9E265"
+  bg: "#0B0B0B"
+  panel: "#141414"
+  surface: "#1B1B1B"
+  dialog: "#1D1D1D"
+  field: "#1B1B1B"
+  hover: "#1D1D1D"
+  selected: "#1C1E13"
+  line: "#2B2B2B"
+  fg: "#EBEBEB"
+  muted: "#9B9B9B"
+  faint: "#969696"
+  primary: "#C9E265"
+  primary-hover: "#B6CE50"
+  on-primary: "#0B0B0B"
+  accent: "#AF6BC8"
+  signal: "#C9E265"
   danger: "#F27A6B"
   ok: "#5CC9A7"
   warn: "#E9AE45"
@@ -44,7 +47,7 @@ typography:
     lineHeight: 1.25
   label:
     fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.9375rem"
+    fontSize: "1.0625rem"
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "0.01em"
@@ -63,6 +66,11 @@ typography:
     fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.6
+  query:
+    fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.3125rem"
+    fontWeight: 400
+    lineHeight: 1.25
   ui:
     fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.875rem"
@@ -78,6 +86,11 @@ typography:
     fontSize: "0.8125rem"
     fontWeight: 600
     lineHeight: 1
+  ui-code:
+    fontFamily: "Atkinson Hyperlegible Mono, ui-monospace, Menlo, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: 1.6
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -98,12 +111,16 @@ components:
     backgroundColor: "{colors.hover}"
     textColor: "{colors.fg}"
   field:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.field}"
     textColor: "{colors.fg}"
     rounded: "6px"
   chip:
     textColor: "{colors.muted}"
     rounded: "999px"
+  dialog:
+    backgroundColor: "{colors.dialog}"
+    textColor: "{colors.fg}"
+    rounded: "10px"
   card-panel:
     backgroundColor: "{colors.panel}"
     textColor: "{colors.fg}"
@@ -112,50 +129,53 @@ components:
 
 # Design System: Code Villain
 
-This file summarises `brand/` and `design/` for design tools. Those folders are the source; when they change, this follows.
+This file summarises `brand/` and `design/` for design tools. Those folders are the source. The frontmatter above is generated from `design/tokens` by `python3 build.py` there, and CI fails if it drifts; the prose below follows the same sources.
 
 ## Overview
 
-**Creative North Star: "The Nightshade Cloak"**
+**Creative North Star: "The Nightshade Court"**
 
-A golden-age comic villain's court, rendered as a calm product surface. The theatre lives in a few large places: Grenze Gotisch titles and the poison strike on the homepage. Everything read or clicked stays plain, quiet, and legible.
+A golden-age comic villain's court, rendered as a calm product surface. The theatre lives in a few large places: Grenze Gotisch titles and the poison strike. Everything read or clicked stays plain, quiet, and legible.
 
-Grey does most of the work. Cloak (violet) is the brand, held to the strength of a grey: the main action, selection. Poison (chartreuse) is an accent, never the main thing.
+Grey does most of the work. Poison (chartreuse) is the brand: the strike in every mark, the main action's fill, the selection tint, and live signals. Cloak (deep violet) supports it with depth and marks focus.
 
 **Key Characteristics:**
 - Night by default; day for the apps' light mode. Studio surfaces stay night.
-- Tone, not lines: regions separate by steps in tone and space.
-- Soft corners: 6px controls, 10px panels, round pills.
-- One quiet primary per screen; everything else steps back.
-- Poison only for focus, one brand moment per surface, and live dots.
+- Tone, not lines: regions separate by steps in tone and space. Greys stay achromatic.
+- Soft corners: 6px controls, 10px panels and dialogs, round pills.
+- One primary per screen, in poison with dark ink; everything else steps back.
+- Every colour at one level shares an OKLCH lightness, so none shouts.
 
-**The mark** is the strike: a gothic V with a poison bar behind it, low and heavy, cut by the letter (`brand/mark/`). It is the surface's one brand moment; app icons are each app's initial built the same way.
+**The mark** is the strike: a gothic C and V with a poison bar behind them, low and heavy, cut where the letters cross (`brand/mark/`). It is the surface's one brand moment. Each app's icon is its initial built the same way; a menu bar glyph is the mark without its tile, in colour.
 
 Principles: `design/principles.md`. Components: `design/components.md`.
 
 ## Colors
 
-Shared names, filled for night and day (full table in `brand/color.md`, numbers in `design/tokens/color.json`).
+Shared names, filled for night and day (full table in `brand/color.md`, numbers in `design/tokens/`). Themes are calculated from three inputs (`base` poison, `accent` cloak, `contrast`), not hand-tuned lists.
 
-- **bg / panel / surface**: frame, content, fields. Elevation is a step in tone.
+- **bg / panel / surface / dialog**: frame, content, raised notes, dialogs. Elevation is a step in tone.
+- **field / dialog-field**: form controls, a tone step from their host.
 - **fg / muted / faint**: text, secondary text, ids and placeholders. Links are `fg`, bold, underlined.
-- **primary**: the main action's fill, a violet tone (`#331C40` night, `#E8DEEB` day).
-- **selected**: violet-tinted selection. Day greys carry no violet.
-- **accent**: poison. Bright `#C9E265` by night, deep `#4C6A00` by day.
-- **danger / ok / warn / info**: status. Ok is teal so it never reads as poison.
+- **primary**: poison, the main action's fill, with dark `on-primary` ink.
+- **selected**: a faint poison tint for the selected row and current nav item.
+- **accent**: cloak, lifted to a readable violet by night: the focus ring.
+- **signal**: poison at the 3:1 non-text floor: live dots.
+- **danger / ok / warn / info**: status, with `status-<name>-ink` for text on their 13% tints. Ok is teal so it never reads as poison.
+- **backdrop-tint**: black at 40% behind a dialog.
 
 ### Named Rules
-**The Accent Rule.** Poison goes to the focus ring, one brand moment per surface, and live dots. Never links, labels, chips, body copy, or large fills. Never on cloak.
+**The Strike Rule.** Poison goes to the strike, the main action (once per screen), the selection tint, live signals, and the search match in code. Never links, labels, chips, body copy, or large fills.
 
-**The Quiet Brand Rule.** Cloak appears as a tone (primary, selected), not as a solid purple block in product UI.
+**The Cloak Rule.** Cloak is focus and depth. It never sits under poison text and never tints the large neutral surfaces.
 
 ## Typography
 
 **Display Font:** Grenze Gotisch (700, 800). Splash, page titles, section titles.
 **Body Font:** Atkinson Hyperlegible Next (400, 600, 700, italic 400). Reading text, labels, buttons, nav, card titles.
-
-Studio roles (splash to code) serve the site, blog and social cards. Interface roles serve app windows: `title` 21px, `ui` 14px, `ui-small` 13px, `control` 13px/600 for buttons and chips.
 **Mono Font:** Atkinson Hyperlegible Mono (400). Code and terminal text.
+
+Studio roles (splash to code) serve the site, blog and social cards; `label` is 17px. Interface roles serve app windows: `title` 21px/700, `query` 21px/400 for a launcher's or command menu's query, `ui` 14px, `ui-small` 13px, `control` 13px/600 for buttons and chips, `ui-code` 13px.
 
 The gothic is the costume; Atkinson is the person inside it. Source: `brand/type.md`.
 
@@ -168,11 +188,11 @@ The gothic is the costume; Atkinson is the person inside it. Source: `brand/type
 
 ## Layout
 
-Apps share one frame: sidebar and top bar on `bg`, dimmed; content rises one step onto a rounded `panel` (`design/layouts/app-window.md`). Prose keeps a 66ch measure. No space scale is published yet; use rem rhythm consistently.
+Apps share one frame: sidebar and top bar on `bg`; content rises one step onto a rounded `panel` inset 0.5rem (`design/layouts/app-window.md`). Prose keeps a 66ch measure. A spacing scale is still a draft (`design/spacing.draft.md`); use rem rhythm consistently.
 
 ## Elevation & Depth
 
-Flat. Depth is tone: bg → panel → surface. No shadows or borders to lift a surface, and no decorative glow. Field focus is the exception: an accent border plus a 3px accent glow at 22%, as specified in `design/components.md`. The `line` token is for tables and menus only.
+Flat. Depth is tone: bg → panel → surface → dialog. No shadows or borders to lift a surface, and no decorative glow. Field focus is the exception: an accent border plus a 3px accent glow at 22%. The `line` token is for tables and menus only.
 
 ## Shapes
 
@@ -180,25 +200,31 @@ Flat. Depth is tone: bg → panel → surface. No shadows or borders to lift a s
 
 ## Components
 
-- **App button**: 28px, `control` role, no border. Primary: `primary` fill, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring, 2px out.
-- **Studio call to action**: `label` role (15px/700, leading 1.2, tracking 0.01em), `0.7rem 1.15rem` padding, automatic height, 6px corners. Same primary colours and no border; focus is a 2px accent ring, 3px out.
-- **Field**: `surface` fill (`panel` in the frame), no border; focus draws an `accent` border plus a 3px accent glow at 22%.
-- **Status pill**: round; status colour as text and dot on a 13% tint.
+- **App button**: 28px, `control` role, no border. Primary: poison fill with dark ink, one per screen. Secondary: muted text, fill only on hover. Focus: 2px accent ring, 2px out.
+- **Studio call to action**: `label` role (17px/700), `0.7rem 1.15rem` padding, 6px corners, the primary colours, no border.
+- **Field**: a tone step with no border; focus draws an accent border plus a 3px accent glow at 22%.
+- **Dialog**: `dialog` fill, `radius-lg`, a backdrop of black at `backdrop-tint`.
+- **Status pill**: round; the status hue at 13% with its status ink.
 - **Chip**: round; muted text on `fg` at 7%.
-- **Row**: no dividers; hover and selection are tone steps.
-- **Live dot**: small round accent dot for something happening now.
+- **Row**: no dividers; hover and selection are tone steps; a menu's active option is `fg` at 8%.
+- **Icon**: one line set per toolkit (Lucide, SF Symbols), 15px beside text, `muted`; never poison or cloak.
+- **Live dot**: a small round `signal` dot for something happening now.
+
+## Code
+
+Code uses the Nightshade code palette (`design/tokens/syntax.json`, rules in `design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette and one 16-colour terminal table dress the Code Villain editor theme (`apps/theme`: VS Code and Cursor, Neovim, WezTerm), the apps, and code on the site.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** lead each screen with one quiet primary.
+- **Do** lead each screen with one primary.
 - **Do** separate regions by tone and space.
 - **Do** keep links in ink, bold and underlined.
 - **Do** meet WCAG AA on every text pairing, in night and day.
 
 ### Don't:
-- **Don't** colour links, chips, or labels with poison.
-- **Don't** use solid cloak as a button fill in product UI.
+- **Don't** colour links, chips, labels or icons with poison.
+- **Don't** let cloak tint surfaces or sit under poison text.
 - **Don't** add hairlines between rows or regions.
 - **Don't** set Grenze Gotisch below 28px or in capitals.
 - **Don't** add shadows or decorative glows; the specified field-focus glow is allowed.

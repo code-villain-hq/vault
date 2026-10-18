@@ -43,8 +43,8 @@ size. App windows are denser and use the interface roles.
 | splash   | Grenze   | 800    | 72–184px | 0.95    | Cover lettering.             |
 | display  | Grenze   | 700    | 36–56px  | 1.1     | Page and post titles.        |
 | headline | Grenze   | 700    | 28–34px  | 1.18    | Section titles.              |
-| title    | Atkinson | 700    | 21px     | 1.25    | Card titles, product names.  |
-| label    | Atkinson | 700    | 17px     | 1.2     | Site buttons and nav.        |
+| title    | Atkinson | 700    | 21px     | 1.25    | Card titles, product names, the homepage nav. |
+| label    | Atkinson | 700    | 17px     | 1.2     | Site buttons, inner-page nav. |
 | body     | Atkinson | 400    | 17px     | 1.6     | Reading text. 66ch measure.  |
 | small    | Atkinson | 400    | 14px     | 1.5     | Captions, dates, meta.       |
 | code     | Mono     | 400    | 14px     | 1.6     | Code blocks, terminal text.  |

@@ -29,8 +29,8 @@ On the site, a main call to action uses the studio `label` role
 (17px, 700, leading 1.2, tracking 0.01em), with `0.7rem 1.15rem`
 padding instead of a fixed height. It keeps the same primary colours,
 6px corners, and no border. Focus is a 2px `accent` ring, 3px out.
-No page uses it yet. Site navigation also uses `label`; it follows the
-layout’s navigation styling.
+No page uses it yet. Inner pages' navigation also uses `label`; the
+homepage's, beside the splash, takes `title`.
 
 ## Field
 
@@ -38,7 +38,7 @@ A tone step with no border, in the `ui` type role: fill `field`, text `fg`, plac
 
 ## Dialog
 
-Fill `dialog`, `radius-lg`, with a dimmed backdrop. No elevation border or shadow. By night the dialog sits above `surface` and its fields sit below it in tone; by day it is white with grey fields. These roles are explicit so a field never accidentally takes its dialog's fill. Inline title and prose editors can remain transparent; they belong to the document rather than a boxed form.
+Fill `dialog`, `radius-lg`, over a backdrop of black at `backdrop-tint` (40%). No elevation border or shadow. By night the dialog sits above `surface` and its fields sit below it in tone; by day it is white with grey fields. These roles are explicit so a field never accidentally takes its dialog's fill. Inline title and prose editors can remain transparent; they belong to the document rather than a boxed form.
 
 ## Link
 

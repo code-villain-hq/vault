@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - "design/tokens/**"
+      - "DESIGN.md"
       - "brand/mark/**"
       - "apps/site/assets/fonts/**"
       - "apps/forge/apps/web/src/design/**"

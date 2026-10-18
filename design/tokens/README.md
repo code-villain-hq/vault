@@ -9,7 +9,7 @@ The numbers taken from `brand/`: color, type, shape.
 | Code (Nightshade syntax, night and day) | [`theme.md`](theme.md#code) | [`syntax.json`](syntax.json), [`syntax.resolved.json`](syntax.resolved.json), [`syntax.css`](syntax.css) |
 | Shape (corner radius) | [`components.md`](../components.md) | [`shape.json`](shape.json), [`shape.css`](shape.css), [`shape.swift`](shape.swift) |
 
-The JSON is the source. Edit it, then run `python3 build.py` here to regenerate every CSS and Swift file. Don't edit the generated files.
+The JSON is the source. Edit it, then run `python3 build.py` here to regenerate every CSS, Swift and resolved JSON file, and the frontmatter of the vault's `DESIGN.md`. Don't edit the generated files.
 
 In CSS, night is the default. An app's light mode sets `data-theme="day"` on its root. Studio surfaces stay night.
 

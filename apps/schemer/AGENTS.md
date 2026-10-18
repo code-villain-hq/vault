@@ -31,7 +31,7 @@ Michael is a senior frontend engineer (14 years; React, TypeScript, Angular, Vue
 - **Small commits** in Conventional Commits style (`feat(workitems): add status command`).
 - **When a decision changes,** write or update an ADR in `docs/adr/` and fix any doc it contradicts in the same change.
 - **Visual design** (brand, colours, type, layout direction): propose 2–3 directions and ask Michael before building. He prefers bold and experimental over safe and corporate. Plain functional UI for internal screens is fine without asking.
-- **Brand:** Schemer is part of Code Villain, alongside Layer and Caster. The Code Villain direction is "Doom-core": armoured and regal, gunmetal, green and gold, dark theme first with a light theme alongside. Stay inside that direction, and still propose options and ask before building any visual design.
+- **Brand:** Schemer is part of Code Villain, alongside Forge, Layer and Caster. It follows the studio system in the vault's `brand/` and `design/`: Nightshade in night and day (grey does the work, poison is the brand and the main action, cloak marks focus), Grenze Gotisch and Atkinson Hyperlegible, and the app-window frame. Read `design/principles.md` and still propose options and ask before building any visual design.
 - **Names in code:** folder `apps/schemer`, Go module `git.codevillain.eu/code-villain/vault/apps/schemer`, binary `schemer`, env var prefix `SCHEMER_`. Use "Schemer" in UI copy.
 
 ## Commands (created in M0; keep this list current)

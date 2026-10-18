@@ -11,7 +11,7 @@ web
 Two audiences share the studio:
 
 1. **Future employers and peers** watching the public build — they should see craft and growth from senior front-end work into shipping whole products with AI.
-2. **People using the products** — Forge (AI-first issue tracker), Layer (macOS agent development environment), and Caster (macOS launcher).
+2. **People using the products** — Forge (AI-first issue tracker), Layer (macOS agent development environment), Caster (macOS launcher), and the Code Villain editor and terminal theme.
 
 Studio surfaces (site, blog, social, mark) speak to the first audience. Apps serve the second. Company-wide design still has to hold for both.
 
@@ -23,12 +23,12 @@ The vault is the home for that record: apps, brand, design tokens, and content.
 
 ## Positioning
 
-A one-person studio that ships real tools while narrating the build in public — theatrical villain posture without corporate cruelty. Neighboring “AI portfolio” or “indie SaaS” stories cannot truthfully claim the same mix of shipped products (Forge, Layer, Caster), Doom-inspired voice, and Nightshade brand system as one company.
+A one-person studio that ships real tools while narrating the build in public — theatrical villain posture without corporate cruelty. Neighboring “AI portfolio” or “indie SaaS” stories cannot truthfully claim the same mix of shipped products (Forge, Layer, Caster, the Code Villain theme), Doom-inspired voice, and Nightshade brand system as one company.
 
 ## Operating Context
 
 - Brand decisions start in `brand/` (color, type, mark, voice); `design/` carries numbers and layouts; apps catch up in their own toolkits.
-- Studio surfaces follow `brand/` and stay night. Nightshade is every app's default, night and day; a theme picker like Layer's can add themes on the same colour names.
+- Studio surfaces follow `brand/` and stay night. Nightshade is every app's default, night and day; a theme picker like Layer's can add themes on the same colour names. Every app uses the shared tokens, with drift checks in CI.
 - Content lives in `content/blog` and `content/social`; the site shows the blog; post pages are hand-written until there is a build step.
 - Agents read `AGENTS.md` at the vault root and each app’s `AGENTS.md` before working there.
 - Role label in public writing: product engineer (current name; may change). The work carries the story, not the title.
@@ -40,12 +40,14 @@ A one-person studio that ships real tools while narrating the build in public �
 - Forge — AI-first issue tracker (web + desktop shell).
 - Layer — agent development environment for macOS.
 - Caster — launcher for macOS.
+- Code Villain theme — VS Code and Cursor, Neovim and WezTerm, generated from the tokens.
+- Schemer — a delivery tool, in planning.
 - Site — the homepage and the blog (index and post pages, hand-written for now).
 
 **Company-wide design**
 
-- Required: one studio design system for company surfaces (site, blog, social, mark, brand study).
-- Apps implement shared decisions in their own stacks; product-specific themes remain allowed.
+- Required: one design system for the studio and every app: the same tokens, components and frame, so every product looks and feels the same.
+- Apps implement shared decisions in their own stacks; extra themes fill the same colour names.
 
 **Undecided**
 
@@ -55,11 +57,11 @@ A one-person studio that ships real tools while narrating the build in public �
 
 ## Brand Commitments
 
-- **Name:** Code Villain. Website: https://www.codevillain.eu/. Products: Forge, Layer, Caster. Source: `brand/name.md`.
+- **Name:** Code Villain. Website: https://www.codevillain.eu/. Products: Forge, Layer, Caster; Schemer in planning; the editor theme is called Code Villain. Source: `brand/name.md`.
 - **Voice:** A golden-age comic villain who ships; Doctor Doom posture — theatrical, precise, a little too sure of himself. Code Villain speaks and names itself (“Code Villain shipped Forge”), never “I” or “we”. Lead with the work; boast only what shipped; one flourish per piece. Never mean, never corporate-evil. Same voice for UI, blog, and social. Short surfaces stay short. Source: `brand/voice.md`.
-- **Color (Nightshade):** Night `#0A0B0D`, cloak `#5A1470`, poison `#C9E265`. Grey does most of the work; cloak is the quiet brand (the main action's violet tone, selection); poison is an accent only (focus, one brand moment per surface, live dots). Night by default, day for the apps' light mode; studio surfaces stay night. Source: `brand/color.md`, `design/tokens/`.
-- **Mark:** the strike, a gothic V with a poison bar behind it, cut by the letter. App icons are each app's initial built the same way. Source: `brand/mark/`.
-- **Type:** Grenze Gotisch for display (28px and up, never capitals), Atkinson Hyperlegible Next for reading and interface, Atkinson Hyperlegible Mono for code. Source: `brand/type.md`, `design/tokens/type.json`.
+- **Color (Nightshade):** Night `bg` `#0B0B0B`, poison `#C9E265`, cloak `#5A1470`. Grey does most of the work, achromatic in both modes. Poison is the brand: the strike, the main action's fill once per screen, the selection tint, live signals, the search match in code. Cloak supports it: the focus ring and depth. Night by default, day for the apps' light mode; studio surfaces stay night. Source: `brand/color.md`, `design/tokens/`.
+- **Mark:** the strike, a gothic C and V with a poison bar behind them, cut where the letters cross. App icons are each app's initial built the same way; a menu bar glyph is the mark without its tile, in colour. Source: `brand/mark/`.
+- **Type:** Grenze Gotisch for display (28px and up, never capitals), Atkinson Hyperlegible Next for reading and interface, Atkinson Hyperlegible Mono for code. Code takes the Nightshade code palette (`design/tokens/syntax.json`). Source: `brand/type.md`, `design/tokens/type.json`.
 - **Binding references:** Golden-age comic villainy (Doctor Doom for posture, not green/gold costume colors).
 
 ## Evidence on Hand
@@ -76,7 +78,7 @@ Do not invent testimonials, customers, benchmarks, pricing, or press.
 
 1. **Ship and show** — Public work is the proof; the record of building matters as much as the product.
 2. **Studio first, apps second** — How Code Villain feels starts in brand/design; products catch up without losing their own job.
-3. **One cloak, one voice** — Nightshade and the villain voice are company-wide; accents stay sparse and never muddy the night.
+3. **One palette, one voice** — Nightshade and the villain voice are company-wide; colour stays sparse and never muddies the night.
 4. **Posture, not cruelty** — Boast only what shipped; never mean; never corporate-evil.
 5. **Short surfaces stay short** — Buttons and posts can sound like the same person.
 

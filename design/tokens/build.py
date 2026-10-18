@@ -117,5 +117,45 @@ for role, r in t["roles"].items():
 sw.append("}")
 emit("type.swift", "\n".join(sw) + "\n")
 
+# DESIGN.md at the vault root: its frontmatter (the DESIGN.md format design
+# tools read) is generated here from the night tokens, so it can't drift; the
+# prose under it is written by hand and kept.
+def design_md():
+    night = c["night"]
+    names = ["bg", "panel", "surface", "dialog", "field", "hover", "selected", "line", "fg", "muted", "faint",
+             "primary", "primary-hover", "on-primary", "accent", "signal", "danger", "ok", "warn", "info"]
+    out = ["---", "name: Code Villain",
+           "description: Nightshade. Grey does the work, poison is the brand and the main action, cloak supports it and marks focus. Night by default, day for the apps.",
+           "colors:"]
+    out += [f'  {n}: "{night[n]}"' for n in names]
+    out += [f'  {n}: "{source["palette"][n]}"' for n in ("cloak", "poison")]
+    out.append("typography:")
+    family = {k: f'{f["family"]}, {f["fallback"]}' for k, f in t["faces"].items()}
+    for role, r in t["roles"].items():
+        size = r["size"]
+        value = f"clamp({rem(size['min'])}, {size['fluid']}, {rem(size['max'])})" if isinstance(size, dict) else rem(size)
+        out += [f"  {role}:", f'    fontFamily: "{family[r["face"]]}"', f'    fontSize: "{value}"',
+                f"    fontWeight: {r['weight']}", f"    lineHeight: {r['lineHeight']}"]
+        if r["tracking"]:
+            out.append(f'    letterSpacing: "{r["tracking"]}em"')
+    md, lg = s["radius"]["md"], s["radius"]["lg"]
+    out += ["components:",
+            "  button-primary:", '    backgroundColor: "{colors.primary}"', '    textColor: "{colors.on-primary}"',
+            '    height: "28px"', '    padding: "0 0.7rem"', f'    rounded: "{md}px"',
+            "  button-primary-hover:", '    backgroundColor: "{colors.primary-hover}"', '    textColor: "{colors.on-primary}"',
+            "  button-secondary:", '    backgroundColor: "transparent"', '    textColor: "{colors.muted}"',
+            '    height: "28px"', '    padding: "0 0.7rem"', f'    rounded: "{md}px"',
+            "  button-secondary-hover:", '    backgroundColor: "{colors.hover}"', '    textColor: "{colors.fg}"',
+            "  field:", '    backgroundColor: "{colors.field}"', '    textColor: "{colors.fg}"', f'    rounded: "{md}px"',
+            "  chip:", '    textColor: "{colors.muted}"', '    rounded: "999px"',
+            "  dialog:", '    backgroundColor: "{colors.dialog}"', '    textColor: "{colors.fg}"', f'    rounded: "{lg}px"',
+            "  card-panel:", '    backgroundColor: "{colors.panel}"', '    textColor: "{colors.fg}"', f'    rounded: "{lg}px"',
+            "---", ""]
+    path = "../../DESIGN.md"
+    body = open(path).read().split("\n---\n", 1)[1].lstrip("\n")
+    return path, "\n".join(out) + "\n" + body
+
+emit(*design_md())
+
 if stale:
     sys.exit("Stale generated tokens: " + ", ".join(stale) + ". Run python3 build.py from design/tokens.")

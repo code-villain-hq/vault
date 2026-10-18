@@ -79,8 +79,10 @@ any output that differs from a fresh build; `bun scripts/sync-design.ts
 --check` does the same for Forge's and Layer's bundled copies (from each
 app's folder), and `make design-check` for Caster's. Forge's `bun run
 check` runs the first two, Layer's runs its own copy check, and the
-`design` workflow on Forgejo runs them all, with the theme tests, on every push
-that touches the tokens, the mark, the fonts or an app's copy.
+`design` workflow on Forgejo runs them all, with the theme tests and
+`bun build.ts --check` for the editor theme, on every push that touches
+the tokens, the mark, the fonts or an app's copy. `build.py --check` also
+covers `DESIGN.md`'s generated frontmatter.
 
 Test alternate hues and contrast extremes, then inspect real Forge lists,
 boards, detail views, settings and dialogs in night and day. A numerical
@@ -94,8 +96,8 @@ for discussion. Mobile redesign remains separate work.
 highlighting and an editor's own moments. [`syntax.py`](syntax.py) does the
 calculation, `build.py` writes `syntax.resolved.json` and `syntax.css`, and
 [`test_syntax.py`](test_syntax.py) holds it to these rules. The editor
-Code Villain theme in [`apps/theme`](../../apps/theme) and Layer's diff are
-built from the resolved file.
+Code Villain theme in [`apps/theme`](../../apps/theme) is built from the
+resolved file; Layer's terminal and diff tints read it too.
 
 - Code sits on `panel`. Every token reads at the text floor (4.6:1) on it and
   on everything drawn under code: the cursor line, a selection, a search
@@ -118,6 +120,8 @@ built from the resolved file.
   menu `highlight-tint`, as in [components](../components.md#row).
 - Diff lines use `status-tint` of `ok`, `danger` and `info`; the changed
   words inside them a stronger tint.
-- Each role lists the TextMate scopes it colours. VS Code and Layer
-  (through Shiki) read the same table; Neovim maps Treesitter and LSP
-  groups onto the role names.
+- Each role lists the TextMate scopes it colours; VS Code reads that
+  table, and Neovim maps Treesitter and LSP groups onto the role names.
+- Every terminal takes one 16-colour table, `ansi` in the resolved file
+  (`--ansi-0` to `--ansi-15` in CSS): the syntax hues, greys for black
+  and white, the comment grey for bright black.

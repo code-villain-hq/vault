@@ -6,7 +6,7 @@ The site's blog: an index of posts and the post page. It follows [`../principles
 
 - The Code Villain wordmark at 10.5rem wide on the left: the page's one brand moment, so nothing else on the page uses poison as decoration.
 - Navigation on the right in the `label` role: `muted`, the current page `fg` and underlined.
-- The footer is one quiet line in `small`, `faint`: what Code Villain does, and the same two links.
+- The footer is one quiet line in `small`, `faint`: what Code Villain does, and the same two links. The links follow the link rule: ink, bold, underlined.
 - No lines above or below either.
 
 ## Index
@@ -24,7 +24,7 @@ The site's blog: an index of posts and the post page. It follows [`../principles
 - Body in `body`, 17px, at a 66ch measure.
 - Links are ink, bold, underlined at 45%. Inline code in mono on `surface` with `radius-sm`.
 - Images sit in a figure: full measure width, `radius-lg`, a caption under them in `small`, `faint`. Images with transparent grounds (the mark, a logo) sit on a `panel` block. No borders.
-- Code blocks sit on `panel` with `radius-lg`: the language as a small label in `ui-small` 600, then mono in the `code` role. Colour stays restrained: property names `muted`, comments `faint`, the rest `fg`. Never poison. Long lines scroll inside the block.
+- Code blocks sit on `panel` with `radius-lg`: the language as a small label in `ui-small` 600, then mono in the `code` role. It takes the code palette (`design/tokens/syntax.css`, rules in [`theme.md`](../tokens/theme.md#code)), the same colours as the editors. Never poison. Long lines scroll inside the block.
 - Ends with a quiet link back to all posts.
 
 ## Content
