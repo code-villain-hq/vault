@@ -29,7 +29,7 @@ enum EmojiSearch {
             .prefix(8)
             .map { _, entry in
                 ResultItem(icon: nil,
-                           title: "\(entry.emoji)  \(entry.name.capitalized)",
+                           title: "\(entry.emoji)  \(entry.name.prefix(1).uppercased() + entry.name.dropFirst())", // sentence case
                            subtitle: "⏎ copies",
                            action: { Clipboard.copy(entry.emoji) })
             }

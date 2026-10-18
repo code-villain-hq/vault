@@ -208,9 +208,38 @@ final class FocusField: NSTextField {
 
 /// The primary button from design/components.md: 28pt tall, the `control`
 /// role, `radius-md`, no border. Fill `primary` with `on-primary` text;
-/// `primary-hover` on hover.
+/// `primary-hover` on hover. Keyboard focus is a 2pt `accent` ring, 2pt out,
+/// drawn in a layer so it can sit outside the button.
 final class PrimaryButton: NSButton {
     private var isHovered = false { didSet { needsDisplay = true } }
+    private let ring = CAShapeLayer()
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { showRing(true) }
+        return became
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { showRing(false) }
+        return resigned
+    }
+
+    private func showRing(_ on: Bool) {
+        wantsLayer = true
+        layer?.masksToBounds = false
+        if ring.superlayer == nil { layer?.addSublayer(ring) }
+        // The stroke's centre sits 3pt out: a 2pt gap, then the 2pt ring.
+        let rect = bounds.insetBy(dx: -3, dy: -3)
+        ring.path = CGPath(roundedRect: rect, cornerWidth: Nightshade.radiusMd + 3, cornerHeight: Nightshade.radiusMd + 3, transform: nil)
+        ring.fillColor = nil
+        ring.lineWidth = 2
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            ring.strokeColor = Nightshade.accent.cgColor
+        }
+        ring.isHidden = !on
+    }
 
     convenience init(title: String, target: AnyObject?, action: Selector?) {
         self.init(frame: .zero)
@@ -218,6 +247,7 @@ final class PrimaryButton: NSButton {
         self.target = target
         self.action = action
         isBordered = false
+        focusRingType = .none
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: 28).isActive = true
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
