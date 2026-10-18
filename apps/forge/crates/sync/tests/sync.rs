@@ -2197,12 +2197,52 @@ async fn a_chosen_reviewer_stays_and_moving_it_yourself_tells_nobody(pool: PgPoo
     assert!(reviews(&pool, f.actor, id).await.is_empty());
 }
 
+/// Forge's GitHub agent, which bounces an issue out of review when its pull
+/// request runs into conflicts or failing checks, and returns it.
+async fn add_github_agent(pool: &PgPool, f: &Fixture) -> Actor {
+    let agent = Actor {
+        user_id: Uuid::now_v7(),
+        workspace_id: f.actor.workspace_id,
+    };
+    sqlx::query("INSERT INTO users (id, email, name, kind) VALUES ($1, $2, 'GitHub', 'agent')")
+        .bind(agent.user_id)
+        .bind(format!(
+            "github@{}.{}",
+            agent.workspace_id,
+            forge_domain::AGENT_EMAIL_DOMAIN
+        ))
+        .execute(pool)
+        .await
+        .unwrap();
+    add_member(pool, agent.workspace_id, agent.user_id, "member").await;
+    agent
+}
+
+/// A move Forge makes itself, as the GitHub agent does.
+async fn forge_moves(pool: &PgPool, github: Actor, id: Uuid, state: Uuid) {
+    let mut db = pool.begin().await.unwrap();
+    apply_in(
+        &mut db,
+        github,
+        &tx(vec![update(
+            ModelKind::Issue,
+            id,
+            json!({ "state_id": state }),
+        )]),
+        Origin::Server,
+    )
+    .await
+    .unwrap();
+    db.commit().await.unwrap();
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn review_notifications_do_not_repeat(pool: PgPool) {
     let f = seed(&pool).await;
     let bob = add_person(&pool, &f, "Bob").await;
     let carol = add_person(&pool, &f, "Carol").await;
     let claude = add_agent(&pool, &f, "Claude Code").await;
+    let github = add_github_agent(&pool, &f).await;
     let id = new_issue(
         &pool,
         &f,
@@ -2212,9 +2252,10 @@ async fn review_notifications_do_not_repeat(pool: PgPool) {
     move_to(&pool, claude, id, f.state("In Review")).await;
     assert_eq!(reviews(&pool, bob, id).await.len(), 1);
 
-    // Bounced back and returned while Bob hasn't read it: still one.
-    move_to(&pool, claude, id, f.state("In Progress")).await;
-    move_to(&pool, claude, id, f.state("In Review")).await;
+    // Forge bounces it for failing checks and returns it while Bob hasn't
+    // read it: still one.
+    forge_moves(&pool, github, id, f.state("In Progress")).await;
+    forge_moves(&pool, github, id, f.state("In Review")).await;
     assert_eq!(reviews(&pool, bob, id).await.len(), 1);
 
     // Edits while it stays in review send nothing.
@@ -2228,10 +2269,23 @@ async fn review_notifications_do_not_repeat(pool: PgPool) {
     .unwrap();
     assert_eq!(reviews(&pool, bob, id).await.len(), 1);
 
-    // Sent back, then resubmitted: a fresh one.
+    // Once Bob has read it, a bounce and return asks again.
+    forge_moves(&pool, github, id, f.state("In Progress")).await;
+    forge_moves(&pool, github, id, f.state("In Review")).await;
+    assert_eq!(reviews(&pool, bob, id).await.len(), 2);
+
+    // Sent back and resubmitted: a fresh one, though the last is unread.
     move_to(&pool, bob, id, f.state("In Progress")).await;
     move_to(&pool, claude, id, f.state("In Review")).await;
-    assert_eq!(reviews(&pool, bob, id).await.len(), 2);
+    assert_eq!(reviews(&pool, bob, id).await.len(), 3);
+
+    // Whoever sends it back: here the agent itself, after a bounce.
+    forge_moves(&pool, github, id, f.state("In Progress")).await;
+    forge_moves(&pool, github, id, f.state("In Review")).await;
+    assert_eq!(reviews(&pool, bob, id).await.len(), 3);
+    move_to(&pool, claude, id, f.state("In Progress")).await;
+    move_to(&pool, claude, id, f.state("In Review")).await;
+    assert_eq!(reviews(&pool, bob, id).await.len(), 4);
 
     // A new reviewer during review hears; the old one doesn't.
     read_all(&pool, bob).await;
@@ -2247,7 +2301,7 @@ async fn review_notifications_do_not_repeat(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(reviews(&pool, carol, id).await.len(), 1);
-    assert_eq!(reviews(&pool, bob, id).await.len(), 2);
+    assert_eq!(reviews(&pool, bob, id).await.len(), 4);
 
     // Outside review, choosing a reviewer tells nobody yet.
     let later = new_issue(&pool, &f, json!({})).await;

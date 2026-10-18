@@ -2,6 +2,7 @@
 //! in when the issue enters review without one, and tells the reviewer it's
 //! ready ("Reviewer filled in at review" and "Ready for review").
 
+use forge_domain::AGENT_EMAIL_DOMAIN;
 use serde_json::{Map, Value, json};
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -101,7 +102,8 @@ async fn fallback(
 /// Who hears that an issue is ready for review after a change: its
 /// reviewer when it enters review (or, without one, the admins who are
 /// people), or a new reviewer while it's in review. Never whoever made the
-/// change, nor anyone with an unread review notification for it already.
+/// change, nor, unless it was sent back since, anyone with an unread review
+/// notification for it already.
 pub(crate) async fn to_notify(
     db: &mut PgConnection,
     workspace_id: Uuid,
@@ -140,6 +142,12 @@ pub(crate) async fn to_notify(
         }
     };
     people.retain(|p| *p != actor);
+    // Sent back and resubmitted: asked again, read or not. Only Forge
+    // bouncing it (for conflicts or failing checks) and returning it, or a
+    // change of reviewer, waits for the unread one.
+    if moved && sent_back(db, workspace_id, issue, state).await? {
+        return Ok(people);
+    }
     let waiting: Vec<Uuid> = sqlx::query_scalar(
         "SELECT user_id FROM notifications WHERE issue_id = $1 AND type = 'review' \
          AND read_at IS NULL AND user_id = ANY($2)",
@@ -150,4 +158,32 @@ pub(crate) async fn to_notify(
     .await?;
     people.retain(|p| !waiting.contains(p));
     Ok(people)
+}
+
+/// Whether the issue last left review because someone sent it back, not
+/// because Forge did: Forge's own agents (`<name>@<workspace>.agents.forge.invalid`)
+/// move it back when its pull request runs into conflicts or failing checks.
+async fn sent_back(
+    db: &mut PgConnection,
+    workspace_id: Uuid,
+    issue: Uuid,
+    review: Uuid,
+) -> Result<bool, SyncError> {
+    let by_forge: Option<bool> = sqlx::query_scalar(
+        "SELECT u.email LIKE $4 FROM ( \
+             SELECT sync_id, actor_id, data->>'state_id' AS state, \
+                    lag(data->>'state_id') OVER (ORDER BY sync_id) AS previous \
+             FROM sync_log WHERE workspace_id = $1 AND model = 'Issue' AND model_id = $2 \
+             AND data IS NOT NULL \
+         ) v JOIN users u ON u.id = v.actor_id \
+         WHERE v.previous = $3::text AND v.state <> $3::text \
+         ORDER BY v.sync_id DESC LIMIT 1",
+    )
+    .bind(workspace_id)
+    .bind(issue)
+    .bind(review)
+    .bind(format!("%@{workspace_id}.{AGENT_EMAIL_DOMAIN}"))
+    .fetch_optional(&mut *db)
+    .await?;
+    Ok(by_forge == Some(false))
 }
