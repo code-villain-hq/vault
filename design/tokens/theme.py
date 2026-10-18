@@ -192,6 +192,10 @@ def generate(source):
         for status in (*source["semantics"], "neutral"):
             color = theme["muted" if status == "neutral" else status]
             composites = [mix(host, color, source["opacity"]["status-tint"]) for host in hosts]
+            if status == "danger":
+                # A destructive button writes its label in danger ink on the button fill.
+                composites += [mix(host, theme["fg"], source["opacity"][tint])
+                               for tint in ("button-tint", "button-hover-tint") for host in hosts]
             theme[f"status-{status}-ink"] = readable(color, composites, mode, minimum)
         result[mode] = theme
     return result

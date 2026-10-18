@@ -19,6 +19,8 @@ enum ColorTokens {
     static let statusTint: Double = 0.13
     static let chipTint: Double = 0.07
     static let highlightTint: Double = 0.08
+    static let buttonTint: Double = 0.1
+    static let buttonHoverTint: Double = 0.16
     static let backdropTint: Double = 0.4
   }
 
@@ -82,7 +84,7 @@ enum ColorTokens {
     ok: "#5CC9A7",
     warn: "#E9AE45",
     info: "#7AAEF5",
-    statusDangerInk: "#F27A6B",
+    statusDangerInk: "#FF8878",
     statusOkInk: "#5CC9A7",
     statusWarnInk: "#E9AE45",
     statusInfoInk: "#7AAEF5",
@@ -113,7 +115,7 @@ enum ColorTokens {
     ok: "#00775D",
     warn: "#8C6100",
     info: "#396AAB",
-    statusDangerInk: "#A7362D",
+    statusDangerInk: "#9B2A22",
     statusOkInk: "#006A53",
     statusWarnInk: "#7D5600",
     statusInfoInk: "#2E5E9E",

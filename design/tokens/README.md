@@ -22,7 +22,7 @@ semantic colours, and status ink for both modes. The fixed recipes belong
 to the design system and are shared by all themes.
 
 The source also publishes tint opacities (`status-tint`, `chip-tint`,
-`highlight-tint`),
+`highlight-tint`, `button-tint`, `button-hover-tint`, `backdrop-tint`),
 semantic hue seeds and a minimum text contrast of 4.6:1, leaving room above
 AA's 4.5:1 floor. Contrast 100 raises that target to 7:1. Live dots use
 `signal`, held at the 3:1 non-text floor.

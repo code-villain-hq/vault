@@ -41,8 +41,8 @@ Layer keeps a full-width top bar instead of the inverted L, by the PO's
 decision (Oct 18, 2026): tabs across the top suit an app with six views
 and one task list better than a sidebar of views.
 
-- The top bar spans the window in `bg`. It holds the views as tabs in the
-  middle, current one filled `selected` with text `fg`, and the app's
+- The top bar spans the window in `bg`. It holds the views as
+  [tabs](../components.md#tabs) in the middle, and the app's
   tools (phone, keep awake, messages, settings) at the right. A tab's count
   follows the sidebar rule above, with one addition: Reviews shows both of
   its view's counts, waiting on you and yours (`15 · 24`), with the live dot

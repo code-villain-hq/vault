@@ -35,6 +35,13 @@ class ThemeTests(unittest.TestCase):
                 self.assertGreaterEqual(contrast(highlight, host), 1.1, (mode, host))
                 for role in ("fg", "muted", "faint"):
                     self.assertGreaterEqual(contrast(theme[role], highlight), minimum, (mode, role, highlight))
+            # A secondary button reads as a block at rest and on hover, and its text holds the floor.
+            for host in hosts:
+                for tint in ("button-tint", "button-hover-tint"):
+                    fill = mix(host, theme["fg"], result["opacity"][tint])
+                    self.assertGreaterEqual(contrast(fill, host), 1.15, (mode, tint, host))
+                    for role in ("fg", "status-danger-ink"):
+                        self.assertGreaterEqual(contrast(theme[role], fill), minimum, (mode, role, fill))
             for status in (*SOURCE["semantics"], "neutral"):
                 hue = theme["muted" if status == "neutral" else status]
                 for host in hosts:

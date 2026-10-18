@@ -74,7 +74,7 @@ hand-tuned night/day colour lists.
 | selected      | `#1C1E13` | `#F6FAE6` | Selected row, current nav item: a poison tint. |
 | line          | `#2B2B2B` | `#E1E1E1` | Tables and menus only.                  |
 | fg            | `#EBEBEB` | `#181818` | Text and links.                         |
-| muted         | `#9B9B9B` | `#555555` | Secondary text, quiet buttons, chips.   |
+| muted         | `#9B9B9B` | `#555555` | Secondary text, chips, idle tabs.       |
 | faint         | `#969696` | `#5E5E5E` | Ids, counts, placeholders.              |
 | primary       | `#C9E265` | `#C9E265` | The main action's fill: poison.         |
 | primary-hover | `#B6CE50` | `#B6CE50` | Its hover.                              |

@@ -13,13 +13,26 @@ The few controls every Code Villain surface shares. They follow [`principles.md`
 
 No borders lift a surface. Elevation is a step in tone.
 
+## Button, link, tab or chip
+
+Each kind of control has its own look, so a glance tells them apart:
+
+- A **button** changes something here. It is a block: filled, 6px corners.
+- A **link** goes somewhere: another view, another app, a web page. It is underlined.
+- A **tab** switches what one place shows. It is text, with a line under the current one.
+- A **chip** or **status pill** says something. It is round, and usually not clickable. A pill that opens its own fix (a conflict count) is the one exception.
+
+Opening a ticket, a pull request or a folder in another app is a link, not a button. Muted text with nothing under it and no fill is never clickable, except an icon button.
+
 ## Button
 
 In app interfaces: 28px tall, the `control` type role (13px, 600),
 6px corners, no border.
 
 - **Primary**: the one action the screen's state needs. Fill `primary`, text `on-primary`; hover `primary-hover`. One per screen.
-- **Secondary**: every other action. No fill, text `muted`; on hover, fill `hover` and text `fg`.
+- **Secondary**: every other action. Fill `fg` at `button-tint` (10%), text `fg`; hover `fg` at `button-hover-tint` (16%). The fill is translucent, like a chip's, so it reads on every host.
+- **Danger**: a destructive secondary action. The secondary fill, text `status-danger-ink`; never a red block.
+- **Icon button**: a 28px square with no fill and a `muted` icon; on hover, fill `hover` and icon `fg`. The icon marks it as a control, so it stays quiet. It carries an accessible name.
 - **Focus**: a 2px `accent` ring, 2px out in app interfaces.
 - **Disabled**: 45% opacity.
 
@@ -42,7 +55,7 @@ Fill `dialog`, `radius-lg`, over a backdrop of black at `backdrop-tint` (40%). N
 
 ## Link
 
-Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. Links are never coloured.
+Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. Links are never coloured. A link that leaves the app, to another app or a web page, ends in ↗. Beside buttons in a header, a link takes the `control` size.
 
 ## Status pill
 
@@ -57,6 +70,10 @@ For user-chosen colours, keep the chosen hue as the tint source and adjust its i
 Round. Text `muted` in the `control` role, on a translucent `fg` tint at `chip-tint` (7%). A label is detail, not a signal.
 
 Tints are recipes, not precomputed solid colours. Chips and status pills blend with their host; the base surface provides the ground. When a tint carries text, check the resulting composite in each supported context and adjust the ink rather than removing the tint.
+
+## Tabs
+
+Switch what one place shows: a task's Spec, Agents, Diff and Pull requests, or an app's views across its top bar. Tabs sit 20px apart. Each is text in the `control` role, `muted`, `fg` on hover. The current tab is `fg` at 700 with a 2px `fg` line under it, and no fill, so a tab never looks like a button or a selected row. A count beside a label is `faint` in `ui-small` at 400. Mark the strip `role="tablist"` and the current tab `aria-selected="true"`.
 
 ## Row
 
