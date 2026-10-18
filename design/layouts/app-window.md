@@ -15,10 +15,10 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 ## Sidebar
 
 - The top row is as tall as the top bar and lines up with it. In the browser it starts with the fixed product wordmark in Grenze Gotisch, 28px, weight 700: the only Grenze in the frame, reading "Forge" in Forge regardless of the workspace name.
-- In the desktop app the native title bar is hidden and macOS's traffic lights take the wordmark's place, as in Layer; Grenze beside them clashed. The empty part of the top row and of the top bar move the window.
+- In the desktop app the native title bar is hidden and macOS's traffic lights take the wordmark's place, as in Layer; Grenze beside them clashed. They sit centred on the top bar, 16px from the left (`trafficLightPosition` 16, 18), at the same spot in every app. The empty part of the top row and of the top bar move the window.
 - Global Search and the product's create action (New issue in Forge) sit together at the right of the top row, as quiet 28px icon buttons with accessible names. They do not occupy a separate row between the workspace and navigation.
 - The workspace picker is a separate row below the product identity and above navigation. It shows the workspace's avatar and name; switching workspace never renames the product wordmark.
-- Items in the `ui` role, text `muted`, 6px corners. Hover fills `hover` and turns the text `fg`.
+- Items in the `ui` role, text `fg` with `muted` icons, 6px corners, as Layer's task list reads. Hover fills `hover`.
 - The current item fills `selected`, with text `fg` at 700.
 - A count shows only when it asks for something: unread, waiting in Triage. The page you're on shows no count; its list says it. Empty counts never show.
 - Unread counts carry a live dot in `signal` (see [`components.md`](../components.md#live-dot)).
@@ -26,6 +26,7 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 
 ## Top bar
 
+- 48px tall in every app, Layer's included, so the traffic lights sit at the same spot.
 - A breadcrumb in `ui-small`, `muted`, with the current place in `fg` at 600.
 - View-wide tools sit on the right. A field here fills `panel`, a step off the frame.
 

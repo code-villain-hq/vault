@@ -121,7 +121,7 @@ export function PageHeader({
       {/* In the desktop app the native title bar is hidden, so this bar and the
           sidebar's top row are what the window is moved by. */}
       <header
-        className="app-topbar @container flex min-h-11 shrink-0 items-center gap-3 px-4"
+        className="app-topbar @container flex min-h-12 shrink-0 items-center gap-3 px-4"
         data-tauri-drag-region="deep"
       >
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
@@ -170,8 +170,10 @@ function Shell() {
   );
 }
 
-const navLink =
-  "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-current";
+// Items read in `fg`, as Layer's task list does; their icons stay `muted`.
+const navLinkBase =
+  "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-muted";
+const navLink = `${navLinkBase} text-fg`;
 
 const iconButton = "ui-button ui-icon-button";
 
@@ -193,7 +195,7 @@ function Sidebar() {
             macOS draws the traffic lights here (`titleBarStyle: Overlay`), in
             the wordmark's place; its empty part moves the window. */}
         <div
-          className="sidebar-heading sticky top-0 z-10 flex h-11 shrink-0 items-center gap-1 bg-bg"
+          className="sidebar-heading sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 bg-bg"
           data-tauri-drag-region="deep"
         >
           {isDesktop ? (
@@ -406,7 +408,7 @@ function SettingsNav() {
           event.preventDefault();
           router.history.push(back);
         }}
-        className={`${navLink} text-muted`}
+        className={`${navLinkBase} text-muted`}
       >
         <NavIcon icon={ArrowLeft} />
         Back to app

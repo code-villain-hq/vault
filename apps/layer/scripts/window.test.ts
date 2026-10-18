@@ -20,6 +20,12 @@ describe("the window", () => {
     }
   });
 
+  test("shows the traffic lights where Forge does, centred on the top bar", () => {
+    const window = JSON.parse(read("src-tauri/tauri.conf.json")).app.windows[0];
+    expect(window.trafficLightPosition).toEqual({ x: 16, y: 18 });
+    expect(read("src/styles.css")).toMatch(/\.topbar \{[^}]*height: 48px;/);
+  });
+
   test("is not left relying on CSS that macOS's WebKit ignores", () => {
     expect(read("src/styles.css")).not.toContain("-webkit-app-region");
   });

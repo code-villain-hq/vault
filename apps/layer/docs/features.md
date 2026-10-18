@@ -1142,7 +1142,8 @@ Code: `previous.rs`, `secrets.rs` (`adopt`).
 The window has no native title bar: the app's top bar takes its place,
 under the traffic lights, across the whole width. It holds the views as
 tabs and the tools for the whole app (phone, keep awake, messages,
-settings), with no wordmark beside the traffic lights. Below it, Work's
+settings), with no wordmark beside the traffic lights. The lights sit
+centred on the bar, at the same spot as in Forge. Below it, Work's
 tasks run down the left in the frame's tone, and every view sits in an
 inset panel (Layer's exception to `design/layouts/app-window.md`). A
 view's count shows only when it asks for something: agents that need you
