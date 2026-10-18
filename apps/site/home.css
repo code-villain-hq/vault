@@ -1,4 +1,4 @@
-/* Product-led homepage. Forge and Layer show real captures; Caster's illustration uses the shared Nightshade tokens. */
+/* Product-led homepage: real captures of each product, on the shared Nightshade tokens. */
 .hero { --logo-width: clamp(18rem, 42vw, 36rem); --splash-pad: clamp(1.5rem, 3vw, 2.25rem); position: relative; overflow: hidden; }
 .splash { margin: 0; padding: var(--splash-pad) var(--gutter); }
 .splash svg { display: block; width: var(--logo-width); max-width: 100%; height: auto; overflow: visible; }
@@ -19,7 +19,7 @@
 .skip:focus { top: 1rem; }
 .intro { padding-block: 2.5rem 3rem; }
 .intro h2 { margin: 0; font-family: var(--font-display); font-size: var(--type-display-size); font-weight: var(--type-display-weight); line-height: var(--type-display-leading); }
-.showcase { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 3rem 2rem; scroll-margin-top: 1.5rem; }
+.showcase { container-type: inline-size; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 3rem 2rem; scroll-margin-top: 1.5rem; }
 .product { min-width: 0; scroll-margin-top: 1.5rem; }
 .product-forge { grid-column: 1 / -1; }
 .product-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem 2rem; min-height: 5.5rem; padding-bottom: 1.25rem; }
@@ -30,25 +30,15 @@
 .product-figure { margin: 0; }
 .product-figure figcaption { margin-top: 0.6rem; color: var(--faint); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
 .product-note { margin: 0.8rem 0 0; color: var(--muted); max-width: 42ch; }
-.stage { display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface); container-type: inline-size; }
 /* A real capture: straight on, on a neutral ground with 24px of surround (16px narrow), 10px corners. */
 .capture-stage { padding: 24px; border-radius: var(--radius-lg); background: var(--surface); }
 .capture-stage img { display: block; width: 100%; height: auto; border-radius: var(--radius-lg); }
-.caster-stage { height: 27rem; padding: 2rem; flex-direction: column; gap: 2rem; }
-.caster-keys { display: flex; gap: 0.5rem; }
-kbd { font-family: var(--font-reading); font-size: var(--type-ui-small-size); font-weight: 600; color: var(--muted); background: var(--surface); border-radius: var(--radius-sm); padding: 0.3rem 0.5rem; }
-.caster-keys kbd { min-width: 3rem; background: var(--panel); padding: 0.65rem 1rem; text-align: center; font-size: var(--type-title-size); }
-.launcher { width: 100%; max-width: 29rem; border-radius: var(--radius-lg); background: var(--panel); padding: 0.65rem; }
-.launcher-query { display: flex; gap: 0.75rem; align-items: center; padding: 0.75rem; font-size: var(--type-title-size); line-height: var(--type-title-leading); }
-.launcher-query svg { width: 1.15rem; height: 1.15rem; color: var(--muted); flex-shrink: 0; }
-.query-caret { height: 1.25rem; width: 1px; background: var(--fg); }
-.launcher-answer { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--selected); border-radius: var(--radius-md); }
-.calculator-symbol { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); background: var(--primary); color: var(--on-primary); font-size: var(--type-title-size); }
-.launcher-answer div { display: grid; gap: 0.2rem; }
-.launcher-answer strong { font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }
-.launcher-answer div > span { color: var(--muted); font-size: var(--type-ui-small-size); }
-.launcher-answer kbd { margin-left: auto; }
-.launcher-foot { display: flex; justify-content: space-between; padding: 0.85rem 0.5rem 0.2rem; color: var(--faint); font-size: var(--type-ui-small-size); }
+/* Caster is a launcher, not a window: a few of its answers, stacked on `panel`,
+   a step under the launcher's own grey so each window reads (Layer's stage is `surface`).
+   Exactly as tall as Layer's stage beside it: that column is 1.2 of 2.2 shares
+   of the showcase less its 2rem gap, and its capture is 1280 × 836. */
+.capture-stack { display: flex; flex-direction: column; justify-content: center; gap: 16px; background: var(--panel); min-height: calc(((100cqw - 2rem) / 2.2 * 1.2 - 48px) * 836 / 1280 + 48px); }
+@media (max-width: 800px) { .capture-stack { min-height: 0; } }
 .home-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: 3.5rem 2.5rem; color: var(--faint); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
 .home-foot a { display: inline-flex; gap: 0.75rem; align-items: center; color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent); text-underline-offset: 0.22em; }
 .home-foot a:hover { text-decoration-color: var(--fg); }
@@ -60,7 +50,6 @@ kbd { font-family: var(--font-reading); font-size: var(--type-ui-small-size); fo
 }
 @media (max-width: 480px) {
   .capture-stage { padding: 16px; }
-  .caster-stage { padding: 1.25rem; }
   .product-name img { width: 36px; height: 36px; }
   .product-name p { max-width: 29ch; }
 }
