@@ -1,0 +1,256 @@
+{
+  "name": "Nightshade",
+  "contrast": 4.6,
+  "opacity": {
+    "cursorline": 0.05,
+    "selection": 0.12,
+    "search": {
+      "night": 0.16,
+      "day": 0.32
+    },
+    "diff": 0.13,
+    "diff-text": 0.2
+  },
+  "styles": {
+    "heading": "bold",
+    "link": "underline",
+    "emphasis": "italic",
+    "strong": "bold",
+    "deprecated": "strikethrough"
+  },
+  "scopes": {
+    "text": [
+      "variable",
+      "variable.other",
+      "variable.parameter",
+      "variable.other.property",
+      "meta.object-literal.key",
+      "entity.name.namespace",
+      "entity.other.attribute-name",
+      "support.variable.property",
+      "source",
+      "text"
+    ],
+    "keyword": [
+      "keyword",
+      "storage",
+      "storage.type",
+      "storage.modifier",
+      "keyword.control",
+      "variable.language",
+      "keyword.other.unit",
+      "meta.decorator",
+      "entity.name.function.decorator",
+      "meta.attribute.rust",
+      "punctuation.definition.attribute",
+      "markup.list punctuation.definition.list",
+      "punctuation.definition.list.begin"
+    ],
+    "operator": [
+      "keyword.operator",
+      "punctuation.accessor",
+      "punctuation.separator.key-value",
+      "storage.type.function.arrow"
+    ],
+    "punctuation": [
+      "punctuation",
+      "meta.brace",
+      "punctuation.definition.tag",
+      "punctuation.definition.heading",
+      "punctuation.definition.bold",
+      "punctuation.definition.italic",
+      "punctuation.definition.markdown",
+      "punctuation.definition.raw"
+    ],
+    "comment": [
+      "comment",
+      "punctuation.definition.comment",
+      "markup.quote",
+      "comment.block.documentation"
+    ],
+    "string": [
+      "string",
+      "string.quoted",
+      "string.template",
+      "markup.inline.raw",
+      "markup.fenced_code",
+      "markup.raw",
+      "constant.other.symbol"
+    ],
+    "constant": [
+      "constant",
+      "constant.numeric",
+      "constant.language",
+      "constant.character",
+      "constant.other",
+      "variable.other.constant",
+      "variable.other.enummember",
+      "support.constant",
+      "constant.character.escape",
+      "string.regexp",
+      "punctuation.definition.template-expression",
+      "punctuation.section.embedded",
+      "entity.name.lifetime",
+      "storage.modifier.lifetime"
+    ],
+    "function": [
+      "entity.name.function",
+      "support.function",
+      "meta.function-call entity.name.function",
+      "entity.name.function.macro",
+      "support.function.macro"
+    ],
+    "type": [
+      "entity.name.type",
+      "entity.name.class",
+      "entity.name.struct",
+      "entity.name.enum",
+      "entity.name.trait",
+      "entity.name.interface",
+      "entity.other.inherited-class",
+      "support.type",
+      "support.class",
+      "entity.name.tag",
+      "support.class.component",
+      "meta.type.annotation entity.name.type"
+    ],
+    "heading": [
+      "markup.heading",
+      "entity.name.section"
+    ],
+    "link": [
+      "markup.underline.link",
+      "string.other.link",
+      "markup.link"
+    ],
+    "emphasis": [
+      "markup.italic"
+    ],
+    "strong": [
+      "markup.bold"
+    ],
+    "deprecated": [
+      "markup.strikethrough"
+    ],
+    "invalid": [
+      "invalid",
+      "invalid.illegal"
+    ],
+    "inserted": [
+      "markup.inserted",
+      "punctuation.definition.inserted"
+    ],
+    "deleted": [
+      "markup.deleted",
+      "punctuation.definition.deleted"
+    ],
+    "changed": [
+      "markup.changed",
+      "punctuation.definition.changed",
+      "meta.diff.range",
+      "meta.diff.header"
+    ]
+  },
+  "night": {
+    "syntax": {
+      "text": "#EBEBEB",
+      "keyword": "#B7B7B7",
+      "operator": "#B7B7B7",
+      "punctuation": "#9E9E9E",
+      "comment": "#9E9E9E",
+      "string": "#76D3B4",
+      "constant": "#E1B671",
+      "function": "#94C0FE",
+      "type": "#F3A3BC",
+      "heading": "#EBEBEB",
+      "link": "#EBEBEB",
+      "emphasis": "#EBEBEB",
+      "strong": "#EBEBEB",
+      "deprecated": "#9E9E9E",
+      "invalid": "#F27A6B",
+      "inserted": "#5CC9A7",
+      "deleted": "#F27A6B",
+      "changed": "#7AAEF5"
+    },
+    "ui": {
+      "background": "#141414",
+      "frame": "#0B0B0B",
+      "float": "#1D1D1D",
+      "cursorline": "#1F1F1F",
+      "selection": "#2E2E2E",
+      "highlight": "#2D2D2D",
+      "search": "#313521",
+      "search-current": "#C9E265",
+      "on-search-current": "#0B0B0B",
+      "selected": "#1C1E13",
+      "guide": "#2B2B2B",
+      "signal": "#C9E265",
+      "diff-added": "#1D2C27",
+      "diff-added-text": "#223831",
+      "diff-removed": "#31211F",
+      "diff-removed-text": "#402825",
+      "diff-changed": "#212831",
+      "diff-changed-text": "#283341",
+      "line-number": "#9E9E9E",
+      "line-number-current": "#EBEBEB",
+      "cursor": "#AF6BC8",
+      "match": "#C882E1",
+      "muted": "#9D9D9D",
+      "danger": "#F27A6B",
+      "ok": "#5CC9A7",
+      "warn": "#E9AE45",
+      "info": "#7AAEF5"
+    }
+  },
+  "day": {
+    "syntax": {
+      "text": "#181818",
+      "keyword": "#3D3D3D",
+      "operator": "#3D3D3D",
+      "punctuation": "#616161",
+      "comment": "#616161",
+      "string": "#006E55",
+      "constant": "#7B5500",
+      "function": "#305D9A",
+      "type": "#8D3F5C",
+      "heading": "#181818",
+      "link": "#181818",
+      "emphasis": "#181818",
+      "strong": "#181818",
+      "deprecated": "#616161",
+      "invalid": "#AB3A30",
+      "inserted": "#006E56",
+      "deleted": "#AB3A30",
+      "changed": "#3161A2"
+    },
+    "ui": {
+      "background": "#FFFFFF",
+      "frame": "#F5F5F5",
+      "float": "#FFFFFF",
+      "cursorline": "#F3F3F3",
+      "selection": "#E3E3E3",
+      "highlight": "#EDEDED",
+      "search": "#EEF6CE",
+      "search-current": "#C9E265",
+      "on-search-current": "#181818",
+      "selected": "#F6FAE6",
+      "guide": "#E1E1E1",
+      "signal": "#7C9000",
+      "diff-added": "#DEEDEA",
+      "diff-added-text": "#CCE4DF",
+      "diff-removed": "#F5E7E5",
+      "diff-removed-text": "#F0D9D7",
+      "diff-changed": "#E5ECF4",
+      "diff-changed-text": "#D7E1EE",
+      "line-number": "#616161",
+      "line-number-current": "#181818",
+      "cursor": "#5A1470",
+      "match": "#5A1470",
+      "muted": "#555555",
+      "danger": "#AB3A30",
+      "ok": "#006E56",
+      "warn": "#815900",
+      "info": "#3161A2"
+    }
+  }
+}

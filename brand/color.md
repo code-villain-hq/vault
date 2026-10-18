@@ -21,6 +21,9 @@ already what people saw in every mark, so the brand now says so.
 - The main action's fill, once per screen, with dark ink.
 - A faint tint for the selected row and the current nav item.
 - Small live signals: an unread dot, a running agent, a live sync.
+- In code, the search match: a faint tint on every match, the fill on
+  the current one. It never colours a token
+  ([`design/tokens/theme.md`](../design/tokens/theme.md#code)).
 
 Poison never colours links, labels, chips, or body copy, and it never
 fills a large area beyond that one action. Links are ink, bold, and

@@ -6,6 +6,7 @@ The numbers taken from `brand/`: color, type, shape.
 | --- | --- | --- |
 | Color (Nightshade, night and day) | [`brand/color.md`](../../brand/color.md) | [`color.json`](color.json), [`color.resolved.json`](color.resolved.json), [`color.css`](color.css), [`color.swift`](color.swift) |
 | Type | [`brand/type.md`](../../brand/type.md) | [`type.json`](type.json), [`type.css`](type.css), [`type.swift`](type.swift) |
+| Code (Nightshade syntax, night and day) | [`theme.md`](theme.md#code) | [`syntax.json`](syntax.json), [`syntax.resolved.json`](syntax.resolved.json), [`syntax.css`](syntax.css) |
 | Shape (corner radius) | [`components.md`](../components.md) | [`shape.json`](shape.json), [`shape.css`](shape.css), [`shape.swift`](shape.swift) |
 
 The JSON is the source. Edit it, then run `python3 build.py` here to regenerate every CSS and Swift file. Don't edit the generated files.

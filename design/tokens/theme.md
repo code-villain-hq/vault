@@ -87,3 +87,33 @@ boards, detail views, settings and dialogs in night and day. A numerical
 contrast pass establishes readability; the real views establish whether
 hierarchy and restraint still feel right. Bring broader visual changes back
 for discussion. Mobile redesign remains separate work.
+
+## Code
+
+`syntax.json` turns the resolved theme into colours for code: syntax
+highlighting and an editor's own moments. [`syntax.py`](syntax.py) does the
+calculation, `build.py` writes `syntax.resolved.json` and `syntax.css`, and
+[`test_syntax.py`](test_syntax.py) holds it to these rules. The editor
+themes in [`apps/nightshade`](../../apps/nightshade) and Layer's diff are
+built from the resolved file.
+
+- Code sits on `panel`. Every token reads at the text floor (4.6:1) on it and
+  on everything drawn under code: the cursor line, a selection, a search
+  match, a float, and the added, removed and changed tints of a diff.
+- Grey carries the structure, in three steps: names in `fg`, keywords and
+  operators one step back, punctuation and comments two. Greys stay
+  achromatic. A higher contrast keeps the steps apart.
+- Four hues carry what a reader looks for: strings, constants, functions
+  and types. Three take the semantic seeds' hues (teal, amber, blue); types
+  have their own rose. All four share one OKLCH lightness, the first at
+  which each reads on every host, so no token is louder than another.
+- Poison never colours a token. In an editor it is the search match (a
+  faint tint) and the current match (the fill, with `on-primary` ink): the
+  one poison fill on the screen. Cloak is the cursor and the bracket under
+  it. The cursor line takes a faint `fg` tint, and the arrow keys' row in a
+  menu `highlight-tint`, as in [components](../components.md#row).
+- Diff lines use `status-tint` of `ok`, `danger` and `info`; the changed
+  words inside them a stronger tint.
+- Each role lists the TextMate scopes it colours. VS Code and Layer
+  (through Shiki) read the same table; Neovim maps Treesitter and LSP
+  groups onto the role names.
