@@ -5,7 +5,7 @@ product: Studio
 draft: true
 ---
 
-Code Villain had three products and no look. Forge was indigo, Layer was lavender, the homepage was a test font matched off a generated picture. Today that ended. The whole studio now draws from one place: `brand/` and `design/` in the vault.
+Code Villain had three products and no look. Forge was indigo, Layer was lavender, the homepage was a test font matched off a generated picture. The whole studio now draws from one place: `brand/` and `design/` in the vault.
 
 ## Type
 
@@ -33,13 +33,13 @@ Every surface reads the same names. An app switches to day with one attribute:
 
 ## The button
 
-Five directions, one shape: 28px, 13px semibold, no border. It ended chartreuse with dark ink, once per screen. In an issue, the title reads first, then the text, then the button. As it should.
+Five directions, one shape: 28px, 13px semibold, no border. It ended chartreuse with dark ink, once per screen. In an issue, the title reads first, then the text, then the button.
 
 ## The mark
 
 Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind the letters, cut where they cross. It began as a gothic V. The V said Villain and nothing about Code, so the C joined it: CV, one unit apart, so their two cuts meet and the bar stops between them. Forge, Layer and Caster wear their initials the same way: F, L, C.
 
-![The CV mark on its night tile, and the Code Villain wordmark with the strike.](../../brand/mark/mark.svg)
+![The CV mark on its night tile, with the chartreuse bar behind the letters.](../../brand/mark/mark.svg)
 
 The cut is one mask. The letters, drawn again with a thick stroke, punch a gap in the bar wherever they cross:
 
@@ -53,4 +53,4 @@ The cut is one mask. The letters, drawn again with a thick stroke, punch a gap i
 
 ## What it cost
 
-Two days, a dozen studies, one colour swap, and a rule written down for every decision, so the apps can catch up without asking. The rest is in the record.
+Two days, a dozen studies, one colour swap, and a rule written down for every decision, so the apps can catch up without asking.

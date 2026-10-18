@@ -1,5 +1,5 @@
 /* Product-led homepage: real captures of each product, on the shared Nightshade tokens. */
-.hero { --logo-width: clamp(18rem, 42vw, 36rem); --splash-pad: clamp(1.5rem, 3vw, 2.25rem); position: relative; overflow: hidden; }
+.hero { --logo-width: clamp(20.5rem, 42vw, 36rem); --splash-pad: clamp(1.5rem, 3vw, 2.25rem); position: relative; overflow: hidden; }
 .splash { margin: 0; padding: var(--splash-pad) var(--gutter); }
 .splash svg { display: block; width: var(--logo-width); max-width: 100%; height: auto; overflow: visible; }
 /* The nav shares the logo's row and stands just above the strike: the
@@ -25,7 +25,7 @@
 .product-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem 2rem; min-height: 5.5rem; padding-bottom: 1.25rem; }
 .product-name { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
 .product-name img { flex-shrink: 0; object-fit: contain; }
-.product h3 { margin: 0 0 0.25rem; font-family: var(--font-display); font-size: var(--type-headline-size); font-weight: var(--type-headline-weight); line-height: var(--type-headline-leading); }
+.product h3 { margin: 0 0 0.25rem; font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading); }
 .product-name p { margin: 0; color: var(--muted); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
 .product-figure { margin: 0; }
 .product-figure figcaption { margin-top: 0.6rem; color: var(--faint); font-size: var(--type-small-size); line-height: var(--type-small-leading); }

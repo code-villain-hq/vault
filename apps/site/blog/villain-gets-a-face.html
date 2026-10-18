@@ -16,11 +16,12 @@
   <link rel="stylesheet" href="../../../design/tokens/color.css">
   <link rel="stylesheet" href="../../../design/tokens/type.css">
   <link rel="stylesheet" href="../../../design/tokens/shape.css">
+  <link rel="stylesheet" href="../../../design/tokens/syntax.css">
   <link rel="stylesheet" href="../site.css">
 </head>
 <body>
   <header class="wrap site-head">
-    <a class="site-logo" href="../"><img src="../../../brand/mark/logo-night.svg" alt="Code Villain" width="168" height="32"></a>
+    <a class="site-logo" href="../"><img src="../../../brand/mark/logo-night.svg" alt="Code Villain" width="168" height="35"></a>
     <nav class="site-nav" aria-label="Site">
       <a href="./" aria-current="page">The log</a>
       <a href="../#products">Tools</a>
@@ -43,7 +44,7 @@
 
       <h1>Code Villain gets a face</h1>
 
-      <p>Code Villain had three products and no look. Forge was indigo, Layer was lavender, the homepage was a test font matched off a generated picture. Today that ended. The whole studio now draws from one place: <code>brand/</code> and <code>design/</code> in the vault.</p>
+      <p>Code Villain had three products and no look. Forge was indigo, Layer was lavender, the homepage was a test font matched off a generated picture. The whole studio now draws from one place: <code>brand/</code> and <code>design/</code> in the vault.</p>
 
       <h2>Type</h2>
       <p>Four pairings went up against the test font. Code Villain picked the boldest: Grenze Gotisch, a gothic display face, for the big titles, and Atkinson Hyperlegible Next for everything read or clicked. The gothic is the costume. Atkinson is the person inside it. Grenze never goes below 28px and never sets a paragraph.</p>
@@ -62,16 +63,16 @@
       <figure class="code">
         <figcaption>CSS</figcaption>
         <pre><code><span class="tok-c">/* design/tokens/color.css, generated from color.json */</span>
-[data-theme="day"] {
-  <span class="tok-p">--bg</span>: #F5F5F5;
-  <span class="tok-p">--panel</span>: #FFFFFF;
-  <span class="tok-p">--primary</span>: #C9E265;
-  <span class="tok-p">--accent</span>: #5A1470;
+[data-theme=<span class="tok-s">"day"</span>] {
+  <span class="tok-p">--bg</span>: <span class="tok-n">#F5F5F5</span>;
+  <span class="tok-p">--panel</span>: <span class="tok-n">#FFFFFF</span>;
+  <span class="tok-p">--primary</span>: <span class="tok-n">#C9E265</span>;
+  <span class="tok-p">--accent</span>: <span class="tok-n">#5A1470</span>;
 }</code></pre>
       </figure>
 
       <h2>The button</h2>
-      <p>Five directions, one shape: 28px, 13px semibold, no border. It ended chartreuse with dark ink, once per screen. In an issue, the title reads first, then the text, then the button. As it should.</p>
+      <p>Five directions, one shape: 28px, 13px semibold, no border. It ended chartreuse with dark ink, once per screen. In an issue, the title reads first, then the text, then the button.</p>
 
       <h2>The mark</h2>
       <p>Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind the letters, cut where they cross. It began as a gothic V. The V said Villain and nothing about Code, so the C joined it: CV, one unit apart, so their two cuts meet and the bar stops between them. Forge, Layer and Caster wear their initials the same way: F, L, C.</p>
@@ -88,15 +89,15 @@
 
       <figure class="code">
         <figcaption>SVG</figcaption>
-        <pre><code>&lt;mask id="cut"&gt;
-  &lt;rect <span class="tok-p">width</span>="200" <span class="tok-p">height</span>="200" <span class="tok-p">fill</span>="#fff"/&gt;
-  &lt;use <span class="tok-p">href</span>="#cv" <span class="tok-p">stroke</span>="#000" <span class="tok-p">stroke-width</span>="14"/&gt;
-&lt;/mask&gt;
-&lt;rect <span class="tok-p">y</span>="108" <span class="tok-p">width</span>="200" <span class="tok-p">height</span>="15" <span class="tok-p">fill</span>="#C9E265" <span class="tok-p">mask</span>="url(#cut)"/&gt;</code></pre>
+        <pre><code>&lt;<span class="tok-t">mask</span> <span class="tok-p">id</span>=<span class="tok-s">"cut"</span>&gt;
+  &lt;<span class="tok-t">rect</span> <span class="tok-p">width</span>=<span class="tok-s">"200"</span> <span class="tok-p">height</span>=<span class="tok-s">"200"</span> <span class="tok-p">fill</span>=<span class="tok-s">"#fff"</span>/&gt;
+  &lt;<span class="tok-t">use</span> <span class="tok-p">href</span>=<span class="tok-s">"#cv"</span> <span class="tok-p">stroke</span>=<span class="tok-s">"#000"</span> <span class="tok-p">stroke-width</span>=<span class="tok-s">"14"</span>/&gt;
+&lt;/<span class="tok-t">mask</span>&gt;
+&lt;<span class="tok-t">rect</span> <span class="tok-p">y</span>=<span class="tok-s">"108"</span> <span class="tok-p">width</span>=<span class="tok-s">"200"</span> <span class="tok-p">height</span>=<span class="tok-s">"15"</span> <span class="tok-p">fill</span>=<span class="tok-s">"#C9E265"</span> <span class="tok-p">mask</span>=<span class="tok-s">"url(#cut)"</span>/&gt;</code></pre>
       </figure>
 
       <h2>What it cost</h2>
-      <p>Two days, a dozen studies, one colour swap, and a rule written down for every decision, so the apps can catch up without asking. The rest is in the record.</p>
+      <p>Two days, a dozen studies, one colour swap, and a rule written down for every decision, so the apps can catch up without asking.</p>
 
       <footer class="post-foot"><a href="./">All posts</a></footer>
     </article>

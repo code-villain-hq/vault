@@ -24,7 +24,7 @@ body {
   font-weight: var(--type-body-weight);
 }
 
-::selection { background: var(--cloak); color: var(--fg); }
+::selection { background: color-mix(in srgb, var(--fg) 25%, transparent); color: var(--fg); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 a { color: inherit; text-decoration: none; }
 
@@ -74,7 +74,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 .site-foot nav { display: flex; gap: 1.25rem; }
-.site-foot a:hover { color: var(--fg); }
+.site-foot a { color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent); text-underline-offset: 0.2em; }
+.site-foot a:hover { text-decoration-color: var(--fg); }
 
 /* Shared pieces. */
 .chip {
@@ -164,8 +165,8 @@ a { color: inherit; text-decoration: none; }
   line-height: var(--type-small-leading);
 }
 
-.post-meta a { color: var(--fg); font-weight: 700; }
-.post-meta a:hover { color: var(--fg); }
+.post-meta a { color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent); text-underline-offset: 0.2em; }
+.post-meta a:hover { text-decoration-color: var(--fg); }
 
 .post h1 {
   margin: 0 0 1.5rem;
@@ -236,7 +237,7 @@ a { color: inherit; text-decoration: none; }
   line-height: var(--type-small-leading);
 }
 
-/* Code blocks: mono on the panel, the language as a small label. Restrained colour: properties muted, comments faint. */
+/* Code blocks: mono on the panel, the language as a small label, in the code palette (design/tokens/syntax.css). */
 .code {
   margin: 1.5rem 0 2rem;
   border-radius: var(--radius-lg);
@@ -256,14 +257,19 @@ a { color: inherit; text-decoration: none; }
   margin: 0;
   padding: 0.5rem 1.25rem 1.1rem;
   overflow-x: auto;
+  color: var(--syntax-text);
   font-family: var(--font-mono);
   font-size: var(--type-code-size);
   line-height: var(--type-code-leading);
 }
 
 .post .code code { padding: 0; background: none; font-size: inherit; }
-.tok-p { color: var(--muted); }
-.tok-c { color: var(--faint); }
+.tok-p { color: var(--syntax-property); }
+.tok-c { color: var(--syntax-comment); font-style: italic; }
+.tok-s { color: var(--syntax-string); }
+.tok-n { color: var(--syntax-constant); }
+.tok-t { color: var(--syntax-special); }
+.tok-x { color: var(--syntax-punctuation); }
 
 .post-foot {
   padding-block: 1.5rem 0;
@@ -272,8 +278,8 @@ a { color: inherit; text-decoration: none; }
   font-weight: var(--type-small-weight);
   line-height: var(--type-small-leading);
 }
-.post-foot a { color: var(--fg); font-weight: 700; }
-.post-foot a:hover { color: var(--fg); }
+.post-foot a { color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 45%, transparent); text-underline-offset: 0.2em; }
+.post-foot a:hover { text-decoration-color: var(--fg); }
 
 @media (max-width: 640px) {
   .post-row { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
