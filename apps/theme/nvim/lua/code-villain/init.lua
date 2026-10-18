@@ -396,14 +396,10 @@ function M.load()
   for name, spec in pairs(groups(p)) do
     vim.api.nvim_set_hl(0, name, spec)
   end
-  -- The terminal's 16 colours, from the same roles.
-  local ansi = { p.bracket, p.deleted, p.string, p.constant, p["function"], p.keyword, p.property, p.text }
-  for i, c in ipairs(ansi) do
-    vim.g["terminal_color_" .. (i - 1)] = c
-    vim.g["terminal_color_" .. (i + 7)] = c
+  -- The terminal's 16 colours, the same table WezTerm and VS Code use.
+  for i = 0, 15 do
+    vim.g["terminal_color_" .. i] = p["ansi." .. i]
   end
-  vim.g.terminal_color_0 = p["frame.surface"]
-  vim.g.terminal_color_8 = p.comment
 end
 
 return M
