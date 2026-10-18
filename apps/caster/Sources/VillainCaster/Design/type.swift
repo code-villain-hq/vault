@@ -22,6 +22,7 @@ enum TypeTokens {
   static let body = Role(face: reading, weight: 400, size: 17, lineHeight: 1.6, trackingEm: 0)
   static let small = Role(face: reading, weight: 400, size: 14, lineHeight: 1.5, trackingEm: 0)
   static let code = Role(face: mono, weight: 400, size: 14, lineHeight: 1.6, trackingEm: 0)
+  static let wordmark = Role(face: display, weight: 700, size: 28, lineHeight: 1.1, trackingEm: 0)
   static let query = Role(face: reading, weight: 400, size: 21, lineHeight: 1.25, trackingEm: 0)
   static let ui = Role(face: reading, weight: 400, size: 14, lineHeight: 1.45, trackingEm: 0)
   static let uiSmall = Role(face: reading, weight: 400, size: 13, lineHeight: 1.4, trackingEm: 0)

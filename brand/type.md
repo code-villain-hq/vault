@@ -53,6 +53,7 @@ size. App windows are denser and use the interface roles.
 
 | Role     | Face     | Weight | Size | Leading | Use                                  |
 | -------- | -------- | ------ | ---- | ------- | ------------------------------------ |
+| wordmark | Grenze   | 700    | 28px | 1.1     | The app's name in the sidebar, an empty state's headline. |
 | title    | Atkinson | 700    | 21px | 1.25    | View and issue titles.               |
 | query    | Atkinson | 400    | 21px | 1.25    | The query in a launcher or command menu. |
 | ui       | Atkinson | 400    | 14px | 1.45    | Rows, nav, descriptions, fields.     |

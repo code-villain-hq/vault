@@ -66,6 +66,11 @@ typography:
     fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.6
+  wordmark:
+    fontFamily: "Grenze Gotisch, ui-serif, Georgia, serif"
+    fontSize: "1.75rem"
+    fontWeight: 700
+    lineHeight: 1.1
   query:
     fontFamily: "Atkinson Hyperlegible Next, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.3125rem"

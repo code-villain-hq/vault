@@ -1,6 +1,6 @@
 # Components
 
-The few controls every Code Villain surface shares. They follow [`principles.md`](principles.md), take their colours from [`brand/color.md`](../brand/color.md), and their numbers from [`tokens/`](tokens). Each app implements them in its own toolkit.
+The few controls every Code Villain surface shares. They follow [`principles.md`](principles.md), take their colours from [`brand/color.md`](../brand/color.md), and their numbers from [`tokens/`](tokens). [`components.css`](components.css) implements them once for the web, as `ui-*` classes that Forge, Layer and the site copy and use; Caster draws the same recipes in AppKit. [`lint/`](lint/README.md) keeps every web surface on them.
 
 ## Shape
 
