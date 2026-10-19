@@ -28,8 +28,9 @@ on:
       - "apps/caster/Resources/AppIcon.svg"
       - "apps/caster/Makefile"
       - "apps/theme/**"
-      - "apps/glyph/ui/**"
-      - "apps/glyph/Makefile"
+      - "apps/glyph/apps/web/src/**"
+      - "apps/glyph/apps/web/public/icon.svg"
+      - "apps/glyph/scripts/sync-design.ts"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -49,7 +50,7 @@ jobs:
         working-directory: apps/caster
       - run: bun build.ts --check
         working-directory: apps/theme
-      - run: make design-check
+      - run: bun scripts/sync-design.ts --check
         working-directory: apps/glyph
       - run: bun install --frozen-lockfile && bun run check
         working-directory: design/lint

@@ -1,20 +1,38 @@
-# Glyph's tests and build on every push that touches it.
+# `bun run check` for Glyph on every push that touches it: fmt, clippy and
+# the Rust tests (the desktop shell too), generated types and design copies
+# up to date, Biome, tsc, the bun tests and the web build. It runs on the
+# MacBook's runner (label `macos`).
+#
+# On push only, never on pull_request: the runner is the Mac itself, and a
+# pull request from someone else's fork would run their code there.
 name: glyph
 
 on:
   push:
     paths:
       - "apps/glyph/**"
+      - "design/tokens/**"
+      - "design/components.css"
+      - "brand/mark/glyph.svg"
       - ".forgejo/workflows/glyph.yml"
 
 jobs:
-  build:
+  check:
     runs-on: macos
     defaults:
       run:
-        working-directory: apps/glyph/backend
+        working-directory: apps/glyph
+    env:
+      # Line numbers for a failing test's backtrace, without the rest of the
+      # debug info: less to compile and link.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@v4
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build -o ../glyph .
+      - run: bun install --frozen-lockfile
+      # The tests need Postgres: the same container as local development
+      # (port 5434), started if it isn't running. Each test gets a database
+      # of its own and drops it, so the dev data is never touched.
+      - run: bun run db
+      # The Rust build is kept between jobs, so a push recompiles what
+      # changed, not the whole app.
+      - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/glyph-target" bun run check
