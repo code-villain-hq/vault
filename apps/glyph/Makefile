@@ -61,10 +61,11 @@ reset-db:
 	@echo "✓ Database reset"
 
 # Drop the DB, move an existing translations/ aside, and copy in the made-up demo data in
-# demo/translations: a villain's lair app in en, sv (92%), fr (52%) and fi
-# (15%), with low-confidence rows, reviewer context and an sv-only key.
+# demo/translations: a villain's lair app with 746 English keys in 17
+# namespaces (gadgets alone has 168, legal 7), sv (92%), fr (52%) and fi (16%),
+# with low-confidence rows, reviewer context and keys that only a translation has.
 # demo/import/de.json is for trying the Import page: ns:key prefixes, a new
-# language, and one key without a prefix.
+# language, and two keys without a prefix.
 # After this, `make run` bootstraps the DB from those JSON files.
 seed-demo: reset-db
 	@if [ -d translations ] && [ -n "$$(ls -A translations)" ]; then \

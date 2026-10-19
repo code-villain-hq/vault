@@ -160,7 +160,7 @@
   .tx-group,
   .key-head {
     display: grid;
-    grid-template-columns: 16px minmax(0, 2fr) minmax(0, 3fr) auto repeat(var(--lang-count, 1), 2.75rem);
+    grid-template-columns: 16px minmax(0, 2fr) minmax(0, 3fr) auto repeat(var(--lang-count, 1), 3.5rem);
     column-gap: 10px;
     align-items: center;
     padding: 0 8px;

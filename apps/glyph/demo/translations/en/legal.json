@@ -1,0 +1,9 @@
+{
+  "terms.title": "Terms of villainy",
+  "terms.summary": "By using this service you agree to pursue world domination responsibly, to keep your minions fed and insured, and not to monologue in shared spaces. We may suspend accounts that destroy more than one city per billing period.",
+  "privacyNotice": "We collect only what we need to run your lair: your name, your minions' shift data and the coordinates of your secret tunnel. We never sell any of it to heroes. Read the <a>full privacy notice</a> for details.",
+  "cookieNotice": "This site uses evil cookies. They remember your last scheme and which hero you are angry at this week. Essential cookies cannot be turned off; the rest you can refuse without any consequences, we promise.",
+  "cookieAccept": "Accept evil cookies",
+  "deviceDisclaimer": "{{device}} is supplied as is. We are not liable for collateral damage, tidal waves, rearranged continents or heroes who become more popular as a result of its use. Always read the manual before pressing the big red button.",
+  "lastUpdated": "Last updated {{date}}"
+}

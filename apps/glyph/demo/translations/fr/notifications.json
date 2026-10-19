@@ -1,0 +1,16 @@
+{
+  "unreadCount_one": "{{count}} non lue",
+  "unreadCount_other": "{{count}} non lues",
+  "paymentReceived": "Paiement de {{amount}} reçu",
+  "approveTimeOff": "Approuver",
+  "snoozeFor_one": "Reporter de {{count}} heure",
+  "snoozeFor_other": "Reporter de {{count}} heures",
+  "muteThread": "Mettre ce complot en sourdine",
+  "digest.subjectWeekly": "Cette semaine dans votre repaire : {{count}} complots, {{foiled}} déjoués",
+  "digest.subjectQuiet": "Rien ne s'est passé cette semaine. Nous avons vérifié deux fois.",
+  "muteAllConfirm": "Mettre toutes les notifications en sourdine jusqu'à {{time}} ? Vous ne serez informé ni des héros repérés, ni des paiements, ni des sbires qui mettent le feu à quelque chose d'ici là. Votre ennemi juré sera ravi.",
+  "pushDisabled": "Les notifications du navigateur sont désactivées. <a>Activez-les</a> pour être averti des héros en temps réel.",
+  "viewAll": "Tout afficher",
+  "legacySmsAlerts": "Alertes SMS (obsolètes)",
+  "digest.subjectMonthly": "Le récapitulatif mensuel de vos méfaits"
+}

@@ -1,0 +1,20 @@
+{
+  "welcomeBody": "Tout empire commence petit. Dans les prochaines minutes, vous allez nommer votre repaire, choisir un personnage de méchant, inviter votre premier sbire et désigner un ennemi juré. Vous pourrez tout modifier plus tard, sauf l'ennemi juré, qui ne vous laissera jamais oublier.",
+  "lairNameLabel": "Nom du repaire",
+  "lairNameHelp": "Vos sbires verront ce nom sur chaque note de service. Choisissez quelque chose qu'ils savent écrire.",
+  "lairTypeVolcano": "Volcan, endormi (en général)",
+  "choosePersona": "Choisissez votre personnage de méchant",
+  "personaMastermind": "Cerveau : planifie tout, n'assiste à rien",
+  "inviteMinion.send": "Envoyer l'invitation",
+  "minionsInvited_one": "{{count}} sbire invité",
+  "minionsInvited_other": "{{count}} sbires invités",
+  "pickNemesis": "Choisissez un ennemi juré",
+  "nemesisHint": "Votre ennemi juré est le héros qui surgit chaque fois qu'un complot est sur le point de réussir. Si vous le choisissez maintenant, nous pourrons vous prévenir avant son arrivée, ce qui est plus que ce dont profitent la plupart des méchants.",
+  "nemesisSelected": "{{hero}} est désormais votre ennemi juré. Il a été prévenu. Sans doute.",
+  "noNemesis": "Je préfère être sous-estimé",
+  "tour.dashboard": "Voici votre tableau de bord. Chaque complot déjoué s'affiche ici, hélas.",
+  "tour.devices": "Vos machines de l'apocalypse se trouvent ici. Rechargez-les avant de menacer qui que ce soit.",
+  "skip": "Passer pour l'instant",
+  "finish": "Ouvrir le repaire",
+  "personaSidekick": "Acolyte : porte le sac, endosse la faute"
+}

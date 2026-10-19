@@ -1,0 +1,17 @@
+{
+  "replyAll": "Répondre à tous les hommes de main",
+  "markAsUnread": "Marquer comme non lu",
+  "unreadCount_one": "{{count}} message non lu",
+  "unreadCount_other": "{{count}} messages non lus",
+  "folders.heroTaunts": "Provocations de héros",
+  "compose.subjectPlaceholder": "Objet (restez menaçant)",
+  "sendRansomNote": "Envoyer la demande de rançon",
+  "ransomDemand": "Exiger {{amount}} avant le {{date}}",
+  "ransomTip": "Une demande de rançon porte mieux avec un montant clair, une échéance ferme et une seule menace par paragraphe. Découper des lettres dans les journaux a son charme, mais c'est lent : l'éditeur s'en charge pour vous.",
+  "threatsFiltered_one": "{{count}} menace classée comme indésirable",
+  "threatsFiltered_other": "{{count}} menaces classées comme indésirables",
+  "emptyTitle": "Boîte vide. Louche.",
+  "deleteThread": "Supprimer le fil",
+  "archive": "Archiver",
+  "pigeonPost": "Pigeon voyageur"
+}

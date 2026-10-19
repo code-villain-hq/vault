@@ -1,0 +1,23 @@
+{
+  "plan_henchman": "Homme de main",
+  "changePlan": "Changer de forfait",
+  "upgradeTo": "Passer au forfait {{plan}}",
+  "downgradeConfirm": "En passant au forfait Homme de main, vous perdrez l'accès aux machines de l'apocalypse à la fin de la période de facturation. Toute machine encore armée sera poliment désarmée, et vos sbires apprendront que c'était leur idée.",
+  "invoicesTitle": "Factures",
+  "invoices.columns.number": "N° de facture",
+  "invoices.columns.amount": "Montant",
+  "invoiceStatus_paid": "Payée",
+  "invoiceStatus_overdue": "En retard",
+  "invoicesEmpty": "Aucune facture pour l'instant. La conquête est gratuite… jusqu'à nouvel ordre.",
+  "paymentMethodLabel": "Moyen de paiement",
+  "cardEnding": "Carte se terminant par {{last4}}",
+  "paymentMethod.goldBullion": "Lingots d'or (livrés par un sbire)",
+  "refundsUnavailable": "Les villes détruites ne sont pas remboursables.",
+  "refundPolicy": "Vous pouvez demander un remboursement dans les {{days}} jours suivant l'achat, à condition que la machine n'ait jamais été allumée. Un complot déjoué par un héros ne compte pas comme inutilisé, même si vous le vivez mal.",
+  "taxes.vat": "TVA ({{rate}} %)",
+  "lairDeduction": "Déduction pour repaire volcanique",
+  "ransomTitle": "Versements de rançons",
+  "billingCycleAnnual": "Facturation annuelle (deux mois de tyrannie offerts)",
+  "legacy_planMinionPlus": "Sbire Plus",
+  "oldCouponApplied": "Code promo de la braderie souterraine appliqué"
+}

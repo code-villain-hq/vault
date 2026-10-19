@@ -1,0 +1,14 @@
+{
+  "title": "Hommes de main",
+  "henchmanCount_one": "{{count}} homme de main",
+  "henchmanCount_other": "{{count}} hommes de main",
+  "profile.title": "Profil de l'homme de main",
+  "contractRenews": "Renouvellement le {{date}}",
+  "loyaltyLow": "A été vu en train de discuter avec des héros",
+  "dramaticExit": "Sortie théâtrale",
+  "dramaticExitConfirm": "Laisser partir {{name}} sur une sortie théâtrale ? Il prononcera un discours d'adieu, renversera au moins un bécher et partira par la fenêtre la plus proche. Ses gadgets restent au repaire. Cette action est irréversible.",
+  "empty.title": "Aucun homme de main pour l'instant",
+  "promote": "Promouvoir bras droit",
+  "searchPlaceholder": "Rechercher par nom ou cicatrice…",
+  "legacyCapeAllowance": "Indemnité de cape"
+}

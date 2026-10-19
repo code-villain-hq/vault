@@ -1,0 +1,17 @@
+{
+  "planHeist": "Préparer un casse",
+  "targetLabel": "Cible",
+  "addToCrew": "Ajouter à l'équipe",
+  "getawayRoute": "Itinéraire de fuite",
+  "routeBlimp": "En dirigeable (lent, mais spectaculaire)",
+  "vault.laserGrid": "Grille laser",
+  "alarms": "Alarmes",
+  "successOddsValue": "{{percent}} % de chances de réussite",
+  "lootTally": "Décompte du butin",
+  "lootItems_one": "{{count}} objet dérobé",
+  "lootItems_other": "{{count}} objets dérobés",
+  "abortConfirm": "Annuler le casse",
+  "keepGoing": "Continuer",
+  "empty.title": "Aucun casse prévu",
+  "heistInsurance": "Assurance casse"
+}
