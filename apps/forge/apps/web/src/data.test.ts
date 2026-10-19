@@ -107,6 +107,18 @@ test("Forgejo's pull requests are up to date for five minutes after a check work
   expect(forgejoUpToDate(forgejo({ connected: false }), NOW)).toBe(false);
 });
 
+test("a failed check isn't up to date, however recent the last one that worked", () => {
+  const failed = forgejo({ checked_at: minutesAgo(1), check_error: "couldn't reach Forgejo" });
+  expect(forgejoUpToDate(failed, NOW)).toBe(false);
+  const known = pullRequestsKnown(failed, NOW);
+  expect(known.known).toBe(false);
+  expect(!known.known && known.why).toMatch(
+    /^Forge last checked Forgejo at .+: couldn't reach Forgejo\.$/,
+  );
+  const row = { kind: "pull_request", state: "open", provider: "forgejo", checks: "passed" };
+  expect(pullRequestNote(row as IssueLink, failed, NOW)?.text).toMatch(/^last checked /);
+});
+
 test("Forge knows an issue's pull requests while a code host can tell it, and says why not", () => {
   expect(pullRequestsKnown(forgejo(), NOW)).toEqual({ known: true });
   expect(pullRequestsKnown({ github: true, forgejo: null }, NOW)).toEqual({ known: true });

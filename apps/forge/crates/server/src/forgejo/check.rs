@@ -128,17 +128,32 @@ pub async fn check(pool: &PgPool, workspace_id: Uuid) -> Result<(), AppError> {
             return Ok(());
         }
     };
-    apply(pool, workspace_id, connection.connected_at, pull_requests).await?;
-    // Unless it was disconnected or connected anew meanwhile.
-    sqlx::query(
-        "UPDATE forgejo_connections SET checked_at = $3, failed_at = NULL, check_error = NULL \
-         WHERE workspace_id = $1 AND connected_at = $2",
+    // Applied only if the connection asked with still stands: disconnected
+    // or connected anew meanwhile, what it found is dropped. Held for share
+    // until done, so disconnecting or changing it waits for this check
+    // instead of being overtaken by it.
+    let mut guard = pool.begin().await?;
+    let stands: Option<i32> = sqlx::query_scalar(
+        "SELECT 1 FROM forgejo_connections WHERE workspace_id = $1 AND connected_at = $2 \
+         FOR SHARE",
     )
     .bind(workspace_id)
     .bind(connection.connected_at)
-    .bind(started)
-    .execute(pool)
+    .fetch_optional(&mut *guard)
     .await?;
+    if stands.is_none() {
+        return Ok(());
+    }
+    apply(pool, workspace_id, connection.connected_at, pull_requests).await?;
+    sqlx::query(
+        "UPDATE forgejo_connections SET checked_at = $2, failed_at = NULL, check_error = NULL \
+         WHERE workspace_id = $1",
+    )
+    .bind(workspace_id)
+    .bind(started)
+    .execute(&mut *guard)
+    .await?;
+    guard.commit().await?;
     Ok(())
 }
 

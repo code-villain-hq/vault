@@ -260,13 +260,18 @@ export interface CodeHosts {
     connected: boolean;
     /** When a check of Forgejo last worked. */
     checked_at: string | null;
+    /** Why the last check failed; cleared by one that works. */
     check_error: string | null;
   } | null;
 }
 
-/** Whether Forgejo's pull requests are up to date: its last successful check is recent. */
+/**
+ * Whether Forgejo's pull requests are up to date: its last successful check
+ * is recent, and no check has failed since.
+ */
 export function forgejoUpToDate(hosts: CodeHosts, now = Date.now()): boolean {
-  const checked = hosts.forgejo?.connected ? hosts.forgejo.checked_at : null;
+  const forgejo = hosts.forgejo;
+  const checked = forgejo?.connected && !forgejo.check_error ? forgejo.checked_at : null;
   return checked !== null && now - Date.parse(checked) < FORGEJO_UP_TO_DATE_MS;
 }
 

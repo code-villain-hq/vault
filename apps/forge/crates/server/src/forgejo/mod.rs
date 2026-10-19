@@ -102,10 +102,13 @@ async fn read_status(state: &AppState, workspace_id: Uuid) -> Result<ForgejoStat
                 repositories,
                 connected_at: Some(connected_at),
                 checked_at,
-                // A failure older than the last success no longer matters.
                 failed_at,
                 check_error,
-                up_to_date: checked_at.is_some_and(|at| Utc::now() - at < UP_TO_DATE),
+                // A failure since the last success means Forge can't tell,
+                // however recent that success.
+                up_to_date: checked_at.is_some_and(|at| {
+                    Utc::now() - at < UP_TO_DATE && failed_at.is_none_or(|failed| failed < at)
+                }),
             }
         }
         None => ForgejoStatus {

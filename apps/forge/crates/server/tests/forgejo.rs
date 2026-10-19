@@ -16,6 +16,7 @@ use common::App;
 use forge_server::{AppState, forgejo};
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use tokio::sync::Notify;
 use uuid::Uuid;
 
 const TOKEN: &str = "read-token";
@@ -30,6 +31,9 @@ struct Forgejo {
     statuses: HashMap<String, Vec<&'static str>>,
     /// Answers 503 to everything.
     down: bool,
+    /// Holds the next answer to a list of pull requests: says it was asked
+    /// on the first, then waits for the second.
+    hold: Option<(Arc<Notify>, Arc<Notify>)>,
 }
 
 type Shared = Arc<Mutex<Forgejo>>;
@@ -87,6 +91,11 @@ async fn fake_forgejo(shared: Shared) -> String {
             "/api/v1/repos/{owner}/{name}/pulls",
             get(
                 move |headers: HeaderMap, Query(query): Query<HashMap<String, String>>| async move {
+                    let hold = list.lock().unwrap().hold.take();
+                    if let Some((asked, release)) = hold {
+                        asked.notify_one();
+                        release.notified().await;
+                    }
                     let forgejo = list.lock().unwrap();
                     if let Some(refused) = refuse(&headers, &forgejo) {
                         return refused;
@@ -221,6 +230,19 @@ impl Setup {
         forgejo::check(&self.app.pool, self.workspace.parse().unwrap())
             .await
             .unwrap();
+    }
+
+    /// Starts a check and waits until it has asked Forgejo for pull
+    /// requests; Forgejo answers once `release` is notified.
+    async fn start_held_check(&self) -> (tokio::task::JoinHandle<()>, Arc<Notify>) {
+        let asked = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        self.forgejo.lock().unwrap().hold = Some((asked.clone(), release.clone()));
+        let pool = self.app.pool.clone();
+        let workspace = self.workspace.parse().unwrap();
+        let check = tokio::spawn(async move { forgejo::check(&pool, workspace).await.unwrap() });
+        asked.notified().await;
+        (check, release)
     }
 
     fn add(&self, pr: Value) {
@@ -703,6 +725,65 @@ async fn an_old_check_is_not_up_to_date(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(s.status(&s.admin).await["up_to_date"], false);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_failed_check_is_not_up_to_date_however_recent_the_last_good_one(pool: PgPool) {
+    let s = setup(pool).await;
+    s.connect().await;
+    s.check().await;
+    assert_eq!(s.status(&s.admin).await["up_to_date"], true);
+
+    s.forgejo.lock().unwrap().down = true;
+    s.check().await;
+    let status = s.status(&s.admin).await;
+    assert_eq!(status["up_to_date"], false, "{status}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_check_running_when_forgejo_is_disconnected_changes_nothing(pool: PgPool) {
+    let s = setup(pool).await;
+    s.add(pull_request(10, "Rate limits", "Fixes FOR-1"));
+    s.connect().await;
+    let (check, release) = s.start_held_check().await;
+    let response = s
+        .app
+        .call(
+            "DELETE",
+            &format!("/api/w/{}/forgejo", s.workspace),
+            Some(&s.admin),
+            None,
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::NO_CONTENT);
+    release.notify_one();
+    check.await.unwrap();
+
+    assert_eq!(
+        s.statuses().await,
+        [(1, "Backlog".into()), (2, "Todo".into())]
+    );
+    assert!(s.links().await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_check_running_when_forgejo_is_changed_leaves_it_to_the_next(pool: PgPool) {
+    let s = setup(pool).await;
+    s.add(pull_request(10, "Rate limits", "Fixes FOR-1"));
+    s.connect().await;
+    let (check, release) = s.start_held_check().await;
+    // Change…: connected anew while the check waits for Forgejo.
+    s.connect().await;
+    release.notify_one();
+    check.await.unwrap();
+
+    assert_eq!(s.statuses().await[0], (1, "Backlog".into()));
+    assert!(s.links().await.is_empty());
+    assert_eq!(s.status(&s.admin).await["checked_at"], Value::Null);
+
+    // The next check, with the connection as it is now, does the work.
+    s.check().await;
+    assert_eq!(s.statuses().await[0], (1, "In Review".into()));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
