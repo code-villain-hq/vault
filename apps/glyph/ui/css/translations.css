@@ -2,11 +2,12 @@
  * Translations: one row per (namespace, key); a row opens onto its
  * languages. Loads after glyph.css. Every colour, size and radius is a token.
  *
- *   top bar   breadcrumb · search (⌘F)
- *   toolbar   languages · namespaces · filters · sort · details · ⓘ
- *             ……………………………………………………………… ↻ · New key · Fill N missing
- *   summary   10 keys · 3 of 30 translated
- *   list      › [ns] key ………………………… 1/3        (open: languages below)
+ *   top bar   Translations  96 of 183 translated · search (⌘F)
+ *   toolbar   [All 61 | Missing 51 | Low confidence 9] · sv · fr · fi ▾
+ *             …………………………………………………………… ⋯ · New key · Fill N missing
+ *   columns                                                sv   fr   fi
+ *   group     › auth  8 keys  2 low confidence             8/8  7/8  1/8
+ *   row         signIn   Sign in ……………………………………    ●    ●    ●
  */
 @layer components {
   /* ── Search in the top bar: a field holding an icon, the input and ⌘F ── */
@@ -38,13 +39,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
-  }
-  .tx-toolbar-group {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
+    margin-bottom: 10px;
   }
   .tx-toolbar-spacer {
     flex: 1 1 auto;
@@ -63,15 +58,21 @@
   .tx-toolbar .ui-button .ui-kbd {
     margin-right: -4px;
   }
-  /* The count of active filters, beside "Filters". */
-  .tx-filter-count {
-    color: var(--muted);
-    font-weight: 700;
+  .tx-toolbar .ui-tab-count {
+    margin-left: 4px;
   }
+  /* The summary rides in the top bar, after the page name. */
   .tx-summary {
-    margin-bottom: 12px;
+    margin-left: 10px;
     color: var(--faint);
-    font-size: var(--type-ui-small-size);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .app-top .app-crumb {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* ── Menus: popovers anchored under their toolbar button ── */
@@ -90,6 +91,10 @@
     max-height: 20rem;
     overflow-y: auto;
     padding: 4px;
+  }
+  .tx-menu-panel-end {
+    right: 0;
+    left: auto;
   }
   .tx-menu-item {
     display: flex;
@@ -126,39 +131,6 @@
     background: var(--line);
   }
 
-  /* The confidence legend: wider, prose, not a list of options. */
-  .tx-legend-panel {
-    gap: 8px;
-    width: 22rem;
-    max-width: calc(100vw - 2rem);
-    max-height: none;
-    padding: 12px;
-    cursor: default;
-  }
-  .tx-legend-title {
-    font-weight: 700;
-  }
-  .tx-legend-desc {
-    color: var(--muted);
-    font-size: var(--type-ui-small-size);
-  }
-  .tx-legend-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .tx-legend-list li {
-    display: grid;
-    grid-template-columns: 5rem 1fr;
-    gap: 10px;
-    align-items: start;
-    color: var(--muted);
-    font-size: var(--type-ui-small-size);
-  }
-  .tx-legend-list .ui-status {
-    justify-self: start;
-  }
-
   /* ── Virtual list: absolute rows inside a sized #keysList ── */
   #keysList[data-virtual="true"] {
     contain: strict;
@@ -179,13 +151,112 @@
     --field-hover: var(--panel);
     background: var(--surface);
   }
+  /*
+   * Groups, rows and the column labels share one grid, so every language's
+   * dot sits under its code: caret · key · source text · actions · one
+   * column per language (--lang-count, set by the script).
+   */
+  .tx-cols,
+  .tx-group,
   .key-head {
     display: grid;
-    grid-template-columns: 16px auto minmax(0, 1fr) auto;
-    gap: 10px;
+    grid-template-columns: 16px minmax(0, 2fr) minmax(0, 3fr) auto repeat(var(--lang-count, 1), 2.75rem);
+    column-gap: 10px;
     align-items: center;
-    min-height: 36px;
-    padding: 4px 8px;
+    padding: 0 8px;
+  }
+  .tx-cols {
+    position: sticky;
+    top: 48px;
+    z-index: 5;
+    height: 24px;
+    background: var(--panel);
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: var(--type-ui-small-size);
+  }
+  .tx-col {
+    text-align: center;
+  }
+
+  /* ── Group: one line per namespace, its progress per language ── */
+  .tx-group {
+    min-height: 34px;
+    margin-top: 6px;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
+    cursor: pointer;
+    user-select: none;
+  }
+  .tx-group:hover {
+    background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
+  }
+  .tx-group:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .tx-group[data-open="true"] .key-caret {
+    transform: rotate(90deg);
+  }
+  .tx-group-title {
+    display: flex;
+    grid-column: span 3;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+  }
+  .tx-group-name {
+    font-weight: 700;
+  }
+  .tx-group-meta {
+    color: var(--muted);
+    font-size: var(--type-ui-small-size);
+  }
+  .tx-group-low {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--status-warn-ink);
+    font-size: var(--type-ui-small-size);
+  }
+  .tx-group-low::before {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--warn);
+    content: "";
+  }
+  .tx-group-count {
+    color: var(--fg);
+    font-size: var(--type-ui-small-size);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  .tx-group-count.is-done {
+    color: var(--faint);
+  }
+  #keysList[data-virtual="true"] .tx-group {
+    margin-top: 0;
+  }
+
+  /* ── Dot: done, missing (a ring) or low confidence ── */
+  .tx-dot {
+    justify-self: center;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--fg) 30%, transparent);
+  }
+  .tx-dot[data-state="missing"] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--fg);
+  }
+  .tx-dot[data-state="low"] {
+    background: var(--warn);
+  }
+
+  .key-head {
+    min-height: 32px;
     border-radius: var(--radius-md);
     cursor: pointer;
     user-select: none;
@@ -201,32 +272,29 @@
   .key-card[data-expanded="true"] .key-caret {
     transform: rotate(90deg);
   }
-  .key-ns-tag {
-    padding: 1px 8px;
-  }
-  .key-name-wrap {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-  }
   .key-name {
     min-width: 0;
-    overflow-wrap: anywhere;
+    overflow: hidden;
     font-family: var(--font-mono);
     font-size: var(--type-ui-code-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .key-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .key-progress-label {
-    min-width: 2.5rem;
+  .key-source {
+    min-width: 0;
+    overflow: hidden;
     color: var(--muted);
     font-size: var(--type-ui-small-size);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .key-source.is-missing {
+    color: var(--faint);
+    font-style: italic;
+  }
+  .key-actions {
+    display: flex;
+    gap: 2px;
   }
   /* Copy and delete stay quiet until the row is hovered, focused or open. */
   .key-copy-btn,
@@ -255,6 +323,7 @@
   /* ── Open row: the translator note, then one row per language ── */
   .key-body {
     padding: 4px 8px 12px 34px;
+    cursor: default;
   }
   .key-context-panel {
     margin-bottom: 10px;
@@ -366,6 +435,16 @@
   }
 
   @media (max-width: 760px) {
+    /* Phone: the source text gives way to the key and the dots. */
+    .tx-cols,
+    .tx-group,
+    .key-head {
+      grid-template-columns: 16px minmax(0, 1fr) 0 auto repeat(var(--lang-count, 1), 2rem);
+      column-gap: 6px;
+    }
+    .key-source {
+      visibility: hidden;
+    }
     .key-body {
       padding-left: 8px;
     }

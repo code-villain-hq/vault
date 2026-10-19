@@ -24,7 +24,7 @@
 
         <div class="app-main">
             <header class="app-top">
-                <h1 class="app-crumb"><span class="app-crumb-current">Translations</span></h1>
+                <h1 class="app-crumb"><span class="app-crumb-current">Translations</span><span id="transSummary" class="tx-summary"></span></h1>
                 <label class="tx-search ui-field">
                     <span data-icon="search"></span>
                     <input type="text" id="searchInput" placeholder="Search keys and text" aria-label="Search keys and text">
@@ -34,106 +34,44 @@
 
             <main class="app-content">
                 <div id="transToolbar" class="tx-toolbar">
-                    <div class="tx-toolbar-group">
-                        <div class="tx-menu" data-menu="langs">
-                            <button class="ui-button" data-menu-toggle="langs" aria-haspopup="true" aria-expanded="false">
-                                <span id="langsBtnLabel">All languages</span>
-                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
-                            </button>
-                            <div class="tx-menu-panel ui-menu hidden" id="langsMenuPanel" role="menu"></div>
-                        </div>
+                    <div class="ui-segmented" role="group" aria-label="Show">
+                        <button class="ui-segment" data-show="all" aria-pressed="true">All <span class="ui-tab-count" data-count="all"></span></button>
+                        <button class="ui-segment" data-show="missing" aria-pressed="false">Missing <span class="ui-tab-count" data-count="missing"></span></button>
+                        <button class="ui-segment" data-show="low" aria-pressed="false" title="Translations the model rated below the pair's review threshold">Low confidence <span class="ui-tab-count" data-count="low"></span></button>
+                    </div>
 
-                        <div class="tx-menu" data-menu="ns">
-                            <button class="ui-button" data-menu-toggle="ns" aria-haspopup="true" aria-expanded="false">
-                                <span id="nsBtnLabel">All namespaces</span>
-                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
-                            </button>
-                            <div class="tx-menu-panel ui-menu hidden" id="nsMenuPanel" role="menu"></div>
-                        </div>
-
-                        <div class="tx-menu" data-menu="filters">
-                            <button class="ui-button" data-menu-toggle="filters" aria-haspopup="true" aria-expanded="false">
-                                <span>Filters</span>
-                                <span id="filtersBadge" class="tx-filter-count hidden">0</span>
-                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
-                            </button>
-                            <div class="tx-menu-panel ui-menu hidden" id="filtersMenuPanel">
-                                <label class="tx-menu-item ui-option">
-                                    <input type="checkbox" id="filterMissing">
-                                    <span>Only keys with missing</span>
-                                </label>
-                                <label class="tx-menu-item ui-option">
-                                    <input type="checkbox" id="filterIssues">
-                                    <span>Only keys with issues (low confidence)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="tx-menu" data-menu="sort">
-                            <button class="ui-button" data-menu-toggle="sort" aria-haspopup="true" aria-expanded="false">
-                                <span id="sortBtnLabel">Alphabetically</span>
-                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
-                            </button>
-                            <div class="tx-menu-panel ui-menu hidden" id="sortMenuPanel" role="menu">
-                                <button class="tx-menu-item ui-option" data-sort="alpha">Alphabetically</button>
-                                <button class="tx-menu-item ui-option" data-sort="missing">Missing first</button>
-                                <button class="tx-menu-item ui-option" data-sort="issues">Issues first</button>
-                            </div>
-                        </div>
-
-                        <button class="ui-button" id="detailsToggleBtn" aria-pressed="false" title="Show translator and date on every row">Details</button>
-
-                        <div class="tx-menu" data-menu="legend">
-                            <button class="ui-button ui-icon-button" data-menu-toggle="legend" title="What do the confidence percentages mean?" aria-label="Confidence legend" aria-expanded="false">
-                                <span data-icon="info"></span>
-                            </button>
-                            <div class="tx-menu-panel tx-legend-panel ui-menu hidden" id="legendMenuPanel" role="dialog" aria-label="Confidence legend">
-                                <p class="tx-legend-title">Confidence</p>
-                                <p class="tx-legend-desc">
-                                    The pill beside each language (e.g.&nbsp;<strong>95%</strong>) is the
-                                    <strong>model's own confidence</strong> in its translation, not an
-                                    independent quality check. Its colour compares the score with the pair's
-                                    review threshold (Settings → Language pairs).
-                                </p>
-                                <ul class="tx-legend-list">
-                                    <li>
-                                        <span class="ui-status ui-status-ok">≥ thr</span>
-                                        <span>At or above the review threshold: the model is confident.</span>
-                                    </li>
-                                    <li>
-                                        <span class="ui-status ui-status-warn">50–thr</span>
-                                        <span>Below the threshold but plausible: flagged for review.</span>
-                                    </li>
-                                    <li>
-                                        <span class="ui-status ui-status-danger">&lt; 50%</span>
-                                        <span>The model thinks this is likely wrong: review it.</span>
-                                    </li>
-                                    <li>
-                                        <span class="ui-status ui-status-info">human</span>
-                                        <span>Edited or reviewed by a person: no automatic score.</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
+                    <div class="tx-menu" data-menu="langs">
+                        <button class="ui-button" data-menu-toggle="langs" aria-haspopup="true" aria-expanded="false">
+                            <span id="langsBtnLabel">All languages</span>
+                            <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
+                        </button>
+                        <div class="tx-menu-panel ui-menu hidden" id="langsMenuPanel" role="menu"></div>
                     </div>
 
                     <div class="tx-toolbar-spacer"></div>
 
-                    <div class="tx-toolbar-group">
-                        <button class="ui-button ui-icon-button" id="refreshBtn" title="Reload translations" aria-label="Reload translations">
-                            <span data-icon="refresh"></span>
+                    <div class="tx-menu" data-menu="ns">
+                        <button class="ui-button ui-icon-button" data-menu-toggle="ns" title="Namespaces" aria-label="Namespaces" aria-haspopup="true" aria-expanded="false">
+                            <span data-icon="more"></span>
                         </button>
-                        <button id="newKeyBtn" class="ui-button" title="Add a new translation key. New namespaces start from the namespace menu.">
-                            <span data-icon="plus"></span>
-                            <span>New key</span>
-                            <kbd class="ui-kbd">⌘N</kbd>
-                        </button>
-                        <button id="fillAllMissingBtn" class="ui-button ui-button-primary" title="Auto-translate every missing cell in the current view">Fill missing</button>
+                        <div class="tx-menu-panel tx-menu-panel-end ui-menu hidden" id="nsMenuPanel" role="menu">
+                            <button class="tx-menu-item ui-option" role="menuitem" data-ns-action="new">
+                                <span data-icon="plus"></span><span>New namespace…</span>
+                            </button>
+                            <button class="tx-menu-item ui-option" role="menuitem" data-ns-action="manage">
+                                <span data-icon="settings"></span><span>Manage namespaces…</span>
+                            </button>
+                        </div>
                     </div>
+                    <button id="newKeyBtn" class="ui-button" title="Add a new translation key">
+                        <span data-icon="plus" data-icon-class="icon-sm"></span>
+                        New key
+                        <kbd class="ui-kbd">⌘N</kbd>
+                    </button>
+                    <button id="fillAllMissingBtn" class="ui-button ui-button-primary" title="Auto-translate every missing cell in the current view">Fill missing</button>
                 </div>
 
-                <p id="transSummary" class="tx-summary"></p>
-
+                <div id="keysCols" class="tx-cols" aria-hidden="true"></div>
                 <div id="keysList" class="list"></div>
                 <div id="keysEmpty" class="empty hidden">No translations to show.</div>
             </main>
