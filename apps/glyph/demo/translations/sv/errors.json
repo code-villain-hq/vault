@@ -1,0 +1,6 @@
+{
+  "notFound": "Sidan finns inte.",
+  "serverError": "Något gick fel på servern.",
+  "permissionDenied": "Bara överherren kan göra det.",
+  "rateLimited": "För många förfrågningar. Även skurkar måste vänta {{seconds}} sekunder."
+}

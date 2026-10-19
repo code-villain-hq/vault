@@ -1,0 +1,13 @@
+{
+  "common:save": "Speichern",
+  "common:cancel": "Abbrechen",
+  "common:delete": "Löschen",
+  "lair:title": "Unterschlupf",
+  "lair:doomsdayClock": "Weltuntergangsuhr: noch {{minutes}} Minuten bis Mitternacht",
+  "minions:title": "Handlanger",
+  "minions:minionCount_one": "{{count}} Handlanger",
+  "minions:minionCount_other": "{{count}} Handlanger",
+  "schemes:foiledBy": "Vereitelt von {{hero}}. Schon wieder.",
+  "errors:permissionDenied": "Nur der Oberschurke darf das.",
+  "welcomeBanner": "Willkommen im Hauptquartier"
+}

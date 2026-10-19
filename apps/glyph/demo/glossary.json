@@ -1,0 +1,77 @@
+[
+  {
+    "source_lang": "en",
+    "target_lang": "sv",
+    "source_term": "minion",
+    "target_term": "hantlangare",
+    "target_variants": [],
+    "note": "Never 'slav' or 'tjänare'."
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "sv",
+    "source_term": "lair",
+    "target_term": "näste",
+    "target_variants": [
+      "nästet"
+    ],
+    "note": "The villain's base. Not 'håla'."
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "sv",
+    "source_term": "scheme",
+    "target_term": "komplott",
+    "target_variants": [
+      "komplotter",
+      "komplotten"
+    ],
+    "note": ""
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "sv",
+    "source_term": "overlord",
+    "target_term": "överherre",
+    "target_variants": [
+      "överherren"
+    ],
+    "note": "Plan name and title."
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "fr",
+    "source_term": "minion",
+    "target_term": "sbire",
+    "target_variants": [
+      "sbires"
+    ],
+    "note": ""
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "fr",
+    "source_term": "lair",
+    "target_term": "repaire",
+    "target_variants": [],
+    "note": ""
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "fr",
+    "source_term": "scheme",
+    "target_term": "complot",
+    "target_variants": [
+      "complots"
+    ],
+    "note": "Not 'plan'."
+  },
+  {
+    "source_lang": "en",
+    "target_lang": "fr",
+    "source_term": "overlord",
+    "target_term": "suzerain",
+    "target_variants": [],
+    "note": "Capitalise as a plan name."
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "invoiceDueSoon": "Your invoice is due in {{days}} days",
+  "payNow": "Pay now",
+  "downloadReceipt": "Download receipt",
+  "plan_free": "Free",
+  "plan_overlord": "Overlord",
+  "taxNote": "Prices exclude VAT. Doomsday devices are taxed separately."
+}

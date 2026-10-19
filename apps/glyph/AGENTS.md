@@ -200,8 +200,8 @@ The Glossary editor exposes a **"Find variants"** button above the chip input in
 ### First Run
 ```bash
 make setup
-make seed-demo     # optional: reset DB + use committed demo namespaces
-make run
+make seed-demo     # optional: reset DB + load the fake demo data (an existing translations/ is moved aside)
+make run           # then, in another terminal: make seed-glossary
 # Visit http://localhost:3000
 ```
 

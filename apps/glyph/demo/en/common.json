@@ -1,9 +1,0 @@
-{
-  "save": "Save",
-  "cancel": "Cancel",
-  "delete": "Delete",
-  "search": "Search",
-  "loading": "Loading…",
-  "welcome": "Welcome back, {{name}}",
-  "itemsSelected": "{{count}} items selected"
-}

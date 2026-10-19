@@ -1,0 +1,10 @@
+{
+  "title": "Hantlangare",
+  "hire": "Anställ",
+  "fire": "Avskeda",
+  "rank": "Rang",
+  "salary": "Lön",
+  "minionCount_one": "{{count}} hantlangare",
+  "minionCount_other": "{{count}} hantlangare",
+  "promoteConfirm": "Befordra <b>{{name}}</b> till hejduk?"
+}

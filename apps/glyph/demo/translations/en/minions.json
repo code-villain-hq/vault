@@ -1,0 +1,11 @@
+{
+  "title": "Minions",
+  "hire": "Hire",
+  "fire": "Fire",
+  "rank": "Rank",
+  "salary": "Salary",
+  "minionCount_one": "{{count}} minion",
+  "minionCount_other": "{{count}} minions",
+  "promoteConfirm": "Promote <b>{{name}}</b> to henchman?",
+  "loyaltyLow": "Loyalty is low. Consider a pizza party."
+}

@@ -1,0 +1,12 @@
+{
+  "title": "Lair",
+  "subtitle": "Your base of operations",
+  "activeSchemes": "{{count}} active schemes",
+  "minionsOnDuty": "Minions on duty",
+  "alertLevel": "Alert level",
+  "doomsdayClock": "Doomsday clock: {{minutes}} minutes to midnight",
+  "lastBreach": "Last breach: {{date}}",
+  "welcomeTitle": "Welcome to the lair",
+  "emptyState": "No schemes yet. Every empire starts with a single evil plan.",
+  "volcanoStatus": "Volcano status: dormant"
+}
