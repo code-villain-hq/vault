@@ -1,0 +1,89 @@
+app:
+  port: 3000
+  translations_dir: ./translations
+  models_dir: ~/.glyph/models
+  # SQLite database file. This is the source of truth for translations,
+  # metadata and user-edited config (user_preferences, language_pairs).
+  # The translations/*.json files are still written on every change so they
+  # can be consumed by downstream i18n tooling.
+  db_path: ./glyph.db
+  # Binary the Settings page uses when you click "▶ Start" on an LLM entry.
+  # Must be on $PATH, or set to an absolute path. Leave commented to use the
+  # default `llama-server` from llama.cpp.
+  # llm_binary: llama-server
+
+user_preferences:
+  source_language: en
+  default_target_language: sv
+
+llm:
+  # Glyph talks to any OpenAI-compatible completion server.
+  # The recommended default is the Viking 7B v.4 model, a Nordic-languages
+  # specialist fine-tune that handles Swedish, Finnish, Danish, Norwegian
+  # and Icelandic well:
+  #
+  #   https://huggingface.co/mradermacher/Viking_7B_V.4-GGUF/resolve/main/Viking_7B_V.4.Q4_K_M.gguf
+  #
+  # `make model-viking` downloads it to ./models. Run it with:
+  #
+  #   llama-server -m ./models/Viking_7B_V.4.Q4_K_M.gguf -c 4096 --port 8080
+  #
+  # and keep the endpoint below in sync with --port.
+  models:
+    # Nordic specialist — best for sv/fi/da/no/is.
+    - name: viking
+      endpoint: http://localhost:8080
+      model: viking-7b-v4
+      # chat_mode defaults to true (uses /v1/chat/completions). This works
+      # for all models on llama-server. Set to false only if your server
+      # doesn't support the chat endpoint.
+      # chat_mode: false
+      # Optional: absolute or relative path to the GGUF file. When set, the
+      # Settings UI can start/stop this server for you (via `llm_binary`).
+      # Without it you can still use the server if you launched it yourself.
+      model_path: ./models/Viking_7B_V.4.Q4_K_M.gguf
+      # Optional extra args appended after `-m <path> --port <port>`, useful
+      # for tuning context size or GPU offload when the UI starts the server.
+      # extra_args: ["-c", "4096"]
+    # Hugging Face GGUF download (no local model_path). Settings ▶ Start runs:
+    #   llama-server --hf-repo … --hf-file … --port <from endpoint> …extra_args
+    # - name: eurollm-9b
+    #   endpoint: http://localhost:8081
+    #   model: EuroLLM-9B-Instruct
+    #   hf_repo: bartowski/EuroLLM-9B-Instruct-GGUF
+    #   hf_file: EuroLLM-9B-Instruct-IQ3_XS.gguf
+    #   extra_args: ["-ngl", "99", "-c", "8192"]
+    #   Avoid --flash-attn/--cache-type-kv q8_0 on Apple Metal unless your build supports it.
+    # General-purpose fallback — anything llama.cpp-compatible will do. Run e.g.
+    # `llama-server -m ./models/mistral-7b-instruct.Q4_K_M.gguf --port 8081`.
+    - name: mistral
+      endpoint: http://localhost:8081
+      model: mistral-7b-instruct
+      # model_path: ./models/mistral-7b-instruct.Q4_K_M.gguf
+
+# language_pairs is keyed by "{source}_{target}". Each entry picks:
+#   - model:                which llm.models[].name to use for this direction
+#   - temperature:          0.0–2.0, lower = more deterministic (0.2 is a
+#                           good default for translation; bump to 0.5+ if the
+#                           output feels too stiff)
+#   - confidence_threshold: below this, the translation is flagged in
+#                           /ui/missing.html for human review.
+# Both directions are independent, so you can e.g. use Viking for en→sv but
+# Mistral for sv→en.
+language_pairs:
+  en_sv:
+    model: viking
+    temperature: 0.2
+    confidence_threshold: 0.7
+  sv_en:
+    model: viking
+    temperature: 0.3
+    confidence_threshold: 0.7
+  en_fi:
+    model: viking
+    temperature: 0.2
+    confidence_threshold: 0.7
+  en_fr:
+    model: mistral
+    temperature: 0.3
+    confidence_threshold: 0.7

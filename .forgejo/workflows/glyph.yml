@@ -1,0 +1,20 @@
+# Glyph's tests and build on every push that touches it.
+name: glyph
+
+on:
+  push:
+    paths:
+      - "apps/glyph/**"
+      - ".forgejo/workflows/glyph.yml"
+
+jobs:
+  build:
+    runs-on: macos
+    defaults:
+      run:
+        working-directory: apps/glyph/backend
+    steps:
+      - uses: actions/checkout@v4
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build -o ../glyph .

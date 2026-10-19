@@ -3,7 +3,7 @@
 The vault holds the whole studio. Apps are one part of it.
 
 - `brand/`: decisions about look and voice. Change these when the feeling should change. A new palette or a new tone starts here.
-- `design/`: principles, tokens, and reference layouts taken from `brand/`. Apps implement them in their own toolkit. Caster is AppKit; Forge, Layer, and the site are web; the Code Villain theme (`apps/theme`) dresses VS Code, Cursor, Neovim and WezTerm; Schemer is in planning. They share the decisions. Read `design/principles.md` before any UI change, in any app.
+- `design/`: principles, tokens, and reference layouts taken from `brand/`. Apps implement them in their own toolkit. Caster is AppKit; Forge, Layer, Glyph and the site are web; the Code Villain theme (`apps/theme`) dresses VS Code, Cursor, Neovim and WezTerm. They share the decisions. Read `design/principles.md` before any UI change, in any app.
 - `content/`: blog posts and social posts. The site renders the blog. The posts live in `content/blog`.
 - `apps/<app>/`: one product. Read `apps/<app>/AGENTS.md` before working there, and run commands from that folder.
 
