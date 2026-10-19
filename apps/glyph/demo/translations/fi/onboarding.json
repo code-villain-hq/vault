@@ -1,0 +1,15 @@
+{
+  "welcomeTitle": "Tervetuloa uuteen piilopaikkaasi",
+  "lairNameLabel": "Piilopaikan nimi",
+  "lairNameHelp": "Apurit näkevät tämän nimen jokaisessa muistiossa. Valitse jotain, jonka he osaavat kirjoittaa.",
+  "choosePersona": "Valitse konnahahmosi",
+  "personaMastermind": "Aivot: suunnittelee kaiken, ei osallistu mihinkään",
+  "personaTinkerer": "Näpertelijä: rakentaa vempaimia, ei välitä aikatauluista",
+  "inviteMinionTitle": "Kutsu ensimmäinen apurisi",
+  "minionEmailLabel": "Apurin sähköpostiosoite",
+  "minionsInvited_one": "{{count}} apuri kutsuttu",
+  "minionsInvited_other": "{{count}} apuria kutsuttu",
+  "nemesisHint": "Arkkivihollisesi on se sankari, joka ilmestyy aina, kun juoni on onnistumassa. Kun valitset hänet nyt, voimme varoittaa sinua ennen hänen saapumistaan, mikä on enemmän kuin useimmat konnat saavat.",
+  "skip": "Ohita toistaiseksi",
+  "tour.legacyMap": "Tunnelikartta on siirretty Asetuksiin."
+}

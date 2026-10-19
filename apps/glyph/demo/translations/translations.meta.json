@@ -13,6 +13,24 @@
           "translated_by": "human",
           "timestamp": "2026-10-12T09:30:00Z",
           "context": "Shown when there are no schemes. Playful, one sentence."
+        },
+        "selfDestruct.confirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T11:04:00Z",
+          "context": "Destructive confirm dialog. {{minutes}} is the countdown length."
+        },
+        "camerasPrivacyNote": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T16:22:00Z",
+          "context": "{{days}} is the retention period. Joke: the minions have a union."
+        },
+        "heroInLair": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T17:04:00Z",
+          "context": "Toast. {{hero}} is the hero's name; keep the <b> tags around it."
         }
       },
       "minions": {
@@ -21,6 +39,18 @@
           "translated_by": "human",
           "timestamp": "2026-10-12T09:30:00Z",
           "context": "Confirm dialog. Keep the <b> tags around the name."
+        },
+        "trainingOverdue": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T09:25:00Z",
+          "context": "{{name}} is the minion's name."
+        },
+        "reviewSaved": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T17:54:00Z",
+          "context": "Toast. {{name}} is the minion's name. Dry joke: they were told it went well."
         }
       },
       "schemes": {
@@ -29,6 +59,346 @@
           "translated_by": "human",
           "timestamp": "2026-10-12T09:30:00Z",
           "context": "{{hero}} is a superhero's name. Weary tone."
+        },
+        "riskHint": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T15:58:00Z",
+          "context": "Tooltip on the risk level field. {{distance}} is a number."
+        },
+        "approvalsHelp": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T15:40:00Z",
+          "context": "Help text under the approval section. {{amount}} is a formatted currency amount."
+        },
+        "approvalRejected": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T11:14:00Z",
+          "context": "Joke: the boss rejected the scheme as unoriginal."
+        }
+      },
+      "common": {
+        "unsavedChanges.body": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T12:45:00Z",
+          "context": "Confirm dialog when leaving an edited form. The sidekick line is a joke; keep the dry tone."
+        },
+        "pagination.pageOf": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T09:17:00Z",
+          "context": "Table footer. {{page}} is the current page number, {{total}} the number of pages."
+        },
+        "itemArchived": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T17:50:00Z",
+          "context": "Toast after archiving. {{name}} is the name of a scheme, device or lair."
+        }
+      },
+      "auth": {
+        "twoFactor.prompt": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T17:03:00Z",
+          "context": "Shown above the code input. The 'evil' authenticator is a joke; keep it short."
+        },
+        "magicLinkSent": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T12:27:00Z",
+          "context": "{{minutes}} is always 15 or more, so the plural form is safe."
+        },
+        "inviteTitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T12:54:00Z",
+          "context": "{{name}} is the inviting person, {{lair}} the workspace (lair) name."
+        },
+        "signUpTerms": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T09:57:00Z",
+          "context": "Below the sign-up button. Keep the <a> tags around the terms link text."
+        }
+      },
+      "errors": {
+        "fileTooLarge": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T11:55:00Z",
+          "context": "{{file}} is the file name, {{size}} a whole number of megabytes."
+        },
+        "deathRayCooldown": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T09:17:00Z",
+          "context": "Shown when firing is rate-limited. {{minutes}} is always 2 or more."
+        },
+        "maintenanceBody": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T14:29:00Z",
+          "context": "Full-page maintenance notice. {{time}} is a clock time like 14:00, {{timezone}} its abbreviation."
+        }
+      },
+      "settings": {
+        "timeZoneHint": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T15:23:00Z",
+          "context": "{{city}} is a city from the time zone list, {{time}} a clock time like 14:05."
+        },
+        "apiKeyShownOnce": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T16:10:00Z",
+          "context": "Shown once after creating an API key, above the copy button. The key itself is not part of this string."
+        },
+        "deleteLairConfirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T10:04:00Z",
+          "context": "Confirm dialog. Keep the <b> tags around the lair name."
+        }
+      },
+      "billing": {
+        "seatsHenchmanNote": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T16:23:00Z",
+          "context": "Joke: only henchmen are billed per seat, minions are not."
+        },
+        "cardEnding": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T17:52:00Z",
+          "context": "{{last4}} is the last four digits of the saved card."
+        },
+        "ransomPending": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T10:48:00Z",
+          "context": "{{city}} is the city paying the ransom; {{amount}} is already formatted with its currency."
+        }
+      },
+      "weather-machine": {
+        "makeItRain": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T10:33:00Z",
+          "context": "Main action button. {{city}} is the target city's name."
+        },
+        "sunshineWarning": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T16:38:00Z",
+          "context": "Joke: good weather is bad news for a villain."
+        }
+      },
+      "legal": {
+        "privacyNotice": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T10:37:00Z",
+          "context": "<a> links to the full privacy notice; keep the tags around the link text."
+        },
+        "deviceDisclaimer": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T16:26:00Z",
+          "context": "{{device}} is the name of a doomsday device, e.g. a death ray model."
+        }
+      },
+      "gadgets": {
+        "hideHeroSafe": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T08:36:00Z",
+          "context": "Checkbox in the catalogue filters. Hero-safe means the gadget cannot harm a hero; most villains filter these out."
+        },
+        "gadget.deathRay.description": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T17:12:00Z",
+          "context": "Joke: villains always monologue before firing. Keep it deadpan."
+        },
+        "gadget.doomsdayStarter.description": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T15:35:00Z",
+          "context": "Overlord is the name of the top paid plan."
+        },
+        "borrowedToast": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T10:57:00Z",
+          "context": "Toast after borrowing. {{device}} is the gadget name, e.g. Freeze Ray Mk II."
+        },
+        "upgradeForDoomsday": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T14:50:00Z",
+          "context": "The <a> tag links to the billing page. Overlord is the plan name."
+        },
+        "specs.heroResistance": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T11:09:00Z",
+          "context": "How well heroes usually resist this gadget. Lower is better for the villain."
+        },
+        "warranty.voidHeroes": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T08:18:00Z",
+          "context": "Joke: the whole point of the gadget is to be used against heroes. Keep the dry, small-print tone."
+        },
+        "recall.acknowledge": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T15:16:00Z",
+          "context": "Button confirming the user read the recall notice. Plays on 'step slowly away' in the notice text."
+        },
+        "shrinkRayUndo": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T16:51:00Z",
+          "context": "Help text under the shrink ray's fire button. {{minutes}} is a number, usually 5."
+        },
+        "cancelOrderConfirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T16:54:00Z",
+          "context": "Confirm dialog. {{device}} is the gadget name. 'The grudge' is a joke; keep it short."
+        },
+        "reviewRating": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T13:10:00Z",
+          "context": "Rating shown on reviews. Skulls replace stars. {{amount}} can be a decimal like 4.5."
+        },
+        "sampleReview": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T16:33:00Z",
+          "context": "Sample minion review shown on the freeze ray page."
+        }
+      },
+      "henchmen": {
+        "profile.lastSeen": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T08:35:00Z",
+          "context": "{{city}} is an invented city name, such as Gravenport."
+        },
+        "contractDentalPlan": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T09:36:00Z",
+          "context": "Contract perk in a checklist. A joke; keep the aside in brackets."
+        },
+        "assignSuccess": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T11:53:00Z",
+          "context": "Toast. {{name}} is the henchman, {{scheme}} the scheme title."
+        }
+      },
+      "heists": {
+        "target.museum": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T14:52:00Z",
+          "context": "Gravenport is an invented city. Keep the name, translate the rest."
+        },
+        "vault.sentientDoor": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T11:27:00Z",
+          "context": "Vault type. The door is alive and can be bribed; a joke."
+        },
+        "heistFoiled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T16:49:00Z",
+          "context": "Toast. {{hero}} is a hero's name, {{target}} a building such as the Grand Museum of Gravenport."
+        }
+      },
+      "inbox": {
+        "ransomDemand": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T14:17:00Z",
+          "context": "Button in the ransom note composer. {{amount}} is a formatted sum, {{date}} the deadline."
+        },
+        "heroTauntReceived": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T12:26:00Z",
+          "context": "Notification preview. {{hero}} is the sender; keep the <b> tags around the quote. The cliché is on purpose."
+        }
+      },
+      "onboarding": {
+        "progress": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T11:41:00Z",
+          "context": "Wizard progress indicator above the step title. {{step}} is the current step number, {{total}} the number of steps."
+        },
+        "inviteMinion.help": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T16:17:00Z",
+          "context": "{{email}} is the invitee's address, {{lair}} the lair name chosen in step 1."
+        },
+        "nemesisSelected": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T14:48:00Z",
+          "context": "{{hero}} is a hero's name. The joke: we are not sure the hero got the message."
+        }
+      },
+      "reports": {
+        "subtitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T13:04:00Z",
+          "context": "{{month}} is a localised month and year, e.g. March 2026."
+        },
+        "ransomTotal": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T14:07:00Z",
+          "context": "{{amount}} is a formatted sum of money; {{change}} is a signed percentage such as +12 %."
+        },
+        "quarterlySummary": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T16:43:00Z",
+          "context": "Generated summary paragraph at the top of the quarterly review. Dry, managerial tone."
+        }
+      },
+      "notifications": {
+        "heroSpotted": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T17:59:00Z",
+          "context": "Toast title. {{hero}} is a hero's name, {{city}} a city name."
+        },
+        "digest.subjectWeekly": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T16:27:00Z",
+          "context": "Email subject line. {{count}} is the total number of schemes, {{foiled}} how many heroes stopped. Keep it under about 60 characters if you can."
+        },
+        "pushDisabled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T08:41:00Z",
+          "context": "The <a> link opens the browser's notification permission prompt."
         }
       }
     },
@@ -38,6 +408,121 @@
           "confidence": 0.55,
           "translated_by": "viking",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "table.columns.shift": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T14:23:00Z"
+        },
+        "table.columns.lastReview": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T08:49:00Z"
+        },
+        "shiftNight": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T09:25:00Z"
+        },
+        "shiftsUnassigned_one": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T14:23:00Z"
+        },
+        "shiftsUnassigned_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T11:23:00Z"
+        },
+        "trainingOverdue": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T17:50:00Z"
+        },
+        "uniformOrder": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T15:11:00Z"
+        },
+        "moraleHigh": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T08:03:00Z"
+        },
+        "moraleLow": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T17:46:00Z"
+        },
+        "pizzaBudget": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T10:48:00Z"
+        },
+        "pizzaBudgetRemaining": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T12:49:00Z"
+        },
+        "pizzaBudgetExceeded": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T10:06:00Z"
+        },
+        "reviewTitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T12:32:00Z"
+        },
+        "startReview": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T12:37:00Z"
+        },
+        "review.rating": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T12:25:00Z"
+        },
+        "reviewSaved": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T13:49:00Z"
+        },
+        "onboardTitle": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T14:27:00Z"
+        },
+        "onboarding.stepBadge": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T12:08:00Z"
+        },
+        "onboarding.stepOath": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T11:58:00Z"
+        },
+        "fireConfirm": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T08:11:00Z"
+        },
+        "selectedCount_one": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T14:05:00Z"
+        },
+        "legacyHelmetSize": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T11:44:00Z"
+        },
+        "oldCoffeeAllowance": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T09:18:00Z"
         }
       },
       "schemes": {
@@ -55,6 +540,116 @@
           "confidence": 0.91,
           "translated_by": "viking",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "editorTitle": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T12:55:00Z"
+        },
+        "editor.saveDraft": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T15:42:00Z"
+        },
+        "editor.unsavedChanges": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T08:49:00Z"
+        },
+        "steps.add": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T17:36:00Z"
+        },
+        "stepsEmpty": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T15:26:00Z"
+        },
+        "stepCount_one": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T15:39:00Z"
+        },
+        "phaseLabel": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T08:06:00Z"
+        },
+        "phase_getaway": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T17:06:00Z"
+        },
+        "riskLevel": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T15:24:00Z"
+        },
+        "risk_reckless": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T16:16:00Z"
+        },
+        "sightingToast": {
+          "confidence": 0.69,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T15:33:00Z"
+        },
+        "backupPlans.add": {
+          "confidence": 0.83,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T14:56:00Z"
+        },
+        "approvals.pending": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T16:11:00Z"
+        },
+        "approvalRejected": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T17:34:00Z"
+        },
+        "monologue.placeholder": {
+          "confidence": 0.43,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T14:11:00Z"
+        },
+        "timeline.today": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T14:00:00Z"
+        },
+        "status_completed": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T10:56:00Z"
+        },
+        "statusChanged": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T09:50:00Z"
+        },
+        "deleteConfirm": {
+          "confidence": 0.44,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T17:04:00Z"
+        },
+        "assignDevice": {
+          "confidence": 0.52,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T15:39:00Z"
+        },
+        "legacyEvilLaughTimer": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T08:01:00Z"
+        },
+        "legacyPublishToLairBoard": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T12:24:00Z"
         }
       },
       "billing": {
@@ -67,6 +662,121 @@
           "confidence": 0.88,
           "translated_by": "viking",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "seats.used": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T10:40:00Z"
+        },
+        "invoicesTitle": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T12:28:00Z"
+        },
+        "invoices.columns.issued": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T11:40:00Z"
+        },
+        "invoices.columns.amount": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T11:02:00Z"
+        },
+        "invoices.columns.status": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T08:21:00Z"
+        },
+        "invoiceStatus_overdue": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T12:37:00Z"
+        },
+        "invoicesEmpty": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T11:55:00Z"
+        },
+        "cardEnding": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T15:51:00Z"
+        },
+        "paymentMethod.goldBullion": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T10:50:00Z"
+        },
+        "updatePaymentMethod": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T08:14:00Z"
+        },
+        "paymentFailed": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T09:05:00Z"
+        },
+        "refundsUnavailable": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T11:47:00Z"
+        },
+        "requestRefund": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T14:08:00Z"
+        },
+        "refundPolicy": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T14:44:00Z"
+        },
+        "taxes.vat": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T08:15:00Z"
+        },
+        "lairDeduction": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T15:28:00Z"
+        },
+        "taxIdLabel": {
+          "confidence": 0.62,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T17:52:00Z"
+        },
+        "ransomPending": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T08:26:00Z"
+        },
+        "ransomCount_one": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T16:20:00Z"
+        },
+        "nextBillingDate": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T16:57:00Z"
+        },
+        "billingCycleAnnual": {
+          "confidence": 0.4,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T17:55:00Z"
+        },
+        "legacy_planMinionPlus": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T16:55:00Z"
+        },
+        "oldCouponApplied": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T15:35:00Z"
         }
       },
       "errors": {
@@ -74,6 +784,131 @@
           "confidence": 0.58,
           "translated_by": "viking",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "validation.required": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T14:31:00Z"
+        },
+        "validation.tooShort": {
+          "confidence": 0.55,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T11:30:00Z"
+        },
+        "validation.invalidEmail": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T12:24:00Z"
+        },
+        "validation.mustBeNumber": {
+          "confidence": 0.46,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T15:50:00Z"
+        },
+        "validation.dateInPast": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T10:33:00Z"
+        },
+        "fileTooLarge": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T09:33:00Z"
+        },
+        "uploadInterrupted": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T13:06:00Z"
+        },
+        "quotaReached": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T08:20:00Z"
+        },
+        "deviceQuota_other": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T15:34:00Z"
+        },
+        "storageFull": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T08:50:00Z"
+        },
+        "conflict": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T11:22:00Z"
+        },
+        "conflictHelp": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T09:52:00Z"
+        },
+        "timeout": {
+          "confidence": 0.98,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T14:42:00Z"
+        },
+        "maintenanceTitle": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T16:15:00Z"
+        },
+        "maintenanceBody": {
+          "confidence": 0.62,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T16:02:00Z"
+        },
+        "readOnlyMode": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T09:13:00Z"
+        },
+        "deviceOffline": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T08:34:00Z"
+        },
+        "heroDetected": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T13:28:00Z"
+        },
+        "featureUnavailable": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T08:15:00Z"
+        },
+        "tryAgain": {
+          "confidence": 0.4,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T10:13:00Z"
+        },
+        "errorCode": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T17:59:00Z"
+        },
+        "failedItems_other": {
+          "confidence": 0.97,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T09:15:00Z"
+        },
+        "offlineBanner": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T11:00:00Z"
+        },
+        "linkExpired": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T14:27:00Z"
+        },
+        "volcanoOverheated": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T17:10:00Z"
         }
       },
       "common": {
@@ -136,6 +971,1565 @@
           "confidence": 1.0,
           "translated_by": "human",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "duplicate": {
+          "confidence": 0.84,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T16:58:00Z"
+        },
+        "archive": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T14:56:00Z"
+        },
+        "copyLink": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T12:37:00Z"
+        },
+        "export": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T13:17:00Z"
+        },
+        "sort": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T16:50:00Z"
+        },
+        "selectedCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T16:52:00Z"
+        },
+        "unsavedChanges.keepEditing": {
+          "confidence": 0.98,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T17:34:00Z"
+        },
+        "pagination.pageOf": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T14:44:00Z"
+        },
+        "previousPage": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T12:24:00Z"
+        },
+        "rowsPerPage": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T12:56:00Z"
+        },
+        "justNow": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T11:17:00Z"
+        },
+        "time.minutesAgo_other": {
+          "confidence": 0.65,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T08:03:00Z"
+        },
+        "today": {
+          "confidence": 0.51,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T11:02:00Z"
+        },
+        "yesterday": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T17:11:00Z"
+        },
+        "moreActions": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T12:33:00Z"
+        },
+        "showMore": {
+          "confidence": 0.56,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T11:09:00Z"
+        },
+        "showLess": {
+          "confidence": 0.45,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T15:23:00Z"
+        },
+        "sortBy": {
+          "confidence": 0.79,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T08:21:00Z"
+        },
+        "optional": {
+          "confidence": 0.68,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T12:47:00Z"
+        },
+        "savingEllipsis": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T10:49:00Z"
+        },
+        "undo": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T11:36:00Z"
+        },
+        "learnMore": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T15:45:00Z"
+        },
+        "comingSoon": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T16:07:00Z"
+        },
+        "legacyConfirmDoom": {
+          "confidence": 0.64,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T13:24:00Z"
+        },
+        "oldToolbar.print": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T16:36:00Z"
+        }
+      },
+      "auth": {
+        "signUp": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T16:31:00Z"
+        },
+        "alreadyHaveAccount": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T12:51:00Z"
+        },
+        "twoFactor.title": {
+          "confidence": 0.57,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T16:11:00Z"
+        },
+        "twoFactor.prompt": {
+          "confidence": 0.43,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T08:31:00Z"
+        },
+        "twoFactor.codeLabel": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T13:24:00Z"
+        },
+        "twoFactor.invalidCode": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T10:22:00Z"
+        },
+        "twoFactor.backupCodesLeft_one": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T09:43:00Z"
+        },
+        "resetPasswordTitle": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T17:54:00Z"
+        },
+        "resetPasswordHelp": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T15:04:00Z"
+        },
+        "newPassword": {
+          "confidence": 0.47,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T16:03:00Z"
+        },
+        "accountLocked": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T16:42:00Z"
+        },
+        "signUpTerms": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T13:11:00Z"
+        },
+        "inviteExpired": {
+          "confidence": 0.63,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T13:13:00Z"
+        },
+        "securityQuestionFirstLair": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T14:27:00Z"
+        },
+        "securityQuestionPet": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T13:58:00Z"
+        }
+      },
+      "gadgets": {
+        "catalogue.subtitle": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T17:14:00Z"
+        },
+        "catalogue.helpText": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T13:11:00Z"
+        },
+        "inStockOnly": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T11:09:00Z"
+        },
+        "hideHeroSafe": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T11:11:00Z"
+        },
+        "clearFilters": {
+          "confidence": 0.59,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T11:58:00Z"
+        },
+        "sortBy": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T17:14:00Z"
+        },
+        "sortBlastRadius": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T17:19:00Z"
+        },
+        "emptyCatalogueTitle": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T10:24:00Z"
+        },
+        "emptyCatalogueBody": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T09:16:00Z"
+        },
+        "resultCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T12:44:00Z"
+        },
+        "category.all": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T15:53:00Z"
+        },
+        "category.lasers": {
+          "confidence": 0.48,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T14:43:00Z"
+        },
+        "category.freezeRays": {
+          "confidence": 0.82,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T14:12:00Z"
+        },
+        "category.shrinkRays": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T13:14:00Z"
+        },
+        "category.jetpacks": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T11:48:00Z"
+        },
+        "category.mindControlHats": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T09:35:00Z"
+        },
+        "category.doomsdayDevices": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T08:23:00Z"
+        },
+        "gadget.freezeRay.name": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T10:52:00Z"
+        },
+        "gadget.freezeRay.description": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T12:55:00Z"
+        },
+        "gadget.shrinkRay.description": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T11:01:00Z"
+        },
+        "gadget.deathRay.name": {
+          "confidence": 0.84,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T17:00:00Z"
+        },
+        "gadget.jetpack.name": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T14:28:00Z"
+        },
+        "gadget.robotShark.name": {
+          "confidence": 0.82,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T09:44:00Z"
+        },
+        "gadget.robotShark.description": {
+          "confidence": 0.61,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T17:15:00Z"
+        },
+        "gadget.explodingPen.name": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T10:57:00Z"
+        },
+        "gadget.grapplingHook.name": {
+          "confidence": 0.4,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T13:22:00Z"
+        },
+        "gadget.grapplingHook.description": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T15:58:00Z"
+        },
+        "gadget.moonMagnet.description": {
+          "confidence": 0.46,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T10:22:00Z"
+        },
+        "tabReviews": {
+          "confidence": 0.45,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T08:26:00Z"
+        },
+        "removeFromArsenal": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T14:15:00Z"
+        },
+        "backToCatalogue": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T12:30:00Z"
+        },
+        "borrowedToast": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T14:29:00Z"
+        },
+        "newGadget": {
+          "confidence": 0.5,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T14:09:00Z"
+        },
+        "editGadget": {
+          "confidence": 0.87,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T12:23:00Z"
+        },
+        "gadgetLoadError": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T13:41:00Z"
+        },
+        "gadgetOfTheMonth": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T14:37:00Z"
+        },
+        "usedInSchemes_one": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T09:52:00Z"
+        },
+        "usedInSchemes_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T12:44:00Z"
+        },
+        "specs.columns.attribute": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T14:02:00Z"
+        },
+        "specRange": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T14:37:00Z"
+        },
+        "specRangeValue": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T15:55:00Z"
+        },
+        "specChargeTime": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T10:58:00Z"
+        },
+        "specs.heroResistance": {
+          "confidence": 0.63,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T14:00:00Z"
+        },
+        "chargeLabel": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T15:13:00Z"
+        },
+        "chargeLevel": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T09:51:00Z"
+        },
+        "fullyCharged": {
+          "confidence": 0.83,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T08:13:00Z"
+        },
+        "maintenance.schedule": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T16:55:00Z"
+        },
+        "nextService": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T11:56:00Z"
+        },
+        "serviceCount_one": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T15:49:00Z"
+        },
+        "serviceCount_other": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T15:12:00Z"
+        },
+        "gadgetJammed": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T17:56:00Z"
+        },
+        "invisibilityCloakCare": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T09:50:00Z"
+        },
+        "warranty.voidHeroes": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T14:06:00Z"
+        },
+        "fileWarrantyClaim": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T11:36:00Z"
+        },
+        "warrantyTerms": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T17:08:00Z"
+        },
+        "warrantyClaimSent": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T15:37:00Z"
+        },
+        "recallNoticeTitle": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T12:20:00Z"
+        },
+        "recallNotice": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T13:36:00Z"
+        },
+        "recallReason": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T08:44:00Z"
+        },
+        "recall.acknowledge": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T12:27:00Z"
+        },
+        "safetyNotAToy": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T16:55:00Z"
+        },
+        "safetyShrinkSelf": {
+          "confidence": 0.47,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T08:20:00Z"
+        },
+        "safetyJetpackIndoors": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T11:13:00Z"
+        },
+        "workshop.title": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T13:33:00Z"
+        },
+        "workshop.leadTimeHelp": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T10:58:00Z"
+        },
+        "orderTable.columns.gadget": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T12:52:00Z"
+        },
+        "orderTable.columns.due": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T13:26:00Z"
+        },
+        "cancelOrderConfirm": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T09:34:00Z"
+        },
+        "orderForm.specialRequestsHint": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T12:02:00Z"
+        },
+        "orderForm.overBudget": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T17:49:00Z"
+        },
+        "prototype.status.testing": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T11:50:00Z"
+        },
+        "inventory.lowStock": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T13:43:00Z"
+        },
+        "missingUnits_one": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T13:24:00Z"
+        },
+        "missingUnits_other": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T16:04:00Z"
+        },
+        "inventoryAuditHelp": {
+          "confidence": 0.87,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T14:45:00Z"
+        },
+        "compare.winner": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T10:24:00Z"
+        },
+        "compare.helpText": {
+          "confidence": 0.68,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T08:35:00Z"
+        },
+        "reviews.verifiedMinion": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T11:49:00Z"
+        },
+        "reviewRating": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T11:05:00Z"
+        },
+        "reviewGuidelines": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T09:12:00Z"
+        },
+        "testFire": {
+          "confidence": 0.41,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T12:57:00Z"
+        },
+        "jetpackModelOneBan": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T08:39:00Z"
+        }
+      },
+      "heists": {
+        "title": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T12:51:00Z"
+        },
+        "planHeist": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T12:04:00Z"
+        },
+        "heistCount_other": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T12:46:00Z"
+        },
+        "targetLabel": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-14T15:38:00Z"
+        },
+        "target.museum": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T10:06:00Z"
+        },
+        "target.bank": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T17:36:00Z"
+        },
+        "crewSize_one": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T08:15:00Z"
+        },
+        "crewSize_other": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:45:00Z"
+        },
+        "getawayRoute": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T14:08:00Z"
+        },
+        "routeRooftops": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T16:51:00Z"
+        },
+        "vaultType": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T16:21:00Z"
+        },
+        "vault.sentientDoor": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T16:45:00Z"
+        },
+        "alarmTripped": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T08:44:00Z"
+        },
+        "alarmSilent": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T17:15:00Z"
+        },
+        "phase.execution": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T15:40:00Z"
+        },
+        "phase.getaway": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T14:09:00Z"
+        },
+        "successOdds": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T13:19:00Z"
+        },
+        "oddsLow": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T09:07:00Z"
+        },
+        "lootTally": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T13:15:00Z"
+        },
+        "lootTotal": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T10:34:00Z"
+        },
+        "lootItems_other": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T16:57:00Z"
+        },
+        "abortBody": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T13:46:00Z"
+        },
+        "abortConfirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T14:38:00Z"
+        },
+        "heistFoiled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T17:19:00Z"
+        },
+        "empty.title": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T08:58:00Z"
+        },
+        "heistInsurance": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T08:13:00Z"
+        }
+      },
+      "henchmen": {
+        "title": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T10:30:00Z"
+        },
+        "addHenchman": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T13:27:00Z"
+        },
+        "henchmanCount_one": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T16:21:00Z"
+        },
+        "henchmanCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T11:51:00Z"
+        },
+        "profile.specialty": {
+          "confidence": 0.5,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T16:08:00Z"
+        },
+        "profile.yearsOfService": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T15:18:00Z"
+        },
+        "specialtyGetawayDriver": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T14:33:00Z"
+        },
+        "specialtyMonologueWriter": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T16:27:00Z"
+        },
+        "specialtyTrapdoors": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T08:37:00Z"
+        },
+        "contractRenews": {
+          "confidence": 0.59,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T09:36:00Z"
+        },
+        "loyaltyHigh": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T10:41:00Z"
+        },
+        "loyaltyLow": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T14:27:00Z"
+        },
+        "loyaltyHelp": {
+          "confidence": 0.87,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T17:08:00Z"
+        },
+        "assignSuccess": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T08:37:00Z"
+        },
+        "unassign": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T15:58:00Z"
+        },
+        "dramaticExitConfirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T11:18:00Z"
+        },
+        "empty.title": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T16:16:00Z"
+        },
+        "filterBySpecialty": {
+          "confidence": 0.61,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T16:03:00Z"
+        },
+        "table.weeklyWage": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T08:36:00Z"
+        },
+        "legacyCapeAllowance": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T14:17:00Z"
+        },
+        "minionUpgradeLegacy": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T09:35:00Z"
+        }
+      },
+      "inbox": {
+        "composeMessage": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T12:30:00Z"
+        },
+        "reply": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T17:26:00Z"
+        },
+        "markAsRead": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T15:26:00Z"
+        },
+        "unreadCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T10:18:00Z"
+        },
+        "folders.minionComplaints": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T13:35:00Z"
+        },
+        "folders.sent": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T12:41:00Z"
+        },
+        "folders.spam": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T13:38:00Z"
+        },
+        "sendRansomNote": {
+          "confidence": 0.4,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T11:52:00Z"
+        },
+        "threadReplies_one": {
+          "confidence": 0.84,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T13:43:00Z"
+        },
+        "threadReplies_other": {
+          "confidence": 0.87,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T11:40:00Z"
+        },
+        "threadFrom": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T12:55:00Z"
+        },
+        "heroTauntReceived": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T12:58:00Z"
+        },
+        "spamExplain": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T15:58:00Z"
+        },
+        "emptyBody": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T10:18:00Z"
+        },
+        "deleteThread": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T12:05:00Z"
+        },
+        "archive": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T10:59:00Z"
+        },
+        "pigeonPost": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T10:51:00Z"
+        },
+        "sealWithWax": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T14:26:00Z"
+        }
+      },
+      "lair": {
+        "roomsTitle": {
+          "confidence": 0.48,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T16:49:00Z"
+        },
+        "rooms.throneRoom": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T15:29:00Z"
+        },
+        "rooms.minionCanteen": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T11:57:00Z"
+        },
+        "sharkTank.fed": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T08:42:00Z"
+        },
+        "startSelfDestruct": {
+          "confidence": 0.5,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T12:10:00Z"
+        },
+        "selfDestruct.confirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T09:40:00Z"
+        },
+        "selfDestruct.abort": {
+          "confidence": 0.84,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T08:09:00Z"
+        },
+        "selfDestructCountdown": {
+          "confidence": 0.65,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T15:07:00Z"
+        },
+        "cameras.offline": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T12:11:00Z"
+        },
+        "cameraFeedLabel": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T11:23:00Z"
+        },
+        "camerasAllClear": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T13:07:00Z"
+        },
+        "camerasPrivacyNote": {
+          "confidence": 0.68,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T11:51:00Z"
+        },
+        "openTunnel": {
+          "confidence": 0.4,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T13:01:00Z"
+        },
+        "intruderCount_one": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T08:44:00Z"
+        },
+        "heroInLair": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T09:20:00Z"
+        },
+        "releaseSharks": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T16:49:00Z"
+        },
+        "guestListEmpty": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T16:42:00Z"
+        },
+        "legacyMoatLevel": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T17:04:00Z"
+        }
+      },
+      "legal": {
+        "terms.title": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T09:02:00Z"
+        },
+        "terms.summary": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T15:12:00Z"
+        },
+        "privacyNotice": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T17:10:00Z"
+        },
+        "cookieAccept": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T16:47:00Z"
+        },
+        "deviceDisclaimer": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T15:45:00Z"
+        },
+        "lastUpdated": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T17:56:00Z"
+        },
+        "legacyHeroWaiver": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T16:02:00Z"
+        }
+      },
+      "notifications": {
+        "centre.title": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T15:00:00Z"
+        },
+        "centre.markAllRead": {
+          "confidence": 0.81,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T08:40:00Z"
+        },
+        "emptyCentre": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T10:44:00Z"
+        },
+        "unreadCount_one": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T15:28:00Z"
+        },
+        "unreadCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T14:29:00Z"
+        },
+        "heroSpotted": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T09:11:00Z"
+        },
+        "heroSpottedBody": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T14:05:00Z"
+        },
+        "timeOff.request": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T12:12:00Z"
+        },
+        "timeOffReason": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T14:23:00Z"
+        },
+        "approveTimeOff": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T14:22:00Z"
+        },
+        "denyTimeOff": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T17:08:00Z"
+        },
+        "mute": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T17:05:00Z"
+        },
+        "snooze": {
+          "confidence": 0.84,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T11:18:00Z"
+        },
+        "snoozeFor_one": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T15:49:00Z"
+        },
+        "snoozeFor_other": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T16:30:00Z"
+        },
+        "mutedUntil": {
+          "confidence": 0.82,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T14:48:00Z"
+        },
+        "muteThread": {
+          "confidence": 0.83,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T13:05:00Z"
+        },
+        "digest.subjectDaily": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T10:30:00Z"
+        },
+        "digest.subjectWeekly": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T11:11:00Z"
+        },
+        "minionPromoted": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T15:15:00Z"
+        },
+        "settingsHelp": {
+          "confidence": 0.82,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T13:38:00Z"
+        },
+        "muteAllConfirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T14:50:00Z"
+        },
+        "offlineError": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T08:22:00Z"
+        },
+        "pushDisabled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T16:21:00Z"
+        },
+        "viewAll": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T12:51:00Z"
+        },
+        "legacySmsAlerts": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T13:38:00Z"
+        },
+        "digest.subjectMonthly": {
+          "confidence": 0.82,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T14:11:00Z"
+        }
+      },
+      "onboarding": {
+        "lairNameLabel": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T15:59:00Z"
+        },
+        "lairTypeVolcano": {
+          "confidence": 0.83,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T09:53:00Z"
+        },
+        "personaMastermind": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T14:05:00Z"
+        },
+        "personaTinkerer": {
+          "confidence": 0.77,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T13:45:00Z"
+        },
+        "minionEmailLabel": {
+          "confidence": 0.43,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T09:28:00Z"
+        },
+        "pickNemesis": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T15:53:00Z"
+        },
+        "nemesisHint": {
+          "confidence": 0.79,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T11:27:00Z"
+        },
+        "nemesisSelected": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T08:35:00Z"
+        },
+        "noNemesis": {
+          "confidence": 0.5,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T16:41:00Z"
+        },
+        "tour.dashboard": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T16:08:00Z"
+        },
+        "tour.devices": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T15:44:00Z"
+        },
+        "skip": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T11:28:00Z"
+        },
+        "finish": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T08:35:00Z"
+        },
+        "personaSidekick": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T17:32:00Z"
+        },
+        "tour.legacyMap": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T16:12:00Z"
+        }
+      },
+      "reports": {
+        "kpi.citiesThreatened": {
+          "confidence": 0.76,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T16:13:00Z"
+        },
+        "kpi.minionTurnover": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T08:02:00Z"
+        },
+        "chartSchemesByStatus": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T10:56:00Z"
+        },
+        "chartRansomOverTime": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T13:11:00Z"
+        },
+        "export.csv": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T15:46:00Z"
+        },
+        "exportStarted": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T12:27:00Z"
+        },
+        "emptyBody": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T16:57:00Z"
+        },
+        "citiesCount_one": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T09:13:00Z"
+        },
+        "citiesCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T14:29:00Z"
+        },
+        "turnoverTooltip": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T11:32:00Z"
+        },
+        "tableScheme": {
+          "confidence": 0.49,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T13:29:00Z"
+        },
+        "tableOutcome": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T09:04:00Z"
+        },
+        "outcomeFoiled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T13:09:00Z"
+        },
+        "exportLegacySheet": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T16:08:00Z"
+        }
+      },
+      "settings": {
+        "profile.title": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T08:17:00Z"
+        },
+        "profile.displayName": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T15:27:00Z"
+        },
+        "profile.avatar": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T17:11:00Z"
+        },
+        "profile.changeAvatar": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T13:48:00Z"
+        },
+        "lairPreferences": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-16T16:49:00Z"
+        },
+        "lairName": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T12:24:00Z"
+        },
+        "languageHint": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T13:30:00Z"
+        },
+        "notifications.email": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T08:41:00Z"
+        },
+        "notifications.push": {
+          "confidence": 0.79,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T11:56:00Z"
+        },
+        "notifications.heroSightings": {
+          "confidence": 0.53,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T10:40:00Z"
+        },
+        "notifications.schemeFoiled": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T11:17:00Z"
+        },
+        "appearance": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T12:16:00Z"
+        },
+        "theme": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T17:08:00Z"
+        },
+        "themeNight": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T17:02:00Z"
+        },
+        "themeDay": {
+          "confidence": 0.97,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T17:23:00Z"
+        },
+        "themeSystem": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T11:41:00Z"
+        },
+        "reduceMotion": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-05T09:44:00Z"
+        },
+        "roleHenchman": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-13T16:41:00Z"
+        },
+        "roleDescriptionHenchman": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T11:15:00Z"
+        },
+        "memberCount_one": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T16:44:00Z"
+        },
+        "memberCount_other": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T13:22:00Z"
+        },
+        "changeRole": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T12:56:00Z"
+        },
+        "apiKeys": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T17:27:00Z"
+        },
+        "createApiKey": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T11:48:00Z"
+        },
+        "apiKeyLastUsed": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T09:49:00Z"
+        },
+        "transferOverlordship": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T16:09:00Z"
+        },
+        "transferOverlordshipHelp": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T12:49:00Z"
+        },
+        "deleteLair": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T13:39:00Z"
+        },
+        "deleteLairConfirm": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T17:04:00Z"
+        },
+        "saveChanges": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:11:00Z"
+        },
+        "defaultHeistBudget": {
+          "confidence": 0.63,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T14:39:00Z"
+        },
+        "lairTypeBlimp": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T15:37:00Z"
+        },
+        "oldEvilLaughVolume": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T16:56:00Z"
+        }
+      },
+      "weather-machine": {
+        "forecastOverride": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T16:34:00Z"
+        },
+        "makeItRain": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T14:14:00Z"
+        },
+        "cooldownHelp": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T16:59:00Z"
+        },
+        "stormScheduled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T12:48:00Z"
+        },
+        "cancelWeather": {
+          "confidence": 0.97,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T13:16:00Z"
+        },
+        "legacyRainbowMode": {
+          "confidence": 0.96,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T14:11:00Z"
         }
       }
     },
@@ -145,6 +2539,96 @@
           "confidence": 0.52,
           "translated_by": "mistral",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "signUp": {
+          "confidence": 0.91,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T10:46:00Z"
+        },
+        "signUpTitle": {
+          "confidence": 0.83,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T17:27:00Z"
+        },
+        "signInAsOverlord": {
+          "confidence": 0.79,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T16:42:00Z"
+        },
+        "twoFactor.title": {
+          "confidence": 0.77,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-06T08:09:00Z"
+        },
+        "twoFactor.prompt": {
+          "confidence": 0.79,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-03T08:10:00Z"
+        },
+        "twoFactor.useBackupCode": {
+          "confidence": 0.5,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T14:21:00Z"
+        },
+        "twoFactor.backupCodesLeft_one": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-01T11:25:00Z"
+        },
+        "resetLinkSent": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T12:11:00Z"
+        },
+        "magicLinkButton": {
+          "confidence": 0.95,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T12:01:00Z"
+        },
+        "magicLinkSent": {
+          "confidence": 0.74,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-13T17:57:00Z"
+        },
+        "accountLocked": {
+          "confidence": 0.92,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-18T09:45:00Z"
+        },
+        "unlockHelp": {
+          "confidence": 0.75,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T15:33:00Z"
+        },
+        "inviteTitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T15:23:00Z"
+        },
+        "acceptInvite": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T16:43:00Z"
+        },
+        "securityQuestionFirstLair": {
+          "confidence": 0.91,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T14:10:00Z"
+        },
+        "securityQuestionPet": {
+          "confidence": 0.92,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T15:08:00Z"
+        },
+        "signInWithLaserRetina": {
+          "confidence": 0.97,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-06T12:27:00Z"
+        },
+        "rememberThisLair": {
+          "confidence": 0.8,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T13:13:00Z"
         }
       },
       "lair": {
@@ -157,6 +2641,86 @@
           "confidence": 0.83,
           "translated_by": "mistral",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "roomsTitle": {
+          "confidence": 0.57,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T08:31:00Z"
+        },
+        "sharkTank.fed": {
+          "confidence": 0.95,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T08:32:00Z"
+        },
+        "feedSharks": {
+          "confidence": 0.78,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T13:52:00Z"
+        },
+        "selfDestruct.confirm": {
+          "confidence": 0.87,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T12:29:00Z"
+        },
+        "selfDestructCountdown": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T10:19:00Z"
+        },
+        "cameras.offline": {
+          "confidence": 0.82,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T12:20:00Z"
+        },
+        "tunnelTitle": {
+          "confidence": 0.66,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T12:04:00Z"
+        },
+        "tunnelHint": {
+          "confidence": 0.63,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-09T11:52:00Z"
+        },
+        "volcanoErupting": {
+          "confidence": 0.94,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-13T08:12:00Z"
+        },
+        "volcanoDormant": {
+          "confidence": 0.73,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T14:03:00Z"
+        },
+        "intruderAlert": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-11T11:48:00Z"
+        },
+        "intruderCount_other": {
+          "confidence": 0.97,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T08:07:00Z"
+        },
+        "releaseSharks": {
+          "confidence": 0.8,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T08:45:00Z"
+        },
+        "powerUsage": {
+          "confidence": 0.46,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-17T13:46:00Z"
+        },
+        "powerWarning": {
+          "confidence": 0.95,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T17:11:00Z"
+        },
+        "guestListTitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T08:40:00Z"
         }
       },
       "minions": {
@@ -164,6 +2728,733 @@
           "confidence": 0.69,
           "translated_by": "mistral",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "table.columns.lastReview": {
+          "confidence": 0.77,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-17T14:03:00Z"
+        },
+        "shiftNight": {
+          "confidence": 0.69,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T16:40:00Z"
+        },
+        "shiftsUnassigned_one": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T14:09:00Z"
+        },
+        "shiftsUnassigned_other": {
+          "confidence": 0.76,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-13T11:28:00Z"
+        },
+        "laserSafetyCourse": {
+          "confidence": 0.73,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-18T14:45:00Z"
+        },
+        "course.henchmanTrack": {
+          "confidence": 0.54,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-14T08:13:00Z"
+        },
+        "trainingOverdue": {
+          "confidence": 0.75,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T17:09:00Z"
+        },
+        "uniformHelp": {
+          "confidence": 0.78,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-17T13:07:00Z"
+        },
+        "pizzaBudgetRemaining": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T14:16:00Z"
+        },
+        "onboardTitle": {
+          "confidence": 0.95,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T10:00:00Z"
+        },
+        "onboarding.stepBadge": {
+          "confidence": 0.77,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-09T14:43:00Z"
+        },
+        "onboarding.stepOath": {
+          "confidence": 0.43,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T13:23:00Z"
+        },
+        "assignMentor": {
+          "confidence": 0.84,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-09T13:28:00Z"
+        },
+        "selectedCount_one": {
+          "confidence": 0.53,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-13T10:06:00Z"
+        },
+        "legacyHelmetSize": {
+          "confidence": 0.97,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T11:02:00Z"
+        }
+      },
+      "billing": {
+        "plan_henchman": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-18T13:42:00Z"
+        },
+        "downgradeConfirm": {
+          "confidence": 0.92,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T10:50:00Z"
+        },
+        "invoiceStatus_paid": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T12:44:00Z"
+        },
+        "invoiceStatus_overdue": {
+          "confidence": 0.75,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T12:37:00Z"
+        },
+        "invoicesEmpty": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T15:33:00Z"
+        },
+        "taxes.vat": {
+          "confidence": 0.82,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T15:49:00Z"
+        },
+        "billingCycleAnnual": {
+          "confidence": 0.67,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T13:42:00Z"
+        }
+      },
+      "common": {
+        "archive": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T16:18:00Z"
+        },
+        "copyLink": {
+          "confidence": 0.67,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T17:50:00Z"
+        },
+        "export": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T12:27:00Z"
+        },
+        "selectAll": {
+          "confidence": 0.76,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T09:33:00Z"
+        },
+        "selectedCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-10T16:02:00Z"
+        },
+        "unsavedChanges.discard": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T13:12:00Z"
+        },
+        "pagination.pageOf": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T15:32:00Z"
+        },
+        "justNow": {
+          "confidence": 0.61,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-03T15:11:00Z"
+        },
+        "time.minutesAgo_other": {
+          "confidence": 0.98,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T16:55:00Z"
+        },
+        "time.hoursAgo_other": {
+          "confidence": 0.83,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T12:09:00Z"
+        },
+        "moreActions": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T14:24:00Z"
+        },
+        "showMore": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T10:32:00Z"
+        },
+        "noResults": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T15:24:00Z"
+        },
+        "clearFilters": {
+          "confidence": 0.66,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T09:41:00Z"
+        },
+        "descending": {
+          "confidence": 0.75,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T17:33:00Z"
+        },
+        "optional": {
+          "confidence": 0.86,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T16:55:00Z"
+        },
+        "savingEllipsis": {
+          "confidence": 0.65,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T17:21:00Z"
+        },
+        "undo": {
+          "confidence": 0.61,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T08:09:00Z"
+        },
+        "dismiss": {
+          "confidence": 0.61,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T08:23:00Z"
+        },
+        "learnMore": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-14T08:47:00Z"
+        },
+        "restoreHelp": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T08:25:00Z"
+        },
+        "comingSoon": {
+          "confidence": 0.85,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T11:24:00Z"
+        }
+      },
+      "errors": {
+        "validation.tooShort": {
+          "confidence": 0.79,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T15:24:00Z"
+        },
+        "validation.mustBeNumber": {
+          "confidence": 0.73,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T13:01:00Z"
+        },
+        "validation.nameTaken": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T08:38:00Z"
+        },
+        "reloadLatest": {
+          "confidence": 0.65,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T08:59:00Z"
+        },
+        "timeout": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T11:37:00Z"
+        },
+        "timeoutHelp": {
+          "confidence": 0.64,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T17:34:00Z"
+        },
+        "maintenanceTitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T13:15:00Z"
+        },
+        "maintenanceBody": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T16:48:00Z"
+        },
+        "deviceOffline": {
+          "confidence": 0.63,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T17:56:00Z"
+        },
+        "schemeFoiled": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T14:43:00Z"
+        }
+      },
+      "gadgets": {
+        "clearFilters": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-04T10:26:00Z"
+        },
+        "sortMinionRating": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-08T11:53:00Z"
+        },
+        "emptyCatalogueTitle": {
+          "confidence": 0.64,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T13:55:00Z"
+        },
+        "emptyCatalogueBody": {
+          "confidence": 0.65,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T08:04:00Z"
+        },
+        "resultCount_one": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-03T08:09:00Z"
+        },
+        "resultCount_other": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T08:14:00Z"
+        },
+        "category.mindControlHats": {
+          "confidence": 0.8,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T10:52:00Z"
+        },
+        "category.grapplingHooks": {
+          "confidence": 0.74,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-09T16:01:00Z"
+        },
+        "category.doomsdayDevices": {
+          "confidence": 0.77,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-07T08:04:00Z"
+        },
+        "gadget.deathRay.name": {
+          "confidence": 0.59,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T16:45:00Z"
+        },
+        "gadget.deathRay.description": {
+          "confidence": 0.98,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T16:45:00Z"
+        },
+        "gadget.robotShark.name": {
+          "confidence": 0.68,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-17T14:53:00Z"
+        },
+        "gadget.robotShark.description": {
+          "confidence": 0.74,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T11:33:00Z"
+        },
+        "gadget.invisibilityCloak.description": {
+          "confidence": 0.61,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-06T16:55:00Z"
+        },
+        "gadget.grapplingHook.description": {
+          "confidence": 0.88,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T17:19:00Z"
+        },
+        "borrowGadget": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T08:49:00Z"
+        },
+        "returnGadget": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T15:54:00Z"
+        },
+        "borrowedToast": {
+          "confidence": 0.72,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T13:14:00Z"
+        },
+        "usedInSchemes_other": {
+          "confidence": 0.73,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T13:52:00Z"
+        },
+        "specMonologueCompatible": {
+          "confidence": 0.91,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-17T08:11:00Z"
+        },
+        "specs.classified": {
+          "confidence": 0.54,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T12:58:00Z"
+        },
+        "specs.batteriesNotIncluded": {
+          "confidence": 0.95,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-07T08:28:00Z"
+        },
+        "chargeLevel": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T09:24:00Z"
+        },
+        "deathRayCooldown": {
+          "confidence": 0.78,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T11:06:00Z"
+        },
+        "serviceOverdue": {
+          "confidence": 0.82,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-14T16:56:00Z"
+        },
+        "recallNoticeTitle": {
+          "confidence": 0.88,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T08:19:00Z"
+        },
+        "safetyJetpackIndoors": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T10:39:00Z"
+        },
+        "orderPlaced": {
+          "confidence": 0.58,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T13:17:00Z"
+        },
+        "sampleReview": {
+          "confidence": 0.77,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T15:08:00Z"
+        }
+      },
+      "heists": {
+        "getawayRoute": {
+          "confidence": 0.8,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-11T16:04:00Z"
+        },
+        "alarms": {
+          "confidence": 0.62,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T11:06:00Z"
+        },
+        "successOddsValue": {
+          "confidence": 0.83,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-13T11:16:00Z"
+        },
+        "lootTally": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T08:22:00Z"
+        },
+        "lootItems_one": {
+          "confidence": 0.82,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T16:11:00Z"
+        },
+        "lootItems_other": {
+          "confidence": 0.65,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T14:04:00Z"
+        },
+        "empty.title": {
+          "confidence": 0.87,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T12:38:00Z"
+        }
+      },
+      "henchmen": {
+        "title": {
+          "confidence": 0.39,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-07T08:47:00Z"
+        },
+        "henchmanCount_one": {
+          "confidence": 0.84,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T13:09:00Z"
+        },
+        "henchmanCount_other": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-18T11:52:00Z"
+        },
+        "profile.title": {
+          "confidence": 0.88,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T11:31:00Z"
+        },
+        "contractRenews": {
+          "confidence": 0.77,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T14:29:00Z"
+        },
+        "promote": {
+          "confidence": 0.92,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T17:52:00Z"
+        },
+        "searchPlaceholder": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-03T13:17:00Z"
+        },
+        "legacyCapeAllowance": {
+          "confidence": 0.49,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T16:15:00Z"
+        }
+      },
+      "inbox": {
+        "unreadCount_other": {
+          "confidence": 0.64,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T12:02:00Z"
+        },
+        "folders.heroTaunts": {
+          "confidence": 0.91,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T16:24:00Z"
+        },
+        "sendRansomNote": {
+          "confidence": 0.74,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T10:27:00Z"
+        },
+        "ransomDemand": {
+          "confidence": 0.41,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T14:40:00Z"
+        },
+        "threatsFiltered_one": {
+          "confidence": 0.68,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-06T15:51:00Z"
+        },
+        "emptyTitle": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-16T15:04:00Z"
+        },
+        "pigeonPost": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-07T13:41:00Z"
+        }
+      },
+      "notifications": {
+        "unreadCount_other": {
+          "confidence": 0.82,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-07T12:40:00Z"
+        },
+        "approveTimeOff": {
+          "confidence": 0.79,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T08:04:00Z"
+        },
+        "snoozeFor_one": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-15T15:32:00Z"
+        },
+        "muteThread": {
+          "confidence": 0.76,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-14T17:00:00Z"
+        },
+        "digest.subjectQuiet": {
+          "confidence": 0.84,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-18T08:03:00Z"
+        },
+        "viewAll": {
+          "confidence": 0.73,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T16:07:00Z"
+        },
+        "legacySmsAlerts": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T08:59:00Z"
+        }
+      },
+      "onboarding": {
+        "welcomeBody": {
+          "confidence": 0.39,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-07T11:07:00Z"
+        },
+        "lairNameLabel": {
+          "confidence": 0.67,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-09T15:39:00Z"
+        },
+        "pickNemesis": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-09T15:36:00Z"
+        },
+        "noNemesis": {
+          "confidence": 0.91,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T13:06:00Z"
+        },
+        "tour.devices": {
+          "confidence": 0.91,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-08T16:02:00Z"
+        },
+        "finish": {
+          "confidence": 0.82,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-05T17:29:00Z"
+        }
+      },
+      "schemes": {
+        "editorTitle": {
+          "confidence": 0.64,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T12:07:00Z"
+        },
+        "editor.unsavedChanges": {
+          "confidence": 0.43,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-06T13:30:00Z"
+        },
+        "phaseLabel": {
+          "confidence": 0.92,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T10:21:00Z"
+        },
+        "risk_low": {
+          "confidence": 0.96,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-06T12:38:00Z"
+        },
+        "sightings.report": {
+          "confidence": 0.66,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T13:52:00Z"
+        },
+        "backupPlansTitle": {
+          "confidence": 0.76,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T10:36:00Z"
+        },
+        "backupPlans.add": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-02T14:47:00Z"
+        },
+        "approvalRejected": {
+          "confidence": 0.88,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-10T08:06:00Z"
+        },
+        "monologueTooLong": {
+          "confidence": 0.95,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T15:53:00Z"
+        },
+        "legacyEvilLaughTimer": {
+          "confidence": 0.47,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-14T09:37:00Z"
+        }
+      },
+      "settings": {
+        "lairTypeUnderwater": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-06T09:10:00Z"
+        },
+        "lairTypeMoon": {
+          "confidence": 0.72,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-17T14:47:00Z"
+        },
+        "timeZoneHint": {
+          "confidence": 0.81,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T11:19:00Z"
+        },
+        "notifications.email": {
+          "confidence": 0.79,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-16T17:54:00Z"
+        },
+        "notifications.weeklyDigest": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-17T11:39:00Z"
+        },
+        "notifications.quietHours": {
+          "confidence": 0.92,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T08:29:00Z"
+        },
+        "themeSystem": {
+          "confidence": 0.88,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-15T13:07:00Z"
+        },
+        "roleMinion": {
+          "confidence": 0.69,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-04T11:22:00Z"
+        },
+        "memberCount_other": {
+          "confidence": 0.44,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T13:37:00Z"
+        },
+        "apiKeys": {
+          "confidence": 0.93,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T17:41:00Z"
+        },
+        "deleteLairWarning": {
+          "confidence": 0.42,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-01T11:06:00Z"
+        },
+        "saveChanges": {
+          "confidence": 0.48,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-07T14:10:00Z"
+        },
+        "lairTypeBlimp": {
+          "confidence": 0.78,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-02T16:01:00Z"
         }
       }
     },
@@ -173,6 +3464,358 @@
           "confidence": 0.5,
           "translated_by": "viking",
           "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "signUp": {
+          "confidence": 0.78,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T09:15:00Z"
+        },
+        "signUpTitle": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T10:46:00Z"
+        },
+        "alreadyHaveAccount": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T17:43:00Z"
+        },
+        "passwordHint": {
+          "confidence": 0.79,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T14:04:00Z"
+        },
+        "twoFactor.title": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T12:48:00Z"
+        },
+        "twoFactor.codeLabel": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T17:02:00Z"
+        },
+        "resetPasswordHelp": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T10:00:00Z"
+        },
+        "newPassword": {
+          "confidence": 0.75,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T09:07:00Z"
+        },
+        "unlockHelp": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T11:26:00Z"
+        },
+        "inviteTitle": {
+          "confidence": 0.63,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T15:12:00Z"
+        },
+        "acceptInvite": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T15:52:00Z"
+        },
+        "signUpTerms": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T12:31:00Z"
+        },
+        "securityQuestionNemesis": {
+          "confidence": 0.38,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T10:30:00Z"
+        },
+        "rememberThisLair": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:48:00Z"
+        }
+      },
+      "common": {
+        "duplicate": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T12:40:00Z"
+        },
+        "copyLink": {
+          "confidence": 0.41,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T11:58:00Z"
+        },
+        "linkCopied": {
+          "confidence": 0.57,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T16:19:00Z"
+        },
+        "export": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T10:30:00Z"
+        },
+        "filter": {
+          "confidence": 0.83,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T10:08:00Z"
+        },
+        "sort": {
+          "confidence": 0.87,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T08:54:00Z"
+        },
+        "selectedCount_one": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T17:53:00Z"
+        },
+        "selectedCount_other": {
+          "confidence": 0.6,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T10:16:00Z"
+        },
+        "unsavedChanges.body": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T11:05:00Z"
+        },
+        "unsavedChanges.discard": {
+          "confidence": 0.92,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T11:00:00Z"
+        },
+        "previousPage": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T12:02:00Z"
+        },
+        "nextPage": {
+          "confidence": 0.51,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T12:05:00Z"
+        },
+        "justNow": {
+          "confidence": 0.94,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T17:27:00Z"
+        },
+        "time.minutesAgo_one": {
+          "confidence": 0.41,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T16:44:00Z"
+        },
+        "time.hoursAgo_other": {
+          "confidence": 0.39,
+          "translated_by": "viking",
+          "timestamp": "2026-10-10T15:45:00Z"
+        },
+        "today": {
+          "confidence": 0.73,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T17:00:00Z"
+        },
+        "yesterday": {
+          "confidence": 0.98,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T16:08:00Z"
+        },
+        "showMore": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T09:16:00Z"
+        },
+        "showLess": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T14:55:00Z"
+        },
+        "clearFilters": {
+          "confidence": 0.52,
+          "translated_by": "viking",
+          "timestamp": "2026-10-18T08:27:00Z"
+        },
+        "ascending": {
+          "confidence": 0.79,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T10:35:00Z"
+        },
+        "descending": {
+          "confidence": 0.64,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T12:26:00Z"
+        },
+        "undo": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T11:14:00Z"
+        },
+        "itemArchived": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T15:58:00Z"
+        },
+        "dismiss": {
+          "confidence": 0.86,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T16:53:00Z"
+        },
+        "restoreHelp": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T12:53:00Z"
+        },
+        "oldToolbar.print": {
+          "confidence": 0.97,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T12:34:00Z"
+        }
+      },
+      "errors": {
+        "validation.tooShort": {
+          "confidence": 0.87,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T13:35:00Z"
+        },
+        "validation.tooLong": {
+          "confidence": 0.61,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T13:00:00Z"
+        },
+        "validation.nameTaken": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-14T13:36:00Z"
+        },
+        "deviceQuota_one": {
+          "confidence": 0.42,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T08:05:00Z"
+        },
+        "deviceQuota_other": {
+          "confidence": 0.48,
+          "translated_by": "viking",
+          "timestamp": "2026-10-03T10:39:00Z"
+        },
+        "timeout": {
+          "confidence": 0.45,
+          "translated_by": "viking",
+          "timestamp": "2026-10-01T08:55:00Z"
+        },
+        "maintenanceTitle": {
+          "confidence": 0.97,
+          "translated_by": "viking",
+          "timestamp": "2026-10-02T12:26:00Z"
+        },
+        "readOnlyMode": {
+          "confidence": 0.57,
+          "translated_by": "viking",
+          "timestamp": "2026-10-06T17:29:00Z"
+        },
+        "heroDetected": {
+          "confidence": 0.98,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T10:33:00Z"
+        },
+        "paymentRequired": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-09T08:38:00Z"
+        },
+        "failedItems_one": {
+          "confidence": 0.51,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T16:48:00Z"
+        },
+        "failedItems_other": {
+          "confidence": 0.85,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T15:12:00Z"
+        }
+      },
+      "gadgets": {
+        "sortBy": {
+          "confidence": 0.67,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T16:43:00Z"
+        },
+        "specs.heroResistance": {
+          "confidence": 0.83,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T12:27:00Z"
+        },
+        "specs.classified": {
+          "confidence": 0.63,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T15:15:00Z"
+        },
+        "workshop.leadTimeHelp": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T17:47:00Z"
+        },
+        "jetpackModelOneBan": {
+          "confidence": 0.89,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T14:50:00Z"
+        }
+      },
+      "notifications": {
+        "muteThread": {
+          "confidence": 0.9,
+          "translated_by": "viking",
+          "timestamp": "2026-10-04T16:45:00Z"
+        },
+        "digest.subjectMonthly": {
+          "confidence": 0.69,
+          "translated_by": "viking",
+          "timestamp": "2026-10-15T13:50:00Z"
+        }
+      },
+      "onboarding": {
+        "welcomeTitle": {
+          "confidence": 0.42,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T16:07:00Z"
+        },
+        "inviteMinionTitle": {
+          "confidence": 0.95,
+          "translated_by": "viking",
+          "timestamp": "2026-10-17T17:22:00Z"
+        },
+        "minionsInvited_other": {
+          "confidence": 0.52,
+          "translated_by": "viking",
+          "timestamp": "2026-10-11T17:51:00Z"
+        },
+        "nemesisHint": {
+          "confidence": 0.65,
+          "translated_by": "viking",
+          "timestamp": "2026-10-08T17:39:00Z"
+        },
+        "tour.legacyMap": {
+          "confidence": 0.79,
+          "translated_by": "viking",
+          "timestamp": "2026-10-07T13:56:00Z"
+        }
+      },
+      "settings": {
+        "lairTypeUnderwater": {
+          "confidence": 0.74,
+          "translated_by": "viking",
+          "timestamp": "2026-10-13T13:25:00Z"
+        },
+        "timeZone": {
+          "confidence": 0.93,
+          "translated_by": "viking",
+          "timestamp": "2026-10-05T16:07:00Z"
+        },
+        "settingsSaved": {
+          "confidence": 0.8,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T16:45:00Z"
         }
       }
     }

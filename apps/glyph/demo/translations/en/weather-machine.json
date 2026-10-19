@@ -1,0 +1,11 @@
+{
+  "forecastOverride": "Forecast override",
+  "makeItRain": "Make it rain on {{city}}",
+  "fog.level": "Fog level",
+  "fog.peaSoup": "Thick as soup",
+  "cooldownActive": "Cooling down. Try again in {{minutes}} min.",
+  "cooldownHelp": "The machine needs to cool down between storms, or it starts making weather of its own. You can override the cooldown, but the last villain who tried spent a week under a personal hailstorm.",
+  "stormScheduled": "Storm scheduled for {{date}}",
+  "sunshineWarning": "Sunshine detected. Henchman morale may rise.",
+  "cancelWeather": "Cancel weather"
+}

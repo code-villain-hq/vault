@@ -1,0 +1,21 @@
+{
+  "editorTitle": "Éditeur de complot",
+  "editor.unsavedChanges": "Vous avez des modifications non enregistrées. Les héros n'attendront pas, mais cette page, si.",
+  "stepsEmpty": "Aucune étape pour l'instant. Tout complot commence par une seule idée maléfique.",
+  "phaseLabel": "Phase {{number}} : {{name}}",
+  "risk_low": "Faible",
+  "risk_reckless": "Téméraire",
+  "sightingsTitle": "Héros repérés",
+  "sightings.report": "Signaler un héros",
+  "backupPlansTitle": "Plans de secours",
+  "backupPlans.add": "Ajouter un plan B",
+  "backupPlansHelp": "Un plan de secours se déclenche automatiquement lorsqu'une étape est déjouée. Restez simple : les méchants qui réussissent le mieux prévoient un plan de secours par étape, jamais plus de trois au total, car personne ne se souvient du plan F sous pression.",
+  "approvalsHelp": "Les complots dont le budget dépasse {{amount}} doivent être validés par le suzerain avant la phase un. Comptez en général une journée, davantage si un héros vient de déjouer quelque chose et que le suzerain est de mauvaise humeur.",
+  "approvedBy": "Validé par {{name}} le {{date}}",
+  "approvalRejected": "Refusé. Le suzerain l'a trouvé « peu original ».",
+  "monologueTitle": "Brouillon de monologue",
+  "monologueTooLong": "Votre monologue dure {{minutes}} minutes. Les héros s'échappent au bout de quatre.",
+  "status_completed": "Accompli",
+  "assignDevice": "Affecter {{device}} à cette étape",
+  "legacyEvilLaughTimer": "Minuteur de rire maléfique"
+}

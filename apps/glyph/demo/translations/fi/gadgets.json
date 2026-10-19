@@ -1,0 +1,9 @@
+{
+  "sortBy": "Lajittele",
+  "specs.heroResistance": "Sankarien vastustuskyky",
+  "specs.classified": "Salainen",
+  "safetyNoMirrors": "Älä tähtää peileihin.",
+  "workshop.leadTimeHelp": "Toimitusaika riippuu siitä, montako tuomiopäivän konetta jonossa on. Yliherra-asiakkaat ohittavat kaikki muut, mikä on muiden asiakkaiden mielestä hyvin tyypillistä.",
+  "ordersEmptyBody": "Keksijöillä ei ole tekemistä, ja silloin he alkavat rakentaa asioita, joita kukaan ei ole pyytänyt.",
+  "jetpackModelOneBan": "Mallin 1 rakettireppuja ei saa käyttää tulivuorten yllä."
+}

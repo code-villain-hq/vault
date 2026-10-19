@@ -1,0 +1,12 @@
+{
+  "forecastOverride": "Åsidosätt prognos",
+  "makeItRain": "Låt det regna över {{city}}",
+  "fog.level": "Dimnivå",
+  "fog.peaSoup": "Tjock som gröt",
+  "cooldownActive": "Svalnar. Försök igen om {{minutes}} min.",
+  "cooldownHelp": "Maskinen behöver svalna mellan ovädren, annars börjar den hitta på eget väder. Det går att åsidosätta nedkylningen, men den senaste skurken som försökte fick tillbringa en vecka under ett personligt hagelväder.",
+  "stormScheduled": "Storm planerad till {{date}}",
+  "sunshineWarning": "Solsken upptäckt. Hejdukarnas humör kan stiga.",
+  "cancelWeather": "Avbryt vädret",
+  "legacyRainbowMode": "Regnbågsläge"
+}
