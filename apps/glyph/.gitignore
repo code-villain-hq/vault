@@ -1,0 +1,42 @@
+# Binaries
+glyph
+backend/glyph
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+backend/.air.toml
+backend/tmp/
+
+# Configuration
+config.yaml
+!config.example.yaml
+
+# Translations (user's files)
+translations/
+!translations/.gitkeep
+translations.meta.json
+
+# SQLite database + WAL/SHM sidecar files
+*.db
+*.db-wal
+*.db-shm
+
+# Models
+models/
+~/.glyph/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temp
+*.tmp
+*.log
+tmp/

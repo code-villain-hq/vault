@@ -39,7 +39,7 @@ A one-person studio that ships real tools while narrating the build in public �
 - Layer — agent development environment for macOS.
 - Caster — launcher for macOS.
 - Code Villain theme — VS Code and Cursor, Neovim and WezTerm, generated from the tokens.
-- Schemer — a delivery tool, in planning.
+- Glyph — AI translation tool for i18n JSON files, on local models.
 - Site — the homepage and the blog (index and post pages, hand-written for now).
 
 **Company-wide design**
@@ -55,7 +55,7 @@ A one-person studio that ships real tools while narrating the build in public �
 
 ## Brand Commitments
 
-- **Name:** Code Villain. Website: https://www.codevillain.eu/. Products: Forge, Layer, Caster; Schemer in planning; the editor theme is called Code Villain. Source: `brand/name.md`.
+- **Name:** Code Villain. Website: https://www.codevillain.eu/. Products: Forge, Layer, Caster, Glyph; the editor theme is called Code Villain. Source: `brand/name.md`.
 - **Voice:** A golden-age comic villain who ships; Doctor Doom posture — theatrical, precise, a little too sure of himself. Code Villain speaks and names itself (“Code Villain shipped Forge”), never “I” or “we”. Lead with the work; boast only what shipped; one flourish per piece. Never mean, never corporate-evil. Same voice for UI, blog, and social. Short surfaces stay short. Source: `brand/voice.md`.
 - **Color (Nightshade):** Night `bg` `#0B0B0B`, poison `#C9E265`, cloak `#5A1470`. Grey does most of the work, achromatic in both modes. Poison is the brand: the strike, the main action's fill once per screen, the selection tint, live signals, the search match in code. Cloak supports it: the focus ring and depth. Night by default, day for the apps' light mode; studio surfaces stay night. Source: `brand/color.md`, `design/tokens/`.
 - **Mark:** the strike, a gothic C and V with a poison bar behind them, cut where the letters cross. App icons are each app's initial built the same way; a menu bar glyph is the mark without its tile, in colour. Source: `brand/mark/`.

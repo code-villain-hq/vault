@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" id="theme">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Glyph</title>
+    <link rel="icon" href="/ui/img/glyph.svg" type="image/svg+xml">
+    <!-- Dark mode is the only supported theme; applied eagerly before the
+         Tailwind CDN paints so the first frame is already dark (avoids a
+         white-flash on load). -->
+    <script>document.documentElement.classList.add('dark');</script>
+    <style>
+        html { background-color: #020617; color-scheme: dark; } /* slate-950 */
+        body { background-color: #020617; }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/ui/css/style.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#f0f4ff',
+                            100: '#e6ebff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300" style="font-family: 'Inter', sans-serif;">
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Main Container -->
+    <div class="min-h-screen flex flex-col dark:text-white">
+        <!-- Header -->
+        <header class="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <!-- Logo -->
+                    <a href="/" class="flex items-center space-x-3">
+                        <img src="/ui/img/glyph.svg" alt="" class="w-10 h-10">
+                        <div>
+                            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Glyph</h1>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">AI-Powered i18n Manager</p>
+                        </div>
+                    </a>
+
+                    <!-- Navigation Tabs -->
+                    <nav class="hidden md:flex items-center space-x-1">
+                        <a href="/" data-page="dashboard" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📊 Dashboard</a>
+                        <a href="/ui/import.html" data-page="import" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📥 Import</a>
+                        <a href="/ui/translations.html" data-page="translations" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📝 Translations</a>
+                        <a href="/ui/missing.html" data-page="missing" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">✨ Review</a>
+                        <a href="/ui/glossary.html" data-page="glossary" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📚 Glossary</a>
+                        <a href="/ui/settings.html" data-page="settings" class="nav-link text-indigo-600 dark:text-indigo-400 font-semibold border-b-2 border-indigo-600 dark:border-indigo-400 px-4 py-2 text-sm transition-all duration-200">⚙️ Settings</a>
+                    </nav>
+
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Settings</h2>
+                <p class="text-slate-600 dark:text-slate-400">Configure your translation preferences</p>
+            </div>
+
+            <!-- Languages -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+                <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-1">Languages</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+                            Add a new target language in one click, or remove one you no longer ship. Removing a language deletes its translations, metadata, on-disk JSON files, glossary entries and matching language pairs — there's no undo, so make sure you've got the data backed up if you might want it again.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="languagesList" class="space-y-2 mb-4">
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">Loading languages…</p>
+                </div>
+
+                <div class="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-dashed border-slate-300 dark:border-slate-700">
+                    <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Add Language</h4>
+                    <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+                        <div class="flex-1 min-w-0">
+                            <label for="newLangCode" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Code</label>
+                            <input id="newLangCode" type="text" placeholder="e.g. no, da, pt-br" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm" autocomplete="off" spellcheck="false" maxlength="15">
+                        </div>
+                        <button id="addLangBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 sm:self-end">
+                            + Add language
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                        Creates a <code class="px-1 py-0.5 rounded bg-white dark:bg-slate-800 text-[11px]">source → new</code> language pair so the language appears everywhere immediately. Translations stay empty until you run them from the Translations or Review page.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Namespaces -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-1">Namespaces</h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+                        Rename moves every key in that bucket across all languages. Delete removes all keys in the namespace and its JSON files on disk. Neither can be undone — the same actions are available from <strong>Translations</strong> → <strong>Manage namespaces…</strong>.
+                    </p>
+                </div>
+                <div id="settingsNsList" class="space-y-1 max-h-[50vh] overflow-y-auto pr-1"></div>
+                <p id="settingsNsEmpty" class="hidden py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                    No namespaces yet. Add keys from the Translations page or import JSON.
+                </p>
+                <p id="settingsNsError" class="hidden mt-2 text-xs text-red-500"></p>
+            </div>
+
+            <!-- LLM Configuration -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-1">LLM Configuration</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    Configured in <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-xs">config.yaml</code>.
+                    Each entry here becomes selectable in the language pairs table below.
+                </p>
+                <div id="llmModels" class="space-y-3">
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">Loading configuration...</p>
+                </div>
+            </div>
+
+            <!-- Language Pairs -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+                <div class="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-1">Language Pairs</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                            Pick which LLM and sampling temperature to use for each translation direction. Both directions are independent, e.g. <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-xs">en → sv</code> can use a different model than <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-xs">sv → en</code>.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="pairsList" class="space-y-3 mb-6">
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">Loading language pairs...</p>
+                </div>
+
+                <!-- Add new pair form -->
+                <div class="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-dashed border-slate-300 dark:border-slate-700">
+                    <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Add Language Pair</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Source</label>
+                            <select id="newPairSource" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Target</label>
+                            <select id="newPairTarget" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">LLM</label>
+                            <select id="newPairModel" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Temperature</label>
+                            <input id="newPairTemp" type="number" min="0" max="2" step="0.1" value="0.2" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
+                        </div>
+                        <button id="addPairBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors duration-200">
+                            + Add pair
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-end mt-6">
+                    <button id="savePairsBtn" class="px-6 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-lg font-medium transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/50">
+                        💾 Save Language Pairs
+                    </button>
+                </div>
+            </div>
+
+            <!-- Keyboard Shortcuts -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-4">Keyboard Shortcuts</h3>
+                <div class="bg-slate-50 dark:bg-slate-900 rounded-lg p-3 space-y-2 text-sm max-w-md">
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400">Dashboard</span>
+                        <kbd class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘ 1</kbd>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400">Translations</span>
+                        <kbd class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘ 2</kbd>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400">Review</span>
+                        <kbd class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘ 3</kbd>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400">Glossary</span>
+                        <kbd class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘ 4</kbd>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400">Settings</span>
+                        <kbd class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘ 5</kbd>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600 dark:text-slate-400">Import</span>
+                        <kbd class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘ 6</kbd>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-6">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                    Glyph by Code Villain • Local-First AI Translation
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/ui/js/api.js"></script>
+    <script src="/ui/js/utils.js"></script>
+    <script src="/ui/js/settings.js"></script>
+</body>
+</html>

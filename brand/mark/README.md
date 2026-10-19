@@ -8,6 +8,7 @@ The strike. A gothic C and V with a poison bar behind them, cut where the letter
 | [`forge.svg`](forge.svg) | Forge's outlined F on the same night tile with the strike. |
 | [`layer.svg`](layer.svg) | Layer's L, built the same way. |
 | [`caster.svg`](caster.svg) | Caster's C, built the same way. |
+| [`glyph.svg`](glyph.svg) | Glyph's G, built the same way. |
 | [`logo-night.svg`](logo-night.svg) | “Code Villain” with the strike, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 | [`logo-home.svg`](logo-home.svg) | Homepage variant on night: cropped lettering with an extended strike. |
@@ -25,7 +26,7 @@ On a 200-unit tile:
 
 Black and white are the apps' own `bg` and `fg` from [`color.md`](../color.md): achromatic, so a mark beside an app's frame or text matches it exactly. Only the strike carries colour.
 
-The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes the tile marks (`mark.svg` and the three product marks) from the font. The logo files are kept by hand.
+The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes the tile marks (`mark.svg` and the four product marks) from the font. The logo files are kept by hand.
 
 The V alone was the mark until October 2026. It said Villain but not Code, so the C joined it after the rename.
 

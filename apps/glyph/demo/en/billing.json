@@ -1,0 +1,5 @@
+{
+  "invoiceDueSoon": "Your invoice is due in {{days}} days",
+  "payNow": "Pay now",
+  "downloadReceipt": "Download receipt"
+}
