@@ -867,6 +867,16 @@ pub fn browse_jql(
     format!("{} ORDER BY updated DESC", parts.join(" AND "))
 }
 
+/// JQL for exactly these tickets, or none when no key is one. The keys come
+/// from branch names and PR titles other people wrote, so only a key's shape
+/// reaches the query.
+pub fn keys_jql(keys: &[String]) -> Option<String> {
+    let mut keys: Vec<&str> = keys.iter().map(|k| k.trim()).filter(|k| looks_like_a_key(k)).collect();
+    keys.sort_unstable();
+    keys.dedup();
+    (!keys.is_empty()).then(|| format!("key IN ({})", keys.join(", ")))
+}
+
 #[cfg(test)]
 mod browse_tests {
     use super::*;
@@ -900,6 +910,14 @@ mod browse_tests {
         assert!(browse_jql(None, Some("ACME-9"), Whose::Anyone, false, &[]).contains(r#"key = "ACME-9""#));
         assert!(browse_jql(None, Some("rounding"), Whose::Anyone, false, &[])
             .contains("text ~ \"rounding\""));
+    }
+
+    #[test]
+    fn only_the_shape_of_a_key_reaches_a_lookup_by_keys() {
+        let keys = |k: &[&str]| keys_jql(&k.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        assert_eq!(keys(&["ACME-2", "ACME-1", "ACME-2"]).as_deref(), Some("key IN (ACME-1, ACME-2)"));
+        assert_eq!(keys(&["ACME-1) OR project = SECRET", "ACME-3"]).as_deref(), Some("key IN (ACME-3)"));
+        assert_eq!(keys(&["fix-typo", ""]), None);
     }
 
     #[test]

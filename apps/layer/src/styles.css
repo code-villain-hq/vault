@@ -859,6 +859,19 @@ body.dragging * { pointer-events: none; }
 }
 /* The list says how many; a group label does not repeat it. */
 .section-head .count { display: none; }
+/* Grouping is set once and left (TASK-17): it stays as faint as the heading. */
+.section-head .group-by {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.section-head .group-by:hover { color: var(--fg); }
+.section-head .group-key { flex: none; font-family: var(--font-mono); }
+.section-head .group-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 
 .chev,
 .chev-spacer {
@@ -1078,6 +1091,7 @@ body.dragging * { pointer-events: none; }
   color: var(--faint);
   font-size: var(--type-ui-small-size);
 }
+.review-list-head .count.key { font-family: var(--font-mono); }
 .review-list-body { padding: 4px 0 0; }
 .review-card {
   display: block;

@@ -1,14 +1,15 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { api } from "../lib/api";
 import { copyAndSay } from "../lib/clipboard";
 import { authoredGroups, countOf, reviewCounts, taskOfPr } from "../lib/derive";
+import { useEpics } from "../lib/epics";
 import { goTo } from "../lib/goto";
+import { byEpic, groupBy, sortPrs, SORT_LABEL, ticketKeyIn, type EpicOf, type Group, type Sort } from "../lib/grouping";
 import { readOneOf, write } from "../lib/persist";
-import { ago } from "../lib/time";
 import { useStore } from "../store";
 import type { AuthoredPr, ReviewRequest, TeamReviews } from "../lib/types";
 import { ChevronIcon } from "./icons";
+import { AuthoredCard, identity, ReviewCard } from "./ReviewCards";
 import { ContextMenu, Spinner, type MenuItem } from "./ui";
 
 /** `@fe` when that is all we know; the team's own name when GitHub sent one. */
@@ -16,90 +17,6 @@ function teamLabel(team: TeamReviews): string {
   const slugPart = team.slug.split("/").pop() || team.slug;
   if (team.name && team.name.toLowerCase() !== slugPart.toLowerCase()) return team.name;
   return `@${slugPart}`;
-}
-
-/** How a banner names a pull request: `owner/repo#n`, as `news.rs` writes it. */
-function identity(pr: { repo: string; number: number }): string {
-  return pr.repo ? `${pr.repo}#${pr.number}` : `#${pr.number}`;
-}
-
-/**
- * A pull request waiting on your review, and what it asks of you (REV-9).
- * A click opens it on GitHub, where it is reviewed.
- */
-function ReviewCard({
-  pr,
-  focused,
-  onContextMenu,
-}: {
-  pr: ReviewRequest;
-  focused: boolean;
-  onContextMenu: (e: MouseEvent) => void;
-}) {
-  const fail = useStore((s) => s.fail);
-  const open = () => void openUrl(pr.url).catch(fail);
-
-  return (
-    // A div, not a button: it holds buttons of its own.
-    <div
-      role="button"
-      tabIndex={0}
-      className={`review-card${focused ? " focused" : ""}`}
-      data-review={identity(pr)}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          open();
-        }
-      }}
-      onContextMenu={onContextMenu}
-      title={pr.url}
-    >
-      <div className="top">
-        <span className="repo">{pr.repo || "pull request"}</span>
-        <span className="num">#{pr.number}</span>
-        {pr.draft && <span className="ui-chip">draft</span>}
-        <span className="spacer" />
-        <span className="when">{ago(pr.updated_at)}</span>
-        <button
-          type="button"
-          className="ui-link"
-          title={pr.url}
-          onClick={(e) => { e.stopPropagation(); open(); }}
-        >
-          GitHub ↗
-        </button>
-      </div>
-      <div className="title">{pr.title}</div>
-      <div className="chips standing">
-        {pr.author && <span className="by">{pr.author}</span>}
-        <span className="ui-chip size" title={`${pr.changed_files} files, opened ${ago(pr.created_at)} ago`}>
-          <span className="add">+{pr.additions}</span> <span className="del">−{pr.deletions}</span>
-          {" · "}{pr.changed_files} {pr.changed_files === 1 ? "file" : "files"}
-        </span>
-        {pr.cross_repo && <span className="ui-chip" title="Its branch is on a fork">fork</span>}
-        {pr.checks === "failing" && <span className="ui-status ui-status-danger">checks failing</span>}
-        {pr.checks === "pending" && <span className="ui-status ui-status-warn">checks running</span>}
-        {pr.checks === "passing" && <span className="ui-status ui-status-ok">checks pass</span>}
-        <MyReview pr={pr} />
-      </div>
-    </div>
-  );
-}
-
-/** Where your own review of it stands (REV-9): what this request asks of you. */
-function MyReview({ pr }: { pr: ReviewRequest }) {
-  if (pr.new_since_review) {
-    return <span className="ui-status ui-status-warn" title="Its author pushed after your last review">new commits since your review</span>;
-  }
-  switch (pr.my_review) {
-    case "approved": return <span className="ui-status ui-status-ok">you approved</span>;
-    case "changes_requested": return <span className="ui-status ui-status-danger">you asked for changes</span>;
-    case "commented": return <span className="ui-chip">you commented</span>;
-    case "dismissed": return <span className="ui-chip">your review was dismissed</span>;
-    default: return <span className="ui-status ui-status-warn">not reviewed yet</span>;
-  }
 }
 
 const TONE = { good: "add", bad: "del", wait: "warn", draft: "" } as const;
@@ -113,107 +30,31 @@ const SIDES = ["review", "authored"] as const;
 type Side = (typeof SIDES)[number];
 
 /**
- * One of your pull requests and where it stands (REV-4), and the way to act
- * on it (REV-7): a click opens its task's Pull requests tab, where feedback
- * goes to an agent; one with no task gets one on its branch. GitHub is the
- * button in the corner. Where it stands is the heading of its group (REV-8).
+ * How each side can be grouped and sorted (REV-11). The first grouping is
+ * the one it always had: who it was asked of, and whose move it is (REV-8).
+ * Your own PRs have no size to sort by.
  */
-function AuthoredCard({
-  pr,
-  task,
-  onContextMenu,
-}: {
-  pr: AuthoredPr;
-  task: { id: string; name: string } | null;
-  onContextMenu: (e: MouseEvent) => void;
-}) {
-  const fail = useStore((s) => s.fail);
-  const refreshTasks = useStore((s) => s.refreshTasks);
-  const refreshPrs = useStore((s) => s.refreshPrs);
-  const [starting, setStarting] = useState(false);
-  const who = (names: string[]) => (names.length ? ` by ${names.join(", ")}` : "");
-  const openGitHub = () => void openUrl(pr.url).catch(fail);
-  const open = () => (task ? goTo(`pr:${task.id}`) : openGitHub());
+const GROUPS = {
+  review: [["who", "Who asked"], ["epic", "Epic"], ["repo", "Repository"]],
+  authored: [["move", "Whose move"], ["epic", "Epic"], ["repo", "Repository"]],
+} as const;
+const SORTS_OF: Record<Side, readonly Sort[]> = { review: ["newest", "oldest", "smallest"], authored: ["newest", "oldest"] };
 
-  async function start() {
-    setStarting(true);
-    try {
-      const made = await api.taskForPr(pr.repo, pr.head, pr.base, pr.title);
-      // In the list before going to it: a task the store has not seen yet
-      // routes to the overview instead.
-      await refreshTasks();
-      goTo(`pr:${made.id}`);
-      void refreshPrs();
-    } catch (e) {
-      fail(e);
-    } finally {
-      setStarting(false);
-    }
-  }
+/** The ticket a pull request is for: its task's, else a key in its branch or title. */
+function ticketOf(pr: { head: string; title: string }, taskKey?: string | null): string | null {
+  return taskKey ?? ticketKeyIn(pr.head) ?? ticketKeyIn(pr.title);
+}
 
-  return (
-    // A div, not a button: it holds buttons of its own.
-    <div
-      role="button"
-      tabIndex={0}
-      className="review-card"
-      data-review={identity(pr)}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          open();
-        }
-      }}
-      onContextMenu={onContextMenu}
-      title={task ? `Open ${task.name}` : pr.url}
-    >
-      <div className="top">
-        <span className="repo">{pr.repo}</span>
-        <span className="num">#{pr.number}</span>
-        <span className="spacer" />
-        <span className="when">{ago(pr.updated_at)}</span>
-        <button
-          type="button"
-          className="ui-link"
-          title={pr.url}
-          onClick={(e) => { e.stopPropagation(); openGitHub(); }}
-        >
-          GitHub ↗
-        </button>
-      </div>
-      <div className="title">{pr.title}</div>
-      <div className="chips standing">
-        {pr.checks === "failing" && <span className="ui-status ui-status-danger">checks failing</span>}
-        {pr.checks === "pending" && <span className="ui-status ui-status-warn">checks running</span>}
-        {pr.checks === "passing" && <span className="ui-status ui-status-ok">checks pass</span>}
-        {pr.review === "changes_requested" && <span className="ui-status ui-status-danger">changes requested{who(pr.changes_by)}</span>}
-        {pr.review === "approved" && <span className="ui-status ui-status-ok">approved{who(pr.approved_by)}</span>}
-        {pr.review === "review_required" && pr.waiting_on.length === 0 && <span className="ui-status ui-status-warn">needs a review</span>}
-        {pr.waiting_on.length > 0 && <span className="ui-chip">waiting on {pr.waiting_on.join(", ")}</span>}
-        {pr.unresolved > 0 && (
-          <span className="ui-status ui-status-warn">{pr.unresolved}{pr.unresolved_more ? "+" : ""} unresolved</span>
-        )}
-        {pr.conflicts && <span className="ui-status ui-status-danger">conflicts</span>}
-        {task && <span className="ui-status ui-status-info">{task.name}</span>}
-        {!task && (
-          <button
-            type="button"
-            className="ui-button start"
-            disabled={starting}
-            title={`A task on ${pr.head}, to work on it here`}
-            onClick={(e) => { e.stopPropagation(); void start(); }}
-          >
-            {starting ? <Spinner /> : "Start task"}
-          </button>
-        )}
-      </div>
-    </div>
-  );
+/** Grouped by epic or repository: the grouping that is not about whose move it is. */
+function regroup<T extends { repo: string }>(prs: T[], by: string, epicOf: (pr: T) => EpicOf | null | undefined): Group<T>[] {
+  return by === "epic"
+    ? byEpic(prs, epicOf)
+    : groupBy(prs, (pr) => ({ id: pr.repo, label: pr.repo || "pull request" }), "No repository");
 }
 
 function ReviewList({
   heading,
+  epicKey,
   tone,
   title,
   count,
@@ -223,6 +64,8 @@ function ReviewList({
   children,
 }: {
   heading: string;
+  /** An epic's Jira key, beside its title. */
+  epicKey?: string;
   tone?: string;
   title?: string;
   count?: string;
@@ -236,6 +79,7 @@ function ReviewList({
       <button type="button" className="review-list-head" onClick={onToggle}>
         <span className={`chev${open ? " open" : ""}`}><ChevronIcon /></span>
         <span className={`title${tone ? ` ${tone}` : ""}`}>{heading}</span>
+        {epicKey && <span className="count key">{epicKey}</span>}
         {count !== undefined && <span className="count">{count}</span>}
       </button>
       {open && (
@@ -273,6 +117,18 @@ export function ReviewsView() {
     setSideState(next);
     write("reviewsSide", next);
   };
+  const [grouping, setGrouping] = useState<Record<Side, string>>(() => ({
+    review: readOneOf("reviewsGroup.review", GROUPS.review.map((g) => g[0]), "who"),
+    authored: readOneOf("reviewsGroup.authored", GROUPS.authored.map((g) => g[0]), "move"),
+  }));
+  const [sorting, setSorting] = useState<Record<Side, Sort>>(() => ({
+    review: readOneOf("reviewsSort.review", SORTS_OF.review, "newest"),
+    authored: readOneOf("reviewsSort.authored", SORTS_OF.authored, "newest"),
+  }));
+  const jiraConnected = useStore((s) => s.settings?.jira_connected ?? false);
+  // Without Jira there is no epic to ask for; the choice is kept for when it is back.
+  const by = grouping[side] === "epic" && !jiraConnected ? GROUPS[side][0][0] : grouping[side];
+  const sort = sorting[side];
 
   // A banner or a message about one pull request: open its list, bring it
   // into view and light it up briefly. It waits for the queue to arrive; one
@@ -319,6 +175,19 @@ export function ReviewsView() {
     return task ? { id: task.id, name: task.name } : null;
   }
 
+  const requested = [
+    ...(queue?.mine ?? []).map((pr) => ({ pr, asked: "you" })),
+    ...(queue?.team && !queue.team.error ? queue.team.prs.map((pr) => ({ pr, asked: teamLabel(queue.team!) })) : []),
+  ];
+  const ownPrs = queue?.authored?.prs ?? [];
+  const keyOf = (pr: AuthoredPr) => ticketOf(pr, tasks.find((t) => t.id === taskOfPr(pr, taskPrs, tasks))?.issue_key);
+  const epics = useEpics(
+    side === "review"
+      ? requested.flatMap(({ pr }) => ticketOf(pr) ?? [])
+      : ownPrs.flatMap((pr) => keyOf(pr) ?? []),
+    by === "epic",
+  );
+
   if (!settings) {
     return (
       <div className="empty">
@@ -346,9 +215,44 @@ export function ReviewsView() {
     <div className="wide">
       <div className="wide-head">
         <h2>Reviews</h2>
-        <span className="sub">
-          {side === "review" ? "Pull requests waiting on you or your team" : "Your pull requests, and what each is waiting on"}
+        <span className="sub">Group</span>
+        <span className="ui-segmented" role="group" aria-label="Group by">
+          {GROUPS[side].filter(([g]) => g !== "epic" || jiraConnected).map(([g, label]) => (
+            <button
+              key={g}
+              type="button"
+              className="ui-segment"
+              aria-pressed={by === g}
+              onClick={() => {
+                setGrouping((c) => ({ ...c, [side]: g }));
+                write(`reviewsGroup.${side}`, g);
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </span>
+        <span className="sub">Sort</span>
+        <button
+          type="button"
+          className="ui-button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({
+              x: r.left,
+              y: r.bottom + 4,
+              items: SORTS_OF[side].map((o) => ({
+                label: `${o === sort ? "✓ " : ""}${SORT_LABEL[o]}`,
+                onSelect: () => {
+                  setSorting((c) => ({ ...c, [side]: o }));
+                  write(`reviewsSort.${side}`, o);
+                },
+              })),
+            });
+          }}
+        >
+          {SORT_LABEL[sort]} ▾
+        </button>
         <div className="spacer" />
         {loading && <Spinner />}
         <button type="button" className="ui-button" onClick={() => void refresh()}>Refresh</button>
@@ -371,9 +275,30 @@ export function ReviewsView() {
             <p className="review-note warn">{authored.error}</p>
           ) : authored && authored.prs.length === 0 ? (
             <p className="review-note">You have no open pull requests.</p>
+          ) : authored && by !== "move" ? (
+            regroup(sortPrs(authored.prs, sort), by, (pr) => {
+              const key = keyOf(pr);
+              return key ? epics[key] : null;
+            }).map((g) => (
+              <ReviewList
+                key={g.id}
+                heading={g.label}
+                epicKey={g.key}
+                count={String(g.items.length)}
+                open={!shut[`authored:${by}:${g.id}`]}
+                onToggle={() => toggle(`authored:${by}:${g.id}`)}
+              >
+                {g.items.map((pr) => {
+                  const task = taskOf(pr);
+                  return (
+                    <AuthoredCard key={identity(pr)} pr={pr} task={task} onContextMenu={(e) => openMenu(e, pr, task?.id)} />
+                  );
+                })}
+              </ReviewList>
+            ))
           ) : (
             authored &&
-            authoredGroups(authored.prs).map(({ standing, prs }) => (
+            authoredGroups(sortPrs(authored.prs, sort)).map(({ standing, prs }) => (
               <ReviewList
                 key={standing.label}
                 heading={groupHeading(standing.label)}
@@ -403,7 +328,41 @@ export function ReviewsView() {
         </div>
       )}
 
-      {side === "review" && (
+      {side === "review" && by !== "who" && (
+        <>
+          {queue?.team?.error && <p className="review-note warn">{queue.team.error}</p>}
+          {queue && requested.length === 0 && <p className="review-note">Nothing is waiting on you or your team.</p>}
+          {!queue && loading && <p className="review-note">Loading…</p>}
+          {regroup(sortPrs(requested.map((r) => r.pr), sort), by, (pr) => {
+            const key = ticketOf(pr);
+            return key ? epics[key] : null;
+          }).map((g) => (
+            <ReviewList
+              key={g.id}
+              heading={g.label}
+              epicKey={g.key}
+              count={String(g.items.length)}
+              open={!shut[`review:${by}:${g.id}`]}
+              onToggle={() => toggle(`review:${by}:${g.id}`)}
+            >
+              {g.items.map((pr) => (
+                <ReviewCard
+                  key={identity(pr)}
+                  pr={pr}
+                  asked={requested.find((r) => r.pr === pr)?.asked}
+                  focused={focusReview === identity(pr)}
+                  onContextMenu={(e) => openMenu(e, pr)}
+                />
+              ))}
+            </ReviewList>
+          ))}
+          {(queue?.mine_more || (queue?.team?.more && !queue.team.error)) && (
+            <p className="review-note">Showing the 100 most recently updated of each.</p>
+          )}
+        </>
+      )}
+
+      {side === "review" && by === "who" && (
         <>
           <ReviewList
             heading="You"
@@ -415,7 +374,7 @@ export function ReviewsView() {
             {queue && queue.mine.length === 0 && (
               <p className="review-note">Nothing is waiting on you.</p>
             )}
-            {queue?.mine.map((pr) => (
+            {queue && sortPrs(queue.mine, sort).map((pr) => (
               <ReviewCard
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
@@ -440,7 +399,7 @@ export function ReviewsView() {
               ) : team.prs.length === 0 ? (
                 <p className="review-note">Nothing is waiting on {teamLabel(team)}.</p>
               ) : (
-                team.prs.map((pr) => (
+                sortPrs(team.prs, sort).map((pr) => (
                   <ReviewCard
                     key={`${pr.repo}#${pr.number}`}
                     pr={pr}

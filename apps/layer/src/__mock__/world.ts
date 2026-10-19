@@ -45,6 +45,8 @@ export interface World {
   prs: TaskPrs[];
   reviews: ReviewQueue;
   issues: JiraIssue[];
+  /** Tickets not on your list, which grouping by epic asks Jira for (TASK-17, REV-11). */
+  elsewhere: JiraIssue[];
   issueTypes: JiraIssueType[];
   transitions: JiraTransition[];
   requiredFields: CreateField[];
@@ -453,6 +455,13 @@ function busy(): World {
       issue("ACME-140", "Remember the last workspace", "To Do", "new", "ACME-100", 12),
       issue("ACME-141", "Rate-limit password resets", "To Do", "new", null, 0.1),
     ],
+    elsewhere: [
+      { ...issue("ACME-130", "Audit log page", "In Progress", "indeterminate", "ACME-200"), epic_summary: "Audit and compliance" },
+      { ...issue("ACME-12", "Document the retry settings", "Review", "indeterminate", "ACME-200"), epic_summary: "Audit and compliance" },
+      { ...issue("ACME-91", "Remember the last workspace", "Review", "indeterminate", "ACME-100") },
+      { ...issue("ACME-88", "Speed up the search box", "Review", "indeterminate", "ACME-300"), epic_summary: "Search speed" },
+      { ...issue("ACME-33", "Drop the legacy theme", "Review", "indeterminate", "ACME-300"), epic_summary: "Search speed" },
+    ],
     issueTypes,
     transitions: [
       { id: "11", name: "Start", to_status: "In Progress", to_id: "3", to_category: "indeterminate" },
@@ -532,7 +541,7 @@ function empty(): World {
   return {
     projects: [], health: [], cleanup: [], tasks: [], panes: [], waiting: [], agents, settings: disconnected, prs: [],
     reviews: { mine: [], mine_more: false, team: null, authored: { prs: [], more: false, error: null } },
-    issues: [], issueTypes: [], transitions: [], requiredFields: [], changed: [], feedback: [], output: {},
+    issues: [], elsewhere: [], issueTypes: [], transitions: [], requiredFields: [], changed: [], feedback: [], output: {},
     messages: [],
     notes: {},
     slackBot: { status: { state: "off", error: null }, threads: [] },
