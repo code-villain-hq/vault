@@ -8,10 +8,13 @@
 mod account;
 mod glossary;
 mod language;
+mod llm;
 mod model;
 mod pair;
 mod protocol;
 mod rules;
+mod run;
+mod suggestion;
 mod translation;
 mod user;
 
@@ -23,6 +26,7 @@ pub use account::{
 };
 pub use glossary::{GlossaryEntry, GlossaryEntryCreate, GlossaryEntryPatch};
 pub use language::{Language, LanguageCreate, LanguagePatch};
+pub use llm::{ModelInfo, ModelProcess, Variants, VariantsRequest};
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use pair::{LanguagePair, LanguagePairCreate, LanguagePairPatch};
 pub use protocol::{
@@ -30,5 +34,10 @@ pub use protocol::{
     TransactionResult,
 };
 pub use rules::language_code;
+pub use run::{
+    KeyRef, RunKind, RunStatus, StartRunRequest, TranslationRun, TranslationRunCreate,
+    TranslationRunPatch,
+};
+pub use suggestion::{GlossaryViolation, Suggestion, SuggestionCreate, SuggestionPatch};
 pub use translation::{DEFAULT_NAMESPACE, HUMAN, Translation, TranslationCreate, TranslationPatch};
 pub use user::User;

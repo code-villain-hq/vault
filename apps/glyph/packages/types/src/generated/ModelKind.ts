@@ -7,4 +7,4 @@
  * create and patch types; the compiler points at every `match` to extend.
  * See "Adding a synced model" in AGENTS.md.
  */
-export type ModelKind = "Language" | "Translation" | "GlossaryEntry" | "LanguagePair" | "User";
+export type ModelKind = "Language" | "Translation" | "GlossaryEntry" | "LanguagePair" | "Suggestion" | "TranslationRun" | "User";

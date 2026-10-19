@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, invites, members, ws};
+use crate::{accounts, invites, members, models, translate, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -40,7 +40,10 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/invites", get(invites::list).post(invites::create))
-        .route("/invites/{invite_id}", delete(invites::revoke));
+        .route("/invites/{invite_id}", delete(invites::revoke))
+        .route("/runs", post(translate::start))
+        .route("/runs/{run_id}/cancel", post(translate::cancel))
+        .route("/glossary/variants", post(translate::variants));
 
     Router::new()
         .route("/api/health", get(|| async { "ok" }))
@@ -51,6 +54,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/me/password", put(accounts::change_password))
         .route("/api/invites/{token}", get(invites::preview))
         .route("/api/invites/{token}/accept", post(invites::accept))
+        .route("/api/models", get(models::list))
+        .route("/api/models/{name}/start", post(models::start))
+        .route("/api/models/{name}/stop", post(models::stop))
         .nest("/api/w/{workspace_id}", workspace)
         .layer(desktop_cors())
         .layer(

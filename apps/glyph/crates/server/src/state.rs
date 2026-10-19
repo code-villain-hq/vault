@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use glyph_llm::{Models, Processes};
 use sqlx::PgPool;
-use tokio::sync::broadcast;
+use tokio::sync::{Semaphore, broadcast};
 use uuid::Uuid;
 
 use crate::limits::Attempts;
@@ -21,6 +22,12 @@ pub struct AppState {
     /// Whether to take client addresses from `X-Forwarded-For`, which only
     /// a proxy in front of Glyph may set (`GLYPH_TRUST_FORWARDED_FOR=1`).
     pub trust_forwarded_for: bool,
+    /// The translation models, from the models file.
+    pub models: Arc<Models>,
+    /// The model servers this server started.
+    pub processes: Processes,
+    /// Translation runs take turns: one model serves them all.
+    pub llm_turn: Arc<Semaphore>,
 }
 
 impl AppState {
@@ -33,7 +40,15 @@ impl AppState {
             password_attempts: Arc::default(),
             signup_attempts: Arc::new(Attempts::sign_ups()),
             trust_forwarded_for: false,
+            models: Arc::default(),
+            processes: Processes::new(),
+            llm_turn: Arc::new(Semaphore::new(1)),
         }
+    }
+
+    pub fn with_models(mut self, models: Models) -> Self {
+        self.models = Arc::new(models);
+        self
     }
 
     /// Takes client addresses from `X-Forwarded-For`, for a server behind a

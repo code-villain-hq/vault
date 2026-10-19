@@ -2,7 +2,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use glyph_server::config::Config;
-use glyph_server::{AppState, accounts, app, notify};
+use glyph_llm::Models;
+use glyph_server::{AppState, accounts, app, models, notify, translate};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -34,8 +35,21 @@ async fn main() -> anyhow::Result<()> {
         .as_slice()
     {
         [] | ["serve"] => {
+            let models = Models::load(&config.models_file)?;
+            match models.models.len() {
+                0 => tracing::warn!(
+                    file = %config.models_file.display(),
+                    "no translation models; see models.example.toml"
+                ),
+                n => tracing::info!(file = %config.models_file.display(), "{n} translation model(s)"),
+            }
+            translate::fail_interrupted(&pool)
+                .await
+                .map_err(|e| anyhow::anyhow!("couldn't tidy up interrupted runs: {e:?}"))?;
             let state = AppState::new(pool, config.cookie_secure)
-                .trusting_forwarded_for(config.trust_forwarded_for);
+                .trusting_forwarded_for(config.trust_forwarded_for)
+                .with_models(models);
+            let processes = state.processes.clone();
             tokio::spawn(notify::listen(state.pool.clone(), state.wake.clone()));
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
@@ -47,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
                     let _ = tokio::signal::ctrl_c().await;
                 })
                 .await?;
+            processes.stop_all(models::GRACE).await;
         }
         ["reset-password", email] => {
             let password = accounts::reset_password(&pool, email).await?;

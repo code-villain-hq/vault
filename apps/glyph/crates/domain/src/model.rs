@@ -7,6 +7,8 @@ use uuid::Uuid;
 use crate::glossary::{GlossaryEntryCreate, GlossaryEntryPatch};
 use crate::language::{LanguageCreate, LanguagePatch};
 use crate::pair::{LanguagePairCreate, LanguagePairPatch};
+use crate::run::{TranslationRunCreate, TranslationRunPatch};
+use crate::suggestion::{SuggestionCreate, SuggestionPatch};
 use crate::translation::{TranslationCreate, TranslationPatch};
 
 /// Who is making a change, and in which workspace.
@@ -28,6 +30,8 @@ pub enum ModelKind {
     Translation,
     GlossaryEntry,
     LanguagePair,
+    Suggestion,
+    TranslationRun,
     User,
 }
 
@@ -45,6 +49,8 @@ impl ModelKind {
         ModelKind::Translation,
         ModelKind::GlossaryEntry,
         ModelKind::LanguagePair,
+        ModelKind::Suggestion,
+        ModelKind::TranslationRun,
         ModelKind::User,
     ];
 
@@ -55,6 +61,8 @@ impl ModelKind {
             ModelKind::Translation => "translations",
             ModelKind::GlossaryEntry => "glossary_entries",
             ModelKind::LanguagePair => "language_pairs",
+            ModelKind::Suggestion => "suggestions",
+            ModelKind::TranslationRun => "translation_runs",
             ModelKind::User => "workspace_users",
         }
     }
@@ -66,6 +74,8 @@ impl ModelKind {
             ModelKind::Translation => "Translation",
             ModelKind::GlossaryEntry => "GlossaryEntry",
             ModelKind::LanguagePair => "LanguagePair",
+            ModelKind::Suggestion => "Suggestion",
+            ModelKind::TranslationRun => "TranslationRun",
             ModelKind::User => "User",
         }
     }
@@ -75,9 +85,15 @@ impl ModelKind {
     }
 
     /// Whether clients may make this kind of write through sync. Users are
-    /// read-only: membership changes go through the account API.
-    pub fn client_may(self, _write: Write) -> bool {
-        self != ModelKind::User
+    /// read-only: membership changes go through the account API. The server
+    /// makes suggestions and runs; clients may only reject (delete) a
+    /// suggestion, and start runs through the translate API.
+    pub fn client_may(self, write: Write) -> bool {
+        match self {
+            ModelKind::User | ModelKind::TranslationRun => false,
+            ModelKind::Suggestion => write == Write::Delete,
+            _ => true,
+        }
     }
 
     /// Records only their owner (`user_id`) syncs, rather than the whole
@@ -93,6 +109,8 @@ impl ModelKind {
             ModelKind::Translation => check::<TranslationCreate>(data),
             ModelKind::GlossaryEntry => check::<GlossaryEntryCreate>(data),
             ModelKind::LanguagePair => check::<LanguagePairCreate>(data),
+            ModelKind::Suggestion => check::<SuggestionCreate>(data),
+            ModelKind::TranslationRun => check::<TranslationRunCreate>(data),
             ModelKind::User => Err(ValidationError("users are read-only".into())),
         }
     }
@@ -104,6 +122,8 @@ impl ModelKind {
             ModelKind::Translation => check::<TranslationPatch>(data),
             ModelKind::GlossaryEntry => check::<GlossaryEntryPatch>(data),
             ModelKind::LanguagePair => check::<LanguagePairPatch>(data),
+            ModelKind::Suggestion => check::<SuggestionPatch>(data),
+            ModelKind::TranslationRun => check::<TranslationRunPatch>(data),
             ModelKind::User => Err(ValidationError("users are read-only".into())),
         }
     }
@@ -156,5 +176,17 @@ mod tests {
         assert!(ModelKind::Translation.validate_patch(&cleared).is_ok());
         let same = map(json!({ "source_lang": "en", "target_lang": "en" }));
         assert!(ModelKind::LanguagePair.validate_create(&same).is_err());
+    }
+
+    #[test]
+    fn clients_only_reject_suggestions_and_never_write_runs() {
+        assert!(ModelKind::Suggestion.client_may(Write::Delete));
+        assert!(!ModelKind::Suggestion.client_may(Write::Create));
+        assert!(!ModelKind::Suggestion.client_may(Write::Update));
+        for write in [Write::Create, Write::Update, Write::Delete] {
+            assert!(!ModelKind::TranslationRun.client_may(write));
+            assert!(!ModelKind::User.client_may(write));
+            assert!(ModelKind::Translation.client_may(write));
+        }
     }
 }

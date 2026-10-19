@@ -9,9 +9,11 @@ pub mod error;
 pub mod invites;
 pub mod limits;
 pub mod members;
+pub mod models;
 pub mod notify;
 pub mod routes;
 pub mod state;
+pub mod translate;
 pub mod ws;
 
 pub use routes::{app, router};

@@ -13,6 +13,7 @@ chrono.workspace = true
 futures.workspace = true
 getrandom.workspace = true
 glyph-domain.workspace = true
+glyph-llm.workspace = true
 glyph-sync.workspace = true
 hex.workspace = true
 http.workspace = true

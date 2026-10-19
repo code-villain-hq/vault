@@ -335,7 +335,8 @@ async fn cascade(
 
     let mut operations = Vec::new();
     match model {
-        // A language takes its texts, glossary and pair settings with it.
+        // A language takes its texts, suggestions, glossary, pair settings
+        // and runs with it.
         ModelKind::Language => {
             let translations = ids(
                 db,
@@ -345,6 +346,14 @@ async fn cascade(
             )
             .await?;
             operations.extend(translations.into_iter().map(delete(ModelKind::Translation)));
+            let suggestions = ids(
+                db,
+                "SELECT s.id FROM suggestions s JOIN languages l \
+                 ON l.workspace_id = s.workspace_id AND l.code = s.lang \
+                 WHERE l.id = $1 AND l.workspace_id = $2",
+            )
+            .await?;
+            operations.extend(suggestions.into_iter().map(delete(ModelKind::Suggestion)));
             let entries = ids(
                 db,
                 "SELECT g.id FROM glossary_entries g JOIN languages l \
@@ -361,8 +370,20 @@ async fn cascade(
             )
             .await?;
             operations.extend(pairs.into_iter().map(delete(ModelKind::LanguagePair)));
+            let runs = ids(
+                db,
+                "SELECT r.id FROM translation_runs r JOIN languages l \
+                 ON l.workspace_id = r.workspace_id AND l.code IN (r.source_lang, r.target_lang) \
+                 WHERE l.id = $1 AND l.workspace_id = $2",
+            )
+            .await?;
+            operations.extend(runs.into_iter().map(delete(ModelKind::TranslationRun)));
         }
-        ModelKind::Translation | ModelKind::GlossaryEntry | ModelKind::LanguagePair => {}
+        ModelKind::Translation
+        | ModelKind::GlossaryEntry
+        | ModelKind::LanguagePair
+        | ModelKind::Suggestion
+        | ModelKind::TranslationRun => {}
         ModelKind::User => {
             return Err(SyncError::Invalid(format!(
                 "{} records can't be deleted this way",

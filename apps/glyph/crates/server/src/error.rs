@@ -44,6 +44,15 @@ impl AppError {
         Self::new(StatusCode::CONFLICT, "conflict", message)
     }
 
+    /// Something the server depends on, such as a model, isn't answering.
+    pub fn unavailable(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::SERVICE_UNAVAILABLE, "unavailable", message)
+    }
+
+    pub fn is_not_found(&self) -> bool {
+        self.status == StatusCode::NOT_FOUND
+    }
+
     /// Refused for now, after too many wrong passwords.
     pub fn too_many(wait: std::time::Duration) -> Self {
         Self::try_again_later("too many wrong passwords", wait)
