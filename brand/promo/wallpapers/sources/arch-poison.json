@@ -1,0 +1,5 @@
+{
+  "generator": "built-in image_gen",
+  "source": "../code-villain-arch-cloak.png",
+  "prompt": "Edit this exact wallpaper by adding ONLY one clean perfectly horizontal thin solid chartreuse poison line (#C9E265) within the central black negative space inside the gothic arch. Center the line horizontally at about 53 percent of canvas height. Line spans about 48 percent of full image width, from x=26% to x=74%, with crisp square ends and uniform thickness about 0.65% of image height. Keep it entirely within the black opening with generous black clear space between its ends and the arch edges. Flat solid color, no glow, no taper, no text, no wordmark. Preserve all existing arch geometry, purple edge lighting, engraved texture, near-black background, composition, resolution and 16:9 aspect ratio. Change nothing else."
+}

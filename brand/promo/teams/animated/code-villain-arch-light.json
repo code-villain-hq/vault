@@ -1,0 +1,58 @@
+{
+  "source": "../../wallpapers/code-villain-arch-cloak.png",
+  "source_sha256": "7a9906e58684d5322418a56c54d4cc81f17394905fe381e77586b260a2f039c8",
+  "source_size": [
+    1672,
+    941
+  ],
+  "output": "code-villain-arch-light.mp4",
+  "size": [
+    1920,
+    1080
+  ],
+  "fps": 30,
+  "duration_seconds": 16,
+  "frames": 480,
+  "design": "Slow soft violet light passing around fixed arch facets. No camera motion, text, strike, or sound.",
+  "loop": "Analytically periodic light fields. Frame at 16s is identical to frame at 0s; duplicate endpoint omitted.",
+  "validation": {
+    "exact_periodic_endpoint": true,
+    "source_frame_seam_mean_absolute_code_difference": 0.0037844889975881643,
+    "source_frame_next_mean_absolute_code_difference": 0.003715845744203035,
+    "neutral_pixels_fixed": true,
+    "decoded_frames": 480,
+    "decoded_seam_mae": 0.17658114711934156,
+    "decoded_adjacent_frame_mae_mean": 0.008096741378643779,
+    "decoded_adjacent_frame_mae_max": 0.03061101466049383
+  },
+  "teams": {
+    "checked": "2026-10-19",
+    "native_custom_video_upload": false,
+    "usage": "Loop this MP4 behind your segmented camera in a virtual-camera compositor; select its virtual camera in Teams and leave Teams background effects off. The PNG can be uploaded as a static background.",
+    "sources": [
+      "https://support.microsoft.com/en-gb/teams/meetings/change-your-background-in-microsoft-teams-meetings",
+      "https://techcommunity.microsoft.com/blog/microsoft365insiderblog/animated-backgrounds-in-teams-meetings/4220884"
+    ]
+  },
+  "rebuild": "python3 render_arch_light.py (requires numpy, Pillow, ffmpeg and ffprobe)",
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "profile": "High",
+        "width": 1920,
+        "height": 1080,
+        "pix_fmt": "yuv420p",
+        "color_space": "bt709",
+        "r_frame_rate": "30/1",
+        "nb_frames": "480"
+      }
+    ],
+    "format": {
+      "duration": "16.000000",
+      "size": "2683065"
+    }
+  }
+}

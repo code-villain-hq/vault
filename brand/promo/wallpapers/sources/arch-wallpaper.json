@@ -1,0 +1,6 @@
+{
+  "generator": "built-in image_gen",
+  "source": "../../teams/code-villain-arch.png",
+  "prompt": "Edit the supplied arch background into a finished premium desktop wallpaper. Preserve this exact composition, pointed gothic arch geometry, layered matte charcoal planes, engraved vertical grooves, near-black center and restrained violet edge lighting. Remove ONLY the chartreuse horizontal line at upper right, seamlessly restoring the underlying charcoal arch grooves. No green anywhere. No lettering, logos, furniture, people or extra objects. Keep the large quiet central void. Refine fine engraved detail for a wallpaper, no visual redesign. Landscape 16:9, output 3840x2160 if possible. The entire canvas is the wallpaper.",
+  "composition": "../build_arch.py adds the original ../../mark/logo-night.svg without modifying its artwork."
+}
