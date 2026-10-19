@@ -8,6 +8,8 @@
  *   columns                                                sv   fr   fi
  *   group     › auth  8 keys  2 low confidence             8/8  7/8  1/8
  *   row         signIn   Sign in ……………………………………    ●    ●    ●
+ *
+ *   phone       › auth ●                                   20    1    2
  */
 @layer components {
   /* ── Search in the top bar: a field holding an icon, the input and ⌘F ── */
@@ -235,6 +237,9 @@
   .tx-group-count.is-done {
     color: var(--faint);
   }
+  .tx-count-missing {
+    display: none;
+  }
   #keysList[data-virtual="true"] .tx-group {
     margin-top: 0;
   }
@@ -435,15 +440,37 @@
   }
 
   @media (max-width: 760px) {
-    /* Phone: the source text gives way to the key and the dots. */
+    /*
+     * Phone: caret · key · one column per language. The source text, the
+     * group's key count and its low-confidence note give way (a warn dot
+     * stays), a group counts what is missing, and copy and delete wait for
+     * the open row: a touch has no hover to reveal them.
+     */
     .tx-cols,
     .tx-group,
     .key-head {
-      grid-template-columns: 16px minmax(0, 1fr) 0 auto repeat(var(--lang-count, 1), 2rem);
+      grid-template-columns: 16px minmax(0, 1fr) repeat(var(--lang-count, 1), 2rem);
       column-gap: 6px;
     }
-    .key-source {
-      visibility: hidden;
+    .tx-cols > span:nth-child(3),
+    .tx-cols > span:nth-child(4),
+    .tx-group-meta,
+    .tx-group-low-label,
+    .tx-count-of,
+    .key-source,
+    .key-card[data-expanded="false"] .key-actions,
+    .key-card[data-expanded="true"] .key-head .tx-dot {
+      display: none;
+    }
+    .tx-count-missing {
+      display: inline;
+    }
+    .tx-group-title {
+      grid-column: auto;
+    }
+    /* An open row lists every language below, so its head drops the dots. */
+    .key-card[data-expanded="true"] .key-head {
+      grid-template-columns: 16px minmax(0, 1fr) auto;
     }
     .key-body {
       padding-left: 8px;

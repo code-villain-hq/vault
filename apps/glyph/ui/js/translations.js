@@ -342,15 +342,16 @@ function renderItem(item) {
 }
 
 // A namespace header: its name, size, low-confidence count, and per language
-// how many of its source keys are translated.
+// how many of its source keys are translated. A phone shows the missing count
+// instead, which fits a narrow column and is left out when nothing is missing.
 function renderGroup(group) {
     const open = isGroupOpen(group.ns);
     const sourceRows = group.rows.filter(isSourceKey);
     const low = group.rows.filter(rowHasIssues).length;
     const cols = viewLangs().map(l => {
         const filled = sourceRows.filter(r => !r.cells[l].missing).length;
-        const done = filled === sourceRows.length;
-        return `<span class="tx-group-count${done ? ' is-done' : ''}" title="${filled} of ${sourceRows.length} ${escapeAttr(Utils.langInfo(l).name)} translated">${filled}/${sourceRows.length}</span>`;
+        const missing = sourceRows.length - filled;
+        return `<span class="tx-group-count${missing ? '' : ' is-done'}" title="${filled} of ${sourceRows.length} ${escapeAttr(Utils.langInfo(l).name)} translated"><span class="tx-count-of">${filled}/${sourceRows.length}</span><span class="tx-count-missing">${missing || ''}</span></span>`;
     }).join('');
     const n = group.rows.length;
     return `
@@ -359,7 +360,7 @@ function renderGroup(group) {
             <span class="tx-group-title">
                 <span class="tx-group-name">${escapeHtml(group.ns)}</span>
                 <span class="tx-group-meta">${n} key${n === 1 ? '' : 's'}</span>
-                ${low ? `<span class="tx-group-low">${low} low confidence</span>` : ''}
+                ${low ? `<span class="tx-group-low" title="${low} low confidence"><span class="tx-group-low-label">${low} low confidence</span></span>` : ''}
             </span>
             ${cols}
         </div>
