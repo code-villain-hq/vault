@@ -3,11 +3,16 @@ import { readdir } from "node:fs/promises";
 import { $ } from "bun";
 
 const root = new URL("..", import.meta.url).pathname;
+// CI checks the desktop app in a job of its own, so the main check doesn't
+// wait for Tauri to build.
+const crates = process.env.GLYPH_CHECK_SKIP_DESKTOP
+  ? ["--workspace", "--exclude", "glyph-desktop"]
+  : ["--workspace"];
 
 const steps: [string, () => Promise<unknown>][] = [
   ["cargo fmt", () => $`cargo fmt --all --check`.cwd(root)],
-  ["cargo clippy", () => $`cargo clippy --workspace --all-targets -- -D warnings`.cwd(root)],
-  ["cargo test", () => $`cargo test --workspace --quiet`.cwd(root)],
+  ["cargo clippy", () => $`cargo clippy ${crates} --all-targets -- -D warnings`.cwd(root)],
+  ["cargo test", () => $`cargo test ${crates} --quiet`.cwd(root)],
   [
     "generated types are current",
     async () => {

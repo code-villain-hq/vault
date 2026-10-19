@@ -13,6 +13,8 @@
     "seed": "bun scripts/seed-demo.ts",
     "dev": "bun scripts/dev.ts",
     "dev:fake-model": "bun scripts/dev-fake-model.ts",
+    "dev:desktop": "bun run --cwd apps/desktop tauri dev",
+    "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
     "app": "docker compose --profile app up -d --build --wait",
     "app:logs": "docker compose --profile app logs -f glyph",
     "gen:types": "bun scripts/gen-types.ts",
