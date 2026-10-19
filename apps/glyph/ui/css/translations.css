@@ -1,0 +1,380 @@
+/*
+ * Translations: one row per (namespace, key); a row opens onto its
+ * languages. Loads after glyph.css. Every colour, size and radius is a token.
+ *
+ *   top bar   breadcrumb · search (⌘F)
+ *   toolbar   languages · namespaces · filters · sort · details · ⓘ
+ *             ……………………………………………………………… ↻ · New key · Fill N missing
+ *   summary   10 keys · 3 of 30 translated
+ *   list      › [ns] key ………………………… 1/3        (open: languages below)
+ */
+@layer components {
+  /* ── Search in the top bar: a field holding an icon, the input and ⌘F ── */
+  .tx-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 280px;
+    max-width: 50%;
+    height: 28px;
+    margin-left: auto;
+    padding: 0 6px 0 10px;
+    color: var(--faint);
+    cursor: text;
+  }
+  .tx-search input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--fg);
+  }
+
+  /* ── Toolbar: quiet controls left, the actions right ── */
+  .tx-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .tx-toolbar-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .tx-toolbar-spacer {
+    flex: 1 1 auto;
+  }
+  .tx-toolbar .ui-button .icon-sm {
+    color: var(--muted);
+  }
+  .tx-toolbar .ui-button[aria-expanded="true"],
+  .tx-toolbar .ui-button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--fg) var(--button-hover-tint), transparent);
+  }
+  .tx-toolbar .ui-icon-button[aria-expanded="true"] {
+    background: var(--hover);
+  }
+  .tx-toolbar .ui-button-primary .ui-kbd,
+  .tx-toolbar .ui-button .ui-kbd {
+    margin-right: -4px;
+  }
+  /* The count of active filters, beside "Filters". */
+  .tx-filter-count {
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .tx-summary {
+    margin-bottom: 12px;
+    color: var(--faint);
+    font-size: var(--type-ui-small-size);
+  }
+
+  /* ── Menus: popovers anchored under their toolbar button ── */
+  .tx-menu {
+    position: relative;
+  }
+  .tx-menu-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 14rem;
+    max-height: 20rem;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .tx-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 4px 8px;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tx-menu-item:hover {
+    background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
+  }
+  .tx-menu-item[aria-selected="true"] {
+    font-weight: 700;
+  }
+  .tx-menu-item .icon {
+    color: var(--muted);
+  }
+  .tx-menu-code {
+    margin-left: auto;
+    padding-left: 12px;
+    color: var(--faint);
+    font-weight: 400;
+  }
+  .tx-menu-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--line);
+  }
+
+  /* The confidence legend: wider, prose, not a list of options. */
+  .tx-legend-panel {
+    gap: 8px;
+    width: 22rem;
+    max-width: calc(100vw - 2rem);
+    max-height: none;
+    padding: 12px;
+    cursor: default;
+  }
+  .tx-legend-title {
+    font-weight: 700;
+  }
+  .tx-legend-desc {
+    color: var(--muted);
+    font-size: var(--type-ui-small-size);
+  }
+  .tx-legend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tx-legend-list li {
+    display: grid;
+    grid-template-columns: 5rem 1fr;
+    gap: 10px;
+    align-items: start;
+    color: var(--muted);
+    font-size: var(--type-ui-small-size);
+  }
+  .tx-legend-list .ui-status {
+    justify-self: start;
+  }
+
+  /* ── Virtual list: absolute rows inside a sized #keysList ── */
+  #keysList[data-virtual="true"] {
+    contain: strict;
+  }
+  #keysList[data-virtual="true"] > .v-card-wrap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+  }
+
+  /* ── Key row: no border, no shadow; an open one steps up to surface ── */
+  .key-card {
+    border-radius: var(--radius-md);
+  }
+  .key-card[data-expanded="true"] {
+    --field: var(--panel);
+    --field-hover: var(--panel);
+    background: var(--surface);
+  }
+  .key-head {
+    display: grid;
+    grid-template-columns: 16px auto minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    min-height: 36px;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    user-select: none;
+  }
+  .key-head:hover {
+    background: var(--hover);
+  }
+  .key-caret {
+    display: inline-flex;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  .key-card[data-expanded="true"] .key-caret {
+    transform: rotate(90deg);
+  }
+  .key-ns-tag {
+    padding: 1px 8px;
+  }
+  .key-name-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .key-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: var(--type-ui-code-size);
+  }
+  .key-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .key-progress-label {
+    min-width: 2.5rem;
+    color: var(--muted);
+    font-size: var(--type-ui-small-size);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  /* Copy and delete stay quiet until the row is hovered, focused or open. */
+  .key-copy-btn,
+  .key-delete-btn {
+    opacity: 0;
+  }
+  .key-head:hover .key-copy-btn,
+  .key-head:hover .key-delete-btn,
+  .key-head:focus-within .key-copy-btn,
+  .key-head:focus-within .key-delete-btn,
+  .key-card[data-expanded="true"] .key-copy-btn,
+  .key-card[data-expanded="true"] .key-delete-btn,
+  .key-copy-btn[data-copied="true"] {
+    opacity: 1;
+  }
+  .key-delete-btn:hover:not(:disabled) .icon {
+    color: var(--status-danger-ink);
+  }
+  .key-copy-btn[data-copied="true"] .icon {
+    color: var(--status-ok-ink);
+  }
+  .key-delete-btn:disabled {
+    cursor: wait;
+  }
+
+  /* ── Open row: the translator note, then one row per language ── */
+  .key-body {
+    padding: 4px 8px 12px 34px;
+  }
+  .key-context-panel {
+    margin-bottom: 10px;
+  }
+  .key-context-input {
+    width: 100%;
+    min-height: 32px;
+    resize: vertical;
+  }
+  .lang-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr) 5rem 60px;
+    gap: 16px;
+    align-items: start;
+    padding: 3px 0;
+  }
+  .lang-label {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    padding-top: 6px;
+    white-space: nowrap;
+  }
+  .lang-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lang-code {
+    color: var(--faint);
+  }
+  .lang-pill {
+    padding-top: 4px;
+  }
+  .lang-input-wrap {
+    min-width: 0;
+  }
+  .lang-input {
+    display: block;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 10px;
+    overflow: hidden;
+    resize: none;
+  }
+  /* A missing cell reads as a quiet placeholder until it is touched. */
+  .lang-input[data-missing="true"]:not(:hover):not(:focus) {
+    background: transparent;
+  }
+  .lang-input[data-saving="true"] {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .lang-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .lang-actions {
+    display: flex;
+    gap: 4px;
+    padding-top: 2px;
+  }
+  .lang-icon-glyph {
+    display: inline-flex;
+  }
+  /* While a suggestion is being generated, the sparkles pulse. */
+  .lang-icon-btn[data-busy="true"] {
+    background: color-mix(in srgb, var(--fg) var(--button-tint), transparent);
+    cursor: wait;
+  }
+  .lang-icon-btn[data-busy="true"] .icon {
+    color: var(--fg);
+  }
+  .lang-icon-btn[data-busy="true"] .lang-icon-glyph {
+    animation: sparkle-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes sparkle-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    40% { transform: scale(1.2) rotate(-10deg); opacity: 1; }
+  }
+
+  /* ── Manage namespaces: rows in the dialog ── */
+  .ns-manage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 60vh;
+    margin: 0 -8px;
+    overflow-y: auto;
+  }
+  .ns-manage-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 8px;
+  }
+  .ns-manage-name {
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--type-ui-code-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ns-manage-counts {
+    color: var(--faint);
+    font-size: var(--type-ui-small-size);
+  }
+
+  @media (max-width: 760px) {
+    .key-body {
+      padding-left: 8px;
+    }
+    .lang-row {
+      grid-template-columns: minmax(0, 1fr) auto 60px;
+    }
+    .lang-label {
+      grid-column: 1 / -1;
+      padding-top: 0;
+    }
+  }
+}

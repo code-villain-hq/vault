@@ -27,27 +27,30 @@ function mountChipInput(container, initialValues, placeholder) {
         Array.isArray(initialValues) ? initialValues.join(',') : (initialValues || '')
     );
 
-    container.classList.add('chip-input');
+    // The box looks like a field (ui-field) and rings on focus-within.
+    container.classList.add('chip-input', 'ui-field');
     container.setAttribute('role', 'group');
     container.innerHTML = '';
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'chip-input__text';
+    input.className = 'chip-input-text';
     input.placeholder = placeholder || 'Type and press Enter';
+    if (container.dataset.inputId) input.id = container.dataset.inputId;
+    else input.setAttribute('aria-label', 'Accepted forms');
     container.appendChild(input);
 
     function render() {
         container.querySelectorAll('.chip').forEach(c => c.remove());
         values.forEach((v, i) => {
             const chip = document.createElement('span');
-            chip.className = 'chip';
+            chip.className = 'ui-chip chip';
             chip.innerHTML = `<span>${esc(v)}</span>`;
             const x = document.createElement('button');
             x.type = 'button';
-            x.className = 'chip__x';
+            x.className = 'ui-button ui-icon-button chip-x';
             x.setAttribute('aria-label', `Remove ${v}`);
-            x.textContent = '✕';
+            x.innerHTML = icon('x', 'icon-sm');
             x.addEventListener('click', (e) => {
                 e.stopPropagation();
                 values.splice(i, 1);
@@ -105,7 +108,7 @@ function mountChipInput(container, initialValues, placeholder) {
     });
 
     container.addEventListener('mousedown', (e) => {
-        // Clicking the padding (not a chip or its ✕) focuses the text input.
+        // Clicking the padding (not a chip or its x) focuses the text input.
         if (e.target === container) {
             e.preventDefault();
             input.focus();
@@ -180,7 +183,7 @@ function initGlossary() {
         const [s, t] = k.split('_');
         const opt = document.createElement('option');
         opt.value = k;
-        opt.textContent = `${s} → ${t}`;
+        opt.textContent = `${langName(s)} → ${langName(t)}`;
         filterSel.appendChild(opt);
     }
 
@@ -209,8 +212,13 @@ function initGlossary() {
 function makeOpt(code) {
     const o = document.createElement('option');
     o.value = code;
-    o.textContent = code;
+    o.textContent = langName(code);
     return o;
+}
+
+// Language name for a code, as the Dashboard shows it (no flags).
+function langName(code) {
+    return Utils.langInfo(code).name;
 }
 
 async function loadGlossary() {
@@ -236,7 +244,12 @@ function renderGlossary() {
         if (!glossaryState.pairFilter) return true;
         return `${e.source_lang}_${e.target_lang}` === glossaryState.pairFilter;
     });
-    if (countEl) countEl.textContent = String(entries.length);
+    // The lead says what the state needs: with no terms at all, that is
+    // the first one; the list then stays empty rather than saying it twice.
+    const none = glossaryState.entries.length === 0;
+    if (countEl) countEl.textContent = none ? 'No' : String(entries.length);
+    const nounEl = document.getElementById('glossaryCountNoun');
+    if (nounEl) nounEl.textContent = none ? 'preferred terms yet' : (entries.length === 1 ? 'preferred term' : 'preferred terms');
 
     // Throw away edit-mode chip-input handles from the previous render; their
     // DOM nodes are about to be destroyed. Keep the "add" handle — its node
@@ -246,13 +259,9 @@ function renderGlossary() {
     }
 
     if (entries.length === 0) {
-        container.innerHTML = `
-            <p class="text-xs text-slate-500 dark:text-slate-400 py-8 text-center italic">
-                ${glossaryState.entries.length === 0
-                    ? 'No glossary entries yet. Add one below to lock in your preferred terminology.'
-                    : 'No entries for this pair. Clear the filter or add one below.'}
-            </p>
-        `;
+        container.innerHTML = none
+            ? ''
+            : '<p class="empty">No terms for this pair. Pick All pairs, or add one above.</p>';
         return;
     }
 
@@ -267,14 +276,12 @@ function renderGlossary() {
     container.innerHTML = [...groups.entries()].map(([pair, items]) => {
         const [src, tgt] = pair.split('_');
         return `
-            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                <div class="px-3 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    ${esc(src)} → ${esc(tgt)} <span class="font-normal text-slate-400">(${items.length})</span>
-                </div>
-                <div class="divide-y divide-slate-200 dark:divide-slate-700">
+            <section class="gl-group">
+                <p class="group-label">${esc(langName(src))} → ${esc(langName(tgt))} · ${items.length}</p>
+                <div class="list">
                     ${items.map(renderGlossaryRow).join('')}
                 </div>
-            </div>
+            </section>
         `;
     }).join('');
 
@@ -316,27 +323,24 @@ function renderGlossaryRow(e) {
         // commas inside variants survive round-tripping (unlikely but safe).
         const initialAttr = variants.join('\u0001');
         return `
-            <div class="p-3 bg-amber-50 dark:bg-amber-900/20 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_auto] gap-2 items-start text-sm">
+            <div class="gl-row gl-row-editing ui-row is-selected">
                 <input type="text" value="${esc(e.source_term)}" data-edit-field="source_term" data-entry="${e.id}"
-                    class="px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
+                    class="ui-field input w-full" aria-label="Source term">
                 <input type="text" value="${esc(e.target_term)}" data-edit-field="target_term" data-entry="${e.id}"
-                    class="px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
-                <div>
-                    <div class="flex justify-end mb-1">
-                        <button type="button" class="find-variants-btn" data-glossary-find-variants="${e.id}"
-                                title="Ask the LLM to suggest grammatical forms of the target term">
-                            <span class="find-variants-btn__glyph">✨</span>
-                            <span>Find variants</span>
-                        </button>
-                    </div>
+                    class="ui-field input w-full" aria-label="Target term">
+                <div class="gl-row-forms">
                     <div data-chipinput-id="edit-${e.id}" data-initial="${esc(initialAttr)}"
                          title="Accepted forms the validator should allow as equivalent to the target term (grammatical inflections, plurals, definite forms, …)."></div>
+                    <button type="button" class="ui-button find-variants-btn" data-glossary-find-variants="${e.id}"
+                            title="Ask the LLM to suggest grammatical forms of the target term">
+                        ${icon('sparkles')}Find variants
+                    </button>
                 </div>
-                <input type="text" value="${esc(e.note || '')}" placeholder="note" data-edit-field="note" data-entry="${e.id}"
-                    class="px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
-                <div class="flex gap-1">
-                    <button data-glossary-save="${e.id}" class="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded">Save</button>
-                    <button data-glossary-cancel="${e.id}" class="px-2 py-1 text-xs bg-slate-200 dark:bg-slate-700 rounded">Cancel</button>
+                <input type="text" value="${esc(e.note || '')}" placeholder="Note" data-edit-field="note" data-entry="${e.id}"
+                    class="ui-field input w-full" aria-label="Note">
+                <div class="gl-row-actions">
+                    <button type="button" data-glossary-save="${e.id}" class="ui-button">Save</button>
+                    <button type="button" data-glossary-cancel="${e.id}" class="ui-button">Cancel</button>
                 </div>
             </div>
         `;
@@ -344,19 +348,19 @@ function renderGlossaryRow(e) {
 
     const variantsChips = variants.length
         ? `<div class="chip-list">${variants.map(v =>
-                `<span class="chip chip--readonly">${esc(v)}</span>`
+                `<span class="ui-chip">${esc(v)}</span>`
             ).join('')}</div>`
-        : '<span class="italic text-slate-400 text-xs">no variants</span>';
+        : '';
 
     return `
-        <div class="p-3 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_auto] gap-2 items-center text-sm">
-            <div class="font-mono text-slate-900 dark:text-white truncate" title="${esc(e.source_term)}">${esc(e.source_term)}</div>
-            <div class="font-mono text-slate-900 dark:text-white truncate" title="${esc(e.target_term)}">→ ${esc(e.target_term)}</div>
-            <div title="${esc(variantsCsv)}">${variantsChips}</div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 truncate italic" title="${esc(e.note || '')}">${esc(e.note || '—')}</div>
-            <div class="flex gap-1 justify-end">
-                <button data-glossary-edit="${e.id}" class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded" title="Edit">✎</button>
-                <button data-glossary-delete="${e.id}" class="px-2 py-1 text-xs bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 rounded" title="Delete">✕</button>
+        <div class="gl-row ui-row">
+            <div class="gl-term truncate" title="${esc(e.source_term)}">${esc(e.source_term)}</div>
+            <div class="gl-term truncate" title="${esc(e.target_term)}"><span class="text-faint" aria-hidden="true">→ </span>${esc(e.target_term)}</div>
+            <div class="min-w-0" title="${esc(variantsCsv)}">${variantsChips}</div>
+            <div class="gl-note truncate" title="${esc(e.note || '')}">${esc(e.note || '')}</div>
+            <div class="gl-row-actions gl-row-quiet">
+                <button type="button" data-glossary-edit="${e.id}" class="ui-button ui-icon-button" aria-label="Edit ${esc(e.source_term)}" title="Edit">${icon('pencil')}</button>
+                <button type="button" data-glossary-delete="${e.id}" class="ui-button ui-icon-button" aria-label="Remove ${esc(e.source_term)}" title="Remove">${icon('trash')}</button>
             </div>
         </div>
     `;
@@ -407,7 +411,7 @@ async function commitEditGlossary(id) {
         Utils.showToast(`Update failed: ${r.error}`, 'error');
         return;
     }
-    Utils.showToast('✓ Entry updated', 'success');
+    Utils.showToast('Term updated', 'success');
     glossaryState.editingId = null;
     await loadGlossary();
 }
@@ -415,13 +419,18 @@ async function commitEditGlossary(id) {
 async function deleteGlossary(id) {
     const entry = glossaryState.entries.find(x => x.id === id);
     if (!entry) return;
-    if (!confirm(`Remove "${entry.source_term}" → "${entry.target_term}" (${entry.source_lang}→${entry.target_lang})?`)) return;
+    const ok = await confirmDialog({
+        title: `Remove “${entry.source_term}”?`,
+        body: `The ${langName(entry.source_lang)} → ${langName(entry.target_lang)} rule “${entry.source_term}” → “${entry.target_term}” stops applying to new translations.`,
+        confirmLabel: 'Remove term',
+    });
+    if (!ok) return;
     const r = await api.deleteGlossaryEntry(id);
     if (!r.ok) {
         Utils.showToast(`Delete failed: ${r.error}`, 'error');
         return;
     }
-    Utils.showToast('✓ Entry removed', 'success');
+    Utils.showToast('Term removed', 'success');
     await loadGlossary();
 }
 
@@ -449,7 +458,7 @@ async function addGlossary() {
     if (!r.ok) {
         Utils.showToast(`Add failed: ${r.error}`, 'error'); return;
     }
-    Utils.showToast('✓ Added to glossary', 'success');
+    Utils.showToast('Added to the glossary', 'success');
     document.getElementById('newGlossarySourceTerm').value = '';
     document.getElementById('newGlossaryTargetTerm').value = '';
     document.getElementById('newGlossaryNote').value = '';
@@ -458,7 +467,7 @@ async function addGlossary() {
 }
 
 // ------------------------------------------------------------------
-// "✨ Find variants" — ask the LLM for grammatical forms of the target term
+// "Find variants" — ask the LLM for grammatical forms of the target term
 // and merge them into the chip input. Used from both the Add form and from
 // each row's edit mode; the shared core handles the busy state + API call,
 // callers just tell it which chip input + which (src, tgt, srcTerm, tgtTerm)
@@ -534,7 +543,7 @@ async function runFindVariants(btn, chip, { sourceLang, targetLang, sourceTerm, 
         }
         chip.setValues(merged);
         const added = merged.length - existing.length;
-        Utils.showToast(`✨ Added ${added} variant${added === 1 ? '' : 's'}`, 'success');
+        Utils.showToast(`Added ${added} variant${added === 1 ? '' : 's'}`, 'success');
     } catch (err) {
         console.error('runFindVariants:', err);
         Utils.showToast('Unexpected error. See console.', 'error');
@@ -543,7 +552,6 @@ async function runFindVariants(btn, chip, { sourceLang, targetLang, sourceTerm, 
         btn.disabled = false;
     }
 }
-
 function esc(s) {
     return String(s ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

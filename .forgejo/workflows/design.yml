@@ -1,6 +1,6 @@
 # Design drift on every push that could cause it: the theme tests, the
 # generated outputs in design/tokens against build.py, Forge's, Layer's,
-# Caster's and the editor themes' copies against the vault, and the lint
+# Caster's, Glyph's and the editor themes' copies against the vault, and the lint
 # guard over every web surface's CSS and markup (design/lint). Each check
 # writes nothing and fails with the fix.
 name: design
@@ -28,6 +28,8 @@ on:
       - "apps/caster/Resources/AppIcon.svg"
       - "apps/caster/Makefile"
       - "apps/theme/**"
+      - "apps/glyph/ui/**"
+      - "apps/glyph/Makefile"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -47,5 +49,7 @@ jobs:
         working-directory: apps/caster
       - run: bun build.ts --check
         working-directory: apps/theme
+      - run: make design-check
+        working-directory: apps/glyph
       - run: bun install --frozen-lockfile && bun run check
         working-directory: design/lint

@@ -1,0 +1,51 @@
+/* Dashboard: one row per target language, no cards. Loads after glyph.css. */
+@layer components {
+  .lang-cover {
+    display: grid;
+    grid-template-columns: minmax(9rem, 12rem) 120px 5.5rem minmax(0, 1fr) auto 4rem;
+    gap: 16px;
+    align-items: center;
+    padding: 10px 8px;
+  }
+  .lang-cover-name {
+    font-weight: 700;
+  }
+  .lang-cover-code {
+    margin-left: 6px;
+    color: var(--faint);
+    font-weight: 400;
+  }
+  .lang-cover-done {
+    color: var(--muted);
+  }
+  .lang-cover-ns {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--type-ui-small-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lang-cover-pills {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+  /* The row's link stays quiet until the row is hovered or focused. */
+  .lang-cover-link {
+    justify-self: end;
+    visibility: hidden;
+  }
+  .lang-cover:hover .lang-cover-link,
+  .lang-cover:focus-within .lang-cover-link {
+    visibility: visible;
+  }
+  @media (max-width: 900px) {
+    .lang-cover {
+      grid-template-columns: minmax(0, 1fr) 80px auto 4rem;
+    }
+    .lang-cover-done,
+    .lang-cover-ns {
+      display: none;
+    }
+  }
+}

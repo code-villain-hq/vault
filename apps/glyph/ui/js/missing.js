@@ -7,10 +7,10 @@
 //     ├ Edit     → user tweaks textarea → Accept path
 //     └ Reject   → back to pending (nothing saved)
 //
-// Bulk actions ("Suggest visible", "Suggest <lang> (N)") run previews in
+// Bulk actions ("Suggest all N", "Suggest <language>") run previews in
 // parallel (capped per language so the LLM is not flooded). Language groups
-// start collapsed; expand a group to see its rows. An "Accept all" button
-// appears in the toolbar when there are proposals.
+// start collapsed; expand a group to see its rows. An "Accept N proposals"
+// button appears in the toolbar when there are proposals.
 //
 // Backend contract: /api/translate/single accepts `dry_run: true` which
 // produces the same result payload without touching the DB.
@@ -32,6 +32,8 @@ const state = {
     expanded: {},
     activeIdx: 0,
     config: null,
+    // True while "Suggest all" runs; the button then shows its progress.
+    bulkBusy: false,
 };
 
 // Per-language-group windowed list: when a group has many rows, only a
@@ -77,10 +79,12 @@ async function initReview() {
         // some target). The loader treats `state.sourceLang` specially and
         // fetches from /missing-source instead of /missing for that entry.
         const targetSel = document.getElementById('targetLanguage');
-        const srcOpt = `<option value="${escapeAttr(state.sourceLang)}">${escapeHtml(state.sourceLang)} (source — back-fill)</option>`;
+        const srcOpt = `<option value="${escapeAttr(state.sourceLang)}">${escapeHtml(langName(state.sourceLang))} (back-fill)</option>`;
         targetSel.innerHTML = '<option value="">All languages</option>'
             + srcOpt
-            + state.targetLangs.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+            + state.targetLangs.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(langName(l))}</option>`).join('');
+        // The selects are dressed as buttons; a chevron says they open.
+        document.querySelectorAll('.review-select').forEach(el => el.insertAdjacentHTML('beforeend', icon('chevron-down')));
 
         state.namespaces = nsRes.ok ? (nsRes.data.namespaces || []) : [];
         const nsSel = document.getElementById('namespaceFilter');
@@ -208,7 +212,7 @@ function visibleRows() {
 }
 
 // proposedRows returns every proposed row currently on screen. We scope this
-// to `visibleRows()` (not `state.rows`) so the "Accept visible" toolbar button
+// to `visibleRows()` (not `state.rows`) so the "Accept N proposals" toolbar button
 // and the per-language "Accept N proposals" group header always operate on
 // exactly the same row set the user can see — otherwise a stale search filter
 // would let a bulk-accept apply to rows that aren't even rendered.
@@ -231,9 +235,11 @@ function teardownReviewVirtualizers() {
     reviewVirtualByLang.clear();
 }
 
+// Row heights from review.css (a pending row is 40px; a proposal takes a
+// source line, the field and a meta line), plus the 2px gap between rows.
 function reviewRowEstimatedHeight(row) {
-    if (row.status === 'proposed' || row.status === 'saving') return 156;
-    return 54;
+    if (row.status === 'proposed' || row.status === 'saving') return 122;
+    return 42;
 }
 
 function rebuildReviewVirtualOffsets(st) {
@@ -372,13 +378,10 @@ function renderReview() {
     updateSummary(visible);
     updateAcceptAllBtn();
 
+    // The lead says when nothing is left; the list and its key hints go.
+    document.querySelector('.review-keys').hidden = visible.length === 0;
     if (visible.length === 0) {
-        container.innerHTML = `
-            <div class="p-12 text-center text-slate-500 dark:text-slate-400">
-                <p class="text-base">🎉 Nothing missing in the current view.</p>
-                <p class="text-xs mt-2">Try clearing the filters above to see other languages or namespaces.</p>
-            </div>
-        `;
+        container.innerHTML = '';
         return;
     }
 
@@ -390,32 +393,40 @@ function renderReview() {
 
     container.innerHTML = [...byLang.entries()].map(([lang, items]) => {
         const collapsed = !state.expanded[lang];
+        const name = langName(lang);
         const proposedInGroup = items.filter(i => i.row.status === 'proposed').length;
         const useVirt = !collapsed && items.length >= REVIEW_VIRT_THRESHOLD;
         const rowsHtml = collapsed
             ? ''
             : useVirt
-                ? `<div class="review-virtual-body" data-review-virt="${escapeAttr(lang)}" style="position:relative;contain:strict"></div>`
+                ? `<div class="review-virtual-body" data-review-virt="${escapeAttr(lang)}"></div>`
                 : items.map(({ row, idx }) => renderRow(row, idx)).join('');
         const groupAcceptBtn = proposedInGroup > 0
-            ? `<button class="review-btn review-btn-accept" data-action="accept-lang" data-lang="${escapeAttr(lang)}" title="Accept all ${proposedInGroup} proposed translations for ${escapeAttr(lang)}">
-                   ✓ Accept ${proposedInGroup} proposal${proposedInGroup === 1 ? '' : 's'}
+            ? `<button type="button" class="ui-button" data-action="accept-lang" data-lang="${escapeAttr(lang)}" title="Accept all ${proposedInGroup} proposed translations for ${escapeAttr(name)}">
+                   ${icon('check')}Accept ${proposedInGroup}
                </button>`
             : '';
+        const meta = [
+            lang,
+            lang === state.sourceLang ? 'back-fill' : '',
+            `${items.length} missing`,
+            proposedInGroup > 0 ? `${proposedInGroup} proposed` : '',
+        ].filter(Boolean).join(' · ');
         return `
             <div class="review-group" data-group-lang="${escapeAttr(lang)}">
                 <div class="review-group-header" data-collapsed="${collapsed}" data-action="toggle-group" data-lang="${escapeAttr(lang)}">
-                    <span class="review-group-caret">▾</span>
-                    <span class="font-mono">${escapeHtml(lang)}</span>
-                    <span class="text-slate-500 dark:text-slate-400 font-normal">(${items.length} missing${proposedInGroup > 0 ? `, ${proposedInGroup} proposed` : ''})</span>
-                    <div class="ml-auto flex gap-1">
+                    <button type="button" class="review-group-toggle" aria-expanded="${!collapsed}">
+                        ${icon('chevron-right')}<span class="review-group-name">${escapeHtml(name)}</span>
+                    </button>
+                    <span class="review-group-meta">${escapeHtml(meta)}</span>
+                    <div class="review-group-actions">
                         ${groupAcceptBtn}
-                        <button class="review-btn" data-action="translate-lang" data-lang="${escapeAttr(lang)}" title="Generate proposals for pending keys in ${escapeAttr(lang)} (max ${MAX_SUGGEST_PER_LANG} per run; nothing is saved until you accept)">
-                            ✨ Suggest ${escapeHtml(lang)} (${items.length})
+                        <button type="button" class="ui-button review-group-suggest" data-action="translate-lang" data-lang="${escapeAttr(lang)}" title="Generate proposals for pending keys in ${escapeAttr(name)} (max ${MAX_SUGGEST_PER_LANG} per run; nothing is saved until you accept)">
+                            Suggest ${escapeHtml(name)}
                         </button>
                     </div>
                 </div>
-                <div class="review-group-body">${rowsHtml}</div>
+                <div class="review-group-body list">${rowsHtml}</div>
             </div>
         `;
     }).join('');
@@ -436,100 +447,116 @@ function renderReview() {
     syncActiveRow();
 }
 
+// The row's key: its namespace as a chip, the key in mono, and on a
+// back-fill row the direction (`sv → en`) as a second chip.
+function renderKey(row, dirTitle) {
+    const isReverse = row.sourceLang && row.sourceLang !== state.sourceLang;
+    const dirBadge = isReverse
+        ? `<span class="ui-chip" title="${escapeAttr(dirTitle)}">${escapeHtml(row.sourceLang)} → ${escapeHtml(row.lang)}</span>`
+        : '';
+    return `
+        <div class="review-key" title="${escapeAttr(row.ns)}.${escapeAttr(row.key)}">
+            <span class="ui-chip">${escapeHtml(row.ns)}</span>
+            <span class="review-key-name">${escapeHtml(row.key)}</span>
+            ${dirBadge}
+        </div>`;
+}
+
 function renderRow(row, idx) {
     if (row.status === 'proposed' || row.status === 'saving') {
         return renderProposedRow(row, idx);
     }
     const busy = row.status === 'previewing';
-    const errTone = row.status === 'error' ? ' data-state="error"' : '';
     // When the row's source lang ISN'T the global source (en), it's a
     // back-fill row — the key is missing in English and we're going to
     // translate FROM whatever existing lang we sampled. Flagging that
     // inline avoids confusion when the source column shows Swedish text
     // inside a row that's grouped under "en".
     const isReverse = row.sourceLang && row.sourceLang !== state.sourceLang;
-    const dirBadge = isReverse
-        ? `<span class="review-direction-badge" title="English is missing; we'll back-translate this ${escapeAttr(row.sourceLang)} value into ${escapeAttr(row.lang)}.">${escapeHtml(row.sourceLang)} → ${escapeHtml(row.lang)}</span>`
+    const failed = row.status === 'error'
+        ? '<span class="ui-status ui-status-danger">Suggest failed</span>'
         : '';
     return `
-        <div class="review-row"${errTone} data-idx="${idx}" data-id="${escapeAttr(row.id)}" ${isReverse ? 'data-reverse="true"' : ''}>
-            <div class="review-key" title="${escapeAttr(row.ns)}.${escapeAttr(row.key)}">
-                <span class="key-ns-tag">${escapeHtml(row.ns)}</span>
-                <span class="review-key-name">${escapeHtml(row.key)}</span>
-                ${dirBadge}
-            </div>
+        <div class="review-row ui-row" data-state="${escapeAttr(row.status)}" data-idx="${idx}" data-id="${escapeAttr(row.id)}" ${isReverse ? 'data-reverse="true"' : ''}>
+            ${renderKey(row, `${langName(state.sourceLang)} is missing; this ${row.sourceLang} value is back-translated into ${row.lang}.`)}
             <div class="review-source" title="${escapeAttr(row.source)}">${escapeHtml(row.source)}</div>
             <div class="review-actions">
-                <button class="review-btn" data-action="suggest-row" ${busy ? 'disabled' : ''} title="Generate a proposal (nothing is saved until you confirm)">
-                    ${busy ? '⏳ suggesting…' : '✨ Suggest'}
-                </button>
-                <button class="review-btn review-btn-secondary" data-action="write-row" ${busy ? 'disabled' : ''} title="Type a translation yourself (nothing is saved until you Accept)">
-                    ✎ Write
-                </button>
-                <button class="review-btn review-btn-secondary" data-action="skip-row" title="Hide from this view (until reload)">✕</button>
+                ${failed}
+                <div class="review-row-actions">
+                    <button type="button" class="ui-button" data-action="suggest-row" ${busy ? 'disabled' : ''} title="Generate a proposal (nothing is saved until you confirm)">
+                        ${busy ? `${icon('loader', 'review-spin')}Suggesting…` : 'Suggest'}
+                    </button>
+                    <button type="button" class="ui-button" data-action="write-row" ${busy ? 'disabled' : ''} title="Type a translation yourself (nothing is saved until you Accept)">Write</button>
+                    <button type="button" class="ui-button ui-icon-button" data-action="skip-row" aria-label="Skip" title="Hide from this view (until reload)">${icon('x')}</button>
+                </div>
             </div>
         </div>
     `;
 }
 
-// The proposed-row takes more vertical space because the editable textarea
+// The proposed-row takes more vertical space because the editable field
 // for the suggestion lives here. Layout:
 //
-//   [key]  [source]                                               [skip]
-//          [editable proposal textarea]                 [Accept] [Re-run]
-//          ↳ tiny metadata line (confidence, model)
+//   [key]  [source]                              [Accept] [again] [reject]
+//          [editable proposal field]
+//          ↳ glossary warning, then confidence and model
 function renderProposedRow(row, idx) {
     const saving = row.status === 'saving';
     const violations = row.glossaryViolations || [];
     const violationBanner = violations.length > 0
         ? `<div class="review-glossary-warn" title="The LLM's output did not use one of your glossary terms verbatim. Edit the text or re-run to try again.">
-             <span class="review-glossary-warn-icon" aria-hidden="true">⚠</span>
+             ${icon('alert')}
              <span>
                Glossary not respected: ${violations.map(v =>
-                   `<code>${escapeHtml(v.source_term)}</code> should be <code>${escapeHtml(v.target_term)}</code>`
+                   `<code class="code">${escapeHtml(v.source_term)}</code> should be <code class="code">${escapeHtml(v.target_term)}</code>`
                ).join(', ')}.
              </span>
            </div>`
         : '';
     const isReverse = row.sourceLang && row.sourceLang !== state.sourceLang;
-    const dirBadge = isReverse
-        ? `<span class="review-direction-badge" title="Back-filling ${escapeAttr(row.lang)} from the existing ${escapeAttr(row.sourceLang)} translation.">${escapeHtml(row.sourceLang)} → ${escapeHtml(row.lang)}</span>`
-        : '';
     return `
-        <div class="review-row review-row-proposed" data-idx="${idx}" data-id="${escapeAttr(row.id)}" ${violations.length > 0 ? 'data-glossary-warn="true"' : ''} ${isReverse ? 'data-reverse="true"' : ''}>
-            <div class="review-key" title="${escapeAttr(row.ns)}.${escapeAttr(row.key)}">
-                <span class="key-ns-tag">${escapeHtml(row.ns)}</span>
-                <span class="review-key-name">${escapeHtml(row.key)}</span>
-                ${dirBadge}
-            </div>
+        <div class="review-row review-row-proposed ui-row" data-state="${escapeAttr(row.status)}" data-idx="${idx}" data-id="${escapeAttr(row.id)}" ${violations.length > 0 ? 'data-glossary-warn="true"' : ''} ${isReverse ? 'data-reverse="true"' : ''}>
+            ${renderKey(row, `Back-filling ${row.lang} from the existing ${row.sourceLang} translation.`)}
             <div class="review-proposal">
                 <div class="review-source review-source-plain" title="${escapeAttr(row.source)}">${escapeHtml(row.source)}</div>
-                <textarea class="review-proposal-input" ${saving ? 'disabled' : ''} rows="1" data-action="edit-proposal">${escapeHtml(row.proposal)}</textarea>
+                <textarea class="ui-field review-proposal-input" ${saving ? 'disabled' : ''} rows="1" data-action="edit-proposal" aria-label="Translation for ${escapeAttr(row.key)}">${escapeHtml(row.proposal)}</textarea>
                 ${violationBanner}
-                <div class="review-proposal-meta">
-                    ${row.confidence !== null ? `<span class="review-meta-pill">${Math.round(row.confidence * 100)}% confidence</span>` : ''}
-                    ${row.translatedBy ? `<span class="review-meta-pill">by ${escapeHtml(row.translatedBy)}</span>` : ''}
-                </div>
+                <div class="review-proposal-meta">${proposalMeta(row)}</div>
             </div>
-            <div class="review-actions review-actions-proposed">
-                <button class="review-btn review-btn-accept" data-action="accept-row" ${saving ? 'disabled' : ''} title="Save this translation (Enter)">
-                    ${saving ? '⏳' : '✓ Accept'}
+            <div class="review-actions">
+                <button type="button" class="ui-button" data-action="accept-row" ${saving ? 'disabled' : ''} title="Save this translation (Enter)">
+                    ${saving ? `${icon('loader', 'review-spin')}Saving…` : `${icon('check')}Accept`}
                 </button>
-                <button class="review-btn review-btn-secondary" data-action="rerun-row" ${saving ? 'disabled' : ''} title="Discard this proposal and ask the LLM again">
-                    ↻
-                </button>
-                <button class="review-btn review-btn-secondary" data-action="reject-row" ${saving ? 'disabled' : ''} title="Discard proposal (Esc)">
-                    ✕
-                </button>
+                <button type="button" class="ui-button ui-icon-button" data-action="rerun-row" ${saving ? 'disabled' : ''} aria-label="Suggest again" title="Discard this proposal and ask the LLM again">${icon('refresh')}</button>
+                <button type="button" class="ui-button ui-icon-button" data-action="reject-row" ${saving ? 'disabled' : ''} aria-label="Reject" title="Discard proposal (Esc)">${icon('x')}</button>
             </div>
         </div>
     `;
 }
 
+// Confidence spends status colour only when it is low; a confident
+// suggestion and a hand-written one stay quiet.
+function proposalMeta(row) {
+    if (row.translatedBy === 'human') return '';
+    let pill = '';
+    const quiet = [];
+    if (row.confidence !== null) {
+        const pct = Math.round(row.confidence * 100);
+        if (row.confidence < 0.8) {
+            pill = `<span class="${Utils.getConfidenceColor(row.confidence)}">Low confidence · ${pct}%</span>`;
+        } else {
+            quiet.push(`${pct}% confidence`);
+        }
+    }
+    if (row.translatedBy) quiet.push(`by ${escapeHtml(row.translatedBy)}`);
+    return pill + (quiet.length ? `<span class="review-proposal-by">${quiet.join(' · ')}</span>` : '');
+}
+
 function bindReviewGroupHeaders(container) {
     container.querySelectorAll('[data-action="toggle-group"]').forEach(el => {
         el.addEventListener('click', (e) => {
-            if (e.target.closest('button')) return;
+            const btn = e.target.closest('button');
+            if (btn && !btn.classList.contains('review-group-toggle')) return;
             const lang = el.dataset.lang;
             state.expanded[lang] = !state.expanded[lang];
             renderReview();
@@ -599,29 +626,51 @@ function bindReviewRowsIn(root) {
     });
 }
 
+// The lead: how many translations wait, and the one action for them.
 function updateSummary(visible) {
-    const summary = document.getElementById('reviewSummary');
     const proposed = visible.filter(r => r.status === 'proposed').length;
-    const langs = new Set(visible.map(r => r.lang));
-    const bits = [`${visible.length} missing`];
-    if (proposed > 0) bits.push(`${proposed} awaiting review`);
-    bits.push(`${langs.size} language${langs.size === 1 ? '' : 's'}`);
-    summary.classList.remove('hidden');
-    summary.textContent = bits.join(' · ');
+    const pending = visible.filter(r => r.status === 'pending').length;
+    const langs = [...new Set(visible.map(r => r.lang))];
+    const filtered = Boolean(state.target || state.namespace || state.search.trim());
+
+    let title, sub;
+    if (visible.length === 0) {
+        title = 'Nothing to review';
+        sub = filtered
+            ? 'Nothing is missing in this view. Clear the filters to see other languages and namespaces.'
+            : 'Every translation is in.';
+    } else {
+        title = `${plural(visible.length, 'translation')} to review`;
+        const where = langs.length === 1 ? langName(langs[0]) : `${langs.length} languages`;
+        const waiting = proposed > 0 ? ` · ${plural(proposed, 'proposal')} to accept` : '';
+        sub = `${where}${waiting} · Nothing is saved until you accept.`;
+    }
+    document.getElementById('leadTitle').textContent = title;
+    document.getElementById('leadSub').textContent = sub;
+
+    // suggestVisible owns the button's label while it runs.
+    const btn = document.getElementById('translateMissingBtn');
+    if (state.bulkBusy) return;
+    btn.hidden = pending === 0;
+    btn.textContent = `Suggest all ${pending}`;
 }
 
 function updateAcceptAllBtn() {
     const btn = document.getElementById('acceptAllBtn');
     if (!btn) return;
     const n = proposedRows().length;
-    if (n === 0) {
-        btn.classList.add('hidden');
-    } else {
-        btn.classList.remove('hidden');
-        // Label matches the "✨ Suggest visible" sibling: both operate on the
-        // current filtered/searched view, not the entire unfiltered backlog.
-        btn.textContent = `✓ Accept visible ${n} proposal${n === 1 ? '' : 's'}`;
-    }
+    btn.hidden = n === 0;
+    // Like "Suggest all", it works on the current filtered/searched view,
+    // not the entire unfiltered backlog.
+    if (n > 0) btn.innerHTML = `${icon('check')}Accept ${plural(n, 'proposal')}`;
+}
+
+function plural(n, word) {
+    return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+function langName(code) {
+    return Utils.langInfo(code).name;
 }
 
 function syncActiveRow() {
@@ -875,9 +924,9 @@ async function suggestVisible() {
     if (!confirm(confirmMsg)) return;
 
     const btn = document.getElementById('translateMissingBtn');
+    state.bulkBusy = true;
     btn.disabled = true;
-    const originalText = btn.textContent;
-    btn.textContent = `⏳ Generating ${targets.length}…`;
+    btn.innerHTML = `${icon('loader', 'review-spin')}Suggesting ${targets.length}…`;
     for (const r of targets) { r.status = 'previewing'; }
     renderReview();
 
@@ -907,8 +956,8 @@ async function suggestVisible() {
             : '';
         Utils.showToast(`Generated ${targets.length} proposal${targets.length === 1 ? '' : 's'} — review below.${tail}`, 'info');
     } finally {
+        state.bulkBusy = false;
         btn.disabled = false;
-        btn.textContent = originalText;
         renderReview();
     }
 }
@@ -960,7 +1009,7 @@ async function acceptMany(rows) {
         }
     }
     renderReview();
-    if (saved > 0) Utils.showToast(`✓ Saved ${saved} translation${saved === 1 ? '' : 's'}`, 'success');
+    if (saved > 0) Utils.showToast(`Saved ${saved} translation${saved === 1 ? '' : 's'}`, 'success');
     if (failed.length > 0) Utils.showToast(`${failed.length} save${failed.length === 1 ? '' : 's'} failed — see console`, 'error');
 }
 

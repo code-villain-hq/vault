@@ -1,4 +1,4 @@
-.PHONY: help build run dev clean setup install-deps seed-demo reset-db model-viking
+.PHONY: help build run dev clean setup install-deps seed-demo reset-db model-viking design design-check
 
 # Viking 7B v.4 GGUF (Nordic languages specialist, good for sv/fi/da/no/is).
 # Quantized Q4_K_M — ~4.3 GB, runs comfortably on a Mac with llama.cpp.
@@ -17,6 +17,8 @@ help:
 	@echo "make seed-demo      - Reset DB and seed demo namespaces"
 	@echo "make reset-db       - Delete the SQLite database"
 	@echo "make model-viking   - Download Viking_7B_V.4 GGUF model"
+	@echo "make design         - Copy the vault's tokens, controls and fonts into ui/design"
+	@echo "make design-check   - Fail if ui/design has drifted from the vault"
 
 setup:
 	@mkdir -p translations
@@ -76,3 +78,28 @@ model-viking:
 	@echo ""
 	@echo "Next: run it with llama.cpp's llama-server:"
 	@echo "  llama-server -m $(VIKING_MODEL_FILE) -c 4096 --port 8080"
+
+# The UI keeps its own copy of the vault's design sources, so ./ui works next
+# to the binary on its own: the Nightshade tokens, the shared ui-* controls and
+# the licensed fonts. `make design` refreshes the copy; `make design-check`
+# writes nothing and fails if it has drifted.
+VAULT = ../..
+DESIGN = ui/design
+FONTS = fonts.css grenze-gotisch.ttf grenze-gotisch-OFL.txt \
+	atkinson-hyperlegible-next.ttf atkinson-hyperlegible-next-italic.ttf atkinson-hyperlegible-next-OFL.txt \
+	atkinson-hyperlegible-mono.ttf atkinson-hyperlegible-mono-OFL.txt
+DESIGN_COPIES = \
+	$(foreach f,color.css type.css shape.css,$(VAULT)/design/tokens/$(f):$(DESIGN)/$(f)) \
+	$(VAULT)/design/components.css:$(DESIGN)/components.css \
+	$(foreach f,$(FONTS),$(VAULT)/apps/site/assets/fonts/$(f):$(DESIGN)/fonts/$(f))
+
+design:
+	@mkdir -p $(DESIGN)/fonts
+	@for pair in $(DESIGN_COPIES); do cp "$${pair%%:*}" "$${pair#*:}"; done
+	@echo "✓ Synced tokens, controls and fonts into $(DESIGN)"
+
+design-check:
+	@stale=""; for pair in $(DESIGN_COPIES); do \
+		cmp -s "$${pair%%:*}" "$${pair#*:}" || stale="$$stale $${pair#*:}"; \
+	done; \
+	if [ -n "$$stale" ]; then echo "Out of date with the vault:$$stale. Run make design."; exit 1; fi

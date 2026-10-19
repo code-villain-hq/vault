@@ -1,8 +1,8 @@
 // Translations page: Locize-style stacked view.
 //
-// Every (namespace, key) is rendered as a collapsed card. Expanding the card
-// reveals every configured language as a horizontal row (flag · name · input ·
-// actions), which makes editing one phrase across all languages the natural,
+// Every (namespace, key) is rendered as a collapsed row. Opening it reveals
+// every configured language as a row (name · input · confidence · actions),
+// which makes editing one phrase across all languages the natural,
 // zero-scroll flow.
 //
 // Shape of `state.rows`:
@@ -232,11 +232,11 @@ const VIRTUAL_OVERSCAN = 8;
 // matters for the very first frame.
 let collapsedCardHeight = 52;
 
-// Vertical gap between cards. Matches the `space-y-2` (0.5rem = 8px) class
-// on #keysList in classic mode. In virtual mode cards are absolutely
-// positioned so the Tailwind rule doesn't apply — we bake the gap into the
-// slot height instead so offsets space cards out correctly.
-const VIRTUAL_CARD_GAP = 8;
+// Vertical gap between rows. Matches the `.list` gap (2px) on #keysList in
+// classic mode. In virtual mode rows are absolutely positioned so the flex
+// gap doesn't apply — we bake the gap into the slot height instead so
+// offsets space rows out correctly.
+const VIRTUAL_CARD_GAP = 2;
 
 const virtualState = {
     active: false,
@@ -460,35 +460,31 @@ function renderCard(row) {
     const translated = state.targetLangs.length - missing;
     const total = state.targetLangs.length;
     const pct = total === 0 ? 100 : Math.round((translated / total) * 100);
-    const progressState = translated === 0 ? 'empty' : (translated < total ? 'partial' : 'full');
-    const issueBadge = issues > 0 ? `<span class="key-badge-issue">${issues} issue${issues === 1 ? '' : 's'}</span>` : '';
+    const issueBadge = issues > 0 ? `<span class="ui-status ui-status-warn">${issues} issue${issues === 1 ? '' : 's'}</span>` : '';
 
     return `
         <div class="key-card" data-id="${escapeAttr(id)}" data-expanded="${expanded}">
             <div class="key-head" data-action="toggle">
-                <span class="key-caret">▶</span>
-                <span class="key-ns-tag">${escapeHtml(row.ns)}</span>
+                <span class="key-caret">${icon('chevron-right')}</span>
+                <span class="key-ns-tag ui-chip">${escapeHtml(row.ns)}</span>
                 <span class="key-name-wrap">
                     <span class="key-name">${escapeHtml(row.key)}</span>
-                    <button class="key-copy-btn" data-action="copy-key"
+                    <button class="key-copy-btn ui-button ui-icon-button" data-action="copy-key"
                             title="Copy key to clipboard"
-                            aria-label="Copy key ${escapeAttr(row.key)} to clipboard">📋</button>
+                            aria-label="Copy key ${escapeAttr(row.key)} to clipboard">${icon('copy')}</button>
                 </span>
                 <span class="key-meta">
                     ${issueBadge}
-                    <span class="key-progress" title="${translated}/${total} translated (${pct}%)">
-                        <span class="key-progress-fill" data-state="${progressState}" style="width: ${pct}%"></span>
-                    </span>
-                    <span class="key-progress-label">${translated}/${total}</span>
-                    <button class="key-delete-btn" data-action="delete-key"
+                    <button class="key-delete-btn ui-button ui-icon-button" data-action="delete-key"
                             title="Delete this key (removes it from every language)"
-                            aria-label="Delete key ${escapeAttr(row.key)}">🗑️</button>
+                            aria-label="Delete key ${escapeAttr(row.key)}">${icon('trash')}</button>
+                    <span class="key-progress-label" title="${translated}/${total} translated (${pct}%)">${translated}/${total}</span>
                 </span>
             </div>
             ${expanded ? `<div class="key-body">
-                <div class="key-context-panel px-1 mb-3">
-                    <label class="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Translator context <span class="font-normal opacity-80">(where this string appears — optional, included in LLM prompts)</span></label>
-                    <textarea class="key-context-input w-full min-h-[2.5rem] px-2 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500" rows="2" placeholder="e.g. Error banner on checkout; keep formal">${escapeHtml(row.keyContext || '')}</textarea>
+                <div class="key-context-panel">
+                    <label class="field-label">Translator context <span class="text-faint font-normal">(where this string appears; optional, included in LLM prompts)</span></label>
+                    <textarea class="key-context-input ui-field input" rows="2" placeholder="e.g. Error banner on checkout; keep formal">${escapeHtml(row.keyContext || '')}</textarea>
                 </div>
                 ${renderLangRows(row)}
             </div>` : ''}
@@ -521,19 +517,22 @@ function renderLangRow(row, lang) {
     const isLow = !isSource && cell.confidence !== null && cell.confidence < threshold;
 
     const inputAttrs = [
-        'class="lang-input"',
+        'class="lang-input ui-field"',
         `data-missing="${cell.missing}"`,
         `data-low="${isLow}"`,
         'rows="1"',
+        `aria-label="${escapeAttr(info.name)}"`,
         cell.saving ? 'data-saving="true"' : '',
-        cell.missing ? 'placeholder="— not translated —"' : '',
+        cell.missing ? 'placeholder="Missing"' : '',
     ].filter(Boolean).join(' ');
 
-    // The confidence chip is always rendered next to the language code so
-    // reviewers can spot a low-confidence translation at a glance — without
-    // needing to flip the Details toggle. The toggle still exists; it just
-    // controls the richer strip below the input (translator + timestamp).
-    const chip = renderConfidenceChip(cell, isSource, threshold);
+    // The confidence pill sits beside every translated row so reviewers can
+    // spot a low-confidence translation at a glance — without needing to
+    // flip the Details toggle. The toggle still exists; it controls the
+    // richer strip below the input (translator + timestamp).
+    const chip = isSource
+        ? '<span class="ui-status">source</span>'
+        : renderConfidenceChip(cell, isSource, threshold);
     const details = state.details && !isSource ? renderDetails(cell) : '';
 
     // Source-row action:
@@ -542,53 +541,54 @@ function renderLangRow(row, lang) {
     //     runs the LLM with (source=that target lang, target=sourceLang) using
     //     the existing target value as the prompt input. No-op if every
     //     target is also empty.
-    //   - Otherwise: just 📋 copy.
+    //   - Otherwise: just copy.
+    const copyBtn = `<button class="lang-icon-btn ui-button ui-icon-button" data-action="copy-source" title="Copy to clipboard" aria-label="Copy ${escapeAttr(info.name)} text">${icon('copy')}</button>`;
     let actions;
     if (isSource) {
         const backFillSource = cell.missing ? pickBackFillSource(row) : null;
         actions = backFillSource
             ? `
-                <button class="lang-icon-btn lang-icon-btn--translate" data-action="fill-source"
+                <button class="lang-icon-btn ui-button ui-icon-button" data-action="fill-source"
                         data-from="${escapeAttr(backFillSource.lang)}"
-                        title="Auto-fill ${escapeAttr(state.sourceLang)} from the existing ${escapeAttr(backFillSource.lang)} translation">
-                    <span class="lang-icon-glyph">✨</span>
+                        title="Auto-fill ${escapeAttr(state.sourceLang)} from the existing ${escapeAttr(backFillSource.lang)} translation"
+                        aria-label="Fill ${escapeAttr(state.sourceLang)} from ${escapeAttr(backFillSource.lang)}">
+                    <span class="lang-icon-glyph">${icon('sparkles')}</span>
                 </button>
-                <button class="lang-icon-btn" data-action="copy-source" title="Copy to clipboard">📋</button>
+                ${copyBtn}
             `
-            : `<button class="lang-icon-btn" data-action="copy-source" title="Copy to clipboard">📋</button>`;
+            : copyBtn;
     } else {
         actions = `
-            <button class="lang-icon-btn lang-icon-btn--translate" data-action="translate" title="Auto-translate from ${escapeAttr(state.sourceLang)}">
-                <span class="lang-icon-glyph">✨</span>
+            <button class="lang-icon-btn ui-button ui-icon-button" data-action="translate" title="Auto-translate from ${escapeAttr(state.sourceLang)}" aria-label="Translate to ${escapeAttr(info.name)}">
+                <span class="lang-icon-glyph">${icon('sparkles')}</span>
             </button>
-            <button class="lang-icon-btn" data-action="clear" title="Clear translation">✕</button>
+            <button class="lang-icon-btn ui-button ui-icon-button" data-action="clear" title="Clear translation" aria-label="Clear ${escapeAttr(info.name)} translation">${icon('x')}</button>
         `;
     }
 
     return `
         <div class="lang-row" data-lang="${escapeAttr(lang)}">
-            <div class="lang-flag" aria-hidden="true">${info.flag}</div>
             <div class="lang-label">
-                <div class="lang-name">${escapeHtml(info.name)}</div>
-                <div class="lang-code">${escapeHtml(lang)}</div>
-                ${chip}
-                ${isSource ? '<span class="lang-source-badge">base</span>' : ''}
+                <span class="lang-name">${escapeHtml(info.name)}</span>
+                <span class="lang-code">${escapeHtml(lang)}</span>
             </div>
             <div class="lang-input-wrap">
                 <textarea ${inputAttrs}>${escapeHtml(cell.value)}</textarea>
                 ${details}
             </div>
+            <div class="lang-pill">${chip}</div>
             <div class="lang-actions">${actions}</div>
         </div>
     `;
 }
 
-// renderConfidenceChip returns the always-on confidence indicator for a
+// renderConfidenceChip returns the always-on confidence pill for a
 // non-source row. Tone is derived from the pair's threshold:
-//   - `high`    (≥ threshold): green
-//   - `medium`  (≥ 0.5 but below threshold): amber
-//   - `low`     (< 0.5): red
-//   - `unknown` (null / missing): no chip
+//   - `high`    (≥ threshold): ok
+//   - `medium`  (≥ 0.5 but below threshold): warn
+//   - `low`     (< 0.5): danger
+//   - `human`   (edited by a person): info
+//   - `unknown` (null / missing): no pill
 function renderConfidenceChip(cell, isSource, threshold) {
     if (isSource || cell.missing || cell.confidence === null || cell.confidence === undefined) return '';
     const pct = Math.round(cell.confidence * 100);
@@ -614,15 +614,17 @@ function renderConfidenceChip(cell, isSource, threshold) {
                 : `well below the ${thrPct}% threshold — likely bad, review recommended`;
         title = `LLM self-reported confidence: ${pct}%. This is how sure the model itself is about its translation (not a quality guarantee). ${pct}% is ${toneWord}.`;
     }
-    return `<span class="lang-confidence-chip" data-tone="${human ? 'human' : tone}" title="${escapeAttr(title)}">${escapeHtml(label)}</span>`;
+    const toneClass = { high: 'ui-status-ok', medium: 'ui-status-warn', low: 'ui-status-danger', human: 'ui-status-info' };
+    const t = human ? 'human' : tone;
+    return `<span class="lang-confidence-chip ui-status ${toneClass[t]}" data-tone="${t}" title="${escapeAttr(title)}">${escapeHtml(label)}</span>`;
 }
 
 function renderDetails(cell) {
     const bits = [];
-    if (cell.translatedBy) bits.push(`<span class="lang-detail-pill">by ${escapeHtml(cell.translatedBy)}</span>`);
+    if (cell.translatedBy) bits.push(`<span class="lang-detail-pill ui-chip">by ${escapeHtml(cell.translatedBy)}</span>`);
     if (cell.timestamp) {
         const dt = Utils.formatDate(cell.timestamp);
-        if (dt !== 'N/A') bits.push(`<span class="lang-detail-pill">${escapeHtml(dt)}</span>`);
+        if (dt !== 'N/A') bits.push(`<span class="lang-detail-pill ui-chip">${escapeHtml(dt)}</span>`);
     }
     return bits.length ? `<div class="lang-details">${bits.join('')}</div>` : '';
 }
@@ -637,8 +639,19 @@ function updateSummary(rows) {
             if (!r.cells[l].missing) filled++;
         }
     }
-    const pct = total === 0 ? 100 : Math.round((filled / total) * 100);
-    summary.textContent = `${rows.length} key${rows.length === 1 ? '' : 's'} · ${filled}/${total} translated (${pct}%)`;
+    summary.textContent = `${rows.length} key${rows.length === 1 ? '' : 's'} · ${filled} of ${total} translated`;
+    updateFillButton(total - filled);
+}
+
+// The view's one primary action is filling what's missing. When nothing in
+// the view is missing, the button steps aside and New key takes the lead.
+function updateFillButton(missing) {
+    const fill = document.getElementById('fillAllMissingBtn');
+    const newKey = document.getElementById('newKeyBtn');
+    if (fill.disabled) return; // a fill pass is running; it restores the label when done
+    fill.textContent = `Fill ${missing} missing`;
+    fill.hidden = missing === 0;
+    newKey.classList.toggle('ui-button-primary', missing === 0);
 }
 
 // -----------------------------------------------------------------------
@@ -687,15 +700,15 @@ async function deleteKey(id, btn) {
     if (!confirm(confirmMsg)) return;
 
     btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = '…';
+    const original = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
 
     try {
         const res = await api.deleteKey(row.key, row.ns);
         if (!res.ok) {
             Utils.showToast(`Delete failed: ${res.error || 'unknown error'}`, 'error');
             btn.disabled = false;
-            btn.textContent = original;
+            btn.innerHTML = original;
             return;
         }
         state.expanded.delete(id);
@@ -706,7 +719,7 @@ async function deleteKey(id, btn) {
         console.error('deleteKey error', err);
         Utils.showToast(`Delete failed: ${err.message || err}`, 'error');
         btn.disabled = false;
-        btn.textContent = original;
+        btn.innerHTML = original;
     }
 }
 
@@ -714,7 +727,7 @@ async function deleteKey(id, btn) {
 // straight into application code (t('common.welcome'), …). We copy just the
 // key — not `ns.key` — because the namespace is part of the row's metadata,
 // not of the identifier most frameworks expect. Briefly flips the button to
-// a check-mark so the click produces visible feedback even when the toast
+// a check icon so the click produces visible feedback even when the toast
 // is off-screen or dismissed too quickly.
 async function copyKey(id, btn) {
     const row = findRow(id);
@@ -726,12 +739,12 @@ async function copyKey(id, btn) {
         Utils.showToast(`Copy failed: ${err.message || err}`, 'error');
         return;
     }
-    const original = btn.textContent;
-    btn.textContent = '✓';
+    const original = btn.innerHTML;
+    btn.innerHTML = icon('check');
     btn.setAttribute('data-copied', 'true');
     Utils.showToast(`Copied "${row.key}"`, 'success');
     setTimeout(() => {
-        btn.textContent = original;
+        btn.innerHTML = original;
         btn.removeAttribute('data-copied');
     }, 1100);
 }
@@ -1023,7 +1036,7 @@ async function fillSourceFromTarget(row, fromLang, btn) {
         btn.dataset.busy = 'false';
         reflectCell(row, sourceLang);
         rerenderCardHead(row);
-        Utils.showToast(`✨ Filled ${sourceLang} from ${fromLang}`, 'success');
+        Utils.showToast(`Filled ${sourceLang} from ${fromLang}`, 'success');
     } catch (err) {
         console.error('fillSourceFromTarget:', err);
         sourceCell.saving = false;
@@ -1076,7 +1089,7 @@ async function translateCell(row, lang, btn) {
         // auto-retries with a correction prompt when it detects violations,
         // so 99% of the time `data.glossary_violations` is empty here. The
         // remaining 1% (retries exhausted, still wrong) is signalled by the
-        // amber confidence chip — no toast needed, the chip already tells
+        // warn confidence pill — no toast needed, the pill already tells
         // the story. We deliberately drop the old "Glossary not respected"
         // toast because users complained it was noise, not signal.
     } catch (err) {
@@ -1115,18 +1128,12 @@ function reflectCell(row, lang) {
     if (cell.saving) input.dataset.saving = 'true';
     else delete input.dataset.saving;
 
-    // Refresh the always-visible confidence chip so a newly-translated cell
-    // shows its score without needing a full re-render.
-    const label = rowEl.querySelector('.lang-label');
-    if (label) {
-        const existingChip = label.querySelector('.lang-confidence-chip');
-        if (existingChip) existingChip.remove();
-        const chipHtml = renderConfidenceChip(cell, lang === state.sourceLang, threshold);
-        if (chipHtml) {
-            // Insert after .lang-code so the DOM order matches renderLangRow.
-            const code = label.querySelector('.lang-code');
-            (code || label).insertAdjacentHTML('afterend', chipHtml);
-        }
+    // Refresh the always-visible confidence pill so a newly-translated cell
+    // shows its score without needing a full re-render. The source row keeps
+    // its "source" pill.
+    const pill = rowEl.querySelector('.lang-pill');
+    if (pill && lang !== state.sourceLang) {
+        pill.innerHTML = renderConfidenceChip(cell, false, threshold);
     }
 
     // Rebuild details strip in-place if it's visible.
@@ -1169,7 +1176,7 @@ function setupToolbar() {
 
     document.getElementById('detailsToggleBtn').addEventListener('click', (e) => {
         state.details = !state.details;
-        e.currentTarget.setAttribute('aria-expanded', String(state.details));
+        e.currentTarget.setAttribute('aria-pressed', String(state.details));
         render();
     });
 
@@ -1234,17 +1241,18 @@ function closeAllMenus() {
 function renderLangsMenu() {
     const panel = document.getElementById('langsMenuPanel');
     const items = [
-        { value: 'all',  label: 'All languages', icon: '🌐' },
-        { value: 'base', label: 'Base only',     icon: '📌' },
+        { value: 'all',  label: 'All languages', icon: 'globe' },
+        { value: 'base', label: 'Source only',   icon: 'file' },
     ];
     for (const lang of state.allLangs) {
         const info = Utils.langInfo(lang);
-        items.push({ value: lang, label: `${info.name} (${lang})`, icon: info.flag });
+        items.push({ value: lang, label: info.name, code: lang });
     }
     panel.innerHTML = items.map(item => `
-        <button class="tx-menu-item" data-lang-view="${escapeAttr(item.value)}" aria-selected="${state.langView === item.value}">
-            <span>${item.icon}</span>
+        <button class="tx-menu-item ui-option" role="menuitemradio" data-lang-view="${escapeAttr(item.value)}" aria-selected="${state.langView === item.value}">
+            ${item.icon ? icon(item.icon) : ''}
             <span>${escapeHtml(item.label)}</span>
+            ${item.code ? `<span class="tx-menu-code">${escapeHtml(item.code)}</span>` : ''}
         </button>
     `).join('');
     panel.querySelectorAll('[data-lang-view]').forEach(btn => {
@@ -1262,18 +1270,18 @@ function renderNsMenu() {
     const panel = document.getElementById('nsMenuPanel');
     const items = [{ value: '', label: 'All namespaces' }, ...state.namespaces.map(ns => ({ value: ns, label: ns }))];
     panel.innerHTML = items.map(item => `
-        <button class="tx-menu-item" data-ns="${escapeAttr(item.value)}" aria-selected="${state.namespace === item.value}">
-            <span>📂</span>
+        <button class="tx-menu-item ui-option" role="menuitemradio" data-ns="${escapeAttr(item.value)}" aria-selected="${state.namespace === item.value}">
+            ${icon('folder')}
             <span>${escapeHtml(item.label)}</span>
         </button>
     `).join('') + `
-        <div class="tx-menu-divider"></div>
-        <button class="tx-menu-item tx-menu-item--action" data-ns-action="new">
-            <span>➕</span>
+        <div class="tx-menu-divider" role="separator"></div>
+        <button class="tx-menu-item ui-option" role="menuitem" data-ns-action="new">
+            ${icon('plus')}
             <span>New namespace…</span>
         </button>
-        <button class="tx-menu-item tx-menu-item--action" data-ns-action="manage">
-            <span>⚙️</span>
+        <button class="tx-menu-item ui-option" role="menuitem" data-ns-action="manage">
+            ${icon('settings')}
             <span>Manage namespaces…</span>
         </button>
     `;
@@ -1304,23 +1312,21 @@ function renderNsMenu() {
 
 function updateToolbarLabels() {
     const langsLabel = document.getElementById('langsBtnLabel');
-    const langsIcon  = document.getElementById('langsBtnIcon');
     if (state.langView === 'all') {
         langsLabel.textContent = 'All languages';
-        langsIcon.textContent = '🌐';
     } else if (state.langView === 'base') {
-        langsLabel.textContent = 'Base only';
-        langsIcon.textContent = '📌';
+        langsLabel.textContent = 'Source only';
     } else {
-        const info = Utils.langInfo(state.langView);
-        langsLabel.textContent = `${info.name}`;
-        langsIcon.textContent = info.flag;
+        langsLabel.textContent = Utils.langInfo(state.langView).name;
     }
 
     document.getElementById('nsBtnLabel').textContent = state.namespace || 'All namespaces';
 
     const sortLabels = { alpha: 'Alphabetically', missing: 'Missing first', issues: 'Issues first' };
     document.getElementById('sortBtnLabel').textContent = sortLabels[state.sort] || 'Alphabetically';
+    document.querySelectorAll('[data-sort]').forEach(btn => {
+        btn.setAttribute('aria-selected', String(btn.dataset.sort === state.sort));
+    });
 }
 
 function updateFiltersBadge() {
@@ -1359,8 +1365,7 @@ async function fillAllMissing() {
 
     const btn = document.getElementById('fillAllMissingBtn');
     btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = `⏳ Filling ${groups.size} group${groups.size === 1 ? '' : 's'}…`;
+    btn.textContent = `Filling ${groups.size} group${groups.size === 1 ? '' : 's'}…`;
 
     try {
         for (const { lang, ns } of groups.values()) {
@@ -1369,11 +1374,11 @@ async function fillAllMissing() {
                 Utils.showToast(`Batch failed ${lang}/${ns}: ${res.error}`, 'error');
             }
         }
-        Utils.showToast('✓ Translation pass complete', 'success');
+        Utils.showToast('Translation pass complete', 'success');
         await loadAll();
     } finally {
         btn.disabled = false;
-        btn.textContent = original;
+        updateSummary(visibleRows());
     }
 }
 
@@ -1638,7 +1643,7 @@ function setNsManageError(msg) {
 async function refreshNsManageList() {
     const list = document.getElementById('nsManageList');
     const empty = document.getElementById('nsManageEmpty');
-    list.innerHTML = `<div class="py-8 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</div>`;
+    Utils.showLoading(list);
     empty.classList.add('hidden');
 
     const resp = await api.getNamespaceStats();
@@ -1661,31 +1666,24 @@ async function refreshNsManageList() {
 function renderNsManageList() {
     const list = document.getElementById('nsManageList');
     list.innerHTML = nsManageEntries.map(entry => `
-        <div class="ns-manage-row flex items-center gap-3 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40"
-             data-ns="${escapeAttr(entry.namespace)}">
-            <span class="text-lg">📂</span>
+        <div class="ns-manage-row ui-row" data-ns="${escapeAttr(entry.namespace)}">
+            <span class="text-muted">${icon('folder')}</span>
             <div class="flex-1 min-w-0">
-                <div class="ns-manage-name font-mono text-sm text-slate-900 dark:text-white truncate" data-role="display">
-                    ${escapeHtml(entry.namespace)}
-                </div>
-                <input type="text" value="${escapeAttr(entry.namespace)}" data-role="edit"
-                       class="hidden w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm font-mono">
-                <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                <div class="ns-manage-name" data-role="display">${escapeHtml(entry.namespace)}</div>
+                <input type="text" value="${escapeAttr(entry.namespace)}" data-role="edit" aria-label="New name for ${escapeAttr(entry.namespace)}"
+                       class="hidden ui-field input w-full font-mono text-code">
+                <div class="ns-manage-counts">
                     ${entry.key_count} key${entry.key_count === 1 ? '' : 's'}
                     · ${entry.translation_count} translation${entry.translation_count === 1 ? '' : 's'}
                 </div>
             </div>
             <div class="flex items-center gap-1" data-role="actions-view">
-                <button class="px-2 py-1 rounded-md text-xs font-medium bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        data-action="rename">Rename</button>
-                <button class="px-2 py-1 rounded-md text-xs font-medium bg-white dark:bg-slate-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
-                        data-action="delete">Delete</button>
+                <button class="ui-button" data-action="rename">Rename</button>
+                <button class="ui-button ui-button-danger" data-action="delete">Delete</button>
             </div>
             <div class="hidden items-center gap-1" data-role="actions-edit">
-                <button class="px-2 py-1 rounded-md text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white"
-                        data-action="rename-save">Save</button>
-                <button class="px-2 py-1 rounded-md text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
-                        data-action="rename-cancel">Cancel</button>
+                <button class="ui-button" data-action="rename-save">Save</button>
+                <button class="ui-button" data-action="rename-cancel">Cancel</button>
             </div>
         </div>
     `).join('');
