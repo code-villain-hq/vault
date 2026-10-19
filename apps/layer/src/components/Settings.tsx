@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../lib/api";
+import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
 import { Field, Modal } from "./ui";
 import { TicketFlowSettings } from "./TicketFlow";
@@ -22,6 +23,8 @@ export function Settings() {
   const toggleSettings = useStore((s) => s.toggleSettings);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const refreshIssues = useStore((s) => s.refreshIssues);
+  const refreshPrs = useStore((s) => s.refreshPrs);
+  const ghRejected = useStore((s) => githubRejected(s.prs));
   const toast = useStore((s) => s.toast);
   const fail = useStore((s) => s.fail);
 
@@ -95,6 +98,8 @@ export function Settings() {
       setGhToken("");
       toast("success", `GitHub connected as ${login}`);
       await refreshSettings();
+      // The PR tabs still hold what the old token was told.
+      void refreshPrs();
     } catch (e) {
       fail(e);
     } finally {
@@ -253,7 +258,9 @@ export function Settings() {
           </p>
           {settings?.github_connected && (
             <div className="row" style={{ marginBottom: 14 }}>
-              <span className="ui-status ui-status-ok">connected</span>
+              {ghRejected
+                ? <span className="ui-status ui-status-danger">token rejected</span>
+                : <span className="ui-status ui-status-ok">connected</span>}
               <span className="muted">{settings.github?.api_url}</span>
               <div className="spacer" />
               <button className="ui-button ui-button-danger" onClick={() => void disconnect("github")}>

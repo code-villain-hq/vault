@@ -176,6 +176,12 @@ let noteSeq = 0;
  * one land last, taking the store backwards.
  */
 let sweeping = false;
+/**
+ * Asked for while one was in the air. A new token is saved mid-sweep, and the
+ * sweep began with the old one: skipped, its refusal stayed on screen until
+ * the next one (PR-12). So one more runs when it lands.
+ */
+let sweepAgain = false;
 let reviewsInflight: Promise<void> | null = null;
 
 /**
@@ -497,7 +503,11 @@ export const useStore = create<State>((set, get) => {
    * put a toast on screen every couple of minutes.
    */
   refreshPrs: async () => {
-    if (sweeping || !get().settings?.github_connected) return;
+    if (!get().settings?.github_connected) return;
+    if (sweeping) {
+      sweepAgain = true;
+      return;
+    }
     sweeping = true;
     const began = Date.now();
     try {
@@ -519,6 +529,10 @@ export const useStore = create<State>((set, get) => {
       // Left as it was: stale rows beat empty ones.
     } finally {
       sweeping = false;
+    }
+    if (sweepAgain) {
+      sweepAgain = false;
+      await get().refreshPrs();
     }
   },
 
