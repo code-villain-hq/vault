@@ -13,12 +13,17 @@ import {
   adoptedDecision,
   agentWork,
   branchName,
+  type CodeHosts,
   decisionProposal,
   decisionsAsked,
   duration,
+  forgejoUpToDate,
   issueKnowledge,
   mergeBlocker,
+  pullRequestNote,
+  pullRequestsKnown,
   pullRequestsToMerge,
+  reviewAsk,
   sharedFields,
 } from "./data";
 
@@ -84,6 +89,96 @@ test("an open pull request's chip says what keeps it from being merged", () => {
   expect(mergeBlocker(link({ blocker: undefined }))).toBeNull();
   // Once it's merged or closed, it no longer matters.
   expect(mergeBlocker(link({ blocker: "conflicts", state: "merged" }))).toBeNull();
+});
+
+const NOW = Date.parse("2026-10-18T12:00:00Z");
+const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+const forgejo = (fields: Partial<NonNullable<CodeHosts["forgejo"]>> = {}): CodeHosts => ({
+  github: false,
+  forgejo: { connected: true, checked_at: minutesAgo(1), check_error: null, ...fields },
+});
+
+test("Forgejo's pull requests are up to date for five minutes after a check worked", () => {
+  expect(forgejoUpToDate(forgejo(), NOW)).toBe(true);
+  expect(forgejoUpToDate(forgejo({ checked_at: minutesAgo(4.9) }), NOW)).toBe(true);
+  expect(forgejoUpToDate(forgejo({ checked_at: minutesAgo(5) }), NOW)).toBe(false);
+  expect(forgejoUpToDate(forgejo({ checked_at: null }), NOW)).toBe(false);
+  expect(forgejoUpToDate({ github: false, forgejo: null }, NOW)).toBe(false);
+  expect(forgejoUpToDate(forgejo({ connected: false }), NOW)).toBe(false);
+});
+
+test("a failed check isn't up to date, however recent the last one that worked", () => {
+  const failed = forgejo({ checked_at: minutesAgo(1), check_error: "couldn't reach Forgejo" });
+  expect(forgejoUpToDate(failed, NOW)).toBe(false);
+  const known = pullRequestsKnown(failed, NOW);
+  expect(known.known).toBe(false);
+  expect(!known.known && known.why).toMatch(
+    /^Forge last checked Forgejo at .+: couldn't reach Forgejo\.$/,
+  );
+  const row = { kind: "pull_request", state: "open", provider: "forgejo", checks: "passed" };
+  expect(pullRequestNote(row as IssueLink, failed, NOW)?.text).toMatch(/^last checked /);
+});
+
+test("Forge knows an issue's pull requests while a code host can tell it, and says why not", () => {
+  expect(pullRequestsKnown(forgejo(), NOW)).toEqual({ known: true });
+  expect(pullRequestsKnown({ github: true, forgejo: null }, NOW)).toEqual({ known: true });
+  expect(pullRequestsKnown({ github: false, forgejo: null }, NOW)).toEqual({
+    known: false,
+    why: "No code host is connected.",
+  });
+  const stale = pullRequestsKnown(
+    forgejo({ checked_at: minutesAgo(20), check_error: "couldn't reach Forgejo" }),
+    NOW,
+  );
+  expect(stale.known).toBe(false);
+  expect(!stale.known && stale.why).toMatch(
+    /^Forge last checked Forgejo at .+: couldn't reach Forgejo\.$/,
+  );
+  expect(pullRequestsKnown(forgejo({ checked_at: null }), NOW)).toEqual({
+    known: false,
+    why: "Forge hasn't checked Forgejo yet.",
+  });
+});
+
+test("the review bar asks to merge, to approve no-code work, or says what's missing", () => {
+  expect(reviewAsk(1, false, true)).toBe("merge");
+  // An open pull request wins over the No code mark, and over a stale look.
+  expect(reviewAsk(2, true, false)).toBe("merge");
+  expect(reviewAsk(0, true, true)).toBe("approve");
+  expect(reviewAsk(0, true, false)).toBe("approve");
+  expect(reviewAsk(0, false, true)).toBe("no_pull_request");
+  expect(reviewAsk(0, false, false)).toBe("unknown");
+});
+
+test("a Forgejo pull request's row says when checks are missing or Forge's look is old", () => {
+  const link = (fields: Partial<IssueLink>) =>
+    ({
+      kind: "pull_request",
+      state: "open",
+      provider: "forgejo",
+      checks: "passed",
+      blocker: null,
+      ...fields,
+    }) as IssueLink;
+  expect(pullRequestNote(link({}), forgejo(), NOW)).toBeNull();
+  expect(pullRequestNote(link({ checks: "none" }), forgejo(), NOW)).toEqual({
+    text: "No checks reported",
+    tone: "muted",
+  });
+  expect(pullRequestNote(link({ blocker: "checks_failed" }), forgejo(), NOW)).toEqual({
+    text: "checks failed",
+    tone: "danger",
+  });
+  expect(pullRequestNote(link({ blocker: "checks_running" }), forgejo(), NOW)?.tone).toBe("muted");
+  // GitHub's rows never say "No checks reported".
+  expect(pullRequestNote(link({ provider: "github", checks: "none" }), forgejo(), NOW)).toBeNull();
+  // An old look can't vouch for what it saw.
+  expect(
+    pullRequestNote(link({ blocker: "conflicts" }), forgejo({ checked_at: minutesAgo(30) }), NOW)
+      ?.text,
+  ).toMatch(/^last checked /);
+  expect(pullRequestNote(link({}), forgejo({ checked_at: null }), NOW)?.text).toBe("not checked");
+  expect(pullRequestNote(link({ state: "merged" }), forgejo({ checked_at: null }), NOW)).toBeNull();
 });
 
 test("an issue's knowledge is its service's and project's, plus workspace-wide decisions", () => {

@@ -193,7 +193,7 @@ impl Setup {
     }
 
     async fn finish(&self, identifier: &str) {
-        finish_work(&self.app.pool, self.agent, issue_ref(identifier))
+        finish_work(&self.app.pool, self.agent, finishing(identifier))
             .await
             .unwrap();
     }
@@ -225,6 +225,13 @@ impl Setup {
         )
         .await
         .unwrap();
+    }
+}
+
+fn finishing(identifier: &str) -> FinishWork {
+    FinishWork {
+        identifier: identifier.into(),
+        no_code: None,
     }
 }
 

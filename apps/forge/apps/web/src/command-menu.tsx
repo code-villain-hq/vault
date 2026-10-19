@@ -6,6 +6,7 @@ import {
   CircleUserRound,
   Folders,
   Funnel,
+  GitMerge,
   GitPullRequest,
   Inbox,
   Layers,
@@ -195,6 +196,7 @@ function Commands({ onDone }: { onDone: () => void }) {
           ["labels", "Labels", Tag, "/$workspace/settings/labels"],
           ["agents", "Agents", Bot, "/$workspace/settings/agents"],
           ["github", "GitHub", GitPullRequest, "/$workspace/settings/github"],
+          ["forgejo", "Forgejo", GitMerge, "/$workspace/settings/forgejo"],
           ["account", "Account", UserRound, "/$workspace/settings/account"],
         ] as const
       ).map(([id, label, icon, to]) => ({

@@ -97,6 +97,8 @@ function Change({ event, users }: { event: IssueEvent; users: Map<string, User> 
         return <>removed {name(users.get(event.from ?? "")?.name ?? "someone")} as reviewer</>;
       if (event.to === event.actor_id) return <>took the review</>;
       return <>asked {name(users.get(event.to)?.name ?? "someone")} to review it</>;
+    case "no_code":
+      return event.to ? <>marked it as needing no code</> : <>removed the No code mark</>;
     case "labels": {
       const list = (ids: string[]) =>
         ids.map((id) => labels.get(id)?.name ?? "a deleted label").join(", ");

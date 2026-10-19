@@ -101,6 +101,9 @@ fn issue_summary(s: &Snapshot, issue: &Issue) -> Value {
         "assignee": s.user_name(issue.assignee_id),
         "reviewer": s.user_name(issue.reviewer_id),
     });
+    if issue.no_code {
+        summary["no_code"] = json!(true);
+    }
     // Only issues waiting for an agent have a place in its queue.
     if let Some(position) = s.queue.get(&issue.id) {
         summary["queue_position"] = json!(position);
@@ -525,6 +528,8 @@ fn describe_change(s: &Snapshot, change: &IssueChange) -> String {
         IssueChange::Assignee { to, .. } => format!("assigned it to {}", user(to)),
         IssueChange::Reviewer { to: None, .. } => "removed the reviewer".into(),
         IssueChange::Reviewer { to, .. } => format!("asked {} to review it", user(to)),
+        IssueChange::NoCode { to: true } => "marked it as needing no code".into(),
+        IssueChange::NoCode { to: false } => "removed the No code mark".into(),
         IssueChange::Labels { added, removed } => {
             let mut parts = Vec::new();
             if !added.is_empty() {
@@ -921,17 +926,46 @@ pub async fn start_work(pool: &PgPool, actor: Actor, input: IssueRef) -> ToolRes
     ))
 }
 
-pub async fn finish_work(pool: &PgPool, actor: Actor, input: IssueRef) -> ToolResult<String> {
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct FinishWork {
+    /// The issue's identifier, e.g. FOR-12.
+    pub identifier: String,
+    /// True when the work changes no code (a spec or decision only), so no
+    /// pull request is coming: the issue gets the "No code" mark, and its
+    /// reviewer can approve it without one.
+    #[serde(default)]
+    pub no_code: Option<bool>,
+}
+
+pub async fn finish_work(pool: &PgPool, actor: Actor, input: FinishWork) -> ToolResult<String> {
     let s = Snapshot::load(pool, actor).await?;
     let issue = s.issue(&input.identifier)?;
     let identifier = s.identifier(issue);
+    let marked = input.no_code == Some(true) && !issue.no_code;
+    if marked {
+        apply(
+            pool,
+            actor,
+            vec![Operation::Update {
+                model: ModelKind::Issue,
+                id: issue.id,
+                data: object(json!({ "no_code": true })),
+            }],
+        )
+        .await?;
+    }
     let finished = forge_sync::finish_work(pool, actor, issue.id)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(if finished {
-        format!("Finished working on {identifier}.")
+    let mark = if marked {
+        " It's marked as needing no code."
     } else {
-        format!("You weren't working on {identifier}; nothing changed.")
+        ""
+    };
+    Ok(if finished {
+        format!("Finished working on {identifier}.{mark}")
+    } else {
+        format!("You weren't working on {identifier}; nothing changed.{mark}")
     })
 }
 

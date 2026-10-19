@@ -45,6 +45,10 @@ pub enum IssueChange {
         from: Option<Uuid>,
         to: Option<Uuid>,
     },
+    /// The "No code" mark was set (`to` true) or removed.
+    NoCode {
+        to: bool,
+    },
     Labels {
         added: Vec<Uuid>,
         removed: Vec<Uuid>,
@@ -164,6 +168,9 @@ fn diff(a: &Issue, b: &Issue) -> Vec<IssueChange> {
             to: b.reviewer_id,
         });
     }
+    if a.no_code != b.no_code {
+        out.push(IssueChange::NoCode { to: b.no_code });
+    }
     let added: Vec<Uuid> = (b.label_ids.iter())
         .filter(|l| !a.label_ids.contains(l))
         .copied()
@@ -263,6 +270,7 @@ mod tests {
             priority: 0,
             assignee_id: None,
             reviewer_id: None,
+            no_code: false,
             parent_id: None,
             project_id: None,
             service_id: None,

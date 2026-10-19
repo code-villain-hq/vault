@@ -12,7 +12,8 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::{
-    accounts, agents, attachments, drift, github, invites, mcp, members, runners, teams, ws,
+    accounts, agents, attachments, drift, forgejo, github, invites, mcp, members, runners, teams,
+    ws,
 };
 
 /// The API, plus the built web app from `web_dir` when given (in production
@@ -67,6 +68,12 @@ pub fn router(state: AppState) -> Router {
         .route("/tokens/{token_id}", delete(agents::revoke_token))
         .route("/services/{service_id}/check", post(drift::request_check))
         .route("/ai", get(drift::status))
+        .route(
+            "/forgejo",
+            get(forgejo::status)
+                .put(forgejo::connect)
+                .delete(forgejo::disconnect),
+        )
         .route("/github", get(github::status))
         .route("/github/refresh", post(github::refresh))
         .route(

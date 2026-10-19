@@ -22,6 +22,8 @@ pub struct AppState {
     pub drift: DriftSettings,
     /// Wakes the drift worker when a check is requested.
     pub drift_wake: Arc<Notify>,
+    /// Wakes the Forgejo worker when Forgejo is connected.
+    pub forgejo_wake: Arc<Notify>,
     /// The GitHub App; `None` turns the GitHub connection off.
     pub github: Option<Arc<GitHubApp>>,
     /// Signing in with GitHub; `None` turns it off.
@@ -48,6 +50,7 @@ impl AppState {
             ai: None,
             drift: DriftSettings::default(),
             drift_wake: Arc::new(Notify::new()),
+            forgejo_wake: Arc::new(Notify::new()),
             github: None,
             github_login: None,
             password_attempts: Arc::default(),

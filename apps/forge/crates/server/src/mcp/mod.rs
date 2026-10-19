@@ -41,7 +41,8 @@ covers or how it's done, propose_description and let people decide; don't widen 
 - When you look for work, take your next issue in queue order: search_issues with assignee \"me\" lists \
 your issues by priority, then age, and queue_position 1 is next. Don't skip ahead.
 - When you pick up an issue, write its spec change first (save_spec_change), then call start_work, and \
-finish_work when you're done with it, so the team sees what you're working on. If start_work is refused \
+finish_work when you're done with it, so the team sees what you're working on. When the work changes no \
+code (only a spec or decision), pass no_code to finish_work: otherwise its reviewer expects a pull request. If start_work is refused \
 because someone is already on it, leave the issue alone. If it's refused because of the spec change, write \
 it, or write it again against the spec as it is now; when another issue changes the same requirement \
 first, settle it with that issue's people (ask in Triage) instead of starting.
@@ -207,11 +208,11 @@ impl Forge {
     }
 
     #[tool(
-        description = "Say you've finished working on an issue for now: handed it over for review, asked for a decision, or stopped. Moving it to In Review or Done, or assigning it to someone else, also finishes it."
+        description = "Say you've finished working on an issue for now: handed it over for review, asked for a decision, or stopped. Moving it to In Review or Done, or assigning it to someone else, also finishes it. Pass no_code when the work changes no code (only a spec or decision), so its reviewer can approve it without a pull request."
     )]
     async fn finish_work(
         &self,
-        Parameters(input): Parameters<IssueRef>,
+        Parameters(input): Parameters<FinishWork>,
         Extension(parts): Extension<Parts>,
     ) -> Result<String, String> {
         finish_work(&self.pool, actor(&parts)?, input).await

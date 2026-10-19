@@ -249,6 +249,94 @@ export function mergeBlocker(link: IssueLink): string | null {
   }
 }
 
+/** How old Forgejo's last successful check may be for its pull requests to count as up to date. */
+export const FORGEJO_UP_TO_DATE_MS = 5 * 60 * 1000;
+
+/** What Forge knows about the workspace's code hosts, as far as the review bar cares. */
+export interface CodeHosts {
+  /** GitHub is on, with an installation linked to the workspace. */
+  github: boolean;
+  forgejo: {
+    connected: boolean;
+    /** When a check of Forgejo last worked. */
+    checked_at: string | null;
+    /** Why the last check failed; cleared by one that works. */
+    check_error: string | null;
+  } | null;
+}
+
+/**
+ * Whether Forgejo's pull requests are up to date: its last successful check
+ * is recent, and no check has failed since.
+ */
+export function forgejoUpToDate(hosts: CodeHosts, now = Date.now()): boolean {
+  const forgejo = hosts.forgejo;
+  const checked = forgejo?.connected && !forgejo.check_error ? forgejo.checked_at : null;
+  return checked !== null && now - Date.parse(checked) < FORGEJO_UP_TO_DATE_MS;
+}
+
+/**
+ * Whether Forge knows an issue's pull requests: Forgejo is up to date, or
+ * GitHub is connected. Otherwise why not, in words for the review bar.
+ */
+export function pullRequestsKnown(
+  hosts: CodeHosts,
+  now = Date.now(),
+): { known: true } | { known: false; why: string } {
+  if (hosts.github || forgejoUpToDate(hosts, now)) return { known: true };
+  const forgejo = hosts.forgejo;
+  if (!forgejo?.connected) return { known: false, why: "No code host is connected." };
+  const since = forgejo.checked_at
+    ? `Forge last checked Forgejo at ${clockTime(forgejo.checked_at)}`
+    : "Forge hasn't checked Forgejo yet";
+  return {
+    known: false,
+    why: forgejo.check_error ? `${since}: ${forgejo.check_error}.` : `${since}.`,
+  };
+}
+
+/** A time of day, like 21:40. */
+export function clockTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * What the review bar asks for: merging the open pull requests that work
+ * on the issue; approving work marked as needing no code; or, without
+ * either, sending it back since no pull request was found, or, when Forge
+ * can't tell, a choice it can't make for you.
+ */
+export type ReviewAsk = "merge" | "approve" | "no_pull_request" | "unknown";
+
+export function reviewAsk(openPullRequests: number, noCode: boolean, known: boolean): ReviewAsk {
+  if (openPullRequests > 0) return "merge";
+  if (noCode) return "approve";
+  return known ? "no_pull_request" : "unknown";
+}
+
+/**
+ * The note on an open pull request's row: what keeps it from being merged;
+ * for Forgejo's, "No checks reported" when it has none, and when Forge's
+ * last look is too old to vouch for, when that was.
+ */
+export function pullRequestNote(
+  link: IssueLink,
+  hosts: CodeHosts,
+  now = Date.now(),
+): { text: string; tone: "danger" | "muted" } | null {
+  if (link.kind !== "pull_request" || link.state !== "open") return null;
+  if (link.provider === "forgejo" && !forgejoUpToDate(hosts, now)) {
+    const checked = hosts.forgejo?.checked_at;
+    return { text: checked ? `last checked ${clockTime(checked)}` : "not checked", tone: "muted" };
+  }
+  const blocker = mergeBlocker(link);
+  if (blocker)
+    return { text: blocker, tone: link.blocker === "checks_running" ? "muted" : "danger" };
+  if (link.provider === "forgejo" && link.checks === "none")
+    return { text: "No checks reported", tone: "muted" };
+  return null;
+}
+
 /**
  * What an agent asks the PO to decide in a proposed description: its
  * "## Decisions (proposed by …)" and "## Proposed split" sections, each up

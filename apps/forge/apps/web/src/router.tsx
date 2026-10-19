@@ -17,6 +17,7 @@ import { Home, NotFound, WorkspaceLayout } from "./layout";
 import { InitiativePage, InitiativesPage, ProjectPage, ProjectsPage } from "./planning";
 import { AccountPage, MembersPage } from "./settings";
 import { AgentsSettingsPage } from "./settings-agents";
+import { ForgejoSettingsPage } from "./settings-forgejo";
 import { GitHubSettingsPage } from "./settings-github";
 import { LabelsSettingsPage, TeamsSettingsPage } from "./settings-tracker";
 
@@ -97,6 +98,11 @@ const agents = createRoute({
   getParentRoute: () => workspace,
   path: "/settings/agents",
   component: AgentsSettingsPage,
+});
+const forgejo = createRoute({
+  getParentRoute: () => workspace,
+  path: "/settings/forgejo",
+  component: ForgejoSettingsPage,
 });
 const github = createRoute({
   getParentRoute: () => workspace,
@@ -191,6 +197,7 @@ const routeTree = root.addChildren([
     members,
     agents,
     github,
+    forgejo,
     teamsSettings,
     labels,
     account,
