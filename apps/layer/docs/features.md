@@ -703,6 +703,10 @@ send feedback to an agent, and finish a merged task.
   Settings, rather than the same failure under every repo. Other failures
   are still listed per repo. An expired token used to show GitHub's raw
   "Bad credentials" JSON beside each repo, and nothing said what to do.
+  While the last read was refused, the chip in Settings says "token
+  rejected" in place of "connected", which only ever meant a token was
+  saved. Saving a token sweeps every task's PRs at once, or straight after
+  a sweep already under way, so the refusal does not linger.
 
 Code: `commands/github.rs`, `commands/open_prs.rs`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `PrPanel.tsx`, `PrReadErrors.tsx`,
 `PrFeedback.tsx`, `Markdown.tsx`, `lib/markdown.ts`.

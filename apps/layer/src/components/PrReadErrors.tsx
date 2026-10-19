@@ -1,8 +1,6 @@
 import { useStore } from "../store";
+import { TOKEN_REJECTED } from "../lib/derive";
 import type { CheckoutPr } from "../lib/types";
-
-/** What the backend says on a 401 (`Error::TokenRejected` in `error.rs`). */
-export const TOKEN_REJECTED = "GitHub no longer accepts the saved token";
 
 /**
  * The repos whose pull requests could not be read. A rejected token is said

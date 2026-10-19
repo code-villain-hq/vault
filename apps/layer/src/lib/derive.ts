@@ -290,6 +290,18 @@ export function taskReview(rows: CheckoutPr[]): TaskReview {
   return "open";
 }
 
+/** What the backend says on a 401 (`Error::TokenRejected` in `error.rs`). */
+export const TOKEN_REJECTED = "GitHub no longer accepts the saved token";
+
+/**
+ * Whether GitHub refused the saved token on the last read of any task's PRs.
+ * Settings said "connected" beside a tab saying the token was refused, since
+ * all it knew was that one was saved (PR-12).
+ */
+export function githubRejected(prs: Record<string, CheckoutPr[]>): boolean {
+  return Object.values(prs).some((rows) => rows.some((r) => r.error === TOKEN_REJECTED));
+}
+
 /** How many comments a task's PRs are carrying, conversation and inline both. */
 export function reviewComments(rows: CheckoutPr[]): number {
   return rows.reduce(
