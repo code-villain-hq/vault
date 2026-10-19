@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Bring a pull request from the GitHub mirror to Forgejo.
+#
+#   scripts/take-pr            list open pull requests on GitHub
+#   scripts/take-pr <n>        review GitHub PR <n>, then open it on Forgejo
+#   scripts/take-pr done <n>   after the Forgejo merge, close GitHub PR <n>
+#                              if GitHub has not marked it merged by itself
+#
+# The contributor's commits go to Forgejo unchanged, so authorship stays and a
+# merge commit on Forgejo makes GitHub mark the PR merged once the mirror syncs.
+# Running <n> again after the contributor pushes more updates the same Forgejo PR.
+#
+# Needs gh logged in to github.com, jq, and push access to origin.
+
+set -euo pipefail
+
+github_repo=code-villain-hq/vault
+forgejo_api=https://git.codevillain.eu/api/v1/repos/code-villain/vault
+export GH_HOST=github.com
+
+die() { printf 'take-pr: %s\n' "$*" >&2; exit 1; }
+gh_pr() { gh pr "$@" --repo "github.com/$github_repo"; }
+
+# The latest Forgejo PR opened from GitHub PR $1, as JSON, or nothing.
+# Forgejo puts the pusher's name in front of the topic: michael/github-pr-<n>.
+forgejo_pr() {
+  curl -fsS "$forgejo_api/pulls?state=all&sort=recentupdate&limit=50" |
+    jq -c --arg topic "github-pr-$1" \
+      'map(select(.flow == 1 and (.head.label | split("/") | last) == $topic)) | first // empty'
+}
+
+list() {
+  gh_pr list --state open --json number,title,author,updatedAt \
+    --template '{{range .}}#{{.number}}  {{.title}}  (@{{.author.login}}, {{timeago .updatedAt}}){{"\n"}}{{end}}'
+}
+
+take() {
+  local n=$1 pr state base title author url body sha ref existing
+  pr=$(gh_pr view "$n" --json state,baseRefName,title,author,url,body,headRefOid)
+  state=$(jq -r .state <<<"$pr")
+  base=$(jq -r .baseRefName <<<"$pr")
+  title=$(jq -r '.title | gsub("[\r\n]+"; " ")' <<<"$pr")
+  author=$(jq -r .author.login <<<"$pr")
+  url=$(jq -r .url <<<"$pr")
+  body=$(jq -r '.body // ""' <<<"$pr")
+  sha=$(jq -r .headRefOid <<<"$pr")
+  [[ $state == OPEN ]] || die "GitHub PR #$n is $state"
+  [[ $base == main ]] || die "GitHub PR #$n targets $base, not main"
+
+  ref=refs/take-pr/$n
+  git fetch -q origin main
+  git fetch -q --no-tags "https://github.com/$github_repo.git" "+refs/pull/$n/head:$ref"
+  [[ $(git rev-parse "$ref") == "$sha" ]] || die "fetched head differs from GitHub's $sha; run again"
+
+  printf '\n#%s  %s\nby @%s  %s\n\n' "$n" "$title" "$author" "$url"
+  git log --reverse --format='  %h %an <%ae>  %s' "origin/main..$ref"
+  echo
+  git diff --stat "origin/main...$ref"
+  if git diff --name-only "origin/main...$ref" | grep -q '^\.forgejo/'; then
+    printf '\n!! This PR changes .forgejo/. CI runs on the Mac after the merge. Read those files closely.\n'
+  fi
+
+  while :; do
+    printf '\n[d]iff, [y] open on Forgejo, [n] stop: '
+    read -r answer
+    case $answer in
+      d) git diff "origin/main...$ref" ;;
+      y) break ;;
+      *) echo "Nothing pushed."; exit 0 ;;
+    esac
+  done
+
+  existing=$(forgejo_pr "$n" | jq -c 'select(.state == "open")')
+  if [[ -n $existing && $(jq -r .head.sha <<<"$existing") == "$sha" ]]; then
+    printf '\n%s already has these commits.\n' "$(jq -r .html_url <<<"$existing")"
+    return
+  fi
+  local description push_opts=()
+  description=$(printf 'From %s by @%s.\n\n%s\n' "$url" "$author" "$body")
+  push_opts+=(-o "topic=github-pr-$n" -o "title=$title")
+  push_opts+=(-o "description={base64}$(printf '%s' "$description" | base64 | tr -d '\n')")
+  [[ -n $existing ]] && push_opts+=(-o force-push=true)
+  git push origin "$sha:refs/for/main" "${push_opts[@]}"
+
+  local forgejo
+  forgejo=$(forgejo_pr "$n" | jq -r '.html_url // empty')
+  [[ -n $forgejo ]] || die "pushed, but no Forgejo PR with topic github-pr-$n turned up"
+  if [[ -z $existing ]]; then
+    gh_pr comment "$n" --body "Under review on Forgejo: $forgejo. When it merges there, the mirror brings your commits back and this pull request shows as merged."
+    printf '\nOpened %s and linked it on GitHub.\n' "$forgejo"
+  else
+    printf '\nUpdated %s.\n' "$forgejo"
+  fi
+}
+
+done_() {
+  local n=$1 fpr state merge
+  fpr=$(forgejo_pr "$n")
+  [[ -n $fpr ]] || die "no Forgejo PR for GitHub PR #$n"
+  [[ $(jq -r .merged <<<"$fpr") == true ]] || die "$(jq -r .html_url <<<"$fpr") is not merged"
+  merge=$(jq -r .merge_commit_sha <<<"$fpr")
+
+  state=$(gh_pr view "$n" --json state --jq .state)
+  [[ $state == OPEN ]] || { echo "GitHub PR #$n is already $state."; return; }
+
+  case $(gh api "repos/$github_repo/compare/$merge...main" --jq .status 2>/dev/null || echo missing) in
+    identical|ahead) ;;
+    *) die "the mirror does not have $merge on main yet; try again in a minute" ;;
+  esac
+  # GitHub flips a PR to merged a moment after its commits reach main.
+  sleep 5
+  state=$(gh_pr view "$n" --json state --jq .state)
+  [[ $state == OPEN ]] || { echo "GitHub PR #$n is $state."; return; }
+
+  gh_pr close "$n" --comment "Landed on Forgejo as https://git.codevillain.eu/code-villain/vault/commit/$merge ($(jq -r .html_url <<<"$fpr")). Thank you."
+  git update-ref -d "refs/take-pr/$n" 2>/dev/null || true
+}
+
+cd "$(git rev-parse --show-toplevel)"
+case ${1:-} in
+  "") list ;;
+  done) [[ ${2:-} =~ ^[0-9]+$ ]] || die "usage: take-pr done <n>"; done_ "$2" ;;
+  *) [[ $1 =~ ^[0-9]+$ ]] || die "usage: take-pr [<n> | done <n>]"; take "$1" ;;
+esac
