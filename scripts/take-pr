@@ -21,10 +21,12 @@ export GH_HOST=github.com
 die() { printf 'take-pr: %s\n' "$*" >&2; exit 1; }
 gh_pr() { gh pr "$@" --repo "github.com/$github_repo"; }
 
-# The Forgejo PR opened from GitHub PR $1, as JSON, or nothing.
+# The latest Forgejo PR opened from GitHub PR $1, as JSON, or nothing.
+# Forgejo puts the pusher's name in front of the topic: michael/github-pr-<n>.
 forgejo_pr() {
   curl -fsS "$forgejo_api/pulls?state=all&sort=recentupdate&limit=50" |
-    jq -c --arg topic "github-pr-$1" 'map(select(.head.label == $topic)) | first // empty'
+    jq -c --arg topic "github-pr-$1" \
+      'map(select(.flow == 1 and (.head.label | split("/") | last) == $topic)) | first // empty'
 }
 
 list() {
@@ -68,7 +70,11 @@ take() {
     esac
   done
 
-  existing=$(forgejo_pr "$n")
+  existing=$(forgejo_pr "$n" | jq -c 'select(.state == "open")')
+  if [[ -n $existing && $(jq -r .head.sha <<<"$existing") == "$sha" ]]; then
+    printf '\n%s already has these commits.\n' "$(jq -r .html_url <<<"$existing")"
+    return
+  fi
   local description push_opts=()
   description=$(printf 'From %s by @%s.\n\n%s\n' "$url" "$author" "$body")
   push_opts+=(-o "topic=github-pr-$n" -o "title=$title")
