@@ -49,7 +49,7 @@ const Utils = {
         toast.className = 'toast';
         toast.dataset.tone = type;
         toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
-        toast.innerHTML = `${icon(glyph)}<span>${message}</span>`;
+        toast.innerHTML = `${icon(glyph)}<span>${Utils.escapeHtml(message)}</span>`;
         toast.style.animationDelay = `0s, ${Math.max(0, duration - 200)}ms`;
 
         toastContainer.appendChild(toast);
@@ -193,3 +193,43 @@ const Utils = {
             .replace(/'/g, '&#39;');
     }
 };
+
+// Static markup writes its icons as <span data-icon="name" data-icon-class="icon-sm">;
+// draw them once. Page scripts load after this one, so their markup is ready.
+document.querySelectorAll('[data-icon]').forEach(el => {
+    el.outerHTML = icon(el.dataset.icon, el.dataset.iconClass || '');
+});
+
+// A page's #confirmModal (title, body, Cancel, OK) as a promise: true on OK,
+// false on Cancel, Escape or a click on the backdrop. Focus returns to the
+// control that opened it.
+function confirmDialog({ title, body, confirmLabel }) {
+    const modal = document.getElementById('confirmModal');
+    const ok = document.getElementById('confirmOk');
+    const cancel = document.getElementById('confirmCancel');
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmBody').textContent = body;
+    ok.textContent = confirmLabel;
+    const opener = document.activeElement;
+    modal.hidden = false;
+    cancel.focus();
+    return new Promise(resolve => {
+        const done = (value) => {
+            modal.hidden = true;
+            ok.removeEventListener('click', onOk);
+            cancel.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+            document.removeEventListener('keydown', onKey, true);
+            if (opener && opener.focus) opener.focus();
+            resolve(value);
+        };
+        const onOk = () => done(true);
+        const onCancel = () => done(false);
+        const onBackdrop = (e) => { if (e.target === modal) done(false); };
+        const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); done(false); } };
+        ok.addEventListener('click', onOk);
+        cancel.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+        document.addEventListener('keydown', onKey, true);
+    });
+}

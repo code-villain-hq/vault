@@ -1,120 +1,68 @@
 <!DOCTYPE html>
-<html lang="en" id="theme">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Translations - Glyph</title>
+    <title>Translations · Glyph</title>
     <link rel="icon" href="/ui/img/glyph.svg" type="image/svg+xml">
-    <!-- Dark mode is the only supported theme; applied eagerly before the
-         Tailwind CDN paints so the first frame is already dark (avoids a
-         white-flash on load). -->
-    <script>document.documentElement.classList.add('dark');</script>
-    <style>
-        html { background-color: #020617; color-scheme: dark; } /* slate-950 */
-        body { background-color: #020617; }
-    </style>
+    <link rel="stylesheet" href="/ui/design/fonts/fonts.css">
+    <link rel="stylesheet" href="/ui/design/color.css">
+    <link rel="stylesheet" href="/ui/design/type.css">
+    <link rel="stylesheet" href="/ui/design/shape.css">
+    <link rel="stylesheet" href="/ui/design/components.css">
+    <link rel="stylesheet" href="/ui/css/glyph.css">
+    <link rel="stylesheet" href="/ui/css/translations.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260418j">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        primary: {
-                            50: '#f0f4ff',
-                            100: '#e6ebff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            800: '#3730a3',
-                            900: '#312e81',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="/ui/js/theme.js"></script>
+    <script src="/ui/js/icons.js"></script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300" style="font-family: 'Inter', sans-serif;">
-    <!-- Toast Container -->
-    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+<body data-page="translations">
+    <div id="toastContainer" class="toast-stack" aria-live="polite"></div>
 
-    <!-- Main Container -->
-    <div class="min-h-screen flex flex-col dark:text-white">
-        <!-- Header -->
-        <header class="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <!-- Logo -->
-                    <a href="/" class="flex items-center space-x-3">
-                        <img src="/ui/img/glyph.svg" alt="" class="w-10 h-10">
-                        <div>
-                            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Glyph</h1>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">AI-Powered i18n Manager</p>
-                        </div>
-                    </a>
+    <div class="app">
+        <aside class="app-side"><script src="/ui/js/frame.js"></script></aside>
 
-                    <!-- Navigation Tabs -->
-                    <nav class="hidden md:flex items-center space-x-1">
-                        <a href="/" data-page="dashboard" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📊 Dashboard</a>
-                        <a href="/ui/import.html" data-page="import" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📥 Import</a>
-                        <a href="/ui/translations.html" data-page="translations" class="nav-link text-indigo-600 dark:text-indigo-400 font-semibold border-b-2 border-indigo-600 dark:border-indigo-400 px-4 py-2 text-sm transition-all duration-200">📝 Translations</a>
-                        <a href="/ui/missing.html" data-page="missing" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">✨ Review</a>
-                        <a href="/ui/glossary.html" data-page="glossary" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📚 Glossary</a>
-                        <a href="/ui/settings.html" data-page="settings" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">⚙️ Settings</a>
-                    </nav>
+        <div class="app-main">
+            <header class="app-top">
+                <h1 class="app-crumb"><span class="app-crumb-current">Translations</span></h1>
+                <label class="tx-search ui-field">
+                    <span data-icon="search"></span>
+                    <input type="text" id="searchInput" placeholder="Search keys and text" aria-label="Search keys and text">
+                    <kbd class="ui-kbd">⌘F</kbd>
+                </label>
+            </header>
 
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Content -->
-        <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-            <!-- Toolbar: two tidy rows (query on top, view + actions below). -->
-            <div id="transToolbar" class="tx-toolbar bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-4">
-                <!-- Row 1: search + filtering -->
-                <div class="tx-toolbar-row tx-toolbar-row--primary">
-                    <div class="tx-search">
-                        <span class="tx-search-icon">🔍</span>
-                        <input type="text" id="searchInput" placeholder="Search translations">
-                    </div>
-
+            <main class="app-content">
+                <div id="transToolbar" class="tx-toolbar">
                     <div class="tx-toolbar-group">
                         <div class="tx-menu" data-menu="langs">
-                            <button class="tx-toolbar-btn" data-menu-toggle="langs">
-                                <span id="langsBtnIcon">🌐</span>
+                            <button class="ui-button" data-menu-toggle="langs" aria-haspopup="true" aria-expanded="false">
                                 <span id="langsBtnLabel">All languages</span>
-                                <span class="tx-caret">▾</span>
+                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
                             </button>
-                            <div class="tx-menu-panel hidden" id="langsMenuPanel"></div>
+                            <div class="tx-menu-panel ui-menu hidden" id="langsMenuPanel" role="menu"></div>
                         </div>
 
                         <div class="tx-menu" data-menu="ns">
-                            <button class="tx-toolbar-btn" data-menu-toggle="ns">
-                                <span>📂</span>
+                            <button class="ui-button" data-menu-toggle="ns" aria-haspopup="true" aria-expanded="false">
                                 <span id="nsBtnLabel">All namespaces</span>
-                                <span class="tx-caret">▾</span>
+                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
                             </button>
-                            <div class="tx-menu-panel hidden" id="nsMenuPanel"></div>
+                            <div class="tx-menu-panel ui-menu hidden" id="nsMenuPanel" role="menu"></div>
                         </div>
 
                         <div class="tx-menu" data-menu="filters">
-                            <button class="tx-toolbar-btn" data-menu-toggle="filters">
-                                <span>☰</span>
+                            <button class="ui-button" data-menu-toggle="filters" aria-haspopup="true" aria-expanded="false">
                                 <span>Filters</span>
-                                <span id="filtersBadge" class="tx-filter-badge hidden">0</span>
-                                <span class="tx-caret">▾</span>
+                                <span id="filtersBadge" class="tx-filter-count hidden">0</span>
+                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
                             </button>
-                            <div class="tx-menu-panel hidden" id="filtersMenuPanel">
-                                <label class="tx-menu-item">
+                            <div class="tx-menu-panel ui-menu hidden" id="filtersMenuPanel">
+                                <label class="tx-menu-item ui-option">
                                     <input type="checkbox" id="filterMissing">
                                     <span>Only keys with missing</span>
                                 </label>
-                                <label class="tx-menu-item">
+                                <label class="tx-menu-item ui-option">
                                     <input type="checkbox" id="filterIssues">
                                     <span>Only keys with issues (low confidence)</span>
                                 </label>
@@ -122,56 +70,47 @@
                         </div>
 
                         <div class="tx-menu" data-menu="sort">
-                            <button class="tx-toolbar-btn" data-menu-toggle="sort">
-                                <span>↕</span>
+                            <button class="ui-button" data-menu-toggle="sort" aria-haspopup="true" aria-expanded="false">
                                 <span id="sortBtnLabel">Alphabetically</span>
-                                <span class="tx-caret">▾</span>
+                                <span data-icon="chevron-down" data-icon-class="icon-sm"></span>
                             </button>
-                            <div class="tx-menu-panel hidden" id="sortMenuPanel">
-                                <button class="tx-menu-item" data-sort="alpha">Alphabetically</button>
-                                <button class="tx-menu-item" data-sort="missing">Missing first</button>
-                                <button class="tx-menu-item" data-sort="issues">Issues first</button>
+                            <div class="tx-menu-panel ui-menu hidden" id="sortMenuPanel" role="menu">
+                                <button class="tx-menu-item ui-option" data-sort="alpha">Alphabetically</button>
+                                <button class="tx-menu-item ui-option" data-sort="missing">Missing first</button>
+                                <button class="tx-menu-item ui-option" data-sort="issues">Issues first</button>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Row 2: view toggles (left) + actions (right) -->
-                <div class="tx-toolbar-row tx-toolbar-row--secondary">
-                    <div class="tx-toolbar-group">
-                        <button class="tx-toolbar-btn" id="detailsToggleBtn" title="Show confidence scores + translator on every row">
-                            <span>🔍</span>
-                            <span>Details</span>
-                        </button>
+                        <button class="ui-button" id="detailsToggleBtn" aria-pressed="false" title="Show translator and date on every row">Details</button>
 
                         <div class="tx-menu" data-menu="legend">
-                            <button class="tx-toolbar-btn tx-icon-btn" data-menu-toggle="legend" title="What do the confidence percentages mean?" aria-label="Confidence legend">
-                                <span aria-hidden="true">ⓘ</span>
+                            <button class="ui-button ui-icon-button" data-menu-toggle="legend" title="What do the confidence percentages mean?" aria-label="Confidence legend" aria-expanded="false">
+                                <span data-icon="info"></span>
                             </button>
-                            <div class="tx-menu-panel tx-legend-panel hidden" id="legendMenuPanel" role="dialog" aria-label="Confidence chip legend">
-                                <div class="tx-legend-title">Confidence chip</div>
+                            <div class="tx-menu-panel tx-legend-panel ui-menu hidden" id="legendMenuPanel" role="dialog" aria-label="Confidence legend">
+                                <p class="tx-legend-title">Confidence</p>
                                 <p class="tx-legend-desc">
-                                    The coloured badge next to each language (e.g.&nbsp;<strong>95%</strong>) is the
-                                    <strong>LLM's own self-reported confidence</strong> in its translation — not an
-                                    independent quality check. Colour reflects how the score compares to this pair's
-                                    review threshold (configured per pair under Settings → Language Pairs).
+                                    The pill beside each language (e.g.&nbsp;<strong>95%</strong>) is the
+                                    <strong>model's own confidence</strong> in its translation, not an
+                                    independent quality check. Its colour compares the score with the pair's
+                                    review threshold (Settings → Language pairs).
                                 </p>
                                 <ul class="tx-legend-list">
                                     <li>
-                                        <span class="lang-confidence-chip" data-tone="high">≥ thr</span>
-                                        <span>At or above the review threshold — model is confident.</span>
+                                        <span class="ui-status ui-status-ok">≥ thr</span>
+                                        <span>At or above the review threshold: the model is confident.</span>
                                     </li>
                                     <li>
-                                        <span class="lang-confidence-chip" data-tone="medium">50–thr</span>
-                                        <span>Below threshold but still plausible — flagged for review.</span>
+                                        <span class="ui-status ui-status-warn">50–thr</span>
+                                        <span>Below the threshold but plausible: flagged for review.</span>
                                     </li>
                                     <li>
-                                        <span class="lang-confidence-chip" data-tone="low">&lt; 50%</span>
-                                        <span>Model itself thinks this is likely wrong — review strongly recommended.</span>
+                                        <span class="ui-status ui-status-danger">&lt; 50%</span>
+                                        <span>The model thinks this is likely wrong: review it.</span>
                                     </li>
                                     <li>
-                                        <span class="lang-confidence-chip" data-tone="human">human</span>
-                                        <span>Edited or reviewed by a person — no automatic score applied.</span>
+                                        <span class="ui-status ui-status-info">human</span>
+                                        <span>Edited or reviewed by a person: no automatic score.</span>
                                     </li>
                                 </ul>
                             </div>
@@ -181,111 +120,100 @@
                     <div class="tx-toolbar-spacer"></div>
 
                     <div class="tx-toolbar-group">
-                        <button class="tx-toolbar-btn tx-icon-btn" id="refreshBtn" title="Reload translations">↻</button>
-                        <button id="newKeyBtn" class="tx-create-btn" title="Add a new translation key (⌘N). Use the namespace dropdown's “➕ New namespace…” entry to create a namespace.">
-                            <span class="tx-create-btn__icon">➕</span>
+                        <button class="ui-button ui-icon-button" id="refreshBtn" title="Reload translations" aria-label="Reload translations">
+                            <span data-icon="refresh"></span>
+                        </button>
+                        <button id="newKeyBtn" class="ui-button" title="Add a new translation key. New namespaces start from the namespace menu.">
+                            <span data-icon="plus"></span>
                             <span>New key</span>
+                            <kbd class="ui-kbd">⌘N</kbd>
                         </button>
-                        <button id="fillAllMissingBtn" class="tx-primary-btn" title="Auto-translate every missing cell in the current view">
-                            ✨ Fill missing
-                        </button>
+                        <button id="fillAllMissingBtn" class="ui-button ui-button-primary" title="Auto-translate every missing cell in the current view">Fill missing</button>
                     </div>
                 </div>
 
-                <div id="transSummary" class="tx-summary"></div>
-            </div>
+                <p id="transSummary" class="tx-summary"></p>
 
-            <!-- Keys list -->
-            <div id="keysList" class="space-y-2"></div>
-            <div id="keysEmpty" class="hidden py-16 text-center text-slate-500 dark:text-slate-400 text-sm">
-                No translations to show.
-            </div>
-        </main>
-
-        <!-- New-key modal -->
-        <div id="newKeyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4"
-             role="dialog" aria-modal="true" aria-labelledby="newKeyModalTitle">
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg p-6">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 id="newKeyModalTitle" class="text-lg font-semibold text-slate-900 dark:text-white">Add translation key</h3>
-                    <button id="newKeyCloseBtn" class="text-slate-500 hover:text-slate-900 dark:hover:text-white text-lg leading-none" aria-label="Close">✕</button>
-                </div>
-                <p id="newKeyModalHelp" class="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                    Create a new translation key in an existing namespace, or pick "+ New namespace…" to start a new one.
-                </p>
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Namespace</label>
-                        <select id="newKeyNamespace" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></select>
-                        <input id="newKeyNamespaceNew" type="text" placeholder="new-namespace"
-                               class="hidden mt-2 w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            Writes to <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-[11px]">translations/&lt;lang&gt;/&lt;namespace&gt;.json</code>.
-                        </p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Key</label>
-                        <input id="newKeyName" type="text" placeholder="login.forgot_password"
-                               class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm font-mono">
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Dotted names are stored as-is — no nesting.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                            Source text (<span id="newKeySourceLangLabel">en</span>)
-                        </label>
-                        <textarea id="newKeySourceValue" rows="3" placeholder="Forgot your password?"
-                                  class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></textarea>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            After creating, click <em>Fill missing</em> or translate the row to populate other languages.
-                        </p>
-                    </div>
-                    <p id="newKeyError" class="hidden text-xs text-red-500"></p>
-                </div>
-
-                <div class="flex justify-end gap-2 mt-6">
-                    <button id="newKeyCancelBtn" class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600">Cancel</button>
-                    <button id="newKeySubmitBtn" class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">Create key</button>
-                </div>
-            </div>
+                <div id="keysList" class="list"></div>
+                <div id="keysEmpty" class="empty hidden">No translations to show.</div>
+            </main>
         </div>
-
-        <!-- Manage namespaces modal -->
-        <div id="nsManageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4"
-             role="dialog" aria-modal="true" aria-labelledby="nsManageTitle">
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl p-6">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 id="nsManageTitle" class="text-lg font-semibold text-slate-900 dark:text-white">Manage namespaces</h3>
-                    <button id="nsManageCloseBtn" class="text-slate-500 hover:text-slate-900 dark:hover:text-white text-lg leading-none" aria-label="Close">✕</button>
-                </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                    Rename rewrites every key across every language. Delete wipes the namespace and removes its JSON files on disk. Both are immediate — there is no undo.
-                </p>
-
-                <div id="nsManageList" class="space-y-1 max-h-[60vh] overflow-y-auto pr-1"></div>
-                <p id="nsManageEmpty" class="hidden py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                    No namespaces yet. Create one from the toolbar.
-                </p>
-                <p id="nsManageError" class="hidden mt-3 text-xs text-red-500"></p>
-
-                <div class="flex justify-end gap-2 mt-6">
-                    <button id="nsManageDoneBtn" class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600">Done</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-6">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Glyph by Code Villain • Local-First AI Translation
-                </p>
-            </div>
-        </footer>
     </div>
 
-    <script src="js/api.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/translations.js"></script>
+    <!-- New key (or new namespace) -->
+    <div id="newKeyModal" class="modal ui-backdrop hidden flex"
+         role="dialog" aria-modal="true" aria-labelledby="newKeyModalTitle">
+        <div class="modal-box ui-dialog">
+            <div class="flex items-center justify-between gap-3 mb-1">
+                <h3 id="newKeyModalTitle" class="modal-title">Add translation key</h3>
+                <button id="newKeyCloseBtn" class="ui-button ui-icon-button" aria-label="Close"><span data-icon="x"></span></button>
+            </div>
+            <p id="newKeyModalHelp" class="text-muted mb-4">
+                Create a new translation key in an existing namespace, or pick "+ New namespace…" to start a new one.
+            </p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="field-label" for="newKeyNamespace">Namespace</label>
+                    <select id="newKeyNamespace" class="ui-field input w-full"></select>
+                    <input id="newKeyNamespaceNew" type="text" placeholder="new-namespace" aria-label="New namespace name"
+                           class="ui-field input w-full mt-2 hidden">
+                    <p class="field-help">
+                        Writes to <code class="code">translations/&lt;lang&gt;/&lt;namespace&gt;.json</code>.
+                    </p>
+                </div>
+                <div>
+                    <label class="field-label" for="newKeyName">Key</label>
+                    <input id="newKeyName" type="text" placeholder="login.forgot_password"
+                           class="ui-field input w-full font-mono text-code">
+                    <p class="field-help">Dotted names are stored as-is, not nested.</p>
+                </div>
+                <div>
+                    <label class="field-label" for="newKeySourceValue">
+                        Source text (<span id="newKeySourceLangLabel">en</span>)
+                    </label>
+                    <textarea id="newKeySourceValue" rows="3" placeholder="Forgot your password?"
+                              class="ui-field input w-full"></textarea>
+                    <p class="field-help">
+                        After creating, use <em>Fill missing</em> or translate the row to fill the other languages.
+                    </p>
+                </div>
+                <p id="newKeyError" class="field-error hidden"></p>
+            </div>
+
+            <div class="modal-actions">
+                <button id="newKeyCancelBtn" class="ui-button">Cancel</button>
+                <button id="newKeySubmitBtn" class="ui-button ui-button-primary">Create key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage namespaces -->
+    <div id="nsManageModal" class="modal ui-backdrop hidden flex"
+         role="dialog" aria-modal="true" aria-labelledby="nsManageTitle">
+        <div class="modal-box ui-dialog max-w-2xl">
+            <div class="flex items-center justify-between gap-3 mb-1">
+                <h3 id="nsManageTitle" class="modal-title">Manage namespaces</h3>
+                <button id="nsManageCloseBtn" class="ui-button ui-icon-button" aria-label="Close"><span data-icon="x"></span></button>
+            </div>
+            <p class="text-muted mb-4">
+                Rename rewrites every key across every language. Delete wipes the namespace and removes its JSON files on disk. Both are immediate; there is no undo.
+            </p>
+
+            <div id="nsManageList" class="ns-manage-list"></div>
+            <p id="nsManageEmpty" class="empty hidden">
+                No namespaces yet. Create one from the namespace menu.
+            </p>
+            <p id="nsManageError" class="field-error mt-3 hidden"></p>
+
+            <div class="modal-actions">
+                <button id="nsManageDoneBtn" class="ui-button ui-button-primary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/ui/js/api.js"></script>
+    <script src="/ui/js/utils.js"></script>
+    <script src="/ui/js/translations.js"></script>
 </body>
 </html>

@@ -50,7 +50,7 @@ llm:
     - name: viking
       endpoint: http://localhost:8080   # llama-server endpoint (health check at /health)
       model: viking-7b-v4
-      model_path: ./models/Viking_7B_V.4.Q4_K_M.gguf  # optional; enables ▶ Start in Settings UI
+      model_path: ./models/Viking_7B_V.4.Q4_K_M.gguf  # optional; enables Start in Settings UI
       # extra_args: ["-c", "4096"]                    # optional; appended to llama-server argv
 
 language_pairs:
@@ -139,7 +139,7 @@ DELETE /api/translations/{lang}                        # legacy alias for DELETE
 
 POST /api/translate/single                           # body: {key, namespace, target_lang, source_lang, source_text?, dry_run?}
                                                       #   dry_run=true → return proposal without saving (used by Review's confirm flow)
-                                                      #   source_text → override DB lookup; used by the Translations page's ✨ back-fill
+                                                      #   source_text → override DB lookup; used by the Translations page's sparkles back-fill
                                                       #     button to translate an existing target value *into* the source language
                                                       #     when the source cell is empty.
 POST /api/translate/missing                          # body: {target_langs, source_lang, namespace}
@@ -148,7 +148,7 @@ GET    /api/glossary?source_lang=en&target_lang=sv    # list glossary entries
 POST   /api/glossary                                  # add  (body: {source_lang, target_lang, source_term, target_term, target_variants?, note?})
 PUT    /api/glossary/{id}                             # update source_term, target_term, target_variants, note (pair is immutable)
 DELETE /api/glossary/{id}                             # remove one entry
-POST   /api/glossary/suggest-variants                 # body: {source_lang, target_lang, source_term, target_term} — ask the pair's LLM for grammatical inflections of target_term; returns {variants: [...]}. Backs the "✨ Find variants" button in the Glossary editor.
+POST   /api/glossary/suggest-variants                 # body: {source_lang, target_lang, source_term, target_term} — ask the pair's LLM for grammatical inflections of target_term; returns {variants: [...]}. Backs the "Find variants" button in the Glossary editor.
 
 GET  /api/metadata/{lang}?ns=common
 PUT  /api/metadata/{lang}/{key}?ns=common
@@ -164,7 +164,7 @@ POST /api/llm/stop                                   # body: {name} — SIGTERMs
 
 ### UI Routes
 - `/` → `ui/index.html` (dashboard with per-namespace coverage)
-- `ui/translations.html` — browse/edit, filter by language + namespace. The "➕ New key" button (⌘N) opens a modal that PUTs a new (namespace, key) for the source language via `/api/translations/:sourceLang/:key?ns=…`; creating a new namespace just writes it — the backend creates `translations/<lang>/<namespace>.json` on first save. The namespace dropdown also has a "➕ New namespace…" entry that re-uses the same modal in "create namespace" mode (ns dropdown pre-set to new, input focused), plus a "⚙️ Manage namespaces…" entry that opens a modal listing every namespace with its key/translation counts; rows have inline Rename (`PUT /api/namespaces/:ns`) and Delete (`DELETE /api/namespaces/:ns`) actions. Each key card has a 📋 copy icon right after the key name (writes the bare key — not `ns.key` — to the clipboard so developers can paste it straight into `t('…')` calls) and a trash icon in its header that calls `DELETE /api/keys?ns=…&key=…` — this wipes the key from every language (translations + metadata) and re-exports each affected JSON file. The copy action prefers `navigator.clipboard.writeText` on secure contexts and falls back to an invisible `<textarea>` + `execCommand('copy')` for older browsers / embedded webviews.
+- `ui/translations.html` — browse/edit, filter by language + namespace. The "New key" button (⌘N) opens a modal that PUTs a new (namespace, key) for the source language via `/api/translations/:sourceLang/:key?ns=…`; creating a new namespace just writes it — the backend creates `translations/<lang>/<namespace>.json` on first save. The namespace dropdown also has a "New namespace…" entry that re-uses the same modal in "create namespace" mode (ns dropdown pre-set to new, input focused), plus a "Manage namespaces…" entry that opens a modal listing every namespace with its key/translation counts; rows have inline Rename (`PUT /api/namespaces/:ns`) and Delete (`DELETE /api/namespaces/:ns`) actions. Each key card has a copy icon right after the key name (writes the bare key — not `ns.key` — to the clipboard so developers can paste it straight into `t('…')` calls) and a trash icon in its header that calls `DELETE /api/keys?ns=…&key=…` — this wipes the key from every language (translations + metadata) and re-exports each affected JSON file. The copy action prefers `navigator.clipboard.writeText` on secure contexts and falls back to an invisible `<textarea>` + `execCommand('copy')` for older browsers / embedded webviews.
 - `ui/missing.html` — review missing + low-confidence, filter by namespace
 - `ui/glossary.html` — manage preferred-term rules (source_term → target_term per pair)
 - `ui/settings.html` — Languages panel (one-click add/remove), LLM config, language pairs, keyboard-shortcuts legend
@@ -186,14 +186,14 @@ Then set `llm.models[0].endpoint: http://localhost:8080` in `config.yaml` (defau
 Health check at `GET {endpoint}/health`. Configure endpoint in UI settings or `config.yaml`.
 
 ### Starting/stopping servers from the UI
-The Settings page shows a status dot (green = reachable, amber = starting, grey = stopped) plus ▶ Start / ■ Stop buttons per configured LLM. Start requires `llm.models[].model_path` in `config.yaml` so the backend knows which GGUF to load; the port is taken from the configured `endpoint`. Externally-started servers still show as "Running (external)" but cannot be stopped via the UI. Managed processes are torn down automatically on app shutdown.
+The Settings page shows a status pill (ok = reachable, warn = starting, neutral = stopped) plus Start / Stop buttons per configured LLM. Start requires `llm.models[].model_path` in `config.yaml` so the backend knows which GGUF to load; the port is taken from the configured `endpoint`. Externally-started servers still show as "Running (external)" but cannot be stopped via the UI. Managed processes are torn down automatically on app shutdown.
 
 ### Glossary (preferred-term rules)
 Each row in the `glossary` table is `(source_lang, target_lang, source_term, target_term, target_variants, note)` with case-insensitive unique constraint on the source term within a pair. Before every LLM call, `Manager.GlossaryMatchesForText` filters the glossary to entries whose `source_term` appears (case-insensitive substring) in the text being translated, and passes them to `llm.Client.TranslateWithGlossary` which renders a `Glossary — MANDATORY preferred terms` block in the prompt. Notes are reviewer-only context and are NOT sent to the LLM. Manage entries on the dedicated **Glossary** page (`ui/glossary.html`, ⌘4).
 
 `target_variants` is an optional list of additional accepted forms of `target_term`, used by both the prompt (so the LLM knows which inflections are OK) and the post-translation validator (so grammatically required forms like Swedish definite `e-posten` for canonical `e-post` aren't flagged as violations). Compounds are still rejected because the validator requires each accepted form to appear as an isolated word — `e-postadressen` never matches `e-post` regardless of variants. Empty variants ⇒ strict exact-word matching, identical to pre-v4 behaviour.
 
-The Glossary editor exposes a **"✨ Find variants"** button above the chip input in both the Add form and every row's edit mode. It POSTs to `/api/glossary/suggest-variants`, which routes through `TranslationService.SuggestGlossaryVariants` → `llm.Client.SuggestVariants` at temperature 0.1 with a prompt explicitly forbidding compounds and synonyms. The model's suggestions are merged case-insensitively into whatever the reviewer has already typed, so running it twice is idempotent. An empty list is a legitimate answer ("language has no inflection / model had nothing to add") and surfaces as an info toast rather than an error.
+The Glossary editor exposes a **"Find variants"** button above the chip input in both the Add form and every row's edit mode. It POSTs to `/api/glossary/suggest-variants`, which routes through `TranslationService.SuggestGlossaryVariants` → `llm.Client.SuggestVariants` at temperature 0.1 with a prompt explicitly forbidding compounds and synonyms. The model's suggestions are merged case-insensitively into whatever the reviewer has already typed, so running it twice is idempotent. An empty list is a legitimate answer ("language has no inflection / model had nothing to add") and surfaces as an info toast rather than an error.
 
 ## Common Operations
 

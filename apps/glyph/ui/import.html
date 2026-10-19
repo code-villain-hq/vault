@@ -1,141 +1,105 @@
 <!DOCTYPE html>
-<html lang="en" id="theme">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Import - Glyph</title>
+    <title>Import · Glyph</title>
     <link rel="icon" href="/ui/img/glyph.svg" type="image/svg+xml">
-    <script>document.documentElement.classList.add('dark');</script>
-    <style>
-        html { background-color: #020617; color-scheme: dark; }
-        body { background-color: #020617; }
-    </style>
+    <link rel="stylesheet" href="/ui/design/fonts/fonts.css">
+    <link rel="stylesheet" href="/ui/design/color.css">
+    <link rel="stylesheet" href="/ui/design/type.css">
+    <link rel="stylesheet" href="/ui/design/shape.css">
+    <link rel="stylesheet" href="/ui/design/components.css">
+    <link rel="stylesheet" href="/ui/css/glyph.css">
+    <link rel="stylesheet" href="/ui/css/settings.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260418m">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        primary: {
-                            50: '#f0f4ff', 100: '#e6ebff', 500: '#6366f1', 600: '#4f46e5',
-                            700: '#4338ca', 800: '#3730a3', 900: '#312e81',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="/ui/js/theme.js"></script>
+    <script src="/ui/js/icons.js"></script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300" style="font-family: 'Inter', sans-serif;">
-    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+<body data-page="import">
+    <div id="toastContainer" class="toast-stack" aria-live="polite"></div>
 
-    <div class="min-h-screen flex flex-col dark:text-white">
-        <header class="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <a href="/" class="flex items-center space-x-3">
-                        <img src="/ui/img/glyph.svg" alt="" class="w-10 h-10">
+    <div class="app">
+        <aside class="app-side"><script src="/ui/js/frame.js"></script></aside>
+
+        <div class="app-main">
+            <header class="app-top">
+                <h1 class="app-crumb"><span class="app-crumb-current">Import</span></h1>
+                <!-- Where the flow stands: configure, then review and merge. -->
+                <ol class="ml-auto import-steps" aria-label="Import steps">
+                    <li id="step1Badge" class="import-step" aria-current="step">1 · Configure</li>
+                    <li aria-hidden="true" class="text-faint">›</li>
+                    <li id="step2Badge" class="import-step">2 · Review</li>
+                </ol>
+            </header>
+
+            <main class="app-content">
+                <div class="max-w-4xl">
+                    <div class="view-lead">
                         <div>
-                            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Glyph</h1>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">AI-Powered i18n Manager</p>
+                            <h2 class="view-title" id="importLeadTitle">Import a JSON file</h2>
+                            <p class="view-sub" id="importLeadSub">
+                                Check where each key lands, including locize-style <span class="code">ns:key</span> prefixes, then merge.
+                            </p>
                         </div>
-                    </a>
-                    <nav class="hidden md:flex items-center space-x-1 flex-wrap justify-end gap-y-1">
-                        <a href="/" class="nav-link text-slate-600 dark:text-slate-400 px-3 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📊 Dashboard</a>
-                        <a href="/ui/import.html" class="nav-link text-indigo-600 dark:text-indigo-400 font-semibold border-b-2 border-indigo-600 dark:border-indigo-400 px-3 py-2 text-sm transition-all duration-200">📥 Import</a>
-                        <a href="/ui/translations.html" class="nav-link text-slate-600 dark:text-slate-400 px-3 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📝 Translations</a>
-                        <a href="/ui/missing.html" class="nav-link text-slate-600 dark:text-slate-400 px-3 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">✨ Review</a>
-                        <a href="/ui/glossary.html" class="nav-link text-slate-600 dark:text-slate-400 px-3 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📚 Glossary</a>
-                        <a href="/ui/settings.html" class="nav-link text-slate-600 dark:text-slate-400 px-3 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">⚙️ Settings</a>
-                    </nav>
-                </div>
-            </div>
-        </header>
-
-        <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Import translations</h2>
-                <p class="text-slate-600 dark:text-slate-400 text-sm mt-1">
-                    Upload a JSON file, review how keys are routed to namespaces (including <code class="text-indigo-400">ns:key</code> locize-style), then confirm.
-                </p>
-            </div>
-
-            <!-- Step indicator -->
-            <div class="flex items-center gap-2 mb-8 text-sm">
-                <span id="step1Badge" class="px-3 py-1 rounded-full bg-indigo-600 text-white font-medium">1 · Configure</span>
-                <span class="text-slate-500">→</span>
-                <span id="step2Badge" class="px-3 py-1 rounded-full bg-slate-700 text-slate-300">2 · Review</span>
-            </div>
-
-            <!-- Step 1 -->
-            <div id="importStep1" class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm space-y-6">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">JSON file</label>
-                    <input type="file" id="importFile" accept=".json,application/json" class="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white file:font-medium">
-                    <p class="text-xs text-slate-500 mt-1">Filename hints: <code class="text-slate-400">en.json</code> or <code class="text-slate-400">en.common.json</code> set the language and default namespace.</p>
-                </div>
-                <div class="grid sm:grid-cols-2 gap-4">
-                    <div>
-                        <label for="importLang" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Language code</label>
-                        <input type="text" id="importLang" placeholder="e.g. en" maxlength="12" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-sm">
                     </div>
-                    <div>
-                        <label for="importDefaultNs" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Default namespace</label>
-                        <input type="text" id="importDefaultNs" placeholder="translation" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-sm">
-                        <p class="text-xs text-slate-500 mt-1">Only for keys <em>without</em> a <code class="text-slate-400">ns:key</code> prefix.</p>
-                    </div>
-                </div>
-                <div class="flex flex-wrap gap-3">
-                    <button type="button" id="btnToReview" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                        Continue to review →
-                    </button>
-                </div>
-            </div>
 
-            <!-- Step 2 -->
-            <div id="importStep2" class="hidden space-y-6">
-                <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">Summary</h3>
-                    <p id="reviewSummary" class="text-slate-600 dark:text-slate-400 text-sm"></p>
-                    <div id="reviewNsBreakdown" class="mt-4 flex flex-wrap gap-2"></div>
-                </div>
-                <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                    <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Sample keys <span id="sampleHint" class="text-sm font-normal text-slate-500"></span></h3>
+                    <!-- Step 1: configure -->
+                    <div id="importStep1">
+                        <label class="drop-zone" id="importDropZone" for="importFile">
+                            <span data-icon="upload"></span>
+                            <span>
+                                <span class="drop-zone-title" id="importFileName">Choose a JSON file</span>
+                                <span class="drop-zone-help">or drop it here. <span class="code">en.json</span> or <span class="code">en.common.json</span> sets the language and default namespace.</span>
+                            </span>
+                            <input type="file" id="importFile" accept=".json,application/json" class="sr-only">
+                        </label>
+
+                        <div class="grid sm:grid-cols-2 gap-4 mt-6">
+                            <div>
+                                <label for="importLang" class="field-label">Language code</label>
+                                <input type="text" id="importLang" placeholder="e.g. en" maxlength="12" class="ui-field input w-full" autocomplete="off" spellcheck="false">
+                            </div>
+                            <div>
+                                <label for="importDefaultNs" class="field-label">Default namespace</label>
+                                <input type="text" id="importDefaultNs" placeholder="translation" class="ui-field input w-full" autocomplete="off" spellcheck="false">
+                                <p class="field-help">Only for keys without an <span class="code">ns:key</span> prefix.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end mt-6">
+                            <button type="button" id="btnToReview" class="ui-button ui-button-primary" disabled>Preview</button>
+                        </div>
                     </div>
-                    <div class="overflow-x-auto max-h-[min(420px,50vh)]">
-                        <table class="w-full text-left text-sm">
-                            <thead class="sticky top-0 bg-slate-100 dark:bg-slate-900/95 text-slate-600 dark:text-slate-400">
-                                <tr>
-                                    <th class="px-4 py-2 font-medium">Namespace</th>
-                                    <th class="px-4 py-2 font-medium">Key (stored)</th>
-                                    <th class="px-4 py-2 font-medium">Raw key in file</th>
-                                    <th class="px-4 py-2 font-medium">Value preview</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reviewTableBody" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
-                        </table>
+
+                    <!-- Step 2: review, then merge -->
+                    <div id="importStep2" class="hidden">
+                        <p id="reviewSummary" class="text-muted"></p>
+                        <div id="reviewNsBreakdown" class="mt-3 flex flex-wrap gap-2"></div>
+
+                        <p class="group-label mt-8">Sample keys <span id="sampleHint"></span></p>
+                        <div class="import-sample">
+                            <table class="import-table">
+                                <thead>
+                                    <tr>
+                                        <th>Namespace</th>
+                                        <th>Key (stored)</th>
+                                        <th>Raw key in file</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reviewTableBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="flex justify-end gap-2 mt-6">
+                            <button type="button" id="btnBack" class="ui-button"><span data-icon="chevron-left"></span>Back</button>
+                            <button type="button" id="btnRunImport" class="ui-button ui-button-primary">Import</button>
+                        </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-3">
-                    <button type="button" id="btnBack" class="px-5 py-2.5 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-800 transition-colors">
-                        ← Back
-                    </button>
-                    <button type="button" id="btnRunImport" class="px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-colors">
-                        ✓ Import now
-                    </button>
-                </div>
-            </div>
-        </main>
-
-        <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-6 mt-auto">
-            <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-600 dark:text-slate-400">
-                Glyph by Code Villain · <a href="/" class="text-indigo-400 hover:underline">Dashboard</a>
-            </div>
-        </footer>
+            </main>
+        </div>
     </div>
 
     <script src="/ui/js/api.js"></script>

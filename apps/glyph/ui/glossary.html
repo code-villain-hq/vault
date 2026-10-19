@@ -1,155 +1,116 @@
 <!DOCTYPE html>
-<html lang="en" id="theme">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glossary - Glyph</title>
+    <title>Glossary · Glyph</title>
     <link rel="icon" href="/ui/img/glyph.svg" type="image/svg+xml">
-    <!-- Dark mode is the only supported theme; applied eagerly before the
-         Tailwind CDN paints so the first frame is already dark (avoids a
-         white-flash on load). -->
-    <script>document.documentElement.classList.add('dark');</script>
-    <style>
-        html { background-color: #020617; color-scheme: dark; } /* slate-950 */
-        body { background-color: #020617; }
-    </style>
+    <link rel="stylesheet" href="/ui/design/fonts/fonts.css">
+    <link rel="stylesheet" href="/ui/design/color.css">
+    <link rel="stylesheet" href="/ui/design/type.css">
+    <link rel="stylesheet" href="/ui/design/shape.css">
+    <link rel="stylesheet" href="/ui/design/components.css">
+    <link rel="stylesheet" href="/ui/css/glyph.css">
+    <link rel="stylesheet" href="/ui/css/glossary.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/ui/css/style.css?v=20260418g">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        primary: {
-                            50: '#f0f4ff', 100: '#e6ebff', 500: '#6366f1',
-                            600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="/ui/js/theme.js"></script>
+    <script src="/ui/js/icons.js"></script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300" style="font-family: 'Inter', sans-serif;">
-    <!-- Toast Container -->
-    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+<body data-page="glossary">
+    <div id="toastContainer" class="toast-stack" aria-live="polite"></div>
 
-    <!-- Main Container -->
-    <div class="min-h-screen flex flex-col dark:text-white">
-        <!-- Header -->
-        <header class="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <a href="/" class="flex items-center space-x-3">
-                        <img src="/ui/img/glyph.svg" alt="" class="w-10 h-10">
-                        <div>
-                            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Glyph</h1>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">AI-Powered i18n Manager</p>
-                        </div>
-                    </a>
+    <div class="app">
+        <aside class="app-side"><script src="/ui/js/frame.js"></script></aside>
 
-                    <nav class="hidden md:flex items-center space-x-1">
-                        <a href="/" data-page="dashboard" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📊 Dashboard</a>
-                        <a href="/ui/import.html" data-page="import" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📥 Import</a>
-                        <a href="/ui/translations.html" data-page="translations" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📝 Translations</a>
-                        <a href="/ui/missing.html" data-page="missing" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">✨ Review</a>
-                        <a href="/ui/glossary.html" data-page="glossary" class="nav-link text-indigo-600 dark:text-indigo-400 font-semibold border-b-2 border-indigo-600 dark:border-indigo-400 px-4 py-2 text-sm transition-all duration-200">📚 Glossary</a>
-                        <a href="/ui/settings.html" data-page="settings" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">⚙️ Settings</a>
-                    </nav>
+        <div class="app-main">
+            <header class="app-top">
+                <h1 class="app-crumb"><span class="app-crumb-current">Glossary</span></h1>
+                <label class="ml-auto flex items-center gap-2 text-ui-small text-muted">
+                    <span>Pair</span>
+                    <select id="glossaryPairFilter" class="ui-field input gl-select" aria-label="Filter by language pair">
+                        <option value="">All pairs</option>
+                    </select>
+                </label>
+            </header>
 
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Content -->
-        <main class="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-            <div class="mb-6">
-                <h2 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Glossary</h2>
-                <p class="text-slate-600 dark:text-slate-400 max-w-2xl">
-                    Preferred-term rules injected into the LLM prompt. When a source text contains one of these terms, the model is told to use the specified target term instead of its usual output — e.g. force
-                    <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-xs">email</code>
-                    → <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-xs">e-post</code>
-                    in Swedish. Matching is case-insensitive substring; notes are reviewer-only.
-                </p>
-            </div>
-
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-                    <div class="text-sm text-slate-500 dark:text-slate-400">
-                        <span id="glossaryCount">0</span> entries
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-xs text-slate-500 dark:text-slate-400">Filter pair:</label>
-                        <select id="glossaryPairFilter" class="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
-                            <option value="">All pairs</option>
-                        </select>
+            <main class="app-content">
+                <div class="view-lead">
+                    <div>
+                        <h2 class="view-title"><span id="glossaryCount">0</span> <span id="glossaryCountNoun">preferred terms</span></h2>
+                        <p class="view-sub max-w-3xl">
+                            When a source text contains a term, the model is told to use your target term,
+                            e.g. <span class="code">email</span> → <span class="code">e-post</span> in Swedish.
+                            Matching ignores case; notes stay with reviewers.
+                        </p>
                     </div>
                 </div>
 
-                <div id="glossaryList" class="space-y-2 mb-4">
-                    <p class="text-slate-500 dark:text-slate-400 text-sm">Loading glossary…</p>
-                </div>
-
-                <!-- Add new entry form -->
-                <div class="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-dashed border-slate-300 dark:border-slate-700">
-                    <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Add Glossary Entry</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Source lang</label>
-                            <select id="newGlossarySource" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></select>
+                <!-- Add a term: a form on the panel, no box. -->
+                <section class="gl-add" aria-labelledby="glAddTitle">
+                    <h3 class="section-title" id="glAddTitle">Add a term</h3>
+                    <div class="gl-add-grid">
+                        <div class="gl-pair">
+                            <label class="field-label" for="newGlossarySource">Pair</label>
+                            <div class="flex items-center gap-2">
+                                <select id="newGlossarySource" class="ui-field input gl-select" aria-label="Source language"></select>
+                                <span class="text-faint" aria-hidden="true">→</span>
+                                <select id="newGlossaryTarget" class="ui-field input gl-select" aria-label="Target language"></select>
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Target lang</label>
-                            <select id="newGlossaryTarget" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm"></select>
+                            <label class="field-label" for="newGlossarySourceTerm">Source term</label>
+                            <input id="newGlossarySourceTerm" type="text" placeholder="email" class="ui-field input w-full">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Source term</label>
-                            <input id="newGlossarySourceTerm" type="text" placeholder="email" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
+                            <label class="field-label" for="newGlossaryTargetTerm">Target term</label>
+                            <input id="newGlossaryTargetTerm" type="text" placeholder="e-post" class="ui-field input w-full">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Target term</label>
-                            <input id="newGlossaryTargetTerm" type="text" placeholder="e-post" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
+                            <label class="field-label" for="newGlossaryNote">Note</label>
+                            <input id="newGlossaryNote" type="text" placeholder="Optional, for reviewers" class="ui-field input w-full">
                         </div>
-                        <div class="sm:col-span-2">
-                            <div class="flex items-end justify-between mb-1 gap-2">
-                                <label class="block text-xs font-medium text-slate-600 dark:text-slate-400">
-                                    Accepted forms
-                                    <span class="font-normal text-slate-400" title="Extra forms the validator should accept as equivalent to the target term — e.g. grammatical inflections like Swedish definite 'e-posten' or plural 'e-poster'. Leave empty for strict exact-word matching.">ⓘ</span>
-                                </label>
-                                <button id="newGlossaryFindVariantsBtn" type="button"
-                                        class="find-variants-btn"
+                        <div class="gl-add-forms">
+                            <div class="flex items-end justify-between gap-2 mb-1">
+                                <label class="field-label mb-0" for="newGlossaryVariantsInput">Accepted forms</label>
+                                <button id="newGlossaryFindVariantsBtn" type="button" class="ui-button find-variants-btn"
                                         title="Ask the LLM to suggest grammatical forms of the target term">
-                                    <span class="find-variants-btn__glyph">✨</span>
-                                    <span>Find variants</span>
+                                    <span data-icon="sparkles"></span>Find variants
                                 </button>
                             </div>
-                            <div id="newGlossaryVariants"></div>
+                            <div id="newGlossaryVariants" data-input-id="newGlossaryVariantsInput"></div>
+                            <p class="field-help">
+                                Grammatical forms the validator accepts as the target term, like Swedish
+                                <span class="code">e-posten</span> or <span class="code">e-poster</span>.
+                                <kbd class="ui-kbd">Enter</kbd>, <kbd class="ui-kbd">Tab</kbd> or <kbd class="ui-kbd">,</kbd> adds one;
+                                paste a comma-separated list to add many. Compounds such as
+                                <span class="code">e-postadressen</span> are still rejected.
+                            </p>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Note (optional)</label>
-                            <input id="newGlossaryNote" type="text" placeholder="product voice" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
+                        <div class="gl-add-submit">
+                            <button id="addGlossaryBtn" type="button" class="ui-button ui-button-primary">
+                                <span data-icon="plus"></span>Add term
+                            </button>
                         </div>
-                        <button id="addGlossaryBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors duration-200">
-                            + Add
-                        </button>
                     </div>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        <strong>Accepted forms</strong> let you whitelist grammatical variants of the target term (e.g. Swedish definite / plural suffixes) so the validator doesn't flag them as violations. Press <kbd class="px-1 py-0.5 rounded bg-white dark:bg-slate-800 text-[11px] border border-slate-300 dark:border-slate-600">Enter</kbd>, <kbd class="px-1 py-0.5 rounded bg-white dark:bg-slate-800 text-[11px] border border-slate-300 dark:border-slate-600">Tab</kbd>, or <kbd class="px-1 py-0.5 rounded bg-white dark:bg-slate-800 text-[11px] border border-slate-300 dark:border-slate-600">,</kbd> to add a form; paste a comma-separated list to bulk-add. Compounds like <code class="px-1 py-0.5 rounded bg-white dark:bg-slate-800 text-[11px]">e-postadressen</code> are still rejected because they glue extra letters onto the stem.
-                    </p>
-                </div>
-            </div>
-        </main>
+                </section>
 
-        <!-- Footer -->
-        <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-6">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Glyph by Code Villain • Local-First AI Translation
-                </p>
+                <div id="glossaryList" class="gl-groups">
+                    <p class="empty">Loading glossary…</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Confirm before removing a term. -->
+    <div id="confirmModal" class="modal ui-backdrop flex" hidden>
+        <div class="modal-box ui-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+            <h2 class="modal-title" id="confirmTitle"></h2>
+            <p class="mt-2 text-muted" id="confirmBody"></p>
+            <div class="modal-actions">
+                <button type="button" class="ui-button" id="confirmCancel">Cancel</button>
+                <button type="button" class="ui-button ui-button-danger" id="confirmOk"></button>
             </div>
-        </footer>
+        </div>
     </div>
 
     <script src="/ui/js/api.js"></script>

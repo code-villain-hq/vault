@@ -1,4 +1,4 @@
-// Settings page logic: general prefs + LLM list + language-pair matrix.
+// Settings page logic: languages, namespaces, LLM list, language-pair matrix.
 
 // Shared utilities — see utils.js for the canonical definition.
 const escapeHtml = Utils.escapeHtml;
@@ -13,6 +13,8 @@ let languagesDetail = [];
 // Cached `/api/namespaces/stats` rows for the Settings → Namespaces panel.
 let settingsNsEntries = [];
 let pairsState = {}; // local, editable copy keyed by "{src}_{tgt}"
+// What the server holds, to tell whether pairsState has unsaved changes.
+let savedPairsSnapshot = '';
 let llmStatusTimer = null;
 const LLM_STATUS_POLL_MS = 3000;
 
@@ -43,6 +45,7 @@ async function initSettings() {
         allLanguages = languagesDetail.map(l => l.code || l);
 
         pairsState = JSON.parse(JSON.stringify(currentConfig.language_pairs || {}));
+        savedPairsSnapshot = pairsSnapshot(currentConfig.language_pairs || {});
 
         renderLLMModels();
         populateNewPairForm();
@@ -64,9 +67,14 @@ function populateLanguageSelect(id, codes, excludeCode) {
         if (excludeCode && code === excludeCode) continue;
         const opt = document.createElement('option');
         opt.value = code;
-        opt.textContent = code;
+        opt.textContent = langName(code);
         sel.appendChild(opt);
     }
+}
+
+// Language name for a code, as the Dashboard shows it (no flags).
+function langName(code) {
+    return Utils.langInfo(code).name;
 }
 
 function renderLLMModels() {
@@ -74,53 +82,28 @@ function renderLLMModels() {
     const models = currentConfig.llm.models || [];
 
     if (models.length === 0) {
-        container.innerHTML = '<p class="text-slate-500 dark:text-slate-400 text-sm">No LLM models configured. Add them to <code>config.yaml</code> under <code>llm.models</code>.</p>';
+        container.innerHTML = '<p class="text-muted px-2">No models yet. Add them to <span class="code">config.yaml</span> under <span class="code">llm.models</span>.</p>';
         return;
     }
 
     container.innerHTML = models.map(model => `
-        <div class="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700" data-llm-name="${escapeHtml(model.name)}">
-            <div class="flex items-start justify-between gap-4 mb-3">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 min-w-0">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Name</label>
-                        <p class="text-sm font-mono text-slate-900 dark:text-white">${escapeHtml(model.name)}</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Endpoint</label>
-                        <p class="text-sm font-mono text-slate-900 dark:text-white truncate">${escapeHtml(model.endpoint)}</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Model</label>
-                        <p class="text-sm font-mono text-slate-900 dark:text-white">${escapeHtml(model.model)}</p>
-                    </div>
+        <div class="llm-row ui-row" data-llm-name="${escapeHtml(model.name)}">
+            <div class="llm-head">
+                <div class="min-w-0">
+                    <div class="font-bold">${escapeHtml(model.name)}</div>
+                    <div class="llm-meta truncate">${escapeHtml(model.model)} · <span class="font-mono">${escapeHtml(model.endpoint)}</span></div>
                 </div>
-                <div class="shrink-0 text-right">
-                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Status</label>
-                    <div class="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700" data-llm-status-pill>
-                        <span class="w-2 h-2 rounded-full bg-slate-400" data-llm-dot></span>
-                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300" data-llm-label>Checking…</span>
-                    </div>
+                <span class="ui-status" data-llm-status-pill><span data-llm-label>Checking…</span></span>
+                <div class="llm-actions">
+                    <button type="button" class="llm-start-btn ui-button" data-name="${escapeHtml(model.name)}" disabled>${icon('play')}<span>Start</span></button>
+                    <button type="button" class="llm-stop-btn ui-button" data-name="${escapeHtml(model.name)}" hidden>${icon('stop')}<span>Stop</span></button>
+                    <button type="button" class="test-llm-btn ui-button" data-endpoint="${escapeHtml(model.endpoint)}">Test</button>
                 </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button class="llm-start-btn px-3 py-2 rounded text-sm font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200" data-name="${escapeHtml(model.name)}" disabled>
-                    ▶ Start
-                </button>
-                <button class="llm-stop-btn px-3 py-2 rounded text-sm font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:bg-rose-200 dark:hover:bg-rose-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200" data-name="${escapeHtml(model.name)}" disabled>
-                    ■ Stop
-                </button>
-                <button class="test-llm-btn px-3 py-2 rounded text-sm font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors duration-200" data-endpoint="${escapeHtml(model.endpoint)}">
-                    🧪 Test
-                </button>
-            </div>
-            <p class="hidden mt-2 text-xs text-slate-500 dark:text-slate-400" data-llm-hint></p>
-            <details class="hidden mt-2 group" data-llm-log-details>
-                <summary class="cursor-pointer select-none text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white inline-flex items-center gap-1">
-                    <span class="transition-transform group-open:rotate-90">▸</span>
-                    <span data-llm-log-summary>Console output</span>
-                </summary>
-                <pre class="mt-2 max-h-64 overflow-auto rounded-md bg-slate-900 text-slate-100 dark:bg-black text-[11px] leading-snug font-mono p-3 whitespace-pre-wrap break-words" data-llm-log></pre>
+            <p class="hidden field-help" data-llm-hint></p>
+            <details class="hidden llm-log" data-llm-log-details>
+                <summary>${icon('chevron-right', 'llm-log-chevron')}<span data-llm-log-summary>Console output</span></summary>
+                <pre data-llm-log></pre>
             </details>
         </div>
     `).join('');
@@ -210,21 +193,21 @@ async function refreshLLMStatus(name) {
 }
 
 function applyLLMStatusUI(card, { state, label, hint, canStart, reachable, managed, exited, exitError, recentOutput }) {
-    const dot = card.querySelector('[data-llm-dot]');
+    const pill = card.querySelector('[data-llm-status-pill]');
     const labelEl = card.querySelector('[data-llm-label]');
     const hintEl = card.querySelector('[data-llm-hint]');
     const startBtn = card.querySelector('.llm-start-btn');
     const stopBtn = card.querySelector('.llm-stop-btn');
 
-    const dotColors = {
-        'running-managed': 'bg-emerald-500 animate-pulse',
-        'running-external': 'bg-emerald-500',
-        'starting': 'bg-amber-500 animate-pulse',
-        'crashed': 'bg-rose-500',
-        'stopped': 'bg-slate-400',
-        'unknown': 'bg-slate-400',
+    // Status colour only where something needs a look: running is ok,
+    // starting is warn, a crash is danger, stopped stays neutral.
+    const pillTones = {
+        'running-managed': 'ui-status ui-status-ok',
+        'running-external': 'ui-status ui-status-ok',
+        'starting': 'ui-status ui-status-warn',
+        'crashed': 'ui-status ui-status-danger',
     };
-    dot.className = `w-2 h-2 rounded-full ${dotColors[state] || 'bg-slate-400'}`;
+    pill.className = pillTones[state] || 'ui-status';
     labelEl.textContent = label;
 
     if (hint) {
@@ -237,7 +220,11 @@ function applyLLMStatusUI(card, { state, label, hint, canStart, reachable, manag
     // Start is only meaningful when the server is not reachable and the
     // config knows which GGUF to load. Stop is only meaningful when we're
     // the ones managing the process.
+    // An impossible action is left out rather than shown disabled; Start
+    // without a model_path stays, disabled, beside the hint that explains it.
+    startBtn.hidden = !!reachable;
     startBtn.disabled = reachable || !canStart;
+    stopBtn.hidden = !managed;
     stopBtn.disabled = !managed;
 
     updateLLMLogPanel(card, { state, recentOutput: recentOutput || [], exitError: exitError || '', exited: !!exited });
@@ -319,7 +306,7 @@ async function startLLMServer(btn) {
     const card = btn.closest('[data-llm-name]');
     btn.disabled = true;
     const original = btn.innerHTML;
-    btn.innerHTML = '⏳ Starting…';
+    btn.innerHTML = `${icon('play')}<span>Starting…</span>`;
     try {
         const result = await api.startLLM(name);
         if (!result.ok) {
@@ -347,7 +334,7 @@ async function stopLLMServer(btn) {
     const name = btn.dataset.name;
     btn.disabled = true;
     const original = btn.innerHTML;
-    btn.innerHTML = '⏳ Stopping…';
+    btn.innerHTML = `${icon('stop')}<span>Stopping…</span>`;
     try {
         const result = await api.stopLLM(name);
         if (!result.ok) {
@@ -389,23 +376,41 @@ function renderPairs() {
     const modelNames = models.map(m => m.name);
 
     if (keys.length === 0) {
-        container.innerHTML = '<p class="text-slate-500 dark:text-slate-400 text-sm italic">No language pairs configured yet. Add one below.</p>';
+        container.innerHTML = '<p class="text-muted px-2">No language pairs yet. Add one below.</p>';
+        updatePairsSaveState();
         return;
     }
 
     container.innerHTML = `
-        <div class="hidden sm:grid grid-cols-12 gap-3 px-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            <div class="col-span-2">Direction</div>
-            <div class="col-span-3">LLM</div>
-            <div class="col-span-3">Temperature</div>
-            <div class="col-span-3">Confidence ≥</div>
-            <div class="col-span-1"></div>
+        <div class="pair-row pair-head" aria-hidden="true">
+            <div>Direction</div>
+            <div>Model</div>
+            <div>Temperature</div>
+            <div>Confidence floor</div>
+            <div></div>
         </div>
     ` + keys.map(key => renderPairRow(key, modelNames)).join('');
 
     for (const key of keys) {
         bindPairRow(key);
     }
+    updatePairsSaveState();
+}
+
+// A stable text form of a pairs map, so key order never reads as a change.
+function pairsSnapshot(pairs) {
+    return JSON.stringify(Object.keys(pairs).sort().map(k =>
+        [k, Object.keys(pairs[k] || {}).sort().map(f => [f, pairs[k][f]])]));
+}
+
+// Save is the view's one primary only while there is something to save.
+function updatePairsSaveState() {
+    const btn = document.getElementById('savePairsBtn');
+    if (!btn) return;
+    const dirty = pairsSnapshot(pairsState) !== savedPairsSnapshot;
+    btn.classList.toggle('ui-button-primary', dirty);
+    btn.textContent = dirty ? 'Save pairs' : 'Saved';
+    btn.disabled = !dirty;
 }
 
 function renderPairRow(key, modelNames) {
@@ -422,25 +427,23 @@ function renderPairRow(key, modelNames) {
         : '';
 
     return `
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700" data-pair-key="${escapeHtml(key)}">
-            <div class="sm:col-span-2 font-mono text-sm text-slate-900 dark:text-white">
-                <span class="inline-block px-2 py-1 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">${escapeHtml(src)} → ${escapeHtml(tgt)}</span>
-            </div>
-            <div class="sm:col-span-3">
-                <select data-field="model" class="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm">
+        <div class="pair-row ui-row" data-pair-key="${escapeHtml(key)}">
+            <div class="truncate"><span class="font-bold">${escapeHtml(langName(src))}</span> <span class="text-faint">→</span> <span class="font-bold">${escapeHtml(langName(tgt))}</span></div>
+            <div>
+                <select data-field="model" class="ui-field input w-full" aria-label="Model for ${escapeHtml(src)} to ${escapeHtml(tgt)}">
                     ${unknownModel}${modelOptions}
                 </select>
             </div>
-            <div class="sm:col-span-3 flex items-center gap-3">
-                <input data-field="temperature" type="range" min="0" max="2" step="0.1" value="${temp}" class="flex-1 h-2 bg-slate-300 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-600">
-                <span data-display="temperature" class="text-sm font-semibold text-slate-700 dark:text-slate-300 min-w-[2.5rem] text-right">${Number(temp).toFixed(1)}</span>
+            <div class="pair-slider">
+                <input data-field="temperature" type="range" min="0" max="2" step="0.1" value="${temp}" aria-label="Temperature">
+                <span data-display="temperature">${Number(temp).toFixed(1)}</span>
             </div>
-            <div class="sm:col-span-3 flex items-center gap-3">
-                <input data-field="confidence_threshold" type="range" min="0" max="1" step="0.05" value="${threshold}" class="flex-1 h-2 bg-slate-300 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-emerald-600">
-                <span data-display="confidence_threshold" class="text-sm font-semibold text-slate-700 dark:text-slate-300 min-w-[2.5rem] text-right">${Number(threshold).toFixed(2)}</span>
+            <div class="pair-slider">
+                <input data-field="confidence_threshold" type="range" min="0" max="1" step="0.05" value="${threshold}" aria-label="Confidence floor">
+                <span data-display="confidence_threshold">${Number(threshold).toFixed(2)}</span>
             </div>
-            <div class="sm:col-span-1 flex justify-end">
-                <button data-action="delete" class="px-2 py-1 text-sm text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded transition-colors" title="Remove pair">✕</button>
+            <div class="flex justify-end">
+                <button type="button" data-action="delete" class="ui-button ui-icon-button icon-danger" aria-label="Remove ${escapeHtml(src)} → ${escapeHtml(tgt)}" title="Remove pair">${icon('x')}</button>
             </div>
         </div>
     `;
@@ -452,6 +455,7 @@ function bindPairRow(key) {
 
     row.querySelector('[data-field="model"]').addEventListener('change', (e) => {
         pairsState[key] = { ...pairsState[key], model: e.target.value };
+        updatePairsSaveState();
     });
 
     const tempInput = row.querySelector('[data-field="temperature"]');
@@ -460,6 +464,7 @@ function bindPairRow(key) {
         const v = parseFloat(e.target.value);
         pairsState[key] = { ...pairsState[key], temperature: v };
         tempDisp.textContent = v.toFixed(1);
+        updatePairsSaveState();
     });
 
     const threshInput = row.querySelector('[data-field="confidence_threshold"]');
@@ -468,6 +473,7 @@ function bindPairRow(key) {
         const v = parseFloat(e.target.value);
         pairsState[key] = { ...pairsState[key], confidence_threshold: v };
         threshDisp.textContent = v.toFixed(2);
+        updatePairsSaveState();
     });
 
     row.querySelector('[data-action="delete"]').addEventListener('click', () => {
@@ -480,19 +486,19 @@ async function testLLMConnection(btn) {
     const endpoint = btn.dataset.endpoint;
     btn.disabled = true;
     const original = btn.textContent;
-    btn.textContent = '⏳ Testing…';
+    btn.textContent = 'Testing…';
 
     try {
         const result = await api.testLLM(endpoint);
         if (!result.ok) {
-            Utils.showToast(`❌ Connection failed: ${result.error}`, 'error');
+            Utils.showToast(`Connection failed: ${result.error}`, 'error');
             return;
         }
 
         if (result.data.reachable) {
-            Utils.showToast(`✓ Connected to ${endpoint}`, 'success');
+            Utils.showToast(`Connected to ${endpoint}`, 'success');
         } else {
-            Utils.showToast(`❌ Endpoint unreachable`, 'error');
+            Utils.showToast('Endpoint unreachable', 'error');
         }
     } catch (error) {
         console.error('Error testing LLM:', error);
@@ -512,7 +518,7 @@ function renderLanguages() {
     if (!container) return;
 
     if (!languagesDetail.length) {
-        container.innerHTML = '<p class="text-slate-500 dark:text-slate-400 text-sm italic">No languages yet. Add one below.</p>';
+        container.innerHTML = '<p class="text-muted px-2">No languages yet. Add one below.</p>';
         return;
     }
 
@@ -536,27 +542,22 @@ function renderLanguageRow(lang) {
     const count = lang.translation_count || 0;
     const namespaces = (lang.namespaces || []).length;
     const isSource = !!lang.is_source;
-
-    const sourceBadge = isSource
-        ? '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">source</span>'
-        : '';
+    const name = langName(lang.code);
 
     const countLabel = count === 0
-        ? '<span class="text-xs text-slate-400 dark:text-slate-500 italic">no translations yet</span>'
-        : `<span class="text-xs text-slate-500 dark:text-slate-400">${count.toLocaleString()} translations · ${namespaces} namespace${namespaces === 1 ? '' : 's'}</span>`;
+        ? 'No translations yet'
+        : `${count.toLocaleString()} translations · ${namespaces} namespace${namespaces === 1 ? '' : 's'}`;
 
-    const removeBtn = isSource
-        ? `<span class="text-xs text-slate-400 dark:text-slate-500" title="The source language is set in General. Change it there before removing.">locked</span>`
-        : `<button data-action="remove-lang" data-lang="${escapeHtml(lang.code)}" class="px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-lg transition-colors" title="Remove language">Remove</button>`;
+    // The source language is the pivot of every pair; it can't be removed.
+    const action = isSource
+        ? '<span class="ui-chip" title="The source language is set in config.yaml; change it there before removing it.">source</span>'
+        : `<button type="button" data-action="remove-lang" data-lang="${escapeHtml(lang.code)}" class="ui-button ui-icon-button icon-danger row-quiet" aria-label="Remove ${escapeHtml(name)}" title="Remove language">${icon('trash')}</button>`;
 
     return `
-        <div class="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-3 min-w-0">
-                <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white">${escapeHtml(lang.code)}</span>
-                ${sourceBadge}
-                ${countLabel}
-            </div>
-            <div>${removeBtn}</div>
+        <div class="settings-row ui-row">
+            <div class="min-w-0 truncate"><span class="font-bold">${escapeHtml(name)}</span><span class="settings-code">${escapeHtml(lang.code)}</span></div>
+            <div class="settings-row-meta">${countLabel}</div>
+            <div class="settings-row-actions">${action}</div>
         </div>
     `;
 }
@@ -588,9 +589,9 @@ async function addLanguage() {
         return;
     }
 
-    const original = btn.textContent;
+    const original = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = '⏳ Adding…';
+    btn.textContent = 'Adding…';
 
     try {
         const result = await api.addLanguage(code);
@@ -598,7 +599,7 @@ async function addLanguage() {
             Utils.showToast(`Failed to add language: ${result.error}`, 'error');
             return;
         }
-        Utils.showToast(`✓ Added "${code}". Start translating from the Translations page.`, 'success');
+        Utils.showToast(`Added "${code}". Start translating from Translations.`, 'success');
         input.value = '';
         await refreshAfterLanguageChange();
     } catch (error) {
@@ -606,7 +607,7 @@ async function addLanguage() {
         Utils.showToast('Error adding language', 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = original;
+        btn.innerHTML = original;
     }
 }
 
@@ -614,10 +615,15 @@ async function removeLanguage(code) {
     if (!code) return;
     const detail = languagesDetail.find(l => l.code === code);
     const count = detail?.translation_count || 0;
-    const msg = count > 0
-        ? `Remove "${code}"? This will permanently delete ${count.toLocaleString()} translations, all glossary entries for this language and any matching language pairs. There is no undo.`
-        : `Remove "${code}"? Matching language pairs and glossary entries will also be cleared.`;
-    if (!confirm(msg)) return;
+    const body = count > 0
+        ? `This deletes ${count.toLocaleString()} translations, every glossary term for this language and its language pairs. There is no undo.`
+        : 'Its language pairs and glossary terms are cleared too.';
+    const ok = await confirmDialog({
+        title: `Remove ${langName(code)} (${code})?`,
+        body,
+        confirmLabel: 'Remove language',
+    });
+    if (!ok) return;
 
     try {
         const result = await api.deleteLanguage(code);
@@ -625,7 +631,7 @@ async function removeLanguage(code) {
             Utils.showToast(`Failed to remove: ${result.error}`, 'error');
             return;
         }
-        const parts = [`✓ Removed "${code}"`];
+        const parts = [`Removed "${code}"`];
         if (result.data.pairs_removed) parts.push(`${result.data.pairs_removed} pair(s)`);
         if (result.data.glossary_removed) parts.push(`${result.data.glossary_removed} glossary entries`);
         Utils.showToast(parts.join(' · '), 'success');
@@ -655,6 +661,7 @@ async function refreshAfterLanguageChange() {
         merged[k] = pairsState[k] ? { ...v, ...pairsState[k] } : v;
     }
     pairsState = merged;
+    savedPairsSnapshot = pairsSnapshot(serverPairs);
 
     populateNewPairForm();
     renderPairs();
@@ -682,7 +689,7 @@ async function refreshSettingsNamespaceList() {
     const empty = document.getElementById('settingsNsEmpty');
     if (!list || !empty) return;
 
-    list.innerHTML = '<div class="py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading…</div>';
+    list.innerHTML = '<p class="text-muted px-2">Loading…</p>';
     empty.classList.add('hidden');
     setSettingsNsError('');
 
@@ -708,31 +715,24 @@ function renderSettingsNamespaceList() {
     if (!list) return;
 
     list.innerHTML = settingsNsEntries.map(entry => `
-        <div class="ns-manage-row flex items-center gap-3 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40"
-             data-ns="${escapeAttr(entry.namespace)}">
-            <span class="text-lg">📂</span>
-            <div class="flex-1 min-w-0">
-                <div class="ns-manage-name font-mono text-sm text-slate-900 dark:text-white truncate" data-role="display">
-                    ${escapeHtml(entry.namespace)}
-                </div>
-                <input type="text" value="${escapeAttr(entry.namespace)}" data-role="edit"
-                       class="hidden w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-sm font-mono">
-                <div class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    ${entry.key_count} key${entry.key_count === 1 ? '' : 's'}
-                    · ${entry.translation_count} translation${entry.translation_count === 1 ? '' : 's'}
-                </div>
+        <div class="ns-manage-row settings-row ui-row" data-ns="${escapeAttr(entry.namespace)}">
+            <div class="min-w-0 flex items-center gap-2">
+                <span class="text-muted">${icon('folder')}</span>
+                <span class="ns-manage-name truncate font-bold" data-role="display">${escapeHtml(entry.namespace)}</span>
+                <input type="text" value="${escapeAttr(entry.namespace)}" data-role="edit" aria-label="New name for ${escapeAttr(entry.namespace)}"
+                       class="hidden ui-field input w-full">
             </div>
-            <div class="flex items-center gap-1" data-role="actions-view">
-                <button type="button" class="px-2 py-1 rounded-md text-xs font-medium bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        data-action="rename">Rename</button>
-                <button type="button" class="px-2 py-1 rounded-md text-xs font-medium bg-white dark:bg-slate-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
-                        data-action="delete">Delete</button>
+            <div class="settings-row-meta">
+                ${entry.key_count} key${entry.key_count === 1 ? '' : 's'}
+                · ${entry.translation_count} translation${entry.translation_count === 1 ? '' : 's'}
             </div>
-            <div class="hidden items-center gap-1" data-role="actions-edit">
-                <button type="button" class="px-2 py-1 rounded-md text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white"
-                        data-action="rename-save">Save</button>
-                <button type="button" class="px-2 py-1 rounded-md text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
-                        data-action="rename-cancel">Cancel</button>
+            <div class="settings-row-actions row-quiet" data-role="actions-view">
+                <button type="button" class="ui-button ui-icon-button" data-action="rename" aria-label="Rename ${escapeAttr(entry.namespace)}" title="Rename">${icon('pencil')}</button>
+                <button type="button" class="ui-button ui-icon-button icon-danger" data-action="delete" aria-label="Delete ${escapeAttr(entry.namespace)}" title="Delete">${icon('trash')}</button>
+            </div>
+            <div class="hidden items-center gap-1 justify-end" data-role="actions-edit">
+                <button type="button" class="ui-button" data-action="rename-save">Save</button>
+                <button type="button" class="ui-button" data-action="rename-cancel">Cancel</button>
             </div>
         </div>
     `).join('');
@@ -808,10 +808,14 @@ async function saveSettingsNsRename(row, oldNs) {
 async function deleteSettingsNamespace(ns) {
     const entry = settingsNsEntries.find(e => e.namespace === ns);
     const keyCount = entry ? entry.key_count : 0;
-    const msg = keyCount
-        ? `Delete namespace "${ns}"? This removes ${keyCount} key${keyCount === 1 ? '' : 's'} across every language. This cannot be undone.`
-        : `Delete namespace "${ns}"? This cannot be undone.`;
-    if (!confirm(msg)) return;
+    const ok = await confirmDialog({
+        title: `Delete namespace ${ns}?`,
+        body: keyCount
+            ? `This removes ${keyCount} key${keyCount === 1 ? '' : 's'} in every language, and their JSON files. It cannot be undone.`
+            : 'It cannot be undone.',
+        confirmLabel: 'Delete namespace',
+    });
+    if (!ok) return;
 
     setSettingsNsError('');
     const resp = await api.deleteNamespace(ns);
@@ -887,14 +891,15 @@ async function savePairs() {
             Utils.showToast(`Failed to save pairs: ${result.error}`, 'error');
             return;
         }
-        Utils.showToast('✓ Language pairs saved', 'success');
+        Utils.showToast('Language pairs saved', 'success');
         currentConfig = { ...currentConfig, language_pairs: pairsState };
+        savedPairsSnapshot = pairsSnapshot(pairsState);
+        updatePairsSaveState();
     } catch (error) {
         console.error('Error saving pairs:', error);
         Utils.showToast('Error saving pairs', 'error');
     }
 }
-
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         const isMeta = e.metaKey || e.ctrlKey;

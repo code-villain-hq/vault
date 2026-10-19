@@ -2,28 +2,52 @@
 
 let selectedFile = null;
 let previewData = null;
+// The step-2 primary names what it will do: "Import 42 keys".
+let importLabel = 'Import';
 
 document.addEventListener('DOMContentLoaded', () => {
+
     const fileInput = document.getElementById('importFile');
     const langInput = document.getElementById('importLang');
     const nsInput = document.getElementById('importDefaultNs');
     const btnToReview = document.getElementById('btnToReview');
     const btnBack = document.getElementById('btnBack');
     const btnRunImport = document.getElementById('btnRunImport');
+    const dropZone = document.getElementById('importDropZone');
+    const fileName = document.getElementById('importFileName');
 
     fileInput.addEventListener('change', () => {
         const f = fileInput.files?.[0];
         selectedFile = f || null;
         if (!f) {
+            fileName.textContent = 'Choose a JSON file';
             btnToReview.disabled = true;
             return;
         }
+        fileName.textContent = f.name;
 
         const parsed = parseFilenameHints(f.name);
         if (parsed.lang) langInput.value = parsed.lang;
         if (parsed.ns) nsInput.value = parsed.ns;
 
         btnToReview.disabled = false;
+    });
+
+    // Dropping a file on the zone is the same as choosing it.
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('is-dragging');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('is-dragging'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('is-dragging');
+        const f = e.dataTransfer?.files?.[0];
+        if (!f) return;
+        const dt = new DataTransfer();
+        dt.items.add(f);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change'));
     });
 
     btnToReview.addEventListener('click', async () => {
@@ -43,11 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
         nsInput.value = defaultNS;
 
         btnToReview.disabled = true;
-        btnToReview.textContent = 'Parsing…';
+        btnToReview.textContent = 'Reading the file…';
 
         const res = await api.importPreview(f, defaultNS);
         btnToReview.disabled = false;
-        btnToReview.textContent = 'Continue to review →';
+        btnToReview.textContent = 'Preview';
 
         if (!res.ok) {
             Utils.showToast(`Preview failed: ${res.error}`, 'error');
@@ -79,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const result = await api.importTranslations(f, lang, 'merge', defaultNS);
         btnRunImport.disabled = false;
-        btnRunImport.textContent = '✓ Import now';
+        btnRunImport.textContent = importLabel;
 
         if (!result.ok) {
             Utils.showToast(`Import failed: ${result.error}`, 'error');
@@ -90,12 +114,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (breakdown.length > 1) {
             const summary = breakdown.map(b => `${b.namespace} (${b.count})`).join(', ');
             Utils.showToast(
-                `✓ Imported ${result.data.count} keys into ${lang}: ${summary}`,
+                `Imported ${result.data.count} keys into ${lang}: ${summary}`,
                 'success'
             );
         } else {
             const landedNS = breakdown[0]?.namespace || defaultNS;
-            Utils.showToast(`✓ Imported ${result.data.count} keys into ${lang}/${landedNS}`, 'success');
+            Utils.showToast(`Imported ${result.data.count} keys into ${lang}/${landedNS}`, 'success');
         }
 
         window.location.href = '/';
@@ -131,16 +155,16 @@ function showStep(step) {
     const b1 = document.getElementById('step1Badge');
     const b2 = document.getElementById('step2Badge');
 
+    s1.classList.toggle('hidden', step !== 1);
+    s2.classList.toggle('hidden', step === 1);
+    const [current, other] = step === 1 ? [b1, b2] : [b2, b1];
+    current.setAttribute('aria-current', 'step');
+    other.removeAttribute('aria-current');
+
     if (step === 1) {
-        s1.classList.remove('hidden');
-        s2.classList.add('hidden');
-        b1.className = 'px-3 py-1 rounded-full bg-indigo-600 text-white font-medium';
-        b2.className = 'px-3 py-1 rounded-full bg-slate-700 text-slate-300';
-    } else {
-        s1.classList.add('hidden');
-        s2.classList.remove('hidden');
-        b1.className = 'px-3 py-1 rounded-full bg-slate-700 text-slate-300';
-        b2.className = 'px-3 py-1 rounded-full bg-indigo-600 text-white font-medium';
+        document.getElementById('importLeadTitle').textContent = 'Import a JSON file';
+        document.getElementById('importLeadSub').innerHTML =
+            'Check where each key lands, including locize-style <span class="code">ns:key</span> prefixes, then merge.';
     }
 }
 
@@ -153,30 +177,36 @@ function renderReview(lang, defaultNS, data) {
     const breakdown = Array.isArray(data.namespaces) ? data.namespaces : [];
     const rows = Array.isArray(data.sample_rows) ? data.sample_rows : [];
 
+    const keys = `${count} key${count === 1 ? '' : 's'}`;
+    importLabel = `Import ${keys}`;
+    document.getElementById('btnRunImport').textContent = importLabel;
+    document.getElementById('importLeadTitle').textContent = `Review ${keys}`;
+    document.getElementById('importLeadSub').textContent =
+        `${selectedFile ? selectedFile.name + ' · ' : ''}to merge into ${Utils.langInfo(lang).name}.`;
+
     document.getElementById('reviewSummary').innerHTML =
-        `About to merge <strong class="text-white">${count}</strong> entries into ` +
-        `<span class="font-mono text-indigo-300">${escapeHtml(lang)}</span>. ` +
-        `Default namespace for unprefixed keys: <span class="font-mono text-slate-300">${escapeHtml(defaultNS)}</span>.`;
+        `Keys with an <span class="code">ns:key</span> prefix land in that namespace; ` +
+        `the rest in <span class="code">${escapeHtml(defaultNS)}</span>.`;
 
     const bdEl = document.getElementById('reviewNsBreakdown');
     bdEl.innerHTML = breakdown.map(b =>
-        `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700 text-xs font-mono text-slate-200">${escapeHtml(b.namespace)} <span class="text-slate-400">(${b.count})</span></span>`
+        `<span class="ui-chip">${escapeHtml(b.namespace)} <span class="text-faint">${b.count}</span></span>`
     ).join('');
 
     document.getElementById('sampleHint').textContent =
-        rows.length > 0 ? `(first ${rows.length} keys, sorted)` : '';
+        rows.length > 0 ? `· first ${rows.length}, sorted` : '';
 
     const tbody = document.getElementById('reviewTableBody');
     tbody.innerHTML = rows.map(r => `
-        <tr class="hover:bg-slate-800/50">
-            <td class="px-4 py-2 font-mono text-xs text-violet-300">${escapeHtml(r.namespace)}</td>
-            <td class="px-4 py-2 font-mono text-xs text-slate-200">${escapeHtml(r.key)}</td>
-            <td class="px-4 py-2 font-mono text-xs text-slate-500 break-all">${escapeHtml(r.raw_key)}</td>
-            <td class="px-4 py-2 text-xs text-slate-400 max-w-md truncate" title="${escapeHtml(r.value_preview)}">${escapeHtml(r.value_preview)}</td>
+        <tr>
+            <td class="text-muted">${escapeHtml(r.namespace)}</td>
+            <td class="font-mono text-code">${escapeHtml(r.key)}</td>
+            <td class="font-mono text-code text-muted break-all">${escapeHtml(r.raw_key)}</td>
+            <td class="import-value truncate" title="${escapeHtml(r.value_preview)}">${escapeHtml(r.value_preview)}</td>
         </tr>
     `).join('');
 
     if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-slate-500">No rows (empty file?)</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="empty">No rows. Is the file empty?</td></tr>`;
     }
 }
