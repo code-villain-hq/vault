@@ -28,6 +28,12 @@ pub enum Error {
     #[error("{0} is not configured")]
     NotConfigured(&'static str),
 
+    /// The service answered 401 to the token saved for it: expired, revoked,
+    /// or replaced. The frontend knows this text (`TOKEN_REJECTED`) and offers
+    /// to reconnect instead of showing it per repo (PR-12).
+    #[error("{0} no longer accepts the saved token")]
+    TokenRejected(&'static str),
+
     #[error("{0}")]
     Other(String),
 }

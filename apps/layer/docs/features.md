@@ -698,8 +698,13 @@ send feedback to an agent, and finish a merged task.
   Diff tab were not yet sent. It is advice, never a
   gate: with anything flagged, the button reads "Open anyway". A push used
   to be the first time anyone saw the branch whole.
+- **PR-12** When GitHub answers 401, the tab MUST say once that GitHub no
+  longer accepts the saved token, with a button to the GitHub page of
+  Settings, rather than the same failure under every repo. Other failures
+  are still listed per repo. An expired token used to show GitHub's raw
+  "Bad credentials" JSON beside each repo, and nothing said what to do.
 
-Code: `commands/github.rs`, `commands/open_prs.rs`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `PrPanel.tsx`,
+Code: `commands/github.rs`, `commands/open_prs.rs`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `PrPanel.tsx`, `PrReadErrors.tsx`,
 `PrFeedback.tsx`, `Markdown.tsx`, `lib/markdown.ts`.
 
 Known gaps:

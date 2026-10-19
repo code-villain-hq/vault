@@ -40,8 +40,13 @@ pub async fn github_connect(
             .and_then(github::normalize_review_team),
     };
     let was = state.config.read().github.as_ref().map(|g| g.api_url.clone());
+    let typed = !token.trim().is_empty();
     let token = stored_or(secrets::GITHUB, &token, "GitHub", was.as_deref(), &cfg.api_url)?;
-    let login = GitHub::new(&cfg, &token)?.login().await?;
+    let login = match GitHub::new(&cfg, &token)?.login().await {
+        // A token just typed in is not the saved one yet.
+        Err(Error::TokenRejected(_)) if typed => Err(Error::Other("GitHub did not accept this token".into())),
+        other => other,
+    }?;
     secrets::set(secrets::GITHUB, &token)?;
     state.config.update(|c| c.github = Some(cfg))?;
     Ok(login)
