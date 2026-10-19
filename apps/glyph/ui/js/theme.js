@@ -11,8 +11,8 @@
 })();
 
 // Tailwind stays for layout only. Its palette, type scale, radii and shadows
-// are replaced by the design tokens, so `bg-slate-800` or `text-indigo-400`
-// generate nothing: colour classes are the token names (`bg-panel`,
+// are replaced by the design tokens, so its palette colour classes generate
+// nothing: colour classes are the token names (`bg-panel`,
 // `text-muted`, `text-danger-ink`). Preflight is off because its unlayered
 // reset would beat the shared ui-* controls in their `components` layer;
 // css/glyph.css carries the reset in `@layer base` instead.

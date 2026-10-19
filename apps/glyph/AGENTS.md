@@ -4,7 +4,7 @@
 
 **Glyph** (code name `glyph`) is a local-first AI translation tool for managing i18n JSON files. Backend: Go 1.21 + Gin. Frontend: vanilla HTML/CSS/JS (no build). Requires `llama-server` for LLM inference.
 
-The UI predates the vault's `design/`: it still uses Tailwind's slate and indigo, not the Nightshade tokens. Read `../../design/principles.md` before changing it; moving it onto the shared design is open work.
+The UI follows the vault's `design/`: read `../../design/principles.md` before changing it. `ui/design/` is a copy of the Nightshade tokens, `components.css` and the self-hosted fonts; `make design` refreshes it from the vault and `make design-check` (CI) fails when it drifts. Tailwind (Play CDN) is there for layout only: `ui/js/theme.js` swaps its palette, type scale and radii for the token names (`bg-panel`, `text-muted`, `text-danger-ink`, `text-ui-small`), so palette classes like `bg-slate-800` generate nothing, and `design/lint` rejects them. Colours, sizes and radii in `ui/css/*.css` come from tokens. Every page shares the app frame (`ui/js/frame.js`: sidebar with the views, breadcrumb top bar, content panel) and Lucide icons from `ui/js/icons.js` (`icon('copy')`), not emoji.
 
 ## Build & Run
 
@@ -169,7 +169,7 @@ POST /api/llm/stop                                   # body: {name} — SIGTERMs
 - `ui/glossary.html` — manage preferred-term rules (source_term → target_term per pair)
 - `ui/settings.html` — Languages panel (one-click add/remove), LLM config, language pairs, keyboard-shortcuts legend
 
-The UI is dark-mode only — there is no light theme or toggle. Source language, default target, and per-pair confidence threshold are edited via `config.yaml` / the Language Pairs table, not a General form.
+Night or day follows the system (`prefers-color-scheme`); there is no toggle. Source language, default target, and per-pair confidence threshold are edited via `config.yaml` / the Language Pairs table, not a General form.
 
 Keyboard shortcuts are consistent across every page: `⌘1` Dashboard, `⌘2` Translations, `⌘3` Review, `⌘4` Glossary, `⌘5` Settings. On the Translations page, `⌘F` focuses search and `⌘N` opens the "add new key" modal.
 
