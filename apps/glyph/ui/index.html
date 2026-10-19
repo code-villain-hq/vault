@@ -1,120 +1,46 @@
 <!DOCTYPE html>
-<html lang="en" id="theme">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Glyph</title>
+    <title>Dashboard · Glyph</title>
     <link rel="icon" href="/ui/img/glyph.svg" type="image/svg+xml">
-    <!-- Dark mode is the only supported theme; applied eagerly before the
-         Tailwind CDN paints so the first frame is already dark (avoids a
-         white-flash on load). -->
-    <script>document.documentElement.classList.add('dark');</script>
-    <style>
-        html { background-color: #020617; color-scheme: dark; } /* slate-950 */
-        body { background-color: #020617; }
-    </style>
+    <link rel="stylesheet" href="/ui/design/fonts/fonts.css">
+    <link rel="stylesheet" href="/ui/design/color.css">
+    <link rel="stylesheet" href="/ui/design/type.css">
+    <link rel="stylesheet" href="/ui/design/shape.css">
+    <link rel="stylesheet" href="/ui/design/components.css">
+    <link rel="stylesheet" href="/ui/css/glyph.css">
+    <link rel="stylesheet" href="/ui/css/dashboard.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/ui/css/style.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        primary: {
-                            50: '#f0f4ff',
-                            100: '#e6ebff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            800: '#3730a3',
-                            900: '#312e81',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="/ui/js/theme.js"></script>
+    <script src="/ui/js/icons.js"></script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300" style="font-family: 'Inter', sans-serif;">
-    <!-- Toast Container -->
-    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+<body data-page="dashboard">
+    <div id="toastContainer" class="toast-stack" aria-live="polite"></div>
 
-    <!-- Main Container -->
-    <div class="min-h-screen flex flex-col dark:text-white">
-        <!-- Header -->
-        <header class="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <!-- Logo -->
-                    <a href="/" class="flex items-center space-x-3">
-                        <img src="/ui/img/glyph.svg" alt="" class="w-10 h-10">
-                        <div>
-                            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Glyph</h1>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">AI-Powered i18n Manager</p>
-                        </div>
-                    </a>
+    <div class="app">
+        <aside class="app-side"><script src="/ui/js/frame.js"></script></aside>
 
-                    <!-- Navigation Tabs -->
-                    <nav class="hidden md:flex items-center space-x-1">
-                        <a href="/" data-page="dashboard" class="nav-link text-indigo-600 dark:text-indigo-400 font-semibold border-b-2 border-indigo-600 dark:border-indigo-400 px-4 py-2 text-sm transition-all duration-200">📊 Dashboard</a>
-                        <a href="/ui/import.html" data-page="import" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📥 Import</a>
-                        <a href="/ui/translations.html" data-page="translations" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📝 Translations</a>
-                        <a href="/ui/missing.html" data-page="missing" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">✨ Review</a>
-                        <a href="/ui/glossary.html" data-page="glossary" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">📚 Glossary</a>
-                        <a href="/ui/settings.html" data-page="settings" class="nav-link text-slate-600 dark:text-slate-400 px-4 py-2 text-sm hover:text-slate-900 dark:hover:text-white transition-all duration-200">⚙️ Settings</a>
-                    </nav>
+        <div class="app-main">
+            <header class="app-top">
+                <h1 class="app-crumb"><span class="app-crumb-current">Dashboard</span></h1>
+            </header>
 
+            <main class="app-content">
+                <!-- The lead says what the state needs; dashboard.js fills it. -->
+                <div class="view-lead">
+                    <div>
+                        <h2 class="view-title" id="leadTitle">Loading…</h2>
+                        <p class="view-sub" id="leadSub"></p>
+                    </div>
+                    <a id="leadAction" class="ui-button ui-button-primary" href="/ui/missing.html" hidden></a>
                 </div>
-            </div>
-        </header>
 
-        <!-- Main Content -->
-        <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-            <!-- Dashboard View -->
-            <div class="mb-8">
-                <h2 class="text-3xl font-bold text-slate-900 dark:text-white mb-2">Dashboard</h2>
-                <p class="text-slate-600 dark:text-slate-400">Monitor translation progress across all language pairs</p>
-            </div>
-
-            <!-- Stats Overview -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Translation Slots</p>
-                    <p class="text-2xl font-bold text-slate-900 dark:text-white mt-2" id="totalKeysCount">-</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1" data-summary="total-keys-subtitle"></p>
-                </div>
-                <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Translated</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2" id="translatedCount">-</p>
-                </div>
-                <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Missing</p>
-                    <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2" id="missingCount">-</p>
-                </div>
-                <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                    <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Low Confidence</p>
-                    <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-2" id="lowConfidenceCount">-</p>
-                </div>
-            </div>
-
-            <!-- Language Pairs Grid -->
-            <div id="languagePairsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Cards populated by JavaScript -->
-            </div>
-        </main>
-
-        <!-- Footer -->
-        <footer class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-6">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Glyph by Code Villain • Local-First AI Translation
-                </p>
-            </div>
-        </footer>
+                <p class="group-label" id="languagesLabel" hidden></p>
+                <div id="languagePairsContainer" class="list"></div>
+            </main>
+        </div>
     </div>
 
     <script src="/ui/js/api.js"></script>

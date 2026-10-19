@@ -40,50 +40,23 @@ function normalizeLangCode(code) {
 }
 
 const Utils = {
-    // Toast notification system
-    showToast(message, type = 'info', duration = 3000) {
+    // Toast: the dialog tone with a status icon; it fades after `duration`.
+    showToast(message, type = 'info', duration = 4000) {
         const toastContainer = document.getElementById('toastContainer');
         const toast = document.createElement('div');
-        
-        const bgColor = {
-            'success': 'bg-green-500 dark:bg-green-600',
-            'error': 'bg-red-500 dark:bg-red-600',
-            'info': 'bg-blue-500 dark:bg-blue-600',
-            'warning': 'bg-amber-500 dark:bg-amber-600'
-        }[type] || 'bg-blue-500 dark:bg-blue-600';
+        const glyph = { success: 'check', error: 'alert', warning: 'alert', info: 'info' }[type] || 'info';
 
-        const icon = {
-            'success': '✓',
-            'error': '✕',
-            'info': 'ℹ',
-            'warning': '!'
-        }[type] || 'ℹ';
-
-        toast.className = `toast ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 min-w-max`;
-        toast.innerHTML = `
-            <span class="text-lg font-bold">${icon}</span>
-            <span>${message}</span>
-        `;
+        toast.className = 'toast';
+        toast.dataset.tone = type;
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        toast.innerHTML = `${icon(glyph)}<span>${message}</span>`;
+        toast.style.animationDelay = `0s, ${Math.max(0, duration - 200)}ms`;
 
         toastContainer.appendChild(toast);
 
         setTimeout(() => {
             toast.remove();
         }, duration);
-    },
-
-    // Dark mode is the only supported theme. The inline <head> script on
-    // every page already adds `dark` to <html>; this function exists only
-    // to defensively re-apply it in case a page forgot the inline script or
-    // some third-party script removed the class. `setTheme` is kept as a
-    // no-op shim so any legacy callers (e.g. older cached bundles) don't
-    // throw.
-    initDarkMode() {
-        document.documentElement.classList.add('dark');
-    },
-
-    setTheme() {
-        document.documentElement.classList.add('dark');
     },
 
     // Format percentage
@@ -109,18 +82,11 @@ const Utils = {
         return `${percent}%`;
     },
 
-    // Get confidence color
+    // Status pill classes for a confidence (design/components.md#status-pill).
     getConfidenceColor(confidence) {
-        if (confidence >= 0.8) return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
-        if (confidence >= 0.6) return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
-        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
-    },
-
-    // Get confidence meter fill color
-    getConfidenceMeterColor(confidence) {
-        if (confidence >= 0.8) return 'bg-green-500';
-        if (confidence >= 0.6) return 'bg-yellow-500';
-        return 'bg-red-500';
+        if (confidence >= 0.8) return 'ui-status ui-status-ok';
+        if (confidence >= 0.6) return 'ui-status ui-status-warn';
+        return 'ui-status ui-status-danger';
     },
 
     // Create language pair key
@@ -148,11 +114,11 @@ const Utils = {
     },
 
     // Show loading spinner
-    showLoading(element, text = 'Loading...') {
+    showLoading(element, text = 'Loading…') {
         element.innerHTML = `
-            <div class="flex items-center justify-center space-x-3 py-8">
-                <div class="w-8 h-8 border-4 border-indigo-300 dark:border-indigo-600 border-t-indigo-600 dark:border-t-indigo-300 rounded-full animate-spin"></div>
-                <span class="text-slate-600 dark:text-slate-400">${text}</span>
+            <div class="empty flex items-center justify-center gap-3">
+                <span class="spinner" aria-hidden="true"></span>
+                <span>${text}</span>
             </div>
         `;
     },
@@ -225,26 +191,5 @@ const Utils = {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
-    },
-
-    // Set active page in navigation
-    setActivePage(pageName) {
-        // Remove active state from all nav links
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.classList.remove('text-indigo-600', 'dark:text-indigo-400', 'font-semibold', 'border-b-2', 'border-indigo-600', 'dark:border-indigo-400');
-            link.classList.add('text-slate-600', 'dark:text-slate-400');
-        });
-
-        // Add active state to current page
-        const activeLink = document.querySelector(`[data-page="${pageName}"]`);
-        if (activeLink) {
-            activeLink.classList.remove('text-slate-600', 'dark:text-slate-400');
-            activeLink.classList.add('text-indigo-600', 'dark:text-indigo-400', 'font-semibold', 'border-b-2', 'border-indigo-600', 'dark:border-indigo-400');
-        }
     }
 };
-
-// Initialize dark mode on load
-document.addEventListener('DOMContentLoaded', () => {
-    Utils.initDarkMode();
-});
