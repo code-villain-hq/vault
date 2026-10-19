@@ -102,7 +102,7 @@ function ListPage({
       </PageHeader>
       <div className="page-content min-h-0 flex-1 overflow-y-auto">
         {empty && <p className="px-6 py-16 text-center text-muted">{empty}</p>}
-        <ul className="flex flex-col gap-0.5 p-2">{listItems("o")}</ul>
+        <ul className="@container flex flex-col gap-0.5 p-2">{listItems("o")}</ul>
       </div>
     </>
   );
@@ -192,7 +192,9 @@ export function ServicesPage() {
                   size="size-8"
                   iconSize="size-4"
                 />
-                <span className="flex min-w-0 flex-1 flex-col">
+                {/* The name never gives way: as the list narrows, the repository
+                    goes first, then the team, then the counts. */}
+                <span className="flex min-w-32 flex-1 flex-col">
                   <span className="truncate font-medium">{service.name}</span>
                   {summary(service.description) && (
                     <span className="truncate text-xs text-muted">
@@ -201,16 +203,18 @@ export function ServicesPage() {
                   )}
                 </span>
                 {!repository && (
-                  <span className="w-40 truncate font-mono text-xs text-faint">
+                  <span className="w-40 truncate font-mono text-xs text-faint @max-3xl:hidden">
                     {service.repository ?? ""}
                   </span>
                 )}
                 {!team && (
-                  <span className="w-24 text-xs text-muted">
+                  <span className="w-24 truncate text-xs text-muted @max-2xl:hidden">
                     {teams.find((t) => t.id === service.team_id)?.name}
                   </span>
                 )}
-                <span className="w-56 text-right text-xs text-muted">{counts.join(" · ")}</span>
+                <span className="w-56 truncate text-right text-xs text-muted @max-xl:hidden">
+                  {counts.join(" · ")}
+                </span>
               </Link>
             </li>
           );
