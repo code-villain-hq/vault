@@ -90,10 +90,7 @@ impl GitHub {
         let status = res.status();
         let body = res.text().await?;
         if !status.is_success() {
-            return Err(Error::Other(format!(
-                "GitHub {status}: {}",
-                body.chars().take(400).collect::<String>()
-            )));
+            return Err(failure(status, &body));
         }
         if body.trim().is_empty() {
             return Ok(Value::Null);
@@ -741,6 +738,16 @@ pub(crate) fn graphql_url(api_url: &str) -> String {
     format!("{}/graphql", base.strip_suffix("/v3").unwrap_or(base))
 }
 
+/// What a refused request reports. A 401 is the saved token, whatever was
+/// asked: an expired one used to put GitHub's "Bad credentials" JSON beside
+/// every repo, and nothing said to reconnect (PR-12).
+fn failure(status: reqwest::StatusCode, body: &str) -> Error {
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return Error::TokenRejected("GitHub");
+    }
+    Error::Other(format!("GitHub {status}: {}", body.chars().take(400).collect::<String>()))
+}
+
 /// How much of a check's own report to keep.
 const SUMMARY_BUDGET: usize = 3_000;
 /// How much of a log to read to the end of.
@@ -899,6 +906,15 @@ mod tests {
         assert_eq!(path_segment("villain/ACME-12-fix"), "villain/ACME-12-fix");
         assert_eq!(path_segment("fix#2 a+b%"), "fix%232%20a%2Bb%25");
         assert_eq!(path_segment("0a1b2c"), "0a1b2c");
+    }
+
+    #[test]
+    fn a_rejected_token_says_so_instead_of_echoing_github() {
+        let body = r#"{"message":"Bad credentials","status":"401"}"#;
+        let said = failure(reqwest::StatusCode::UNAUTHORIZED, body).to_string();
+        assert_eq!(said, "GitHub no longer accepts the saved token");
+        let other = failure(reqwest::StatusCode::NOT_FOUND, r#"{"message":"Not Found"}"#).to_string();
+        assert!(other.starts_with("GitHub 404 Not Found: "), "{other}");
     }
 
     fn review(author: &str, state: &str) -> Review {

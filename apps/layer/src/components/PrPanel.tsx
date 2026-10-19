@@ -12,6 +12,7 @@ import { ChevronIcon, CopyIcon, ExternalIcon, PlusIcon } from "./icons";
 import { Combo, Field, Modal, Spinner } from "./ui";
 import { PrFeedback } from "./PrFeedback";
 import { Outgoing } from "./Outgoing";
+import { PrReadErrors } from "./PrReadErrors";
 import { FinishTask } from "./FinishTask";
 
 /**
@@ -696,18 +697,7 @@ export function PrPanel({
         </div>
       )}
 
-      {loaded && rows.some((r) => r.error) && (
-        <div className="card">
-          <h3>Repos that could not be read</h3>
-          {rows.filter((r) => r.error).map((r) => (
-            <div key={r.checkout_id} className="check">
-              <span className="dot" style={{ background: "var(--status-danger-ink)" }} />
-              <span className="name">{r.repo}</span>
-              <span className="muted">{r.error}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {loaded && <PrReadErrors rows={rows} />}
 
       {feedback && <PrFeedback task={task} first={feedback} onClose={() => setFeedback(null)} />}
       {finishing && <FinishTask task={task} onClose={() => setFinishing(false)} />}
