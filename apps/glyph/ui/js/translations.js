@@ -190,6 +190,11 @@ function compareKeys(a, b) {
     return a.key.localeCompare(b.key);
 }
 
+// A key with no source text is not a source key yet: its empty target cells
+// can't be translated until the source is back-filled.
+function isSourceKey(row) {
+    return !row.cells[state.sourceLang].missing;
+}
 function rowHasMissing(row) {
     return state.targetLangs.some(l => row.cells[l].missing);
 }
@@ -629,17 +634,24 @@ function renderDetails(cell) {
     return bits.length ? `<div class="lang-details">${bits.join('')}</div>` : '';
 }
 
+// Counts follow the Dashboard: only source keys are slots to translate;
+// keys missing their source text are counted on their own.
 function updateSummary(rows) {
     const summary = document.getElementById('transSummary');
+    let keys = 0;
     let filled = 0;
     let total = 0;
     for (const r of rows) {
+        if (!isSourceKey(r)) continue;
+        keys++;
         for (const l of state.targetLangs) {
             total++;
             if (!r.cells[l].missing) filled++;
         }
     }
-    summary.textContent = `${rows.length} key${rows.length === 1 ? '' : 's'} · ${filled} of ${total} translated`;
+    const backFill = rows.length - keys;
+    const back = backFill > 0 ? ` · ${backFill} key${backFill === 1 ? '' : 's'} missing ${Utils.langInfo(state.sourceLang).name}` : '';
+    summary.textContent = `${keys} key${keys === 1 ? '' : 's'} · ${filled} of ${total} translated${back}`;
     updateFillButton(total - filled);
 }
 
@@ -1345,7 +1357,7 @@ function updateFiltersBadge() {
 // -----------------------------------------------------------------------
 
 async function fillAllMissing() {
-    const rows = visibleRows().filter(rowHasMissing);
+    const rows = visibleRows().filter(r => isSourceKey(r) && rowHasMissing(r));
     if (rows.length === 0) {
         Utils.showToast('Nothing missing in the current view', 'info');
         return;

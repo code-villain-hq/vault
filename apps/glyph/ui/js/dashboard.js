@@ -50,11 +50,18 @@ async function renderDashboard() {
         return;
     }
 
-    // Source keys per namespace, for the totals.
+    // Source keys per namespace, for the totals. Keys only a target has are
+    // not source keys: they wait for a back-fill into the source, counted
+    // on their own.
     let totalSourceKeys = 0;
+    let totalBackFill = 0;
     for (const ns of allNamespaces) {
-        const r = await api.getTranslations(sourceLang, ns);
+        const [r, back] = await Promise.all([
+            api.getTranslations(sourceLang, ns),
+            api.getMissingSource(sourceLang, ns),
+        ]);
         totalSourceKeys += r.ok ? Object.keys(r.data || {}).length : 0;
+        totalBackFill += back.ok ? (back.data || []).length : 0;
     }
 
     if (targetLangs.length === 0) {
@@ -101,12 +108,15 @@ async function renderDashboard() {
     label.textContent = `Languages · from ${sourceInfo.name}`;
     label.hidden = false;
 
-    const across = `${totalTranslated} of ${totalSlots} translated across ${plural(targetLangs.length, 'language')} · ${plural(totalSourceKeys, 'key')} in ${plural(allNamespaces.length, 'namespace')}`;
+    const backFill = totalBackFill > 0 ? ` · ${plural(totalBackFill, 'key')} missing ${sourceInfo.name}` : '';
+    const across = `${totalTranslated} of ${totalSlots} translated across ${plural(targetLangs.length, 'language')} · ${plural(totalSourceKeys, 'key')} in ${plural(allNamespaces.length, 'namespace')}${backFill}`;
     if (totalMissing > 0) {
         const low = totalLowConfidence > 0 ? ` · ${totalLowConfidence} low confidence` : '';
         setLead(`${plural(totalMissing, 'translation')} missing`, across + low, 'Review missing', '/ui/missing.html');
     } else if (totalLowConfidence > 0) {
         setLead(`${plural(totalLowConfidence, 'translation')} with low confidence`, across, 'Review', '/ui/missing.html');
+    } else if (totalBackFill > 0) {
+        setLead(`${plural(totalBackFill, 'key')} missing ${sourceInfo.name}`, across, 'Back-fill', `/ui/missing.html?target=${encodeURIComponent(sourceLang)}`);
     } else {
         setLead('Every translation is in', across);
     }

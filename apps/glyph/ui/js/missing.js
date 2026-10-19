@@ -627,11 +627,16 @@ function bindReviewRowsIn(root) {
 }
 
 // The lead: how many translations wait, and the one action for them.
+// Back-fill rows (a key missing in the source) are not translations of a
+// source key, so they are counted on their own, as the Dashboard does.
 function updateSummary(visible) {
     const proposed = visible.filter(r => r.status === 'proposed').length;
     const pending = visible.filter(r => r.status === 'pending').length;
-    const langs = [...new Set(visible.map(r => r.lang))];
+    const forward = visible.filter(r => r.lang !== state.sourceLang);
+    const backFill = visible.length - forward.length;
+    const langs = [...new Set(forward.map(r => r.lang))];
     const filtered = Boolean(state.target || state.namespace || state.search.trim());
+    const backFillText = `${plural(backFill, 'key')} missing ${langName(state.sourceLang)}`;
 
     let title, sub;
     if (visible.length === 0) {
@@ -640,10 +645,16 @@ function updateSummary(visible) {
             ? 'Nothing is missing in this view. Clear the filters to see other languages and namespaces.'
             : 'Every translation is in.';
     } else {
-        title = `${plural(visible.length, 'translation')} to review`;
-        const where = langs.length === 1 ? langName(langs[0]) : `${langs.length} languages`;
         const waiting = proposed > 0 ? ` · ${plural(proposed, 'proposal')} to accept` : '';
-        sub = `${where}${waiting} · Nothing is saved until you accept.`;
+        if (forward.length === 0) {
+            title = backFillText;
+            sub = `Back-fill into ${langName(state.sourceLang)}${waiting} · Nothing is saved until you accept.`;
+        } else {
+            title = `${plural(forward.length, 'translation')} to review`;
+            const where = langs.length === 1 ? langName(langs[0]) : `${langs.length} languages`;
+            const back = backFill > 0 ? ` · ${backFillText}` : '';
+            sub = `${where}${back}${waiting} · Nothing is saved until you accept.`;
+        }
     }
     document.getElementById('leadTitle').textContent = title;
     document.getElementById('leadSub').textContent = sub;

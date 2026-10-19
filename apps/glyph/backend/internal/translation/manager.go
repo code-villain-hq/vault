@@ -604,15 +604,16 @@ func (m *Manager) GetAllMetadataForNamespace(lang, namespace string) map[string]
 }
 
 // GetLanguagePairStats returns coverage numbers for a (source, target,
-// namespace) triple.
+// namespace) triple. Only source keys count: a key the target has but the
+// source lacks is not a translation of anything yet (it waits for a
+// back-fill into the source), so translated + missing == total.
 func (m *Manager) GetLanguagePairStats(sourceLang, targetLang, namespace string) map[string]interface{} {
 	source := m.GetTranslations(sourceLang, namespace)
-	target := m.GetTranslations(targetLang, namespace)
 	missing := m.GetMissingTranslations(sourceLang, targetLang, namespace)
 
 	totalKeys := len(source)
-	translatedKeys := len(target)
 	missingCount := len(missing)
+	translatedKeys := totalKeys - missingCount
 	lowConfCount := len(m.GetLowConfidenceTranslations(targetLang, namespace, 0.7))
 
 	var coverage float64
