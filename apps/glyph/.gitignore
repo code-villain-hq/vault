@@ -1,5 +1,11 @@
+# Rust and Bun
+/target
+node_modules/
+dist/
+apps/desktop/src-tauri/gen/
+
 # Binaries
-glyph
+/glyph
 backend/glyph
 *.exe
 *.dll
@@ -13,6 +19,9 @@ backend/tmp/
 # Configuration
 config.yaml
 !config.example.yaml
+/models.toml
+.env
+.env.local
 
 # Translations (user's files)
 translations/

@@ -1,0 +1,47 @@
+name: code-villain-glyph
+services:
+  postgres:
+    image: postgres:18
+    # Come back after Docker restarts, unless stopped on purpose.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: glyph
+      POSTGRES_PASSWORD: glyph
+      POSTGRES_DB: glyph
+    ports:
+      # 5434 on this machine only: Forge's Postgres has 5433, a local one 5432,
+      # and nobody else on the network can reach the data.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glyph"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The whole app, as the team uses it: `bun run app`, then http://localhost:7490.
+  glyph:
+    profiles: ["app"]
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # This machine only by default. For teammates, put it behind https and
+      # set GLYPH_LISTEN, e.g. 0.0.0.0:7490 (and drop GLYPH_COOKIE_SECURE).
+      - "${GLYPH_LISTEN:-127.0.0.1:7490}:7480"
+    environment:
+      DATABASE_URL: postgres://glyph:glyph@postgres:5432/glyph
+      # Plain http on this machine; use https and drop this anywhere else.
+      GLYPH_COOKIE_SECURE: "0"
+      # The models Glyph translates with. In Docker they run on the host:
+      # point their endpoints at host.docker.internal.
+      GLYPH_MODELS: /etc/glyph/models.toml
+      GLYPH_TRUST_FORWARDED_FOR: ${GLYPH_TRUST_FORWARDED_FOR:-}
+    volumes:
+      - ./models.toml:/etc/glyph/models.toml:ro
+
+volumes:
+  postgres-data:
