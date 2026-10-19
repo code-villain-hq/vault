@@ -7,6 +7,7 @@ import { onPtyOutput } from "../lib/ptyOutput";
 import { useStore } from "../store";
 import type { PaneInfo } from "../lib/types";
 import { decode, TERMINAL_FONT, terminalTheme } from "../lib/terminal";
+import { whenBehind } from "../lib/catchUp";
 import { currentTheme, type Theme } from "../lib/theme";
 import { afterDrag, isDragging } from "../lib/drag";
 
@@ -19,6 +20,15 @@ import { afterDrag, isDragging } from "../lib/drag";
  * xterm's own renderer and get a context again when they are next shown.
  */
 const GPU_TERMINALS = 6;
+
+/**
+ * How long a repaint's narrower size is held before the real one returns.
+ *
+ * Both sizes sent at once, OpenCode read only the second, found it was the
+ * size it already had, and drew nothing. Measured against OpenCode 2.0.32,
+ * 16ms was already enough for a whole new screen.
+ */
+const REPAINT_GAP_MS = 100;
 
 const fontSize = () => useStore.getState().settings?.ui.terminal_font_size ?? 13;
 
@@ -247,6 +257,7 @@ class PaneTerminal {
       return;
     }
     this.syncing = true;
+    let repaint = false;
     try {
       do {
         this.again = false;
@@ -254,7 +265,11 @@ class PaneTerminal {
         if (this.disposed) return;
         // Too far behind to catch up: the scrollback has moved on past the
         // last byte drawn, so start again from what it still holds.
-        if (c.reset) this.term.reset();
+        if (c.reset) {
+          const how = whenBehind(this.term.buffer.active.type);
+          if (how.wipe) this.term.reset();
+          repaint ||= how.repaint;
+        }
         if (c.data) this.term.write(decode(c.data));
         this.have = c.end;
         const held = this.held;
@@ -263,12 +278,26 @@ class PaneTerminal {
           if (!this.apply(bytes, end)) this.again = true;
         }
       } while (this.again && this.shown && !this.disposed);
+      if (repaint && !this.disposed) this.repaint();
     } catch {
       // The pane has gone; the next pane list drops this terminal.
       this.held = [];
     } finally {
       this.syncing = false;
     }
+  }
+
+  /**
+   * Have the program draw its whole screen again, as a window resize does:
+   * one column narrower, then back. Restored even if the pane has left the
+   * screen by then, so its process is never left a column short.
+   */
+  private repaint() {
+    const { rows, cols } = this.term;
+    void api.ptyResize(this.id, rows, Math.max(1, cols - 1)).catch(() => {});
+    setTimeout(() => {
+      if (!this.disposed) void api.ptyResize(this.id, this.term.rows, this.term.cols).catch(() => {});
+    }, REPAINT_GAP_MS);
   }
 
   private gpu() {

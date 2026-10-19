@@ -330,9 +330,13 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   where Claude found "No conversation found to continue", while its real
   conversation was in the repo's folder.
 - **PANE-8** A terminal MUST keep 256KB of scrollback. One coming back on
-  screen gets exactly what it missed, by byte position. Keystrokes echo
-  immediately, even while the pane is printing heavily. Output is batched
-  to about 30 frames a second otherwise.
+  screen gets exactly what it missed, by byte position. One that missed
+  more than its scrollback holds is replayed from what it still holds,
+  except a full-screen program (on the alternate screen, as OpenCode is):
+  its screen and modes are kept, and it MUST be made to draw its whole
+  screen again, as a window resize would. Keystrokes echo immediately,
+  even while the pane is printing heavily. Output is batched to about 30
+  frames a second otherwise.
 - **PANE-9** Handoff moves the work, not the conversation: no CLI can
   resume another's session. It MUST give the new agent a briefing: the task prompt,
   the commits and changed files per repo since the branch point, and the
