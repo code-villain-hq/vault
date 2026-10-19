@@ -28,42 +28,29 @@
             </header>
 
             <main class="app-content">
-                <!-- The lead says what the state needs; missing.js fills it. -->
+                <!-- The lead follows the state of the open language; missing.js
+                     fills it. Accept leads while proposals wait, else Suggest. -->
                 <div class="view-lead">
                     <div>
                         <h2 class="view-title" id="leadTitle">Loading…</h2>
                         <p class="view-sub" id="leadSub"></p>
                     </div>
-                    <button id="translateMissingBtn" class="ui-button ui-button-primary" hidden
-                        title="Generate proposals for pending keys in the current view (max 50 per language per run; nothing is saved until you accept each)">Suggest all</button>
+                    <div class="review-lead-actions">
+                        <button type="button" id="suggestBtn" class="ui-button" hidden></button>
+                        <button type="button" id="acceptBtn" class="ui-button ui-button-primary" hidden></button>
+                    </div>
                 </div>
 
-                <div class="review-toolbar">
-                    <label class="review-select">
-                        <span class="sr-only">Language</span>
-                        <select id="targetLanguage" class="ui-button">
-                            <option value="">All languages</option>
-                        </select>
+                <!-- One tab per language with something to review; the filter
+                     matches text and the full ns.key. -->
+                <div class="review-bar" id="reviewBar" hidden>
+                    <div class="ui-tabs review-tabs" role="tablist" aria-label="Language" id="langTabs"></div>
+                    <label class="review-search">
+                        <input type="search" id="searchInput" class="ui-field" placeholder="Filter keys or text" aria-label="Filter keys or text" autocomplete="off">
                     </label>
-                    <label class="review-select">
-                        <span class="sr-only">Namespace</span>
-                        <select id="namespaceFilter" class="ui-button">
-                            <option value="">All namespaces</option>
-                        </select>
-                    </label>
-                    <input type="search" id="searchInput" class="ui-field review-search" placeholder="Filter by key or text" aria-label="Filter by key or text">
-                    <button id="acceptAllBtn" class="ui-button review-toolbar-end" hidden></button>
                 </div>
 
-                <p class="review-keys">
-                    <span><span class="ui-kbd">j</span> <span class="ui-kbd">k</span> move</span>
-                    <span><span class="ui-kbd">↵</span> suggest, accept</span>
-                    <span><span class="ui-kbd">w</span> write</span>
-                    <span><span class="ui-kbd">esc</span> reject</span>
-                    <span><span class="ui-kbd">x</span> skip</span>
-                </p>
-
-                <div id="reviewContainer"></div>
+                <div id="reviewContainer" role="tabpanel"></div>
             </main>
         </div>
     </div>

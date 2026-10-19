@@ -1,16 +1,17 @@
-// Translations page: Locize-style stacked view.
+// Translations page: one group per namespace, one row per key.
 //
-// Every (namespace, key) is rendered as a collapsed row. Opening it reveals
-// every configured language as a row (name · input · confidence · actions),
-// which makes editing one phrase across all languages the natural,
-// zero-scroll flow.
+// A group's header carries its progress per language; a long project starts
+// as one line per namespace and the reader opens the one they work on. A key
+// row shows its source text and a dot per language (done, missing, low
+// confidence). Opening a row reveals every language as an editable row
+// (name · input · confidence · actions).
 //
 // Shape of `state.rows`:
 //   { ns, key, cells: { [lang]: { value, confidence, translatedBy, missing,
 //                                 dirty, saving } } }
 //
-// Everything else — filters, search, toolbar menus — is pure view state and
-// recomputed on each render.
+// Everything else — the Show filter, search, the language picker, open
+// groups — is view state and recomputed on each render.
 
 const state = {
     config: null,
@@ -22,15 +23,27 @@ const state = {
 
     rows: [],
 
-    namespace: '',              // '' = all
     search: '',
-    langView: 'all',            // 'all' | 'base' | <lang code>
-    filterMissing: false,
-    filterIssues: false,
-    sort: 'alpha',              // alpha | missing | issues
-    details: false,             // show confidence/translator inline
+    langView: 'all',            // 'all' | <target lang code>
+    show: 'all',                // all | missing | low
+    open: new Set(),            // namespaces whose keys are shown
     expanded: new Set(),        // "ns::key"
+    lastLoad: 0,
 };
+
+// Open groups survive a reload. Storage can be missing (private window,
+// blocked site data), so every read and write is guarded.
+const OPEN_KEY = 'glyph.translations.open';
+function loadOpenGroups() {
+    try {
+        const raw = localStorage.getItem(OPEN_KEY);
+        if (raw === null) return null;
+        return new Set(JSON.parse(raw));
+    } catch { return null; }
+}
+function saveOpenGroups() {
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...state.open])); } catch { /* view state only */ }
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
     await init();
@@ -38,6 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNewKeyModal();
     setupNsManageModal();
     setupKeyboardShortcuts();
+    setupAutoReload();
 });
 
 async function init() {
@@ -66,8 +80,11 @@ async function init() {
 
         state.namespaces = nsRes.ok ? (nsRes.data.namespaces || []) : [];
 
+        // First visit: open the first namespace, fold the rest.
+        const stored = loadOpenGroups();
+        state.open = stored ?? new Set(state.namespaces.slice(0, 1));
+
         renderLangsMenu();
-        renderNsMenu();
         updateToolbarLabels();
 
         await loadAll();
@@ -78,11 +95,16 @@ async function init() {
 }
 
 // loadAll fetches every (lang, ns) translation + metadata in parallel and
-// folds them into state.rows keyed by (ns, key).
-async function loadAll() {
+// folds them into state.rows keyed by (ns, key). A quiet load (coming back to
+// the window) keeps the list on screen until the new rows are in.
+async function loadAll({ quiet = false } = {}) {
     const list = document.getElementById('keysList');
-    Utils.showLoading(list, 'Loading translations…');
+    if (!quiet) Utils.showLoading(list, 'Loading translations…');
+    state.lastLoad = Date.now();
 
+    // Namespaces change under us: renamed or deleted here, added on disk.
+    const nsRes = await api.getNamespaces();
+    if (nsRes.ok) state.namespaces = nsRes.data.namespaces || [];
     const namespaces = state.namespaces.length ? state.namespaces : ['translation'];
 
     const tasks = [];
@@ -151,18 +173,19 @@ async function loadAll() {
 }
 
 // -----------------------------------------------------------------------
-// Filtering & sorting
+// Filtering
 // -----------------------------------------------------------------------
 
-function visibleRows() {
+// The target languages in view: every one, or the one the picker chose.
+// Columns, counts, the Show filter and Fill all follow it.
+function viewLangs() {
+    return state.langView === 'all' ? state.targetLangs : [state.langView];
+}
+
+// Rows matching the search, before the Show filter, in namespace order.
+function searchedRows() {
     const q = state.search.trim().toLowerCase();
     let rows = state.rows;
-
-    if (state.namespace) rows = rows.filter(r => r.ns === state.namespace);
-
-    if (state.filterMissing) rows = rows.filter(rowHasMissing);
-    if (state.filterIssues)  rows = rows.filter(rowHasIssues);
-
     if (q) {
         rows = rows.filter(r => {
             if (r.key.toLowerCase().includes(q)) return true;
@@ -173,16 +196,14 @@ function visibleRows() {
             return false;
         });
     }
+    return rows.slice().sort(compareKeys);
+}
 
-    const sorted = rows.slice();
-    if (state.sort === 'missing') {
-        sorted.sort((a, b) => (countMissing(b) - countMissing(a)) || compareKeys(a, b));
-    } else if (state.sort === 'issues') {
-        sorted.sort((a, b) => (countIssues(b) - countIssues(a)) || compareKeys(a, b));
-    } else {
-        sorted.sort(compareKeys);
-    }
-    return sorted;
+function visibleRows() {
+    const rows = searchedRows();
+    if (state.show === 'missing') return rows.filter(rowHasMissing);
+    if (state.show === 'low') return rows.filter(rowHasIssues);
+    return rows;
 }
 
 function compareKeys(a, b) {
@@ -195,58 +216,69 @@ function compareKeys(a, b) {
 function isSourceKey(row) {
     return !row.cells[state.sourceLang].missing;
 }
+function isLowCell(cell, lang) {
+    if (cell.missing || cell.confidence === null) return false;
+    return cell.confidence < (state.confidenceByPair[lang] ?? 0.7);
+}
 function rowHasMissing(row) {
-    return state.targetLangs.some(l => row.cells[l].missing);
+    return viewLangs().some(l => row.cells[l].missing);
 }
 function rowHasIssues(row) {
-    return state.targetLangs.some(l => {
-        const c = row.cells[l];
-        if (c.missing || c.confidence === null) return false;
-        return c.confidence < (state.confidenceByPair[l] ?? 0.7);
-    });
-}
-function countMissing(row) {
-    return state.targetLangs.filter(l => row.cells[l].missing).length;
-}
-function countIssues(row) {
-    return state.targetLangs.filter(l => {
-        const c = row.cells[l];
-        if (c.missing || c.confidence === null) return false;
-        return c.confidence < (state.confidenceByPair[l] ?? 0.7);
-    }).length;
+    return viewLangs().some(l => isLowCell(row.cells[l], l));
 }
 
 // -----------------------------------------------------------------------
 // Rendering
 // -----------------------------------------------------------------------
+//
+// The list is a flat run of items: a group header per namespace, then that
+// namespace's keys when the group is open. While searching every group with
+// a match is open, so a hit is never hidden behind a fold.
 
-// Virtual-list threshold. Below this, we render the whole key list as a plain
-// block flow — faster to reason about, and small projects don't benefit from
-// virtualization. At or above this, we switch to windowed rendering (see
-// renderVirtual) which keeps ~2 screens of cards in the DOM and absolute-
-// positions them inside a sized container.
+function isGroupOpen(ns) {
+    return state.search.trim() !== '' || state.open.has(ns);
+}
+
+function buildItems(rows) {
+    const items = [];
+    let group = null;
+    for (const row of rows) {
+        if (!group || group.ns !== row.ns) {
+            group = { type: 'group', ns: row.ns, rows: [] };
+            items.push(group);
+        }
+        group.rows.push(row);
+    }
+    const out = [];
+    for (const g of items) {
+        out.push(g);
+        if (isGroupOpen(g.ns)) for (const row of g.rows) out.push({ type: 'row', row });
+    }
+    return out;
+}
+
+// Virtual-list threshold. Below this many items, the list renders as a plain
+// block flow. At or above it, windowed rendering (see renderVirtual) keeps
+// ~2 screens of items in the DOM and absolute-positions them inside a sized
+// container.
 const VIRTUAL_THRESHOLD = 200;
 
-// Overscan: extra cards rendered above/below the viewport so scrolling feels
-// smooth. 8 is enough to hide the recompute latency at typical scroll speeds
-// without ballooning the DOM.
+// Overscan: extra items rendered above/below the viewport so scrolling feels
+// smooth.
 const VIRTUAL_OVERSCAN = 8;
 
-// Fallback per-row height used until we measure a real collapsed card. The
-// actual value is read from the first rendered card and cached; this only
-// matters for the very first frame.
-let collapsedCardHeight = 52;
+// Fallback heights used until a real row and group header are measured.
+let collapsedCardHeight = 34;
+let groupHeight = 42;
 
 // Vertical gap between rows. Matches the `.list` gap (2px) on #keysList in
-// classic mode. In virtual mode rows are absolutely positioned so the flex
-// gap doesn't apply — we bake the gap into the slot height instead so
-// offsets space rows out correctly.
+// classic mode; virtual mode bakes it into each slot.
 const VIRTUAL_CARD_GAP = 2;
 
 const virtualState = {
     active: false,
-    rows: [],           // current visible-rows array (post-filter/sort)
-    heights: [],        // per-row measured height
+    items: [],          // current items (group headers and key rows)
+    heights: [],        // per-item measured height
     offsets: [],        // prefix sum of heights
     total: 0,           // sum of heights
     startIdx: -1,       // currently-rendered window [start, end)
@@ -262,60 +294,113 @@ function render() {
     const rows = visibleRows();
 
     updateSummary(rows);
+    renderColumns();
 
     if (rows.length === 0) {
         teardownVirtual();
         list.innerHTML = '';
         list.style.cssText = '';
+        empty.textContent = emptyMessage();
         empty.classList.remove('hidden');
         return;
     }
     empty.classList.add('hidden');
 
-    if (rows.length < VIRTUAL_THRESHOLD) {
+    const items = buildItems(rows);
+    list.style.setProperty('--lang-count', viewLangs().length);
+    if (items.length < VIRTUAL_THRESHOLD) {
         teardownVirtual();
-        list.style.cssText = '';
         list.removeAttribute('data-virtual');
-        list.innerHTML = rows.map(renderCard).join('');
+        list.style.position = '';
+        list.style.height = '';
+        list.innerHTML = items.map(renderItem).join('');
         bindCardEvents();
         measureCollapsedHeight();
         return;
     }
-    renderVirtual(rows);
+    renderVirtual(items);
 }
 
-// measureCollapsedHeight caches the height of a collapsed card so virtual
-// mode has a realistic per-row estimate without having to run the layout
-// engine on thousands of elements. Called once per classic render so any CSS
-// tweak takes effect on the next virtual switch.
+function emptyMessage() {
+    if (state.search.trim()) return 'No keys match the search.';
+    if (state.show === 'missing') return 'Nothing missing. Every key is translated.';
+    if (state.show === 'low') return 'No low-confidence translations.';
+    return 'No translations to show.';
+}
+
+// The language codes above the dot columns.
+function renderColumns() {
+    const cols = document.getElementById('keysCols');
+    const langs = viewLangs();
+    cols.style.setProperty('--lang-count', langs.length);
+    cols.innerHTML = '<span></span><span></span><span></span><span></span>'
+        + langs.map(l => `<span class="tx-col" title="${escapeAttr(Utils.langInfo(l).name)}">${escapeHtml(l)}</span>`).join('');
+}
+
+function renderItem(item) {
+    return item.type === 'group' ? renderGroup(item) : renderCard(item.row);
+}
+
+// A namespace header: its name, size, low-confidence count, and per language
+// how many of its source keys are translated.
+function renderGroup(group) {
+    const open = isGroupOpen(group.ns);
+    const sourceRows = group.rows.filter(isSourceKey);
+    const low = group.rows.filter(rowHasIssues).length;
+    const cols = viewLangs().map(l => {
+        const filled = sourceRows.filter(r => !r.cells[l].missing).length;
+        const done = filled === sourceRows.length;
+        return `<span class="tx-group-count${done ? ' is-done' : ''}" title="${filled} of ${sourceRows.length} ${escapeAttr(Utils.langInfo(l).name)} translated">${filled}/${sourceRows.length}</span>`;
+    }).join('');
+    const n = group.rows.length;
+    return `
+        <div class="tx-group" data-ns="${escapeAttr(group.ns)}" data-open="${open}" role="button" tabindex="0" aria-expanded="${open}">
+            <span class="key-caret">${icon('chevron-right')}</span>
+            <span class="tx-group-title">
+                <span class="tx-group-name">${escapeHtml(group.ns)}</span>
+                <span class="tx-group-meta">${n} key${n === 1 ? '' : 's'}</span>
+                ${low ? `<span class="tx-group-low">${low} low confidence</span>` : ''}
+            </span>
+            ${cols}
+        </div>
+    `;
+}
+
+// measureCollapsedHeight caches the height of a collapsed row and a group
+// header so virtual mode has realistic estimates without laying out
+// thousands of elements.
 function measureCollapsedHeight() {
     const list = document.getElementById('keysList');
     const sample = list.querySelector('.key-card[data-expanded="false"]');
-    if (!sample) return;
-    const h = sample.getBoundingClientRect().height;
-    if (h > 0) collapsedCardHeight = h + VIRTUAL_CARD_GAP;
+    if (sample) {
+        const h = sample.getBoundingClientRect().height;
+        if (h > 0) collapsedCardHeight = h + VIRTUAL_CARD_GAP;
+    }
+    const head = list.querySelector('.tx-group');
+    if (head) {
+        const h = head.getBoundingClientRect().height + parseFloat(getComputedStyle(head).marginTop || '0');
+        if (h > 0) groupHeight = h + VIRTUAL_CARD_GAP;
+    }
 }
 
 // ----- Virtual list ------------------------------------------------------
 //
-// Model: every row has an entry in `heights[]`. Collapsed rows use the
-// measured `collapsedCardHeight`; expanded rows use whatever we measured
-// last time the card was in the window. `offsets[]` is the prefix sum so
-// we can translate a scroll position into a row index with a binary search.
-//
-// Render: on scroll (rAF-throttled) compute [start, end) with overscan, and
-// if that range moved, rebuild the DOM inside #keysList with absolutely-
-// positioned `.v-card-wrap` elements. After render we re-measure any card
-// that looks taller than expected (i.e. expanded ones) and reflow if
-// heights changed.
+// Model: every item has an entry in `heights[]`. Group headers and collapsed
+// rows use their measured heights; expanded rows use whatever we measured
+// last time the row was in the window. `offsets[]` is the prefix sum so we
+// can translate a scroll position into an item index with a binary search.
 
-function renderVirtual(rows) {
+function itemHeight(item) {
+    if (item.type === 'group') return groupHeight;
+    const id = rowId(item.row);
+    return state.expanded.has(id) ? (expandedHeightCache.get(id) || collapsedCardHeight * 3) : collapsedCardHeight;
+}
+
+function renderVirtual(items) {
     const list = document.getElementById('keysList');
     virtualState.active = true;
-    virtualState.rows = rows;
-    virtualState.heights = rows.map(row =>
-        state.expanded.has(rowId(row)) ? (virtualHeightFor(row) || collapsedCardHeight * 3) : collapsedCardHeight,
-    );
+    virtualState.items = items;
+    virtualState.heights = items.map(itemHeight);
     rebuildVirtualOffsets();
     virtualState.startIdx = -1;
     virtualState.endIdx = -1;
@@ -328,11 +413,10 @@ function renderVirtual(rows) {
     renderVirtualWindow();
 }
 
-// Height cache for expanded cards keyed by row id. Survives filter/sort
-// changes so re-opening a card doesn't flash a wrong estimate.
+// Height cache for expanded rows keyed by row id. Survives filter changes so
+// re-opening a row doesn't flash a wrong estimate.
 const expandedHeightCache = new Map();
 function rowId(row) { return `${row.ns}::${row.key}`; }
-function virtualHeightFor(row) { return expandedHeightCache.get(rowId(row)); }
 
 function rebuildVirtualOffsets() {
     const n = virtualState.heights.length;
@@ -345,9 +429,9 @@ function rebuildVirtualOffsets() {
     virtualState.total = acc;
 }
 
-// findRowAtOffset: binary search the prefix-sum offsets for the row whose
-// slab contains y. Returns an index in [0, rows.length].
-function findRowAtOffset(y) {
+// findItemAtOffset: binary search the prefix-sum offsets for the item whose
+// slab contains y. Returns an index in [0, items.length].
+function findItemAtOffset(y) {
     const o = virtualState.offsets;
     let lo = 0, hi = o.length - 1;
     while (lo < hi) {
@@ -386,10 +470,9 @@ function teardownVirtual() {
     virtualState.endIdx = -1;
 }
 
-// renderVirtualWindow computes the currently-visible row range (with
-// overscan), and re-renders #keysList only if that range moved. Cards are
-// absolute-positioned via `transform: translateY` so scroll offsets work
-// without touching document layout above/below.
+// renderVirtualWindow computes the visible item range (with overscan) and
+// re-renders #keysList only if that range moved. Items are positioned with
+// `transform: translateY` so scrolling never touches the layout around them.
 function renderVirtualWindow() {
     const list = document.getElementById('keysList');
     if (!virtualState.active || !list) return;
@@ -404,9 +487,9 @@ function renderVirtualWindow() {
     const viewportTop = -listRect.top;
     const viewportBottom = viewportTop + window.innerHeight;
 
-    const n = virtualState.rows.length;
-    let start = findRowAtOffset(Math.max(0, viewportTop));
-    let end = findRowAtOffset(Math.max(0, viewportBottom)) + 1;
+    const n = virtualState.items.length;
+    let start = findItemAtOffset(Math.max(0, viewportTop));
+    let end = findItemAtOffset(Math.max(0, viewportBottom)) + 1;
     start = Math.max(0, start - VIRTUAL_OVERSCAN);
     end = Math.min(n, end + VIRTUAL_OVERSCAN);
 
@@ -416,11 +499,10 @@ function renderVirtualWindow() {
 
     const parts = new Array(end - start);
     for (let i = start; i < end; i++) {
-        const row = virtualState.rows[i];
         const top = virtualState.offsets[i];
         parts[i - start] =
             `<div class="v-card-wrap" data-vidx="${i}" style="transform:translateY(${top}px)">`
-            + renderCard(row)
+            + renderItem(virtualState.items[i])
             + `</div>`;
     }
     list.innerHTML = parts.join('');
@@ -429,9 +511,7 @@ function renderVirtualWindow() {
 }
 
 // measureExpandedInWindow re-measures the rendered wraps and reflows the
-// list if any expanded card's real height differs from what we estimated.
-// Collapsed cards are trusted to be `collapsedCardHeight` — measuring them
-// would just waste layout passes.
+// list if any expanded row's real height differs from the estimate.
 function measureExpandedInWindow() {
     const list = document.getElementById('keysList');
     let changed = false;
@@ -443,7 +523,7 @@ function measureExpandedInWindow() {
         const h = wrap.getBoundingClientRect().height + VIRTUAL_CARD_GAP;
         if (h > 0 && Math.abs(h - virtualState.heights[idx]) > 0.5) {
             virtualState.heights[idx] = h;
-            expandedHeightCache.set(rowId(virtualState.rows[idx]), h);
+            expandedHeightCache.set(rowId(virtualState.items[idx].row), h);
             changed = true;
         }
     });
@@ -457,34 +537,49 @@ function measureExpandedInWindow() {
     });
 }
 
+// One dot per language in view: done, missing, or below the pair's review
+// threshold. The title says which, so no legend is needed.
+function renderDot(row, lang) {
+    const cell = row.cells[lang];
+    const name = Utils.langInfo(lang).name;
+    let stateName = 'done';
+    let title = `${name}: translated`;
+    if (cell.missing) {
+        stateName = 'missing';
+        title = `${name}: missing`;
+    } else if (isLowCell(cell, lang)) {
+        stateName = 'low';
+        const thr = Math.round((state.confidenceByPair[lang] ?? 0.7) * 100);
+        title = `${name}: ${Math.round(cell.confidence * 100)}% confidence, below the ${thr}% review threshold`;
+    } else if (cell.confidence !== null && cell.translatedBy !== 'human' && cell.translatedBy !== 'human-edited') {
+        title = `${name}: translated, ${Math.round(cell.confidence * 100)}% confidence`;
+    }
+    return `<span class="tx-dot" data-state="${stateName}" title="${escapeAttr(title)}"></span>`;
+}
+
 function renderCard(row) {
     const id = `${row.ns}::${row.key}`;
     const expanded = state.expanded.has(id);
-    const missing = countMissing(row);
-    const issues = countIssues(row);
-    const translated = state.targetLangs.length - missing;
-    const total = state.targetLangs.length;
-    const pct = total === 0 ? 100 : Math.round((translated / total) * 100);
-    const issueBadge = issues > 0 ? `<span class="ui-status ui-status-warn">${issues} issue${issues === 1 ? '' : 's'}</span>` : '';
+    const source = row.cells[state.sourceLang];
+    const sourceText = source.missing
+        ? `<span class="key-source is-missing">No ${escapeHtml(Utils.langInfo(state.sourceLang).name)} text</span>`
+        : `<span class="key-source">${escapeHtml(source.value)}</span>`;
 
     return `
         <div class="key-card" data-id="${escapeAttr(id)}" data-expanded="${expanded}">
             <div class="key-head" data-action="toggle">
                 <span class="key-caret">${icon('chevron-right')}</span>
-                <span class="key-ns-tag ui-chip">${escapeHtml(row.ns)}</span>
-                <span class="key-name-wrap">
-                    <span class="key-name">${escapeHtml(row.key)}</span>
+                <span class="key-name">${escapeHtml(row.key)}</span>
+                ${sourceText}
+                <span class="key-actions">
                     <button class="key-copy-btn ui-button ui-icon-button" data-action="copy-key"
                             title="Copy key to clipboard"
                             aria-label="Copy key ${escapeAttr(row.key)} to clipboard">${icon('copy')}</button>
-                </span>
-                <span class="key-meta">
-                    ${issueBadge}
                     <button class="key-delete-btn ui-button ui-icon-button" data-action="delete-key"
                             title="Delete this key (removes it from every language)"
                             aria-label="Delete key ${escapeAttr(row.key)}">${icon('trash')}</button>
-                    <span class="key-progress-label" title="${translated}/${total} translated (${pct}%)">${translated}/${total}</span>
                 </span>
+                ${viewLangs().map(l => renderDot(row, l)).join('')}
             </div>
             ${expanded ? `<div class="key-body">
                 <div class="key-context-panel">
@@ -502,16 +597,10 @@ function renderLangRows(row) {
     return langs.map(lang => renderLangRow(row, lang)).join('');
 }
 
-// Which languages to show inside an expanded key card, honoring the langView
-// picker (all / base only / a specific language).
+// An open key shows the source text above the languages in view, so the
+// reader always has the base text next to what they're editing.
 function pickVisibleLangs() {
-    if (state.langView === 'base') return [state.sourceLang];
-    if (state.langView === 'all')  return state.allLangs;
-    // A specific language: show source + that one so the user always has the
-    // base text next to what they're editing.
-    const pick = state.langView;
-    if (pick === state.sourceLang) return [state.sourceLang];
-    return [state.sourceLang, pick];
+    return [state.sourceLang, ...viewLangs()];
 }
 
 function renderLangRow(row, lang) {
@@ -532,13 +621,12 @@ function renderLangRow(row, lang) {
     ].filter(Boolean).join(' ');
 
     // The confidence pill sits beside every translated row so reviewers can
-    // spot a low-confidence translation at a glance — without needing to
-    // flip the Details toggle. The toggle still exists; it controls the
-    // richer strip below the input (translator + timestamp).
+    // spot a low-confidence translation at a glance; who translated it and
+    // when sit under the input.
     const chip = isSource
         ? '<span class="ui-status">source</span>'
         : renderConfidenceChip(cell, isSource, threshold);
-    const details = state.details && !isSource ? renderDetails(cell) : '';
+    const details = !isSource ? renderDetails(cell) : '';
 
     // Source-row action:
     //   - If the source cell is missing AND at least one target cell has a
@@ -635,23 +723,35 @@ function renderDetails(cell) {
 }
 
 // Counts follow the Dashboard: only source keys are slots to translate;
-// keys missing their source text are counted on their own.
+// keys missing their source text are counted on their own. The summary sits
+// in the top bar; the Show segments carry the key counts.
 function updateSummary(rows) {
     const summary = document.getElementById('transSummary');
+    const langs = viewLangs();
     let keys = 0;
     let filled = 0;
     let total = 0;
     for (const r of rows) {
         if (!isSourceKey(r)) continue;
         keys++;
-        for (const l of state.targetLangs) {
+        for (const l of langs) {
             total++;
             if (!r.cells[l].missing) filled++;
         }
     }
     const backFill = rows.length - keys;
     const back = backFill > 0 ? ` · ${backFill} key${backFill === 1 ? '' : 's'} missing ${Utils.langInfo(state.sourceLang).name}` : '';
-    summary.textContent = `${keys} key${keys === 1 ? '' : 's'} · ${filled} of ${total} translated${back}`;
+    summary.textContent = `${filled} of ${total} translated${back}`;
+
+    const searched = searchedRows();
+    const counts = {
+        all: searched.length,
+        missing: searched.filter(rowHasMissing).length,
+        low: searched.filter(rowHasIssues).length,
+    };
+    document.querySelectorAll('[data-count]').forEach(el => {
+        el.textContent = counts[el.dataset.count];
+    });
     updateFillButton(total - filled);
 }
 
@@ -673,7 +773,10 @@ function updateFillButton(missing) {
 function bindCardEvents() {
     const list = document.getElementById('keysList');
 
-    list.querySelectorAll('[data-action="toggle"]').forEach(el => {
+    // toggleCard re-runs this after swapping one row, so every element is
+    // bound once, marked, and skipped after.
+    list.querySelectorAll('[data-action="toggle"]:not([data-bound])').forEach(el => {
+        el.dataset.bound = 'true';
         el.addEventListener('click', (e) => {
             // Let clicks inside textareas/buttons pass through.
             if (e.target.closest('textarea, button')) return;
@@ -682,7 +785,8 @@ function bindCardEvents() {
         });
     });
 
-    list.querySelectorAll('[data-action="delete-key"]').forEach(btn => {
+    list.querySelectorAll('[data-action="delete-key"]:not([data-bound])').forEach(btn => {
+        btn.dataset.bound = 'true';
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const card = btn.closest('.key-card');
@@ -691,7 +795,8 @@ function bindCardEvents() {
         });
     });
 
-    list.querySelectorAll('[data-action="copy-key"]').forEach(btn => {
+    list.querySelectorAll('[data-action="copy-key"]:not([data-bound])').forEach(btn => {
+        btn.dataset.bound = 'true';
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const card = btn.closest('.key-card');
@@ -700,7 +805,8 @@ function bindCardEvents() {
         });
     });
 
-    list.querySelectorAll('.key-card[data-expanded="true"]').forEach(card => {
+    list.querySelectorAll('.key-card[data-expanded="true"]:not([data-bound])').forEach(card => {
+        card.dataset.bound = 'true';
         bindExpandedCard(card);
     });
 }
@@ -887,7 +993,7 @@ function toggleCard(id) {
     // the expand path; for collapse we reset the entry to the baseline and
     // drop the cached height so a later re-expand starts clean.
     if (virtualState.active) {
-        const idx = virtualState.rows.findIndex(r => rowId(r) === id);
+        const idx = virtualState.items.findIndex(it => it.type === 'row' && rowId(it.row) === id);
         if (idx >= 0) {
             if (state.expanded.has(id)) {
                 measureExpandedInWindow();
@@ -1148,8 +1254,8 @@ function reflectCell(row, lang) {
         pill.innerHTML = renderConfidenceChip(cell, false, threshold);
     }
 
-    // Rebuild details strip in-place if it's visible.
-    if (state.details && lang !== state.sourceLang) {
+    // Rebuild the translator and date strip in place.
+    if (lang !== state.sourceLang) {
         const wrap = rowEl.querySelector('.lang-input-wrap');
         const existing = wrap.querySelector('.lang-details');
         if (existing) existing.remove();
@@ -1174,6 +1280,33 @@ function rerenderCardHead(row) {
         if (e.target.closest('textarea, button')) return;
         toggleCard(id);
     });
+    newHead.querySelector('[data-action="copy-key"]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyKey(id, e.currentTarget);
+    });
+    newHead.querySelector('[data-action="delete-key"]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteKey(id, e.currentTarget);
+    });
+
+    // The row stays where it is, even if it no longer matches the Show
+    // filter; its group's counts and the summary catch up now.
+    const groupEl = document.querySelector(`.tx-group[data-ns="${cssEscape(row.ns)}"]`);
+    if (groupEl) {
+        const rows = visibleRows().filter(r => r.ns === row.ns);
+        const tmpGroup = document.createElement('div');
+        tmpGroup.innerHTML = renderGroup({ type: 'group', ns: row.ns, rows: rows.length ? rows : [row] });
+        groupEl.replaceWith(tmpGroup.firstElementChild);
+    }
+    updateSummary(visibleRows());
+}
+
+function toggleGroup(ns) {
+    if (state.search.trim()) return; // every group with a hit stays open while searching
+    if (state.open.has(ns)) state.open.delete(ns);
+    else state.open.add(ns);
+    saveOpenGroups();
+    render();
 }
 
 // -----------------------------------------------------------------------
@@ -1186,50 +1319,68 @@ function setupToolbar() {
         render();
     }, 150));
 
-    document.getElementById('detailsToggleBtn').addEventListener('click', (e) => {
-        state.details = !state.details;
-        e.currentTarget.setAttribute('aria-pressed', String(state.details));
-        render();
-    });
-
-    document.getElementById('refreshBtn').addEventListener('click', loadAll);
-
     document.getElementById('fillAllMissingBtn').addEventListener('click', fillAllMissing);
     document.getElementById('newKeyBtn').addEventListener('click', () => openNewKeyModal({ mode: 'key' }));
-    // "New namespace" lives in the namespace-filter dropdown (see renderNsMenu);
-    // the toolbar button was removed to avoid a double entry point.
 
-    document.getElementById('filterMissing').addEventListener('change', (e) => {
-        state.filterMissing = e.target.checked;
-        updateFiltersBadge();
-        render();
+    document.querySelectorAll('[data-show]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            state.show = btn.dataset.show;
+            document.querySelectorAll('[data-show]').forEach(b => {
+                b.setAttribute('aria-pressed', String(b.dataset.show === state.show));
+            });
+            render();
+        });
     });
-    document.getElementById('filterIssues').addEventListener('change', (e) => {
-        state.filterIssues = e.target.checked;
-        updateFiltersBadge();
-        render();
+
+    // Group headers are redrawn often; one listener on the list serves them.
+    const list = document.getElementById('keysList');
+    list.addEventListener('click', (e) => {
+        const head = e.target.closest('.tx-group');
+        if (head) toggleGroup(head.dataset.ns);
+    });
+    list.addEventListener('keydown', (e) => {
+        const head = e.target.closest('.tx-group');
+        if (!head || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        toggleGroup(head.dataset.ns);
     });
 
     document.querySelectorAll('[data-menu-toggle]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const key = btn.dataset.menuToggle;
-            toggleMenu(key, btn);
+            toggleMenu(btn.dataset.menuToggle, btn);
         });
     });
 
-    document.querySelectorAll('[data-sort]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            state.sort = btn.dataset.sort;
-            closeAllMenus();
-            updateToolbarLabels();
-            render();
-        });
+    document.querySelector('[data-ns-action="new"]').addEventListener('click', () => {
+        closeAllMenus();
+        openNewKeyModal({ mode: 'namespace' });
+    });
+    document.querySelector('[data-ns-action="manage"]').addEventListener('click', () => {
+        closeAllMenus();
+        openNsManageModal();
     });
 
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.tx-menu')) closeAllMenus();
     });
+}
+
+// Coming back to the window reloads quietly, so edits made elsewhere (the
+// JSON files, another tab) show up without a refresh button. Never while a
+// cell is being edited or a fill pass runs.
+function setupAutoReload() {
+    const maybeReload = () => {
+        if (document.visibilityState !== 'visible') return;
+        if (Date.now() - state.lastLoad < 5000) return;
+        if (document.getElementById('fillAllMissingBtn').disabled) return;
+        const active = document.activeElement;
+        if (active && active.closest?.('#keysList') && active.tagName === 'TEXTAREA') return;
+        if (state.rows.some(r => Object.values(r.cells).some(c => c.dirty || c.saving))) return;
+        void loadAll({ quiet: true });
+    };
+    document.addEventListener('visibilitychange', maybeReload);
+    window.addEventListener('focus', maybeReload);
 }
 
 function toggleMenu(key, btn) {
@@ -1244,21 +1395,16 @@ function toggleMenu(key, btn) {
 }
 function closeAllMenus() {
     document.querySelectorAll('.tx-menu-panel').forEach(p => p.classList.add('hidden'));
-    document.querySelectorAll('[data-menu-toggle]').forEach(b => {
-        // Keep Details' toggled state sticky since it's a toggle, not a popover.
-        if (b.id !== 'detailsToggleBtn') b.setAttribute('aria-expanded', 'false');
-    });
+    document.querySelectorAll('[data-menu-toggle]').forEach(b => b.setAttribute('aria-expanded', 'false'));
 }
 
+// The language picker: every target language, or one. The source language
+// always shows in an open key.
 function renderLangsMenu() {
     const panel = document.getElementById('langsMenuPanel');
-    const items = [
-        { value: 'all',  label: 'All languages', icon: 'globe' },
-        { value: 'base', label: 'Source only',   icon: 'file' },
-    ];
-    for (const lang of state.allLangs) {
-        const info = Utils.langInfo(lang);
-        items.push({ value: lang, label: info.name, code: lang });
+    const items = [{ value: 'all', label: 'All languages', icon: 'globe' }];
+    for (const lang of state.targetLangs) {
+        items.push({ value: lang, label: Utils.langInfo(lang).name, code: lang });
     }
     panel.innerHTML = items.map(item => `
         <button class="tx-menu-item ui-option" role="menuitemradio" data-lang-view="${escapeAttr(item.value)}" aria-selected="${state.langView === item.value}">
@@ -1278,78 +1424,11 @@ function renderLangsMenu() {
     });
 }
 
-function renderNsMenu() {
-    const panel = document.getElementById('nsMenuPanel');
-    const items = [{ value: '', label: 'All namespaces' }, ...state.namespaces.map(ns => ({ value: ns, label: ns }))];
-    panel.innerHTML = items.map(item => `
-        <button class="tx-menu-item ui-option" role="menuitemradio" data-ns="${escapeAttr(item.value)}" aria-selected="${state.namespace === item.value}">
-            ${icon('folder')}
-            <span>${escapeHtml(item.label)}</span>
-        </button>
-    `).join('') + `
-        <div class="tx-menu-divider" role="separator"></div>
-        <button class="tx-menu-item ui-option" role="menuitem" data-ns-action="new">
-            ${icon('plus')}
-            <span>New namespace…</span>
-        </button>
-        <button class="tx-menu-item ui-option" role="menuitem" data-ns-action="manage">
-            ${icon('settings')}
-            <span>Manage namespaces…</span>
-        </button>
-    `;
-    panel.querySelectorAll('[data-ns]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            state.namespace = btn.dataset.ns;
-            renderNsMenu();
-            updateToolbarLabels();
-            closeAllMenus();
-            render();
-        });
-    });
-    const newBtn = panel.querySelector('[data-ns-action="new"]');
-    if (newBtn) {
-        newBtn.addEventListener('click', () => {
-            closeAllMenus();
-            openNewKeyModal({ mode: 'namespace' });
-        });
-    }
-    const manageBtn = panel.querySelector('[data-ns-action="manage"]');
-    if (manageBtn) {
-        manageBtn.addEventListener('click', () => {
-            closeAllMenus();
-            openNsManageModal();
-        });
-    }
-}
-
 function updateToolbarLabels() {
     const langsLabel = document.getElementById('langsBtnLabel');
-    if (state.langView === 'all') {
-        langsLabel.textContent = 'All languages';
-    } else if (state.langView === 'base') {
-        langsLabel.textContent = 'Source only';
-    } else {
-        langsLabel.textContent = Utils.langInfo(state.langView).name;
-    }
-
-    document.getElementById('nsBtnLabel').textContent = state.namespace || 'All namespaces';
-
-    const sortLabels = { alpha: 'Alphabetically', missing: 'Missing first', issues: 'Issues first' };
-    document.getElementById('sortBtnLabel').textContent = sortLabels[state.sort] || 'Alphabetically';
-    document.querySelectorAll('[data-sort]').forEach(btn => {
-        btn.setAttribute('aria-selected', String(btn.dataset.sort === state.sort));
-    });
-}
-
-function updateFiltersBadge() {
-    const badge = document.getElementById('filtersBadge');
-    const n = (state.filterMissing ? 1 : 0) + (state.filterIssues ? 1 : 0);
-    if (n === 0) {
-        badge.classList.add('hidden');
-    } else {
-        badge.classList.remove('hidden');
-        badge.textContent = String(n);
-    }
+    langsLabel.textContent = state.langView === 'all'
+        ? (state.targetLangs.join(' · ') || 'All languages')
+        : Utils.langInfo(state.langView).name;
 }
 
 // -----------------------------------------------------------------------
@@ -1368,7 +1447,7 @@ async function fillAllMissing() {
     // faster than N /translate/single calls.
     const groups = new Map();
     for (const r of rows) {
-        for (const lang of state.targetLangs) {
+        for (const lang of viewLangs()) {
             if (!r.cells[lang].missing) continue;
             const k = `${lang}|${r.ns}`;
             if (!groups.has(k)) groups.set(k, { lang, ns: r.ns });
@@ -1517,7 +1596,8 @@ function openNewKeyModal({ mode = 'key' } = {}) {
         titleEl.textContent = 'Add translation key';
         helpEl.innerHTML = 'Create a new translation key in an existing namespace, or pick "+ New namespace…" to start a new one.';
         submitBtn.textContent = 'Create key';
-        sel.value = state.namespace && existing.includes(state.namespace) ? state.namespace : existing[0];
+        // Default to the first open group: that's where the reader is working.
+        sel.value = [...state.open].find(ns => existing.includes(ns)) || existing[0];
     }
 
     document.getElementById('newKeyModal').classList.remove('hidden');
@@ -1592,8 +1672,9 @@ async function submitNewKey() {
         if (!state.namespaces.includes(ns)) state.namespaces.push(ns);
         state.expanded.add(`${ns}::${key}`);
 
+        state.open.add(ns);
+        saveOpenGroups();
         closeNewKeyModal();
-        renderNsMenu();
         await loadAll();
 
         Utils.showToast(`Created ${ns}/${key}`, 'success');
@@ -1763,13 +1844,15 @@ async function saveRename(row, oldNs) {
         return;
     }
 
-    // If the user was filtered by the old namespace, carry the filter over.
-    if (state.namespace === oldNs) state.namespace = newNs;
+    // An open group stays open under its new name.
+    if (state.open.delete(oldNs)) {
+        state.open.add(newNs);
+        saveOpenGroups();
+    }
 
     Utils.showToast(`Renamed ${oldNs} → ${newNs}`, 'success');
     await refreshNsManageList();
     await loadAll();
-    renderNsMenu();
 }
 
 async function deleteNsFromManage(ns) {
@@ -1788,11 +1871,10 @@ async function deleteNsFromManage(ns) {
         return;
     }
 
-    if (state.namespace === ns) state.namespace = '';
+    if (state.open.delete(ns)) saveOpenGroups();
     Utils.showToast(`Deleted namespace ${ns}`, 'success');
     await refreshNsManageList();
     await loadAll();
-    renderNsMenu();
 }
 
 // HTML-entity escaping lives in Utils (utils.js) — every page loads utils.js

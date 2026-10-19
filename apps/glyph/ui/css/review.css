@@ -1,165 +1,123 @@
 /*
- * Review (missing.html): a toolbar of quiet filters, then one group per
- * target language with its rows. A row's actions stay hidden until the row
- * is hovered, focused or active; a row with a proposal keeps its actions in
- * view, because it waits on a decision. Loads after glyph.css.
+ * Review (missing.html): the lead and its actions, a tab per language with
+ * the filter beside it, then the open language's rows: proposals under
+ * "To accept", missing keys under "Missing". The source text leads; the key
+ * trails faint. Quiet actions and the keyboard hints show on hover or on the
+ * active row. Loads after glyph.css.
  */
 @layer components {
-  /* ── Toolbar: filters on the left, the bulk accept on the right ── */
-  .review-toolbar {
+  /* ── Lead: Suggest, then the one primary action ── */
+  .review-lead-actions {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
     gap: 8px;
-  }
-  .review-toolbar-end {
     margin-left: auto;
   }
-  /* A native select dressed as a secondary button, with a chevron. */
-  .review-select {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-  }
-  .review-select select {
-    padding-right: 28px;
-    appearance: none;
-  }
-  .review-select select option {
-    background: var(--surface);
-    color: var(--fg);
-  }
-  .review-select .icon {
-    position: absolute;
-    right: 9px;
-    color: var(--muted);
-    pointer-events: none;
-  }
-  .review-search {
-    width: 15rem;
-    height: 28px;
-    padding: 0 10px;
-  }
-  /* The keyboard hints under the toolbar: faint, keys on the chip tint. */
-  .review-keys {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 14px;
-    margin: 10px 0 20px;
-    color: var(--faint);
-    font-size: var(--type-ui-small-size);
-  }
-  .review-keys .ui-kbd {
-    margin-right: 2px;
+  .review-lead-actions:not(:has(.ui-button:not([hidden]))) {
+    display: none;
   }
 
-  /* ── Groups: one per language; a quiet header, no dividers ── */
-  .review-group + .review-group {
-    margin-top: 12px;
+  /* ── Language tabs and the filter ── */
+  .review-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-bottom: 18px;
   }
-  .review-group-header {
+  .review-bar[hidden] {
+    display: none;
+  }
+  .review-tabs {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .review-search {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    margin: 0 -8px;
-    padding: 0 8px;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    user-select: none;
   }
-  .review-group-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: var(--radius-sm);
-  }
-  .review-group-toggle > .icon {
-    color: var(--muted);
-    transition: transform 0.15s ease;
-  }
-  .review-group-header[data-collapsed="false"] .review-group-toggle > .icon {
-    transform: rotate(90deg);
-  }
-  .review-group-name {
-    font-weight: 700;
-  }
-  .review-group-meta {
+  .review-search > .icon {
+    position: absolute;
+    left: 9px;
     color: var(--faint);
+    pointer-events: none;
   }
-  .review-group-actions {
-    display: flex;
-    gap: 6px;
-    margin-left: auto;
+  .review-search > input {
+    width: 13rem;
+    height: 28px;
+    padding: 0 10px 0 30px;
   }
-  /* Suggest for a whole language shows on hover or focus; Accept stays. */
-  .review-group-suggest {
-    visibility: hidden;
-  }
-  .review-group-header:hover .review-group-suggest,
-  .review-group-header:focus-within .review-group-suggest {
-    visibility: visible;
-  }
-  .review-group-body:not(:empty) {
-    margin-top: 2px;
+
+  .review-section + .review-section {
+    margin-top: 22px;
   }
 
   /* ── Rows ── */
   .review-row {
     display: grid;
-    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 9.5rem;
     gap: 16px;
-    align-items: center;
-    min-height: 40px;
-    padding: 6px 8px;
+    align-items: start;
+    padding: 8px;
+    scroll-margin: 56px 0 16px;
   }
   /* The row j/k moves to: the selected tone, like ui-row.is-selected. */
   .review-row[data-active="true"] {
     background: var(--selected);
   }
+  /* The key trails the text: faint mono, ns.key. */
   .review-key {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     min-width: 0;
     overflow: hidden;
-  }
-  /* Only the key name truncates; the namespace and direction chips stay whole. */
-  .review-key > .ui-chip {
-    flex-shrink: 0;
-  }
-  .review-key-name {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--muted);
+    color: var(--faint);
     font-family: var(--font-mono);
-    font-size: var(--type-ui-code-size);
+    font-size: var(--type-ui-small-size);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .review-source {
-    overflow: hidden;
-    text-overflow: ellipsis;
+  /* A back-fill row says which language its text comes from. */
+  .review-from {
+    flex: none;
+    color: var(--faint);
+    font-size: var(--type-ui-small-size);
     white-space: nowrap;
   }
   .review-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 4px;
   }
-  .review-row-actions {
+  /* Re-run, reject, Suggest, Write and Skip wait for hover or the active row. */
+  .review-quiet {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     visibility: hidden;
   }
-  .review-row:hover .review-row-actions,
-  .review-row:focus-within .review-row-actions,
-  .review-row[data-active="true"] .review-row-actions,
-  .review-row[data-state="previewing"] .review-row-actions {
+  .review-row:hover .review-quiet,
+  .review-row:focus-within .review-quiet,
+  .review-row[data-active="true"] .review-quiet,
+  .review-row[data-state="previewing"] .review-quiet {
     visibility: visible;
   }
-  /* A spinning loader icon while a suggestion runs. */
+  /* The keyboard hints live in the active row only. */
+  .review-hint {
+    display: none;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    color: var(--faint);
+    font-size: var(--type-ui-small-size);
+    white-space: nowrap;
+  }
+  .review-row[data-active="true"] .review-hint {
+    display: inline-flex;
+  }
+  .review-hint .ui-kbd {
+    margin-right: 2px;
+  }
+  /* A spinning loader icon while a suggestion runs or a save is on its way. */
   .review-spin {
     animation: review-spin 0.8s linear infinite;
   }
@@ -167,24 +125,57 @@
     to { transform: rotate(360deg); }
   }
 
-  /* ── A row with a proposal: the source, the editable proposal, its details ── */
-  .review-row-proposed {
-    align-items: start;
-    padding-top: 10px;
-    padding-bottom: 10px;
+  /* ── A missing key: one line of fixed height (the windowed list counts on it) ── */
+  .review-row-missing {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    height: 34px;
+    padding: 0 8px;
   }
-  .review-row-proposed .review-key {
-    min-height: 24px;
+  .review-line {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+  }
+  /* The text gives way before the key does. */
+  .review-text {
+    flex: 0 4 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .review-line > .review-key {
+    flex: 0 1 auto;
+  }
+  .review-row-missing .review-hint {
+    margin-right: 8px;
+  }
+
+  /* ── A proposal: the source and its key, the editable field, Accept ── */
+  .review-source {
+    min-width: 0;
+    padding-top: 5px;
+  }
+  .review-text-full {
+    overflow-wrap: anywhere;
+  }
+  .review-key-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 2px;
+  }
+  .review-row-proposed .review-actions {
+    padding-top: 3px;
   }
   .review-proposal {
     display: flex;
     flex-direction: column;
     gap: 6px;
     min-width: 0;
-  }
-  .review-source-plain {
-    color: var(--muted);
-    white-space: normal;
   }
   .review-proposal-input {
     display: block;
@@ -198,19 +189,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 6px 10px;
   }
+  /* Nothing to say: no line (the hints alone count only on the active row). */
+  .review-row:not([data-active="true"]) .review-proposal-meta:not(:has(.ui-status)),
   .review-proposal-meta:empty {
     display: none;
   }
-  .review-proposal-by {
-    color: var(--faint);
-    font-size: var(--type-ui-small-size);
-  }
 
   /*
-   * Glossary not respected: the LLM's output skipped a preferred term. Warn
-   * ink and the alert icon, no box; it goes away once the proposal is edited.
+   * Glossary not respected: the proposal skipped a preferred term. Warn ink
+   * and the alert icon, no box; it goes away once the proposal is edited.
    */
   .review-glossary-warn {
     display: flex;
@@ -222,12 +211,13 @@
   }
   .review-glossary-warn > .icon {
     margin-top: 2px;
+    color: inherit;
   }
   .review-row[data-glossary-warn="true"] .review-proposal-input:not(:focus) {
     border-color: color-mix(in srgb, var(--warn) 60%, transparent);
   }
 
-  /* ── Windowed rows for large groups (see missing.js) ── */
+  /* ── Windowed Missing list (see missing.js) ── */
   .review-virtual-body {
     position: relative;
     contain: strict;
@@ -239,17 +229,21 @@
     left: 0;
   }
 
+  @media (max-width: 1000px) {
+    .review-row-missing .review-hint {
+      display: none;
+    }
+  }
   @media (max-width: 900px) {
-    .review-row,
     .review-row-proposed {
       grid-template-columns: minmax(0, 1fr) auto;
     }
-    .review-row > .review-source,
-    .review-row > .review-proposal {
+    .review-row-proposed > .review-proposal {
       grid-column: 1 / -1;
       grid-row: 2;
     }
-    .review-search {
+    .review-search,
+    .review-search > input {
       width: 100%;
     }
   }

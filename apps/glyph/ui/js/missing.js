@@ -1,59 +1,69 @@
-// Review page: per-row confirm flow.
+// Review page: one language at a time; the lead follows its state.
 //
 // Lifecycle for a single row:
-//   pending  → (click "Suggest") → previewing → (LLM returns) → proposed
-//          ↘ (click "Write")  → proposed (empty textarea, translatedBy=human)
-//     ├ Accept   → PUT /api/translations  → gone from list
-//     ├ Edit     → user tweaks textarea → Accept path
+//   pending  → (Suggest) → previewing → (LLM returns) → proposed
+//          ↘ (Write)  → proposed (empty field, translatedBy=human)
+//     ├ Accept   → PUT /api/translations  → gone from the list
+//     ├ Edit     → the reviewer tweaks the field → Accept
 //     └ Reject   → back to pending (nothing saved)
+//   A suggestion that fails leaves the row in 'error'; Suggest tries again.
 //
-// Bulk actions ("Suggest all N", "Suggest <language>") run previews in
-// parallel (capped per language so the LLM is not flooded). Language groups
-// start collapsed; expand a group to see its rows. An "Accept N proposals"
-// button appears in the toolbar when there are proposals.
+// Each target language is a tab, and so is the source language while it has
+// back-fill keys (missing in the source, present in a target). The open tab
+// lists its proposals first, under "To accept", the ones that need a look
+// (a glossary miss, low confidence) on top; its missing keys follow. While
+// proposals wait, "Accept N" is the one primary action; otherwise Suggest is.
+// Both act on the open tab only, and the bulk Accept skips proposals that
+// need a look: those are accepted one by one.
 //
-// Backend contract: /api/translate/single accepts `dry_run: true` which
+// Backend contract: /api/translate/single accepts `dry_run: true`, which
 // produces the same result payload without touching the DB.
 
 const state = {
     sourceLang: 'en',
     targetLangs: [],
     namespaces: [],
-    target: '',
-    namespace: '',
+    // The open language tab.
+    tab: '',
     search: '',
-    // rows[] { id, lang, ns, key, source, status, proposal, confidence,
-    //         translatedBy, originalProposal, skipped }
+    // rows[] { id, lang, ns, key, source, sourceLang, status, proposal,
+    //         confidence, translatedBy, originalProposal, glossaryViolations,
+    //         error, skipped }
     //   status: 'pending' | 'previewing' | 'proposed' | 'saving' | 'error'
     rows: [],
-    // Per-language section: expanded[lang] === true means the group body is
-    // open. Absent/false ⇒ collapsed (default), so the page does not render
-    // every row at once on load.
-    expanded: {},
+    // The row j/k moves to, by id; activeIdx is its place in the list, so the
+    // next row takes over when it is accepted, rejected or skipped.
+    activeId: null,
     activeIdx: 0,
     config: null,
-    // True while "Suggest all" runs; the button then shows its progress.
-    bulkBusy: false,
+    // lang → number of suggestions running from the lead's Suggest.
+    busy: {},
+    // True when part of the list failed to load: an empty list then is not "all done".
+    loadFailed: false,
 };
 
-// Per-language-group windowed list: when a group has many rows, only a
-// slice is mounted in the DOM (same idea as the Translations page). Threshold
-// is lower than Translations because review rows are heavier (grid + actions).
-const REVIEW_VIRT_THRESHOLD = 120;
-const REVIEW_VIRT_OVERSCAN = 6;
-/** Max concurrent dry-run translations per language in bulk Suggest (server-friendly). */
+/** Below this confidence a model's proposal needs a look (Utils.getConfidenceColor agrees). */
+const LOW_CONFIDENCE = 0.8;
+/** Max dry-run translations per language in one Suggest (server-friendly). */
 const MAX_SUGGEST_PER_LANG = 50;
 
-/** @type {Map<string, { items: {row: *, idx: number}[], heights: number[], offsets: number[], total: number, startIdx: number, endIdx: number, bodyEl: HTMLElement | null }>} */
-const reviewVirtualByLang = new Map();
-let reviewVirtualGlobalHandler = null;
-let reviewVirtualScrollAttached = false;
-let reviewVirtualRafPending = false;
+// Windowed Missing list: with many missing keys only a slice is mounted (same
+// idea as the Translations page). A missing row is one line of fixed height,
+// so the window's offsets are exact.
+const REVIEW_VIRT_THRESHOLD = 120;
+const REVIEW_VIRT_OVERSCAN = 8;
+/** .review-row-missing is 34px tall, plus the list's 2px gap. */
+const MISSING_ROW_HEIGHT = 36;
+
+/** @type {{ rows: object[], bodyEl: HTMLElement, start: number, end: number } | null} */
+let missingVirt = null;
+let missingVirtRafPending = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await initReview();
+    document.querySelector('.review-search').insertAdjacentHTML('afterbegin', icon('search'));
     setupEventHandlers();
     setupKeyboardShortcuts();
+    await initReview();
 });
 
 async function initReview() {
@@ -63,8 +73,8 @@ async function initReview() {
             api.getLanguages(),
             api.getNamespaces(),
         ]);
-        if (!configRes.ok) {
-            Utils.showToast('Failed to load configuration', 'error');
+        if (!configRes.ok || !langRes.ok) {
+            showLoadFailure();
             return;
         }
         state.config = configRes.data;
@@ -73,33 +83,16 @@ async function initReview() {
         const allLangs = (langRes.ok ? langRes.data : [])
             .map(l => l.code || l).filter(Boolean);
         state.targetLangs = allLangs.filter(c => c !== state.sourceLang).sort();
-
-        // The language filter also offers the source lang so reviewers can
-        // focus on back-fill rows (keys missing in English but present in
-        // some target). The loader treats `state.sourceLang` specially and
-        // fetches from /missing-source instead of /missing for that entry.
-        const targetSel = document.getElementById('targetLanguage');
-        const srcOpt = `<option value="${escapeAttr(state.sourceLang)}">${escapeHtml(langName(state.sourceLang))} (back-fill)</option>`;
-        targetSel.innerHTML = '<option value="">All languages</option>'
-            + srcOpt
-            + state.targetLangs.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(langName(l))}</option>`).join('');
-        // The selects are dressed as buttons; a chevron says they open.
-        document.querySelectorAll('.review-select').forEach(el => el.insertAdjacentHTML('beforeend', icon('chevron-down')));
-
         state.namespaces = nsRes.ok ? (nsRes.data.namespaces || []) : [];
-        const nsSel = document.getElementById('namespaceFilter');
-        nsSel.innerHTML = '<option value="">All namespaces</option>'
-            + state.namespaces.map(ns => `<option value="${escapeAttr(ns)}">${escapeHtml(ns)}</option>`).join('');
-
-        const params = new URLSearchParams(window.location.search);
-        const queryTarget = params.get('target');
-        const validTargets = [state.sourceLang, ...state.targetLangs];
-        if (queryTarget && validTargets.includes(queryTarget)) {
-            state.target = queryTarget;
-            targetSel.value = queryTarget;
-        }
 
         await loadRows();
+
+        // ?target=xx (the Dashboard's links) opens that language; otherwise
+        // the one with proposals waiting, else the one with the most missing.
+        const queryTarget = new URLSearchParams(window.location.search).get('target');
+        const valid = [state.sourceLang, ...state.targetLangs];
+        state.tab = queryTarget && valid.includes(queryTarget) ? queryTarget : defaultTab();
+        renderReview();
     } catch (err) {
         console.error('Init error:', err);
         Utils.showToast('Error initializing', 'error');
@@ -110,24 +103,14 @@ async function loadRows() {
     const container = document.getElementById('reviewContainer');
     Utils.showLoading(container, 'Loading missing translations…');
 
-    // A filter of `''` means "everything", so we pull both the normal
-    // forward rows (missing in each target) AND the reverse rows (missing
-    // in the source lang itself). When the user filters down to a single
-    // language, we only hit the endpoint matching that direction — keeps
-    // the load proportional to what's actually shown.
-    const allLangs = state.target ? [state.target] : [state.sourceLang, ...state.targetLangs];
-    const namespaces = state.namespace ? [state.namespace] : (state.namespaces.length ? state.namespaces : ['translation']);
-
+    // Forward rows: keys missing in each target. Reverse (back-fill) rows:
+    // keys missing in the source language itself but present in a target.
+    const namespaces = state.namespaces.length ? state.namespaces : ['translation'];
     const forwardTasks = [];
     const reverseTasks = [];
-    for (const lang of allLangs) {
-        for (const ns of namespaces) {
-            if (lang === state.sourceLang) {
-                reverseTasks.push({ lang, ns });
-            } else {
-                forwardTasks.push({ lang, ns });
-            }
-        }
+    for (const ns of namespaces) {
+        reverseTasks.push({ lang: state.sourceLang, ns });
+        for (const lang of state.targetLangs) forwardTasks.push({ lang, ns });
     }
 
     try {
@@ -136,50 +119,35 @@ async function loadRows() {
             Promise.all(reverseTasks.map(t => api.getMissingSource(t.lang, t.ns))),
         ]);
 
+        state.loadFailed = [...forwardResults, ...reverseResults].some(r => !r.ok);
+        if (state.loadFailed) Utils.showToast('Part of the review did not load. Reload to try again.', 'error');
+
         const rows = [];
+        const add = (t, item, sourceLang) => rows.push({
+            id: `${t.lang}|${t.ns}|${item.key}`,
+            lang: t.lang,
+            ns: t.ns,
+            key: item.key,
+            source: item.source || '',
+            // Forward rows translate from the global source language; a
+            // back-fill row from the target it was sampled from.
+            sourceLang,
+            status: 'pending',
+            proposal: '',
+            confidence: null,
+            translatedBy: '',
+            originalProposal: '',
+            glossaryViolations: [],
+            error: '',
+            skipped: false,
+        });
         forwardTasks.forEach((t, i) => {
             const r = forwardResults[i];
-            if (!r.ok) return;
-            for (const item of (r.data || [])) {
-                rows.push({
-                    id: `${t.lang}|${t.ns}|${item.key}`,
-                    lang: t.lang,
-                    ns: t.ns,
-                    key: item.key,
-                    source: item.source || '',
-                    // Normal forward rows translate from the global source lang.
-                    sourceLang: state.sourceLang,
-                    status: 'pending',
-                    proposal: '',
-                    confidence: null,
-                    translatedBy: '',
-                    originalProposal: '',
-                    skipped: false,
-                });
-            }
+            if (r.ok) for (const item of (r.data || [])) add(t, item, state.sourceLang);
         });
         reverseTasks.forEach((t, i) => {
             const r = reverseResults[i];
-            if (!r.ok) return;
-            for (const item of (r.data || [])) {
-                rows.push({
-                    id: `${t.lang}|${t.ns}|${item.key}`,
-                    // The key is missing in the source lang, so `lang` is
-                    // the one we're filling (source). `sourceLang` is the
-                    // sampled lang whose value we use as the prompt input.
-                    lang: t.lang,
-                    ns: t.ns,
-                    key: item.key,
-                    source: item.source || '',
-                    sourceLang: item.source_lang || '',
-                    status: 'pending',
-                    proposal: '',
-                    confidence: null,
-                    translatedBy: '',
-                    originalProposal: '',
-                    skipped: false,
-                });
-            }
+            if (r.ok) for (const item of (r.data || [])) add(t, item, item.source_lang || '');
         });
         rows.sort((a, b) => {
             if (a.lang !== b.lang) return a.lang.localeCompare(b.lang);
@@ -187,428 +155,322 @@ async function loadRows() {
             return a.key.localeCompare(b.key);
         });
         state.rows = rows;
+        state.activeId = null;
         state.activeIdx = 0;
-        state.expanded = {};
-        renderReview();
     } catch (err) {
         console.error('Load error:', err);
+        state.loadFailed = true;
         Utils.showToast('Error loading missing translations', 'error');
     }
 }
 
+/** The server did not answer: say so in the lead, not "nothing to review". */
+function showLoadFailure() {
+    document.getElementById('leadTitle').textContent = 'Review did not load';
+    document.getElementById('leadSub').textContent = 'The Glyph server did not answer. Reload the page to try again.';
+    document.getElementById('reviewContainer').innerHTML = '';
+}
+
 // -------------------------------------------------------------------------
-// Filtering
+// What the open tab shows
 // -------------------------------------------------------------------------
 
-function visibleRows() {
+function isProposal(row) {
+    return row.status === 'proposed' || row.status === 'saving';
+}
+
+/** A proposal that breaks the glossary or that the model was unsure of. */
+function needsLook(row) {
+    if (!isProposal(row)) return false;
+    if ((row.glossaryViolations || []).length > 0) return true;
+    return isLowConfidence(row);
+}
+
+function isLowConfidence(row) {
+    return row.translatedBy !== 'human' && row.confidence !== null && row.confidence < LOW_CONFIDENCE;
+}
+
+function matchesSearch(row, q) {
+    if (!q) return true;
+    return `${row.ns}.${row.key}`.toLowerCase().includes(q)
+        || row.source.toLowerCase().includes(q)
+        || (row.proposal || '').toLowerCase().includes(q);
+}
+
+/** Rows of a language that pass the filter (any tab; used for the counts). */
+function rowsForLang(lang) {
     const q = state.search.trim().toLowerCase();
-    return state.rows.filter(r => {
-        if (r.skipped) return false;
-        if (!q) return true;
-        return r.key.toLowerCase().includes(q)
-            || r.source.toLowerCase().includes(q)
-            || (r.proposal || '').toLowerCase().includes(q);
-    });
+    return state.rows.filter(r => r.lang === lang && !r.skipped && matchesSearch(r, q));
 }
 
-// proposedRows returns every proposed row currently on screen. We scope this
-// to `visibleRows()` (not `state.rows`) so the "Accept N proposals" toolbar button
-// and the per-language "Accept N proposals" group header always operate on
-// exactly the same row set the user can see — otherwise a stale search filter
-// would let a bulk-accept apply to rows that aren't even rendered.
-function proposedRows() {
-    return visibleRows().filter(r => r.status === 'proposed');
+/**
+ * The open tab's rows in the order they show: proposals first (the ones
+ * that need a look on top), then the missing keys. j/k walk this order.
+ */
+function visibleRows() {
+    const { proposals, missing } = tabSections();
+    return [...proposals, ...missing];
 }
 
-// -------------------------------------------------------------------------
-// Virtual list (per language group)
-// -------------------------------------------------------------------------
-
-function teardownReviewVirtualizers() {
-    if (reviewVirtualGlobalHandler) {
-        window.removeEventListener('scroll', reviewVirtualGlobalHandler);
-        window.removeEventListener('resize', reviewVirtualGlobalHandler);
-        reviewVirtualGlobalHandler = null;
+function tabSections() {
+    const rows = rowsForLang(state.tab);
+    const flagged = [];
+    const calm = [];
+    const missing = [];
+    for (const r of rows) {
+        if (!isProposal(r)) missing.push(r);
+        else if (needsLook(r)) flagged.push(r);
+        else calm.push(r);
     }
-    reviewVirtualScrollAttached = false;
-    reviewVirtualRafPending = false;
-    reviewVirtualByLang.clear();
+    return { proposals: [...flagged, ...calm], missing };
 }
 
-// Row heights from review.css (a pending row is 40px; a proposal takes a
-// source line, the field and a meta line), plus the 2px gap between rows.
-function reviewRowEstimatedHeight(row) {
-    if (row.status === 'proposed' || row.status === 'saving') return 122;
-    return 42;
+/** The tabs: every target language, and the source while it has back-fill keys. */
+function tabLangs() {
+    const hasBackFill = state.rows.some(r => r.lang === state.sourceLang && !r.skipped);
+    const langs = [...state.targetLangs];
+    if (hasBackFill || state.tab === state.sourceLang) langs.unshift(state.sourceLang);
+    return langs;
 }
 
-function rebuildReviewVirtualOffsets(st) {
-    st.offsets = [];
-    let acc = 0;
-    for (let i = 0; i < st.heights.length; i++) {
-        st.offsets[i] = acc;
-        acc += st.heights[i];
+function defaultTab() {
+    const langs = tabLangs();
+    const waiting = langs.find(l => state.rows.some(r => r.lang === l && !r.skipped && isProposal(r)));
+    if (waiting) return waiting;
+    let best = langs[0] || state.sourceLang;
+    let most = -1;
+    for (const l of langs) {
+        const n = state.rows.filter(r => r.lang === l && !r.skipped).length;
+        if (n > most) { most = n; best = l; }
     }
-    st.total = acc;
+    return best;
 }
 
-function findRowAtOffsetLocal(offsets, y) {
-    if (!offsets.length) return 0;
-    let lo = 0;
-    let hi = offsets.length - 1;
-    while (lo < hi) {
-        const mid = (lo + hi + 1) >>> 1;
-        if (offsets[mid] <= y) lo = mid;
-        else hi = mid - 1;
-    }
-    return lo;
-}
-
-function paintReviewVirtualWindow(lang) {
-    const st = reviewVirtualByLang.get(lang);
-    if (!st?.bodyEl) return;
-
-    const active = document.activeElement;
-    if (active && st.bodyEl.contains(active) && active.tagName === 'TEXTAREA') return;
-
-    const rect = st.bodyEl.getBoundingClientRect();
-    const viewportTop = -rect.top;
-    const viewportBottom = viewportTop + window.innerHeight;
-    const n = st.items.length;
-    let start = findRowAtOffsetLocal(st.offsets, Math.max(0, viewportTop));
-    let end = findRowAtOffsetLocal(st.offsets, Math.max(0, viewportBottom)) + 1;
-    start = Math.max(0, start - REVIEW_VIRT_OVERSCAN);
-    end = Math.min(n, end + REVIEW_VIRT_OVERSCAN);
-
-    if (start === st.startIdx && end === st.endIdx) return;
-    st.startIdx = start;
-    st.endIdx = end;
-
-    const parts = [];
-    for (let i = start; i < end; i++) {
-        const { row, idx } = st.items[i];
-        const top = st.offsets[i];
-        parts.push(
-            `<div class="v-review-wrap" data-review-vidx="${i}" style="transform:translateY(${top}px)">`
-            + renderRow(row, idx)
-            + '</div>',
-        );
-    }
-    st.bodyEl.innerHTML = parts.join('');
-    bindReviewRowsIn(st.bodyEl);
-}
-
-function initReviewVirtualForLang(lang, items) {
-    let bodyEl = null;
-    document.querySelectorAll('.review-virtual-body').forEach(el => {
-        if (el.dataset.reviewVirt === lang) bodyEl = el;
-    });
-    if (!bodyEl) return;
-    const heights = items.map(({ row }) => reviewRowEstimatedHeight(row));
-    const st = {
-        items,
-        heights,
-        offsets: [],
-        total: 0,
-        startIdx: -1,
-        endIdx: -1,
-        bodyEl,
-    };
-    rebuildReviewVirtualOffsets(st);
-    reviewVirtualByLang.set(lang, st);
-    bodyEl.style.height = `${st.total}px`;
-    paintReviewVirtualWindow(lang);
-}
-
-function attachReviewVirtualScrollIfNeeded() {
-    if (reviewVirtualByLang.size === 0 || reviewVirtualScrollAttached) return;
-    reviewVirtualScrollAttached = true;
-    reviewVirtualGlobalHandler = () => {
-        if (reviewVirtualRafPending) return;
-        reviewVirtualRafPending = true;
-        requestAnimationFrame(() => {
-            reviewVirtualRafPending = false;
-            for (const lang of reviewVirtualByLang.keys()) {
-                paintReviewVirtualWindow(lang);
-            }
-        });
-    };
-    window.addEventListener('scroll', reviewVirtualGlobalHandler, { passive: true });
-    window.addEventListener('resize', reviewVirtualGlobalHandler);
-}
-
-function refreshReviewVirtualLang(lang) {
-    const st = reviewVirtualByLang.get(lang);
-    if (!st) return;
-    st.heights = st.items.map(({ row }) => reviewRowEstimatedHeight(row));
-    rebuildReviewVirtualOffsets(st);
-    if (st.bodyEl) st.bodyEl.style.height = `${st.total}px`;
-    st.startIdx = -1;
-    st.endIdx = -1;
-    paintReviewVirtualWindow(lang);
-}
-
-function ensureVirtualReviewRowVisible(idx) {
-    const row = findRowByIdx(idx);
-    if (!row) return;
-    const st = reviewVirtualByLang.get(row.lang);
-    if (!st?.bodyEl) return;
-    const local = st.items.findIndex(x => x.idx === idx);
-    if (local < 0) return;
-    const rowTopDoc = window.scrollY + st.bodyEl.getBoundingClientRect().top + st.offsets[local];
-    const targetY = rowTopDoc - window.innerHeight * 0.22;
-    window.scrollTo({ top: Math.max(0, targetY), behavior: 'auto' });
-    for (const l of reviewVirtualByLang.keys()) paintReviewVirtualWindow(l);
-    const target = document.querySelector(`.review-row[data-idx="${idx}"]`);
-    if (target) {
-        document.querySelectorAll('.review-row').forEach(el => el.removeAttribute('data-active'));
-        target.setAttribute('data-active', 'true');
-    }
+function findRowById(id) {
+    return state.rows.find(r => r.id === id) || null;
 }
 
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
 
-function renderReview() {
-    teardownReviewVirtualizers();
+/**
+ * Re-draw the tabs, the lead and the open tab's rows. A proposal field that
+ * has focus keeps it (and its caret) across the re-draw.
+ */
+function renderReview({ scrollActive = true } = {}) {
+    const focused = document.activeElement;
+    const focusId = focused && focused.matches && focused.matches('textarea.review-proposal-input')
+        ? focused.closest('.review-row')?.dataset.id
+        : null;
+    const sel = focusId ? [focused.selectionStart, focused.selectionEnd] : null;
+
+    teardownMissingVirt();
+    renderTabs();
+    updateLead();
 
     const container = document.getElementById('reviewContainer');
-    const visible = visibleRows();
-    updateSummary(visible);
-    updateAcceptAllBtn();
+    const { proposals, missing } = tabSections();
+    resolveActive([...proposals, ...missing]);
 
-    // The lead says when nothing is left; the list and its key hints go.
-    document.querySelector('.review-keys').hidden = visible.length === 0;
-    if (visible.length === 0) {
-        container.innerHTML = '';
-        return;
+    // A label per section only when both show; one list needs no heading.
+    const both = proposals.length > 0 && missing.length > 0;
+    const useVirt = missing.length >= REVIEW_VIRT_THRESHOLD;
+    const parts = [];
+    if (proposals.length > 0) {
+        parts.push(`
+            <section class="review-section" aria-label="To accept">
+                ${both ? `<p class="group-label">To accept · ${proposals.length}</p>` : ''}
+                <div class="list">${proposals.map(renderRow).join('')}</div>
+            </section>`);
+    }
+    if (missing.length > 0) {
+        parts.push(`
+            <section class="review-section" aria-label="Missing">
+                ${both ? `<p class="group-label">Missing · ${missing.length}</p>` : ''}
+                <div class="list">${useVirt
+                    ? `<div class="review-virtual-body" style="height:${missing.length * MISSING_ROW_HEIGHT}px"></div>`
+                    : missing.map(renderRow).join('')}</div>
+            </section>`);
+    }
+    container.innerHTML = parts.join('');
+    bindReviewRowsIn(container);
+
+    if (useVirt) {
+        missingVirt = {
+            rows: missing,
+            bodyEl: container.querySelector('.review-virtual-body'),
+            start: -1,
+            end: -1,
+        };
+        paintMissingWindow();
     }
 
-    const byLang = new Map();
-    visible.forEach((row, idx) => {
-        if (!byLang.has(row.lang)) byLang.set(row.lang, []);
-        byLang.get(row.lang).push({ row, idx });
-    });
-
-    container.innerHTML = [...byLang.entries()].map(([lang, items]) => {
-        const collapsed = !state.expanded[lang];
-        const name = langName(lang);
-        const proposedInGroup = items.filter(i => i.row.status === 'proposed').length;
-        const useVirt = !collapsed && items.length >= REVIEW_VIRT_THRESHOLD;
-        const rowsHtml = collapsed
-            ? ''
-            : useVirt
-                ? `<div class="review-virtual-body" data-review-virt="${escapeAttr(lang)}"></div>`
-                : items.map(({ row, idx }) => renderRow(row, idx)).join('');
-        const groupAcceptBtn = proposedInGroup > 0
-            ? `<button type="button" class="ui-button" data-action="accept-lang" data-lang="${escapeAttr(lang)}" title="Accept all ${proposedInGroup} proposed translations for ${escapeAttr(name)}">
-                   ${icon('check')}Accept ${proposedInGroup}
-               </button>`
-            : '';
-        const meta = [
-            lang,
-            lang === state.sourceLang ? 'back-fill' : '',
-            `${items.length} missing`,
-            proposedInGroup > 0 ? `${proposedInGroup} proposed` : '',
-        ].filter(Boolean).join(' · ');
-        return `
-            <div class="review-group" data-group-lang="${escapeAttr(lang)}">
-                <div class="review-group-header" data-collapsed="${collapsed}" data-action="toggle-group" data-lang="${escapeAttr(lang)}">
-                    <button type="button" class="review-group-toggle" aria-expanded="${!collapsed}">
-                        ${icon('chevron-right')}<span class="review-group-name">${escapeHtml(name)}</span>
-                    </button>
-                    <span class="review-group-meta">${escapeHtml(meta)}</span>
-                    <div class="review-group-actions">
-                        ${groupAcceptBtn}
-                        <button type="button" class="ui-button review-group-suggest" data-action="translate-lang" data-lang="${escapeAttr(lang)}" title="Generate proposals for pending keys in ${escapeAttr(name)} (max ${MAX_SUGGEST_PER_LANG} per run; nothing is saved until you accept)">
-                            Suggest ${escapeHtml(name)}
-                        </button>
-                    </div>
-                </div>
-                <div class="review-group-body list">${rowsHtml}</div>
-            </div>
-        `;
-    }).join('');
-
-    for (const [lang, items] of byLang.entries()) {
-        if (!state.expanded[lang]) continue;
-        if (items.length >= REVIEW_VIRT_THRESHOLD) {
-            initReviewVirtualForLang(lang, items);
+    if (focusId) {
+        const ta = container.querySelector(`.review-row[data-id="${cssEscape(focusId)}"] textarea.review-proposal-input`);
+        if (ta) {
+            ta.focus({ preventScroll: true });
+            ta.setSelectionRange(sel[0], sel[1]);
         }
     }
-    attachReviewVirtualScrollIfNeeded();
-
-    bindReviewGroupHeaders(container);
-    container.querySelectorAll('.review-group-body').forEach(body => {
-        if (body.querySelector('.review-virtual-body')) return;
-        bindReviewRowsIn(body);
-    });
-    syncActiveRow();
+    markActive(scrollActive && !focusId);
 }
 
-// The row's key: its namespace as a chip, the key in mono, and on a
-// back-fill row the direction (`sv → en`) as a second chip.
-function renderKey(row, dirTitle) {
+function renderTabs() {
+    const bar = document.getElementById('reviewBar');
+    const tabs = document.getElementById('langTabs');
+    const langs = tabLangs();
+    bar.hidden = langs.length === 0;
+    tabs.innerHTML = langs.map(lang => {
+        const n = rowsForLang(lang).length;
+        const current = lang === state.tab;
+        const title = lang === state.sourceLang
+            ? `Back-fill: keys missing in ${langName(lang)} that another language has`
+            : `Keys missing in ${langName(lang)}`;
+        // Leave out an empty count.
+        return `<button type="button" class="ui-tab" role="tab" data-lang="${escapeAttr(lang)}"
+                    aria-selected="${current}" tabindex="${current ? 0 : -1}" title="${escapeAttr(title)}">
+                    ${escapeHtml(langName(lang))}${n > 0 ? ` <span class="ui-tab-count">${n}</span>` : ''}
+                </button>`;
+    }).join('');
+}
+
+// The row's key trails its text, faint mono, as ns.key; a back-fill row says
+// which language its text comes from.
+function renderKey(row) {
     const isReverse = row.sourceLang && row.sourceLang !== state.sourceLang;
-    const dirBadge = isReverse
-        ? `<span class="ui-chip" title="${escapeAttr(dirTitle)}">${escapeHtml(row.sourceLang)} → ${escapeHtml(row.lang)}</span>`
+    const from = isReverse
+        ? ` <span class="review-from" title="${escapeAttr(`${langName(state.sourceLang)} is missing; this ${langName(row.sourceLang)} text is translated into ${langName(row.lang)}.`)}">from ${escapeHtml(langName(row.sourceLang))}</span>`
+        : '';
+    return `<span class="review-key" title="${escapeAttr(row.ns)}.${escapeAttr(row.key)}">${escapeHtml(row.ns)}.${escapeHtml(row.key)}</span>${from}`;
+}
+
+// Keyboard hints: every row carries them, review.css shows the active row's.
+function renderHint(kind) {
+    const k = (key, label) => `<span><span class="ui-kbd">${key}</span> ${label}</span>`;
+    const keys = kind === 'proposal'
+        ? [k('↵', 'accept'), k('esc', 'reject'), `<span><span class="ui-kbd">j</span><span class="ui-kbd">k</span> move</span>`]
+        : [k('↵', 'suggest'), k('w', 'write'), k('x', 'skip'), `<span><span class="ui-kbd">j</span><span class="ui-kbd">k</span> move</span>`];
+    return `<span class="review-hint" aria-hidden="true">${keys.join('')}</span>`;
+}
+
+function renderRow(row) {
+    return isProposal(row) ? renderProposedRow(row) : renderMissingRow(row);
+}
+
+// A missing key: one line, its text leading and its key trailing. Suggest,
+// Write and Skip show on hover or on the active row; a failure stays in view.
+function renderMissingRow(row) {
+    const busy = row.status === 'previewing';
+    const failed = row.status === 'error'
+        ? `<span class="ui-status ui-status-danger" title="${escapeAttr(row.error || 'The suggestion failed')}">Suggest failed</span>`
         : '';
     return `
-        <div class="review-key" title="${escapeAttr(row.ns)}.${escapeAttr(row.key)}">
-            <span class="ui-chip">${escapeHtml(row.ns)}</span>
-            <span class="review-key-name">${escapeHtml(row.key)}</span>
-            ${dirBadge}
+        <div class="review-row review-row-missing ui-row" data-state="${escapeAttr(row.status)}" data-id="${escapeAttr(row.id)}">
+            <div class="review-line">
+                <span class="review-text" title="${escapeAttr(row.source)}">${escapeHtml(row.source)}</span>
+                ${renderKey(row)}
+            </div>
+            <div class="review-actions">
+                ${failed}
+                ${busy ? '' : renderHint('missing')}
+                <div class="review-quiet">
+                    <button type="button" class="ui-button" data-action="suggest-row" ${busy ? 'disabled' : ''} title="Draft a proposal (nothing is saved until you accept)">
+                        ${busy ? `${icon('loader', 'review-spin')}Suggesting…` : (row.status === 'error' ? 'Try again' : 'Suggest')}
+                    </button>
+                    <button type="button" class="ui-button" data-action="write-row" ${busy ? 'disabled' : ''} title="Type the translation yourself (nothing is saved until you accept)">Write</button>
+                    <button type="button" class="ui-button ui-icon-button" data-action="skip-row" ${busy ? 'disabled' : ''} aria-label="Skip" title="Hide until reload (x)">${icon('x')}</button>
+                </div>
+            </div>
         </div>`;
 }
 
-function renderRow(row, idx) {
-    if (row.status === 'proposed' || row.status === 'saving') {
-        return renderProposedRow(row, idx);
-    }
-    const busy = row.status === 'previewing';
-    // When the row's source lang ISN'T the global source (en), it's a
-    // back-fill row — the key is missing in English and we're going to
-    // translate FROM whatever existing lang we sampled. Flagging that
-    // inline avoids confusion when the source column shows Swedish text
-    // inside a row that's grouped under "en".
-    const isReverse = row.sourceLang && row.sourceLang !== state.sourceLang;
-    const failed = row.status === 'error'
-        ? '<span class="ui-status ui-status-danger">Suggest failed</span>'
-        : '';
-    return `
-        <div class="review-row ui-row" data-state="${escapeAttr(row.status)}" data-idx="${idx}" data-id="${escapeAttr(row.id)}" ${isReverse ? 'data-reverse="true"' : ''}>
-            ${renderKey(row, `${langName(state.sourceLang)} is missing; this ${row.sourceLang} value is back-translated into ${row.lang}.`)}
-            <div class="review-source" title="${escapeAttr(row.source)}">${escapeHtml(row.source)}</div>
-            <div class="review-actions">
-                ${failed}
-                <div class="review-row-actions">
-                    <button type="button" class="ui-button" data-action="suggest-row" ${busy ? 'disabled' : ''} title="Generate a proposal (nothing is saved until you confirm)">
-                        ${busy ? `${icon('loader', 'review-spin')}Suggesting…` : 'Suggest'}
-                    </button>
-                    <button type="button" class="ui-button" data-action="write-row" ${busy ? 'disabled' : ''} title="Type a translation yourself (nothing is saved until you Accept)">Write</button>
-                    <button type="button" class="ui-button ui-icon-button" data-action="skip-row" aria-label="Skip" title="Hide from this view (until reload)">${icon('x')}</button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// The proposed-row takes more vertical space because the editable field
-// for the suggestion lives here. Layout:
-//
-//   [key]  [source]                              [Accept] [again] [reject]
-//          [editable proposal field]
-//          ↳ glossary warning, then confidence and model
-function renderProposedRow(row, idx) {
+// A proposal: the source text with its key, the editable proposal with what
+// needs a look under it, then Accept. Re-run and Reject wait for hover or the
+// active row.
+function renderProposedRow(row) {
     const saving = row.status === 'saving';
     const violations = row.glossaryViolations || [];
-    const violationBanner = violations.length > 0
-        ? `<div class="review-glossary-warn" title="The LLM's output did not use one of your glossary terms verbatim. Edit the text or re-run to try again.">
+    const glossary = violations.length > 0
+        ? `<div class="review-glossary-warn" title="The proposal does not use a glossary term. Edit the text or suggest again.">
              ${icon('alert')}
-             <span>
-               Glossary not respected: ${violations.map(v =>
-                   `<code class="code">${escapeHtml(v.source_term)}</code> should be <code class="code">${escapeHtml(v.target_term)}</code>`
-               ).join(', ')}.
-             </span>
+             <span>Glossary: ${violations.map(v =>
+                 `<code class="code">${escapeHtml(v.source_term)}</code> should be <code class="code">${escapeHtml(v.target_term)}</code>`
+             ).join(', ')}.</span>
            </div>`
         : '';
-    const isReverse = row.sourceLang && row.sourceLang !== state.sourceLang;
+    const low = isLowConfidence(row)
+        ? `<span class="ui-status ui-status-warn">Low confidence · ${Math.round(row.confidence * 100)}%</span>`
+        : '';
     return `
-        <div class="review-row review-row-proposed ui-row" data-state="${escapeAttr(row.status)}" data-idx="${idx}" data-id="${escapeAttr(row.id)}" ${violations.length > 0 ? 'data-glossary-warn="true"' : ''} ${isReverse ? 'data-reverse="true"' : ''}>
-            ${renderKey(row, `Back-filling ${row.lang} from the existing ${row.sourceLang} translation.`)}
+        <div class="review-row review-row-proposed ui-row" data-state="${escapeAttr(row.status)}" data-id="${escapeAttr(row.id)}" ${violations.length > 0 ? 'data-glossary-warn="true"' : ''}>
+            <div class="review-source">
+                <div class="review-text-full">${escapeHtml(row.source)}</div>
+                <div class="review-key-line">${renderKey(row)}</div>
+            </div>
             <div class="review-proposal">
-                <div class="review-source review-source-plain" title="${escapeAttr(row.source)}">${escapeHtml(row.source)}</div>
-                <textarea class="ui-field review-proposal-input" ${saving ? 'disabled' : ''} rows="1" data-action="edit-proposal" aria-label="Translation for ${escapeAttr(row.key)}">${escapeHtml(row.proposal)}</textarea>
-                ${violationBanner}
-                <div class="review-proposal-meta">${proposalMeta(row)}</div>
+                <textarea class="ui-field review-proposal-input" ${saving ? 'disabled' : ''} rows="1" data-action="edit-proposal"
+                    aria-label="Translation of ${escapeAttr(row.ns)}.${escapeAttr(row.key)}" title="${escapeAttr(proposalOrigin(row))}">${escapeHtml(row.proposal)}</textarea>
+                ${glossary}
+                <div class="review-proposal-meta">${low}${saving ? '' : renderHint('proposal')}</div>
             </div>
             <div class="review-actions">
-                <button type="button" class="ui-button" data-action="accept-row" ${saving ? 'disabled' : ''} title="Save this translation (Enter)">
+                <div class="review-quiet">
+                    <button type="button" class="ui-button ui-icon-button" data-action="rerun-row" ${saving ? 'disabled' : ''} aria-label="Suggest again" title="Discard this proposal and ask again">${icon('refresh')}</button>
+                    <button type="button" class="ui-button ui-icon-button" data-action="reject-row" ${saving ? 'disabled' : ''} aria-label="Reject" title="Discard the proposal (esc)">${icon('x')}</button>
+                </div>
+                <button type="button" class="ui-button" data-action="accept-row" ${saving ? 'disabled' : ''} title="Save this translation (↵)">
                     ${saving ? `${icon('loader', 'review-spin')}Saving…` : `${icon('check')}Accept`}
                 </button>
-                <button type="button" class="ui-button ui-icon-button" data-action="rerun-row" ${saving ? 'disabled' : ''} aria-label="Suggest again" title="Discard this proposal and ask the LLM again">${icon('refresh')}</button>
-                <button type="button" class="ui-button ui-icon-button" data-action="reject-row" ${saving ? 'disabled' : ''} aria-label="Reject" title="Discard proposal (Esc)">${icon('x')}</button>
             </div>
-        </div>
-    `;
+        </div>`;
 }
 
-// Confidence spends status colour only when it is low; a confident
-// suggestion and a hand-written one stay quiet.
-function proposalMeta(row) {
-    if (row.translatedBy === 'human') return '';
-    let pill = '';
-    const quiet = [];
-    if (row.confidence !== null) {
-        const pct = Math.round(row.confidence * 100);
-        if (row.confidence < 0.8) {
-            pill = `<span class="${Utils.getConfidenceColor(row.confidence)}">Low confidence · ${pct}%</span>`;
-        } else {
-            quiet.push(`${pct}% confidence`);
-        }
-    }
-    if (row.translatedBy) quiet.push(`by ${escapeHtml(row.translatedBy)}`);
-    return pill + (quiet.length ? `<span class="review-proposal-by">${quiet.join(' · ')}</span>` : '');
+// Where a proposal came from, for the field's tooltip: a confident score is
+// not shown in the row.
+function proposalOrigin(row) {
+    if (row.translatedBy === 'human') return 'Written by you';
+    const parts = [];
+    if (row.confidence !== null) parts.push(`${Math.round(row.confidence * 100)}% confidence`);
+    if (row.translatedBy) parts.push(`by ${row.translatedBy}`);
+    return parts.join(' · ');
 }
 
-function bindReviewGroupHeaders(container) {
-    container.querySelectorAll('[data-action="toggle-group"]').forEach(el => {
-        el.addEventListener('click', (e) => {
-            const btn = e.target.closest('button');
-            if (btn && !btn.classList.contains('review-group-toggle')) return;
-            const lang = el.dataset.lang;
-            state.expanded[lang] = !state.expanded[lang];
-            renderReview();
-        });
-    });
-    container.querySelectorAll('[data-action="translate-lang"]').forEach(el => {
-        el.addEventListener('click', (e) => { e.stopPropagation(); suggestLang(el.dataset.lang); });
-    });
-    container.querySelectorAll('[data-action="accept-lang"]').forEach(el => {
-        el.addEventListener('click', (e) => { e.stopPropagation(); acceptLang(el.dataset.lang); });
-    });
-}
-
-/** Wire row clicks, action buttons, and proposal textarea (call on a group body, virtual body, or a single `.review-row`). */
+/** Wire row clicks, action buttons and proposal fields: root is a row or holds rows. */
 function bindReviewRowsIn(root) {
-    const rowEls = root.matches('.review-row')
-        ? [root]
-        : Array.from(root.querySelectorAll('.review-row'));
+    const rowEls = root.matches('.review-row') ? [root] : root.querySelectorAll('.review-row');
     rowEls.forEach(el => {
-        const idx = parseInt(el.dataset.idx, 10);
-        el.addEventListener('click', (e) => {
-            if (e.target.closest('textarea, button')) return;
-            state.activeIdx = idx;
-            syncActiveRow();
-        });
+        const id = el.dataset.id;
+        const activate = () => { if (state.activeId !== id) setActive(id, false); };
+        el.addEventListener('click', activate);
+        el.addEventListener('focusin', activate);
 
         const map = {
-            'suggest-row': () => suggestRowByIdx(idx),
-            'write-row':   () => writeRowByIdx(idx),
-            'accept-row':  () => acceptRowByIdx(idx),
-            'reject-row':  () => rejectRowByIdx(idx),
-            'rerun-row':   () => rerunRowByIdx(idx),
-            'skip-row':    () => skipRowByIdx(idx),
+            'suggest-row': () => suggestRow(findRowById(id)),
+            'write-row':   () => writeRow(findRowById(id)),
+            'accept-row':  () => acceptRow(findRowById(id)),
+            'reject-row':  () => rejectRow(findRowById(id)),
+            'rerun-row':   () => rerunRow(findRowById(id)),
+            'skip-row':    () => skipRow(findRowById(id)),
         };
-        el.querySelectorAll('[data-action]').forEach(btn => {
-            const act = btn.dataset.action;
-            if (!map[act]) return;
-            btn.addEventListener('click', (e) => { e.stopPropagation(); map[act](); });
+        el.querySelectorAll('button[data-action]').forEach(btn => {
+            const act = map[btn.dataset.action];
+            if (act) btn.addEventListener('click', (e) => { e.stopPropagation(); activate(); act(); });
         });
 
         const ta = el.querySelector('[data-action="edit-proposal"]');
         if (ta) {
             autoresize(ta);
             ta.addEventListener('input', () => {
-                const row = findRowByIdx(idx);
+                const row = findRowById(id);
                 if (row) {
                     row.proposal = ta.value;
+                    // An edit answers a glossary miss; the lead's count follows.
                     if (row.glossaryViolations && row.glossaryViolations.length > 0) {
                         row.glossaryViolations = [];
-                        const warn = el.querySelector('.review-glossary-warn');
-                        if (warn) warn.remove();
+                        el.querySelector('.review-glossary-warn')?.remove();
                         el.removeAttribute('data-glossary-warn');
+                        updateLead();
                     }
                 }
                 autoresize(ta);
@@ -616,64 +478,94 @@ function bindReviewRowsIn(root) {
             ta.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    acceptRowByIdx(idx);
+                    acceptRow(findRowById(id));
                 } else if (e.key === 'Escape') {
                     e.preventDefault();
-                    rejectRowByIdx(idx);
+                    rejectRow(findRowById(id));
                 }
             });
         }
     });
 }
 
-// The lead: how many translations wait, and the one action for them.
-// Back-fill rows (a key missing in the source) are not translations of a
-// source key, so they are counted on their own, as the Dashboard does.
-function updateSummary(visible) {
-    const proposed = visible.filter(r => r.status === 'proposed').length;
-    const pending = visible.filter(r => r.status === 'pending').length;
-    const forward = visible.filter(r => r.lang !== state.sourceLang);
-    const backFill = visible.length - forward.length;
-    const langs = [...new Set(forward.map(r => r.lang))];
-    const filtered = Boolean(state.target || state.namespace || state.search.trim());
-    const backFillText = `${plural(backFill, 'key')} missing ${langName(state.sourceLang)}`;
+// -------------------------------------------------------------------------
+// The lead: what the open tab needs, and its one primary action
+// -------------------------------------------------------------------------
 
-    let title, sub;
-    if (visible.length === 0) {
+function updateLead() {
+    const name = langName(state.tab);
+    const { proposals, missing } = tabSections();
+    const flagged = proposals.filter(needsLook).length;
+    const acceptable = acceptableRows(proposals).length;
+    const suggestable = missing.filter(r => r.status === 'pending' || r.status === 'error').length;
+    const failed = missing.filter(r => r.status === 'error');
+    const busy = state.busy[state.tab] || 0;
+    const q = state.search.trim();
+    const anyLeft = state.rows.some(r => !r.skipped);
+
+    let title;
+    let sub;
+    if (!anyLeft && state.loadFailed) {
+        title = 'Review did not load';
+        sub = escapeHtml('The Glyph server did not answer. Reload the page to try again.');
+    } else if (!anyLeft) {
         title = 'Nothing to review';
-        sub = filtered
-            ? 'Nothing is missing in this view. Clear the filters to see other languages and namespaces.'
-            : 'Every translation is in.';
+        sub = escapeHtml('Every translation is in.');
+    } else if (proposals.length === 0 && missing.length === 0) {
+        title = q ? `No ${name} keys match “${q}”` : `Nothing missing in ${name}`;
+        sub = escapeHtml(q ? 'Clear the filter to see every key.' : `Every ${name} key is in.`);
+    } else if (proposals.length > 0) {
+        title = `${plural(proposals.length, `${name} suggestion`)} to accept`;
+        const bits = [];
+        if (missing.length > 0) bits.push(`${plural(missing.length, 'more key')} ${missing.length === 1 ? 'is' : 'are'} missing in ${name}.`);
+        bits.push('Nothing is saved until you accept.');
+        sub = escapeHtml(bits.join(' '));
     } else {
-        const waiting = proposed > 0 ? ` · ${plural(proposed, 'proposal')} to accept` : '';
-        if (forward.length === 0) {
-            title = backFillText;
-            sub = `Back-fill into ${langName(state.sourceLang)}${waiting} · Nothing is saved until you accept.`;
-        } else {
-            title = `${plural(forward.length, 'translation')} to review`;
-            const where = langs.length === 1 ? langName(langs[0]) : `${langs.length} languages`;
-            const back = backFill > 0 ? ` · ${backFillText}` : '';
-            sub = `${where}${back}${waiting} · Nothing is saved until you accept.`;
-        }
+        title = `${plural(missing.length, 'key')} missing in ${name}`;
+        sub = escapeHtml(state.tab === state.sourceLang
+            ? `Their text comes from another language. Nothing is saved until you accept.`
+            : 'Suggest drafts a translation for each. Nothing is saved until you accept.');
+    }
+    // A failed suggestion says why, and where to fix it.
+    if (failed.length > 0 && busy === 0) {
+        const why = failed[0].error || 'the suggestion failed';
+        sub = escapeHtml(`Suggest failed for ${plural(failed.length, 'key')}: ${why}.`)
+            + (why === MODEL_DOWN ? ' <a class="ui-link" href="/ui/settings.html">Start it in Settings</a>' : '');
     }
     document.getElementById('leadTitle').textContent = title;
-    document.getElementById('leadSub').textContent = sub;
+    document.getElementById('leadSub').innerHTML = sub;
 
-    // suggestVisible owns the button's label while it runs.
-    const btn = document.getElementById('translateMissingBtn');
-    if (state.bulkBusy) return;
-    btn.hidden = pending === 0;
-    btn.textContent = `Suggest all ${pending}`;
+    // Accept N leads while proposals wait; then Suggest is secondary.
+    const acceptBtn = document.getElementById('acceptBtn');
+    acceptBtn.hidden = acceptable === 0;
+    if (acceptable > 0) {
+        acceptBtn.textContent = `Accept ${acceptable}`;
+        acceptBtn.title = flagged > 0
+            ? `Accept ${acceptable} — ${flagged} ${flagged === 1 ? 'needs' : 'need'} a look first`
+            : `Save ${acceptable === 1 ? 'this proposal' : `these ${acceptable} proposals`} in ${name}`;
+    }
+
+    const suggestBtn = document.getElementById('suggestBtn');
+    suggestBtn.classList.toggle('ui-button-primary', proposals.length === 0);
+    if (busy > 0) {
+        suggestBtn.hidden = false;
+        suggestBtn.disabled = true;
+        suggestBtn.innerHTML = `${icon('loader', 'review-spin')}Suggesting ${busy}…`;
+        suggestBtn.title = '';
+    } else {
+        const n = Math.min(suggestable, MAX_SUGGEST_PER_LANG);
+        suggestBtn.hidden = suggestable === 0;
+        suggestBtn.disabled = false;
+        suggestBtn.textContent = `Suggest ${n}`;
+        suggestBtn.title = suggestable > MAX_SUGGEST_PER_LANG
+            ? `Draft proposals for the first ${MAX_SUGGEST_PER_LANG} of ${suggestable} missing keys in ${name}; nothing is saved until you accept`
+            : `Draft a proposal for each missing key in ${name}; nothing is saved until you accept`;
+    }
 }
 
-function updateAcceptAllBtn() {
-    const btn = document.getElementById('acceptAllBtn');
-    if (!btn) return;
-    const n = proposedRows().length;
-    btn.hidden = n === 0;
-    // Like "Suggest all", it works on the current filtered/searched view,
-    // not the entire unfiltered backlog.
-    if (n > 0) btn.innerHTML = `${icon('check')}Accept ${plural(n, 'proposal')}`;
+/** Proposals the lead's Accept takes: not needing a look, and not empty. */
+function acceptableRows(proposals) {
+    return proposals.filter(r => r.status === 'proposed' && !needsLook(r) && r.proposal.trim());
 }
 
 function plural(n, word) {
@@ -684,88 +576,145 @@ function langName(code) {
     return Utils.langInfo(code).name;
 }
 
-function syncActiveRow() {
-    const visible = visibleRows();
-    if (visible.length === 0) return;
-    if (state.activeIdx >= visible.length) state.activeIdx = visible.length - 1;
-    if (state.activeIdx < 0) state.activeIdx = 0;
-    document.querySelectorAll('.review-row').forEach(el => {
-        el.removeAttribute('data-active');
+// -------------------------------------------------------------------------
+// The active row
+// -------------------------------------------------------------------------
+
+/** Keep activeId on a shown row: the same one if it is still here, else the one now at its place. */
+function resolveActive(list) {
+    if (list.length === 0) { state.activeId = null; state.activeIdx = 0; return; }
+    const i = list.findIndex(r => r.id === state.activeId);
+    if (i >= 0) { state.activeIdx = i; return; }
+    state.activeIdx = Math.max(0, Math.min(state.activeIdx, list.length - 1));
+    state.activeId = list[state.activeIdx].id;
+}
+
+function setActive(id, scroll) {
+    state.activeId = id;
+    resolveActive(visibleRows());
+    markActive(scroll);
+}
+
+function moveActive(delta) {
+    const list = visibleRows();
+    if (list.length === 0) return;
+    resolveActive(list);
+    const i = Math.max(0, Math.min(state.activeIdx + delta, list.length - 1));
+    setActive(list[i].id, true);
+}
+
+function markActive(scroll) {
+    document.querySelectorAll('.review-row[data-active]').forEach(el => el.removeAttribute('data-active'));
+    if (!state.activeId) return;
+    if (scroll) ensureMissingRowMounted(state.activeId);
+    const el = document.querySelector(`.review-row[data-id="${cssEscape(state.activeId)}"]`);
+    if (!el) return;
+    el.setAttribute('data-active', 'true');
+    if (scroll) el.scrollIntoView({ block: 'nearest' });
+}
+
+// -------------------------------------------------------------------------
+// Windowed Missing list
+// -------------------------------------------------------------------------
+
+function teardownMissingVirt() {
+    missingVirt = null;
+}
+
+function paintMissingWindow() {
+    const v = missingVirt;
+    if (!v?.bodyEl?.isConnected) return;
+    const rect = v.bodyEl.getBoundingClientRect();
+    const top = Math.max(0, -rect.top);
+    const n = v.rows.length;
+    const start = Math.max(0, Math.floor(top / MISSING_ROW_HEIGHT) - REVIEW_VIRT_OVERSCAN);
+    const end = Math.min(n, Math.ceil((top + window.innerHeight) / MISSING_ROW_HEIGHT) + REVIEW_VIRT_OVERSCAN);
+    if (start === v.start && end === v.end) return;
+    v.start = start;
+    v.end = end;
+    const parts = [];
+    for (let i = start; i < end; i++) {
+        parts.push(`<div class="v-review-wrap" style="transform:translateY(${i * MISSING_ROW_HEIGHT}px)">${renderMissingRow(v.rows[i])}</div>`);
+    }
+    v.bodyEl.innerHTML = parts.join('');
+    bindReviewRowsIn(v.bodyEl);
+    const el = state.activeId && v.bodyEl.querySelector(`.review-row[data-id="${cssEscape(state.activeId)}"]`);
+    if (el) el.setAttribute('data-active', 'true');
+}
+
+/** Scroll a windowed missing row into the mounted slice before it is marked. */
+function ensureMissingRowMounted(id) {
+    const v = missingVirt;
+    if (!v?.bodyEl) return;
+    const i = v.rows.findIndex(r => r.id === id);
+    if (i < 0 || (i >= v.start && i < v.end && document.querySelector(`.review-row[data-id="${cssEscape(id)}"]`))) return;
+    const rowTop = window.scrollY + v.bodyEl.getBoundingClientRect().top + i * MISSING_ROW_HEIGHT;
+    window.scrollTo({ top: Math.max(0, rowTop - window.innerHeight * 0.3) });
+    paintMissingWindow();
+}
+
+function onWindowScroll() {
+    if (!missingVirt || missingVirtRafPending) return;
+    missingVirtRafPending = true;
+    requestAnimationFrame(() => {
+        missingVirtRafPending = false;
+        paintMissingWindow();
     });
-    const activeRow = findRowByIdx(state.activeIdx);
-    if (activeRow && !state.expanded[activeRow.lang]) {
-        state.expanded[activeRow.lang] = true;
-        renderReview();
-        return;
-    }
-    const target = document.querySelector(`.review-row[data-idx="${state.activeIdx}"]`);
-    if (target) {
-        target.setAttribute('data-active', 'true');
-        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    } else {
-        ensureVirtualReviewRowVisible(state.activeIdx);
-    }
 }
 
 // -------------------------------------------------------------------------
 // Per-row actions
 // -------------------------------------------------------------------------
 
-function findRowByIdx(idx) {
-    const v = visibleRows();
-    return v[idx] || null;
+/** Re-draw one row in place, so a transition does not move focus or scroll. */
+function rerenderRow(row) {
+    const el = document.querySelector(`.review-row[data-id="${cssEscape(row.id)}"]`);
+    if (!el) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderRow(row);
+    const replacement = tmp.firstElementChild;
+    if (el.hasAttribute('data-active')) replacement.setAttribute('data-active', 'true');
+    el.replaceWith(replacement);
+    bindReviewRowsIn(replacement);
 }
 
-async function suggestRowByIdx(idx) {
-    const row = findRowByIdx(idx);
-    if (row) await suggestRow(row);
-}
-
-function writeRowByIdx(idx) {
-    const row = findRowByIdx(idx);
-    if (row) writeRow(row);
-}
-
-/** Open the proposal editor with an empty textarea — no LLM call. */
+/** Open the proposal field empty, with no model call. */
 function writeRow(row) {
-    if (row.status === 'previewing' || row.status === 'saving') return;
+    if (!row || row.status === 'previewing' || row.status === 'saving') return;
     row.status = 'proposed';
     row.proposal = '';
     row.originalProposal = '';
     row.confidence = 1;
     row.translatedBy = 'human';
     row.glossaryViolations = [];
-    renderReview();
-    requestAnimationFrame(() => {
-        const el = document.querySelector(`.review-row[data-id="${cssEscape(row.id)}"] textarea.review-proposal-input`);
-        if (el) {
-            el.focus();
-            autoresize(el);
-        }
-    });
+    row.error = '';
+    state.activeId = row.id;
+    renderReview({ scrollActive: false });
+    const el = document.querySelector(`.review-row[data-id="${cssEscape(row.id)}"] textarea.review-proposal-input`);
+    if (el) {
+        el.focus();
+        autoresize(el);
+    }
 }
 
-async function suggestRow(row) {
+/** Ask for a dry-run proposal for one row; on success the row's fields fill in. */
+async function draft(row) {
     if (!row.source) {
-        Utils.showToast(`No source text for ${row.ns}.${row.key}`, 'error');
-        return;
+        row.status = 'error';
+        row.error = 'it has no source text';
+        return false;
     }
-    row.status = 'previewing';
-    rerenderRow(row);
     try {
-        // Reverse rows (missing source-lang) carry their own sourceLang +
-        // source text, so we pass both: the backend treats `source_text` as
-        // an override for the usual source-lookup. Forward rows fall through
-        // to the same call with `state.sourceLang` and no text override.
+        // Back-fill rows carry their own source language and text; the
+        // backend takes `source_text` over its own lookup.
         const r = await api.translateSingle(
             row.key, row.lang, row.sourceLang || state.sourceLang, row.ns,
             /*dryRun=*/true, row.source || null,
         );
         if (!r.ok) {
-            Utils.showToast(`Translation failed: ${r.error}`, 'error');
             row.status = 'error';
-            rerenderRow(row);
-            return;
+            row.error = friendlyError(r.error);
+            return false;
         }
         const data = r.data || {};
         row.proposal = data.translation ?? '';
@@ -773,22 +722,30 @@ async function suggestRow(row) {
         row.confidence = data.confidence ?? null;
         row.translatedBy = data.model_used ?? '';
         row.glossaryViolations = data.glossary_violations || [];
+        row.error = '';
         row.status = 'proposed';
-        renderReview();
+        return true;
     } catch (err) {
         console.error('suggest error:', err);
         row.status = 'error';
-        rerenderRow(row);
-        Utils.showToast('Translation error', 'error');
+        row.error = friendlyError(err && err.message);
+        return false;
     }
 }
 
-async function acceptRowByIdx(idx) {
-    const row = findRowByIdx(idx);
-    if (row && row.status === 'proposed') await acceptRow(row);
+async function suggestRow(row) {
+    if (!row || row.status === 'previewing' || row.status === 'saving' || isProposal(row)) return;
+    row.status = 'previewing';
+    rerenderRow(row);
+    const ok = await draft(row);
+    if (!ok) Utils.showToast(failureToast(row.error), 'error');
+    // The row moves up to To accept; if it is still the active one, the view
+    // follows it, so ↵ then accepts what is on screen.
+    renderReview({ scrollActive: state.activeId === row.id });
 }
 
 async function acceptRow(row) {
+    if (!row || row.status !== 'proposed') return;
     if (!row.proposal || !row.proposal.trim()) {
         Utils.showToast('Cannot accept an empty translation', 'error');
         return;
@@ -796,14 +753,14 @@ async function acceptRow(row) {
     row.status = 'saving';
     rerenderRow(row);
     try {
-        const meta = buildAcceptMeta(row);
-        const r = await api.updateTranslation(row.lang, row.key, row.proposal, meta, row.ns);
+        const r = await api.updateTranslation(row.lang, row.key, row.proposal, buildAcceptMeta(row), row.ns);
         if (!r.ok) {
             Utils.showToast(`Save failed: ${r.error}`, 'error');
             row.status = 'proposed';
             rerenderRow(row);
             return;
         }
+        leaveRow(row);
         state.rows = state.rows.filter(x => x !== row);
         renderReview();
     } catch (err) {
@@ -826,182 +783,105 @@ function buildAcceptMeta(row) {
     };
 }
 
-function rejectRowByIdx(idx) {
-    const row = findRowByIdx(idx);
-    if (!row) return;
+/** A row about to leave its place: the row now there becomes the active one. */
+function leaveRow(row) {
+    if (state.activeId !== row.id) return;
+    const i = visibleRows().findIndex(r => r.id === row.id);
+    if (i >= 0) state.activeIdx = i;
+    state.activeId = null;
+}
+
+function clearProposal(row) {
     row.status = 'pending';
     row.proposal = '';
     row.originalProposal = '';
     row.confidence = null;
     row.translatedBy = '';
+    row.glossaryViolations = [];
+}
+
+function rejectRow(row) {
+    if (!row || row.status !== 'proposed') return;
+    leaveRow(row);
+    clearProposal(row);
     renderReview();
 }
 
-async function rerunRowByIdx(idx) {
-    const row = findRowByIdx(idx);
-    if (!row) return;
-    row.status = 'pending';
-    row.proposal = '';
-    row.originalProposal = '';
-    row.confidence = null;
-    row.translatedBy = '';
+async function rerunRow(row) {
+    if (!row || row.status !== 'proposed') return;
+    clearProposal(row);
+    renderReview({ scrollActive: false });
     await suggestRow(row);
 }
 
-function skipRowByIdx(idx) {
-    const row = findRowByIdx(idx);
-    if (!row) return;
+function skipRow(row) {
+    if (!row || isProposal(row) || row.status === 'previewing') return;
+    leaveRow(row);
     row.skipped = true;
     renderReview();
 }
 
 // -------------------------------------------------------------------------
-// Bulk actions
+// The lead's actions: on the open tab only
 // -------------------------------------------------------------------------
 
-async function suggestLang(lang) {
-    // Scope to visible rows so the action matches the "(N)" count we rendered
-    // in the group header — otherwise a search filter makes the toolbar lie.
-    const allPending = visibleRows().filter(r => r.lang === lang && r.status === 'pending');
-    if (allPending.length === 0) {
-        Utils.showToast(`No pending rows for "${lang}" in the current view — accept or reject existing proposals first.`, 'info');
-        return;
-    }
-    const targets = allPending.slice(0, MAX_SUGGEST_PER_LANG);
-    const skipped = allPending.length - targets.length;
-    let msg = `Generate ${targets.length} proposal${targets.length === 1 ? '' : 's'} for "${lang}"? You'll review each before anything is saved.`;
-    if (skipped > 0) {
-        msg += `\n\n${skipped} more pending in this view are skipped this round (max ${MAX_SUGGEST_PER_LANG} per language). Run Suggest again after reviewing, or narrow filters.`;
-    }
+async function suggestTab() {
+    const lang = state.tab;
+    const name = langName(lang);
+    if (state.busy[lang]) return;
+    const all = tabSections().missing.filter(r => r.status === 'pending' || r.status === 'error');
+    if (all.length === 0) return;
+    const targets = all.slice(0, MAX_SUGGEST_PER_LANG);
+    const left = all.length - targets.length;
+    let msg = `Draft ${plural(targets.length, 'proposal')} for ${name}? You review each before anything is saved.`;
+    if (left > 0) msg += `\n\nThe other ${left} wait for the next round (at most ${MAX_SUGGEST_PER_LANG} at a time).`;
     if (!confirm(msg)) return;
-    for (const r of targets) { r.status = 'previewing'; }
-    renderReview();
 
-    await Promise.all(targets.map(async row => {
-        if (!row.source) { row.status = 'error'; return; }
-        try {
-            const r = await api.translateSingle(
-                row.key, row.lang, row.sourceLang || state.sourceLang, row.ns,
-                /*dryRun=*/true, row.source || null,
-            );
-            if (!r.ok) {
-                row.status = 'error';
-                return;
-            }
-            const data = r.data || {};
-            row.proposal = data.translation ?? '';
-            row.originalProposal = row.proposal;
-            row.confidence = data.confidence ?? null;
-            row.translatedBy = data.model_used ?? '';
-            row.glossaryViolations = data.glossary_violations || [];
-            row.status = 'proposed';
-        } catch (err) {
-            console.error('suggestLang per-row error:', err);
-            row.status = 'error';
-        }
-    }));
-    renderReview();
-    const toast = skipped > 0
-        ? `Generated ${targets.length} for ${lang} (${skipped} still pending — run Suggest again or filter).`
-        : `Generated ${targets.length} proposal${targets.length === 1 ? '' : 's'} — review below`;
-    Utils.showToast(toast, 'info');
-}
+    state.busy[lang] = targets.length;
+    for (const r of targets) { r.status = 'previewing'; r.error = ''; }
+    renderReview({ scrollActive: false });
 
-async function suggestVisible() {
-    const pending = visibleRows().filter(r => r.status === 'pending');
-    if (pending.length === 0) {
-        Utils.showToast('No pending rows in the current view — accept or reject existing proposals first.', 'info');
-        return;
-    }
-    const byLang = new Map();
-    for (const r of pending) {
-        if (!byLang.has(r.lang)) byLang.set(r.lang, []);
-        byLang.get(r.lang).push(r);
-    }
-    const targets = [];
-    const skipParts = [];
-    for (const [lg, rows] of byLang) {
-        const take = rows.slice(0, MAX_SUGGEST_PER_LANG);
-        targets.push(...take);
-        const skip = rows.length - take.length;
-        if (skip > 0) skipParts.push(`${lg}: ${skip} not run`);
-    }
-    if (targets.length === 0) return;
-
-    let confirmMsg = `Generate ${targets.length} proposal${targets.length === 1 ? '' : 's'} (${byLang.size} language${byLang.size === 1 ? '' : 's'}, up to ${MAX_SUGGEST_PER_LANG} each)? You'll review each before anything is saved.`;
-    if (skipParts.length > 0) {
-        confirmMsg += `\n\nSkipped this round (cap per language): ${skipParts.join('; ')}. Run again after reviewing or narrow filters.`;
-    }
-    if (!confirm(confirmMsg)) return;
-
-    const btn = document.getElementById('translateMissingBtn');
-    state.bulkBusy = true;
-    btn.disabled = true;
-    btn.innerHTML = `${icon('loader', 'review-spin')}Suggesting ${targets.length}…`;
-    for (const r of targets) { r.status = 'previewing'; }
-    renderReview();
-
+    let drafted = 0;
+    let firstError = '';
     try {
-        await Promise.all(targets.map(async row => {
-            if (!row.source) { row.status = 'error'; return; }
-            try {
-                const r = await api.translateSingle(
-                    row.key, row.lang, row.sourceLang || state.sourceLang, row.ns,
-                    /*dryRun=*/true, row.source || null,
-                );
-                if (!r.ok) { row.status = 'error'; return; }
-                const data = r.data || {};
-                row.proposal = data.translation ?? '';
-                row.originalProposal = row.proposal;
-                row.confidence = data.confidence ?? null;
-                row.translatedBy = data.model_used ?? '';
-                row.glossaryViolations = data.glossary_violations || [];
-                row.status = 'proposed';
-            } catch (err) {
-                console.error('suggestVisible per-row:', err);
-                row.status = 'error';
-            }
-        }));
-        const tail = skipParts.length > 0
-            ? ` Some keys skipped (max ${MAX_SUGGEST_PER_LANG} per language); run again or filter.`
-            : '';
-        Utils.showToast(`Generated ${targets.length} proposal${targets.length === 1 ? '' : 's'} — review below.${tail}`, 'info');
+        const results = await Promise.all(targets.map(draft));
+        results.forEach((ok, i) => {
+            if (ok) drafted++;
+            else if (!firstError) firstError = targets[i].error;
+        });
     } finally {
-        state.bulkBusy = false;
-        btn.disabled = false;
-        renderReview();
+        delete state.busy[lang];
+        renderReview({ scrollActive: false });
+    }
+    const failed = targets.length - drafted;
+    if (drafted === 0) {
+        Utils.showToast(failureToast(firstError || 'no proposals came back'), 'error');
+    } else {
+        const tail = failed > 0 ? ` ${failed} failed: ${firstError}.` : '';
+        Utils.showToast(`Drafted ${plural(drafted, 'proposal')} for ${name}.${tail}`, failed > 0 ? 'error' : 'info');
     }
 }
 
-async function acceptLang(lang) {
-    // Visible-row scoping keeps the group header's "(N proposed)" count
-    // honest even when a search filter is active.
-    const rows = visibleRows().filter(r => r.lang === lang && r.status === 'proposed' && r.proposal.trim());
+async function acceptTab() {
+    const name = langName(state.tab);
+    const { proposals } = tabSections();
+    const rows = acceptableRows(proposals);
     if (rows.length === 0) return;
-    if (!confirm(`Accept ${rows.length} proposed translation${rows.length === 1 ? '' : 's'} for "${lang}"?`)) return;
-    await acceptMany(rows);
-}
-
-async function acceptAll() {
-    // proposedRows() is already scoped to visibleRows(), so this accepts
-    // exactly what the toolbar button advertises — no ghost rows.
-    const rows = proposedRows().filter(r => r.proposal.trim());
-    if (rows.length === 0) return;
-    if (!confirm(`Accept ${rows.length} proposed translation${rows.length === 1 ? '' : 's'} in the current view?`)) return;
+    const flagged = proposals.filter(needsLook).length;
+    let msg = `Accept ${plural(rows.length, `${name} proposal`)}?`;
+    if (flagged > 0) msg += `\n\n${flagged} that ${flagged === 1 ? 'needs' : 'need'} a look ${flagged === 1 ? 'stays' : 'stay'} in the list, to accept one by one.`;
+    if (!confirm(msg)) return;
     await acceptMany(rows);
 }
 
 async function acceptMany(rows) {
     for (const r of rows) { r.status = 'saving'; }
-    renderReview();
+    renderReview({ scrollActive: false });
 
-    // PUTs run in parallel — the /api/translations/:lang/:key endpoint is
-    // per-row, so parallelising saves a lot of wall-time when reviewing
-    // dozens of proposals at once.
+    // The PUT is per row; in parallel they take a fraction of the time.
     const results = await Promise.all(rows.map(async row => {
         try {
-            const meta = buildAcceptMeta(row);
-            const r = await api.updateTranslation(row.lang, row.key, row.proposal, meta, row.ns);
+            const r = await api.updateTranslation(row.lang, row.key, row.proposal, buildAcceptMeta(row), row.ns);
             return { row, ok: r.ok, error: r.error };
         } catch (err) {
             return { row, ok: false, error: err };
@@ -1015,32 +895,30 @@ async function acceptMany(rows) {
             state.rows = state.rows.filter(x => x !== res.row);
             saved++;
         } else {
+            console.error('accept failed:', res.row.id, res.error);
             res.row.status = 'proposed';
             failed.push(res);
         }
     }
     renderReview();
-    if (saved > 0) Utils.showToast(`Saved ${saved} translation${saved === 1 ? '' : 's'}`, 'success');
+    if (saved > 0) Utils.showToast(`Saved ${plural(saved, 'translation')}`, 'success');
     if (failed.length > 0) Utils.showToast(`${failed.length} save${failed.length === 1 ? '' : 's'} failed — see console`, 'error');
 }
 
-// -------------------------------------------------------------------------
-// Lean row-level rerender (used while a row is mid-transition to avoid a
-// full re-render that would lose focus)
-// -------------------------------------------------------------------------
+// A model that is not running reads as such, not as a socket error.
+const MODEL_DOWN = 'the translation model isn’t reachable';
 
-function rerenderRow(row) {
-    const el = document.querySelector(`.review-row[data-id="${cssEscape(row.id)}"]`);
-    if (!el) {
-        refreshReviewVirtualLang(row.lang);
-        return;
+/** A failure for a toast: a model that is down says where to start it. */
+function failureToast(msg) {
+    return `Suggest failed: ${msg}${msg === MODEL_DOWN ? '. Start it in Settings.' : ''}`;
+}
+
+function friendlyError(msg) {
+    const m = String(msg || '');
+    if (/failed to call LLM|connection refused|dial tcp|no such host|timeout|Network error|Failed to fetch/i.test(m)) {
+        return MODEL_DOWN;
     }
-    const idx = parseInt(el.dataset.idx, 10);
-    const tmp = document.createElement('div');
-    tmp.innerHTML = renderRow(row, idx);
-    const replacement = tmp.firstElementChild;
-    el.replaceWith(replacement);
-    bindReviewRowsIn(replacement);
+    return m || 'the suggestion failed';
 }
 
 function autoresize(ta) {
@@ -1050,27 +928,48 @@ function autoresize(ta) {
 }
 
 // -------------------------------------------------------------------------
-// Toolbar / keyboard
+// Tabs, filter, keyboard
 // -------------------------------------------------------------------------
 
+function openTab(lang, focusTab = false) {
+    if (!lang || lang === state.tab) return;
+    state.tab = lang;
+    state.activeId = null;
+    state.activeIdx = 0;
+    const url = new URL(window.location.href);
+    url.searchParams.set('target', lang);
+    history.replaceState(null, '', url);
+    renderReview({ scrollActive: false });
+    if (focusTab) document.querySelector(`#langTabs .ui-tab[data-lang="${cssEscape(lang)}"]`)?.focus();
+}
+
 function setupEventHandlers() {
-    document.getElementById('targetLanguage').addEventListener('change', async (e) => {
-        state.target = e.target.value;
-        await loadRows();
+    const tabs = document.getElementById('langTabs');
+    tabs.addEventListener('click', (e) => {
+        const tab = e.target.closest('.ui-tab');
+        if (tab) openTab(tab.dataset.lang);
     });
-    document.getElementById('namespaceFilter').addEventListener('change', async (e) => {
-        state.namespace = e.target.value;
-        await loadRows();
+    // Arrow keys move between tabs, as in any tab strip.
+    tabs.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        const langs = tabLangs();
+        const i = langs.indexOf(state.tab);
+        const next = langs[(i + (e.key === 'ArrowRight' ? 1 : -1) + langs.length) % langs.length];
+        e.preventDefault();
+        openTab(next, true);
     });
-    const searchDebounced = Utils.debounce(() => renderReview(), 150);
+
+    const searchDebounced = Utils.debounce(() => renderReview({ scrollActive: false }), 150);
     document.getElementById('searchInput').addEventListener('input', (e) => {
         state.search = e.target.value;
+        state.activeId = null;
         state.activeIdx = 0;
         searchDebounced();
     });
-    document.getElementById('translateMissingBtn').addEventListener('click', suggestVisible);
-    const acceptAllBtn = document.getElementById('acceptAllBtn');
-    if (acceptAllBtn) acceptAllBtn.addEventListener('click', acceptAll);
+    document.getElementById('suggestBtn').addEventListener('click', suggestTab);
+    document.getElementById('acceptBtn').addEventListener('click', acceptTab);
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    window.addEventListener('resize', onWindowScroll);
 }
 
 function setupKeyboardShortcuts() {
@@ -1090,36 +989,33 @@ function setupKeyboardShortcuts() {
             document.getElementById('searchInput').focus();
             return;
         }
-        if (inField) return;
+        if (inField || isMeta || e.altKey) return;
 
         if (e.key === 'j' || e.key === 'ArrowDown') {
             e.preventDefault();
-            state.activeIdx++;
-            syncActiveRow();
+            moveActive(1);
         } else if (e.key === 'k' || e.key === 'ArrowUp') {
             e.preventDefault();
-            state.activeIdx--;
-            syncActiveRow();
+            moveActive(-1);
         } else if (e.key === 'Enter') {
-            // Enter is the primary affordance for both flow steps:
-            //   pending  → Suggest
-            //   proposed → Accept
+            // A focused button or link takes its own Enter.
+            if (target && target.closest && target.closest('button, a')) return;
+            // ↵ is the next step: suggest a missing key, accept a proposal.
             e.preventDefault();
-            const row = findRowByIdx(state.activeIdx);
+            const row = findRowById(state.activeId);
             if (!row) return;
-            if (row.status === 'pending' || row.status === 'error') suggestRowByIdx(state.activeIdx);
-            else if (row.status === 'proposed') acceptRowByIdx(state.activeIdx);
+            if (row.status === 'pending' || row.status === 'error') suggestRow(row);
+            else if (row.status === 'proposed') acceptRow(row);
         } else if (e.key === 'w') {
             e.preventDefault();
-            const row = findRowByIdx(state.activeIdx);
-            if (!row) return;
-            if (row.status === 'pending' || row.status === 'error') writeRowByIdx(state.activeIdx);
+            const row = findRowById(state.activeId);
+            if (row && (row.status === 'pending' || row.status === 'error')) writeRow(row);
         } else if (e.key === 'x' || e.key === 'Escape') {
             e.preventDefault();
-            const row = findRowByIdx(state.activeIdx);
+            const row = findRowById(state.activeId);
             if (!row) return;
-            if (row.status === 'proposed') rejectRowByIdx(state.activeIdx);
-            else skipRowByIdx(state.activeIdx);
+            if (row.status === 'proposed') rejectRow(row);
+            else skipRow(row);
         }
     });
 }
