@@ -118,7 +118,10 @@ impl Models {
                 )));
             }
             if models.models[..i].iter().any(|o| o.name == m.name) {
-                return Err(ModelsError::Invalid(format!("two models are called {:?}", m.name)));
+                return Err(ModelsError::Invalid(format!(
+                    "two models are called {:?}",
+                    m.name
+                )));
             }
         }
         Ok(models)
@@ -152,7 +155,12 @@ impl Model {
             if repo.is_empty() || file.is_empty() {
                 return Err("Set both hf_repo and hf_file, or neither and model_path.".into());
             }
-            vec!["--hf-repo".into(), repo.into(), "--hf-file".into(), file.into()]
+            vec![
+                "--hf-repo".into(),
+                repo.into(),
+                "--hf-file".into(),
+                file.into(),
+            ]
         } else if !self.model_path.trim().is_empty() {
             vec!["-m".into(), self.model_path.trim().into()]
         } else {
@@ -243,7 +251,12 @@ chat_mode = false
         assert!(Models::parse("surprise = 1").is_err());
         let twice = "[[models]]\nname = \"a\"\nendpoint = \"http://x\"\n[[models]]\nname = \"a\"\nendpoint = \"http://y\"";
         assert!(Models::parse(twice).is_err());
-        assert!(Models::load(Path::new("/nonexistent/models.toml")).unwrap().models.is_empty());
+        assert!(
+            Models::load(Path::new("/nonexistent/models.toml"))
+                .unwrap()
+                .models
+                .is_empty()
+        );
     }
 
     #[test]

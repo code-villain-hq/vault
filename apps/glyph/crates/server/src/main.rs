@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use glyph_server::config::Config;
 use glyph_llm::Models;
+use glyph_server::config::Config;
 use glyph_server::{AppState, accounts, app, models, notify, translate};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -41,7 +41,9 @@ async fn main() -> anyhow::Result<()> {
                     file = %config.models_file.display(),
                     "no translation models; see models.example.toml"
                 ),
-                n => tracing::info!(file = %config.models_file.display(), "{n} translation model(s)"),
+                n => {
+                    tracing::info!(file = %config.models_file.display(), "{n} translation model(s)")
+                }
             }
             translate::fail_interrupted(&pool)
                 .await

@@ -30,7 +30,10 @@ pub enum RunStatus {
 
 impl RunStatus {
     pub fn finished(self) -> bool {
-        matches!(self, RunStatus::Done | RunStatus::Failed | RunStatus::Cancelled)
+        matches!(
+            self,
+            RunStatus::Done | RunStatus::Failed | RunStatus::Cancelled
+        )
     }
 }
 

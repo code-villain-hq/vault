@@ -36,13 +36,15 @@
       "port": 1420
     },
     {
-      "name": "glyph",
-      "runtimeExecutable": "sh",
+      "name": "glyph-dev",
+      "runtimeExecutable": "bun",
       "runtimeArgs": [
-        "-c",
-        "cd apps/glyph && ./glyph"
+        "run",
+        "--cwd",
+        "apps/glyph",
+        "dev"
       ],
-      "port": 7383
+      "port": 5174
     }
   ]
 }

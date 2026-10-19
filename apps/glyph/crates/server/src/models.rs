@@ -38,9 +38,9 @@ pub async fn start(
         .start(&model.name, binary, &args)
         .map_err(|e| match e {
             ProcessError::AlreadyRunning => AppError::conflict(e.to_string()),
-            ProcessError::Spawn { .. } => AppError::invalid(format!(
-                "Couldn't start {binary}. Is it installed? ({e})"
-            )),
+            ProcessError::Spawn { .. } => {
+                AppError::invalid(format!("Couldn't start {binary}. Is it installed? ({e})"))
+            }
             ProcessError::NotRunning => AppError::internal(e),
         })?;
     tracing::info!(model = model.name, binary, "started a model server");
@@ -58,7 +58,9 @@ pub async fn stop(
         .processes
         .stop(&model.name, GRACE)
         .await
-        .map_err(|_| AppError::invalid("It wasn't started from here, so it can't be stopped from here."))?;
+        .map_err(|_| {
+            AppError::invalid("It wasn't started from here, so it can't be stopped from here.")
+        })?;
     Ok(Json(info(&state, model).await))
 }
 

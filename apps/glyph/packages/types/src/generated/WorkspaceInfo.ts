@@ -6,6 +6,6 @@ import type { Role } from "./Role";
  */
 export type WorkspaceInfo = { id: string, name: string, 
 /**
- * The workspace's name in URLs, e.g. `dib` in `/dib/translations`.
+ * The workspace's name in URLs, e.g. `lair` in `/lair/translations`.
  */
 url_key: string, role: Role, };

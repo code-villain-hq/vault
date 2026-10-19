@@ -193,7 +193,10 @@ mod tests {
         let script = vec!["-c".to_string(), "echo ready; sleep 30".to_string()];
         let started = processes.start("m", "sh", &script).unwrap();
         assert!(started.pid.is_some());
-        assert!(matches!(processes.start("m", "sh", &script), Err(ProcessError::AlreadyRunning)));
+        assert!(matches!(
+            processes.start("m", "sh", &script),
+            Err(ProcessError::AlreadyRunning)
+        ));
 
         for _ in 0..50 {
             if !processes.status("m").unwrap().recent_output.is_empty() {

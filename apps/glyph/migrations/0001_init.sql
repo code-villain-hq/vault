@@ -5,7 +5,7 @@
 CREATE TABLE workspaces (
     id uuid PRIMARY KEY,
     name text NOT NULL,
-    -- The workspace's name in URLs, e.g. /dib/translations.
+    -- The workspace's name in URLs, e.g. /lair/translations.
     url_key text NOT NULL UNIQUE,
     -- Changes whenever the workspace's sync history starts over (for example
     -- after a database reset), so clients know to download a fresh snapshot.

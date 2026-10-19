@@ -248,9 +248,7 @@ mod tests {
         let reply = move || {
             let n = counter.fetch_add(1, Ordering::SeqCst);
             let text = replies[n.min(replies.len() - 1)].clone();
-            async move {
-                Json(json!({ "choices": [{ "text": text, "message": { "content": text } }] }))
-            }
+            async move { Json(json!({ "choices": [{ "text": text, "message": { "content": text } }] })) }
         };
         let app = Router::new()
             .route("/completion", post(reply.clone()))
@@ -350,7 +348,10 @@ mod tests {
             false,
         )
         .await;
-        let out = client.translate(&request("Hello {{name}}!", &[])).await.unwrap();
+        let out = client
+            .translate(&request("Hello {{name}}!", &[]))
+            .await
+            .unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 2);
         assert_eq!(out.text, "Hej {{name}}!");
         assert!(!out.placeholders_broken);
@@ -373,9 +374,18 @@ mod tests {
 
     #[test]
     fn localhost_becomes_ipv4_loopback() {
-        assert_eq!(normalize_endpoint("http://localhost:8081/"), "http://127.0.0.1:8081");
-        assert_eq!(normalize_endpoint("http://LOCALHOST"), "http://127.0.0.1:80");
-        assert_eq!(normalize_endpoint("http://10.0.0.2:8080"), "http://10.0.0.2:8080");
+        assert_eq!(
+            normalize_endpoint("http://localhost:8081/"),
+            "http://127.0.0.1:8081"
+        );
+        assert_eq!(
+            normalize_endpoint("http://LOCALHOST"),
+            "http://127.0.0.1:80"
+        );
+        assert_eq!(
+            normalize_endpoint("http://10.0.0.2:8080"),
+            "http://10.0.0.2:8080"
+        );
         assert_eq!(normalize_endpoint("http://[::1]:8080"), "http://[::1]:8080");
     }
 }

@@ -78,7 +78,9 @@ pub async fn start(
         })),
     });
     apply(&mut db, actor, operations).await?;
-    let run = load_run(&mut db, actor, id).await?.ok_or_else(|| AppError::internal("run vanished"))?;
+    let run = load_run(&mut db, actor, id)
+        .await?
+        .ok_or_else(|| AppError::internal("run vanished"))?;
     db.commit().await?;
 
     let named = request.keys.is_some();
@@ -102,8 +104,15 @@ pub async fn cancel(
     if run.status.finished() {
         return Ok(Json(run));
     }
-    apply(&mut db, actor, vec![patch_run(run_id, json!({ "status": RunStatus::Cancelled }))]).await?;
-    let run = load_run(&mut db, actor, run_id).await?.ok_or_else(|| AppError::internal("run vanished"))?;
+    apply(
+        &mut db,
+        actor,
+        vec![patch_run(run_id, json!({ "status": RunStatus::Cancelled }))],
+    )
+    .await?;
+    let run = load_run(&mut db, actor, run_id)
+        .await?
+        .ok_or_else(|| AppError::internal("run vanished"))?;
     db.commit().await?;
     Ok(Json(run))
 }
@@ -116,7 +125,13 @@ pub async fn variants(
     Json(request): Json<VariantsRequest>,
 ) -> Result<Json<Variants>, AppError> {
     request.validate()?;
-    let settings = settings(&state, member.actor, &request.source_lang, &request.target_lang).await?;
+    let settings = settings(
+        &state,
+        member.actor,
+        &request.source_lang,
+        &request.target_lang,
+    )
+    .await?;
     let variants = Client::new(&settings.model)
         .variants(
             &languages::name(&request.source_lang),
@@ -132,9 +147,9 @@ pub async fn variants(
 fn model_failed(e: LlmError) -> AppError {
     tracing::warn!(error = %e, "the model failed");
     match e {
-        LlmError::Unreachable { .. } => {
-            AppError::unavailable("The model isn't answering. Start it in Settings, or check its endpoint.")
-        }
+        LlmError::Unreachable { .. } => AppError::unavailable(
+            "The model isn't answering. Start it in Settings, or check its endpoint.",
+        ),
         other => AppError::unavailable(format!("The model failed: {other}")),
     }
 }
@@ -149,7 +164,10 @@ pub async fn fail_interrupted(pool: &PgPool) -> Result<(), AppError> {
     .fetch_all(pool)
     .await?;
     for (id, workspace_id, user_id) in runs {
-        let actor = Actor { user_id, workspace_id };
+        let actor = Actor {
+            user_id,
+            workspace_id,
+        };
         let mut db = pool.begin().await?;
         let patch = patch_run(
             id,
@@ -179,12 +197,20 @@ async fn settings(
     .fetch_optional(&state.pool)
     .await?;
     let (name, temperature) = pair.unwrap_or_else(|| (String::new(), 0.2));
-    let model = state.models.pick(&name).cloned().ok_or_else(|| AppError::invalid(NO_MODEL))?;
+    let model = state
+        .models
+        .pick(&name)
+        .cloned()
+        .ok_or_else(|| AppError::invalid(NO_MODEL))?;
     Ok(Settings { model, temperature })
 }
 
 /// The keys a run translates, in order.
-async fn plan(pool: &PgPool, actor: Actor, request: &StartRunRequest) -> Result<Vec<Item>, AppError> {
+async fn plan(
+    pool: &PgPool,
+    actor: Actor,
+    request: &StartRunRequest,
+) -> Result<Vec<Item>, AppError> {
     let (namespaces, keys): (Option<Vec<String>>, Option<Vec<String>>) = match &request.keys {
         Some(refs) => (
             Some(refs.iter().map(|k| k.namespace.clone()).collect()),
@@ -256,7 +282,14 @@ async fn work(
     let id = run.id;
     if let Err(e) = carry_out(&state, actor, &run, &items, &settings, named).await {
         tracing::error!(error = ?e, run = %id, "a translation run broke off");
-        let _ = finish(&state.pool, actor, id, RunStatus::Failed, "Something went wrong on the server.").await;
+        let _ = finish(
+            &state.pool,
+            actor,
+            id,
+            RunStatus::Failed,
+            "Something went wrong on the server.",
+        )
+        .await;
     }
 }
 
@@ -277,7 +310,10 @@ async fn carry_out(
     }
     let glossary = glossary(pool, actor, &run.source_lang, &run.target_lang).await?;
     let client = Client::new(&settings.model);
-    let (source, target) = (languages::name(&run.source_lang), languages::name(&run.target_lang));
+    let (source, target) = (
+        languages::name(&run.source_lang),
+        languages::name(&run.target_lang),
+    );
     let (mut done, mut failed) = (0, 0);
 
     for item in items {
@@ -297,8 +333,12 @@ async fn carry_out(
                 done += 1;
                 let progress = patch_run(run.id, json!({ "done": done }));
                 let written = match run.kind {
-                    RunKind::Suggest => suggest(pool, actor, run, item, &translated, progress).await,
-                    RunKind::Fill => fill(pool, actor, run, item, &translated, progress, named).await,
+                    RunKind::Suggest => {
+                        suggest(pool, actor, run, item, &translated, progress).await
+                    }
+                    RunKind::Fill => {
+                        fill(pool, actor, run, item, &translated, progress, named).await
+                    }
                 };
                 if let Err(e) = written {
                     if still(pool, actor, run.id).await?.is_none() {
@@ -476,18 +516,28 @@ async fn glossary(
 
 /// The run's status now, or `None` once it's gone.
 async fn still(pool: &PgPool, actor: Actor, id: Uuid) -> Result<Option<RunStatus>, AppError> {
-    let status: Option<String> =
-        sqlx::query_scalar("SELECT status FROM translation_runs WHERE id = $1 AND workspace_id = $2")
-            .bind(id)
-            .bind(actor.workspace_id)
-            .fetch_optional(pool)
-            .await?;
+    let status: Option<String> = sqlx::query_scalar(
+        "SELECT status FROM translation_runs WHERE id = $1 AND workspace_id = $2",
+    )
+    .bind(id)
+    .bind(actor.workspace_id)
+    .fetch_optional(pool)
+    .await?;
     Ok(status.and_then(|s| serde_json::from_value(Value::String(s)).ok()))
 }
 
 /// Ends a run, unless someone cancelled it first.
-async fn finish(pool: &PgPool, actor: Actor, id: Uuid, status: RunStatus, error: &str) -> Result<(), AppError> {
-    if still(pool, actor, id).await?.is_some_and(RunStatus::finished) {
+async fn finish(
+    pool: &PgPool,
+    actor: Actor,
+    id: Uuid,
+    status: RunStatus,
+    error: &str,
+) -> Result<(), AppError> {
+    if still(pool, actor, id)
+        .await?
+        .is_some_and(RunStatus::finished)
+    {
         return Ok(());
     }
     update_run(pool, actor, id, json!({ "status": status, "error": error })).await?;
@@ -495,7 +545,12 @@ async fn finish(pool: &PgPool, actor: Actor, id: Uuid, status: RunStatus, error:
 }
 
 /// Changes a run in a transaction of its own; `false` when it's gone.
-async fn update_run(pool: &PgPool, actor: Actor, id: Uuid, fields: Value) -> Result<bool, AppError> {
+async fn update_run(
+    pool: &PgPool,
+    actor: Actor,
+    id: Uuid,
+    fields: Value,
+) -> Result<bool, AppError> {
     let mut db = pool.begin().await?;
     match apply(&mut db, actor, vec![patch_run(id, fields)]).await {
         Ok(()) => {}
@@ -514,7 +569,11 @@ fn patch_run(id: Uuid, fields: Value) -> Operation {
     }
 }
 
-async fn load_run(db: &mut PgConnection, actor: Actor, id: Uuid) -> Result<Option<TranslationRun>, AppError> {
+async fn load_run(
+    db: &mut PgConnection,
+    actor: Actor,
+    id: Uuid,
+) -> Result<Option<TranslationRun>, AppError> {
     let row: Option<Value> = sqlx::query_scalar(
         "SELECT to_jsonb(r.*) FROM translation_runs r WHERE r.id = $1 AND r.workspace_id = $2",
     )
@@ -522,10 +581,16 @@ async fn load_run(db: &mut PgConnection, actor: Actor, id: Uuid) -> Result<Optio
     .bind(actor.workspace_id)
     .fetch_optional(&mut *db)
     .await?;
-    row.map(serde_json::from_value).transpose().map_err(AppError::internal)
+    row.map(serde_json::from_value)
+        .transpose()
+        .map_err(AppError::internal)
 }
 
-async fn apply(db: &mut PgConnection, actor: Actor, operations: Vec<Operation>) -> Result<(), AppError> {
+async fn apply(
+    db: &mut PgConnection,
+    actor: Actor,
+    operations: Vec<Operation>,
+) -> Result<(), AppError> {
     let transaction = Transaction {
         id: Uuid::now_v7(),
         operations,

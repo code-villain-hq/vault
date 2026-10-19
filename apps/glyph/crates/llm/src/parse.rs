@@ -47,9 +47,14 @@ fn is_placeholder(s: &str) -> bool {
     s.is_empty()
         || s == "<translate>"
         || s == "hallo welt"
-        || ["translated text here", "your translation here", "dein text hier", "corrected text here"]
-            .iter()
-            .any(|p| s.contains(p))
+        || [
+            "translated text here",
+            "your translation here",
+            "dein text hier",
+            "corrected text here",
+        ]
+        .iter()
+        .any(|p| s.contains(p))
 }
 
 /// A confidence from 0 to 1, rounded to two places; 95 means 0.95.
@@ -138,8 +143,18 @@ pub fn translation(reply: &str) -> (String, f64) {
 
     // 5. The first line that isn't a label or a scrap of JSON.
     const LABELS: &[&str] = &[
-        "translate", "translation", "source", "json", "response", "###", "##", "#", "```", "---",
-        "note:", "confidence",
+        "translate",
+        "translation",
+        "source",
+        "json",
+        "response",
+        "###",
+        "##",
+        "#",
+        "```",
+        "---",
+        "note:",
+        "confidence",
     ];
     for line in reply.lines() {
         let text = clean_line(line);
@@ -187,7 +202,11 @@ pub fn variants(reply: &str, term: &str) -> Vec<String> {
         .or_else(|| {
             let (start, end) = (reply.find('{')?, reply.rfind('}')?);
             (start < end)
-                .then(|| serde_json::from_str(&reply[start..=end]).ok().and_then(parse))
+                .then(|| {
+                    serde_json::from_str(&reply[start..=end])
+                        .ok()
+                        .and_then(parse)
+                })
                 .flatten()
         })
         .unwrap_or_default();
@@ -216,7 +235,10 @@ mod tests {
     #[test]
     fn generated_text_in_either_shape() {
         assert_eq!(generated_text(&json!({ "content": "a" })), Some("a"));
-        assert_eq!(generated_text(&json!({ "choices": [{ "text": "b" }] })), Some("b"));
+        assert_eq!(
+            generated_text(&json!({ "choices": [{ "text": "b" }] })),
+            Some("b")
+        );
         assert_eq!(
             generated_text(&json!({ "choices": [{ "message": { "content": "c" } }] })),
             Some("c")
@@ -244,9 +266,18 @@ more noise {"translation": "final", "confidence": 0.88}"#;
 
     #[test]
     fn replies_without_json_still_count() {
-        assert_eq!(translation("Hej världen | 0.9"), ("Hej världen".into(), 0.9));
-        assert_eq!(translation("### Translation:\n\"Hej\""), ("Hej".into(), UNSAID));
-        assert_eq!(translation("Translate:\n\"Hej då\"\n"), ("Hej då".into(), UNSAID));
+        assert_eq!(
+            translation("Hej världen | 0.9"),
+            ("Hej världen".into(), 0.9)
+        );
+        assert_eq!(
+            translation("### Translation:\n\"Hej\""),
+            ("Hej".into(), UNSAID)
+        );
+        assert_eq!(
+            translation("Translate:\n\"Hej då\"\n"),
+            ("Hej då".into(), UNSAID)
+        );
     }
 
     #[test]

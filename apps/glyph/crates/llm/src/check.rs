@@ -49,7 +49,10 @@ pub fn glossary_violations(translation: &str, glossary: &[GlossaryTerm]) -> Vec<
         .filter(|g| {
             let forms = accepted_forms(g);
             // A rule with no forms at all would flag every text.
-            !forms.is_empty() && !forms.iter().any(|f| contains_word(&lower, &f.to_lowercase()))
+            !forms.is_empty()
+                && !forms
+                    .iter()
+                    .any(|f| contains_word(&lower, &f.to_lowercase()))
         })
         .map(|g| Violation {
             source_term: g.source_term.clone(),
@@ -130,8 +133,15 @@ mod tests {
     #[test]
     fn glossary_terms_must_appear_as_words() {
         let email = [term("email", "e-post", &[])];
-        let variants = [term("email", "e-post", &["e-posten", "e-poster", "e-posterna"])];
-        let both = [term("email", "e-post", &[]), term("password", "lösenord", &[])];
+        let variants = [term(
+            "email",
+            "e-post",
+            &["e-posten", "e-poster", "e-posterna"],
+        )];
+        let both = [
+            term("email", "e-post", &[]),
+            term("password", "lösenord", &[]),
+        ];
         let cases: &[(&str, &[GlossaryTerm], usize)] = &[
             ("Har du glömt din e-post?", &email, 0),
             ("E-post address is required.", &email, 0),
@@ -144,7 +154,11 @@ mod tests {
             ("Logga in med e-post och lösen.", &both, 1),
             ("anything", &[], 0),
             ("E-posten är redan registrerad.", &variants, 0),
-            ("E-postadressen eller lösenordet är felaktigt.", &variants, 1),
+            (
+                "E-postadressen eller lösenordet är felaktigt.",
+                &variants,
+                1,
+            ),
             ("Kolla e-posterna nu.", &variants, 0),
         ];
         for (text, glossary, want) in cases {
@@ -154,7 +168,10 @@ mod tests {
 
     #[test]
     fn only_terms_in_the_text_go_to_the_model() {
-        let glossary = [term("email", "e-post", &[]), term("password", "lösenord", &[])];
+        let glossary = [
+            term("email", "e-post", &[]),
+            term("password", "lösenord", &[]),
+        ];
         let found = terms_in("Your Email address", &glossary);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].source_term, "email");

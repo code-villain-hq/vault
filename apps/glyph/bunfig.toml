@@ -1,0 +1,3 @@
+[test]
+# The Go app's leftovers and the Rust build aren't Bun's.
+pathIgnorePatterns = ["backend/**", "ui/**", "target/**"]

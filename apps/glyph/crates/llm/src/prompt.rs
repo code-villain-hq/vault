@@ -45,7 +45,11 @@ fn forms_list(g: &GlossaryTerm) -> String {
 
 fn mapping(g: &GlossaryTerm) -> String {
     if g.target_variants.is_empty() {
-        format!("  - {} → {}\n", quote(&g.source_term), quote(&g.target_term))
+        format!(
+            "  - {} → {}\n",
+            quote(&g.source_term),
+            quote(&g.target_term)
+        )
     } else {
         format!(
             "  - {} → {} (accepted forms: {})\n",
@@ -257,7 +261,12 @@ pub fn fix_glossary(job: &Job, previous: &str, violations: &[Violation], chat: b
 
 /// Asks for a term's grammatical forms: inflections, never synonyms or
 /// compounds.
-pub fn variants(source_lang: &str, target_lang: &str, source_term: &str, target_term: &str) -> String {
+pub fn variants(
+    source_lang: &str,
+    target_lang: &str,
+    source_term: &str,
+    target_term: &str,
+) -> String {
     format!(
         r#"You are a {target_lang} linguist. The word "{target_term}" is the canonical {target_lang} translation of the {source_lang} term "{source_term}".
 
@@ -302,7 +311,9 @@ mod tests {
         }];
         for chat in [true, false] {
             let prompt = translate(&job("Your email", &glossary), chat);
-            assert!(prompt.contains(r#""email" → "e-post" (accepted forms: "e-post", "e-posten")"#));
+            assert!(
+                prompt.contains(r#""email" → "e-post" (accepted forms: "e-post", "e-posten")"#)
+            );
             assert!(prompt.contains(r#""Your email""#));
         }
     }
@@ -310,7 +321,11 @@ mod tests {
     #[test]
     fn a_placeholder_fix_names_what_went_missing() {
         let prompt = fix_placeholders(&job("Hi {{name}}", &[]), "Hej", false);
-        assert!(prompt.contains(r#""{{name}}" must appear exactly 1 time(s) in the translation (found 0)."#));
+        assert!(
+            prompt.contains(
+                r#""{{name}}" must appear exactly 1 time(s) in the translation (found 0)."#
+            )
+        );
         let invented = fix_placeholders(&job("Hi", &[]), "Hej {{x}}", true);
         assert!(invented.contains("invented template tokens"));
         assert!(invented.contains("{{x}}"));

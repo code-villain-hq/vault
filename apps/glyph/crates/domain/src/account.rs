@@ -49,7 +49,7 @@ pub struct UserInfo {
 pub struct WorkspaceInfo {
     pub id: Uuid,
     pub name: String,
-    /// The workspace's name in URLs, e.g. `dib` in `/dib/translations`.
+    /// The workspace's name in URLs, e.g. `lair` in `/lair/translations`.
     pub url_key: String,
     pub role: Role,
 }
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn url_keys_are_readable_and_avoid_app_paths() {
         assert_eq!(url_key_from("Code Villain"), "code-villain");
-        assert_eq!(url_key_from("  DIB!!  Travel "), "dib-travel");
+        assert_eq!(url_key_from("  Evil!!  Lair "), "evil-lair");
         assert_eq!(url_key_from("Über"), "ber");
         assert_eq!(url_key_from("???"), "workspace");
         assert_eq!(url_key_from("Login"), "login-team");
