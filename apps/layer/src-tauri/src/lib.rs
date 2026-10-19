@@ -302,6 +302,7 @@ pub fn run() {
             commands::jira_issues,
             commands::jira_issue_types,
             commands::jira_browse,
+            commands::jira_issues_by_key,
             commands::jira_transitions,
             commands::jira_sync_status,
             commands::jira_transition,

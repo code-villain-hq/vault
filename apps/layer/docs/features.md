@@ -256,8 +256,20 @@ count, running agents, uncommitted changes and the review verdict.
   is dragged, terminals keep their size and are fitted once, when it is
   let go: each fit resizes the agent's terminal, which redraws its whole
   screen for it.
+- **TASK-17** The task list MUST group by stage (Tasks, In review, Done:
+  the default), by epic, or by repository, chosen from "by stage ▾" on its
+  heading and remembered across launches. By epic, a task is under its
+  ticket's epic; an epic-level ticket is its own; a task with no ticket, or
+  whose ticket has no epic, is under "No epic", last. A ticket not on your
+  own list is asked of Jira (`jira_issues_by_key`), once a session, and only
+  while the list is grouped by epic. By repository, a task in several is
+  listed once, under all of their names. Inside each group, and between
+  groups, the stage order holds: what is being written first, what has
+  landed last. Epic is not offered without Jira. Twenty tasks over five
+  epics read as one list; which belonged to which piece of work was only in
+  the ticket.
 
-Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `lib/drag.ts` (TASK-16).
+Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17).
 
 Known gaps:
 - A folder cut off before its last commit was recorded, or whose last
@@ -848,7 +860,7 @@ dot marks it only while something waits on your review.
 - **REV-8** "Opened by you" MUST group your PRs by whose move it is, in
   this order: needs you, ready to merge, checks running, waiting on
   review, drafts. A group with nothing in it is not shown. Each group can
-  be folded, and keeps the most recently updated first. A flat list of a
+  be folded, and keeps the order chosen (REV-11), the most recently updated first by default. A flat list of a
   dozen PRs hid the two that needed you among the drafts.
 - **REV-9** Every PR in "To review" MUST say what it asks of you: its size
   (lines added and removed, files), its checks as GitHub rolls them up,
@@ -868,10 +880,21 @@ dot marks it only while something waits on your review.
   review checkout left from 0.5.0 lists as an ordinary task, named
   `Review: <title>`, to be deleted. It is still never pushed nor opened as
   a pull request, and its ticket never moves.
+- **REV-11** Each tab MUST group by its own question (who it was asked of
+  for "To review", whose move it is for "Opened by you": the default), by
+  epic, or by repository, and sort newest first (the default), oldest
+  first, or, in "To review", smallest first (lines added and removed).
+  Each tab remembers its own choice across launches. By epic, a PR's
+  ticket is its task's, else the first Jira key in its branch, else in its
+  title, and its epic is found as for tasks (TASK-17); one with none is
+  under "No epic", last. Grouped another way, "To review" is one list of
+  yours and your team's, each card saying who it was asked of; a failed
+  team lookup still shows as a note above it (REV-1). Epic is not offered
+  without Jira.
 
 Code: `commands/github.rs` (`review_queue`, `github_review_queue`),
 `integrations/github/authored.rs`, `integrations/github/requested.rs`,
-`commands/pr_task.rs`, `ReviewsView.tsx`.
+`commands/pr_task.rs`, `ReviewsView.tsx`, `ReviewCards.tsx`, `lib/grouping.ts` (REV-11).
 
 ## 11. Notifications
 

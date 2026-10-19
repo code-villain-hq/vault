@@ -4,6 +4,9 @@ import { api, errMessage } from "../../lib/api";
 import { copyAndSay } from "../../lib/clipboard";
 import { useStore } from "../../store";
 import { taskReview } from "../../lib/derive";
+import { useEpics } from "../../lib/epics";
+import { byEpic, groupBy } from "../../lib/grouping";
+import { readOneOf, write } from "../../lib/persist";
 import { useFleetAgents } from "../../lib/panes";
 import type { JiraTransition, TaskView } from "../../lib/types";
 import { BusyOverlay, Confirm, ContextMenu, Field, Modal, type MenuItem } from "../ui";
@@ -12,6 +15,11 @@ import { FinishTask } from "../FinishTask";
 import { DeleteTask } from "./DeleteTask";
 import { TaskRow } from "./TaskRow";
 import { ProfileMenu } from "./ProfileMenu";
+
+/** What the task list is grouped by (TASK-17). Stage is the three lists it always had. */
+const GROUPINGS = ["stage", "epic", "repo"] as const;
+type Grouping = (typeof GROUPINGS)[number];
+const GROUPING_LABEL: Record<Grouping, string> = { stage: "Stage", epic: "Epic", repo: "Repository" };
 
 /**
  * The overview is a place, not merely what you see before choosing.
@@ -67,6 +75,7 @@ export function Sidebar() {
   const toast = useStore((s) => s.toast);
   const fail = useStore((s) => s.fail);
   const cursorIde = useStore((s) => s.cursorIde);
+  const jiraConnected = useStore((s) => s.settings?.jira_connected ?? false);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [addingRepoTo, setAddingRepoTo] = useState<TaskView | null>(null);
@@ -85,6 +94,14 @@ export function Sidebar() {
   /** The task whose delete dialog is open. */
   const [asking, setAsking] = useState<TaskView | null>(null);
   const [finishing, setFinishing] = useState<TaskView | null>(null);
+  const [grouping, setGroupingState] = useState<Grouping>(() => readOneOf("tasksGroup", GROUPINGS, "stage"));
+  const [groupMenu, setGroupMenu] = useState<{ x: number; y: number } | null>(null);
+  // Without Jira there is no epic to ask for; the choice is kept for when it is back.
+  const by: Grouping = grouping === "epic" && !jiraConnected ? "stage" : grouping;
+  const epics = useEpics(
+    tasks.flatMap((t) => (t.issue_key ? [t.issue_key] : [])),
+    by === "epic",
+  );
 
   function askDeleteTask(task: TaskView) {
     if (deleting) return;
@@ -301,6 +318,36 @@ export function Sidebar() {
   const elsewhere = new Set([...done, ...reviewing].map((t) => t.id));
   const working = tasks.filter((t) => !elsewhere.has(t.id));
   const ordered = [...working, ...reviewing, ...done];
+  // Grouped another way, each group keeps that order: what is being written
+  // first, what has landed last, and a group with work under way leads.
+  const groups =
+    by === "epic"
+      ? byEpic(ordered, (t) => (t.issue_key ? epics[t.issue_key] : null))
+      : by === "repo"
+        ? groupBy(ordered, (t) => {
+            // A task in several repositories is one piece of work: it is listed
+            // once, under all of them, rather than once under each.
+            const names = t.checkouts.map((c) => c.project_name).sort().join(", ");
+            return names ? { id: names, label: names } : null;
+          }, "No repository")
+        : null;
+
+  const row = (task: TaskView) => (
+    <TaskRow
+      key={task.id}
+      task={task}
+      selected={task.id === selected}
+      vanishing={deleting?.id === task.id}
+      open={expanded[task.id] ?? false}
+      review={review.get(task.id) ?? "none"}
+      canAdd={available(task).length > 0}
+      onSelect={select}
+      onMenu={onMenu}
+      onToggle={onToggle}
+      onAddRepo={setAddingRepoTo}
+      onRemoveRepo={askRemoveRepo}
+    />
+  );
 
   return (
     <div className="sidebar">
@@ -310,6 +357,19 @@ export function Sidebar() {
         <div className="section-head">
           Tasks
           <span className="count">{working.length}</span>
+          {tasks.length > 0 && (
+            <button
+              type="button"
+              className="group-by"
+              title="Group tasks by stage, epic or repository"
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setGroupMenu({ x: r.left, y: r.bottom + 4 });
+              }}
+            >
+              by {GROUPING_LABEL[by].toLowerCase()} ▾
+            </button>
+          )}
         </div>
 
         {tasks.length === 0 && (
@@ -344,7 +404,17 @@ export function Sidebar() {
           </div>
         )}
 
-        {ordered.map((task, i) => (
+        {groups?.map((g) => (
+          <Fragment key={g.id}>
+            <div className="section-head" title={g.key ? `${g.key} ${g.label}` : g.label}>
+              {g.key && <span className="group-key">{g.key}</span>}
+              <span className="group-label">{g.label}</span>
+            </div>
+            {g.items.map(row)}
+          </Fragment>
+        ))}
+
+        {!groups && ordered.map((task, i) => (
           <Fragment key={task.id}>
             {i === working.length && reviewing.length > 0 && (
               <div className="section-head">
@@ -358,19 +428,7 @@ export function Sidebar() {
                 <span className="count">{done.length}</span>
               </div>
             )}
-            <TaskRow
-              task={task}
-              selected={task.id === selected}
-              vanishing={deleting?.id === task.id}
-              open={expanded[task.id] ?? false}
-              review={review.get(task.id) ?? "none"}
-              canAdd={available(task).length > 0}
-              onSelect={select}
-              onMenu={onMenu}
-              onToggle={onToggle}
-              onAddRepo={setAddingRepoTo}
-              onRemoveRepo={askRemoveRepo}
-            />
+            {row(task)}
           </Fragment>
         ))}
 
@@ -383,6 +441,21 @@ export function Sidebar() {
           y={menu.y}
           onClose={() => setMenu(null)}
           items={taskMenu(menu.task)}
+        />
+      )}
+
+      {groupMenu && (
+        <ContextMenu
+          x={groupMenu.x}
+          y={groupMenu.y}
+          onClose={() => setGroupMenu(null)}
+          items={GROUPINGS.filter((g) => g !== "epic" || jiraConnected).map((g) => ({
+            label: `${g === by ? "✓ " : ""}${GROUPING_LABEL[g]}`,
+            onSelect: () => {
+              setGroupingState(g);
+              write("tasksGroup", g);
+            },
+          }))}
         />
       )}
 

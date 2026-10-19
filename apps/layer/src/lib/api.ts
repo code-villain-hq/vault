@@ -289,6 +289,7 @@ export const api = {
   setTicketStart: (projectKey: string, to: StartTo) => invoke<void>("set_ticket_start", { projectKey, to }),
   jiraBrowse: (text: string, whose: string, includeDone: boolean, types: string[]) =>
     invoke<JiraPage>("jira_browse", { text: text || null, whose, includeDone, types }),
+  jiraIssuesByKey: (keys: string[]) => invoke<JiraIssue[]>("jira_issues_by_key", { keys }),
   jiraCreateFields: (projectKey: string, issueTypeId: string) =>
     invoke<CreateField[]>("jira_create_fields", { projectKey, issueTypeId }),
   jiraCreateIssue: (req: {

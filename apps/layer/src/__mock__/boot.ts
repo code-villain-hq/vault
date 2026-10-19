@@ -508,6 +508,8 @@ const answer: Record<string, Answer> = {
   },
   jira_create_fields: () => world.requiredFields,
   jira_browse: () => ({ issues: world.issues, more: false }),
+  jira_issues_by_key: (a) =>
+    [...world.issues, ...world.elsewhere].filter((i) => (a.keys as string[]).includes(i.key)),
   jira_start_work: (a) => {
     const key = a.key as string;
     const root = `/Users/you/.villain-worktrees/${key}`;

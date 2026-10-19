@@ -212,6 +212,37 @@ pub async fn jira_browse(
     client.search(&jql, CAP).await
 }
 
+/// These tickets, wherever they are, for the epic each belongs to (TASK-17,
+/// REV-11). A task's ticket or a PR's is often not on your own list: done,
+/// given to someone else, or never yours.
+///
+/// Jira refuses the whole query when one key does not exist, and a key read
+/// from a branch name may be a guess; then each is asked for on its own, and
+/// the ones Jira does not have are left out.
+#[tauri::command]
+pub async fn jira_issues_by_key(state: State<'_, AppState>, keys: Vec<String>) -> Result<Vec<jira::Issue>> {
+    // The sidebar and both review lists together; past this, the rest show
+    // under "No epic" rather than sending a query per ticket.
+    const CAP: usize = 100;
+    let (client, _) = jira_client(&state)?;
+    let Some(jql) = jira::keys_jql(&keys[..keys.len().min(CAP)]) else {
+        return Ok(Vec::new());
+    };
+    match client.search(&jql, CAP as u32).await {
+        Ok(page) => Ok(page.issues),
+        Err(Error::Other(msg)) if msg.starts_with("Jira 400") => {
+            let mut found = Vec::new();
+            for key in keys.iter().take(CAP).filter(|k| jira::looks_like_a_key(k)) {
+                if let Ok(issue) = client.issue(key).await {
+                    found.push(issue);
+                }
+            }
+            Ok(found)
+        }
+        Err(e) => Err(e),
+    }
+}
+
 #[tauri::command]
 pub async fn jira_transitions(
     state: State<'_, AppState>,
