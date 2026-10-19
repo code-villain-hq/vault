@@ -1,0 +1,8 @@
+{
+  "title": "Sbires",
+  "hire": "Recruter",
+  "fire": "Renvoyer",
+  "rank": "Rang",
+  "minionCount_one": "{{count}} sbire",
+  "minionCount_other": "{{count}} sbires"
+}

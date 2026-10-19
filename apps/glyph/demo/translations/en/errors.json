@@ -1,0 +1,7 @@
+{
+  "notFound": "This page does not exist.",
+  "serverError": "Something went wrong on the server.",
+  "network": "No connection. Check your network.",
+  "permissionDenied": "Only the overlord can do that.",
+  "rateLimited": "Too many requests. Even villains must wait {{seconds}} seconds."
+}

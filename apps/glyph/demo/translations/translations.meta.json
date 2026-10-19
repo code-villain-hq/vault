@@ -1,0 +1,180 @@
+{
+  "translations": {
+    "en": {
+      "lair": {
+        "doomsdayClock": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z",
+          "context": "Banner at the top of the lair dashboard. Keep it short; {{minutes}} is a number."
+        },
+        "emptyState": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z",
+          "context": "Shown when there are no schemes. Playful, one sentence."
+        }
+      },
+      "minions": {
+        "promoteConfirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z",
+          "context": "Confirm dialog. Keep the <b> tags around the name."
+        }
+      },
+      "schemes": {
+        "foiledBy": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z",
+          "context": "{{hero}} is a superhero's name. Weary tone."
+        }
+      }
+    },
+    "sv": {
+      "minions": {
+        "promoteConfirm": {
+          "confidence": 0.55,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      },
+      "schemes": {
+        "status_foiled": {
+          "confidence": 0.62,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "deadline": {
+          "confidence": 0.48,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "foiledBy": {
+          "confidence": 0.91,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      },
+      "billing": {
+        "plan_overlord": {
+          "confidence": 0.66,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "invoiceDueSoon": {
+          "confidence": 0.88,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      },
+      "errors": {
+        "rateLimited": {
+          "confidence": 0.58,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      },
+      "common": {
+        "save": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "cancel": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "delete": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "edit": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "search": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "loading": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "back": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "next": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "confirm": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "close": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "yes": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "no": {
+          "confidence": 1.0,
+          "translated_by": "human",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      }
+    },
+    "fr": {
+      "auth": {
+        "welcomeBack": {
+          "confidence": 0.52,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      },
+      "lair": {
+        "doomsdayClock": {
+          "confidence": 0.64,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T09:30:00Z"
+        },
+        "subtitle": {
+          "confidence": 0.83,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      },
+      "minions": {
+        "minionCount_other": {
+          "confidence": 0.69,
+          "translated_by": "mistral",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      }
+    },
+    "fi": {
+      "auth": {
+        "signIn": {
+          "confidence": 0.5,
+          "translated_by": "viking",
+          "timestamp": "2026-10-12T09:30:00Z"
+        }
+      }
+    }
+  }
+}

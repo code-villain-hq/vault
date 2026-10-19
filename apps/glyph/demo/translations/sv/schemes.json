@@ -1,0 +1,11 @@
+{
+  "title": "Komplotter",
+  "newScheme": "Ny komplott",
+  "status_planning": "Planeras",
+  "status_active": "Pågår",
+  "status_foiled": "Avslöjad",
+  "deadline": "Deadline: {{date}}",
+  "budget": "Budget",
+  "foiledBy": "Stoppad av {{hero}}. Igen.",
+  "archive": "Arkivera"
+}

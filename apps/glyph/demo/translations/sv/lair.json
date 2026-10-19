@@ -1,0 +1,12 @@
+{
+  "title": "Näste",
+  "subtitle": "Din operationsbas",
+  "activeSchemes": "{{count}} aktiva komplotter",
+  "minionsOnDuty": "Hantlangare i tjänst",
+  "alertLevel": "Larmnivå",
+  "doomsdayClock": "Domedagsklockan: {{minutes}} minuter till midnatt",
+  "lastBreach": "Senaste intrång: {{date}}",
+  "welcomeTitle": "Välkommen till nästet",
+  "volcanoStatus": "Vulkanstatus: vilande",
+  "secretTunnel": "Hemlig tunnel"
+}

@@ -1,0 +1,12 @@
+{
+  "title": "Schemes",
+  "newScheme": "New scheme",
+  "status_planning": "Planning",
+  "status_active": "Active",
+  "status_foiled": "Foiled",
+  "deadline": "Deadline: {{date}}",
+  "budget": "Budget",
+  "foiledBy": "Foiled by {{hero}}. Again.",
+  "longDescriptionHint": "Describe the scheme in as much detail as you like: the target, the timeline, the minions involved, the backup plan, and the backup plan for the backup plan. Heroes rarely read this far.",
+  "archive": "Archive"
+}

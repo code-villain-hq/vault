@@ -1,0 +1,8 @@
+{
+  "title": "Repaire",
+  "subtitle": "Votre base d'opérations",
+  "activeSchemes": "{{count}} complots actifs",
+  "minionsOnDuty": "Sbires en service",
+  "doomsdayClock": "Horloge de l'apocalypse : {{minutes}} minutes avant minuit",
+  "welcomeTitle": "Bienvenue au repaire"
+}

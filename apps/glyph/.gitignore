@@ -40,3 +40,8 @@ models/
 *.tmp
 *.log
 tmp/
+translations.before-demo-*/
+
+# The made-up demo data is committed
+!demo/translations/
+!demo/translations/**
