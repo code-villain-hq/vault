@@ -153,7 +153,7 @@ Grey does most of the work. Poison (chartreuse) is the brand: the strike in ever
 
 **The mark** is the strike: a gothic C and V with a poison bar behind them, low and heavy, cut where the letters cross (`brand/mark/`). It is the surface's one brand moment. Each app's icon is its initial built the same way; a menu bar glyph is the mark without its tile, in colour.
 
-Principles: `design/principles.md`. Components: `design/components.md`.
+Principles: `design/principles.md`. Components: `design/components.md`. Behaviour: `design/behaviour.md`.
 
 ## Colors
 
