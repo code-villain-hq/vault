@@ -336,7 +336,7 @@ async fn invite_links_let_people_join(pool: PgPool) {
     assert_eq!(preview.status, StatusCode::OK);
     assert_eq!(
         preview.body,
-        json!({ "workspace_name": "Acme", "workspace_url_key": "acme", "invited_by": "Ada" })
+        json!({ "workspace_name": "Acme", "workspace_url_key": "acme", "invited_by": "Ada", "role": "member" })
     );
 
     // A new account joins through the link instead of creating a workspace.

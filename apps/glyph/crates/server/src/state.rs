@@ -6,6 +6,7 @@ use tokio::sync::{Semaphore, broadcast};
 use uuid::Uuid;
 
 use crate::limits::Attempts;
+use crate::oidc::OidcLogin;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -14,6 +15,8 @@ pub struct AppState {
     /// wake every connection (after missed notifications).
     pub wake: broadcast::Sender<Uuid>,
     pub cookie_secure: bool,
+    /// Signing in with Code Villain; when on, it's the only way in.
+    pub oidc_login: Option<Arc<OidcLogin>>,
     /// Wrong passwords per account, to slow down guessing.
     pub password_attempts: Arc<Attempts>,
     /// Sign-ups per client address, so nobody can make accounts (or find
@@ -37,6 +40,7 @@ impl AppState {
             pool,
             wake,
             cookie_secure,
+            oidc_login: None,
             password_attempts: Arc::default(),
             signup_attempts: Arc::new(Attempts::sign_ups()),
             trust_forwarded_for: false,
@@ -48,6 +52,12 @@ impl AppState {
 
     pub fn with_models(mut self, models: Models) -> Self {
         self.models = Arc::new(models);
+        self
+    }
+
+    /// Turns on signing in with Code Villain, and off passwords.
+    pub fn with_oidc_login(mut self, login: OidcLogin) -> Self {
+        self.oidc_login = Some(Arc::new(login));
         self
     }
 

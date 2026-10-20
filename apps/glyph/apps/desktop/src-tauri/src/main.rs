@@ -1,5 +1,6 @@
 //! Glyph's desktop app. It shows the web app (apps/web) and adds links
-//! opened in the browser and the session token kept in the system keychain;
+//! opened in the browser, the session token kept in the system keychain, and
+//! `glyph://` links, which bring a sign-in in the browser back to the app;
 //! the web app calls them when it runs here.
 
 // Don't open a console window next to the app on Windows release builds.
@@ -39,6 +40,7 @@ fn forget_session_token(server: String) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             session_token,

@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, invites, members, models, translate, ws};
+use crate::{accounts, invites, members, models, oidc, translate, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -50,6 +50,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/signup", post(accounts::signup))
         .route("/api/auth/login", post(accounts::login))
         .route("/api/auth/logout", post(accounts::logout))
+        .route("/api/auth/providers", get(providers))
+        .route("/api/auth/oidc", get(oidc::start))
+        .route("/api/auth/oidc/callback", get(oidc::callback))
+        .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/me", get(accounts::me).put(accounts::update_profile))
         .route("/api/me/password", put(accounts::change_password))
         .route("/api/invites/{token}", get(invites::preview))
@@ -83,6 +87,13 @@ async fn transaction(
 ) -> Result<Json<TransactionResult>, AppError> {
     let sync_id = glyph_sync::apply_transaction(&state.pool, member.actor, &transaction).await?;
     Ok(Json(TransactionResult { sync_id }))
+}
+
+/// `GET /api/auth/providers`: the ways to sign in. Signing in with Code
+/// Villain, when on, is the only one.
+async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let oidc = state.oidc_login.is_some();
+    Json(serde_json::json!({ "oidc": oidc, "password": !oidc }))
 }
 
 /// The packaged desktop app runs from its own origin (`tauri://localhost`,
