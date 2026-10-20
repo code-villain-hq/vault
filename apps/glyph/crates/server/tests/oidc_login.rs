@@ -353,7 +353,7 @@ async fn the_desktop_app_collects_its_session_once(pool: PgPool) {
     let (to, session) = sign_in(&app, "ada", &format!("?desktop={challenge}&redirect=/acme")).await;
     assert!(session.is_none(), "the browser isn't signed in");
     let code = to
-        .strip_prefix("glyph://signed-in?code=")
+        .strip_prefix("/signed-in?code=")
         .unwrap_or_else(|| panic!("{to}"));
     let (code, next) = code.split_once("&next=").unwrap();
     assert_eq!(next, "%2Facme");
@@ -379,4 +379,24 @@ async fn the_desktop_app_collects_its_session_once(pool: PgPool) {
 
     let again = app.router.clone().oneshot(collect(secret)).await.unwrap();
     assert_eq!(again.status(), StatusCode::UNAUTHORIZED, "codes work once");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_failed_desktop_sign_in_goes_back_to_the_app(pool: PgPool) {
+    let Setup { app, .. } = setup(pool).await;
+    let challenge = hex::encode(Sha256::digest(b"the desktop app's secret"));
+    let (to, session) = sign_in(&app, "newbie", &format!("?desktop={challenge}")).await;
+    assert_eq!(to, "/signed-in?error=oidc_no_account");
+    assert!(session.is_none());
+
+    let started = start(&app, &format!("?desktop={challenge}")).await;
+    let tampered = Started {
+        state: format!("{}0", started.state),
+        ..started
+    };
+    let (to, _) = back(&app, "ada", &tampered, &tampered.cookie).await;
+    assert_eq!(
+        to, "/login?error=oidc_expired",
+        "a trip that can't be read isn't the app's"
+    );
 }

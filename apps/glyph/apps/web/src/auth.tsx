@@ -122,6 +122,11 @@ const OIDC_PROBLEMS: Record<string, string> = {
   oidc_failed: "Something went wrong. Try again.",
 };
 
+/** A Code Villain sign-in problem we have words for; unknown codes are the general one. */
+function oidcCode(code: string) {
+  return Object.hasOwn(OIDC_PROBLEMS, code) ? code : "oidc_failed";
+}
+
 type SignInProps = {
   label: string;
   /** An invite to join with, or where to go afterwards. */
@@ -162,8 +167,16 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
   useEffect(() => {
     if (!secret) return;
     return onAppLink(async (url) => {
+      if (!url.href.startsWith("glyph://signed-in")) return;
+      // The browser says why it didn't work; stop waiting and say so here.
+      const problem = url.searchParams.get("error");
+      if (problem) {
+        setSecret(null);
+        setError(OIDC_PROBLEMS[oidcCode(problem)] ?? null);
+        return;
+      }
       const code = url.searchParams.get("code");
-      if (!url.href.startsWith("glyph://signed-in") || !code) return;
+      if (!code) return;
       setSecret(null);
       try {
         signedIn(await api<Me>("POST", "/api/auth/oidc/desktop", { code, secret }));
@@ -232,7 +245,7 @@ export function LoginPage() {
     return <Redirect to={safeRedirect(redirect)} />;
   }
   if (!providers) return <Splash />;
-  const problem = problemCode ? (OIDC_PROBLEMS[problemCode] ?? OIDC_PROBLEMS.oidc_failed) : null;
+  const problem = problemCode ? OIDC_PROBLEMS[oidcCode(problemCode)] : null;
   const query: Record<string, string> = redirect ? { redirect: safeRedirect(redirect) } : {};
 
   if (providers.oidc) {
@@ -457,6 +470,49 @@ export function JoinPage() {
           Sign in to join
         </Link>
       </p>
+    </AuthScreen>
+  );
+}
+
+/**
+ * Where a desktop sign-in ends in the browser: opens the desktop app with
+ * the one-time code, and leaves a page that says the tab can go. The code
+ * is no use without the secret only that app holds. When signing in failed,
+ * it says why, and tells the app so it stops waiting.
+ */
+export function SignedInPage() {
+  const { code, next, error } = useSearch({ from: "/signed-in" });
+  const problem = error ? oidcCode(error) : null;
+  const link = problem
+    ? `glyph://signed-in?${new URLSearchParams({ error: problem })}`
+    : /^[0-9a-f]{64}$/.test(code ?? "")
+      ? `glyph://signed-in?${new URLSearchParams({ code: code ?? "", next: safeRedirect(next) })}`
+      : null;
+
+  useEffect(() => {
+    if (link) window.location.href = link;
+  }, [link]);
+
+  if (!link) return <Redirect to="/" />;
+  if (problem) {
+    return (
+      <AuthScreen title="Couldn't sign you in">
+        <div className="mb-4">
+          <ErrorMessage>{OIDC_PROBLEMS[problem]}</ErrorMessage>
+        </div>
+        <p className="mb-6 text-center text-muted">Glyph shows this too. You can close this tab.</p>
+        <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
+          Back to Glyph
+        </a>
+      </AuthScreen>
+    );
+  }
+  return (
+    <AuthScreen title="You're signed in">
+      <p className="-mt-3 mb-6 text-center text-muted">Glyph is opening. You can close this tab.</p>
+      <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
+        Open Glyph
+      </a>
     </AuthScreen>
   );
 }

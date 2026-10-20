@@ -1,5 +1,5 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
-import { JoinPage, LoginPage, SignupPage } from "./auth";
+import { JoinPage, LoginPage, SignedInPage, SignupPage } from "./auth";
 import { GlossaryPage, type GlossarySearch } from "./glossary";
 import { ImportExportPage } from "./import-export";
 import { Home, NotFound, WorkspaceLayout } from "./layout";
@@ -29,6 +29,20 @@ const login = createRoute({
 const signup = createRoute({ getParentRoute: () => root, path: "/signup", component: SignupPage });
 
 const join = createRoute({ getParentRoute: () => root, path: "/join/$token", component: JoinPage });
+
+/** Where a desktop sign-in ends in the browser, to hand back to the app. */
+const signedIn = createRoute({
+  getParentRoute: () => root,
+  path: "/signed-in",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { code?: string; next?: string; error?: string } => ({
+    code: text(search.code),
+    next: text(search.next),
+    error: text(search.error),
+  }),
+  component: SignedInPage,
+});
 
 /** Everything inside a workspace: `/<url key>/...`. */
 const workspace = createRoute({
@@ -99,6 +113,7 @@ const routeTree = root.addChildren([
   index,
   login,
   signup,
+  signedIn,
   join,
   workspace.addChildren([
     overview,

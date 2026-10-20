@@ -213,7 +213,14 @@ pub fn clean_name(name: &str, what: &str) -> Result<String, ValidationError> {
 
 /// Paths the app uses itself, which a workspace's URL key must not take.
 const RESERVED_URL_KEYS: &[&str] = &[
-    "api", "assets", "join", "login", "logout", "settings", "signup",
+    "api",
+    "assets",
+    "join",
+    "login",
+    "logout",
+    "settings",
+    "signed-in",
+    "signup",
 ];
 
 /// A URL key based on a workspace name: lowercase letters, digits and dashes.
@@ -274,6 +281,7 @@ mod tests {
         assert_eq!(url_key_from("Über"), "ber");
         assert_eq!(url_key_from("???"), "workspace");
         assert_eq!(url_key_from("Login"), "login-team");
+        assert_eq!(url_key_from("Signed in"), "signed-in-team");
         assert!(url_key_from(&"a".repeat(80)).len() <= 32);
     }
 }

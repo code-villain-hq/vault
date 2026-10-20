@@ -24,10 +24,13 @@
 //!
 //! The desktop app can't see the browser's cookies. It opens the system
 //! browser at `/api/auth/oidc?desktop=<challenge>`, the hex SHA-256 of a
-//! secret it keeps. Once signed in, the browser goes to
-//! `glyph://signed-in?code=<code>&next=<path>`, and the app trades that
-//! one-time code and its secret at `POST /api/auth/oidc/desktop` for a
-//! session.
+//! secret it keeps. Once signed in, the browser lands on the web app's
+//! `/signed-in?code=<code>&next=<path>` page, which opens
+//! `glyph://signed-in` with the same query and says the tab can close. The
+//! app trades that one-time code and its secret at
+//! `POST /api/auth/oidc/desktop` for a session. When signing in fails, the
+//! page gets `?error=<problem>` instead and passes it on, so the app stops
+//! waiting and says why.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -61,8 +64,8 @@ use crate::state::AppState;
 const NONCE_COOKIE: &str = "glyph_oidc_login";
 /// How long someone has to finish signing in at the provider.
 const VALID_FOR: i64 = 10 * 60;
-/// Where the browser hands a desktop sign-in back to the app.
-pub const DESKTOP_RETURN: &str = "glyph://signed-in";
+/// The web app's page that hands a desktop sign-in back to the app.
+pub const DESKTOP_RETURN: &str = "/signed-in";
 /// How long the desktop app has to collect its session.
 const HANDOFF_FOR: Duration = Duration::from_secs(5 * 60);
 
@@ -442,9 +445,11 @@ fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     .expect("a cookie made of hex and ASCII is a valid header")
 }
 
-/// Back to the sign-in screen, which explains the problem.
-fn failed(problem: Problem, secure: bool) -> Response {
-    let to = format!("/login?error={}", problem.code());
+/// Back to the sign-in screen, which explains the problem; for a desktop
+/// sign-in, to the page that hands it back to the app.
+fn failed(problem: Problem, desktop: bool, secure: bool) -> Response {
+    let page = if desktop { DESKTOP_RETURN } else { "/login" };
+    let to = format!("{page}?error={}", problem.code());
     redirect(&to, &[nonce_cookie("", 0, secure)])
 }
 
@@ -459,12 +464,13 @@ pub struct StartParams {
 /// `GET /api/auth/oidc`: off to the provider to sign in.
 pub async fn start(State(state): State<AppState>, Query(params): Query<StartParams>) -> Response {
     let secure = state.cookie_secure;
+    let desktop = params.desktop.is_some();
     let Some(login) = state.oidc_login.as_ref() else {
-        return failed(Problem::NotSetUp, secure);
+        return failed(Problem::NotSetUp, desktop, secure);
     };
     let endpoints = match login.endpoints().await {
         Ok(endpoints) => endpoints,
-        Err(problem) => return failed(problem, secure),
+        Err(problem) => return failed(problem, desktop, secure),
     };
     let nonce = new_token();
     let verifier = new_token();
@@ -519,6 +525,11 @@ pub async fn callback(
 ) -> Response {
     let secure = state.cookie_secure;
     let clear = nonce_cookie("", 0, secure);
+    // A trip that can't be read can't say it came from the app.
+    let desktop = (state.oidc_login.as_ref())
+        .zip(params.state.as_deref())
+        .and_then(|(login, s)| login.read_state(s))
+        .is_some_and(|trip| trip.desktop.is_some());
     match finish(&state, &headers, params).await {
         Ok(Done::Browser { session, to }) => {
             redirect(&to, &[session_cookie(&session, secure), clear])
@@ -527,7 +538,7 @@ pub async fn callback(
             &format!("{DESKTOP_RETURN}?code={code}&next={}", urlencode(&to)),
             &[clear],
         ),
-        Err(problem) => failed(problem, secure),
+        Err(problem) => failed(problem, desktop, secure),
     }
 }
 
