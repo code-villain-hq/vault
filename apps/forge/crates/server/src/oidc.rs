@@ -24,10 +24,11 @@
 //!
 //! The desktop app can't see the browser's cookies. It opens the system
 //! browser at `/api/auth/oidc?desktop=<challenge>`, the hex SHA-256 of a
-//! secret it keeps. Once signed in, the browser goes to
-//! `forge://signed-in?code=<code>&next=<path>`, and the app trades that
-//! one-time code and its secret at `POST /api/auth/oidc/desktop` for a
-//! session.
+//! secret it keeps. Once signed in, the browser lands on the web app's
+//! `/signed-in?code=<code>&next=<path>` page, which opens
+//! `forge://signed-in` with the same query and tells the person they can
+//! close the tab. The app trades that one-time code and its secret at
+//! `POST /api/auth/oidc/desktop` for a session.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -61,8 +62,8 @@ use crate::state::AppState;
 const NONCE_COOKIE: &str = "forge_oidc_login";
 /// How long someone has to finish signing in at the provider.
 const VALID_FOR: i64 = 10 * 60;
-/// Where the browser hands a desktop sign-in back to the app.
-pub const DESKTOP_RETURN: &str = "forge://signed-in";
+/// The web app's page that hands a desktop sign-in back to the app.
+pub const DESKTOP_RETURN: &str = "/signed-in";
 /// How long the desktop app has to collect its session.
 const HANDOFF_FOR: Duration = Duration::from_secs(5 * 60);
 

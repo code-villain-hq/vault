@@ -350,7 +350,7 @@ async fn the_desktop_app_collects_its_session_once(pool: PgPool) {
     let (to, session) = sign_in(&app, "ada", &format!("?desktop={challenge}&redirect=/acme")).await;
     assert!(session.is_none(), "the browser isn't signed in");
     let code = to
-        .strip_prefix("forge://signed-in?code=")
+        .strip_prefix("/signed-in?code=")
         .unwrap_or_else(|| panic!("{to}"));
     let (code, next) = code.split_once("&next=").unwrap();
     assert_eq!(next, "%2Facme");

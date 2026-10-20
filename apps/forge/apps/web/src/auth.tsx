@@ -528,3 +528,29 @@ export function JoinPage() {
     </AuthScreen>
   );
 }
+
+/**
+ * Where a desktop sign-in ends in the browser: opens the desktop app with
+ * the one-time code, and leaves a page that says the tab can go. The code
+ * is no use without the secret only that app holds.
+ */
+export function SignedInPage() {
+  const { code, next } = useSearch({ from: "/signed-in" });
+  const link = /^[0-9a-f]{64}$/.test(code ?? "")
+    ? `forge://signed-in?${new URLSearchParams({ code: code ?? "", next: safeRedirect(next) })}`
+    : null;
+
+  useEffect(() => {
+    if (link) window.location.href = link;
+  }, [link]);
+
+  if (!link) return <Redirect to="/" />;
+  return (
+    <AuthScreen title="You're signed in">
+      <p className="-mt-3 mb-6 text-center text-muted">Forge is opening. You can close this tab.</p>
+      <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
+        Open Forge
+      </a>
+    </AuthScreen>
+  );
+}
