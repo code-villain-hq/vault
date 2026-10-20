@@ -103,11 +103,11 @@ issue is done.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, types up to date, Biome,
   typecheck, bun tests, web build. It must pass before you finish.
-  GitHub runs it on every pull request too (`.github/workflows/check.yml`),
-  merged with the latest `main`, and shows the result on the pull request.
-  (GitHub can't block merging a red pull request on this private repository's
-  plan, so look before merging.) Locally, `FORGE_CHECK_SKIP_DESKTOP=1` leaves
-  the desktop app out, as GitHub's main job does.
+  The vault's CI runs it on every push that touches Forge
+  (`.forgejo/workflows/forge.yml`, on the MacBook's runner). It runs on push
+  only, not on pull requests, so a pull request shows no result: run the
+  check before you open one. Locally, `FORGE_CHECK_SKIP_DESKTOP=1` leaves the
+  desktop app out.
 
 Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 `.cargo/config.toml`.

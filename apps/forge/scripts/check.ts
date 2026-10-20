@@ -3,8 +3,8 @@ import { readdir } from "node:fs/promises";
 import { $ } from "bun";
 
 const root = new URL("..", import.meta.url).pathname;
-// GitHub checks the desktop app in a job of its own, so the main check
-// doesn't wait for Tauri to build (FOR-35).
+// FORGE_CHECK_SKIP_DESKTOP leaves the desktop app out, for a quicker check
+// that doesn't wait for Tauri to build.
 const crates = process.env.FORGE_CHECK_SKIP_DESKTOP
   ? ["--workspace", "--exclude", "forge-desktop"]
   : ["--workspace"];
