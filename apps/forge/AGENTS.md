@@ -4,7 +4,9 @@ Forge is an AI-first issue tracker in the spirit of Linear. Its specs and
 decisions live in Forge itself, not in this repository: read them through the
 Forge MCP tools before larger changes. `get_issue` lists the ones an issue
 follows; `list_specs` also finds the product-wide ones ("Product: what Forge
-is and why", "Product: concepts", "Architecture overview"). Decisions are
+is and why", "Product: concepts", "Architecture overview"). To find what the
+specs say about something, `search_specs` returns only the requirements that
+mention it; `get_spec` with `outline` lists a spec's requirements. Decisions are
 records there too (the early ones keep their numbers, "D1: …" to "D35: …");
 record a new one with `save_decision` when you settle something.
 

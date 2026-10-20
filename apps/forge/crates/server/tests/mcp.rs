@@ -629,6 +629,7 @@ async fn save_spec_points_out_where_a_behaviour_spec_breaks_the_convention(pool:
         s.agent,
         SpecRef {
             spec: "Rate limits".into(),
+            outline: None,
         },
     )
     .await
@@ -676,6 +677,153 @@ async fn save_spec_points_out_where_a_behaviour_spec_breaks_the_convention(pool:
     assert!(
         fixed.starts_with("Updated Spec") && !fixed.contains("convention"),
         "{fixed}"
+    );
+}
+
+/// Agents find the requirements that mention something without reading
+/// whole specs ("Finding requirements", "A spec's outline").
+#[sqlx::test(migrations = "../../migrations")]
+async fn agents_find_requirements_without_reading_whole_specs(pool: PgPool) {
+    let s = setup(pool).await;
+    let pool = &s.app.pool;
+    save_service(
+        pool,
+        s.agent,
+        SaveService {
+            service: None,
+            name: Some("MCP server".into()),
+            description: None,
+            team: Some("FOR".into()),
+            repository: None,
+            paths: None,
+            current_state: None,
+        },
+    )
+    .await
+    .unwrap();
+    let write = |title: &str, service: Option<&str>, body: String| SaveSpec {
+        body: Some(body),
+        ..spec(title, "active", service, None)
+    };
+    let sign_in = "## Purpose\n\nSigning in.\n\n## Requirements\n\n\
+### Requirement: Signing in\nPeople SHALL sign in with a button.\n\n\
+#### Scenario: Through GitHub\n- **WHEN** Ada signs in through GitHub\n- **THEN** she's in\n\n\
+### Requirement: Signing out\nPeople SHALL sign out.\n\n\
+#### Scenario: Out\n- **WHEN** Ada signs out\n- **THEN** she's out\n";
+    save_spec(
+        pool,
+        s.person,
+        write("Signing in with GitHub", None, sign_in.into()),
+    )
+    .await
+    .unwrap();
+    let tokens = "## Purpose\n\nTokens.\n\n## Requirements\n\n\
+### Requirement: Tokens expire\nA token SHALL expire after a year.\n\n\
+#### Scenario: Old token\n- **WHEN** a token is a year old\n- **THEN** it's refused\n\n\
+### Requirement: Tokens are shown once\nA token SHALL be shown once.\n\n\
+#### Scenario: Shown\n- **WHEN** an agent is added\n- **THEN** its token is shown once\n";
+    save_spec(
+        pool,
+        s.person,
+        write("Agents' tokens", Some("MCP server"), tokens.into()),
+    )
+    .await
+    .unwrap();
+    let overview = "Forge talks to GitHub through an app.".to_string();
+    save_spec(
+        pool,
+        s.person,
+        write("Architecture overview", None, overview),
+    )
+    .await
+    .unwrap();
+    let many = (1..=25)
+        .map(|n| format!("### Requirement: Limit {n}\nIt SHALL limit.\n\n#### Scenario: Hit\n- **WHEN** hit\n- **THEN** limited\n"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let many = format!("## Purpose\n\nLimits.\n\n## Requirements\n\n{many}");
+    save_spec(pool, s.person, write("Rate limits", None, many))
+        .await
+        .unwrap();
+    let search = |query: &str, service: Option<&str>| {
+        search_specs(
+            pool,
+            s.agent,
+            SearchSpecs {
+                query: query.into(),
+                service: service.map(Into::into),
+            },
+        )
+    };
+    let names = |found: &Value| {
+        found["requirements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["requirement"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+
+    // A word in a scenario finds the requirement in full, under its spec;
+    // a prose spec that mentions it is only named.
+    let found = parse(search("github", None).await.unwrap());
+    assert_eq!(names(&found), ["Signing in"], "{found}");
+    assert_eq!(found["requirements"][0]["spec"], "Signing in with GitHub");
+    assert!(
+        found["requirements"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("#### Scenario: Through GitHub"),
+        "{found}"
+    );
+    assert_eq!(
+        found["prose_specs"][0]["spec"], "Architecture overview",
+        "{found}"
+    );
+    assert!(found["prose_specs"][0].get("text").is_none(), "{found}");
+
+    // Every word has to be there.
+    let found = parse(search("token EXPIRE", None).await.unwrap());
+    assert_eq!(names(&found), ["Tokens expire"], "{found}");
+
+    // One service's specs.
+    let found = parse(search("shall", Some("MCP server")).await.unwrap());
+    assert_eq!(
+        names(&found),
+        ["Tokens expire", "Tokens are shown once"],
+        "{found}"
+    );
+
+    // Many matches: 20 come back, and the rest are counted.
+    let found = parse(search("limit", None).await.unwrap());
+    assert_eq!(names(&found).len(), 20, "{found}");
+    assert_eq!(found["more"], 5, "{found}");
+
+    assert!(search(" ", None).await.is_err());
+
+    // The outline names requirements and scenarios, without the text.
+    let outline = parse(
+        get_spec(
+            pool,
+            s.agent,
+            SpecRef {
+                spec: "Agents' tokens".into(),
+                outline: Some(true),
+            },
+        )
+        .await
+        .unwrap(),
+    );
+    assert_eq!(
+        outline["requirements"],
+        json!([
+            { "name": "Tokens expire", "scenarios": ["Old token"] },
+            { "name": "Tokens are shown once", "scenarios": ["Shown"] },
+        ])
+    );
+    assert!(
+        outline.get("body").is_none() && outline.get("history").is_none(),
+        "{outline}"
     );
 }
 
@@ -2000,6 +2148,7 @@ async fn agents_write_spec_changes_instead_of_editing_specs(pool: PgPool) {
             s.agent,
             SpecRef {
                 spec: "Rate limits".into(),
+                outline: None,
             },
         )
         .await
@@ -2040,6 +2189,7 @@ async fn agents_write_spec_changes_instead_of_editing_specs(pool: PgPool) {
         s.agent,
         SpecRef {
             spec: "Rate limits".into(),
+            outline: None,
         },
     )
     .await
@@ -2270,6 +2420,7 @@ async fn a_spec_has_a_domain(pool: PgPool) {
     let read = |text: String| serde_json::from_str::<Value>(&text).unwrap();
     let spec_ref = || SpecRef {
         spec: "Invite links".into(),
+        outline: None,
     };
     let saved = read(get_spec(pool, s.person, spec_ref()).await.unwrap());
     assert_eq!(saved["domain"], "Accounts");

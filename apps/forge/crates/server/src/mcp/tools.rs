@@ -1483,11 +1483,29 @@ fn service_names<'a>(s: &'a Snapshot, sp: &Spec) -> Vec<&'a str> {
 pub struct SpecRef {
     /// Spec id or title.
     pub spec: String,
+    /// true for only its requirements' and their scenarios' names, without
+    /// its text and history.
+    pub outline: Option<bool>,
 }
 
 pub async fn get_spec(pool: &PgPool, actor: Actor, input: SpecRef) -> ToolResult<String> {
     let s = Snapshot::load(pool, actor).await?;
     let sp = s.spec(&input.spec)?;
+    if input.outline == Some(true) {
+        return pretty(json!({
+            "id": sp.id,
+            "title": sp.title,
+            "status": sp.status,
+            "domain": s.domain_of(sp),
+            "services": service_names(&s, sp),
+            "project": sp.project_id.and_then(|id| s.projects.iter().find(|p| p.id == id)).map(|p| &p.name),
+            "updated_at": sp.updated_at,
+            "requirements": requirements(&sp.body).iter().map(|r| json!({
+                "name": r.name,
+                "scenarios": scenario_names(&r.text),
+            })).collect::<Vec<_>>(),
+        }));
+    }
     pretty(json!({
         "id": sp.id,
         "title": sp.title,
@@ -1499,6 +1517,80 @@ pub async fn get_spec(pool: &PgPool, actor: Actor, input: SpecRef) -> ToolResult
         "updated_at": sp.updated_at,
         // The issues whose spec changes it took in, newest first.
         "history": spec_history(&s, sp),
+    }))
+}
+
+/// The names of a requirement's `#### Scenario:`s, in order.
+fn scenario_names(text: &str) -> Vec<&str> {
+    text.lines()
+        .filter_map(|line| line.strip_prefix("#### Scenario:"))
+        .map(str::trim)
+        .collect()
+}
+
+/// At most this many requirements come back from a search.
+const SEARCH_LIMIT: usize = 20;
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct SearchSpecs {
+    /// Words that must all appear, in any case.
+    pub query: String,
+    /// Only the specs of this service (id or name).
+    pub service: Option<String>,
+}
+
+/// The requirements that mention every word, in full, so an agent doesn't
+/// read whole specs to find them. Specs without requirements are prose and
+/// are only named.
+pub async fn search_specs(pool: &PgPool, actor: Actor, input: SearchSpecs) -> ToolResult<String> {
+    let words: Vec<String> = input
+        .query
+        .split_whitespace()
+        .map(str::to_lowercase)
+        .collect();
+    if words.is_empty() {
+        return Err("give the words to look for".into());
+    }
+    let s = Snapshot::load(pool, actor).await?;
+    let service = input
+        .service
+        .as_deref()
+        .map(|sv| s.service(sv))
+        .transpose()?;
+    let mentions = |text: &str| {
+        let text = text.to_lowercase();
+        words.iter().all(|w| text.contains(w.as_str()))
+    };
+    let mut found = Vec::new();
+    let mut prose = Vec::new();
+    for sp in s
+        .specs
+        .iter()
+        .filter(|sp| service.is_none_or(|sv| sp.service_ids.contains(&sv.id)))
+    {
+        let reqs = requirements(&sp.body);
+        if reqs.is_empty() {
+            if mentions(&sp.title) || mentions(&sp.body) {
+                prose.push(json!({ "spec_id": sp.id, "spec": sp.title }));
+            }
+            continue;
+        }
+        for r in reqs.into_iter().filter(|r| mentions(&r.text)) {
+            found.push(json!({
+                "spec_id": sp.id,
+                "spec": sp.title,
+                "requirement": r.name,
+                "text": r.text,
+            }));
+        }
+    }
+    let more = found.len().saturating_sub(SEARCH_LIMIT);
+    found.truncate(SEARCH_LIMIT);
+    pretty(json!({
+        "requirements": found,
+        "more": more,
+        // Specs without requirements that mention the words: get_spec reads them.
+        "prose_specs": prose,
     }))
 }
 

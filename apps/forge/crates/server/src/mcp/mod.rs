@@ -34,6 +34,8 @@ Read specs and decisions here instead of from files in the repository.
 - Before working on an issue, call get_issue: it includes the discussion, sub-issues, relations and \
 the specs and decisions it follows (its service's, its project's and workspace-wide ones). \
 get_service, get_spec and get_decision give the full text.
+- To find what the specs say about something, use search_specs: it returns only the requirements that \
+mention it. get_spec with outline lists a spec's requirements; read whole specs only when you need them.
 - Issues are identified like FOR-12. Statuses, people, labels, projects and services are referred to by name.
 - To clear a field, pass \"none\".
 - An issue's description is its scope: build what it says. Comments are discussion. To change what an issue \
@@ -297,7 +299,20 @@ impl Forge {
         list_specs(&self.pool, actor(&parts)?, input).await
     }
 
-    #[tool(description = "One spec in full.")]
+    #[tool(
+        description = "The requirements that mention every one of the words, each in full with its scenarios and under its spec, optionally for one service; specs without requirements that mention them are named. Use it to find what the specs say about something before reading whole specs."
+    )]
+    async fn search_specs(
+        &self,
+        Parameters(input): Parameters<SearchSpecs>,
+        Extension(parts): Extension<Parts>,
+    ) -> Result<String, String> {
+        search_specs(&self.pool, actor(&parts)?, input).await
+    }
+
+    #[tool(
+        description = "One spec in full, or with `outline` only the names of its requirements and their scenarios."
+    )]
     async fn get_spec(
         &self,
         Parameters(input): Parameters<SpecRef>,
