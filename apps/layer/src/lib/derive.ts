@@ -181,7 +181,9 @@ export function groupByEpic(issues: JiraIssue[], started: Set<string> = new Set(
       if (a.key === "") return 1;
       if (b.key === "") return -1;
       if (a.live !== b.live) return b.live - a.live;
-      return a.key.localeCompare(b.key);
+      // Then in the order of each epic's top ticket: the list comes in
+      // sorted (TKT-13), and a bucket is made where its first ticket is.
+      return 0;
     });
 }
 

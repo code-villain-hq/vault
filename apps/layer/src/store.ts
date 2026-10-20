@@ -86,6 +86,8 @@ interface State {
   settings: Settings | null;
   issues: JiraIssue[];
   issueTypes: JiraIssueType[];
+  /** The site's priorities, highest first, for sorting by them (TKT-13). */
+  priorities: string[];
   issuesLoading: boolean;
   /** A fetch has completed, so the list — even an empty one — is a real snapshot. */
   issuesLoaded: boolean;
@@ -347,6 +349,7 @@ export const useStore = create<State>((set, get) => {
   settings: null,
   issues: [],
   issueTypes: [],
+  priorities: [],
   issuesLoading: false,
   issuesLoaded: false,
   issuesTruncated: false,
@@ -585,7 +588,7 @@ export const useStore = create<State>((set, get) => {
     // Disconnecting has to take the list with it, or the badge keeps counting
     // tickets from a site the app can no longer reach.
     if (!settings.jira_connected && (get().issues.length > 0 || get().issuesLoaded)) {
-      set({ issues: [], issueTypes: [], issuesTruncated: false, issuesLoaded: false });
+      set({ issues: [], issueTypes: [], priorities: [], issuesTruncated: false, issuesLoaded: false });
     }
     // Only when GitHub itself changed. Every slider moved and every update
     // from base refreshed settings, and each ran a search — which GitHub
@@ -639,11 +642,14 @@ export const useStore = create<State>((set, get) => {
     const spin = !opts?.quiet || !get().issuesLoaded;
     if (spin) set({ issuesLoading: true });
     try {
-      const [page, issueTypes] = await Promise.all([
+      const [page, issueTypes, priorities] = await Promise.all([
         api.jiraIssues(),
         // Types rarely change and are cached in the backend; a failure here
         // must not stop the issues themselves from showing.
         api.jiraIssueTypes().catch(() => get().issueTypes),
+        // Asked once per connection, as rarely changed. Without them a sort
+        // by priority keeps the order it had.
+        get().priorities.length > 0 ? get().priorities : api.jiraPriorities().catch(() => []),
       ]);
       // As for reviews: an answer from a site disconnected meanwhile is not kept.
       if (!get().settings?.jira_connected) return;
@@ -651,6 +657,7 @@ export const useStore = create<State>((set, get) => {
         issues: reuse(s.issues, page.issues, (i) => i.key),
         issuesTruncated: page.more,
         issueTypes: keep(s.issueTypes, issueTypes),
+        priorities: keep(s.priorities, priorities),
         issuesLoaded: true,
       }));
     } catch (e) {

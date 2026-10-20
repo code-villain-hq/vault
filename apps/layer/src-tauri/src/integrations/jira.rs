@@ -8,7 +8,9 @@ use serde_json::{json, Value};
 use super::{http_client, str_at};
 
 mod flow;
+mod order;
 pub use flow::ProjectStatus;
+pub use order::Order;
 use crate::config::JiraConfig;
 use crate::error::{Error, Result};
 
@@ -41,6 +43,8 @@ pub struct Issue {
     pub url: String,
     /// When it was filed, as RFC 3339 (TKT-11). None if Jira left it out.
     pub created: Option<String>,
+    /// When it last changed, as RFC 3339, for sorting by it (TKT-13).
+    pub updated: Option<String>,
 }
 
 /// An issue type exactly as this Jira defines it. Nothing about types is
@@ -218,7 +222,7 @@ impl Jira {
     pub async fn search(&self, jql: &str, max: u32) -> Result<Page> {
         let mut fields = json!([
             "summary", "description", "status", "issuetype",
-            "priority", "assignee", "labels", "components", "parent", "created",
+            "priority", "assignee", "labels", "components", "parent", "created", "updated",
         ]);
         // Asked for only when this site has one; its id differs per site.
         if let Some(field) = &self.epic_field {
@@ -589,6 +593,7 @@ impl Jira {
                 .and_then(|s| s.as_str())
                 .map(str::to_string),
             created: f.get("created").and_then(|s| s.as_str()).and_then(jira_time),
+            updated: f.get("updated").and_then(|s| s.as_str()).and_then(jira_time),
         }
     }
 }
@@ -831,6 +836,7 @@ pub fn browse_jql(
     whose: Whose,
     include_done: bool,
     types: &[String],
+    order: Order,
 ) -> String {
     let mut parts: Vec<String> = Vec::new();
 
@@ -861,10 +867,11 @@ pub fn browse_jql(
         });
     }
 
+    let order = order.clause();
     if parts.is_empty() {
-        return "ORDER BY updated DESC".into();
+        return order.into();
     }
-    format!("{} ORDER BY updated DESC", parts.join(" AND "))
+    format!("{} {order}", parts.join(" AND "))
 }
 
 /// JQL for exactly these tickets, or none when no key is one. The keys come
@@ -907,8 +914,8 @@ mod browse_tests {
         assert!(!looks_like_a_key("rounding error"));
         assert!(!looks_like_a_key("ACME-21042-fix"));
 
-        assert!(browse_jql(None, Some("ACME-9"), Whose::Anyone, false, &[]).contains(r#"key = "ACME-9""#));
-        assert!(browse_jql(None, Some("rounding"), Whose::Anyone, false, &[])
+        assert!(browse_jql(None, Some("ACME-9"), Whose::Anyone, false, &[], Order::Updated).contains(r#"key = "ACME-9""#));
+        assert!(browse_jql(None, Some("rounding"), Whose::Anyone, false, &[], Order::Updated)
             .contains("text ~ \"rounding\""));
     }
 
@@ -927,7 +934,7 @@ mod browse_tests {
         assert_eq!(number_as_key(Some("ACME"), " 4826 ").as_deref(), Some("ACME-4826"));
         assert_eq!(number_as_key(Some(" acme "), "4826").as_deref(), Some("ACME-4826"));
         let key = number_as_key(Some("ACME"), "4826").unwrap_or_default();
-        assert!(browse_jql(Some("ACME"), Some(&key), Whose::Anyone, false, &[]).contains(r#"key = "ACME-4826""#));
+        assert!(browse_jql(Some("ACME"), Some(&key), Whose::Anyone, false, &[], Order::Updated).contains(r#"key = "ACME-4826""#));
 
         assert_eq!(number_as_key(None, "4826"), None, "without a project a number is only text");
         assert_eq!(number_as_key(Some("  "), "4826"), None);
@@ -939,17 +946,17 @@ mod browse_tests {
 
     #[test]
     fn picked_types_narrow_the_search() {
-        let jql = browse_jql(None, None, Whose::Anyone, false, &["Bug".into(), "Epic".into()]);
+        let jql = browse_jql(None, None, Whose::Anyone, false, &["Bug".into(), "Epic".into()], Order::Updated);
         assert!(jql.contains(r#"issuetype IN ("Bug", "Epic")"#), "{jql}");
 
         // Nothing picked means every type, not none of them.
-        assert!(!browse_jql(None, None, Whose::Anyone, false, &[]).contains("issuetype"));
-        assert!(!browse_jql(None, None, Whose::Anyone, false, &["  ".into()]).contains("issuetype"));
+        assert!(!browse_jql(None, None, Whose::Anyone, false, &[], Order::Updated).contains("issuetype"));
+        assert!(!browse_jql(None, None, Whose::Anyone, false, &["  ".into()], Order::Updated).contains("issuetype"));
     }
 
     #[test]
     fn typed_quotes_cannot_escape_the_literal() {
-        let jql = browse_jql(None, Some("say \"hi\" \\ bye"), Whose::Anyone, false, &[]);
+        let jql = browse_jql(None, Some("say \"hi\" \\ bye"), Whose::Anyone, false, &[], Order::Updated);
         assert!(jql.contains("text ~ \"say \\\"hi\\\" \\\\ bye\""), "{jql}");
     }
 
@@ -957,17 +964,24 @@ mod browse_tests {
     fn unassigned_is_kept_in_what_is_not_mine() {
         // The obvious `assignee != currentUser()` silently drops every issue
         // nobody has picked up, which is most of what this view is for.
-        let mine_excluded = browse_jql(None, None, Whose::NotMine, false, &[]);
+        let mine_excluded = browse_jql(None, None, Whose::NotMine, false, &[], Order::Updated);
         assert!(mine_excluded.contains("assignee IS EMPTY OR assignee != currentUser()"));
 
         assert_eq!(
-            browse_jql(Some("ACME"), None, Whose::Unassigned, false, &[]),
+            browse_jql(Some("ACME"), None, Whose::Unassigned, false, &[], Order::Updated),
             r#"project = "ACME" AND assignee IS EMPTY AND statusCategory != Done ORDER BY updated DESC"#,
         );
         assert_eq!(
-            browse_jql(None, None, Whose::Anyone, true, &[]),
+            browse_jql(None, None, Whose::Anyone, true, &[], Order::Updated),
             "ORDER BY updated DESC",
         );
+    }
+
+    #[test]
+    fn a_chosen_order_is_asked_of_jira_rather_than_applied_to_a_capped_page() {
+        let jql = browse_jql(Some("ACME"), None, Whose::Anyone, false, &[], Order::Priority);
+        assert!(jql.ends_with("ORDER BY priority DESC, updated DESC"), "{jql}");
+        assert_eq!(browse_jql(None, None, Whose::Anyone, true, &[], Order::Oldest), "ORDER BY created ASC");
     }
 
     /// What happens when Jira is asked with credentials it rejects.
