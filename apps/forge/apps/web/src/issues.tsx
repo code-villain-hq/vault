@@ -1,4 +1,4 @@
-import type { Issue, StateType } from "@forge/types";
+import type { StateType } from "@forge/types";
 import { Link, useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { byId, identifier, useStates, useTeamStates, useTeams } from "./data";
@@ -12,7 +12,6 @@ import { useNewIssue } from "./new-issue";
 import { NewButton } from "./page-parts";
 import { Redirect } from "./redirect";
 import { SuggestionCard, TriageSuggestion, useOpenSuggestions } from "./suggestions";
-import { Button } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
 /** `/$workspace`: opens the first team's issues. */
@@ -242,13 +241,14 @@ export function MyIssuesPage() {
 
 /**
  * New issues that need someone to accept them into a team's workflow, or
- * decline them. Later, AI suggestions about drift arrive here too.
+ * decline them, and Forge AI's drift suggestions. The rows only open their
+ * issue: Triage is decided on the issue's page, after reading it, where the
+ * decision bar also adopts an agent's proposed description.
  */
 export function TriagePage() {
-  const { sync, workspace } = useWorkspace();
+  const { workspace } = useWorkspace();
   const issues = useRecords("Issue");
   const states = useStates();
-  const allStates = useRecords("WorkflowState");
   const teams = useRecords("Team");
   const teamsById = useMemo(() => byId(teams), [teams]);
   const waiting = useMemo(
@@ -260,12 +260,6 @@ export function TriagePage() {
   );
 
   const suggestions = useOpenSuggestions();
-
-  /** The team's first state of a type, e.g. where accepted issues go. */
-  const stateOf = (issue: Issue, type: StateType) =>
-    allStates
-      .filter((s) => s.team_id === issue.team_id && s.type === type)
-      .sort((a, b) => a.position - b.position)[0];
 
   return (
     <>
@@ -288,8 +282,6 @@ export function TriagePage() {
         ) : (
           <ul className="flex flex-col gap-0.5 px-2 py-2">
             {waiting.map((issue) => {
-              const accept = stateOf(issue, "backlog") ?? stateOf(issue, "unstarted");
-              const decline = stateOf(issue, "canceled");
               const triage = states.get(issue.state_id);
               return (
                 <li
@@ -316,24 +308,6 @@ export function TriagePage() {
                     ) : (
                       <span className="min-w-0 flex-1 truncate">{issue.title}</span>
                     )}
-                    <Button
-                      variant="secondary"
-                      disabled={!accept}
-                      onClick={() =>
-                        accept && sync.update("Issue", issue.id, { state_id: accept.id })
-                      }
-                    >
-                      Accept
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={!decline}
-                      onClick={() =>
-                        decline && sync.update("Issue", issue.id, { state_id: decline.id })
-                      }
-                    >
-                      Decline
-                    </Button>
                   </div>
                   <div className="pl-7">
                     <TriageSuggestion issueId={issue.id} />
