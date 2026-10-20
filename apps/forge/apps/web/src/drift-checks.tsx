@@ -94,8 +94,13 @@ function outcome(run: AiRun, seen: { filed: Issue[] }, now: number): { label: st
       : { label: "No suggestions", tone: "neutral" };
   }
   if ((run.tally?.unjudged ?? 0) > 0) return { label: "Incomplete", tone: "warn" };
-  return seen.filed.length > 0
-    ? { label: `${plural(seen.filed.length, "issue", "issues")} filed`, tone: "warn" }
+  if (seen.filed.length > 0) {
+    return { label: `${plural(seen.filed.length, "issue", "issues")} filed`, tone: "warn" };
+  }
+  // Unmet without an issue filed must not read as a clean check.
+  const unmet = run.tally?.not_met ?? 0;
+  return unmet > 0
+    ? { label: `${unmet} unmet`, tone: "warn" }
     : { label: "Nothing filed", tone: "neutral" };
 }
 
@@ -253,7 +258,7 @@ export function ServiceDriftChecks({
           <Link
             to="/$workspace/drift-checks"
             params={{ workspace: workspace.url_key }}
-            className="ui-link text-xs"
+            className="ml-auto text-xs text-muted hover:text-fg"
           >
             All checks
           </Link>
@@ -261,7 +266,7 @@ export function ServiceDriftChecks({
         {ai && (
           <Button
             variant="secondary"
-            className="ml-auto"
+            className={checks.length > 0 ? undefined : "ml-auto"}
             disabled={busy || !hasRepository}
             title={hasRepository ? undefined : "Give the service a repository first"}
             onClick={() => void start()}
@@ -418,8 +423,9 @@ function Lead({
           .join(" and ")}.`
       : "Forge saw no issues filed or commented on.";
   const notes = [
-    t?.unclear ? `${plural(t.unclear, "requirement is", "requirements are")} unclear` : null,
-    t?.covered ? `${t.covered} ${t.covered === 1 ? "is" : "are"} covered by open work` : null,
+    t?.not_met ? `${t.not_met} unmet` : null,
+    t?.unclear ? `${t.unclear} unclear` : null,
+    t?.covered ? `${t.covered} covered by open work` : null,
   ].filter(Boolean);
   return (
     <p>

@@ -552,8 +552,13 @@ pub async fn report_drift_check(
     write(&mut db, actor, operations).await?;
     db.commit().await.map_err(|e| e.to_string())?;
     Ok(format!(
-        "Recorded {} verdicts. So far: {}.",
+        "Recorded {} {}. So far: {}.",
         verdicts.len(),
+        if verdicts.len() == 1 {
+            "verdict"
+        } else {
+            "verdicts"
+        },
         describe(&tally)
     ))
 }
