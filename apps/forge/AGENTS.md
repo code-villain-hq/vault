@@ -98,8 +98,9 @@ issue is done.
 - `bun run runner:install`: on the PO's Mac, install the launch agent that
   starts Claude Code when Forge wakes it (`scripts/agent-runner/README.md`).
 - `bun run reset-password <email>`: set a new password for someone.
-- `bun run backup`: dump the database and attachments to `backups/`
-  (restoring: see the script).
+- `bun run backup`: dump the database and attachments to the backup folder,
+  outside the repository: `FORGE_BACKUP_DIR`, or else `backup/forge` next to
+  the vault's checkout (restoring: see the script).
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, types up to date, Biome,
   typecheck, bun tests, web build. It must pass before you finish.
