@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "What the main window may do.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-start-dragging", "opener:allow-open-url", "opener:allow-default-urls"]
+  "permissions": ["core:default", "core:window:allow-start-dragging", "deep-link:default", "opener:allow-open-url", "opener:allow-default-urls"]
 }

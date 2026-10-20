@@ -13,6 +13,7 @@
     "@glyph/types": "workspace:*",
     "@tanstack/react-router": "1.170.44",
     "@tauri-apps/api": "2.12.3",
+    "@tauri-apps/plugin-deep-link": "2.6.1",
     "@tauri-apps/plugin-opener": "2.7.0",
     "lucide-react": "1.49.0",
     "react": "19.3.0",

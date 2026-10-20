@@ -19,8 +19,9 @@ const index = createRoute({ getParentRoute: () => root, path: "/", component: Ho
 const login = createRoute({
   getParentRoute: () => root,
   path: "/login",
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string; error?: string } => ({
     redirect: text(search.redirect),
+    error: text(search.error),
   }),
   component: LoginPage,
 });

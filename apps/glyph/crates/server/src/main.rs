@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use glyph_llm::Models;
 use glyph_server::config::Config;
+use glyph_server::oidc::OidcLogin;
 use glyph_server::{AppState, accounts, app, models, notify, translate};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -51,6 +52,13 @@ async fn main() -> anyhow::Result<()> {
             let state = AppState::new(pool, config.cookie_secure)
                 .trusting_forwarded_for(config.trust_forwarded_for)
                 .with_models(models);
+            let state = match OidcLogin::from_env()? {
+                Some(login) => {
+                    tracing::info!("signing in with Code Villain is on: passwords are off");
+                    state.with_oidc_login(login)
+                }
+                None => state,
+            };
             let processes = state.processes.clone();
             tokio::spawn(notify::listen(state.pool.clone(), state.wake.clone()));
             let listener = TcpListener::bind(config.addr).await?;
