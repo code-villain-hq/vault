@@ -1,47 +1,29 @@
-# Binaries
-glyph
-backend/glyph
-*.exe
-*.dll
-*.so
-*.dylib
-
-# Go
-backend/.air.toml
-backend/tmp/
+# Rust and Bun
+/target
+node_modules/
+dist/
+apps/desktop/src-tauri/gen/
 
 # Configuration
-config.yaml
-!config.example.yaml
+/models.toml
+.env
+.env.local
 
-# Translations (user's files)
-translations/
-!translations/.gitkeep
+# Real translation files and the old Go app's database: never in this
+# public repository. The made-up demo data in demo/ is.
+/translations/
 translations.meta.json
-
-# SQLite database + WAL/SHM sidecar files
 *.db
 *.db-wal
 *.db-shm
 
 # Models
 models/
-~/.glyph/
 
-# IDE
+# Editors and the OS
 .vscode/
 .idea/
 *.swp
-*.swo
 *~
 .DS_Store
-
-# Temp
-*.tmp
 *.log
-tmp/
-translations.before-demo-*/
-
-# The made-up demo data is committed
-!demo/translations/
-!demo/translations/**

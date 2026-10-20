@@ -76,7 +76,7 @@ runtime theme picker in Forge.
 
 Drift fails the build. `python3 build.py --check` writes nothing and names
 any output that differs from a fresh build; `bun scripts/sync-design.ts
---check` does the same for Forge's and Layer's bundled copies (from each
+--check` does the same for Forge's, Layer's and Glyph's bundled copies (from each
 app's folder), and `make design-check` for Caster's. Forge's `bun run
 check` runs the first two, Layer's runs its own copy check, and the
 `design` workflow on Forgejo runs them all, with the theme tests and

@@ -1,0 +1,35 @@
+[package]
+name = "glyph-server"
+description = "Glyph's server: HTTP API, sync over WebSocket, accounts, and translating with local models"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+argon2.workspace = true
+axum.workspace = true
+chrono.workspace = true
+futures.workspace = true
+getrandom.workspace = true
+glyph-domain.workspace = true
+glyph-llm.workspace = true
+glyph-sync.workspace = true
+hex.workspace = true
+http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

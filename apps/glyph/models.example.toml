@@ -1,0 +1,34 @@
+# The models Glyph's server may translate with. Copy this to models.toml
+# (or point GLYPH_MODELS at another file) and restart the server.
+#
+# Any OpenAI-compatible server works; Glyph checks `{endpoint}/health`.
+# Language pairs pick a model by name in the app; a pair without one uses
+# the first model here.
+
+# The program the server runs for models it starts itself (the Start button
+# in Settings). Looked up on PATH unless it's a path.
+llm_binary = "llama-server"
+
+# Viking 7B v.4, a Nordic-languages fine-tune that handles Swedish, Finnish,
+# Danish, Norwegian and Icelandic well. With hf_repo and hf_file set,
+# llama-server downloads it on first start (about 4.3 GB).
+[[models]]
+name = "viking"
+endpoint = "http://localhost:7481"
+hf_repo = "mradermacher/Viking_7B_V.4-GGUF"
+hf_file = "Viking_7B_V.4.Q4_K_M.gguf"
+extra_args = ["-c", "4096"]
+
+# A GGUF file you already have:
+#
+# [[models]]
+# name = "mistral"
+# endpoint = "http://localhost:7482"
+# model_path = "./models/mistral-7b-instruct.Q4_K_M.gguf"
+#
+# A server you run yourself, which Glyph only talks to:
+#
+# [[models]]
+# name = "external"
+# endpoint = "http://localhost:7483"
+# chat_mode = false   # use the raw /completion endpoint

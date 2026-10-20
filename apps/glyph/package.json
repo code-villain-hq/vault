@@ -1,0 +1,32 @@
+{
+  "name": "glyph",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "design:sync": "bun scripts/sync-design.ts",
+    "db": "docker compose up -d --wait",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "seed": "bun scripts/seed-demo.ts",
+    "dev": "bun scripts/dev.ts",
+    "dev:fake-model": "bun scripts/dev-fake-model.ts",
+    "dev:desktop": "bun run --cwd apps/desktop tauri dev",
+    "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
+    "app": "docker compose --profile app up -d --build --wait",
+    "app:logs": "docker compose --profile app logs -f glyph",
+    "gen:types": "bun scripts/gen-types.ts",
+    "typecheck": "tsc -p apps/web && tsc -p packages/sync-client",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "cargo test --workspace && bun test",
+    "check": "bun scripts/check.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "1.4.3",
+    "typescript": "7.0.2"
+  }
+}

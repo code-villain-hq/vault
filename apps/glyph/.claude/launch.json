@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "glyph-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5174
+    },
+    {
+      "name": "glyph-server",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "-q", "-p", "glyph-server"],
+      "port": 7480
+    }
+  ]
+}

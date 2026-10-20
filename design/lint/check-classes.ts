@@ -1,13 +1,13 @@
 // Tailwind arbitrary values and palette colours in markup bypass the tokens
 // where stylelint can't see them: `text-[12px]`, `bg-[#111]`, `bg-zinc-800`,
-// `text-white`. Scans Forge's and Layer's TSX/TS and Glyph's HTML and JS. A
+// `text-white`. Scans the TSX/TS of Forge, Layer and Glyph. A
 // line that must keep one says why with `design-lint-ignore` in a comment.
 import { Glob } from "bun";
 
 const roots: [string, string][] = [
   ["../../apps/forge/apps/web/src", "**/*.{ts,tsx}"],
   ["../../apps/layer/src", "**/*.{ts,tsx}"],
-  ["../../apps/glyph/ui", "**/*.{html,js}"],
+  ["../../apps/glyph/apps/web/src", "**/*.{ts,tsx}"],
 ];
 const skip = [/\/design\//, /\/phone\//, /\.test\.tsx?$/, /\/__mock__\//];
 const palette =
