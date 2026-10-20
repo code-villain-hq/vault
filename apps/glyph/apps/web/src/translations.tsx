@@ -367,7 +367,7 @@ function NamespaceGroup({
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className="sticky top-0 z-10 flex h-9 w-full items-center gap-2 bg-bg px-4 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent"
+        className="sticky top-0 z-10 flex h-9 w-full items-center gap-2 bg-panel px-4 text-left outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent"
       >
         <ChevronDown
           size={15}
