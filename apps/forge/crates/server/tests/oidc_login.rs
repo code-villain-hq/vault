@@ -379,6 +379,26 @@ async fn the_desktop_app_collects_its_session_once(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_failed_desktop_sign_in_goes_back_to_the_app(pool: PgPool) {
+    let Setup { app, .. } = setup(pool).await;
+    let challenge = hex::encode(Sha256::digest(b"the desktop app's secret"));
+    let (to, session) = sign_in(&app, "newbie", &format!("?desktop={challenge}")).await;
+    assert_eq!(to, "/signed-in?error=oidc_no_account");
+    assert!(session.is_none());
+
+    let started = start(&app, &format!("?desktop={challenge}")).await;
+    let tampered = Started {
+        state: format!("{}0", started.state),
+        ..started
+    };
+    let (to, _) = back(&app, "ada", &tampered, &tampered.cookie).await;
+    assert_eq!(
+        to, "/login?error=oidc_expired",
+        "a trip that can't be read isn't the app's"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn github_sign_in_is_off(pool: PgPool) {
     let Setup { app, .. } = setup(pool).await;
     let response = app

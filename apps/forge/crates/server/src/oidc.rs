@@ -400,9 +400,11 @@ fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     .expect("a cookie made of hex and ASCII is a valid header")
 }
 
-/// Back to the sign-in screen, which explains the problem.
-fn failed(problem: Problem, secure: bool) -> Response {
-    let to = format!("/login?error={}", problem.code());
+/// Back to the sign-in screen, which explains the problem; for a desktop
+/// sign-in, to the page that hands it back to the app.
+fn failed(problem: Problem, desktop: bool, secure: bool) -> Response {
+    let page = if desktop { DESKTOP_RETURN } else { "/login" };
+    let to = format!("{page}?error={}", problem.code());
     redirect(&to, &[nonce_cookie("", 0, secure)])
 }
 
@@ -417,12 +419,13 @@ pub struct StartParams {
 /// `GET /api/auth/oidc`: off to the provider to sign in.
 pub async fn start(State(state): State<AppState>, Query(params): Query<StartParams>) -> Response {
     let secure = state.cookie_secure;
+    let desktop = params.desktop.is_some();
     let Some(login) = state.oidc_login.as_ref() else {
-        return failed(Problem::NotSetUp, secure);
+        return failed(Problem::NotSetUp, desktop, secure);
     };
     let endpoints = match login.endpoints().await {
         Ok(endpoints) => endpoints,
-        Err(problem) => return failed(problem, secure),
+        Err(problem) => return failed(problem, desktop, secure),
     };
     let nonce = new_token();
     let verifier = new_token();
@@ -477,6 +480,11 @@ pub async fn callback(
 ) -> Response {
     let secure = state.cookie_secure;
     let clear = nonce_cookie("", 0, secure);
+    // A trip that can't be read can't say it came from the app.
+    let desktop = (state.oidc_login.as_ref())
+        .zip(params.state.as_deref())
+        .and_then(|(login, s)| login.read_state(s))
+        .is_some_and(|trip| trip.desktop.is_some());
     match finish(&state, &headers, params).await {
         Ok(Done::Browser { session, to }) => {
             redirect(&to, &[session_cookie(&session, secure), clear])
@@ -485,7 +493,7 @@ pub async fn callback(
             &format!("{DESKTOP_RETURN}?code={code}&next={}", urlencode(&to)),
             &[clear],
         ),
-        Err(problem) => failed(problem, secure),
+        Err(problem) => failed(problem, desktop, secure),
     }
 }
 

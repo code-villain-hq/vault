@@ -138,10 +138,15 @@ const OIDC_PROBLEMS: Record<string, string> = {
   oidc_failed: "Something went wrong. Try again.",
 };
 
+/** A Code Villain sign-in problem we have words for; unknown codes are the general one. */
+function oidcCode(code: string) {
+  return Object.hasOwn(OIDC_PROBLEMS, code) ? code : "oidc_failed";
+}
+
 /** Why signing in didn't work, for a code in the page's address. */
 function problemOf(code: string, providers: Providers) {
   return providers.oidc
-    ? (OIDC_PROBLEMS[code] ?? OIDC_PROBLEMS.oidc_failed)
+    ? OIDC_PROBLEMS[oidcCode(code)]
     : (GITHUB_PROBLEMS[code] ?? GITHUB_PROBLEMS.github_failed);
 }
 
@@ -185,8 +190,16 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
   useEffect(() => {
     if (!secret) return;
     return onAppLink(async (url) => {
+      if (!url.href.startsWith("forge://signed-in")) return;
+      // The browser says why it didn't work; stop waiting and say so here.
+      const problem = url.searchParams.get("error");
+      if (problem) {
+        setSecret(null);
+        setError(OIDC_PROBLEMS[oidcCode(problem)] ?? null);
+        return;
+      }
       const code = url.searchParams.get("code");
-      if (!url.href.startsWith("forge://signed-in") || !code) return;
+      if (!code) return;
       setSecret(null);
       try {
         signedIn(await api<Me>("POST", "/api/auth/oidc/desktop", { code, secret }));
@@ -532,19 +545,36 @@ export function JoinPage() {
 /**
  * Where a desktop sign-in ends in the browser: opens the desktop app with
  * the one-time code, and leaves a page that says the tab can go. The code
- * is no use without the secret only that app holds.
+ * is no use without the secret only that app holds. When signing in failed,
+ * it says why, and tells the app so it stops waiting.
  */
 export function SignedInPage() {
-  const { code, next } = useSearch({ from: "/signed-in" });
-  const link = /^[0-9a-f]{64}$/.test(code ?? "")
-    ? `forge://signed-in?${new URLSearchParams({ code: code ?? "", next: safeRedirect(next) })}`
-    : null;
+  const { code, next, error } = useSearch({ from: "/signed-in" });
+  const problem = error ? oidcCode(error) : null;
+  const link = problem
+    ? `forge://signed-in?${new URLSearchParams({ error: problem })}`
+    : /^[0-9a-f]{64}$/.test(code ?? "")
+      ? `forge://signed-in?${new URLSearchParams({ code: code ?? "", next: safeRedirect(next) })}`
+      : null;
 
   useEffect(() => {
     if (link) window.location.href = link;
   }, [link]);
 
   if (!link) return <Redirect to="/" />;
+  if (problem) {
+    return (
+      <AuthScreen title="Couldn't sign you in">
+        <div className="mb-4">
+          <ErrorMessage>{OIDC_PROBLEMS[problem]}</ErrorMessage>
+        </div>
+        <p className="mb-6 text-center text-muted">Forge shows this too. You can close this tab.</p>
+        <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
+          Back to Forge
+        </a>
+      </AuthScreen>
+    );
+  }
   return (
     <AuthScreen title="You're signed in">
       <p className="-mt-3 mb-6 text-center text-muted">Forge is opening. You can close this tab.</p>
