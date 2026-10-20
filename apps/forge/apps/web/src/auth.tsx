@@ -49,7 +49,8 @@ function serverOrNothing(input: string) {
  */
 function useServerChoice() {
   const [server, setServer] = useState(serverUrl() || DEFAULT_SERVER);
-  const [checked, setChecked] = useState(() => serverOrNothing(server));
+  // In the browser the app is on its server already: ask it ("").
+  const [checked, setChecked] = useState(() => (bundled ? serverOrNothing(server) : ""));
   const field = bundled ? (
     <TextField
       label="Server"
