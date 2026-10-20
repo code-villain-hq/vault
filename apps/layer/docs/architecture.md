@@ -107,7 +107,8 @@ restart (selected task, view, tab, sidebar) goes to `localStorage` through
   together. The mock harness's fixtures are typed against `types.ts`, so a
   change there breaks `tsc` until the fixtures follow.
 - **Errors.** `error::Error` serialises as its message. The UI shows it
-  with `errMessage` and `toast`. A command over several repos returns one
+  with `errMessage`, where the user acted (`useFailure`, `ErrorMessage`) or
+  in the top bar's status (`fail`). A command over several repos returns one
   row per repo instead (`RepoResult`, a row `error`) and shows them with
   `reportRepoResults`.
 
@@ -128,7 +129,7 @@ for, and the reverse, and that each is in this table.
 | `spec:draft` | `{ request_id, part, checkout_id, text }` | one file's draft so far, whole each time: the task's requirements or design (`checkout_id` null), or one repository's tasks (SPEC-5); the requirements as Apply answers rewrites them (SPEC-20); or the merge of specs from before (SPEC-25) | `Watchers.tsx` → `useSpecs.chunk`, into that editor |
 | `spec:changed` | task id | an agent ticked a step of the task's spec (`spec_task`, SPEC-13) or proposed a change (`spec_propose`, SPEC-24) | `Watchers.tsx` → `useSpecs.changed`, which reads it again if it has been read; `pty:activity` for an agent that stopped does the same, to show a spec file it changed outside the app (SPEC-22) |
 | `system-notify-click` | a `Target` (`target.rs`) | a banner was clicked | `Watchers.tsx` → `goTo`, which opens what it is about (NOTE-4) |
-| `app:notices` | none | a notice was queued after startup (`commands::notify`) | `Watchers.tsx` → `takeNotices`, as toasts |
+| `app:notices` | none | a notice was queued after startup (`commands::notify`) | `Watchers.tsx` → `takeNotices`, as toasts, failures in the top bar's status |
 | `panes:waiting` | none | the panes a launch did not put back changed: marked at launch, reopened, forgotten (PANE-7), a Slack thread's chat stopped or picked up again (BOT-14) | `Watchers.tsx` → `refreshWaiting` |
 | `messages:changed` | none | the message center's log changed: recorded, read or cleared (`messages.rs`) | `Watchers.tsx` → `refreshMessages` |
 | `runs:changed` | none | an agent's run was recorded, a task finished or deleted, or the log cleared (`runs.rs`, RUN-1, RUN-9) | `UsageView.tsx`, while open → `listRuns` |

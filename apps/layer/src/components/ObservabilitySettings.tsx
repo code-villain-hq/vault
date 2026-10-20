@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { GrafanaDatasource } from "../lib/types";
 import { useStore } from "../store";
-import { Field } from "./ui";
+import { ErrorMessage, Field, useFailure } from "./ui";
 import { S3LogSources } from "./S3LogSources";
 
 /**
@@ -27,7 +27,11 @@ function GrafanaSource() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Disconnecting fails under its row, choosing under the list, connecting
+  // under its button (NOTE-6).
+  const unlink = useFailure();
+  const choosing = useFailure();
+  const connecting = useFailure();
   const connected = settings?.grafana_connected ?? false;
   const [url, setUrl] = useState(settings?.grafana?.base_url ?? "");
   const [token, setToken] = useState("");
@@ -51,16 +55,18 @@ function GrafanaSource() {
   }, [connected, baseUrl]);
 
   async function choose(uid: string) {
+    choosing.clear();
     try {
       await api.grafanaSetDatasource(uid || null);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      choosing.fail(e);
     }
   }
 
   async function connect() {
     setBusy(true);
+    connecting.clear();
     try {
       const loki = await api.grafanaConnect(url.trim(), token.trim());
       setToken("");
@@ -71,19 +77,20 @@ function GrafanaSource() {
       }
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      connecting.fail(e);
     } finally {
       setBusy(false);
     }
   }
 
   async function disconnect() {
+    unlink.clear();
     try {
       await api.disconnect("grafana");
       await refreshSettings();
       toast("info", "grafana disconnected");
     } catch (e) {
-      fail(e);
+      unlink.fail(e);
     }
   }
 
@@ -100,6 +107,7 @@ function GrafanaSource() {
           </button>
         </div>
       )}
+      <ErrorMessage>{unlink.error}</ErrorMessage>
       <p className="muted" style={{ marginTop: 0 }}>
         Logs in Loki, read with LogQL or with a Grafana Explore link from a ticket.
       </p>
@@ -116,6 +124,7 @@ function GrafanaSource() {
               </option>
             ))}
           </select>
+          <ErrorMessage>{choosing.error}</ErrorMessage>
         </Field>
       )}
       <Field label="Site URL" hint="Where you open Grafana, e.g. https://acme.grafana.net.">
@@ -139,6 +148,7 @@ function GrafanaSource() {
       >
         {busy ? "Verifying…" : connected ? "Save & reconnect" : "Connect"}
       </button>
+      <ErrorMessage>{connecting.error}</ErrorMessage>
     </div>
   );
 }

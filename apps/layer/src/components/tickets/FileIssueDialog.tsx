@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
 import type { JiraIssue, JiraIssueType } from "../../lib/types";
-import { Combo, Field, Modal } from "../ui";
+import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { creatableTypes, preferredCreatable } from "../task-forms/creatable";
 import { OptimizeDescription } from "./OptimizeDescription";
@@ -27,7 +27,8 @@ export function FileIssueDialog({
   const issues = useStore((s) => s.issues);
   const refreshIssues = useStore((s) => s.refreshIssues);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Filing fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
 
   const [project, setProject] = useState(() => read("jiraProject", ""));
   const [newSummary, setNewSummary] = useState("");
@@ -78,6 +79,7 @@ export function FileIssueDialog({
     // directly, so a second Enter — or key repeat — filed a second ticket.
     if (filingBusy || !newSummary.trim() || !newType || !projectKey || missing.length > 0) return;
     setFilingBusy(true);
+    failure.clear();
     try {
       const issue = await api.jiraCreateIssue({
         summary: newSummary.trim(),
@@ -94,7 +96,7 @@ export function FileIssueDialog({
       // half of picking it up.
       onFiled(issue);
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setFilingBusy(false);
     }
@@ -199,6 +201,7 @@ export function FileIssueDialog({
           disabled={filingBusy}
         />
       </Field>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

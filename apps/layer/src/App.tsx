@@ -24,6 +24,7 @@ import { PhoneBadge } from "./components/PhoneSettings";
 import { statusClass } from "./components/tickets/status";
 import { SidebarToggle } from "./components/ui";
 import { MessageCenter } from "./components/MessageCenter";
+import { FrameStatus } from "./components/FrameStatus";
 import { Watchers } from "./Watchers";
 import { goTo } from "./lib/goto";
 
@@ -39,7 +40,6 @@ function TopBar() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const toggleSettings = useStore((s) => s.toggleSettings);
-  const watchFailing = useStore((s) => s.watchFailing);
   // Counts, not the lists: a number that has not changed is not a redraw.
   // Chats have their own tab, so they must not be counted as work as well.
   const running = useStore(
@@ -124,11 +124,7 @@ function TopBar() {
         ))}
       </nav>
       <div className="topbar-right">
-        {watchFailing && (
-          <span className="ui-status ui-status-warn watch-chip" title="Task and pane polls are failing">
-            couldn&apos;t refresh
-          </span>
-        )}
+        <FrameStatus />
         <PhoneBadge />
         <KeepAwake />
         <MessageCenter />

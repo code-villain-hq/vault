@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, errMessage } from "../lib/api";
 import type { FlowStatus, JiraTransition, ProjectStatus, Settings, StartTo, TicketFlow } from "../lib/types";
 import { useStore } from "../store";
-import { Field } from "./ui";
+import { ErrorMessage, Field, useFailure } from "./ui";
 
 /** The flow chosen for a ticket's project, if any. */
 export function flowOf(settings: Settings | null, key: string | null): TicketFlow | undefined {
@@ -30,7 +30,9 @@ export function TicketFlowSettings() {
   const settings = useStore((s) => s.settings);
   const tasks = useStore((s) => s.tasks);
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const fail = useStore((s) => s.fail);
+  // A choice that did not save says so under its project's statuses (NOTE-6).
+  const failure = useFailure();
+  const [failedIn, setFailedIn] = useState<string | null>(null);
   // The project the ticket list is scoped to, and every one there is work in.
   const projects = [...new Set([
     ...(settings?.jira?.project_key ? [settings.jira.project_key] : []),
@@ -54,11 +56,13 @@ export function TicketFlowSettings() {
     const to: StartTo = picked
       ? { to: "status", id: picked.id, name: picked.name }
       : value === "leave" ? { to: "leave" } : { to: "first_in_progress" };
+    failure.clear();
+    setFailedIn(project);
     try {
       await api.setTicketStart(project, to);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     }
   }
 
@@ -66,11 +70,13 @@ export function TicketFlowSettings() {
     const list = statuses[project];
     const picked = Array.isArray(list) ? list.find((s) => s.id === id) : undefined;
     const status: FlowStatus | null = picked ? { id: picked.id, name: picked.name } : null;
+    failure.clear();
+    setFailedIn(project);
     try {
       await api.setTicketFlow(project, stage, status);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     }
   }
 
@@ -139,6 +145,7 @@ export function TicketFlowSettings() {
                   {pick("merged", flow?.merged)}
                 </div>
               )}
+              {failedIn === p && <ErrorMessage>{failure.error}</ErrorMessage>}
             </div>
           );
         })}

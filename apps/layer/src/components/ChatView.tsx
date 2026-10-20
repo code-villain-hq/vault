@@ -10,7 +10,7 @@ import { CHAT_TASK_ID, canRestart, paneName, paneState } from "../lib/derive";
 import { PaneView } from "./AcpPane";
 import { BrowserSide, BrowserToggle, useBrowserSide } from "./BrowserSide";
 import { PlusIcon } from "./icons";
-import { ContextMenu, Confirm } from "./ui";
+import { ContextMenu, Confirm, ErrorMessage, useFailure } from "./ui";
 import { PaneExited, RestartButton, useRestart } from "./Restart";
 import { WaitingChats } from "./WaitingPanes";
 import { SidebarGrip } from "./sidebar/SidebarGrip";
@@ -36,7 +36,9 @@ export function ChatView() {
   const { panes, ids } = usePanesOf(CHAT_TASK_ID);
   const agents = useStore((s) => s.agents);
   const refreshPanes = useStore((s) => s.refreshPanes);
-  const fail = useStore((s) => s.fail);
+  // Starting or closing a chat fails under the list's head, where + is, or
+  // under the start buttons while there are no chats (NOTE-6).
+  const failure = useFailure();
   // A chat the Slack bot opened links to its thread (BOT-11).
   const slack = useSlackBot();
 
@@ -90,23 +92,25 @@ export function ChatView() {
   async function start(agentId: string, acp = false) {
     if (starting.current) return;
     starting.current = true;
+    failure.clear();
     try {
       const pane = await api.spawnChat(agentId, null, acp);
       await refreshPanes();
       setActive(pane.id);
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       starting.current = false;
     }
   }
 
   async function close(id: string) {
+    failure.clear();
     try {
       await api.closePane(id);
       await refreshPanes();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     }
   }
 
@@ -146,6 +150,7 @@ export function ChatView() {
             <PlusIcon />
           </button>
         </div>
+        {panes.length > 0 && <ErrorMessage>{failure.error}</ErrorMessage>}
 
         <div className="chat-list-body">
           {panes.map((p) => (
@@ -228,6 +233,7 @@ export function ChatView() {
                 </button>
               ))}
             </div>
+            <ErrorMessage>{failure.error}</ErrorMessage>
           </div>
         )}
       </div>

@@ -221,7 +221,7 @@ export function UsageView() {
               setAgent(null);
               setRepo(null);
               setPages(1);
-            }).catch(fail)
+            })
           }
           onCancel={() => setClearing(false)}
         />

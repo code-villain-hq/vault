@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import { api, errMessage } from "./lib/api";
+import { api, errMessage, failureText } from "./lib/api";
 import { CHAT_TASK_ID } from "./lib/derive";
 import { forgetAllBut, read, readOneOf, write } from "./lib/persist";
 import { keep, only, reuse, sameJson } from "./lib/same";
@@ -30,7 +30,8 @@ export type View = (typeof VIEWS)[number];
 
 interface Toast {
   id: number;
-  kind: "info" | "error" | "success";
+  /** News or a done thing. A failure is never a toast (NOTE-6): it is `fail`. */
+  kind: "info" | "success";
   text: string;
   /** Where a click on it goes (NOTE-4); without one a click only dismisses. */
   target?: Target;
@@ -39,7 +40,7 @@ interface Toast {
 interface ToastOpts {
   target?: Target;
   /**
-   * Keep it in the message center as this kind (MSG-1). Errors are kept
+   * Keep it in the message center as this kind (MSG-1). Failures are kept
    * unless this says otherwise; anything else only when it says so. False
    * for news the backend has recorded already (MSG-3).
    */
@@ -105,6 +106,8 @@ interface State {
   /** Review request (`owner/repo#n`) to scroll to and highlight, then clear. */
   focusReview: string | null;
   toasts: Toast[];
+  /** The failure the top bar's status shows (WIN-2), for six seconds. */
+  failure: { id: number; text: string } | null;
   /** Background task/pane polls have failed repeatedly — not a toast every few seconds. */
   watchFailing: boolean;
   /** Cursor IDE (the editor app / `cursor` CLI), not the cursor-agent agent. */
@@ -132,7 +135,12 @@ interface State {
 
   toast: (kind: Toast["kind"], text: string, opts?: ToastOpts) => void;
   dismissToast: (id: number) => void;
-  fail: (e: unknown) => void;
+  /**
+   * A failure in the background, or of a tool with no place of its own:
+   * the top bar's status (WIN-2). One the user can see where they acted
+   * goes there instead, through `useFailure` (NOTE-6).
+   */
+  fail: (e: unknown, opts?: ToastOpts) => void;
 
   refreshAll: () => Promise<void>;
   refreshRepos: () => Promise<void>;
@@ -258,11 +266,11 @@ const prsFetchedAt = new Map<string, number>();
 const askedFlow = new Set<string>();
 
 /** Say what the PR sweep did about tickets (TKT-8). */
-function reportTickets(moves: TicketMove[], toast: State["toast"]) {
+function reportTickets(moves: TicketMove[], toast: State["toast"], fail: State["fail"]) {
   for (const m of moves) {
     const target: Target = `ticket:${m.key}`;
     if (m.moved_to) toast("success", `${m.key} → ${m.moved_to}`, { target, record: "ticket" });
-    else if (m.error) toast("error", m.error, { target, record: "ticket" });
+    else if (m.error) fail(m.error, { target, record: "ticket" });
     else if (m.unchosen) {
       const project = m.key.split("-")[0];
       if (askedFlow.has(`${project}:${m.stage}`)) continue;
@@ -355,6 +363,7 @@ export const useStore = create<State>((set, get) => {
   focusPane: null,
   focusReview: null,
   toasts: [],
+  failure: null,
   watchFailing: false,
   cursorIde: false,
   appActive: true,
@@ -383,13 +392,24 @@ export const useStore = create<State>((set, get) => {
   toast: (kind, text, opts) => {
     const id = ++toastSeq;
     set((s) => ({ toasts: [...s.toasts, { id, kind, text, target: opts?.target }] }));
-    const keep = opts?.record ?? (kind === "error" ? "error" : false);
-    // Swallowed: failing to keep an error must not raise another.
+    const keep = opts?.record ?? false;
+    // Swallowed: failing to keep a message must not raise another.
     if (keep) void api.addMessage(keep, kind, text, opts?.target).catch(() => {});
-    setTimeout(() => get().dismissToast(id), kind === "error" ? 8000 : 4000);
+    setTimeout(() => get().dismissToast(id), 4000);
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-  fail: (e) => get().toast("error", errMessage(e)),
+  fail: (e, opts) => {
+    const id = ++toastSeq;
+    const text = failureText(e);
+    set({ failure: { id, text } });
+    const keep = opts?.record ?? "error";
+    // Swallowed: failing to keep an error must not raise another.
+    if (keep) void api.addMessage(keep, "error", text, opts?.target).catch(() => {});
+    // Only its own: a newer failure keeps its full six seconds.
+    setTimeout(() => {
+      if (get().failure?.id === id) set({ failure: null });
+    }, 6000);
+  },
 
   refreshAll: async () => {
     // Settings (and with them the Jira list) must not wait on a full git-status
@@ -523,7 +543,7 @@ export const useStore = create<State>((set, get) => {
         return { prs: { ...s.prs, ...Object.fromEntries(changed.map((t) => [t.task_id, t.rows])) } };
       });
       const moves = all.map((t) => t.ticket).filter((m): m is TicketMove => m !== null);
-      reportTickets(moves, get().toast);
+      reportTickets(moves, get().toast, get().fail);
       if (moves.some((m) => m.moved_to)) void get().refreshIssues({ quiet: true });
     } catch {
       // Left as it was: stale rows beat empty ones.

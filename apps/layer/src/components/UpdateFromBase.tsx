@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import { useStore } from "../store";
 import { updateByFor } from "../lib/derive";
 import type { RepoUpdate, TaskView, UpdateBy } from "../lib/types";
-import { Combo, Modal, Spinner } from "./ui";
+import { Combo, ErrorMessage, Modal, Spinner, useFailure } from "./ui";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
 
 const OUTCOME_DOT: Record<RepoUpdate["outcome"], string> = {
@@ -38,7 +38,9 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
   const projects = useStore((s) => s.projects);
   const health = useStore((s) => s.repoHealth);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Everything here is done in the dialog, so it fails there (NOTE-6).
+  const failure = useFailure();
+  const fail = failure.fail;
   const githubConnected = useStore((s) => s.settings?.github_connected ?? false);
   const setTaskPrs = useStore((s) => s.setTaskPrs);
   const at = useAgentTarget(task);
@@ -94,6 +96,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
   async function update() {
     setBusy(true);
+    failure.clear();
     try {
       const chosen = Object.fromEntries([...picked].map((id) => [id, by[id] ?? "merge"])) as Record<string, UpdateBy>;
       const out = await api.updateFromBase(
@@ -124,6 +127,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
   async function setBase(checkoutId: string, base: string) {
     const was = task.checkouts.find((c) => c.id === checkoutId)?.base;
     if (!base.trim() || base.trim() === was) return;
+    failure.clear();
     try {
       await api.setCheckoutBase(checkoutId, base);
       // The Pull requests tab reads the base from its own rows, and offered
@@ -141,6 +145,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
   async function abort(checkoutId: string) {
     setBusy(true);
+    failure.clear();
     try {
       await api.abortUpdate(checkoutId);
       setAborted((a) => new Set(a).add(checkoutId));
@@ -154,6 +159,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
   async function handOff() {
     setBusy(true);
+    failure.clear();
     try {
       const who = await at.send((paneId, scope) => api.sendMergeConflicts(task.id, paneId, scope));
       toast("success", `Handed the conflicts to ${who}.`);
@@ -340,6 +346,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
           ))}
         </div>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

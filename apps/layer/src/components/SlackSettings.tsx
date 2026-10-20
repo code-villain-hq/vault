@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { BOT_NAME_MAX, botManifest, newAppUrl, useSlackBot } from "../lib/slackBot";
 import { useStore } from "../store";
 import type { AgentStatus, SlackBotConfig, SlackBotStatus, SlackConfig } from "../lib/types";
-import { Field, Switch } from "./ui";
+import { ErrorMessage, Field, Switch, useFailure } from "./ui";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
   connected: ["connected", "ui-status ui-status-ok"],
@@ -24,7 +24,11 @@ export function SlackSettings() {
   const agents = useStore((s) => s.agents);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Each card's actions fail in that card, the connect under its button
+  // (NOTE-6).
+  const card = useFailure();
+  const voice = useFailure();
+  const connecting = useFailure();
   const view = useSlackBot();
   const bot = settings?.slack_bot ?? null;
   const conversational = agents.filter((a) => a.installed && a.acp);
@@ -41,6 +45,7 @@ export function SlackSettings() {
 
   async function connect() {
     setBusy(true);
+    connecting.clear();
     try {
       await api.slackBotConnect(botToken.trim(), appToken.trim(), owner.trim(), bot?.agent_id || agentId);
       setBotToken("");
@@ -48,56 +53,61 @@ export function SlackSettings() {
       toast("success", "Slack bot connected. Mention it in a thread to try it.");
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      connecting.fail(e);
     } finally {
       setBusy(false);
     }
   }
 
   async function setOn(on: boolean) {
+    card.clear();
     try {
       await api.setSlackBotOn(on);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      card.fail(e);
     }
   }
 
   async function setAgent(id: string, model: string) {
+    card.clear();
     try {
       await api.setSlackBotAgent(id, model);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      card.fail(e);
     }
   }
 
   async function setAuto(on: boolean) {
+    card.clear();
     try {
       await api.setSlackBotAuto(on);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      card.fail(e);
     }
   }
 
   async function savePersonality() {
+    voice.clear();
     try {
       await api.setSlackBotPersonality(personality);
       await refreshSettings();
       toast("success", "Saved. Threads handed over from now on get the new voice.");
     } catch (e) {
-      fail(e);
+      voice.fail(e);
     }
   }
 
   async function disconnect() {
+    card.clear();
     try {
       await api.disconnect("slack");
       await refreshSettings();
       toast("info", "Slack disconnected");
     } catch (e) {
-      fail(e);
+      card.fail(e);
     }
   }
 
@@ -157,6 +167,7 @@ export function SlackSettings() {
               ))}
             </div>
           )}
+          <ErrorMessage>{card.error}</ErrorMessage>
         </div>
       )}
 
@@ -180,6 +191,7 @@ export function SlackSettings() {
           <button className="ui-button" disabled={!personalityChanged} onClick={() => void savePersonality()}>
             Save personality
           </button>
+          <ErrorMessage>{voice.error}</ErrorMessage>
         </div>
       )}
 
@@ -261,6 +273,7 @@ export function SlackSettings() {
       >
         {busy ? "Checking with Slack…" : bot ? "Save & reconnect" : "Connect"}
       </button>
+      <ErrorMessage>{connecting.error}</ErrorMessage>
     </>
   );
 }
@@ -317,30 +330,32 @@ function Notifications({ botName }: { botName: string }) {
   const slack = useStore((s) => s.settings?.slack ?? null);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  const failure = useFailure();
   const [channel, setChannel] = useState(slack?.channel ?? "");
   const [busy, setBusy] = useState(false);
   const chosen = slack !== null && slack.channel !== "";
 
   async function saveChannel() {
     setBusy(true);
+    failure.clear();
     try {
       await api.setSlackChannel(channel.trim());
       toast("success", "Posted a test message: check the channel.");
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setBusy(false);
     }
   }
 
   async function save(prefs: SlackConfig) {
+    failure.clear();
     try {
       await api.setSlackPrefs(prefs);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     }
   }
 
@@ -393,6 +408,7 @@ function Notifications({ botName }: { botName: string }) {
           </div>
         </Field>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
 import type { JiraIssue, JiraIssueType } from "../../lib/types";
-import { Combo, Field, Modal } from "../ui";
+import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { epicTypes, preferredEpic } from "../task-forms/creatable";
 import { OptimizeDescription } from "./OptimizeDescription";
@@ -23,7 +23,8 @@ export function CreateEpicDialog({
   const settings = useStore((s) => s.settings);
   const refreshIssues = useStore((s) => s.refreshIssues);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Creating fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
 
   const [summary, setSummary] = useState("");
   const [desc, setDesc] = useState("");
@@ -67,6 +68,7 @@ export function CreateEpicDialog({
     // and a second Enter created a second epic.
     if (busy || !summary.trim() || !epicType || !project.trim() || missing.length > 0) return;
     setBusy(true);
+    failure.clear();
     try {
       const issue = await api.jiraCreateIssue({
         summary: summary.trim(),
@@ -80,7 +82,7 @@ export function CreateEpicDialog({
       onClose();
       await refreshIssues();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setBusy(false);
     }
@@ -182,6 +184,7 @@ export function CreateEpicDialog({
           disabled={busy}
         />
       </Field>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

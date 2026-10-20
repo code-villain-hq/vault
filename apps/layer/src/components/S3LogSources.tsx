@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useStore } from "../store";
 import type { AwsSetup, LogSource, S3Found } from "../lib/types";
-import { Combo, Confirm, Field } from "./ui";
+import { Combo, Confirm, ErrorMessage, Field, useFailure } from "./ui";
 
 /**
  * Settings → Observability → S3 log sources (OBS-8, OBS-9): logs kept in S3,
@@ -23,12 +23,17 @@ export function S3LogSources() {
   const scanned = useStore((s) => s.settings?.log_scanned_today);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Looking for the CLI fails in the card, as it opens or on Check again;
+  // removing fails in its dialog (NOTE-6).
+  const looking = useFailure();
   const [setup, setSetup] = useState<AwsSetup | null>(null);
   const [editing, setEditing] = useState<LogSource | null>(null);
   const [removing, setRemoving] = useState<LogSource | null>(null);
 
-  const look = () => void api.awsSetup().then(setSetup).catch(fail);
+  const look = () => {
+    looking.clear();
+    void api.awsSetup().then(setSetup).catch(looking.fail);
+  };
   useEffect(look, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, and on Check again
 
   async function remove(s: LogSource) {
@@ -56,6 +61,7 @@ export function S3LogSources() {
           <button className="ui-button" onClick={look}>Check again</button>
         </div>
       )}
+      <ErrorMessage>{looking.error}</ErrorMessage>
 
       {sources.length > 0 && (
         <div className="s3-sources">
@@ -107,9 +113,13 @@ export function S3LogSources() {
         <Confirm
           title={`Remove ${removing.name}?`}
           confirmLabel="Remove"
-          body={<>Agents will no longer read <span className="mono">s3://{removing.bucket}/{removing.prefix}</span>. Nothing in S3 changes.</>}
+          body={
+            <>
+              Agents will no longer read <span className="mono">s3://{removing.bucket}/{removing.prefix}</span>. Nothing in S3 changes.
+            </>
+          }
           onCancel={() => setRemoving(null)}
-          onConfirm={() => remove(removing).catch(fail)}
+          onConfirm={() => remove(removing)}
         />
       )}
     </div>
@@ -148,7 +158,9 @@ function blank(setup: AwsSetup | null): LogSource {
 function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSetup | null; onDone: () => void }) {
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Find fails under its button, saving under the Save row (NOTE-6).
+  const finding = useFailure();
+  const saving = useFailure();
   const [s, setS] = useState<LogSource>(start);
   const [found, setFound] = useState<S3Found | null>(null);
   const [busy, setBusy] = useState<"find" | "save" | null>(null);
@@ -159,6 +171,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
 
   async function find() {
     setBusy("find");
+    finding.clear();
     try {
       const f = await api.s3LogSourceFind(s.profile, s.region, s.bucket.trim(), s.prefix);
       setFound(f);
@@ -170,7 +183,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
       }
     } catch (e) {
       setFound(null);
-      fail(e);
+      finding.fail(e);
     } finally {
       setBusy(null);
     }
@@ -178,13 +191,14 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
 
   async function save() {
     setBusy("save");
+    saving.clear();
     try {
       const saved = await api.s3LogSourceSave(s);
       await refreshSettings();
       toast("success", `${saved.name} saved: the profile can read s3://${saved.bucket}/${saved.prefix}`);
       onDone();
     } catch (e) {
-      fail(e);
+      saving.fail(e);
     } finally {
       setBusy(null);
     }
@@ -216,6 +230,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
       <button className="ui-button" disabled={!!busy || !s.bucket.trim() || !s.profile} onClick={() => void find()}>
         {busy === "find" ? "Looking…" : "Find"}
       </button>
+      <ErrorMessage>{finding.error}</ErrorMessage>
 
       {found && (
         <div className="s3-found">
@@ -304,6 +319,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
         <button className="ui-button" disabled={busy === "save"} onClick={onDone}>Cancel</button>
         {!busy && <span className="muted">{missing(s, athena.workgroup)}</span>}
       </div>
+      <ErrorMessage>{saving.error}</ErrorMessage>
     </div>
   );
 }

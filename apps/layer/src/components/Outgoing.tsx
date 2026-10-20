@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useStore, type ReviewNote } from "../store";
 import type { RepoOutgoing } from "../lib/types";
-import { Spinner } from "./ui";
+import { ErrorMessage, Spinner, useFailure } from "./ui";
 
 const NO_NOTES: ReviewNote[] = [];
 const KIND_TONE = { debug: "ui-status-danger", "focused test": "ui-status-danger", "conflict marker": "ui-status-danger", todo: "ui-status-warn" } as const;
@@ -16,21 +16,23 @@ const KIND_TONE = { debug: "ui-status-danger", "focused test": "ui-status-danger
  * button says "anyway" when there are some.
  */
 export function Outgoing({ taskId, onFlags }: { taskId: string; onFlags: (n: number) => void }) {
-  const fail = useStore((s) => s.fail);
+  // Read as the dialog opens, so it fails in the dialog, where this goes (NOTE-6).
+  const failure = useFailure();
   const notes = useStore((s) => s.notes[taskId] ?? NO_NOTES);
   const [rows, setRows] = useState<RepoOutgoing[] | null>(null);
   const [specOutside, setSpecOutside] = useState<string[]>([]);
 
   useEffect(() => {
     let current = true;
+    failure.clear();
     api.taskOutgoing(taskId)
       .then((r) => { if (current) setRows(r); })
-      .catch((e) => { if (current) { setRows([]); fail(e); } });
+      .catch((e) => { if (current) { setRows([]); failure.fail(e); } });
     api.readSpec(taskId)
       .then((s) => { if (current) setSpecOutside(s.parts.flatMap((p) => p.outside.map((o) => `${o.folder}/…/${p.file}`))); })
       .catch(() => {});
     return () => { current = false; };
-  }, [taskId, fail]);
+  }, [taskId, failure.clear, failure.fail]);
 
   const going = useMemo(() => (rows ?? []).filter((r) => r.commits.length > 0 || r.error), [rows]);
   const leftovers = going.reduce((n, r) => n + r.leftovers.length, 0);
@@ -41,6 +43,7 @@ export function Outgoing({ taskId, onFlags }: { taskId: string; onFlags: (n: num
   if (rows === null) {
     return <div className="outgoing muted"><Spinner /> Looking at what this would push…</div>;
   }
+  if (failure.error) return <ErrorMessage>{failure.error}</ErrorMessage>;
   if (going.length === 0 && specOutside.length === 0) return null;
 
   return (

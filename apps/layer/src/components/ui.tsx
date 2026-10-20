@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { failureText } from "../lib/api";
 import { useStore } from "../store";
 import { CloseIcon, PanelIcon } from "./icons";
 
@@ -56,6 +57,29 @@ export function Field({
       {children}
       {hint && <div className="hint">{hint}</div>}
     </div>
+  );
+}
+
+/**
+ * A failure of what the user just did, shown where they did it (NOTE-6):
+ * `fail` in the catch, `clear` before trying again, and `error` in an
+ * `ErrorMessage`. Not the top bar's status, and not kept in the message
+ * center (MSG-1).
+ */
+export function useFailure() {
+  const [error, setError] = useState<string | null>(null);
+  const fail = useCallback((e: unknown) => setError(failureText(e)), []);
+  const clear = useCallback(() => setError(null), []);
+  return useMemo(() => ({ error, fail, clear }), [error, fail, clear]);
+}
+
+/** The danger-tinted note above a dialog's buttons or under the actions that failed. */
+export function ErrorMessage({ children }: { children: ReactNode }) {
+  if (!children) return null;
+  return (
+    <p role="alert" className="ui-tint-danger error-message">
+      {children}
+    </p>
   );
 }
 
@@ -278,8 +302,10 @@ export function Confirm({
   onCancel: () => void;
 }) {
   const [running, setRunning] = useState(false);
+  const failure = useFailure();
 
   function go() {
+    failure.clear();
     const done = onConfirm();
     // Nothing to wait for: the caller has taken over, as the task delete does
     // with its own overlay.
@@ -290,9 +316,9 @@ export function Confirm({
     setRunning(true);
     void (done as Promise<unknown>).then(
       () => onCancel(),
-      // The caller reports its own failures; this only has to stop spinning,
-      // and it has to stop whether or not the dialog is still mounted.
-      () => { setRunning(false); },
+      // A rejection stays in the dialog, above its buttons (NOTE-6). A caller
+      // that reports its own failure resolves instead, and the dialog closes.
+      (e: unknown) => { setRunning(false); failure.fail(e); },
     );
   }
 
@@ -321,6 +347,7 @@ export function Confirm({
       }
     >
       <div style={{ lineHeight: 1.6 }}>{body}</div>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

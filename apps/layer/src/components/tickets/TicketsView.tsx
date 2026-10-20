@@ -6,7 +6,7 @@ import { useStore } from "../../store";
 import { groupByEpic } from "../../lib/derive";
 import type { JiraIssue, JiraPage } from "../../lib/types";
 import { ChevronIcon } from "../icons";
-import { ContextMenu, Spinner, type MenuItem } from "../ui";
+import { ContextMenu, ErrorMessage, Spinner, useFailure, type MenuItem } from "../ui";
 import { IssueTypeIcon, isEpicType, typeMap } from "../IssueType";
 import { BrowsePanel } from "./BrowsePanel";
 import { CreateEpicDialog } from "./CreateEpicDialog";
@@ -15,6 +15,8 @@ import { ReadTicketDialog } from "./ReadTicketDialog";
 import { StartWorkDialog } from "./StartWorkDialog";
 import { TicketCard } from "./TicketCard";
 import { TypeFilter } from "./TypeFilter";
+
+const noBrowser = "Couldn't open the browser. Try again.";
 
 export function TicketsView() {
   const issues = useStore((s) => s.issues);
@@ -29,7 +31,10 @@ export function TicketsView() {
   const toggleSettings = useStore((s) => s.toggleSettings);
   const select = useStore((s) => s.select);
   const toast = useStore((s) => s.toast);
+  // A search fails under the search panel (NOTE-6). Menu items, the epic's
+  // Jira link and a card's sync have no room of their own: the top bar.
   const fail = useStore((s) => s.fail);
+  const search = useFailure();
   const focusIssueKey = useStore((s) => s.focusIssueKey);
   const clearFocusIssue = useStore((s) => s.clearFocusIssue);
 
@@ -97,6 +102,7 @@ export function TicketsView() {
       setIncludeDone(true);
       setKinds([]);
       setSearching(true);
+      search.clear();
       // Counted like any other search, so a newer one is not overwritten by
       // this landing late, nor has its spinner cleared by it.
       const asked = ++searchSeq.current;
@@ -113,7 +119,7 @@ export function TicketsView() {
         .catch((e) => {
           if (asked !== searchSeq.current) return;
           setFound({ issues: [], more: false });
-          fail(e);
+          search.fail(e);
         })
         .finally(() => { if (asked === searchSeq.current) setSearching(false); });
       const clear = window.setTimeout(() => clearFocusIssue(), 2200);
@@ -130,7 +136,7 @@ export function TicketsView() {
       window.clearTimeout(scroll);
       window.clearTimeout(clear);
     };
-    // issues / fail deliberately omitted: this runs once per focus request.
+    // issues / search deliberately omitted: this runs once per focus request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusIssueKey]);
 
@@ -149,7 +155,7 @@ export function TicketsView() {
     const link = `${jiraBase}/browse/${key}`;
     return [
       // A divider only when something precedes them.
-      { label: "Open in Jira", separated: after, onSelect: () => void openUrl(link).catch(fail) },
+      { label: "Open in Jira", separated: after, onSelect: () => void openUrl(link).catch(() => fail(noBrowser)) },
       { label: "Copy link", onSelect: () => copyAndSay(link, link) },
       { label: `Copy ${key}`, onSelect: () => copyAndSay(key, key) },
       { label: "Copy summary", onSelect: () => copyAndSay(`${key} ${summary}`, key) },
@@ -199,13 +205,14 @@ export function TicketsView() {
   async function browse() {
     const asked = ++searchSeq.current;
     setSearching(true);
+    search.clear();
     try {
       const page = await api.jiraBrowse(browseText.trim(), whose, includeDone, kinds);
       if (asked === searchSeq.current) setFound(page);
     } catch (e) {
       if (asked !== searchSeq.current) return;
       setFound({ issues: [], more: false });
-      fail(e);
+      search.fail(e);
     } finally {
       if (asked === searchSeq.current) setSearching(false);
     }
@@ -376,6 +383,7 @@ export function TicketsView() {
           }}
         />
       )}
+      {sub === "browse" && <ErrorMessage>{search.error}</ErrorMessage>}
 
       {sub === "mine" && (
         <TypeFilter
@@ -498,7 +506,7 @@ export function TicketsView() {
                   title={`Open ${epic.key} in Jira`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    void openUrl(`${jiraBase}/browse/${epic.key}`).catch(fail);
+                    void openUrl(`${jiraBase}/browse/${epic.key}`).catch(() => fail(noBrowser));
                   }}
                 >
                   Jira ↗

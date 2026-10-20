@@ -6,6 +6,7 @@ import { pastedImages, readImage, type PastedImage } from "../lib/pastedImage";
 import { useStore } from "../store";
 import type { AcpEntry, AcpToolContent, AcpView, PaneInfo } from "../lib/types";
 import { Markdown } from "./Markdown";
+import { ErrorMessage, useFailure } from "./ui";
 import { TerminalPane } from "./Terminal";
 
 /**
@@ -25,8 +26,10 @@ export const PaneView = memo(function PaneView({ pane, visible }: { pane: PaneIn
  */
 function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
   const appActive = useStore((s) => s.appActive);
-  const fail = useStore((s) => s.fail);
-  const toast = useStore((s) => s.toast);
+  // What is sent, answered or set here fails under the message box, just
+  // above it for a question answered in the log (NOTE-6).
+  const failure = useFailure();
+  const fail = failure.fail;
   const textSize = useStore((s) => s.settings?.ui.conversation_font_size ?? 14);
   const shown = visible && appActive;
 
@@ -90,6 +93,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
     setDraft("");
     setImages([]);
     atBottom.current = true;
+    failure.clear();
     try {
       await api.acpPrompt(pane.id, text, sent.map(({ mimeType, data }) => ({ mimeType, data })));
     } catch (e) {
@@ -103,15 +107,20 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
     if (files.length === 0) return;
     // Not the link that came with it (ACP-16).
     e.preventDefault();
+    failure.clear();
     if (!view?.images) {
-      toast("error", `${view?.agent ?? "This agent"} does not take images.`);
+      fail(`${view?.agent ?? "This agent"} doesn't take images.`);
       return;
     }
     void Promise.all(files.map(readImage)).then((read) => setImages((now) => [...now, ...read])).catch(fail);
   };
-  const stop = () => void api.acpCancel(pane.id).catch(fail);
-  const answer = (entry: number, option: string) => void api.acpAnswer(pane.id, entry, option).catch(fail);
-  const set = (setting: string, value: string) => void api.acpSet(pane.id, setting, value).catch(fail);
+  const attempt = (work: () => Promise<unknown>) => {
+    failure.clear();
+    void work().catch(fail);
+  };
+  const stop = () => attempt(() => api.acpCancel(pane.id));
+  const answer = (entry: number, option: string) => attempt(() => api.acpAnswer(pane.id, entry, option));
+  const set = (setting: string, value: string) => attempt(() => api.acpSet(pane.id, setting, value));
 
   const busy = view?.busy ?? false;
   const over = !pane.running || (view?.exited ?? false);
@@ -218,6 +227,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               )}
             </div>
           </div>
+          <ErrorMessage>{failure.error}</ErrorMessage>
         </div>
       </div>
     </div>

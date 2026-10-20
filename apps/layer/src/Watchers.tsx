@@ -263,8 +263,9 @@ export function Watchers() {
 
       const owner = state.tasks.find((t) => t.id === pane.task_id);
       const how = pane.exit_code === 0 ? "finished" : `exited with ${pane.exit_code ?? "?"}`;
+      // News, not a failure of the app (NOTE-6): a toast that opens the pane.
       state.toast(
-        pane.exit_code === 0 ? "info" : "error",
+        "info",
         `${pane.title} ${how} in ${owner?.name ?? "a task"}`,
         // attention.rs keeps this one (MSG-3).
         { target: `pane:${pane.task_id}:${pane.id}`, record: false },
@@ -332,7 +333,7 @@ export function Watchers() {
       } else if (e.payload.notice === "usage_limit") {
         // A chat has no handoff; a task's agent does.
         state.toast(
-          "error",
+          "info",
           pane.task_id === CHAT_TASK_ID
             ? `${pane.title} hit a usage limit in a chat — start another chat with a different agent.`
             : `${pane.title} hit a usage limit in ${owner?.name ?? "a task"} — open it to hand off to another agent.`,
@@ -348,10 +349,11 @@ export function Watchers() {
   // has usually finished — emitting at setup time is silent.
   useEffect(() => {
     const show = (notices: { kind: string; text: string }[]) => {
-      const toast = useStore.getState().toast;
+      const { toast, fail } = useStore.getState();
       for (const n of notices) {
         // push_notice kept it already (MSG-3).
-        toast(n.kind === "error" ? "error" : "info", n.text, { record: false });
+        if (n.kind === "error") fail(n.text, { record: false });
+        else toast("info", n.text, { record: false });
       }
     };
     void api.takeNotices().then(show).catch(() => {});
@@ -436,7 +438,7 @@ export function Watchers() {
         if (now.verdict !== was.verdict && now.verdict === "approved") {
           toast("success", `${pr} approved${by ? ` by ${by}` : ""} — ${where}`, news);
         } else if (now.verdict !== was.verdict && now.verdict === "changes_requested") {
-          toast("error", `${pr}: changes requested${by ? ` by ${by}` : ""} — ${where}`, news);
+          toast("info", `${pr}: changes requested${by ? ` by ${by}` : ""} — ${where}`, news);
         } else if (now.comments > was.comments) {
           const n = now.comments - was.comments;
           toast("info", `${n} new comment${n === 1 ? "" : "s"} on ${pr} — ${where}`, news);

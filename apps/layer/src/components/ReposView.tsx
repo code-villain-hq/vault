@@ -11,7 +11,7 @@ import { AddRepos } from "./AddRepos";
 import { CleanUp } from "./CleanUp";
 import { RepoNotes } from "./RepoNotes";
 import { ChevronIcon } from "./icons";
-import { Combo, Confirm, Spinner } from "./ui";
+import { Combo, Confirm, ErrorMessage, Spinner, useFailure } from "./ui";
 
 export function ReposView() {
   const projects = useStore((s) => s.projects);
@@ -21,7 +21,13 @@ export function ReposView() {
   const refreshRepoHealth = useStore((s) => s.refreshRepoHealth);
   const refreshAll = useStore((s) => s.refreshAll);
   const toast = useStore((s) => s.toast);
+  // Reads the view makes on its own fail in the top bar. What the user does
+  // to a repository fails under its row, Sync all under the header (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const head = useFailure();
+  const row = useFailure();
+  // Which row `row` belongs to: a project id, or `group:` and a group's name.
+  const [failedAt, setFailedAt] = useState<string | null>(null);
   const now = useNow(60_000);
 
   const [adding, setAdding] = useState(false);
@@ -66,66 +72,77 @@ export function ReposView() {
   const anyOpen = groups.some((g) => !isClosed(g));
   const lastSync = Math.max(0, ...projects.map((p) => health[p.id]?.synced_at ?? 0));
 
+  function tryAt(at: string) {
+    row.clear();
+    setFailedAt(at);
+  }
+
   async function setGroup(projectId: string, group: string) {
+    tryAt(projectId);
     try {
       await api.setProjectGroup([projectId], group.trim() || null);
       await refreshRepos();
     } catch (e) {
-      fail(e);
+      row.fail(e);
     }
   }
 
   async function regroup(from: string, to: string) {
     const ids = projects.filter((p) => (p.group ?? "") === from).map((p) => p.id);
+    tryAt(`group:${from}`);
     try {
       await api.setProjectGroup(ids, to.trim() || null);
       await refreshRepos();
     } catch (e) {
-      fail(e);
+      row.fail(e);
     }
   }
 
   async function setUpdateBy(p: Project, by: UpdateBy | null) {
+    tryAt(p.id);
     try {
       await api.setProjectUpdateBy(p.id, by);
       await refreshRepos();
     } catch (e) {
-      fail(e);
+      row.fail(e);
     }
   }
 
   async function setCheck(p: Project, command: string) {
+    tryAt(p.id);
     try {
       await api.setProjectCheck(p.id, command || null);
       await refreshRepos();
     } catch (e) {
-      fail(e);
+      row.fail(e);
     }
   }
 
   async function setSpecs(p: Project, inApp: boolean, folder: string) {
+    tryAt(p.id);
     try {
       await api.setProjectSpecs(p.id, inApp, folder);
       await refreshRepos();
     } catch (e) {
-      fail(e);
+      row.fail(e);
     }
   }
 
   async function sync(ids: string[]) {
     setSyncing((s) => new Set([...s, ...ids]));
+    const all = ids.length > 1;
+    if (all) head.clear(); else tryAt(ids[0]);
     try {
       const rows = await api.syncRepos(ids);
       setSynced((s) => ({ ...s, ...Object.fromEntries(rows.map((r) => [r.project_id, r])) }));
-      const failed = rows.filter((r) => !r.ok);
-      if (ids.length > 1) {
-        toast(failed.length ? "error" : "success", syncSummary(rows));
-      } else if (failed.length) {
-        toast("error", failed[0].detail);
+      // One repository's reason is already on its row, under the button.
+      if (all) {
+        if (rows.some((r) => !r.ok)) head.fail(syncSummary(rows));
+        else toast("success", syncSummary(rows));
       }
       await Promise.all([refreshRepos(), refreshRepoHealth()]);
     } catch (e) {
-      fail(e);
+      (all ? head : row).fail(e);
     } finally {
       setSyncing((s) => new Set([...s].filter((id) => !ids.includes(id))));
     }
@@ -134,6 +151,7 @@ export function ReposView() {
   async function locate(p: Project, path?: string) {
     const chosen = path ?? (await openDialog({ directory: true, title: `Where is ${p.name} now?` }));
     if (typeof chosen !== "string") return;
+    tryAt(p.id);
     try {
       const moved = await api.locateProject(p.id, chosen);
       // Its group was open only for the trouble; closing under the click
@@ -142,7 +160,7 @@ export function ReposView() {
       toast("success", `${p.name} is at ${moved.path} now. Its tasks keep it.`);
       await Promise.all([refreshRepos(), refreshRepoHealth()]);
     } catch (e) {
-      fail(e);
+      row.fail(e);
     }
   }
 
@@ -169,12 +187,15 @@ export function ReposView() {
       // it. Awaited, so the dialog is what waits rather than the sidebar
       // silently rearranging itself a few seconds later.
       busyLabel: "Removing…",
+      // The dialog closes either way; a repository it could not remove is
+      // still there, and says why under its row.
       run: async () => {
+        tryAt(p.id);
         try {
           await api.removeProject(p.id);
           await Promise.all([refreshAll(), refreshRepoHealth()]);
         } catch (e) {
-          fail(e);
+          row.fail(e);
         }
       },
     });
@@ -226,6 +247,7 @@ export function ReposView() {
           Add repositories
         </button>
       </div>
+      <ErrorMessage>{head.error}</ErrorMessage>
 
       {projects.length === 0 && (
         <div className="card">
@@ -260,6 +282,7 @@ export function ReposView() {
               />
             </div>
           </div>
+          {failedAt === `group:${g.group}` && <ErrorMessage>{row.error}</ErrorMessage>}
 
           {!closed && g.projects.map((p) => {
             const h = health[p.id];
@@ -268,7 +291,7 @@ export function ReposView() {
             const inUse = tasks.filter((t) =>
               t.checkouts.some((c) => c.project_id === p.id),
             ).length;
-            const row = synced[p.id];
+            const last = synced[p.id];
             const busy = syncing.has(p.id);
             const noted = notes[p.id] ?? [];
             const stale = noted.filter((n) => n.changed?.length).length;
@@ -337,7 +360,8 @@ export function ReposView() {
                     )}
                   </div>
                 )}
-                {row && <div className={`repo-synced${row.ok ? "" : " failed"}`}>{row.detail}</div>}
+                {last && <div className={`repo-synced${last.ok ? "" : " failed"}`}>{last.detail}</div>}
+                {failedAt === p.id && <ErrorMessage>{row.error}</ErrorMessage>}
                 {showNotes && <RepoNotes project={p} notes={noted} onChanged={loadNotes} />}
               </div>
             );

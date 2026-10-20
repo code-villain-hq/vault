@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { api, errMessage } from "../lib/api";
+import { api } from "../lib/api";
 import { read, write } from "../lib/persist";
 import { useStore } from "../store";
 import type { CodeLine, FeedbackItem, FeedbackNote, RepoFeedback, TaskView } from "../lib/types";
 import { ChevronIcon, ExternalIcon } from "./icons";
-import { Modal, Spinner } from "./ui";
+import { ErrorMessage, Modal, Spinner, useFailure } from "./ui";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
 import { Markdown } from "./Markdown";
+
+/** An icon button has no room for a failure of its own: the top bar says it. */
+const NO_BROWSER = "Couldn't open the browser. Try again.";
 
 /** One row in the picker, and what it becomes if it is sent. */
 interface Entry {
@@ -192,7 +195,7 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
           <button
             className="ui-button ui-icon-button"
             title="Open on GitHub"
-            onClick={(e) => { e.stopPropagation(); void openUrl(url).catch(() => {}); }}
+            onClick={(e) => { e.stopPropagation(); void openUrl(url).catch(() => useStore.getState().fail(NO_BROWSER)); }}
           >
             <ExternalIcon />
           </button>
@@ -220,11 +223,12 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
  */
 export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: string; onClose: () => void }) {
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Reading fails where the list would be, sending above the buttons (NOTE-6).
+  const reading = useFailure();
+  const sending = useFailure();
   const at = useAgentTarget(task);
 
   const [rows, setRows] = useState<RepoFeedback[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [shown, setShown] = useState<string | undefined>(first);
@@ -238,7 +242,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
   useEffect(() => {
     let stop = false;
     setRows(null);
-    setError(null);
+    reading.clear();
     api.githubPrFeedback(task.id)
       .then((r) => {
         if (stop) return;
@@ -247,9 +251,9 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
         for (const row of r) for (const e of entries(row, sent).list) if (e.preset) next.add(e.key);
         setPicked(next);
       })
-      .catch((e) => { if (!stop) setError(errMessage(e)); });
+      .catch((e) => { if (!stop) reading.fail(e); });
     return () => { stop = true; };
-  }, [task.id, sent]);
+  }, [task.id, sent, reading.clear, reading.fail]);
 
   const chosen = built.flatMap((b) => b.list.filter((e) => picked.has(e.key)));
   // The PR asked for, or the first when it has none or its PR has gone.
@@ -268,6 +272,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
   async function send() {
     if (chosen.length === 0) return;
     setBusy(true);
+    sending.clear();
     try {
       const items = chosen.map((e) => e.item);
       const who = await at.send((paneId, scope) => api.sendPrFeedback(task.id, paneId, scope, items));
@@ -276,7 +281,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
       write(sentKey(task.id), keep.slice(-SENT_LIMIT));
       onClose();
     } catch (e) {
-      fail(e);
+      sending.fail(e);
     } finally {
       setBusy(false);
     }
@@ -330,8 +335,8 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
 
   return (
     <Modal title={title} wide tall onClose={() => !busy && onClose()} footer={footer} toolbar={tabs || undefined}>
-      {error && <div className="muted" style={{ color: "var(--status-danger-ink)" }}>{error}</div>}
-      {!rows && !error && (
+      <ErrorMessage>{reading.error}</ErrorMessage>
+      {!rows && !reading.error && (
         <div className="row muted"><Spinner /> Reading reviews and checks…</div>
       )}
       {rows && rows.length === 0 && (
@@ -357,6 +362,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
           work through it and say what it did about each. Nothing is posted to GitHub.
         </div>
       )}
+      <ErrorMessage>{sending.error}</ErrorMessage>
     </Modal>
   );
 }
@@ -394,7 +400,7 @@ function PrItems({ row, list, open, resolved, picked, onToggle, onAll }: {
           <button
             className="ui-button ui-icon-button"
             title="Open the pull request on GitHub"
-            onClick={() => void openUrl(row.url).catch(() => {})}
+            onClick={() => void openUrl(row.url).catch(() => useStore.getState().fail(NO_BROWSER))}
           >
             <ExternalIcon />
           </button>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import type { TaskSpec, TaskView } from "../../lib/types";
-import { Confirm } from "../ui";
+import { Confirm, ErrorMessage, useFailure } from "../ui";
 
 /**
  * Start agent, once for the task above its files (SPEC-12), saying what it
@@ -25,7 +25,8 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
   const refreshPanes = useStore((s) => s.refreshPanes);
   const showPane = useStore((s) => s.showPane);
   const setTab = useStore((s) => s.setTab);
-  const fail = useStore((s) => s.fail);
+  // Starting fails under this bar (NOTE-6).
+  const failure = useFailure();
   const [scope, setScope] = useState<string>("all");
   const [starting, setStarting] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -49,6 +50,7 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
   async function start() {
     if (!agentId) return;
     setStarting(true);
+    failure.clear();
     try {
       const checkoutId = one && repos.length > 1 ? one.checkout_id : null;
       const [prompt, work] = await Promise.all([api.taskPrompt(task.id, checkoutId), api.specWorkPrompt(task.id, checkoutId)]);
@@ -57,49 +59,52 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
       showPane(pane.id);
       setTab("terminals");
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setStarting(false);
     }
   }
 
   return (
-    <div className="spec-start-bar">
-      <select className="ui-field" value={agentId ?? ""} disabled={installed.length === 0} onChange={(e) => setAgentId(e.target.value)} aria-label="Agent">
-        {installed.length === 0 && <option value="">No agent CLI installed</option>}
-        {installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-      </select>
-      {repos.length > 1 && (
-        <select className="ui-field" value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Which repositories">
-          <option value="all">Every repository, from the task folder</option>
-          {repos.map((r) => <option key={r.checkout_id} value={r.checkout_id}>Only {r.folder}</option>)}
+    <>
+      <div className="spec-start-bar">
+        <select className="ui-field" value={agentId ?? ""} disabled={installed.length === 0} onChange={(e) => setAgentId(e.target.value)} aria-label="Agent">
+          {installed.length === 0 && <option value="">No agent CLI installed</option>}
+          {installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-      )}
-      <button
-        className={`ui-button${quiet || !agentId || total === 0 || left === 0 ? "" : " ui-button-primary"}`}
-        disabled={!agentId || total === 0 || left === 0 || starting}
-        title={total === 0 ? "Approve the tasks first" : left === 0 ? "Every step is done" : "It works through the approved steps in order, ticking each off as it finishes it"}
-        onClick={() => (working.length > 0 ? setConfirming(true) : void start())}
-      >
-        {starting ? "Starting…" : total === 0 ? "Start agent" : `Start ${name} on ${where} · ${left} step${left === 1 ? "" : "s"} left`}
-      </button>
-      <span className="spacer" />
-      {working.length > 0 && (
-        <span className="spec-working">
-          {working.length === 1 ? `${nameOf(working[0].agent_id)} is working in this task` : `${working.length} agents are working in this task`}
-          <button className="ui-button" onClick={() => { showPane(working[0].id); setTab("terminals"); }}>Open</button>
-        </span>
-      )}
-      {confirming && (
-        <Confirm
-          title="Start another agent?"
-          body={`${working.length === 1 ? `${nameOf(working[0].agent_id)} is` : `${working.length} agents are`} already working in this task. A second agent on the same steps does them again, alongside the first.`}
-          confirmLabel="Start another"
-          danger={false}
-          onConfirm={() => { setConfirming(false); void start(); }}
-          onCancel={() => setConfirming(false)}
-        />
-      )}
-    </div>
+        {repos.length > 1 && (
+          <select className="ui-field" value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Which repositories">
+            <option value="all">Every repository, from the task folder</option>
+            {repos.map((r) => <option key={r.checkout_id} value={r.checkout_id}>Only {r.folder}</option>)}
+          </select>
+        )}
+        <button
+          className={`ui-button${quiet || !agentId || total === 0 || left === 0 ? "" : " ui-button-primary"}`}
+          disabled={!agentId || total === 0 || left === 0 || starting}
+          title={total === 0 ? "Approve the tasks first" : left === 0 ? "Every step is done" : "It works through the approved steps in order, ticking each off as it finishes it"}
+          onClick={() => (working.length > 0 ? setConfirming(true) : void start())}
+        >
+          {starting ? "Starting…" : total === 0 ? "Start agent" : `Start ${name} on ${where} · ${left} step${left === 1 ? "" : "s"} left`}
+        </button>
+        <span className="spacer" />
+        {working.length > 0 && (
+          <span className="spec-working">
+            {working.length === 1 ? `${nameOf(working[0].agent_id)} is working in this task` : `${working.length} agents are working in this task`}
+            <button className="ui-button" onClick={() => { showPane(working[0].id); setTab("terminals"); }}>Open</button>
+          </span>
+        )}
+        {confirming && (
+          <Confirm
+            title="Start another agent?"
+            body={`${working.length === 1 ? `${nameOf(working[0].agent_id)} is` : `${working.length} agents are`} already working in this task. A second agent on the same steps does them again, alongside the first.`}
+            confirmLabel="Start another"
+            danger={false}
+            onConfirm={() => { setConfirming(false); void start(); }}
+            onCancel={() => setConfirming(false)}
+          />
+        )}
+      </div>
+      <ErrorMessage>{failure.error}</ErrorMessage>
+    </>
   );
 }

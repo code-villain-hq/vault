@@ -51,6 +51,10 @@ and one task list better than a sidebar of views.
   only for the first.
 - No wordmark. The bar starts under macOS's traffic lights, and Grenze
   beside them clashed with them.
+- The frame's status ([`../behaviour.md`](../behaviour.md#errors)) sits in
+  the top bar, left of the tools, since Layer has no sidebar foot. Layer
+  has no sync, so it says only what failed in the background, and nothing
+  while all is well.
 - Below the bar, Work's task list runs down the left in `bg`, with the
   profile at its foot, as the sidebar does in Forge. Every view, Work's
   included, is an inset `panel` with `radius-lg`.

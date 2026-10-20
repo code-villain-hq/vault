@@ -13,7 +13,6 @@ import { Confirm, Floating } from "./ui";
  */
 export function MessageCenter() {
   const unread = useStore((s) => s.messages.reduce((n, m) => n + (m.read ? 0 : 1), 0));
-  const fail = useStore((s) => s.fail);
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   // Asked from the panel, which closes for it: the panel floats over dialogs.
   const [clearing, setClearing] = useState(false);
@@ -51,7 +50,7 @@ export function MessageCenter() {
           title="Clear every message?"
           body="The list empties for good. What comes next still lands here."
           confirmLabel="Clear"
-          onConfirm={() => api.clearMessages().catch(fail)}
+          onConfirm={() => api.clearMessages()}
           onCancel={() => setClearing(false)}
         />
       )}

@@ -9,7 +9,7 @@ import { useStore } from "../store";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
 import { ChevronIcon, CopyIcon, ExternalIcon, PlusIcon } from "./icons";
-import { Combo, Field, Modal, Spinner } from "./ui";
+import { Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 import { PrFeedback } from "./PrFeedback";
 import { Outgoing } from "./Outgoing";
 import { PrReadErrors } from "./PrReadErrors";
@@ -120,7 +120,11 @@ export function PrPanel({
   const agentPanes = useRunningAgentsOf(task.id);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // The panel's own actions fail under its buttons, the dialog's above its
+  // footer (NOTE-6).
+  const panel = useFailure();
+  const dialog = useFailure();
+  const fail = panel.fail;
 
   /**
    * The rows, held in the store rather than here.
@@ -169,6 +173,7 @@ export function PrPanel({
   const load = useCallback(async () => {
     if (!settings?.github_connected) return;
     setLoading(true);
+    panel.clear();
     try {
       setTaskPrs(task.id, await api.githubTaskPrs(task.id));
     } catch (e) {
@@ -179,7 +184,7 @@ export function PrPanel({
       setAskedFor(task.id);
       setLoading(false);
     }
-  }, [task.id, settings?.github_connected, fail]);
+  }, [task.id, settings?.github_connected, fail, panel.clear]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -228,7 +233,7 @@ export function PrPanel({
   }, [task.id, task.name, task.issue_url]);
 
   function openPr(url: string) {
-    void openUrl(url).catch(() => toast("error", "Could not open the browser"));
+    void openUrl(url).catch(() => fail("Couldn't open the browser. Try again."));
   }
 
   /** Where this repo's next PR goes. Changing it leaves an open PR alone. */
@@ -262,6 +267,7 @@ export function PrPanel({
   /// it knows what the diff cannot say.
   async function draftWithAgent() {
     setDrafting(true);
+    dialog.clear();
     // Cleared so the streamed text is not appended to whatever was there.
     setBody("");
     streaming.current = true;
@@ -279,7 +285,7 @@ export function PrPanel({
       const pane = agentPanes[0];
       if (!pane) {
         setDrafting(false);
-        fail(e);
+        dialog.fail(e);
         return;
       }
       toast("info", `Asking ${pane.title} instead — this one takes longer.`);
@@ -302,19 +308,20 @@ export function PrPanel({
         } else if (Date.now() - started > 5 * 60 * 1000) {
           setDrafting(false);
           if (pollRef.current) window.clearInterval(pollRef.current);
-          toast("error", "Gave up waiting for the draft. The agent may still be working.");
+          dialog.fail("Gave up waiting for the draft. The agent may still be working.");
         }
       }, 2000);
     } catch (e) {
       setDrafting(false);
-      fail(e);
+      dialog.fail(e);
     }
   }
 
   async function push() {
     setBusy(true);
+    panel.clear();
     try {
-      reportRepoResults(toast, await api.pushTask(task.id), "Pushed");
+      reportRepoResults(toast, fail, await api.pushTask(task.id), "Pushed");
       await load();
     } catch (e) {
       fail(e);
@@ -325,16 +332,15 @@ export function PrPanel({
 
   async function openPrs() {
     setBusy(true);
+    dialog.clear();
     try {
-      reportRepoResults(
-        toast,
-        await api.githubOpenPrs(task.id, title.trim(), body, draft, leftOut),
-        "Opened",
-      );
-      setCreating(false);
+      const results = await api.githubOpenPrs(task.id, title.trim(), body, draft, leftOut);
+      reportRepoResults(toast, dialog.fail, results, "Opened");
+      // A repository that refused keeps the dialog open, its reason in it.
+      if (results.every((r) => r.ok)) setCreating(false);
       await load();
     } catch (e) {
-      fail(e);
+      dialog.fail(e);
     } finally {
       setBusy(false);
     }
@@ -476,12 +482,13 @@ export function PrPanel({
                     pending.length === 1 ? "y" : "ies"
                   }`
             }
-            onClick={() => { setLeftOut([]); setCreating(true); }}
+            onClick={() => { setLeftOut([]); dialog.clear(); setCreating(true); }}
           >
             <PlusIcon />
           </button>
         )}
       </div>
+      <ErrorMessage>{panel.error}</ErrorMessage>
 
       {review === "merged" && (
         <div className="card row">
@@ -511,7 +518,7 @@ export function PrPanel({
           <button
             className={`ui-button${pending.length > 0 ? " ui-button-primary" : ""}`}
             disabled={pending.length === 0}
-            onClick={() => { setLeftOut([]); setCreating(true); }}
+            onClick={() => { setLeftOut([]); dialog.clear(); setCreating(true); }}
           >
             Open pull request
           </button>
@@ -776,6 +783,7 @@ export function PrPanel({
               ? ` The links are also posted back to ${task.issue_key} as a single comment.`
               : ""}
           </div>
+          <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>
       )}
     </div>

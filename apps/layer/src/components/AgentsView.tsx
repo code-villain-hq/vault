@@ -1,11 +1,11 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { api } from "../lib/api";
 import { markStopping, useStore } from "../store";
 import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
 import { Ago } from "./Ago";
-import { SidebarToggle, Spinner } from "./ui";
+import { ErrorMessage, SidebarToggle, Spinner, useFailure } from "./ui";
 
 /**
  * Every agent, one card each.
@@ -17,7 +17,10 @@ import { SidebarToggle, Spinner } from "./ui";
  */
 export function AgentsView() {
   const refreshPanes = useStore((s) => s.refreshPanes);
-  const fail = useStore((s) => s.fail);
+  // A Stop that failed says so under its card (NOTE-6). Drawn here rather
+  // than in the card, which is handed `stop` once and stays as it is.
+  const failure = useFailure();
+  const [failedOn, setFailedOn] = useState<string | null>(null);
   // What needs you first, so the dock's count is the top of this list.
   const ids = useStore(useShallow((s) =>
     s.panes
@@ -44,11 +47,13 @@ export function AgentsView() {
     if (stoppingNow.current.has(paneId)) return;
     setStopping((s) => new Set(s).add(paneId));
     markStopping(paneId);
+    failure.clear();
+    setFailedOn(paneId);
     try {
       await api.killPane(paneId);
       await refreshPanes();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setStopping((s) => {
         const next = new Set(s);
@@ -56,7 +61,7 @@ export function AgentsView() {
         return next;
       });
     }
-  }, [refreshPanes, fail]);
+  }, [refreshPanes, failure.clear, failure.fail]);
 
   return (
     <div className="wide">
@@ -85,7 +90,10 @@ export function AgentsView() {
       )}
 
       {ids.map((id) => (
-        <AgentCard key={id} id={id} stopping={stopping.has(id)} onStop={stop} />
+        <Fragment key={id}>
+          <AgentCard id={id} stopping={stopping.has(id)} onStop={stop} />
+          {failedOn === id && <ErrorMessage>{failure.error}</ErrorMessage>}
+        </Fragment>
       ))}
     </div>
   );

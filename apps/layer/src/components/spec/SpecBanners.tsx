@@ -1,6 +1,7 @@
 import { partView, slotKey, useSpecs, type SpecFile } from "../../lib/specs";
 import { useStore } from "../../store";
 import type { TaskSpec, TaskView } from "../../lib/types";
+import { ErrorMessage, useFailure } from "../ui";
 
 /**
  * What needs the user before the file in the editor can be trusted: specs
@@ -20,7 +21,8 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
   const approve = useSpecs((s) => s.approve);
   const putBack = useSpecs((s) => s.putBack);
   const turnDown = useSpecs((s) => s.turnDown);
-  const fail = useStore((s) => s.fail);
+  // What fails in a banner shows under the banners (NOTE-6).
+  const failure = useFailure();
   const toast = useStore((s) => s.toast);
   const view = partView(spec, file.part, file.checkoutId);
   const word = file.part === "tasks" ? "tasks" : file.part === "design" ? "design" : spec.kind === "bugfix" ? "bug analysis" : "requirements";
@@ -34,7 +36,7 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
             requirements and a design for the whole task, and each repository's tasks with their ticks
             kept. Nothing is written until you approve it.
           </span>
-          <button className="ui-button" disabled={busy} onClick={() => void merge(task.id).catch(fail)}>Merge into one</button>
+          <button className="ui-button" disabled={busy} onClick={() => { failure.clear(); void merge(task.id).catch(failure.fail); }}>Merge into one</button>
         </div>
       )}
       {view?.outside.map((o) => (
@@ -52,9 +54,15 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
                 title={file.part === "tasks" ? "Approve it as these tasks" : "Approve it, and write it into every repository"}
                 onClick={() => {
                   const target: SpecFile = { part: file.part, checkoutId: file.part === "tasks" ? o.checkout_id : null };
+                  // Tasks go to their one repository; the rest to every one.
+                  const reached = target.checkoutId ? 1 : spec.repos.length;
+                  failure.clear();
                   void approve(task.id, [target], null, { [slotKey(target.part, target.checkoutId)]: o.text })
-                    .then((failed) => toast(failed.length ? "error" : "success", failed.length ? `Not written in ${failed.map((f) => f.folder).join(", ")}.` : `Approved the ${word} from ${o.folder}.`))
-                    .catch(fail);
+                    .then((failed) => {
+                      if (failed.length === 0) toast("success", `Approved the ${word} from ${o.folder}.`);
+                      else failure.fail(`Couldn't write it in ${failed.map((f) => f.folder).join(", ")}. ${reached > failed.length ? "The others have it." : "Try again."}`);
+                    })
+                    .catch(failure.fail);
                 }}
               >
                 Approve it
@@ -65,7 +73,10 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
             className="ui-button"
             disabled={busy}
             title="Write what was approved back over it, and commit that"
-            onClick={() => void putBack(task.id, file.part, o.checkout_id).then(() => toast("success", `Put back the approved ${word} in ${o.folder}.`)).catch(fail)}
+            onClick={() => {
+              failure.clear();
+              void putBack(task.id, file.part, o.checkout_id).then(() => toast("success", `Put back the approved ${word} in ${o.folder}.`)).catch(failure.fail);
+            }}
           >
             Put back
           </button>
@@ -81,12 +92,13 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
             className="ui-button"
             disabled={busy}
             title="Drop the change, and tell the agent"
-            onClick={() => void turnDown(task.id, file).catch(fail)}
+            onClick={() => { failure.clear(); void turnDown(task.id, file).catch(failure.fail); }}
           >
             Turn down
           </button>
         </div>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </>
   );
 }

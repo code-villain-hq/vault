@@ -4,7 +4,7 @@ import { CHAT_TASK_ID } from "../lib/derive";
 import { goTo } from "../lib/goto";
 import { useStore } from "../store";
 import type { WaitingPane } from "../lib/types";
-import { Confirm } from "./ui";
+import { Confirm, ErrorMessage, useFailure } from "./ui";
 
 const NONE: WaitingPane[] = [];
 
@@ -23,7 +23,8 @@ function useWaiting(taskId: string): WaitingPane[] {
  * went with them: nothing in the app could open it again.
  */
 function useActions(taskId: string) {
-  const fail = useStore((s) => s.fail);
+  // Fails under the list it was done from (NOTE-6).
+  const failure = useFailure();
   const [busy, setBusy] = useState<string | null>(null);
   const [forgetting, setForgetting] = useState<WaitingPane | null>(null);
   const refresh = () => Promise.all([useStore.getState().refreshPanes(), useStore.getState().refreshWaiting()]);
@@ -31,12 +32,13 @@ function useActions(taskId: string) {
   async function reopen(w: WaitingPane) {
     if (busy) return;
     setBusy(w.id);
+    failure.clear();
     try {
       const pane = await api.reopenWaitingPane(w.id);
       await refresh();
       goTo(`pane:${taskId}:${pane.id}`);
     } catch (e) {
-      fail(e);
+      failure.fail(e);
       void refresh().catch(() => {});
     } finally {
       setBusy(null);
@@ -44,11 +46,12 @@ function useActions(taskId: string) {
   }
 
   async function forget(w: WaitingPane) {
+    failure.clear();
     try {
       await api.forgetWaitingPane(w.id);
       await useStore.getState().refreshWaiting();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     }
   }
 
@@ -68,13 +71,14 @@ function useActions(taskId: string) {
       }}
     />
   );
-  return { busy, reopen, ask: setForgetting, confirm };
+  const problem = <ErrorMessage>{failure.error}</ErrorMessage>;
+  return { busy, reopen, ask: setForgetting, confirm, problem };
 }
 
 /** Chats the last launch did not put back, under the open ones in the Chat view. */
 export function WaitingChats() {
   const waiting = useWaiting(CHAT_TASK_ID);
-  const { busy, reopen, ask, confirm } = useActions(CHAT_TASK_ID);
+  const { busy, reopen, ask, confirm, problem } = useActions(CHAT_TASK_ID);
   if (waiting.length === 0) return null;
   return (
     <>
@@ -91,6 +95,7 @@ export function WaitingChats() {
           <span className="x" title="Forget this chat" onClick={(e) => { e.stopPropagation(); ask(w); }}>✕</span>
         </div>
       ))}
+      {problem}
       {confirm}
     </>
   );
@@ -100,24 +105,27 @@ export function WaitingChats() {
 export function WaitingTaskPanes({ taskId }: { taskId: string }) {
   const waiting = useWaiting(taskId);
   const agents = useStore((s) => s.agents);
-  const { busy, reopen, ask, confirm } = useActions(taskId);
+  const { busy, reopen, ask, confirm, problem } = useActions(taskId);
   if (waiting.length === 0) return null;
   return (
-    <div className="limit-banner waiting-banner">
-      <span>
-        {waiting.length === 1 ? "A pane was" : `${waiting.length} panes were`} not reopened at launch (12 at most):
-      </span>
-      {waiting.map((w) => (
-        <span key={w.id} className="waiting-pane">
-          <b>{w.kind === "shell" ? "Shell" : agents.find((a) => a.id === w.agent_id)?.name ?? w.agent_id ?? "Agent"}</b>
-          {w.title && ` · ${w.title}`}
-          <button className="ui-button" disabled={busy !== null} onClick={() => void reopen(w)}>
-            {busy === w.id ? "Reopening…" : "Reopen"}
-          </button>
-          <button className="ui-button" title="Do not list it again" onClick={() => ask(w)}>Forget</button>
+    <>
+      <div className="limit-banner waiting-banner">
+        <span>
+          {waiting.length === 1 ? "A pane was" : `${waiting.length} panes were`} not reopened at launch (12 at most):
         </span>
-      ))}
-      {confirm}
-    </div>
+        {waiting.map((w) => (
+          <span key={w.id} className="waiting-pane">
+            <b>{w.kind === "shell" ? "Shell" : agents.find((a) => a.id === w.agent_id)?.name ?? w.agent_id ?? "Agent"}</b>
+            {w.title && ` · ${w.title}`}
+            <button className="ui-button" disabled={busy !== null} onClick={() => void reopen(w)}>
+              {busy === w.id ? "Reopening…" : "Reopen"}
+            </button>
+            <button className="ui-button" title="Do not list it again" onClick={() => ask(w)}>Forget</button>
+          </span>
+        ))}
+        {confirm}
+      </div>
+      {problem}
+    </>
   );
 }

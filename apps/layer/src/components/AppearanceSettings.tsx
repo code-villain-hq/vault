@@ -3,13 +3,19 @@ import { api } from "../lib/api";
 import { useStore } from "../store";
 import { THEMES, type Theme } from "../lib/theme";
 import type { ThemeChoice, UiPrefs } from "../lib/types";
-import { Field, Switch } from "./ui";
+import { ErrorMessage, Field, Switch, useFailure } from "./ui";
+
+/** Which setting a failed save shows under. */
+type Place = "theme" | "scale" | "notifications" | "terminals" | "terminal-text" | "conversation-text";
 
 /** Settings → Appearance: how the app looks, and how its terminals and agents behave. */
 export function AppearanceSettings() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const fail = useStore((s) => s.fail);
+  // A save that fails says so under the setting that was changed (NOTE-6).
+  const failure = useFailure();
+  const [failedAt, setFailedAt] = useState<Place | null>(null);
+  const failedUnder = (at: Place) => failedAt === at && <ErrorMessage>{failure.error}</ErrorMessage>;
 
   /**
    * What the sliders say before it is saved.
@@ -25,7 +31,7 @@ export function AppearanceSettings() {
   const ui = settings ? { ...settings.ui, ...uiDraft } : null;
 
   /** Save a change to the prefs, on top of whatever a slider has not saved yet. */
-  async function saveUi(patch: Partial<UiPrefs>) {
+  async function saveUi(patch: Partial<UiPrefs>, at: Place) {
     // Read now, not from the render that scheduled this: a slider's save
     // runs after a pause, and anything switched meanwhile must survive it.
     const stored = useStore.getState().settings?.ui;
@@ -36,6 +42,7 @@ export function AppearanceSettings() {
     uiDraftRef.current = { ...uiDraftRef.current, ...patch };
     setUiDraft(uiDraftRef.current);
     const n = ++uiSaves.current;
+    failure.clear();
     try {
       await api.setUiPrefs({ ...stored, ...uiDraftRef.current });
       await refreshSettings();
@@ -44,12 +51,13 @@ export function AppearanceSettings() {
         setUiDraft({});
       }
     } catch (e) {
-      fail(e);
+      setFailedAt(at);
+      failure.fail(e);
     }
   }
 
   /** A slider: shown at once, saved once it stops moving. */
-  function slideUi(patch: Partial<UiPrefs>) {
+  function slideUi(patch: Partial<UiPrefs>, at: Place) {
     // Counts as a newer change, so a save already on its way does not clear
     // the draft when it lands — that threw away a value still waiting on its
     // timer, and the thumb jumped back.
@@ -57,7 +65,7 @@ export function AppearanceSettings() {
     uiDraftRef.current = { ...uiDraftRef.current, ...patch };
     setUiDraft(uiDraftRef.current);
     window.clearTimeout(uiSaveTimer.current);
-    uiSaveTimer.current = window.setTimeout(() => void saveUi({}), 250);
+    uiSaveTimer.current = window.setTimeout(() => void saveUi({}, at), 250);
   }
 
   if (!settings || !ui) return null;
@@ -67,7 +75,8 @@ export function AppearanceSettings() {
         label="Theme"
         hint="Match the Mac switches between Nightshade's night and day as the Mac does. A paired phone draws in the same theme, or under Match the Mac in its own appearance. In a terminal an agent picks its own colours: if one stays dark, change its theme (Claude Code: /theme)."
       >
-        <ThemePicker value={ui.theme} onPick={(theme) => void saveUi({ theme })} />
+        <ThemePicker value={ui.theme} onPick={(theme) => void saveUi({ theme }, "theme")} />
+        {failedUnder("theme")}
       </Field>
 
       <Field
@@ -80,7 +89,7 @@ export function AppearanceSettings() {
           max={1.6}
           step={0.05}
           value={ui.scale}
-          onChange={(e) => slideUi({ scale: Number(e.target.value) })}
+          onChange={(e) => slideUi({ scale: Number(e.target.value) }, "scale")}
         />
         <div className="ui-segmented" style={{ marginTop: 6 }}>
           {[0.9, 1.0, 1.15, 1.3, 1.45].map((v) => (
@@ -88,12 +97,13 @@ export function AppearanceSettings() {
               key={v}
               className="ui-segment"
               aria-pressed={Math.abs(ui.scale - v) < 0.001}
-              onClick={() => void saveUi({ scale: v })}
+              onClick={() => void saveUi({ scale: v }, "scale")}
             >
               {Math.round(v * 100)}%
             </button>
           ))}
         </div>
+        {failedUnder("scale")}
       </Field>
 
       <Field
@@ -105,15 +115,16 @@ export function AppearanceSettings() {
             label="New reviews and tickets"
             detail="A banner when a pull request starts waiting on your review, or a ticket is assigned to you."
             checked={settings.ui.system_notifications}
-            onChange={(v) => void saveUi({ system_notifications: v })}
+            onChange={(v) => void saveUi({ system_notifications: v }, "notifications")}
           />
           <Switch
             label="Agents waiting on you"
             detail="A banner when an agent goes quiet, asks to trust its folder, runs out of budget or exits — and the number waiting on the dock icon."
             checked={settings.ui.notify_waiting_agents}
-            onChange={(v) => void saveUi({ notify_waiting_agents: v })}
+            onChange={(v) => void saveUi({ notify_waiting_agents: v }, "notifications")}
           />
         </div>
+        {failedUnder("notifications")}
       </Field>
 
       <Field
@@ -125,34 +136,37 @@ export function AppearanceSettings() {
             label="Put terminals back when the app reopens"
             detail="Panes that were open last time are reopened in the same worktrees."
             checked={settings.ui.restore_panes}
-            onChange={(v) => void saveUi({ restore_panes: v })}
+            onChange={(v) => void saveUi({ restore_panes: v }, "terminals")}
           />
           <Switch
             label="Let agents read terminal output"
             detail="Agents can read what a terminal here has printed — a dev server's log, a test run — instead of starting a second copy. A shell's scrollback is a record of everything typed in it, so this stays off until you want it."
             checked={settings.ui.agents_read_panes}
-            onChange={(v) => void saveUi({ agents_read_panes: v })}
+            onChange={(v) => void saveUi({ agents_read_panes: v }, "terminals")}
           />
           <Switch
             label="Trust the folders this app creates"
             detail="Claude Code asks whether it trusts a folder the first time it starts there, and does nothing until answered — once per task, per repo. This answers it in advance, and only for worktrees and chat folders the app made itself."
             checked={settings.ui.trust_agent_dirs}
-            onChange={(v) => void saveUi({ trust_agent_dirs: v })}
+            onChange={(v) => void saveUi({ trust_agent_dirs: v }, "terminals")}
           />
         </div>
+        {failedUnder("terminals")}
       </Field>
 
       <TextSize
         label="Terminal text"
         hint="Applies to running panes immediately; they re-fit to the new cell size."
         value={ui.terminal_font_size}
-        onChange={(v) => slideUi({ terminal_font_size: v })}
+        onChange={(v) => slideUi({ terminal_font_size: v }, "terminal-text")}
+        error={failedUnder("terminal-text")}
       />
       <TextSize
         label="Conversation text"
         hint="Agents started as a conversation (ACP): what they say, their tool calls and the message box. Applies to open ones immediately."
         value={ui.conversation_font_size}
-        onChange={(v) => slideUi({ conversation_font_size: v })}
+        onChange={(v) => slideUi({ conversation_font_size: v }, "conversation-text")}
+        error={failedUnder("conversation-text")}
       />
     </>
   );
@@ -215,15 +229,18 @@ function Preview({ theme, half }: { theme: Theme; half?: boolean }) {
 }
 
 /** A text size in px, 9–24, saved as the slider moves. */
-function TextSize({ label, hint, value, onChange }: {
+function TextSize({ label, hint, value, onChange, error }: {
   label: string;
   hint: string;
   value: number;
   onChange: (value: number) => void;
+  /** A failed save of this size. */
+  error?: ReactNode;
 }) {
   return (
     <Field label={`${label} — ${value}px`} hint={hint}>
       <input type="range" min={9} max={24} step={1} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      {error}
     </Field>
   );
 }
