@@ -4,7 +4,7 @@
 //! `GLYPH_OIDC_CLIENT_SECRET` and `GLYPH_PUBLIC_URL` (Glyph's own address;
 //! the provider sends people back to `<it>/api/auth/oidc/callback`). Off
 //! without them. When it's on, it's the only way people sign in: email and
-//! password, and GitHub, are closed.
+//! password are closed.
 //!
 //! The provider says who someone is; Glyph says what they may do here
 //! (workspaces, roles and invites stay in Glyph). A studio account signs in
@@ -15,7 +15,7 @@
 //! invite link, and confirms joining on the invite page.
 //!
 //! The round trip carries a signed `state` and a cookie with the nonce, the
-//! PKCE verifier and any invite. A copy of Glyph's `oidc.rs`; keep the two
+//! PKCE verifier and any invite. A copy of Forge's `oidc.rs`; keep the two
 //! alike. Glyph trades the code for tokens itself, with its
 //! client secret over TLS, so it checks the ID token's issuer, audience,
 //! expiry and nonce but not its signature (OpenID Connect Core 1.0,
