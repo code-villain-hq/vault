@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import { groupByEpic } from "../../lib/derive";
 import { readOneOf, write } from "../../lib/persist";
+import { groupByStatus, TICKET_GROUP_LABEL, TICKET_GROUPS, type TicketGroup } from "../../lib/ticket-group";
 import { sortTickets, TICKET_SORT_LABEL, TICKET_SORTS, type TicketSort } from "../../lib/ticket-sort";
 import type { JiraIssue, JiraPage } from "../../lib/types";
 import { ContextMenu, ErrorMessage, Spinner, useFailure, type MenuItem } from "../ui";
@@ -13,8 +14,10 @@ import { BrowsePanel } from "./BrowsePanel";
 import { CreateEpicDialog } from "./CreateEpicDialog";
 import { EpicGroup } from "./EpicGroup";
 import { FileIssueDialog } from "./FileIssueDialog";
+import { PickMenu } from "./PickMenu";
 import { ReadTicketDialog } from "./ReadTicketDialog";
 import { StartWorkDialog } from "./StartWorkDialog";
+import { StatusGroup } from "./StatusGroup";
 import { TicketCard } from "./TicketCard";
 import { TypeFilter } from "./TypeFilter";
 
@@ -61,6 +64,12 @@ export function TicketsView() {
     setSortState(next);
     write("ticketsSort", next);
   };
+  // Mine only, and remembered (TKT-14).
+  const [group, setGroupState] = useState<TicketGroup>(() => readOneOf("ticketsGroup", TICKET_GROUPS, "epic"));
+  const setGroup = (next: TicketGroup) => {
+    setGroupState(next);
+    write("ticketsGroup", next);
+  };
   const [syncing, setSyncing] = useState<string | null>(null);
   // Held as built items rather than a subject, so an epic header and a ticket
   // card can each offer what makes sense for them.
@@ -100,8 +109,9 @@ export function TicketsView() {
       setSub("mine");
       setQuery(key);
       setKinds([]);
-      const epicKey = issues.find((i) => i.key === key)?.epic_key;
-      if (epicKey) setShut((c) => ({ ...c, [epicKey]: false }));
+      const found = issues.find((i) => i.key === key);
+      // Open whichever group holds it, by epic or by status.
+      if (found) setShut((c) => ({ ...c, [found.epic_key ?? ""]: false, [`status:${found.status}`]: false }));
     } else {
       // Not on the Mine list (common once a Done ticket is unassigned) — ask
       // Jira for that key specifically, including Done.
@@ -258,6 +268,7 @@ export function TicketsView() {
     () => groupByEpic(filtered, new Set(taskByKey.keys())),
     [filtered, taskByKey],
   );
+  const statuses = useMemo(() => groupByStatus(filtered), [filtered]);
   const taskFor = (key: string) => taskByKey.get(key) ?? null;
 
   if (!settings) {
@@ -280,7 +291,12 @@ export function TicketsView() {
 
   // Collapsed is stored per epic, so "all" means every one currently listed —
   // which is what a filter has narrowed things to, not the whole board.
-  const allShut = epics.length > 0 && epics.every((e) => shut[e.key] ?? false);
+  const groupKeys = group === "epic" ? epics.map((e) => e.key) : group === "status" ? statuses.map((s) => s.key) : [];
+  const allShut = groupKeys.length > 0 && groupKeys.every((k) => shut[k] ?? false);
+  const groupCount =
+    group === "epic" ? ` in ${epics.length} epic${epics.length === 1 ? "" : "s"}`
+    : group === "status" ? ` in ${statuses.length} status${statuses.length === 1 ? "" : "es"}`
+    : "";
 
   function renderCard(issue: JiraIssue) {
     return (
@@ -322,30 +338,15 @@ export function TicketsView() {
             Find work
           </button>
         </div>
-        <span className="sub sort-label">Sort</span>
-        <button
-          type="button"
-          className="ui-button"
-          onClick={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            setMenu({
-              x: r.left,
-              y: r.bottom + 4,
-              items: TICKET_SORTS.map((o) => ({
-                label: `${o === sort ? "✓ " : ""}${TICKET_SORT_LABEL[o]}`,
-                onSelect: () => setSort(o),
-              })),
-            });
-          }}
-        >
-          {TICKET_SORT_LABEL[sort]} ▾
-        </button>
+        <PickMenu label="Sort" options={TICKET_SORTS} names={TICKET_SORT_LABEL} value={sort} onChange={setSort} />
+        {sub === "mine" && (
+          <PickMenu label="Group" options={TICKET_GROUPS} names={TICKET_GROUP_LABEL} value={group} onChange={setGroup} />
+        )}
         <div className="spacer" />
         {sub === "mine" ? (
           <>
             <span className="sub">
-              {filtered.length} issue{filtered.length === 1 ? "" : "s"} in {epics.length} epic
-              {epics.length === 1 ? "" : "s"}
+              {filtered.length} issue{filtered.length === 1 ? "" : "s"}{groupCount}
             </span>
             {issuesLoading && <Spinner />}
             <input className="ui-field ticket-filter"
@@ -354,18 +355,16 @@ export function TicketsView() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button
-              className="ui-button"
-              disabled={epics.length === 0}
-              title={allShut ? "Open every epic" : "Close every epic"}
-              onClick={() =>
-                setShut(
-                  allShut ? {} : Object.fromEntries(epics.map((e) => [e.key, true])),
-                )
-              }
-            >
-              {allShut ? "Expand all" : "Collapse all"}
-            </button>
+            {group !== "none" && (
+              <button
+                className="ui-button"
+                disabled={groupKeys.length === 0}
+                title={allShut ? "Open every group" : "Close every group"}
+                onClick={() => setShut(allShut ? {} : Object.fromEntries(groupKeys.map((k) => [k, true])))}
+              >
+                {allShut ? "Expand all" : "Collapse all"}
+              </button>
+            )}
             <button type="button" className="ui-button" onClick={() => setCreatingTicket(true)}>
               New ticket…
             </button>
@@ -433,13 +432,13 @@ export function TicketsView() {
         </div>
       )}
 
-      {sub === "mine" && epics.length === 0 && issuesLoading && (
+      {sub === "mine" && filtered.length === 0 && issuesLoading && (
         <div className="card">
           <div className="muted">Loading tickets…</div>
         </div>
       )}
 
-      {sub === "mine" && epics.length === 0 && !issuesLoading && (
+      {sub === "mine" && filtered.length === 0 && !issuesLoading && (
         <div className="card">
           <div className="muted">
             {q ? `Nothing matches “${query}”.` : "No issues matched your JQL. Adjust it in Settings."}
@@ -447,7 +446,24 @@ export function TicketsView() {
         </div>
       )}
 
-      {sub === "mine" && epics.map((epic) => {
+      {sub === "mine" && group === "none" && filtered.length > 0 && (
+        <div className="epic-body">{filtered.map(renderCard)}</div>
+      )}
+
+      {sub === "mine" && group === "status" && statuses.map((s) => (
+        <StatusGroup
+          key={s.key}
+          name={s.name}
+          category={s.category}
+          count={s.issues.length}
+          closed={shut[s.key] ?? false}
+          onToggle={() => setShut((c) => ({ ...c, [s.key]: !(c[s.key] ?? false) }))}
+        >
+          {s.issues.map(renderCard)}
+        </StatusGroup>
+      ))}
+
+      {sub === "mine" && group === "epic" && epics.map((epic) => {
         const closed = shut[epic.key] ?? false;
         // Name the epic's own type from the site rather than assuming "Epic":
         // some Jiras rename the level-1 type.

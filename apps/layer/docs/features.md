@@ -743,7 +743,8 @@ Known gaps:
 ## 9. Tickets
 
 The Tickets view has two tabs. **Mine** is your assigned, not-done tickets,
-grouped by epic, with a filter, type toggles and a sort (TKT-13). **Find work** searches
+grouped by epic, by status or not at all (TKT-14), with a filter, type toggles
+and a sort (TKT-13). **Find work** searches
 beyond them: not mine / unassigned / anyone, done included or not, by type,
 by text, or by key. A ticket opens its task if there is one; otherwise it
 offers Start work.
@@ -815,6 +816,13 @@ offers Start work.
   in flight first, then in the order of their top ticket, with "No epic"
   last. Find work asks Jira for the order, since its results are capped:
   sorting the first hundred here would only reshuffle them.
+- **TKT-14** Mine MUST group by epic (the default), by status, or not at
+  all, and the choice is remembered across launches. By status, a group is
+  one status name, so the same name in two Jira projects is one group;
+  groups in progress come first, then to do, then done, by status category
+  rather than name. Within a group, tickets keep the order TKT-13 gives.
+  Ungrouped, Mine is one list in that order. Grouping by repository is not
+  offered: a ticket has no repository until a task is started from it.
 
 Code: `commands/jira.rs`, `commands/ticket_flow.rs`, `integrations/jira.rs`,
 `integrations/jira/flow.rs`, `components/tickets/`, `TicketFlow.tsx`,
