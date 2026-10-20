@@ -11,6 +11,14 @@ Nightshade is every app's default theme, in night and day. An app's theme picker
 
 A change to how Code Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.
 
+## Signing in with Code Villain
+
+One studio account signs people in to every app: Pocket ID at id.codevillain.eu, over OpenID Connect. The provider says who someone is; each app keeps its own workspaces, roles and invites. Forge and Glyph have it. For the next app:
+
+- Copy Forge's `crates/server/src/oidc.rs` and `tests/oidc_login.rs`, the `users.oidc_sub` migration, the `passwords_open` guard and `/api/auth/providers`. On the web side copy `useProviders`, `CodeVillainButton`, `DesktopSignIn` and `OIDC_PROBLEMS` from `auth.tsx`. For the desktop app copy the `<app>://` deep link (tauri-plugin-deep-link 2.6.1) and `openInBrowser`/`onAppLink` in `platform.ts`. Glyph shows the changes a copy needs.
+- In Pocket ID, register a confidential client with the callback `<public url>/api/auth/oidc/callback`, and a group for the people allowed in.
+- Set `<APP>_OIDC_ISSUER`, `<APP>_OIDC_CLIENT_ID`, `<APP>_OIDC_CLIENT_SECRET` and `<APP>_PUBLIC_URL`. With them set, passwords are off. Without them the app keeps its passwords, as local development does.
+
 ## Specs are checked against the code
 
 Forge's specs live in Forge, not in this repository. A scheduled drift check (Claude Code on the studio's Mac) reads each new commit on `main`. For every Forge service a commit touches, it compares the service's specs with the code. Where the code no longer does what a requirement or scenario says, it files `Spec drift: "<spec>" no longer matches the code` in that team's Triage, or comments on the one already open. It files nothing for:
