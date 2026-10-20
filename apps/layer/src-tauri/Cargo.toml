@@ -1,6 +1,6 @@
 [package]
 name = "villain-layer"
-version = "0.9.0"
+version = "0.10.0"
 description = "Layer - an agent development environment"
 authors = ["Code Villain <codevillain@proton.me>"]
 license = "MIT OR Apache-2.0"
