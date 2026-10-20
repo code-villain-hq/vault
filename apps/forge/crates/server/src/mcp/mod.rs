@@ -34,8 +34,9 @@ Read specs and decisions here instead of from files in the repository.
 - Before working on an issue, call get_issue: it includes the discussion, sub-issues, relations and \
 the specs and decisions it follows (its service's, its project's and workspace-wide ones). \
 get_service, get_spec and get_decision give the full text.
-- To find what the specs say about something, use search_specs: it returns only the requirements that \
-mention it. get_spec with outline lists a spec's requirements; read whole specs only when you need them.
+- To find what the specs say about something, use search_specs once, with the word and its alternatives: \
+it returns only the requirements that mention them, best first, and when nothing matches the specs don't \
+cover it. get_spec with outline lists a spec's requirements; read whole specs only when you need them.
 - Issues are identified like FOR-12. Statuses, people, labels, projects and services are referred to by name.
 - To clear a field, pass \"none\".
 - An issue's description is its scope: build what it says. Comments are discussion. To change what an issue \
@@ -300,7 +301,7 @@ impl Forge {
     }
 
     #[tool(
-        description = "The requirements that mention every one of the words, each in full with its scenarios and under its spec, optionally for one service; specs without requirements that mention them are named. Use it to find what the specs say about something before reading whole specs."
+        description = "The requirements that mention any of the words, those mentioning more of them first, each under its spec with the words it mentions; the best 10 in full with their scenarios, the next 30 by name. Optionally for one service. Specs without requirements that mention them are named. Search once with the word and its alternatives, e.g. `GitHub \"sign in\" login OAuth` (a quoted phrase is one word). When nothing matches, the specs don't mention it: don't search again with rephrasings."
     )]
     async fn search_specs(
         &self,

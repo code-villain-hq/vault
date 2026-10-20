@@ -737,7 +737,7 @@ async fn agents_find_requirements_without_reading_whole_specs(pool: PgPool) {
     )
     .await
     .unwrap();
-    let many = (1..=25)
+    let many = (1..=45)
         .map(|n| format!("### Requirement: Limit {n}\nIt SHALL limit.\n\n#### Scenario: Hit\n- **WHEN** hit\n- **THEN** limited\n"))
         .collect::<Vec<_>>()
         .join("\n");
@@ -780,11 +780,35 @@ async fn agents_find_requirements_without_reading_whole_specs(pool: PgPool) {
         found["prose_specs"][0]["spec"], "Architecture overview",
         "{found}"
     );
+    assert_eq!(found["requirements"][0]["matched"], json!(["github"]));
+    assert_eq!(found["prose_specs"][0]["matched"], json!(["github"]));
     assert!(found["prose_specs"][0].get("text").is_none(), "{found}");
 
-    // Every word has to be there.
-    let found = parse(search("token EXPIRE", None).await.unwrap());
-    assert_eq!(names(&found), ["Tokens expire"], "{found}");
+    // Alternatives in one search: any word counts, and those with more of
+    // them come first.
+    let found = parse(search(r#"YEAR "shown once" token"#, None).await.unwrap());
+    assert_eq!(
+        names(&found),
+        ["Tokens expire", "Tokens are shown once"],
+        "{found}"
+    );
+    assert_eq!(
+        found["requirements"][0]["matched"],
+        json!(["YEAR", "token"])
+    );
+    assert_eq!(
+        found["requirements"][1]["matched"],
+        json!(["shown once", "token"])
+    );
+    let found = parse(search(r#"limit "shown once" token"#, None).await.unwrap());
+    assert_eq!(
+        found["requirements"][0]["requirement"], "Tokens are shown once",
+        "{found}"
+    );
+    assert_eq!(
+        found["requirements"][1]["requirement"], "Tokens expire",
+        "{found}"
+    );
 
     // One service's specs.
     let found = parse(search("shall", Some("MCP server")).await.unwrap());
@@ -794,12 +818,22 @@ async fn agents_find_requirements_without_reading_whole_specs(pool: PgPool) {
         "{found}"
     );
 
-    // Many matches: 20 come back, and the rest are counted.
+    // Many matches: 10 in full, 30 by name, and the rest counted.
     let found = parse(search("limit", None).await.unwrap());
-    assert_eq!(names(&found).len(), 20, "{found}");
+    assert_eq!(names(&found).len(), 10, "{found}");
+    assert_eq!(found["also"].as_array().unwrap().len(), 30, "{found}");
+    assert!(found["also"][0].get("text").is_none(), "{found}");
     assert_eq!(found["more"], 5, "{found}");
 
+    // Nothing matches: the answer says so.
+    let none = search(r#"Kubernetes "dark mode""#, None).await.unwrap();
+    assert!(
+        none.starts_with("No spec mentions any of: Kubernetes, dark mode."),
+        "{none}"
+    );
+
     assert!(search(" ", None).await.is_err());
+    assert!(search(r#""""#, None).await.is_err());
 
     // The outline names requirements and scenarios, without the text.
     let outline = parse(

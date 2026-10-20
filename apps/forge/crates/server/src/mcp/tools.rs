@@ -1528,26 +1528,45 @@ fn scenario_names(text: &str) -> Vec<&str> {
         .collect()
 }
 
-/// At most this many requirements come back from a search.
-const SEARCH_LIMIT: usize = 20;
+/// How many of the best matches come back in full, and how many more by
+/// name only.
+const SEARCH_IN_FULL: usize = 10;
+const SEARCH_BY_NAME: usize = 30;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct SearchSpecs {
-    /// Words that must all appear, in any case.
+    /// The word and its alternatives, in any case, e.g.
+    /// `GitHub "sign in" login OAuth`; a quoted phrase counts as one word.
     pub query: String,
     /// Only the specs of this service (id or name).
     pub service: Option<String>,
 }
 
-/// The requirements that mention every word, in full, so an agent doesn't
-/// read whole specs to find them. Specs without requirements are prose and
+/// A search's words: quoted phrases whole, the rest split on spaces, each
+/// once.
+fn search_words(query: &str) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    for (i, part) in query.split('"').enumerate() {
+        let found: Vec<&str> = if i % 2 == 1 {
+            vec![part.trim()]
+        } else {
+            part.split_whitespace().collect()
+        };
+        for word in found.into_iter().filter(|w| !w.is_empty()) {
+            if !words.iter().any(|w| w.eq_ignore_ascii_case(word)) {
+                words.push(word.to_string());
+            }
+        }
+    }
+    words
+}
+
+/// The requirements that mention any of the words, those mentioning more of
+/// them first, so one search with the alternatives finds them all and an
+/// agent doesn't read whole specs. Specs without requirements are prose and
 /// are only named.
 pub async fn search_specs(pool: &PgPool, actor: Actor, input: SearchSpecs) -> ToolResult<String> {
-    let words: Vec<String> = input
-        .query
-        .split_whitespace()
-        .map(str::to_lowercase)
-        .collect();
+    let words = search_words(&input.query);
     if words.is_empty() {
         return Err("give the words to look for".into());
     }
@@ -1557,9 +1576,15 @@ pub async fn search_specs(pool: &PgPool, actor: Actor, input: SearchSpecs) -> To
         .as_deref()
         .map(|sv| s.service(sv))
         .transpose()?;
-    let mentions = |text: &str| {
+    let lower: Vec<String> = words.iter().map(|w| w.to_lowercase()).collect();
+    let mentioned = |text: &str| -> Vec<&str> {
         let text = text.to_lowercase();
-        words.iter().all(|w| text.contains(w.as_str()))
+        words
+            .iter()
+            .zip(&lower)
+            .filter(|(_, w)| text.contains(w.as_str()))
+            .map(|(word, _)| word.as_str())
+            .collect()
     };
     let mut found = Vec::new();
     let mut prose = Vec::new();
@@ -1570,27 +1595,55 @@ pub async fn search_specs(pool: &PgPool, actor: Actor, input: SearchSpecs) -> To
     {
         let reqs = requirements(&sp.body);
         if reqs.is_empty() {
-            if mentions(&sp.title) || mentions(&sp.body) {
-                prose.push(json!({ "spec_id": sp.id, "spec": sp.title }));
+            let matched = mentioned(&format!("{}\n{}", sp.title, sp.body));
+            if !matched.is_empty() {
+                prose.push((sp, matched));
             }
             continue;
         }
-        for r in reqs.into_iter().filter(|r| mentions(&r.text)) {
-            found.push(json!({
-                "spec_id": sp.id,
-                "spec": sp.title,
-                "requirement": r.name,
-                "text": r.text,
-            }));
+        for r in reqs {
+            let matched = mentioned(&r.text);
+            if !matched.is_empty() {
+                found.push((sp, r, matched));
+            }
         }
     }
-    let more = found.len().saturating_sub(SEARCH_LIMIT);
-    found.truncate(SEARCH_LIMIT);
+    if found.is_empty() && prose.is_empty() {
+        return Ok(format!(
+            "No spec mentions any of: {}. The specs don't cover it.",
+            words.join(", ")
+        ));
+    }
+    // Stable, so equal matches keep the specs' order.
+    found.sort_by_key(|(_, _, matched)| std::cmp::Reverse(matched.len()));
+    prose.sort_by_key(|(_, matched)| std::cmp::Reverse(matched.len()));
+    let more = found.len().saturating_sub(SEARCH_IN_FULL + SEARCH_BY_NAME);
+    let mut found = found.into_iter();
+    let in_full: Vec<Value> = found
+        .by_ref()
+        .take(SEARCH_IN_FULL)
+        .map(|(sp, r, matched)| {
+            json!({
+                "spec_id": sp.id, "spec": sp.title, "requirement": r.name,
+                "matched": matched, "text": r.text,
+            })
+        })
+        .collect();
+    let by_name: Vec<Value> = found
+        .take(SEARCH_BY_NAME)
+        .map(|(sp, r, matched)| {
+            json!({ "spec_id": sp.id, "spec": sp.title, "requirement": r.name, "matched": matched })
+        })
+        .collect();
     pretty(json!({
-        "requirements": found,
+        "requirements": in_full,
+        // Further matches without their text: get_spec reads them.
+        "also": by_name,
         "more": more,
         // Specs without requirements that mention the words: get_spec reads them.
-        "prose_specs": prose,
+        "prose_specs": prose.iter().map(|(sp, matched)| json!({
+            "spec_id": sp.id, "spec": sp.title, "matched": matched,
+        })).collect::<Vec<_>>(),
     }))
 }
 
