@@ -126,26 +126,43 @@ export function PageHeader({
   );
 }
 
-/** The pages ⌘1 to ⌘5 open, in the sidebar's order. */
-const SHORTCUT_PAGES = [
-  "/$workspace",
-  "/$workspace/translations",
-  "/$workspace/review",
-  "/$workspace/glossary",
-  "/$workspace/import",
-] as const;
+/** "G" then a letter goes to a page, as in Forge. */
+const GO_TO: Record<string, string> = {
+  o: "/$workspace",
+  t: "/$workspace/translations",
+  r: "/$workspace/review",
+  l: "/$workspace/glossary",
+  i: "/$workspace/import",
+};
+
+/** True while the key goes to a field, so letters are typed rather than shortcuts. */
+function isTyping(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+  );
+}
 
 /** The workspace frame: sidebar and page. */
 function Shell() {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   useEffect(() => {
+    let pendingG = 0;
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      const page = SHORTCUT_PAGES[Number(event.key) - 1];
-      if (!page) return;
-      event.preventDefault();
-      void navigate({ to: page, params: { workspace: workspace.url_key } });
+      if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
+      const key = event.key.toLowerCase();
+      if (key === "g") {
+        pendingG = event.timeStamp;
+        return;
+      }
+      const page = GO_TO[key];
+      if (page && event.timeStamp - pendingG < 1500) {
+        event.preventDefault();
+        pendingG = 0;
+        void navigate({ to: page, params: { workspace: workspace.url_key } });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -204,7 +221,7 @@ function Sidebar() {
   );
 }
 
-/** The views, in the order ⌘1 to ⌘5 open them. */
+/** The views; each title names its "G" key. */
 function AppNav() {
   const { workspace } = useWorkspace();
   const params = { workspace: workspace.url_key };
@@ -216,7 +233,7 @@ function AppNav() {
         params={params}
         activeOptions={{ exact: true }}
         className={navLink}
-        title="Overview (⌘1)"
+        title="Overview (G then O)"
       >
         <NavIcon icon={Gauge} />
         Overview
@@ -225,19 +242,24 @@ function AppNav() {
         to="/$workspace/translations"
         params={params}
         className={navLink}
-        title="Translations (⌘2)"
+        title="Translations (G then T)"
       >
         <NavIcon icon={Languages} />
         Translations
       </Link>
-      <Link to="/$workspace/review" params={params} className={navLink} title="Review (⌘3)">
+      <Link to="/$workspace/review" params={params} className={navLink} title="Review (G then R)">
         <NavIcon icon={ListChecks} />
         Review
         {waiting > 0 && (
           <span className="nav-count ml-auto text-xs font-normal text-faint">{waiting}</span>
         )}
       </Link>
-      <Link to="/$workspace/glossary" params={params} className={navLink} title="Glossary (⌘4)">
+      <Link
+        to="/$workspace/glossary"
+        params={params}
+        className={navLink}
+        title="Glossary (G then L)"
+      >
         <NavIcon icon={BookA} />
         Glossary
       </Link>
@@ -245,7 +267,7 @@ function AppNav() {
         to="/$workspace/import"
         params={params}
         className={navLink}
-        title="Import & export (⌘5)"
+        title="Import & export (G then I)"
       >
         <NavIcon icon={ArrowLeftRight} />
         Import & export
