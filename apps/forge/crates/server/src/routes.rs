@@ -67,6 +67,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/tokens/{token_id}", delete(agents::revoke_token))
         .route("/services/{service_id}/check", post(drift::request_check))
+        .route("/drift-checks/{run_id}", get(drift::check_details))
         .route("/ai", get(drift::status))
         .route(
             "/forgejo",

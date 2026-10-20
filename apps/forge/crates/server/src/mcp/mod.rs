@@ -4,6 +4,7 @@
 //! Agents authenticate with an API token (see `agents.rs`); the middleware
 //! puts the agent's [`Actor`] on the request, and every tool acts as it.
 
+pub mod drift_checks;
 pub mod snapshot;
 pub mod tools;
 
@@ -23,6 +24,10 @@ use sqlx::PgPool;
 
 use crate::agents;
 use crate::state::AppState;
+use drift_checks::{
+    FinishDriftCheck, ReportDriftCheck, StartDriftCheck, finish_drift_check, report_drift_check,
+    start_drift_check,
+};
 use snapshot::ToolResult;
 use tools::*;
 
@@ -57,6 +62,9 @@ similar titles first; file it only if none of them covers it.
 change with save_spec_change (the requirements it adds, changes, removes or renames, and the decisions \
 it replaces), or say why no spec changes. An issue can't be started without one. If you can't tell what \
 the spec change is, the issue isn't clear enough: ask in Triage. Forge applies it when the issue is done.
+- When you check the code for drift from the specs, report the check: start_drift_check with a key of \
+your own, report_drift_check as verdicts come in, and finish_drift_check at the end, with usage when you \
+know it. How you check is up to you.
 - Everything you change is attributed to you and shows up live for the team. When you finish work on an \
 issue, move it to the right status and say what you did in a comment.";
 
@@ -309,6 +317,39 @@ impl Forge {
         Extension(parts): Extension<Parts>,
     ) -> Result<String, String> {
         search_specs(&self.pool, actor(&parts)?, input).await
+    }
+
+    #[tool(
+        description = "Start a drift check you run yourself, so the team can follow it in Forge: your own key for it, the commit range, the services it covers, the checker's name and version, whether it's a full audit, and optionally the requirements you plan to judge. Starting again with the same key answers with that check and changes nothing."
+    )]
+    async fn start_drift_check(
+        &self,
+        Parameters(input): Parameters<StartDriftCheck>,
+        Extension(parts): Extension<Parts>,
+    ) -> Result<String, String> {
+        start_drift_check(&self.pool, actor(&parts)?, input).await
+    }
+
+    #[tool(
+        description = "Report verdicts into your running drift check: met, not_met, unclear, skipped, or covered (naming the open issue), each with why. A requirement reported again replaces its earlier verdict. If anything doesn't resolve, nothing is recorded and the answer says what to fix. Met, not met and unclear also become the requirements' latest verdicts on the spec pages."
+    )]
+    async fn report_drift_check(
+        &self,
+        Parameters(input): Parameters<ReportDriftCheck>,
+        Extension(parts): Extension<Parts>,
+    ) -> Result<String, String> {
+        report_drift_check(&self.pool, actor(&parts)?, input).await
+    }
+
+    #[tool(
+        description = "End your drift check as finished or failed, with a summary, the reason for a failed one, and usage per part (orchestrator, each worker) when you know it. Planned requirements without a verdict show the check as incomplete. The answer lists the issues Forge saw you file and comment on meanwhile."
+    )]
+    async fn finish_drift_check(
+        &self,
+        Parameters(input): Parameters<FinishDriftCheck>,
+        Extension(parts): Extension<Parts>,
+    ) -> Result<String, String> {
+        finish_drift_check(&self.pool, actor(&parts)?, input).await
     }
 
     #[tool(

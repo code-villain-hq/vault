@@ -34,8 +34,9 @@ pub use account::{
 };
 pub use convention::{convention_warnings, requirement_warnings};
 pub use drift::{
-    AiRun, AiRunCreate, AiRunKind, AiRunPatch, AiRunStatus, AiRunTrigger, Suggestion,
-    SuggestionCreate, SuggestionKind, SuggestionPatch, SuggestionStatus,
+    AiRun, AiRunCreate, AiRunKind, AiRunPatch, AiRunStatus, AiRunTrigger, CheckResult,
+    CheckVerdict, DriftCheckDetails, Suggestion, SuggestionCreate, SuggestionKind, SuggestionPatch,
+    SuggestionStatus, UsagePart, VerdictTally,
 };
 pub use history::{IssueChange, IssueEvent, IssueVersion, SpecVersion, issue_history};
 pub use issue::{

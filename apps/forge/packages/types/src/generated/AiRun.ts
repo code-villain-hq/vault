@@ -2,12 +2,36 @@
 import type { AiRunKind } from "./AiRunKind";
 import type { AiRunStatus } from "./AiRunStatus";
 import type { AiRunTrigger } from "./AiRunTrigger";
+import type { UsagePart } from "./UsagePart";
+import type { VerdictTally } from "./VerdictTally";
 
 /**
- * One run of Forge's AI: a drift check of a service, or the triage of an issue.
+ * One run of Forge's AI: a drift check of a service, or the triage of an
+ * issue. Or a drift check an agent ran outside Forge and reported (trigger
+ * `agent`), which can cover several services and a range of commits.
  */
 export type AiRun = { id: string, workspace_id: string, kind: AiRunKind, service_id: string | null, issue_id: string | null, trigger: AiRunTrigger, status: AiRunStatus, model: string, 
 /**
  * Markdown: what the run found.
  */
-summary: string, error: string | null, input_tokens: number, output_tokens: number, cost_usd: number, suggestions: number, created_by: string, started_at: string | null, finished_at: string | null, created_at: string, updated_at: string, };
+summary: string, error: string | null, input_tokens: number, output_tokens: number, cost_usd: number, suggestions: number, 
+/**
+ * The services an agent's check covers.
+ */
+service_ids: Array<string>, commit_from: string | null, commit_to: string | null, 
+/**
+ * The checker's name and version.
+ */
+checker: string | null, full_audit: boolean | null, 
+/**
+ * The agent's own key for its check.
+ */
+run_key: string | null, 
+/**
+ * When the agent last started or reported into its check.
+ */
+last_report_at: string | null, tally: VerdictTally | null, 
+/**
+ * What an agent's check used, per part; `None` when it didn't say.
+ */
+usage: Array<UsagePart> | null, created_by: string, started_at: string | null, finished_at: string | null, created_at: string, updated_at: string, };

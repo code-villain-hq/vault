@@ -17,9 +17,11 @@ use std::time::Duration;
 
 use axum::Json;
 use axum::extract::{Path as UrlPath, State};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use forge_ai::ModelProvider;
-use forge_domain::{Actor, AiRunStatus, ModelKind, Operation, Transaction};
+use forge_domain::{
+    Actor, AiRunStatus, CheckResult, DriftCheckDetails, ModelKind, Operation, Transaction,
+};
 use forge_sync::{Origin, apply_in};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -183,6 +185,71 @@ pub async fn request_check(
     db.commit().await?;
     state.drift_wake.notify_one();
     Ok(Json(QueuedRun { id }))
+}
+
+/// `GET /api/w/{workspace}/drift-checks/{run}`: what a drift check found,
+/// and the issues Forge saw its agent file and comment on while it ran.
+pub async fn check_details(
+    State(state): State<AppState>,
+    member: Member,
+    UrlPath((_, run_id)): UrlPath<(Uuid, Uuid)>,
+) -> Result<Json<DriftCheckDetails>, AppError> {
+    let workspace_id = member.actor.workspace_id;
+    #[derive(sqlx::FromRow)]
+    struct Run {
+        created_by: Uuid,
+        trigger: String,
+        started_at: DateTime<Utc>,
+        finished_at: Option<DateTime<Utc>>,
+    }
+    let run: Run = sqlx::query_as(
+        "SELECT created_by, trigger, coalesce(started_at, created_at) AS started_at, finished_at \
+         FROM ai_runs WHERE id = $1 AND workspace_id = $2 AND kind = 'drift'",
+    )
+    .bind(run_id)
+    .bind(workspace_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found("drift check not found"))?;
+    // An agent reports per check; a Forge AI check's verdicts are the
+    // requirements' latest ones it still holds.
+    let results: Vec<Value> = if run.trigger == "agent" {
+        sqlx::query_scalar(
+            "SELECT to_jsonb(r) - 'id' - 'workspace_id' - 'run_id' FROM drift_check_results r \
+             WHERE run_id = $1 ORDER BY spec_title, requirement",
+        )
+    } else {
+        sqlx::query_scalar(
+            "SELECT jsonb_build_object('spec_id', v.spec_id, 'spec_title', s.title, \
+             'spec_updated_at', v.spec_updated_at, 'requirement', v.requirement, \
+             'requirement_text', v.requirement_text, 'verdict', v.verdict, 'why', v.evidence, \
+             'issue_id', NULL, 'reported_at', v.checked_at) \
+             FROM requirement_verdicts v JOIN specs s ON s.id = v.spec_id \
+             WHERE v.run_id = $1 ORDER BY s.title, v.requirement",
+        )
+    }
+    .bind(run_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let results = results
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<Result<Vec<CheckResult>, _>>()
+        .map_err(AppError::internal)?;
+    let mut db = state.pool.acquire().await?;
+    let (filed, commented) = crate::mcp::drift_checks::seen(
+        &mut db,
+        workspace_id,
+        run.created_by,
+        run.started_at,
+        run.finished_at,
+    )
+    .await?;
+    Ok(Json(DriftCheckDetails {
+        results,
+        filed,
+        commented,
+    }))
 }
 
 /// Queues a run unless the service already has one waiting or running.
@@ -372,7 +439,7 @@ pub async fn run_next(
 async fn recover_interrupted(pool: &PgPool, model: bool) -> Result<(), AppError> {
     let stuck: Vec<(Uuid, Uuid, String, String)> = sqlx::query_as(
         "SELECT id, workspace_id, kind, status FROM ai_runs \
-         WHERE status = 'running' OR (status = 'queued' AND NOT $1)",
+         WHERE trigger <> 'agent' AND (status = 'running' OR (status = 'queued' AND NOT $1))",
     )
     .bind(model)
     .fetch_all(pool)
