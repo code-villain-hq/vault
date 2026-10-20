@@ -21,7 +21,7 @@
 .intro h2 { margin: 0; font-family: var(--font-display); font-size: var(--type-display-size); font-weight: var(--type-display-weight); line-height: var(--type-display-leading); }
 .showcase { container-type: inline-size; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 3rem 2rem; scroll-margin-top: 1.5rem; }
 .product { min-width: 0; scroll-margin-top: 1.5rem; }
-.product-forge { grid-column: 1 / -1; }
+.product-forge, .product-glyph { grid-column: 1 / -1; }
 .product-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem 2rem; min-height: 5.5rem; padding-bottom: 1.25rem; }
 .product-name { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
 .product-name img { flex-shrink: 0; object-fit: contain; }

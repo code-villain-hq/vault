@@ -26,6 +26,7 @@ REPLACEMENTS = {
     '../forge/apps/web/public/icon.svg': '/assets/products/forge.svg',
     '../layer/src-tauri/icons/icon.svg': '/assets/products/layer.svg',
     '../caster/Resources/AppIcon.svg': '/assets/products/caster.svg',
+    '../glyph/apps/web/public/icon.svg': '/assets/products/glyph.svg',
     '../../../content/blog/images/': '/assets/blog/',
 }
 
@@ -105,6 +106,7 @@ def main() -> None:
         'forge': 'apps/forge/apps/web/public/icon.svg',
         'layer': 'apps/layer/src-tauri/icons/icon.svg',
         'caster': 'apps/caster/Resources/AppIcon.svg',
+        'glyph': 'apps/glyph/apps/web/public/icon.svg',
     }.items():
         copy(VAULT / path, f'assets/products/{product}.svg')
     copy(SITE / 'uberspace.htaccess', '.htaccess')
