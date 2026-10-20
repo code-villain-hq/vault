@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "forge": {
+      "type": "http",
+      "url": "http://127.0.0.1:7380/mcp",
+      "headersHelper": "./scripts/forge-mcp-headers"
+    }
+  }
+}

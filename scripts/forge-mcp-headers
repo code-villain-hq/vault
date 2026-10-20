@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+# Prints the Authorization header for Forge's MCP server (.mcp.json's
+# headersHelper), so every session in the vault and its worktrees gets the
+# Forge tools without a token in the repository.
+#
+# The token is the "Claude Code" agent's, from Forge's Settings → Agents. It's
+# read from FORGE_MCP_TOKEN_FILE (default ~/.config/forge/mcp-token), or else
+# from the `forge` server Claude Code already has for ~/code/villain/villain-forge.
+import json
+import os
+import sys
+
+token_file = os.path.expanduser(os.environ.get("FORGE_MCP_TOKEN_FILE", "~/.config/forge/mcp-token"))
+if os.path.exists(token_file):
+    print(json.dumps({"Authorization": "Bearer " + open(token_file).read().strip()}))
+    sys.exit(0)
+
+try:
+    config = json.load(open(os.path.expanduser("~/.claude.json")))
+    for project in config.get("projects", {}).values():
+        auth = project.get("mcpServers", {}).get("forge", {}).get("headers", {}).get("Authorization")
+        if auth:
+            print(json.dumps({"Authorization": auth}))
+            sys.exit(0)
+except (OSError, ValueError):
+    pass
+
+sys.exit(f"No Forge agent token: put it in {token_file} (Forge → Settings → Agents).")

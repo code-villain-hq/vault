@@ -21,7 +21,7 @@ One studio account signs people in to every app: Pocket ID at id.codevillain.eu,
 
 ## Specs are checked against the code
 
-Forge's specs live in Forge, not in this repository. A scheduled drift check (Claude Code on the studio's Mac) reads each new commit on `main`. For every Forge service a commit touches, it compares the service's specs with the code. Where the code no longer does what a requirement or scenario says, it files `Spec drift: "<spec>" no longer matches the code` in that team's Triage, or comments on the one already open. It files nothing for:
+Forge's specs live in Forge, not in this repository. Sessions here get Forge's tools from `.mcp.json` (the token comes from `scripts/forge-mcp-headers`); find what the specs say with one `search_specs` that lists the word and its alternatives. A scheduled drift check (Claude Code on the studio's Mac) reads each new commit on `main`. For every Forge service a commit touches, it compares the service's specs with the code. Where the code no longer does what a requirement or scenario says, it files `Spec drift: "<spec>" no longer matches the code` in that team's Triage, or comments on the one already open. It files nothing for:
 
 - behaviour no requirement deals with: that is only named in the check's run summary;
 - a point that open work already covers: an issue on that service in Triage, Backlog, Todo, In Progress or In Review, about the same requirement. When a commit from another issue meets part of that work, the check says so once, in a comment on the covering issue.
