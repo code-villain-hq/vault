@@ -353,7 +353,7 @@ impl Forge {
     }
 
     #[tool(
-        description = "One spec in full, or with `outline` only the names of its requirements and their scenarios."
+        description = "One spec in full, with each requirement's latest drift-check verdict (evidence, commit, and whether the requirement changed since), or with `outline` only the names of its requirements and their scenarios."
     )]
     async fn get_spec(
         &self,

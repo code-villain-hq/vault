@@ -409,3 +409,45 @@ async fn restarts_leave_agents_checks_alone(pool: PgPool) {
     .unwrap();
     assert_eq!(run(&pool, "running").await["tally"]["met"], 1);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_spec_lists_its_verdicts(pool: PgPool) {
+    let s = setup(pool).await;
+    let pool = &s.app.pool;
+    start_drift_check(pool, s.agent, start("range", &["MCP server"]))
+        .await
+        .unwrap();
+    report_drift_check(
+        pool,
+        s.agent,
+        report("range", vec![verdict("Agent keys", "met", "keys.rs:12")]),
+    )
+    .await
+    .unwrap();
+    let get = || {
+        get_spec(
+            pool,
+            s.agent,
+            SpecRef {
+                spec: "Agents' tokens".into(),
+                outline: None,
+            },
+        )
+    };
+    let spec: Value = serde_json::from_str(&get().await.unwrap()).unwrap();
+    // Only judged requirements are listed.
+    assert_eq!(spec["verdicts"].as_array().unwrap().len(), 1, "{spec}");
+    let keys = &spec["verdicts"][0];
+    assert_eq!(keys["requirement"], "Agent keys");
+    assert_eq!(keys["verdict"], "met");
+    assert_eq!(keys["evidence"], "keys.rs:12");
+    assert_eq!(keys["commit"], "c02dcc0");
+    assert_eq!(keys["requirement_changed_since"], false);
+
+    sqlx::query("UPDATE requirement_verdicts SET requirement_text = 'older text'")
+        .execute(pool)
+        .await
+        .unwrap();
+    let spec: Value = serde_json::from_str(&get().await.unwrap()).unwrap();
+    assert_eq!(spec["verdicts"][0]["requirement_changed_since"], true);
+}

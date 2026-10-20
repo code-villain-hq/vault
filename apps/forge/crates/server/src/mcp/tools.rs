@@ -1506,6 +1506,7 @@ pub async fn get_spec(pool: &PgPool, actor: Actor, input: SpecRef) -> ToolResult
             })).collect::<Vec<_>>(),
         }));
     }
+    let verdicts = spec_verdicts(pool, actor, sp).await?;
     pretty(json!({
         "id": sp.id,
         "title": sp.title,
@@ -1517,7 +1518,48 @@ pub async fn get_spec(pool: &PgPool, actor: Actor, input: SpecRef) -> ToolResult
         "updated_at": sp.updated_at,
         // The issues whose spec changes it took in, newest first.
         "history": spec_history(&s, sp),
+        "verdicts": verdicts,
     }))
+}
+
+#[derive(sqlx::FromRow)]
+struct LatestVerdict {
+    requirement: String,
+    verdict: String,
+    evidence: String,
+    requirement_text: String,
+    commit_sha: Option<String>,
+    checked_at: chrono::DateTime<Utc>,
+}
+
+/// Each requirement's latest verdict, in the spec's order, so an agent sees
+/// what was judged, on what evidence and at which commit. A verdict on a
+/// requirement the spec no longer has isn't listed.
+async fn spec_verdicts(pool: &PgPool, actor: Actor, spec: &Spec) -> ToolResult<Vec<Value>> {
+    let stored: Vec<LatestVerdict> = sqlx::query_as(
+        "SELECT requirement, verdict, evidence, requirement_text, commit_sha, checked_at \
+         FROM requirement_verdicts WHERE workspace_id = $1 AND spec_id = $2",
+    )
+    .bind(actor.workspace_id)
+    .bind(spec.id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(requirements(&spec.body)
+        .iter()
+        .filter_map(|r| {
+            let v = stored.iter().find(|v| v.requirement == r.name)?;
+            Some(json!({
+                "requirement": r.name,
+                "verdict": v.verdict,
+                "evidence": v.evidence,
+                "commit": v.commit_sha,
+                "checked_at": v.checked_at,
+                // As the spec page decides it.
+                "requirement_changed_since": v.requirement_text.trim_end() != r.text,
+            }))
+        })
+        .collect())
 }
 
 /// The names of a requirement's `#### Scenario:`s, in order.
