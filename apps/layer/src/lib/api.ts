@@ -287,8 +287,9 @@ export const api = {
   setTicketFlow: (projectKey: string, stage: "review" | "merged", status: FlowStatus | null) =>
     invoke<void>("set_ticket_flow", { projectKey, stage, status }),
   setTicketStart: (projectKey: string, to: StartTo) => invoke<void>("set_ticket_start", { projectKey, to }),
-  jiraBrowse: (text: string, whose: string, includeDone: boolean, types: string[]) =>
-    invoke<JiraPage>("jira_browse", { text: text || null, whose, includeDone, types }),
+  jiraBrowse: (text: string, whose: string, includeDone: boolean, types: string[], order: string) =>
+    invoke<JiraPage>("jira_browse", { text: text || null, whose, includeDone, types, order }),
+  jiraPriorities: () => invoke<string[]>("jira_priorities"),
   jiraIssuesByKey: (keys: string[]) => invoke<JiraIssue[]>("jira_issues_by_key", { keys }),
   jiraCreateFields: (projectKey: string, issueTypeId: string) =>
     invoke<CreateField[]>("jira_create_fields", { projectKey, issueTypeId }),

@@ -297,6 +297,8 @@ export interface JiraIssue {
   url: string;
   /** When it was filed, RFC 3339 (TKT-11). */
   created: string | null;
+  /** When it last changed, RFC 3339 (TKT-13). */
+  updated: string | null;
 }
 
 /** A field a project insists on before it will accept a new issue. */

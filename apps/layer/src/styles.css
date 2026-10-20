@@ -1096,7 +1096,7 @@ body.dragging * { pointer-events: none; }
 }
 /* The top bar names the view; the heading stays for screen readers only. */
 .wide-head h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; margin: 0; }
-.wide-head .sub { color: var(--muted); font-size: var(--type-ui-small-size); }
+.wide-head .sub { color: var(--muted); font-size: var(--type-ui-small-size); white-space: nowrap; }
 
 .review-list {
   margin-bottom: 16px;
@@ -1684,6 +1684,13 @@ input.mono { font-family: var(--font-mono); }
 
 /* Tickets (and Diff scope): tabs beside the view's own tools. */
 .subtabs { margin-left: 6px; }
+/* Apart from the tabs, so it reads as one control over both. */
+.wide-head .sort-label { margin-left: 8px; }
+/* The filter gives way first in a narrow window, then the buttons take a
+   second line: with the Sort control (TKT-13) the header no longer fits in
+   900 pixels, the window's least, and Refresh was cut off. */
+.wide-head.tickets-head { flex-wrap: wrap; row-gap: 8px; }
+.wide-head .ticket-filter { flex: 0 1 220px; min-width: 120px; }
 
 .browse-bar {
   display: flex;

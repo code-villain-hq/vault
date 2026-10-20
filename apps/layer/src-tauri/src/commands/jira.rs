@@ -124,6 +124,14 @@ pub(crate) async fn jira_issue_types_inner(
     Ok(types)
 }
 
+/// The site's priorities, highest first, for sorting your list by them
+/// (TKT-13). The UI asks once per connection.
+#[tauri::command]
+pub async fn jira_priorities(state: State<'_, AppState>) -> Result<Vec<String>> {
+    let (client, _) = jira_client(&state)?;
+    client.priorities().await
+}
+
 #[tauri::command]
 pub async fn jira_issues(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<jira::Page> {
     let page = my_issues(&state).await?;
@@ -187,10 +195,12 @@ pub async fn jira_browse(
     whose: String,
     include_done: Option<bool>,
     types: Option<Vec<String>>,
+    order: Option<String>,
 ) -> Result<jira::Page> {
     let (client, cfg) = jira_client(&state)?;
     let project = cfg.project_key.as_deref();
     let whose = jira::Whose::parse(&whose);
+    let order = jira::Order::parse(order.as_deref().unwrap_or_default());
     let include_done = include_done.unwrap_or(false);
     let types = types.unwrap_or_default();
     // A search is refined rather than read end to end, so it stays capped —
@@ -201,14 +211,14 @@ pub async fn jira_browse(
     // naming a key it does not have, and the filters may hide the one it
     // does, so either way the number is searched for as text after all.
     if let Some(key) = text.as_deref().and_then(|t| jira::number_as_key(project, t)) {
-        let jql = jira::browse_jql(project, Some(&key), whose, include_done, &types);
+        let jql = jira::browse_jql(project, Some(&key), whose, include_done, &types, order);
         if let Ok(page) = client.search(&jql, CAP).await {
             if !page.issues.is_empty() {
                 return Ok(page);
             }
         }
     }
-    let jql = jira::browse_jql(project, text.as_deref(), whose, include_done, &types);
+    let jql = jira::browse_jql(project, text.as_deref(), whose, include_done, &types, order);
     client.search(&jql, CAP).await
 }
 

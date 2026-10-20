@@ -4,12 +4,14 @@ import { copyAndSay } from "../../lib/clipboard";
 import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import { groupByEpic } from "../../lib/derive";
+import { readOneOf, write } from "../../lib/persist";
+import { sortTickets, TICKET_SORT_LABEL, TICKET_SORTS, type TicketSort } from "../../lib/ticket-sort";
 import type { JiraIssue, JiraPage } from "../../lib/types";
-import { ChevronIcon } from "../icons";
 import { ContextMenu, ErrorMessage, Spinner, useFailure, type MenuItem } from "../ui";
-import { IssueTypeIcon, isEpicType, typeMap } from "../IssueType";
+import { isEpicType, typeMap } from "../IssueType";
 import { BrowsePanel } from "./BrowsePanel";
 import { CreateEpicDialog } from "./CreateEpicDialog";
+import { EpicGroup } from "./EpicGroup";
 import { FileIssueDialog } from "./FileIssueDialog";
 import { ReadTicketDialog } from "./ReadTicketDialog";
 import { StartWorkDialog } from "./StartWorkDialog";
@@ -21,6 +23,7 @@ const noBrowser = "Couldn't open the browser. Try again.";
 export function TicketsView() {
   const issues = useStore((s) => s.issues);
   const issueTypes = useStore((s) => s.issueTypes);
+  const priorities = useStore((s) => s.priorities);
   const issuesLoading = useStore((s) => s.issuesLoading);
   const issuesTruncated = useStore((s) => s.issuesTruncated);
   const settings = useStore((s) => s.settings);
@@ -52,6 +55,12 @@ export function TicketsView() {
   const [searching, setSearching] = useState(false);
   // Shared by both tabs: your own list filters in place, a search asks Jira.
   const [kinds, setKinds] = useState<string[]>([]);
+  // Shared too, and remembered (TKT-13): the same question of either list.
+  const [sort, setSortState] = useState<TicketSort>(() => readOneOf("ticketsSort", TICKET_SORTS, "updated"));
+  const setSort = (next: TicketSort) => {
+    setSortState(next);
+    write("ticketsSort", next);
+  };
   const [syncing, setSyncing] = useState<string | null>(null);
   // Held as built items rather than a subject, so an epic header and a ticket
   // card can each offer what makes sense for them.
@@ -71,7 +80,7 @@ export function TicketsView() {
     if (sub !== "browse" || found === null) return;
     void browse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kinds, whose, includeDone]);
+  }, [kinds, whose, includeDone, sort]);
 
   useEffect(() => {
     if (sub === "browse" && found === null) void browse();
@@ -106,7 +115,7 @@ export function TicketsView() {
       // Counted like any other search, so a newer one is not overwritten by
       // this landing late, nor has its spinner cleared by it.
       const asked = ++searchSeq.current;
-      void api.jiraBrowse(key, "anyone", true, [])
+      void api.jiraBrowse(key, "anyone", true, [], sort)
         .then((page) => {
           if (asked !== searchSeq.current) return;
           setFound(page);
@@ -207,7 +216,7 @@ export function TicketsView() {
     setSearching(true);
     search.clear();
     try {
-      const page = await api.jiraBrowse(browseText.trim(), whose, includeDone, kinds);
+      const page = await api.jiraBrowse(browseText.trim(), whose, includeDone, kinds, sort);
       if (asked === searchSeq.current) setFound(page);
     } catch (e) {
       if (asked !== searchSeq.current) return;
@@ -224,16 +233,20 @@ export function TicketsView() {
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
-      issues.filter(
-        (i) =>
-          (kinds.length === 0 || kinds.includes(i.issue_type)) &&
-          (!q ||
-            i.key.toLowerCase().includes(q) ||
-            i.summary.toLowerCase().includes(q) ||
-            i.labels.some((l) => l.toLowerCase().includes(q)) ||
-            i.components.some((c) => c.toLowerCase().includes(q))),
+      sortTickets(
+        issues.filter(
+          (i) =>
+            (kinds.length === 0 || kinds.includes(i.issue_type)) &&
+            (!q ||
+              i.key.toLowerCase().includes(q) ||
+              i.summary.toLowerCase().includes(q) ||
+              i.labels.some((l) => l.toLowerCase().includes(q)) ||
+              i.components.some((c) => c.toLowerCase().includes(q))),
+        ),
+        sort,
+        priorities,
       ),
-    [issues, kinds, q],
+    [issues, kinds, q, sort, priorities],
   );
   const taskByKey = useMemo(() => {
     // The first task for a ticket wins, as it did when this was a find().
@@ -292,7 +305,7 @@ export function TicketsView() {
 
   return (
     <div className="wide">
-      <div className="wide-head">
+      <div className="wide-head tickets-head">
         <h2>Tickets</h2>
         <div className="ui-tabs subtabs" role="tablist">
           <button
@@ -309,6 +322,24 @@ export function TicketsView() {
             Find work
           </button>
         </div>
+        <span className="sub sort-label">Sort</span>
+        <button
+          type="button"
+          className="ui-button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({
+              x: r.left,
+              y: r.bottom + 4,
+              items: TICKET_SORTS.map((o) => ({
+                label: `${o === sort ? "✓ " : ""}${TICKET_SORT_LABEL[o]}`,
+                onSelect: () => setSort(o),
+              })),
+            });
+          }}
+        >
+          {TICKET_SORT_LABEL[sort]} ▾
+        </button>
         <div className="spacer" />
         {sub === "mine" ? (
           <>
@@ -317,9 +348,8 @@ export function TicketsView() {
               {epics.length === 1 ? "" : "s"}
             </span>
             {issuesLoading && <Spinner />}
-            <input className="ui-field"
+            <input className="ui-field ticket-filter"
               type="text"
-              style={{ width: 220 }}
               placeholder="Filter by key, title, label…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -425,101 +455,42 @@ export function TicketsView() {
           issues.find((i) => i.key === epic.key)?.issue_type ??
           issueTypes.find((t) => t.hierarchy_level >= 1)?.name ??
           "Epic";
+        const own = epic.issue;
+        const work = () => {
+          if (!own) return;
+          const id = taskFor(own.key);
+          if (id) select(id);
+          else setOpen(own);
+        };
         return (
-          <div key={epic.key || "_none"} className="epic">
-            <div
-              className="epic-head"
-              onClick={() => setShut((c) => ({ ...c, [epic.key]: !closed }))}
-              onContextMenu={(e) => {
-                if (!epic.key) return;
-                e.preventDefault();
-                const own = epic.issue;
-                setMenu({
-                  x: e.clientX,
-                  y: e.clientY,
-                  items: [
-                    ...(own
-                      ? [{
-                          label: taskFor(own.key) ? "Open task" : "Start work…",
-                          onSelect: () => {
-                            const id = taskFor(own.key);
-                            if (id) select(id);
-                            else setOpen(own);
-                          },
-                        }]
-                      : []),
-                    ...epicItems(epic.key, epic.summary),
-                    ...linkItems(epic.key, epic.summary, true),
-                  ],
-                });
-              }}
-            >
-              <span className={`chev${closed ? "" : " open"}`}><ChevronIcon /></span>
-              {epic.key && <IssueTypeIcon types={types} name={epicTypeName} size={18} />}
-              {epic.key ? <span className="ui-chip key-chip">{epic.key}</span> : null}
-              <span className="title">{epic.summary || (epic.key ? epic.key : "No epic")}</span>
-              <span className="count">{epic.issues.length}</span>
-              {epic.live > 0 && (
-                <span className="ui-status ui-status-ok" title="Tickets in progress, or with a task open here">
-                  {epic.live} in flight
-                </span>
-              )}
-              <div className="spacer" />
-              {/*
-                Working on the epic itself is only possible when it is one of
-                your own issues: otherwise all the app has is the key and title
-                its children carry, which is not enough to start from.
-              */}
-              {epic.issue && (
-                <button
-                  className="ui-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const id = taskFor(epic.issue!.key);
-                    if (id) select(id);
-                    else setOpen(epic.issue!);
-                  }}
-                >
-                  {taskFor(epic.issue.key) ? "Open task" : "Start work"}
-                </button>
-              )}
-              {/*
-                Jira itself is always reachable: the key is enough for a link,
-                so every epic gets the same way out rather than some of them
-                appearing actionable and the rest not.
-              */}
-              {epic.key && (
-                <button
-                  className="ui-button"
-                  title={`File a new ticket under ${epic.key}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFiling({ key: epic.key, summary: epic.summary });
-                  }}
-                >
-                  + ticket
-                </button>
-              )}
-              {epic.key && jiraBase && (
-                <button
-                  className="ui-link"
-                  title={`Open ${epic.key} in Jira`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void openUrl(`${jiraBase}/browse/${epic.key}`).catch(() => fail(noBrowser));
-                  }}
-                >
-                  Jira ↗
-                </button>
-              )}
-            </div>
-
-            {!closed && (
-              <div className="epic-body">
-                {epic.issues.map(renderCard)}
-              </div>
-            )}
-          </div>
+          <EpicGroup
+            key={epic.key || "_none"}
+            epic={epic}
+            typeName={epicTypeName}
+            types={types}
+            closed={closed}
+            taskId={own ? taskFor(own.key) : null}
+            jiraBase={jiraBase}
+            onToggle={() => setShut((c) => ({ ...c, [epic.key]: !closed }))}
+            onContextMenu={(e) => {
+              if (!epic.key) return;
+              e.preventDefault();
+              setMenu({
+                x: e.clientX,
+                y: e.clientY,
+                items: [
+                  ...(own ? [{ label: taskFor(own.key) ? "Open task" : "Start work…", onSelect: work }] : []),
+                  ...epicItems(epic.key, epic.summary),
+                  ...linkItems(epic.key, epic.summary, true),
+                ],
+              });
+            }}
+            onWork={work}
+            onFile={() => setFiling({ key: epic.key, summary: epic.summary })}
+            onJira={() => void openUrl(`${jiraBase}/browse/${epic.key}`).catch(() => fail(noBrowser))}
+          >
+            {epic.issues.map(renderCard)}
+          </EpicGroup>
         );
       })}
 

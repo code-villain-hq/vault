@@ -30,6 +30,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { BrowserView, Catchup, Cleaned, FlowStatus, LogSource, Message, PaneInfo, PhoneStatus, Project, RepoUpdate, StartTo, Synced, TaskView } from "../lib/types";
+import { sortTickets, type TicketSort } from "../lib/ticket-sort";
 import { ago, SCENARIOS } from "./world";
 import { acpAnswers, seedAcp } from "./acp";
 import { loopAnswers, seedLoop } from "./loop";
@@ -54,6 +55,8 @@ for (const p of world.panes) {
   if (phase && p.task_id === params.get("task") && p.kind === "agent" && p.running) seedLoop(p.id, p.task_id, phase);
 }
 const overrides = new Map<string, Answer>();
+/** A site's own names, highest first, as Jira lists them. */
+const PRIORITIES = ["Highest", "High", "Medium", "Low", "Lowest"];
 
 /** Base64 of the UTF-8 bytes, as the backend sends it, and how many bytes that was. */
 function encode(text: string): { data: string; end: number } {
@@ -507,7 +510,9 @@ const answer: Record<string, Answer> = {
     return [];
   },
   jira_create_fields: () => world.requiredFields,
-  jira_browse: () => ({ issues: world.issues, more: false }),
+  // Jira orders a search (TKT-13); here the list is sorted as Jira would.
+  jira_browse: (a) => ({ issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES), more: false }),
+  jira_priorities: () => PRIORITIES,
   jira_issues_by_key: (a) =>
     [...world.issues, ...world.elsewhere].filter((i) => (a.keys as string[]).includes(i.key)),
   jira_start_work: (a) => {

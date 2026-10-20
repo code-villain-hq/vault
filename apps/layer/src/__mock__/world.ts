@@ -118,7 +118,10 @@ const issueTypes: JiraIssueType[] = [
 /** Shaped like a real workflow: Review shares In Progress's category, and two statuses are done. */
 const STATUS_IDS: Record<string, string> = { "To Do": "1", "In Progress": "3", Review: "10322", Done: "10002", Cancelled: "10016" };
 
-function issue(key: string, summary: string, status: string, category: string, epic: string | null, days = 3): JiraIssue {
+function issue(
+  key: string, summary: string, status: string, category: string, epic: string | null, days = 3,
+  priority = "Medium", touched = days / 2,
+): JiraIssue {
   return {
     key,
     summary,
@@ -127,7 +130,7 @@ function issue(key: string, summary: string, status: string, category: string, e
     status_id: STATUS_IDS[status] ?? "0",
     status_category: category,
     issue_type: "Story",
-    priority: "Medium",
+    priority,
     assignee: "You",
     labels: [],
     components: [],
@@ -135,6 +138,7 @@ function issue(key: string, summary: string, status: string, category: string, e
     epic_summary: epic ? "Sign-in overhaul" : null,
     url: `https://acme.atlassian.net/browse/${key}`,
     created: ago(days * 86400),
+    updated: ago(touched * 86400),
   };
 }
 
@@ -452,8 +456,10 @@ function busy(): World {
     },
     issues: [
       issue("ACME-123", "Fix login race", "In Progress", "indeterminate", "ACME-100"),
-      issue("ACME-140", "Remember the last workspace", "To Do", "new", "ACME-100", 12),
-      issue("ACME-141", "Rate-limit password resets", "To Do", "new", null, 0.1),
+      issue("ACME-140", "Remember the last workspace", "To Do", "new", "ACME-100", 12, "Highest", 0.05),
+      issue("ACME-141", "Rate-limit password resets", "To Do", "new", null, 0.1, "Low"),
+      { ...issue("ACME-150", "Audit who changed a role", "To Do", "new", "ACME-200", 30, "High", 4), epic_summary: "Audit and compliance" },
+      { ...issue("ACME-151", "Export the audit log as CSV", "In Progress", "indeterminate", "ACME-200", 6, "Lowest", 0.5), epic_summary: "Audit and compliance" },
     ],
     elsewhere: [
       { ...issue("ACME-130", "Audit log page", "In Progress", "indeterminate", "ACME-200"), epic_summary: "Audit and compliance" },

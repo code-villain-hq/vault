@@ -743,7 +743,7 @@ Known gaps:
 ## 9. Tickets
 
 The Tickets view has two tabs. **Mine** is your assigned, not-done tickets,
-grouped by epic, with a filter and type toggles. **Find work** searches
+grouped by epic, with a filter, type toggles and a sort (TKT-13). **Find work** searches
 beyond them: not mine / unassigned / anyone, done included or not, by type,
 by text, or by key. A ticket opens its task if there is one; otherwise it
 offers Start work.
@@ -806,6 +806,15 @@ offers Start work.
   `ACME-4826`), since Jira's text search does not look at keys. If no
   ticket has that key, or the filters hide it, the number is searched for
   as text instead. Without a project set, a number is only text.
+- **TKT-13** Both tabs MUST sort by last updated (the default), newest or
+  oldest filed, or priority, highest first. One choice serves both tabs and
+  is remembered across launches. Priority follows the site's own list of
+  priorities, never names the app knows; a ticket with none, or one the
+  list lacks, sorts after the rest, and ties go to the most recently
+  updated. In Mine, tickets are sorted within their epic, and epics come
+  in flight first, then in the order of their top ticket, with "No epic"
+  last. Find work asks Jira for the order, since its results are capped:
+  sorting the first hundred here would only reshuffle them.
 
 Code: `commands/jira.rs`, `commands/ticket_flow.rs`, `integrations/jira.rs`,
 `integrations/jira/flow.rs`, `components/tickets/`, `TicketFlow.tsx`,
@@ -825,6 +834,8 @@ Known gaps:
   list (assigned to you, not done).
 - A move that needs two transitions (a workflow with no direct way from
   In Progress to the after-merge status) is reported, not made.
+- Sorting by priority takes the order Jira's priority search lists them
+  in. Jira does not document that order as the site's ranking.
 
 ## 10. Reviews
 
