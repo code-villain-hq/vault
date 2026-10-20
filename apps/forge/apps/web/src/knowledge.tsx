@@ -14,7 +14,15 @@ import type {
   SpecVersion,
 } from "@forge/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { FolderCode, Folders, GitBranch, Replace, UsersRound } from "lucide-react";
+import {
+  ChevronRight,
+  FolderCode,
+  Folders,
+  GitBranch,
+  Globe,
+  Replace,
+  UsersRound,
+} from "lucide-react";
 import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { type Confirmation, ConfirmDialog } from "./confirm";
@@ -106,9 +114,11 @@ function ListPage({
 /** The first line of a Markdown text, without its marks, to show in a list. */
 function summary(markdown: string): string {
   const line = markdown.split("\n").find((l) => l.trim()) ?? "";
+  // Underscores of emphasis go, not those inside a name like workspace_id.
   return line
     .replace(/^[#>\-*\s]+/, "")
-    .replace(/[*_`]/g, "")
+    .replace(/[*`]/g, "")
+    .replace(/(?<![a-z0-9])_+|_+(?![a-z0-9])/gi, "")
     .trim();
 }
 
@@ -225,7 +235,9 @@ export function ServicePage() {
   const specs = useRecords("Spec")
     .filter((s) => servicesOf(s).includes(id))
     .sort((a, b) => a.title.localeCompare(b.title));
-  const decisions = useRecords("Decision").filter((d) => d.service_id === id);
+  const decisions = useRecords("Decision")
+    .filter((d) => d.service_id === id)
+    .sort(newestDecisionFirst);
   const issues = useRecords("Issue");
   const states = useStates();
   const newIssue = useNewIssue();
@@ -767,17 +779,9 @@ export function SpecRow({ spec }: { spec: Spec }) {
   );
 }
 
-export function DecisionRow({
-  decision,
-  withService,
-}: {
-  decision: Decision;
-  /** Its service's icon at the end, where decisions of several services share a list. */
-  withService?: boolean;
-}) {
+export function DecisionRow({ decision }: { decision: Decision }) {
   const { workspace } = useWorkspace();
   const status = DECISION_STATUSES.find((s) => s.value === decision.status);
-  const service = useRecords("Service").find((s) => s.id === decision.service_id);
   return (
     <li>
       <Link
@@ -794,47 +798,102 @@ export function DecisionRow({
         {decision.status !== "accepted" && (
           <span className="text-xs text-faint">{status?.label}</span>
         )}
-        {withService && service && (
-          <span title={service.name}>
-            <ServiceIcon service={service} />
-          </span>
-        )}
       </Link>
     </li>
   );
 }
 
+/** A decision's title without the number the early ones carry: "D12: Two roles" reads "Two roles". */
+function decisionTitle(title: string): string {
+  return title.replace(/^D\d+:\s*/, "");
+}
+
+/** Newest decided first; decisions of the same day by when they were recorded. */
+function newestDecisionFirst(a: Decision, b: Decision): number {
+  const day = (d: Decision) => d.decided_on ?? d.created_at.slice(0, 10);
+  return day(b).localeCompare(day(a)) || b.created_at.localeCompare(a.created_at);
+}
+
 /**
  * A decision in a list of its own: its title and the first line of what was
- * decided; its status only when it isn't accepted.
+ * decided, then when. A proposed one says so in a pill, and other states that
+ * aren't accepted in a word.
  */
-function DecisionListItem({ decision }: { decision: Decision }) {
+function DecisionListItem({
+  decision,
+  withService,
+}: {
+  decision: Decision;
+  /** Its service's name, where decisions of several services share a list. */
+  withService?: boolean;
+}) {
   const { workspace } = useWorkspace();
   const status = DECISION_STATUSES.find((s) => s.value === decision.status);
-  // Older decisions repeat their title as what was decided; that says nothing new.
-  const plain = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
+  const service = useRecords("Service").find((s) => s.id === decision.service_id);
+  // Older decisions repeat their title as what was decided, give or take a
+  // word or two; that says nothing new.
+  const words = (text: string) => text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   const decided = summary(decision.decision);
-  const what = plain(decision.title).includes(plain(decided)) ? "" : decided;
+  const inTitle = new Set(words(decision.title));
+  const said = words(decided);
+  const repeats = said.filter((word) => inTitle.has(word)).length >= said.length * 0.8;
+  const what = repeats ? "" : decided;
+  const day = decision.decided_on ?? decision.created_at;
   return (
     <li>
       <Link
         to="/$workspace/decision/$decision"
         params={{ workspace: workspace.url_key, decision: decision.id }}
-        title={decision.decided_on ? `Decided ${formatDate(decision.decided_on)}` : undefined}
         className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
       >
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-medium">{decision.title}</span>
+          <span className="truncate font-medium" title={decision.title}>
+            {decisionTitle(decision.title)}
+          </span>
           {what && <span className="truncate text-xs text-muted">{what}</span>}
         </span>
-        {decision.status !== "accepted" && (
-          <span className="shrink-0 text-xs text-faint">{status?.label}</span>
+        {withService && service && (
+          <span className="hidden shrink-0 text-xs text-faint @md:inline">{service.name}</span>
         )}
+        {decision.status === "proposed" ? (
+          <span className="ui-status ui-status-warn shrink-0 px-2">{status?.label}</span>
+        ) : (
+          decision.status !== "accepted" && (
+            <span className="shrink-0 text-xs text-faint">{status?.label}</span>
+          )
+        )}
+        <span
+          className="w-12 shrink-0 text-right text-xs text-faint"
+          title={decision.decided_on ? `Decided ${formatDate(decision.decided_on)}` : undefined}
+        >
+          {formatDate(day)}
+        </span>
       </Link>
+    </li>
+  );
+}
+
+/** A group of decisions on the Decisions page, under its label and count. */
+function DecisionGroup({
+  heading,
+  decisions,
+  withService,
+}: {
+  heading: React.ReactNode;
+  decisions: Decision[];
+  withService?: boolean;
+}) {
+  return (
+    <li>
+      <h2 className="flex h-9 items-center gap-2 px-3 pt-2 text-xs text-faint">
+        {heading}
+        <span>{decisions.length}</span>
+      </h2>
+      <ul className="flex flex-col gap-0.5">
+        {decisions.map((decision) => (
+          <DecisionListItem key={decision.id} decision={decision} withService={withService} />
+        ))}
+      </ul>
     </li>
   );
 }
@@ -1858,12 +1917,16 @@ function Requirements({
 
 export function DecisionsPage() {
   const decisions = useRecords("Decision");
+  const services = [...useRecords("Service")].sort(byName);
   const [creating, setCreating] = useState(false);
-  const newestFirst = [...decisions].sort((a, b) =>
-    (b.decided_on ?? b.created_at).localeCompare(a.decided_on ?? a.created_at),
-  );
-  const inForce = newestFirst.filter((d) => d.status === "accepted" || d.status === "proposed");
+  const [showPast, setShowPast] = useState(false);
+  const { workspace } = useWorkspace();
+  const newestFirst = [...decisions].sort(newestDecisionFirst);
+  const proposed = newestFirst.filter((d) => d.status === "proposed");
+  const accepted = newestFirst.filter((d) => d.status === "accepted");
   const past = newestFirst.filter((d) => d.status !== "accepted" && d.status !== "proposed");
+  const known = new Set(services.map((s) => s.id));
+  const workspaceWide = accepted.filter((d) => !d.service_id || !known.has(d.service_id));
   return (
     <ListPage
       title="Decisions"
@@ -1881,13 +1944,67 @@ export function DecisionsPage() {
         </>
       }
     >
-      {inForce.map((decision) => (
-        <DecisionRow key={decision.id} decision={decision} withService />
-      ))}
-      {past.length > 0 && <li className="px-3 pt-5 pb-1 text-xs text-muted">No longer in force</li>}
-      {past.map((decision) => (
-        <DecisionRow key={decision.id} decision={decision} withService />
-      ))}
+      {proposed.length > 0 && (
+        <DecisionGroup key="proposed" heading="Proposed" decisions={proposed} withService />
+      )}
+      {workspaceWide.length > 0 && (
+        <DecisionGroup
+          key="workspace"
+          heading={
+            <>
+              <Globe size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+              Whole workspace
+            </>
+          }
+          decisions={workspaceWide}
+        />
+      )}
+      {services.map((service) => {
+        const own = accepted.filter((d) => d.service_id === service.id);
+        if (own.length === 0) return null;
+        return (
+          <DecisionGroup
+            key={service.id}
+            heading={
+              <Link
+                to="/$workspace/service/$service"
+                params={{ workspace: workspace.url_key, service: service.id }}
+                className="flex items-center gap-2 hover:text-fg"
+              >
+                <ServiceIcon service={service} />
+                {service.name}
+              </Link>
+            }
+            decisions={own}
+          />
+        );
+      })}
+      {past.length > 0 && (
+        <li key="past">
+          <button
+            type="button"
+            aria-expanded={showPast}
+            onClick={() => setShowPast(!showPast)}
+            className="flex h-9 items-center gap-2 rounded-md px-3 pt-2 text-xs text-faint hover:text-fg"
+          >
+            <ChevronRight
+              size={12}
+              strokeWidth={1.75}
+              aria-hidden="true"
+              className={`shrink-0 transition-transform ${showPast ? "rotate-90" : ""}`}
+            />
+            No longer in force
+            <span>{past.length}</span>
+          </button>
+          {showPast && (
+            <ul className="flex flex-col gap-0.5">
+              {past.map((decision) => (
+                <DecisionListItem key={decision.id} decision={decision} withService />
+              ))}
+            </ul>
+          )}
+        </li>
+      )}
     </ListPage>
   );
 }
