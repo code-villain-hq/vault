@@ -47,6 +47,12 @@ services:
       FORGE_GITHUB_WEBHOOK_SECRET: ${FORGE_GITHUB_WEBHOOK_SECRET:-}
       FORGE_GITHUB_CLIENT_ID: ${FORGE_GITHUB_CLIENT_ID:-}
       FORGE_GITHUB_CLIENT_SECRET: ${FORGE_GITHUB_CLIENT_SECRET:-}
+      # Signing in with Code Villain (id.codevillain.eu); with it, passwords
+      # and GitHub sign-in are off. FORGE_PUBLIC_URL is this Forge's address.
+      FORGE_OIDC_ISSUER: ${FORGE_OIDC_ISSUER:-}
+      FORGE_OIDC_CLIENT_ID: ${FORGE_OIDC_CLIENT_ID:-}
+      FORGE_OIDC_CLIENT_SECRET: ${FORGE_OIDC_CLIENT_SECRET:-}
+      FORGE_PUBLIC_URL: ${FORGE_PUBLIC_URL:-http://localhost:7390}
       # 1 behind a proxy that sets X-Forwarded-For (limits per client use it).
       FORGE_TRUST_FORWARDED_FOR: ${FORGE_TRUST_FORWARDED_FOR:-}
     volumes:

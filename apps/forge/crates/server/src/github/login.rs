@@ -281,7 +281,7 @@ impl GitHubLogin {
 
 /// A path on this site, nothing that a browser could read as another one:
 /// no control characters, spaces or backslashes, and not `//`.
-fn safe_redirect(path: Option<&str>) -> String {
+pub(crate) fn safe_redirect(path: Option<&str>) -> String {
     path.filter(|p| {
         p.starts_with('/')
             && !p.starts_with("//")
@@ -291,7 +291,7 @@ fn safe_redirect(path: Option<&str>) -> String {
     .to_string()
 }
 
-fn redirect(to: &str, cookies: &[HeaderValue]) -> Response {
+pub(crate) fn redirect(to: &str, cookies: &[HeaderValue]) -> Response {
     let mut response = (StatusCode::SEE_OTHER, [(LOCATION, to.to_string())]).into_response();
     for cookie in cookies {
         response.headers_mut().append(SET_COOKIE, cookie.clone());
@@ -305,7 +305,7 @@ fn failed(problem: Problem, secure: bool) -> Response {
     redirect(&to, &[nonce_cookie("", 0, secure)])
 }
 
-fn urlencode(text: &str) -> String {
+pub(crate) fn urlencode(text: &str) -> String {
     text.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
@@ -325,7 +325,7 @@ fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     .expect("a cookie made of hex and ASCII is a valid header")
 }
 
-fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
+pub(crate) fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get_all(COOKIE)
         .iter()
@@ -377,7 +377,12 @@ pub struct StartParams {
 
 /// `GET /api/auth/github`: off to GitHub to sign in.
 pub async fn start(State(state): State<AppState>, Query(params): Query<StartParams>) -> Response {
-    let Some(login) = state.github_login.as_ref() else {
+    // Signing in with Code Villain, when on, is the only way in.
+    let Some(login) = state
+        .github_login
+        .as_ref()
+        .filter(|_| state.oidc_login.is_none())
+    else {
         return failed(Problem::NotSetUp, state.cookie_secure);
     };
     let to = safe_redirect(params.redirect.as_deref());
@@ -391,7 +396,12 @@ pub async fn connect(
     user: CurrentUser,
     Query(params): Query<StartParams>,
 ) -> Response {
-    let Some(login) = state.github_login.as_ref() else {
+    // Signing in with Code Villain, when on, is the only way in.
+    let Some(login) = state
+        .github_login
+        .as_ref()
+        .filter(|_| state.oidc_login.is_none())
+    else {
         return failed(Problem::NotSetUp, state.cookie_secure);
     };
     let to = safe_redirect(params.redirect.as_deref());

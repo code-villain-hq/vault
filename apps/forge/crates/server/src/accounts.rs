@@ -35,6 +35,14 @@ pub fn signup_refused() -> AppError {
     AppError::invalid(SIGNUP_REFUSED)
 }
 
+/// With Code Villain sign-in on, it's the only way in: no passwords.
+fn passwords_open(state: &AppState) -> Result<(), AppError> {
+    match state.oidc_login {
+        Some(_) => Err(AppError::not_found("sign in with Code Villain instead")),
+        None => Ok(()),
+    }
+}
+
 /// Signs someone up, at most five times an hour from one client address
 /// (every try counts).
 pub async fn signup(
@@ -43,6 +51,7 @@ pub async fn signup(
     headers: HeaderMap,
     Json(request): Json<SignupRequest>,
 ) -> Result<Response, AppError> {
+    passwords_open(&state)?;
     state
         .signup_attempts
         .count(&client.key())
@@ -112,6 +121,7 @@ pub async fn login(
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<Response, AppError> {
+    passwords_open(&state)?;
     let email = normalize_email(&request.email).unwrap_or_default();
     let attempt = state
         .password_attempts
@@ -214,6 +224,7 @@ pub async fn change_password(
     user: CurrentUser,
     Json(request): Json<ChangePasswordRequest>,
 ) -> Result<StatusCode, AppError> {
+    passwords_open(&state)?;
     check_password(&request.new_password)?;
     let (email, hash): (String, Option<String>) =
         sqlx::query_as("SELECT email, password_hash FROM users WHERE id = $1")

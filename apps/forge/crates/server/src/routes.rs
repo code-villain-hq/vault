@@ -12,8 +12,8 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::{
-    accounts, agents, attachments, drift, forgejo, github, invites, mcp, members, runners, teams,
-    ws,
+    accounts, agents, attachments, drift, forgejo, github, invites, mcp, members, oidc, runners,
+    teams, ws,
 };
 
 /// The API, plus the built web app from `web_dir` when given (in production
@@ -98,6 +98,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/github", get(github::login::start))
         .route("/api/auth/github/connect", get(github::login::connect))
         .route("/api/auth/github/callback", get(github::login::callback))
+        .route("/api/auth/oidc", get(oidc::start))
+        .route("/api/auth/oidc/callback", get(oidc::callback))
+        .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/github/setup", get(github::setup))
         .route("/api/github/webhook", post(github::webhook::receive))
         .nest("/api/w/{workspace_id}", workspace)
@@ -176,7 +179,13 @@ fn desktop_cors() -> CorsLayer {
         .expose_headers([HeaderName::from_static(crate::auth::SESSION_HEADER)])
 }
 
-/// `GET /api/auth/providers`: the ways to sign in besides email.
+/// `GET /api/auth/providers`: the ways to sign in. Signing in with Code
+/// Villain, when on, is the only one.
 async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "github": state.github_login.is_some() }))
+    let oidc = state.oidc_login.is_some();
+    Json(serde_json::json!({
+        "oidc": oidc,
+        "password": !oidc,
+        "github": !oidc && state.github_login.is_some(),
+    }))
 }

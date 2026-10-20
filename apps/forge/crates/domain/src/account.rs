@@ -161,6 +161,8 @@ pub struct InvitePreview {
     /// Where to go once joined.
     pub workspace_url_key: String,
     pub invited_by: String,
+    /// What the invite makes you there.
+    pub role: Role,
 }
 
 pub const MIN_PASSWORD: usize = 8;
