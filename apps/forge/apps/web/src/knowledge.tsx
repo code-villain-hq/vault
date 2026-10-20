@@ -20,6 +20,7 @@ import { api } from "./api";
 import { type Confirmation, ConfirmDialog } from "./confirm";
 import { conventionWarnings } from "./convention";
 import { byId, formatDate, identifier, servicesOf, timeAgo, useStates, useTeams } from "./data";
+import { ServiceDriftChecks, useServiceChecks } from "./drift-checks";
 import { ICON_NAMES } from "./icon-set";
 import { Avatar, ProjectIcon, ServiceIcon, StateIcon } from "./icons";
 import { IssueList, SharedFields } from "./issue-list";
@@ -41,13 +42,7 @@ import {
   pendingChanges,
   specConflicts,
 } from "./spec-change";
-import {
-  DriftChecks,
-  SuggestionCard,
-  TextDiff,
-  useAiConfigured,
-  useOpenSuggestions,
-} from "./suggestions";
+import { SuggestionCard, TextDiff, useAiConfigured, useOpenSuggestions } from "./suggestions";
 import { Button } from "./ui";
 import {
   aroundRequirements,
@@ -237,6 +232,7 @@ export function ServicePage() {
   const navigate = useNavigate();
   const suggestions = useOpenSuggestions(id);
   const ai = useAiConfigured();
+  const checks = useServiceChecks(id);
   const isAdmin = useIsAdmin();
   const [creatingSpec, setCreatingSpec] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -338,7 +334,7 @@ export function ServicePage() {
             <SharedFields issues={openIssues} except={["service"]} />
           </div>
           <IssueList issues={openIssues} empty="No open issues for this service." />
-          {(showCurrentState || ai) && (
+          {(showCurrentState || ai || checks.length > 0) && (
             <div className="flex flex-col gap-8 px-8 py-6">
               {showCurrentState && (
                 <div>
@@ -363,8 +359,14 @@ export function ServicePage() {
                   )}
                 </div>
               )}
-              {ai && (
-                <DriftChecks serviceId={service.id} hasRepository={Boolean(service.repository)} />
+              {/* Agents' checks show without a model; asking Forge AI for one needs it. */}
+              {(ai || checks.length > 0) && (
+                <ServiceDriftChecks
+                  serviceId={service.id}
+                  hasRepository={Boolean(service.repository)}
+                  ai={ai === true}
+                  checks={checks}
+                />
               )}
             </div>
           )}

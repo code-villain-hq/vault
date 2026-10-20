@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
 import { JoinPage, LoginPage, SignedInPage, SignupPage } from "./auth";
+import { DriftCheckPage, DriftChecksPage } from "./drift-checks";
 import { InboxPage } from "./inbox";
 import { IssuePage } from "./issue-page";
 import { MyIssuesPage, TeamIssuesPage, TriagePage, WorkspaceHome } from "./issues";
@@ -108,6 +109,16 @@ const decision = createRoute({
   path: "/decision/$decision",
   component: DecisionPage,
 });
+const driftChecks = createRoute({
+  getParentRoute: () => workspace,
+  path: "/drift-checks",
+  component: DriftChecksPage,
+});
+const driftCheck = createRoute({
+  getParentRoute: () => workspace,
+  path: "/drift-check/$check",
+  component: DriftCheckPage,
+});
 const agents = createRoute({
   getParentRoute: () => workspace,
   path: "/settings/agents",
@@ -201,6 +212,8 @@ const routeTree = root.addChildren([
     spec,
     decisions,
     decision,
+    driftChecks,
+    driftCheck,
     myIssues,
     triage,
     teamIssues,

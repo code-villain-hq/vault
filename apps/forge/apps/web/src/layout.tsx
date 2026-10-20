@@ -22,6 +22,7 @@ import {
   Inbox,
   Layers,
   Mountain,
+  Radar,
   Scale,
   Search,
   Server,
@@ -307,6 +308,10 @@ function AppNav() {
         <Link to="/$workspace/decisions" params={params} className={navLink}>
           <NavIcon icon={Scale} />
           Decisions
+        </Link>
+        <Link to="/$workspace/drift-checks" params={params} className={navLink}>
+          <NavIcon icon={Radar} />
+          Drift checks
         </Link>
       </Section>
       <Section id="teams" title="Teams">
