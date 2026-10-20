@@ -25,6 +25,19 @@
       "port": 5173
     },
     {
+      "name": "forge-dev-passwords",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "FORGE_OIDC_ISSUER=",
+        "bun",
+        "run",
+        "--cwd",
+        "apps/forge",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
       "name": "layer-mock",
       "runtimeExecutable": "bun",
       "runtimeArgs": [
