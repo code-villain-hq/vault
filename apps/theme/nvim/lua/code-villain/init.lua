@@ -15,6 +15,9 @@ local function groups(p)
   local ui = function(name) return p["ui." .. name] end
   local frame = function(name) return p["frame." .. name] end
   local bg, float = ui("background"), ui("float")
+  -- Code inside a float (a picker preview) sits on the panel, unless the
+  -- float is the panel's own tone (day), when it steps to the surface.
+  local inset = float == bg and frame("surface") or bg
 
   local g = {
     -- The editor ---------------------------------------------------------
@@ -295,11 +298,19 @@ local function groups(p)
     -- snacks.nvim
     SnacksIndent = { fg = ui("guide") },
     SnacksIndentScope = { fg = p.bracket },
+    -- The picker's panes separate by tone: the input is a field, the list a
+    -- float, and the preview is code, so it sits on the editor's background.
+    SnacksPickerInput = { fg = p.text, bg = ui("highlight") },
     SnacksPickerInputBorder = { link = "FloatBorder" },
     SnacksPickerInputTitle = { link = "FloatTitle" },
+    SnacksPickerPreview = { fg = p.text, bg = inset },
+    SnacksPickerPreviewBorder = { fg = inset, bg = inset },
+    SnacksPickerPreviewTitle = { fg = p.text, bg = inset, bold = true },
     SnacksPickerBoxTitle = { link = "FloatTitle" },
     SnacksPickerTitle = { link = "FloatTitle" },
-    SnacksPickerMatch = { fg = p.text, bold = true },
+    -- Picker matches are search matches, so they take poison.
+    SnacksPickerMatch = { fg = ui("search-current"), bold = true },
+    SnacksPickerSearch = { link = "IncSearch" },
     SnacksPickerSelected = { fg = p.keyword },
     SnacksPickerToggle = { fg = ui("muted"), bg = ui("highlight") },
     SnacksPickerDir = { fg = p.comment },
