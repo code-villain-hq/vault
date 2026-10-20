@@ -1,0 +1,43 @@
+{
+  "source": "../code-villain-cubes.png",
+  "source_sha256": "c3ca8ebc5d88acd4a9482e4eef269a0d67426ce1742ef9bf4aec0adde5771295",
+  "source_size": [
+    1672,
+    941
+  ],
+  "output": "code-villain-cubes-light.mp4",
+  "size": [
+    1920,
+    1080
+  ],
+  "duration_seconds": 8,
+  "fps": 30,
+  "design": "Clearly visible violet light sweeps across cube faces and engraved tops; fixed cubes, black centre and poison strike.",
+  "validation": {
+    "exact_periodic_endpoint": true,
+    "outside_cube_silhouettes_fixed": true,
+    "cube_blue_channel_temporal_range_median_codes": 61.0,
+    "cube_blue_channel_temporal_range_p90_codes": 64.0
+  },
+  "teams_usage": "For motion, loop the MP4 behind a segmented webcam in a virtual-camera compositor, then choose its virtual camera in Teams with Teams background effects off. PNG is the static fallback; GIF is preview only.",
+  "rebuild": "python3 render_cubes_light.py (numpy, Pillow, ffmpeg, ffprobe)",
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "profile": "High",
+        "width": 1920,
+        "height": 1080,
+        "pix_fmt": "yuv420p",
+        "r_frame_rate": "30/1",
+        "nb_frames": "240"
+      }
+    ],
+    "format": {
+      "duration": "8.000000",
+      "size": "4623291"
+    }
+  }
+}
