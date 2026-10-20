@@ -2,9 +2,11 @@
 
 The Code Villain website at **https://www.codevillain.eu/**: the homepage, and the blog in [`blog/`](blog). Shared styles are in [`site.css`](site.css).
 
-The blog shows posts from [`content/blog`](../../content/blog). Each post page is written by hand from its Markdown; `build.py` packages the finished pages without generating posts. The blog index lists the published posts.
+The blog is generated from [`content/blog`](../../content/blog). `python3 build.py` renders each post's Markdown into `blog/` through [`templates/`](templates) with [`blog.py`](blog.py): a page per post and the index, newest first. `blog/` is build output, not in git; edit the Markdown or the templates. The preview shows drafts with a pill; `dist/` leaves them out.
 
-It reads colour, type, and shape from [`design/tokens`](../../design/tokens) by relative path, so open it through the vault's preview server (`vault-static` in `.claude/launch.json`, then `/apps/site/`), not from disk. `python3 build.py` copies the public assets and rewrites their references for deployment at the domain root.
+The Markdown is the plain subset the posts need: `##` and `###` headings, paragraphs, lists, quotes, fenced code, links, images, inline code, strong and emphasis. Straight quotes become curly. A paragraph of images alone is a figure, the image title (`![alt](path "caption")`) its caption; two images in one paragraph share a panel. Image paths are relative to the post. CSS and SVG/HTML code takes the code palette; other languages stay plain. Reading time counts prose at 200 words a minute.
+
+It reads colour, type, and shape from [`design/tokens`](../../design/tokens) by relative path, so run `python3 build.py` once for the blog, then open it through the vault's preview server (`vault-static` in `.claude/launch.json`, then `/apps/site/`), not from disk. `python3 build.py` copies the public assets and rewrites their references for deployment at the domain root.
 
 The homepage uses the outlined [`logo-home.svg`](../../brand/mark/logo-home.svg) variant through an external SVG reference. Its extended strike and cropped lettering are defined in [`brand/mark/README.md`](../../brand/mark/README.md).
 

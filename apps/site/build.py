@@ -8,6 +8,8 @@ import re
 import shutil
 from urllib.parse import unquote, urljoin, urlsplit
 
+import blog
+
 SITE = Path(__file__).resolve().parent
 VAULT = SITE.parent.parent
 OUTPUT = SITE / 'dist'
@@ -72,22 +74,25 @@ def main() -> None:
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir()
-    for relative in ['index.html', 'blog/index.html', 'blog/villain-gets-a-face.html']:
-        text = (SITE / relative).read_text()
+    # The vault preview shows drafts; the public package leaves them out.
+    shutil.rmtree(SITE / 'blog', ignore_errors=True)
+    blog.write(SITE / 'blog', drafts=True)
+    copy(SITE / 'index.html', 'index.html')
+    pages = ['index.html', *('blog/' + name for name in blog.write(OUTPUT / 'blog', drafts=False))]
+    for relative in pages:
+        text = (OUTPUT / relative).read_text()
         for before, after in REPLACEMENTS.items():
             text = text.replace(before, after)
-        target = OUTPUT / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text)
+        (OUTPUT / relative).write_text(text)
     for name in ['site.css', 'home.css']:
         copy(SITE / name, name)
     for path in (SITE / 'assets/fonts').iterdir():
         if path.suffix in {'.ttf', '.css', '.txt'}:
             copy(path, 'assets/fonts/' + path.name)
     # Only captures a page shows: the folder also holds drafts not yet on the site.
-    pages = ''.join((OUTPUT / page).read_text() for page in ['index.html', 'blog/index.html', 'blog/villain-gets-a-face.html'])
+    shown = ''.join((OUTPUT / page).read_text() for page in pages)
     for path in (SITE / 'assets/captures').glob('*.png'):
-        if f'assets/captures/{path.name}' in pages:
+        if f'assets/captures/{path.name}' in shown:
             copy(path, 'assets/captures/' + path.name)
     for path in (VAULT / 'brand/mark').glob('*.svg'):
         copy(path, 'assets/brand/' + path.name)
