@@ -2,8 +2,16 @@ import type { InvitePreview, Me } from "@forge/types";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
+import { onAppLink, openInBrowser } from "./platform";
 import { Redirect } from "./redirect";
-import { bundled, DEFAULT_SERVER, normalizeServer, serverUrl, setServerUrl } from "./server";
+import {
+  apiUrl,
+  bundled,
+  DEFAULT_SERVER,
+  normalizeServer,
+  serverUrl,
+  setServerUrl,
+} from "./server";
 import { defaultWorkspace, signedIn, signOut, useSession } from "./session";
 import { AuthScreen, Button, buttonClass, ErrorMessage, Splash, TextField } from "./ui";
 
@@ -25,12 +33,23 @@ function useSubmit(action: () => Promise<void>) {
   return { busy, error, submit };
 }
 
+/** The server address someone typed, or "" when it doesn't look like one. */
+function serverOrNothing(input: string) {
+  try {
+    return normalizeServer(input);
+  } catch {
+    return "";
+  }
+}
+
 /**
  * The packaged desktop app asks which server to use; the browser app is
- * already on it. Returns the field and a function that applies the choice.
+ * already on it. Returns the field, a function that applies the choice, and
+ * the server whose ways in to show (checked when the field is left).
  */
 function useServerChoice() {
   const [server, setServer] = useState(serverUrl() || DEFAULT_SERVER);
+  const [checked, setChecked] = useState(() => serverOrNothing(server));
   const field = bundled ? (
     <TextField
       label="Server"
@@ -40,6 +59,7 @@ function useServerChoice() {
       hint="Where your team's Forge runs."
       value={server}
       onChange={(e) => setServer(e.target.value)}
+      onBlur={() => setChecked(serverOrNothing(server))}
     />
   ) : null;
   const apply = () => {
@@ -52,7 +72,7 @@ function useServerChoice() {
     }
     setServerUrl(url);
   };
-  return { field, apply };
+  return { field, apply, checked };
 }
 
 /** The ways in this server offers. */
@@ -62,18 +82,28 @@ export type Providers = { oidc: boolean; password: boolean; github: boolean };
 const PASSWORD_ONLY: Providers = { oidc: false, password: true, github: false };
 
 /**
- * How this server signs people in; null until it says, so the page doesn't
- * flash the wrong way in. The packaged desktop app chooses its server at
- * sign-in, so it offers a password.
+ * How a server signs people in; null until it first says, so the page
+ * doesn't flash the wrong way in. The packaged desktop app asks the server
+ * chosen at sign-in, and leaves GitHub to the browser.
  */
-export function useProviders() {
-  const [providers, setProviders] = useState<Providers | null>(bundled ? PASSWORD_ONLY : null);
+export function useProviders(server = serverUrl()) {
+  const [providers, setProviders] = useState<Providers | null>(null);
   useEffect(() => {
-    if (bundled) return;
-    api<Providers>("GET", "/api/auth/providers")
-      .then(setProviders)
-      .catch(() => setProviders(PASSWORD_ONLY));
-  }, []);
+    if (bundled && !server) {
+      setProviders(PASSWORD_ONLY);
+      return;
+    }
+    let current = true;
+    fetch(`${server}/api/auth/providers`)
+      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : PASSWORD_ONLY))
+      .catch(() => PASSWORD_ONLY)
+      .then((p) => {
+        if (current) setProviders({ ...p, github: p.github && !bundled });
+      });
+    return () => {
+      current = false;
+    };
+  }, [server]);
   return providers;
 }
 
@@ -114,8 +144,17 @@ function problemOf(code: string, providers: Providers) {
     : (GITHUB_PROBLEMS[code] ?? GITHUB_PROBLEMS.github_failed);
 }
 
+type SignInProps = {
+  label: string;
+  /** An invite to join with, or where to go afterwards. */
+  query: Record<string, string>;
+  /** Runs first: the desktop app applies its choice of server. */
+  before?: () => void;
+};
+
 /** Off to the studio's sign-in; the server brings people back signed in. */
-function CodeVillainButton({ label, query }: { label: string; query: Record<string, string> }) {
+function CodeVillainButton({ label, query, before }: SignInProps) {
+  if (bundled) return <DesktopSignIn label={label} query={query} before={before} />;
   const params = new URLSearchParams(query).toString();
   return (
     <a
@@ -124,6 +163,65 @@ function CodeVillainButton({ label, query }: { label: string; query: Record<stri
     >
       {label}
     </a>
+  );
+}
+
+function hex(bytes: ArrayBuffer | Uint8Array) {
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * The packaged app signs in in the browser, where passkeys and the studio's
+ * session are. The server sends back a one-time code through a
+ * `forge://signed-in` link, and only this app, which knows the secret behind
+ * the challenge, can trade it for a session.
+ */
+function DesktopSignIn({ label, query, before }: SignInProps) {
+  const navigate = useNavigate();
+  const [secret, setSecret] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!secret) return;
+    return onAppLink(async (url) => {
+      const code = url.searchParams.get("code");
+      if (!url.href.startsWith("forge://signed-in") || !code) return;
+      setSecret(null);
+      try {
+        signedIn(await api<Me>("POST", "/api/auth/oidc/desktop", { code, secret }));
+        await navigate({ to: safeRedirect(url.searchParams.get("next") ?? undefined) });
+      } catch (e) {
+        setError(messageOf(e));
+      }
+    });
+  }, [secret, navigate]);
+
+  const start = async () => {
+    setError(null);
+    try {
+      before?.();
+      const fresh = hex(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fresh)));
+      setSecret(fresh);
+      const params = new URLSearchParams({ ...query, desktop: challenge });
+      await openInBrowser(apiUrl(`/api/auth/oidc?${params}`));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  };
+
+  return (
+    <>
+      {error && (
+        <div className="mb-4">
+          <ErrorMessage>{error}</ErrorMessage>
+        </div>
+      )}
+      <Button className="w-full" onClick={() => void start()}>
+        {label}
+      </Button>
+      {secret && <p className="mt-3 text-center text-muted">Finish signing in in your browser.</p>}
+    </>
   );
 }
 
@@ -163,10 +261,10 @@ export function LoginPage() {
     error?: string;
   };
   const navigate = useNavigate();
-  const providers = useProviders();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const server = useServerChoice();
+  const providers = useProviders(server.checked);
   const { busy, error, submit } = useSubmit(async () => {
     server.apply();
     signedIn(await api<Me>("POST", "/api/auth/login", { email, password }));
@@ -200,7 +298,8 @@ export function LoginPage() {
             <ErrorMessage>{problem}</ErrorMessage>
           </div>
         )}
-        <CodeVillainButton label="Sign in with Code Villain" query={query} />
+        {server.field && <div className="mb-4">{server.field}</div>}
+        <CodeVillainButton label="Sign in with Code Villain" query={query} before={server.apply} />
         <p className="mt-6 text-center text-muted">
           One account for every Code Villain app.
           <br />
@@ -258,13 +357,13 @@ export function LoginPage() {
 export function SignupPage() {
   const session = useSession();
   const navigate = useNavigate();
-  const providers = useProviders();
   const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
   const field = (key: keyof typeof form) => ({
     value: form[key],
     onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
   });
   const server = useServerChoice();
+  const providers = useProviders(server.checked);
   const { busy, error, submit } = useSubmit(async () => {
     server.apply();
     const me = await api<Me>("POST", "/api/auth/signup", form);
