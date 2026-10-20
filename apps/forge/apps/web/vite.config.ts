@@ -7,6 +7,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // The server answers CORS itself, so the packaged app can use this port.
+    cors: false,
     // The Rust server, so the app and the API share an origin in development.
     proxy: {
       "/api": { target: "http://127.0.0.1:7380", ws: true },

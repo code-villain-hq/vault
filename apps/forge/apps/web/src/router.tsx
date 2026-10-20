@@ -44,9 +44,12 @@ const join = createRoute({ getParentRoute: () => root, path: "/join/$token", com
 const signedInRoute = createRoute({
   getParentRoute: () => root,
   path: "/signed-in",
-  validateSearch: (search: Record<string, unknown>): { code?: string; next?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { code?: string; next?: string; error?: string } => ({
     code: typeof search.code === "string" ? search.code : undefined,
     next: typeof search.next === "string" ? search.next : undefined,
+    error: typeof search.error === "string" ? search.error : undefined,
   }),
   component: SignedInPage,
 });
