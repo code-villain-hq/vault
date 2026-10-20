@@ -2,6 +2,7 @@
 title: Code Villain gets a face
 date: 2026-10-18
 product: Studio
+summary: Three products and no look, until today. One type pairing, one palette in night and day, one chartreuse button, a mark, and every app wearing them.
 draft: false
 ---
 
@@ -17,7 +18,7 @@ Nightshade stays: night `#0B0B0B`, poison chartreuse, cloak violet. Grey does th
 
 There is a day mode too, for the apps. Poison is light, so it stays a fill by day: the button keeps its chartreuse and takes dark ink, at 12.3:1. The swap itself was two lines in `color.json`; the generator worked out the rest.
 
-![Nightshade in two rows. Night: frame, panel, field, the main action in poison, the selection tint, the violet focus. Day: the same names, filled for light.](images/2026-10-16-night-and-day.svg)
+![Nightshade in two rows. Night: frame, panel, field, the main action in poison, the selection tint, the violet focus. Day: the same names, filled for light.](images/2026-10-16-night-and-day.svg "Night above, day below: frame, panel, field, the main action, selection, focus.")
 
 Every surface reads the same names. An app switches to day with one attribute:
 
@@ -39,7 +40,8 @@ Five directions, one shape: 28px, 13px semibold, no border. It ended chartreuse 
 
 Four concepts: a strike, an iron mask, a seal, a hood. The strike won. Twenty-five variants later, the bar sits low and heavy behind the letters, cut where they cross. It began as a gothic V. The V said Villain and nothing about Code, so the C joined it: CV, one unit apart, so their two cuts meet and the bar stops between them. Forge, Layer and Caster wear their initials the same way: F, L, C.
 
-![The CV mark on its night tile, with the chartreuse bar behind the letters.](../../brand/mark/mark.svg)
+![The mark: a gothic C and V on a night tile, with a chartreuse bar behind them.](../../brand/mark/mark.svg)
+![The Code Villain wordmark with the strike.](../../brand/mark/logo-night.svg "The mark, and the logo it comes from.")
 
 The cut is one mask. The letters, drawn again with a thick stroke, punch a gap in the bar wherever they cross:
 

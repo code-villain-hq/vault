@@ -29,4 +29,4 @@ The site's blog: an index of posts and the post page. It follows [`../principles
 
 ## Content
 
-Posts are Markdown in [`content/blog`](../../content/blog), named `YYYY-MM-DD-slug.md`, with `title`, `date`, `product`, and `draft` in front matter. Until the site has a build step, each post page is written by hand from its Markdown.
+Posts are Markdown in [`content/blog`](../../content/blog), named `YYYY-MM-DD-slug.md`, with `title`, `date`, `product`, `summary`, and `draft` in front matter. The site's build renders them into these pages.
