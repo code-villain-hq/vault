@@ -42,8 +42,9 @@ export async function backupFolder(env = process.env, from = root): Promise<stri
       : resolve(from, configured);
   }
   // The main checkout's .git, also from a worktree: <folder>/villain-vault/.git.
-  const git = (await $`git rev-parse --path-format=absolute --git-common-dir`.cwd(from).text())
-    .trim();
+  const git = (
+    await $`git rev-parse --path-format=absolute --git-common-dir`.cwd(from).text()
+  ).trim();
   return join(dirname(dirname(git)), "backup", "forge");
 }
 
