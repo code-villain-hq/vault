@@ -1,4 +1,5 @@
-// Saves a backup to backups/ as two files with the same time in their names:
+// Saves a backup in the backup folder as two files with the same time in
+// their names:
 //   forge-<time>.dump                  the whole database, from the Postgres
 //                                      container (`bun run db` or `bun run app`)
 //   forge-<time>-attachments.tar.gz    the attached files, which live in the
@@ -8,20 +9,43 @@
 // (FORGE_DATA_DIR, default ./data). Repository clones (data/repos) are left
 // out: Forge clones them from GitHub again.
 //
-// To restore one, stop the server, then:
-//   docker compose exec -T postgres pg_restore -U forge -d forge --clean --if-exists < backups/forge-<time>.dump
+// The backup folder is FORGE_BACKUP_DIR, or else backup/forge next to the
+// vault's checkout (~/code/villain/backup/forge for ~/code/villain/villain-vault),
+// the same for every worktree. Never inside the repository: it is public.
+//
+// To restore one, stop the server, then (with <folder> the backup folder):
+//   docker compose exec -T postgres pg_restore -U forge -d forge --clean --if-exists < <folder>/forge-<time>.dump
 //   docker compose exec -T postgres psql -U forge -c "UPDATE workspaces SET sync_epoch = gen_random_uuid()"
-//   tar -xzf backups/forge-<time>-attachments.tar.gz -C data
+//   tar -xzf <folder>/forge-<time>-attachments.tar.gz -C data
 // The second command makes every client download a fresh copy instead of
 // trusting what it saw after the backup was made. The third puts the files
 // back in the data folder (use FORGE_DATA_DIR's folder if you set one). For
 // `bun run app`, unpack them into its volume instead:
-//   docker compose run --rm --no-deps -T forge tar -xzf - -C /var/lib/forge < backups/forge-<time>-attachments.tar.gz
+//   docker compose run --rm --no-deps -T forge tar -xzf - -C /var/lib/forge < <folder>/forge-<time>-attachments.tar.gz
 import { mkdir, readdir, rm } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { $ } from "bun";
 
 const root = new URL("..", import.meta.url).pathname;
+
+/**
+ * The folder backups go in: `FORGE_BACKUP_DIR`, or else `backup/forge` next
+ * to the checkout `from` belongs to. A worktree counts as its main checkout,
+ * so every worktree's backups end up together, outside the repository.
+ */
+export async function backupFolder(env = process.env, from = root): Promise<string> {
+  const configured = env.FORGE_BACKUP_DIR?.trim();
+  if (configured) {
+    return configured.startsWith("~/")
+      ? join(homedir(), configured.slice(2))
+      : resolve(from, configured);
+  }
+  // The main checkout's .git, also from a worktree: <folder>/villain-vault/.git.
+  const git = (await $`git rev-parse --path-format=absolute --git-common-dir`.cwd(from).text())
+    .trim();
+  return join(dirname(dirname(git)), "backup", "forge");
+}
 
 /** Where the app container (`bun run app`) keeps its files. */
 const CONTAINER_DATA_DIR = "/var/lib/forge";
@@ -86,8 +110,9 @@ function size(bytes: number): string {
 
 async function main() {
   const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
-  const base = `${root}backups/forge-${stamp}`;
-  await mkdir(`${root}backups`, { recursive: true });
+  const folder = await backupFolder();
+  const base = join(folder, `forge-${stamp}`);
+  await mkdir(folder, { recursive: true });
 
   // The database first: attachments added while this runs are then extra
   // files in the backup rather than missing ones.
