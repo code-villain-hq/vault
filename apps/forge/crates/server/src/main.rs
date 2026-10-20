@@ -6,6 +6,7 @@ use forge_server::config::Config;
 use forge_server::drift::{self, DriftSettings};
 use forge_server::github::GitHubApp;
 use forge_server::github::login::GitHubLogin;
+use forge_server::oidc::OidcLogin;
 use forge_server::{AppState, accounts, app, forgejo, notify, runners};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -62,6 +63,12 @@ async fn main() -> anyhow::Result<()> {
             if let Some(login) = GitHubLogin::from_env() {
                 tracing::info!("signing in with GitHub is on");
                 state = state.with_github_login(login);
+            }
+            if let Some(login) = OidcLogin::from_env()? {
+                tracing::info!(
+                    "signing in with Code Villain is on: passwords and GitHub sign-in are off"
+                );
+                state = state.with_oidc_login(login);
             }
             tokio::spawn(notify::listen(state.pool.clone(), state.wake.clone()));
             tokio::spawn(drift::worker(state.clone()));

@@ -15,6 +15,7 @@ pub mod limits;
 pub mod mcp;
 pub mod members;
 pub mod notify;
+pub mod oidc;
 pub mod routes;
 pub mod runners;
 pub mod state;
