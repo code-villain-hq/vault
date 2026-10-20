@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import type { SignInForm } from "../lib/types";
 import { useStore } from "../store";
 import { KeyIcon } from "./icons";
-import { Field, Modal } from "./ui";
+import { ErrorMessage, Field, Modal, useFailure } from "./ui";
 
 /**
  * "Save sign-in" in the browser panel (BRW-20): what the user typed into the
@@ -11,7 +11,10 @@ import { Field, Modal } from "./ui";
  * the page and saved by the backend; it never comes to this window.
  */
 export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boolean }) {
+  // Reading the form is a toolbar icon's, with no place of its own, so it
+  // fails in the top bar; saving fails in the dialog (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const dialog = useFailure();
   const toast = useStore((s) => s.toast);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const [form, setForm] = useState<SignInForm | null>(null);
@@ -23,6 +26,7 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
   async function start() {
     try {
       const f = await api.browserSignInForm(taskId);
+      dialog.clear();
       setForm(f);
       setSite(f.site);
       setUsername(f.username ?? "");
@@ -35,13 +39,14 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
     if (saving.current) return;
     saving.current = true;
     setBusy(true);
+    dialog.clear();
     try {
       const saved = await api.browserSaveSignIn(taskId, site.trim(), username.trim());
       await refreshSettings();
       toast("success", `Saved the sign-in for ${saved.username} on ${saved.site}: agents can use it now.`);
       setForm(null);
     } catch (e) {
-      fail(e);
+      dialog.fail(e);
     } finally {
       saving.current = false;
       setBusy(false);
@@ -91,6 +96,7 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
             The password is the one typed into the page's password field. It goes to the keychain;
             agents can have it filled in, and never see it.
           </p>
+          <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>
       )}
     </>

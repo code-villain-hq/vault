@@ -5,7 +5,9 @@ import { goTo } from "../lib/goto";
 import { ago } from "../lib/time";
 import { useStore } from "../store";
 import type { AuthoredPr, ReviewRequest } from "../lib/types";
-import { Spinner } from "./ui";
+import { ErrorMessage, Spinner, useFailure } from "./ui";
+
+const NO_BROWSER = "Couldn't open the browser. Try again.";
 
 /** How a banner names a pull request: `owner/repo#n`, as `news.rs` writes it. */
 export function identity(pr: { repo: string; number: number }): string {
@@ -28,8 +30,9 @@ export function ReviewCard({
   asked?: string;
   onContextMenu: (e: MouseEvent) => void;
 }) {
+  // A card has no room for the browser failing to open: the top bar says it.
   const fail = useStore((s) => s.fail);
-  const open = () => void openUrl(pr.url).catch(fail);
+  const open = () => void openUrl(pr.url).catch(() => fail(NO_BROWSER));
 
   return (
     // A div, not a button: it holds buttons of its own.
@@ -110,16 +113,20 @@ export function AuthoredCard({
   task: { id: string; name: string } | null;
   onContextMenu: (e: MouseEvent) => void;
 }) {
+  // Opening GitHub fails in the top bar, like the review card; Start task
+  // under the card's chips, by its button (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const failure = useFailure();
   const refreshTasks = useStore((s) => s.refreshTasks);
   const refreshPrs = useStore((s) => s.refreshPrs);
   const [starting, setStarting] = useState(false);
   const who = (names: string[]) => (names.length ? ` by ${names.join(", ")}` : "");
-  const openGitHub = () => void openUrl(pr.url).catch(fail);
+  const openGitHub = () => void openUrl(pr.url).catch(() => fail(NO_BROWSER));
   const open = () => (task ? goTo(`pr:${task.id}`) : openGitHub());
 
   async function start() {
     setStarting(true);
+    failure.clear();
     try {
       const made = await api.taskForPr(pr.repo, pr.head, pr.base, pr.title);
       // In the list before going to it: a task the store has not seen yet
@@ -128,7 +135,7 @@ export function AuthoredCard({
       goTo(`pr:${made.id}`);
       void refreshPrs();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setStarting(false);
     }
@@ -141,7 +148,8 @@ export function AuthoredCard({
       tabIndex={0}
       className="review-card"
       data-review={identity(pr)}
-      onClick={open}
+      // Selecting a failure's text is not a click on the card.
+      onClick={(e) => { if (!(e.target as Element).closest(".error-message")) open(); }}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
@@ -191,6 +199,7 @@ export function AuthoredCard({
           </button>
         )}
       </div>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </div>
   );
 }

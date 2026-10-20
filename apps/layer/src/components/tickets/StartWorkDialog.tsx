@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import { useSpecs } from "../../lib/specs";
 import type { AgentStatus, JiraIssue, Project } from "../../lib/types";
-import { Combo, Field, Modal } from "../ui";
+import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { RepoPicker } from "../RepoPicker";
 import { suggestBase } from "../../lib/derive";
 import { read, write } from "../../lib/persist";
@@ -29,7 +29,8 @@ export function StartWorkDialog({
   const setTab = useStore((s) => s.setTab);
   const setPendingSpec = useSpecs((s) => s.setPending);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Starting fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
 
   const [picked, setPicked] = useState<string[]>([]);
   const [reason, setReason] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export function StartWorkDialog({
   }, [firstInstalled, agentId]);
 
   useEffect(() => {
+    failure.clear();
     setReason(null);
     setSuffix("");
     setBase("");
@@ -71,7 +73,7 @@ export function StartWorkDialog({
       })
       .catch(() => { if (!stop) setReason(null); });
     return () => { stop = true; };
-  }, [issue]);
+  }, [issue, failure.clear]);
 
   // Prefill from the repos' defaults when they agree; load the union of their
   // remote-tracking branches for the picker. Typing still works — a branch
@@ -114,6 +116,7 @@ export function StartWorkDialog({
   async function startWork() {
     if (picked.length === 0) return;
     setStarting(true);
+    failure.clear();
     const spec = specFirst && !!agentId;
     try {
       const task = await api.jiraStartWork(
@@ -138,7 +141,7 @@ export function StartWorkDialog({
           (task.moved ? ` · ${issue.key} → ${task.moved}` : ""),
       );
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setStarting(false);
     }
@@ -272,6 +275,7 @@ export function StartWorkDialog({
           </div>
         </Field>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

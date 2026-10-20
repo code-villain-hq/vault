@@ -11,7 +11,7 @@ import { useStore } from "../store";
 import { BrowserTabs } from "./BrowserTabs";
 import { SaveSignIn } from "./SaveSignIn";
 import { BackIcon, CloseIcon, ExternalIcon, ForwardIcon, ReloadIcon } from "./icons";
-import { Spinner } from "./ui";
+import { ErrorMessage, Spinner, useFailure } from "./ui";
 
 /**
  * A task's tab, as `browser_view` has it, kept current by `browser:changed`.
@@ -55,7 +55,10 @@ type Size = { width: number; height: number };
  */
 export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; visible: boolean; onClose: () => void }) {
   const view = useBrowserView(taskId);
+  // Tabs, keys and the toolbar's icons fail in the top bar; the address,
+  // taking over and the answers here fail under the bar (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const panel = useFailure();
   const refreshSettings = useStore((s) => s.refreshSettings);
   const appActive = useStore((s) => s.appActive);
   const allowed = useStore((s) => s.settings?.browser_sites);
@@ -287,31 +290,34 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
   }
 
   async function hold(held: boolean) {
+    panel.clear();
     try {
       await api.browserHold(taskId, held);
       if (held) keysRef.current?.focus();
     } catch (e) {
-      fail(e);
+      panel.fail(e);
     }
   }
 
   /** The page's dialog answered (BRW-13). */
   async function answerDialog(accept: boolean) {
+    panel.clear();
     try {
       await api.browserDialog(taskId, accept, view?.dialog?.kind === "prompt" ? promptText : undefined);
       keysRef.current?.focus();
     } catch (e) {
-      fail(e);
+      panel.fail(e);
     }
   }
 
   /** An agent's request answered (BRW-11). */
   async function answer(id: number, allow: boolean) {
+    panel.clear();
     try {
       await api.browserAnswerSite(id, allow);
       if (allow) await refreshSettings();
     } catch (e) {
-      fail(e);
+      panel.fail(e);
     }
   }
 
@@ -342,11 +348,12 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
     const url = address.trim();
     if (!url) return;
     addressRef.current?.blur();
+    panel.clear();
     try {
       await api.browserOpen(taskId, url);
       keysRef.current?.focus();
     } catch (err) {
-      fail(err);
+      panel.fail(err);
     }
   }
 
@@ -418,6 +425,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
           <CloseIcon />
         </button>
       </div>
+      <ErrorMessage>{panel.error}</ErrorMessage>
 
       {view?.requests.map((r) => (
         <div key={r.id} className="browser-ask">

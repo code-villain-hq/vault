@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, errMessage } from "../lib/api";
+import { api, errMessage, failureText } from "../lib/api";
 import type { Cleaned, CleanupItem } from "../lib/types";
-import { useStore } from "../store";
-import { Modal, Spinner } from "./ui";
+import { ErrorMessage, Modal, Spinner, useFailure } from "./ui";
 
 const SECTIONS: { kind: CleanupItem["kind"]; title: string }[] = [
   { kind: "folder", title: "Task folders no task uses" },
@@ -21,7 +20,8 @@ const SECTIONS: { kind: CleanupItem["kind"]; title: string }[] = [
  * what changed in the meantime.
  */
 export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const fail = useStore((s) => s.fail);
+  // Fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
   const [items, setItems] = useState<CleanupItem[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [running, setRunning] = useState(false);
@@ -39,7 +39,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
         setPicked(new Set(found.filter((i) => i.verdict === "safe").map((i) => i.id)));
       },
       (e) => {
-        if (live) setBroken(errMessage(e));
+        if (live) setBroken(failureText(`Couldn't look through the task folders and copies: ${errMessage(e)}`));
       },
     );
     return () => { live = false; };
@@ -56,12 +56,13 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
 
   async function run() {
     setRunning(true);
+    failure.clear();
     try {
       const done = await api.cleanupApply([...picked]);
       setResults(Object.fromEntries(done.map((d) => [d.id, d])));
       onDone();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setRunning(false);
     }
@@ -95,7 +96,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
       footer={items && items.length > 0 ? footer : undefined}
     >
       {broken ? (
-        <div className="repo-problem">Could not look through the task folders and copies: {broken}</div>
+        <ErrorMessage>{broken}</ErrorMessage>
       ) : items === null ? (
         <div className="muted"><span className="btn-busy"><Spinner />Looking through task folders and copies…</span></div>
       ) : items.length === 0 ? (
@@ -142,6 +143,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
           })}
         </>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

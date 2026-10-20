@@ -14,8 +14,8 @@ export async function copyText(text: string): Promise<void> {
 
 /** Copy, then say so: "Copied <what>", or that the clipboard was out of reach. */
 export function copyAndSay(text: string, what: string): void {
-  const { toast } = useStore.getState();
+  const { toast, fail } = useStore.getState();
   void copyText(text)
     .then(() => toast("success", `Copied ${what}`))
-    .catch(() => toast("error", "Could not reach the clipboard"));
+    .catch(() => fail("Couldn't reach the clipboard. Try again."));
 }

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { markStopping, useStore } from "../store";
 import type { PaneInfo, TaskView } from "../lib/types";
-import { Field, Modal, Spinner } from "./ui";
+import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 
 /**
  * Hand a pane's work to another agent (PANE-9): what opens the dialog, and
@@ -11,7 +11,10 @@ import { Field, Modal, Spinner } from "./ui";
 export function useHandoff(task: TaskView, setActive: (paneId: string) => void) {
   const agents = useStore((s) => s.agents);
   const refreshPanes = useStore((s) => s.refreshPanes);
+  // With no agent to hand to, no dialog opens: the top bar says why. The
+  // briefing and the start fail in the dialog, above its buttons (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const failure = useFailure();
   const installed = agents.filter((a) => a.installed);
   const [handoff, setHandoff] = useState<{ from: PaneInfo; agentId: string } | null>(null);
   const [handoffPrompt, setHandoffPrompt] = useState("");
@@ -26,9 +29,10 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
   function startHandoff(from: PaneInfo) {
     const target = installed.find((a) => a.id !== from.agent_id) ?? installed[0];
     if (!target) {
-      fail("No other agent CLI is installed to hand off to.");
+      fail("No other agent CLI is installed to hand off to. Install one, then try again.");
       return;
     }
+    failure.clear();
     setHandoff({ from, agentId: target.id });
     setHandoffPrompt("");
     setHandoffLoading(true);
@@ -37,7 +41,7 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
     // the dialog was reopened for another replaced what was on screen.
     api.handoffPrompt(from.id)
       .then((p) => { if (asked === handoffAsk.current) setHandoffPrompt(p); })
-      .catch((e) => { if (asked === handoffAsk.current) fail(e); })
+      .catch((e) => { if (asked === handoffAsk.current) failure.fail(e); })
       .finally(() => { if (asked === handoffAsk.current) setHandoffLoading(false); });
   }
 
@@ -47,6 +51,7 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
   async function runHandoff() {
     if (!handoff) return;
     setHandoffBusy(true);
+    failure.clear();
     try {
       const pane = await api.spawnAgent(
         task.id,
@@ -63,7 +68,7 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
       await refreshPanes();
       setActive(pane.id);
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       // Cleared here, where it was set. It lived in launchAgent's finally,
       // so after one handoff the dialog opened already busy, and after a
@@ -147,6 +152,7 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
         />
         Stop {handoff.from.title} once the new agent starts
       </label>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 

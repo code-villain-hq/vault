@@ -818,12 +818,24 @@ body.dragging * { pointer-events: none; }
 }
 /* Its kind is a dot in the status ink, not a coloured edge. */
 .toast::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--status-neutral-ink); transform: translateY(-1px); }
-.toast.error::before { background: var(--status-danger-ink); }
 .toast.success::before { background: var(--status-ok-ink); }
 .toast.info::before { background: var(--status-info-ink); }
 /* A toast that opens what it is about says so, so a click is not a surprise. */
 .toast.linked:hover { background: var(--hover); }
 .toast.linked::after { content: " →"; color: var(--muted); }
+
+/* A failure where the user acted (NOTE-6): Forge's ErrorMessage. */
+.error-message {
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--type-ui-small-size);
+  line-height: 1.45;
+  white-space: pre-line;
+  user-select: text;
+}
+/* The browser panel runs edge to edge; its note keeps off the edges. */
+.browser > .error-message { margin: 6px 8px; }
 
 /* A spinner standing in for a button's label: same box, so the button does
    not change width the moment it starts working. */
@@ -1055,7 +1067,24 @@ body.dragging * { pointer-events: none; }
 .viewtab-label { display: inline-flex; flex-direction: column; }
 .viewtab-label::after { content: attr(data-label); height: 0; overflow: hidden; visibility: hidden; font-weight: 700; }
 .viewtab-count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-ui-small-size); font-weight: 400; color: var(--faint); }
-.watch-chip { user-select: none; }
+/* The top bar's status (WIN-2): Forge's sync status, a dot and a
+   sentence. Cut short with "…"; the whole of it is in its title and the
+   message center. */
+.frame-status {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  max-width: 360px;
+  margin-right: 10px;
+  color: var(--muted);
+  font-size: var(--type-ui-small-size);
+  user-select: none;
+}
+.frame-status::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warn-ink); transform: translateY(-1px); }
+.frame-status.danger::before { background: var(--status-danger-ink); }
+/* Cut short with "…"; the title and the message center keep it whole. */
+.frame-status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ------------------------------------------------------------ agents view */
 .wide { flex: 1; overflow-y: auto; padding: 14px 16px; }

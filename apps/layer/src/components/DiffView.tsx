@@ -11,7 +11,7 @@ import { lineOf, parseDiff, toTree, type DiffLine, type Node } from "../lib/diff
 import { NoteCard, NoteEditor } from "./DiffNote";
 import { DiffCode, useDiffColours } from "./DiffCode";
 import { ChevronIcon } from "./icons";
-import { Field, Modal, Spinner } from "./ui";
+import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 import { dragGrip } from "../lib/drag";
 import { read, write } from "../lib/persist";
 
@@ -40,7 +40,11 @@ const fileKey = (f: ChangedFile) => `${f.checkout_id}:${f.path}`;
 const LINE_BUDGET = 3000;
 
 export function DiffView({ task }: { task: TaskView }) {
+  // Loading follows the sidebar's poll, so it fails in the top bar; what the
+  // user sends or commits fails where they did it (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const tray = useFailure();
+  const dialog = useFailure();
   const toast = useStore((s) => s.toast);
   const refreshTasks = useStore((s) => s.refreshTasks);
   const refreshPanes = useStore((s) => s.refreshPanes);
@@ -395,6 +399,7 @@ export function DiffView({ task }: { task: TaskView }) {
   async function send() {
     if (queued.length === 0) return;
     const pane = agentPanes.find((p) => p.id === target);
+    tray.clear();
     if (pane) {
       try {
         const n = queued.length;
@@ -403,22 +408,24 @@ export function DiffView({ task }: { task: TaskView }) {
         dropNotes(task.id, sent);
         toast("success", `Sent ${n} note${n === 1 ? "" : "s"} to ${pane.title}.`);
       } catch (e) {
-        fail(e);
+        tray.fail(e);
       }
       return;
     }
     // Notes stay queued: open a picker instead of failing after the work.
     if (installed.length === 0) {
-      toast("error", "No agent CLI is installed — install one, then send these notes.");
+      tray.fail("No agent CLI is installed. Install one, then send these notes.");
       return;
     }
     setStartScope(null);
+    dialog.clear();
     setStarting(true);
   }
 
   async function startAndSend() {
     if (!startAgentId || queued.length === 0) return;
     setStartingBusy(true);
+    dialog.clear();
     try {
       const n = queued.length;
       const sent = queued.map((d) => d.id);
@@ -434,7 +441,7 @@ export function DiffView({ task }: { task: TaskView }) {
       setTab("terminals");
       toast("success", `Started ${pane.title} with ${n} note${n === 1 ? "" : "s"}.`);
     } catch (e) {
-      fail(e);
+      dialog.fail(e);
     } finally {
       setStartingBusy(false);
     }
@@ -446,9 +453,10 @@ export function DiffView({ task }: { task: TaskView }) {
   /// second press while the first was still in the hooks.
   async function commit() {
     setCommitBusy(true);
+    dialog.clear();
     try {
       const results = await api.commitTask(task.id, message.trim());
-      reportRepoResults(toast, results, "Committed");
+      reportRepoResults(toast, dialog.fail, results, "Committed");
       // A hook that fails comes back as a result, not an error. Closing the
       // dialog then threw the message away with the repo still uncommitted.
       if (results.every((r) => r.ok)) {
@@ -457,7 +465,7 @@ export function DiffView({ task }: { task: TaskView }) {
       }
       await Promise.all([load(), refreshTasks()]);
     } catch (e) {
-      fail(e);
+      dialog.fail(e);
     } finally {
       setCommitBusy(false);
     }
@@ -840,7 +848,7 @@ export function DiffView({ task }: { task: TaskView }) {
             </label>
           )}
           <button className="ui-button" onClick={() => void load()}>Refresh</button>
-          <button className="ui-button" onClick={() => setCommitting(true)}>Commit…</button>
+          <button className="ui-button" onClick={() => { dialog.clear(); setCommitting(true); }}>Commit…</button>
           <button
             className="ui-button ui-button-primary"
             disabled={queued.length === 0}
@@ -861,6 +869,7 @@ export function DiffView({ task }: { task: TaskView }) {
             {queued.length > 0 && <span className="badge">{queued.length}</span>}
           </button>
         </div>
+        <ErrorMessage>{tray.error}</ErrorMessage>
       </div>
 
       {starting && (
@@ -915,6 +924,7 @@ export function DiffView({ task }: { task: TaskView }) {
               ))}
             </select>
           </Field>
+          <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>
       )}
 
@@ -970,6 +980,7 @@ export function DiffView({ task }: { task: TaskView }) {
               {groups.map((g) => g.checkout.project_name).join(", ")}
             </div>
           )}
+          <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>
       )}
     </>

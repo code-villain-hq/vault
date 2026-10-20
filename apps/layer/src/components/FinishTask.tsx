@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, errMessage } from "../lib/api";
+import { api, errMessage, failureText } from "../lib/api";
 import { useStore } from "../store";
 import { taskTotals } from "../lib/derive";
 import type { JiraTransition, TaskView } from "../lib/types";
-import { Field, Modal, Spinner } from "./ui";
+import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 import { flowOf, mergedTransition } from "./TicketFlow";
 
 /**
@@ -23,7 +23,10 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
   const refreshTasks = useStore((s) => s.refreshTasks);
   const refreshPanes = useStore((s) => s.refreshPanes);
   const toast = useStore((s) => s.toast);
+  // Fails in the dialog while the task is still there. A ticket that would
+  // not move after the task is gone has no dialog left: the top bar (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const failure = useFailure();
 
   const key = jiraConnected ? task.issue_key : null;
   const [done, setDone] = useState<JiraTransition[] | null>(key ? null : []);
@@ -68,16 +71,18 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
 
   async function finish() {
     setBusy(true);
+    failure.clear();
     try {
       const out = await api.finishTask(task.id, transition || null, landed);
       await Promise.all([refreshTasks(), refreshPanes()]);
       const stuck = out.repos.filter((r) => !r.ok);
+      // The task is kept, so the dialog is too: the reason stays in it, and
+      // Finish task tries again once it is dealt with.
       if (stuck.length > 0) {
-        toast(
-          "error",
-          `Kept ${task.name} — git would not remove ${stuck.map((r) => `${r.repo} (${r.detail})`).join(", ")}`,
+        failure.fail(
+          `Kept ${task.name}: git wouldn't remove ${stuck.map((r) => `${r.repo} (${r.detail})`).join(", ")}`,
         );
-        onClose();
+        setBusy(false);
         return;
       }
       if (selected === task.id) select(null);
@@ -86,14 +91,14 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
         "success",
         `Finished ${task.name}` + (out.ticket_moved && moved ? ` · ${key} moved to ${moved.to_status}` : ""),
       );
-      if (out.ticket_error) toast("error", `${key} could not be moved: ${out.ticket_error}`);
+      if (out.ticket_error) fail(`Couldn't move ${key}: ${out.ticket_error}`);
       const kept = out.branches.filter((b) => !b.ok);
       if (kept.length > 0) {
         toast("info", `Branch ${task.branch} was kept in ${kept.map((b) => `${b.repo} (${b.detail})`).join(", ")}`);
       }
       onClose();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
       setBusy(false);
     }
   }
@@ -152,7 +157,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
           label="Ticket"
           hint={
             ticketError
-              ? `Could not ask Jira where ${key} can go: ${ticketError}`
+              ? failureText(`Couldn't ask Jira where ${key} can go: ${ticketError}`)
               : done && done.length === 0
                 ? `Jira offers no move from here to a done status, so ${key} stays as it is.`
                 : done && done.length > 1 && !transition
@@ -179,6 +184,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
           )}
         </Field>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

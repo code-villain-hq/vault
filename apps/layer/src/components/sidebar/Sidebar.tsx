@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-import { api, errMessage } from "../../lib/api";
+import { api, errMessage, failureText } from "../../lib/api";
 import { copyAndSay } from "../../lib/clipboard";
 import { useStore } from "../../store";
 import { taskReview } from "../../lib/derive";
@@ -9,7 +9,7 @@ import { byEpic, groupBy } from "../../lib/grouping";
 import { readOneOf, write } from "../../lib/persist";
 import { useFleetAgents } from "../../lib/panes";
 import type { JiraTransition, TaskView } from "../../lib/types";
-import { BusyOverlay, Confirm, ContextMenu, Field, Modal, type MenuItem } from "../ui";
+import { BusyOverlay, Confirm, ContextMenu, ErrorMessage, Field, Modal, useFailure, type MenuItem } from "../ui";
 import { RepoPicker } from "../RepoPicker";
 import { FinishTask } from "../FinishTask";
 import { DeleteTask } from "./DeleteTask";
@@ -73,7 +73,10 @@ export function Sidebar() {
   const refreshPanes = useStore((s) => s.refreshPanes);
   const refreshIssues = useStore((s) => s.refreshIssues);
   const toast = useStore((s) => s.toast);
+  // Menu items close their menu, and a task deleted takes its dialog with
+  // it: those fail in the top bar. Adding repositories fails in its dialog.
   const fail = useStore((s) => s.fail);
+  const dialog = useFailure();
   const cursorIde = useStore((s) => s.cursorIde);
   const jiraConnected = useStore((s) => s.settings?.jira_connected ?? false);
 
@@ -113,20 +116,30 @@ export function Sidebar() {
   /// rest, and the user needs to know which one it was.
   async function addRepos(task: TaskView) {
     setBusy(true);
-    const failed: string[] = [];
+    dialog.clear();
+    const failed: { id: string; why: string }[] = [];
     let told = 0;
     for (const id of adding) {
       try {
         told = Math.max(told, (await api.addCheckout(task.id, id)).told);
       } catch (e) {
-        failed.push(`${projects.find((p) => p.id === id)?.name ?? id}: ${errMessage(e)}`);
+        const name = projects.find((p) => p.id === id)?.name ?? id;
+        failed.push({ id, why: failureText(`Couldn't add ${name}: ${errMessage(e)}`) });
       }
     }
     await Promise.all([refreshTasks(), refreshPanes()]);
     setBusy(false);
-    setAddingRepoTo(null);
-    setAdding([]);
     setExpanded((e) => ({ ...e, [task.id]: true }));
+    if (failed.length) {
+      // The dialog stays, with the reasons in it and only those repos still
+      // picked; the task is read again so the ones added leave the list.
+      setAddingRepoTo(useStore.getState().tasks.find((t) => t.id === task.id) ?? task);
+      setAdding(failed.map((f) => f.id));
+      dialog.fail(failed.map((f) => f.why).join("\n"));
+    } else {
+      setAddingRepoTo(null);
+      setAdding([]);
+    }
 
     const added = adding.length - failed.length;
     if (added > 0) {
@@ -138,7 +151,6 @@ export function Sidebar() {
           (told > 0 ? ` · told ${told} running agent${told === 1 ? "" : "s"}` : ""),
       );
     }
-    if (failed.length) toast("error", failed.join("\n"));
   }
 
   /// git refuses to remove a worktree with uncommitted or untracked files. Say
@@ -163,7 +175,7 @@ export function Sidebar() {
             moved = ` · ${task.issue_key} moved to ${ticket.to_status}`;
             void refreshIssues({ quiet: true });
           } catch (e) {
-            toast("error", `${task.issue_key} could not be moved: ${errMessage(e)}`);
+            fail(`Couldn't move ${task.issue_key}: ${errMessage(e)}`);
           }
         }
         toast("success", `Deleted ${task.name}${moved}`);
@@ -282,7 +294,7 @@ export function Sidebar() {
       items.push({
         label: "Add a repository…",
         separated: true,
-        onSelect: () => setAddingRepoTo(task),
+        onSelect: () => { dialog.clear(); setAddingRepoTo(task); },
       });
     }
     const landed = taskReview(prs[task.id] ?? []) === "merged";
@@ -523,6 +535,7 @@ export function Sidebar() {
               onChange={setAdding}
             />
           </Field>
+          <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>
       )}
     </div>

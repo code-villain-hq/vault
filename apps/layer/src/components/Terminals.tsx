@@ -15,7 +15,7 @@ import { PaneExited, RestartButton, useRestart } from "./Restart";
 import { WaitingTaskPanes } from "./WaitingPanes";
 import { PaneView } from "./AcpPane";
 import { CloseIcon, PlusIcon, SwapIcon } from "./icons";
-import { ContextMenu, Field, Modal, Spinner, Switch } from "./ui";
+import { ContextMenu, ErrorMessage, Field, Modal, Spinner, Switch, useFailure } from "./ui";
 import type { MenuItem } from "./ui";
 
 function ago(unixSeconds: number): string {
@@ -35,8 +35,11 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   const agents = useStore((s) => s.agents);
   const refreshPanes = useStore((s) => s.refreshPanes);
   const tab = useStore((s) => s.tab);
-  const toast = useStore((s) => s.toast);
+  // Starting a pane fails under the buttons that start one, the launch
+  // dialog above its own. A tab's ✕ has no room of its own: the top bar.
   const fail = useStore((s) => s.fail);
+  const start = useFailure();
+  const dialog = useFailure();
 
   const [active, setActive] = useState<string | null>(null);
   const { restarting, restart } = useRestart(setActive);
@@ -106,6 +109,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   useEffect(() => {
     if (!launching) return;
     let cancelled = false;
+    dialog.clear();
     setPromptLoading(true);
     api.taskPrompt(task.id, scope)
       .then((p) => {
@@ -119,11 +123,11 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         });
       })
       .catch((e) => {
-        if (!cancelled) toast("error", `Could not load the briefing: ${errMessage(e)}`);
+        if (!cancelled) dialog.fail(`Couldn't load the briefing: ${errMessage(e)}`);
       })
       .finally(() => { if (!cancelled) setPromptLoading(false); });
     return () => { cancelled = true; };
-  }, [launching, task.id, scope, toast]);
+  }, [launching, task.id, scope, dialog.clear, dialog.fail]);
 
   // Keep a sensible pane selected as panes come and go. Panes are given fresh
   // ids every launch, so what survives a restart is the position in the bar,
@@ -205,6 +209,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   ];
 
   const launchAgent = (agentId: string) => once(async () => {
+    dialog.clear();
     try {
       const acp = asAcp && !!agents.find((a) => a.id === agentId)?.acp;
       const pane = await api.spawnAgent(task.id, agentId, scope, prompt.trim() || null, false, acp);
@@ -213,27 +218,29 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
       await refreshPanes();
       setActive(pane.id);
     } catch (e) {
-      fail(e);
+      dialog.fail(e);
     }
   });
 
   const resume = (agentId: string) => once(async () => {
+    start.clear();
     try {
       const pane = await api.spawnAgent(task.id, agentId, scope, null, true);
       await refreshPanes();
       setActive(pane.id);
     } catch (e) {
-      fail(e);
+      start.fail(e);
     }
   });
 
   const launchShell = () => once(async () => {
+    start.clear();
     try {
       const pane = await api.spawnShell(task.id, scope);
       await refreshPanes();
       setActive(pane.id);
     } catch (e) {
-      fail(e);
+      start.fail(e);
     }
   });
 
@@ -350,6 +357,8 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
           <PlusIcon />
         </button>
       </div>
+      {/* With no panes the buttons that failed are in the empty state below. */}
+      {panes.length > 0 && <ErrorMessage>{start.error}</ErrorMessage>}
 
       {addMenu && (
         <ContextMenu
@@ -425,12 +434,13 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 <button
                   className="ui-button"
                   title={`Open ${task.root} in Cursor`}
-                  onClick={() => void api.openInCursor(task.root).catch(fail)}
+                  onClick={() => { start.clear(); void api.openInCursor(task.root).catch(start.fail); }}
                 >
                   Open in Cursor
                 </button>
               )}
             </div>
+            <ErrorMessage>{start.error}</ErrorMessage>
           </div>
         )}
       </div>
@@ -509,6 +519,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
               : task.root}</code>
             {` · ${scopeName}`}
           </div>
+          <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>
       )}
     </>

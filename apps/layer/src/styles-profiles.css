@@ -106,4 +106,3 @@
 .profile-swatch:hover { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--line); }
 .profile-swatch.chosen { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--fg); }
 .profile-rename { flex: 1; min-width: 0; }
-.profile-error { color: var(--status-danger-ink); margin-top: 8px; font-size: var(--type-ui-small-size); }

@@ -907,7 +907,8 @@ Code: `commands/github.rs` (`review_queue`, `github_review_queue`),
 | Dock count | agents that need you (STATE table) | `attention.rs`, every 5s |
 | Banner: agent | an agent starts needing you, or exits on its own, while the window is not focused | `attention.rs` |
 | Banner: review, ticket | a new review request or assigned ticket, while the window is not focused | `news.rs`, every 3 min while away |
-| Toast | PR approved, changes requested, new comments, merged; a pane that exited; errors | `Watchers.tsx` |
+| Toast | PR approved, changes requested, new comments, merged; a pane that exited | `Watchers.tsx` |
+| Status, in the top bar | a failure in the background, or of a tool with no place of its own; polls that keep failing (WIN-2) | `FrameStatus.tsx` |
 | Message center | all of the above but Slack and the dock, kept | `messages.rs`, `MessageCenter.tsx` |
 | Slack | an agent finished, PRs opened, an agent's own post, posted by the Slack bot to its channel (BOT-15) | `commands/slack.rs` |
 | Slack thread | a chat the Slack bot opened replied, or is asking (BOT-6, BOT-7) | `slack_bot/` |
@@ -930,6 +931,13 @@ Code: `commands/github.rs` (`review_queue`, `github_review_queue`),
   closes. A banner also brings the window forward, minimized or not.
 - **NOTE-5** Slack posts MUST pass the backend's switches: "Send anything"
   first, then one per kind. Nothing routes around them.
+- **NOTE-6** A failure MUST NOT be a toast. A failure of something you just
+  did shows where you did it: in the dialog above its buttons, under the row
+  of actions or the button that failed, in the danger tint
+  (`ErrorMessage`), until you try again or close it. A failure in the
+  background, or of a tool that has no place of its own (an icon in the top
+  bar, a menu item), shows in the top bar's status (WIN-2). Both say what
+  happened in a sentence (`design/behaviour.md`).
 
 ### Message center
 
@@ -940,16 +948,18 @@ Center; this keeps what the app told you, newest first.
   asking, finished or exited on its own (with a trust prompt or a usage
   limit), a new review request, a new ticket, a ticket the work moved, a
   pull request approved, sent back, commented on or merged, a notice from
-  the app, and every error shown as a toast. Feedback on something you just
-  did ("Copied …") MUST NOT be kept.
+  the app, and every failure shown in the top bar's status (WIN-2). Feedback
+  on something you just did ("Copied …", a failure shown where you did it)
+  MUST NOT be kept.
 - **MSG-2** News MUST be recorded whether or not the window is focused and
   whether or not its banner is switched on. The switches decide banners and
   the dock count, nothing else. The first look is still a snapshot (NOTE-2).
 - **MSG-3** Each piece of news MUST be recorded once, by one source: agents
   by `attention.rs`, reviews and tickets by `news.rs`, notices by
-  `push_notice`; pull request news, ticket moves and errors by the UI's
-  toast (`add_message`), which is the only place they are seen. A toast of
-  something the backend recorded does not record it again. The same unread
+  `push_notice`; pull request news and ticket moves by the UI's toast,
+  and failures by the top bar's status (`add_message`), which are the only
+  places they are seen. A toast or status of something the backend recorded
+  does not record it again. The same unread
   message again within ten minutes MUST count on the row already there
   (×N) rather than add another.
 - **MSG-4** The log MUST survive a restart: `messages.json` beside
@@ -1194,7 +1204,15 @@ to fix on Repos. A running agent or chat is a live dot.
   `-webkit-app-region` does nothing in macOS's WebKit, and a window built on
   it could not be moved at all.
 
-Code: `App.tsx` (`TopBar`), `src-tauri/capabilities/default.json`.
+- **WIN-2** The top bar's status MUST sit left of the app's tools and say
+  what failed in the background, as a dot and a sentence in `muted`: a
+  failure for six seconds (`danger`), then only in the message center; task
+  and pane polls failing twice in a row, until one works again (`warn`,
+  "Can't refresh tasks. Retrying…"). A newer failure replaces the one
+  shown. A long one is cut short with "…" and kept whole in its title and
+  the message center. While all is well it shows nothing.
+
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 

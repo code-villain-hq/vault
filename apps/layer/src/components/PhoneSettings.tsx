@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { useStore } from "../store";
 import type { PhoneStatus } from "../lib/types";
 import { PhoneIcon } from "./icons";
-import { Field, Switch } from "./ui";
+import { ErrorMessage, Field, Switch, useFailure } from "./ui";
 
 /** Phone access as the backend has it, kept current by `phone:changed`. */
 function usePhoneStatus(): [PhoneStatus | null, (s: PhoneStatus) => void, () => void] {
@@ -31,39 +31,49 @@ const WAY = { tailscale: "Tailscale", home: "Home network" } as const;
 export function PhoneSettings() {
   const [status, setStatus, reload] = usePhoneStatus();
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const fail = useStore((s) => s.fail);
+  // A switch that could not be saved says so under its own list, pairing
+  // and forgetting under the phones (NOTE-6).
+  const ways = useFailure();
+  const typing = useFailure();
+  const phones = useFailure();
   const [busy, setBusy] = useState(false);
 
-  async function save(patch: Partial<Pick<PhoneStatus, "tailscale" | "home" | "typing">>) {
+  async function save(
+    patch: Partial<Pick<PhoneStatus, "tailscale" | "home" | "typing">>,
+    where: ReturnType<typeof useFailure>,
+  ) {
     if (!status) return;
     const next = { ...status, ...patch };
     setBusy(true);
+    where.clear();
     try {
       setStatus(await api.setPhoneAccess(next.tailscale, next.home, next.typing));
       // Keep awake reads whether a way is open (PHONE-8).
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      where.fail(e);
     } finally {
       setBusy(false);
     }
   }
 
   async function pair() {
+    phones.clear();
     try {
       const pairing = await api.phonePair();
       if (status) setStatus({ ...status, pairing });
     } catch (e) {
-      fail(e);
+      phones.fail(e);
     }
   }
 
   async function forget(id: string) {
+    phones.clear();
     try {
       await api.phoneForget(id);
       reload();
     } catch (e) {
-      fail(e);
+      phones.fail(e);
     }
   }
 
@@ -84,16 +94,17 @@ export function PhoneSettings() {
             detail="From anywhere, over your tailnet. Install Tailscale on this Mac and on the phone, signed in to the same account."
             checked={status.tailscale}
             disabled={busy}
-            onChange={(v) => void save({ tailscale: v })}
+            onChange={(v) => void save({ tailscale: v }, ways)}
           />
           <Switch
             label="Home network and router VPN"
             detail="On the same Wi-Fi as this Mac, or from anywhere through your router's own VPN (WireGuard on a GL.iNet router, say), which puts the phone on the home network."
             checked={status.home}
             disabled={busy}
-            onChange={(v) => void save({ home: v })}
+            onChange={(v) => void save({ home: v }, ways)}
           />
         </div>
+        <ErrorMessage>{ways.error}</ErrorMessage>
       </Field>
 
       {status.error && <div className="phone-error">{status.error}</div>}
@@ -129,9 +140,10 @@ export function PhoneSettings() {
             detail="A line of text, and the keys an agent's questions take: Enter, Esc, the arrows, 1 to 3, Ctrl-C. Into agents only, never shells. Off, a phone only watches."
             checked={status.typing}
             disabled={busy}
-            onChange={(v) => void save({ typing: v })}
+            onChange={(v) => void save({ typing: v }, typing)}
           />
         </div>
+        <ErrorMessage>{typing.error}</ErrorMessage>
       </Field>
 
       <Field
@@ -158,6 +170,7 @@ export function PhoneSettings() {
             ))}
           </div>
         )}
+        <ErrorMessage>{phones.error}</ErrorMessage>
       </Field>
     </>
   );

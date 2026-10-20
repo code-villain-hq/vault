@@ -5,7 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../lib/api";
 import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
-import { Field, Modal } from "./ui";
+import { ErrorMessage, Field, Modal, useFailure } from "./ui";
 import { TicketFlowSettings } from "./TicketFlow";
 import { PhoneSettings } from "./PhoneSettings";
 import { BrowserSettings } from "./BrowserSettings";
@@ -26,7 +26,12 @@ export function Settings() {
   const refreshPrs = useStore((s) => s.refreshPrs);
   const ghRejected = useStore((s) => githubRejected(s.prs));
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Each section's actions fail under what was pressed (NOTE-6): connecting
+  // under its button, disconnecting under the connected row.
+  const jira = useFailure();
+  const github = useFailure();
+  const unlink = useFailure();
+  const general = useFailure();
 
   const [section, setSection] = useState<Section>(
     () => (useStore.getState().settingsSection as Section | null) ?? "appearance",
@@ -73,6 +78,7 @@ export function Settings() {
 
   async function connectJira() {
     setBusy(true);
+    jira.clear();
     try {
       const who = await api.jiraConnect(
         jiraUrl.trim(), jiraEmail.trim(), jiraToken.trim(),
@@ -83,7 +89,7 @@ export function Settings() {
       await refreshSettings();
       await refreshIssues();
     } catch (e) {
-      fail(e);
+      jira.fail(e);
     } finally {
       setBusy(false);
     }
@@ -91,6 +97,7 @@ export function Settings() {
 
   async function connectGithub() {
     setBusy(true);
+    github.clear();
     try {
       const login = await api.githubConnect(
         ghApi.trim(), ghWeb.trim(), ghToken.trim(), ghTeam.trim() || null,
@@ -101,28 +108,30 @@ export function Settings() {
       // The PR tabs still hold what the old token was told.
       void refreshPrs();
     } catch (e) {
-      fail(e);
+      github.fail(e);
     } finally {
       setBusy(false);
     }
   }
 
   async function disconnect(which: "jira" | "github") {
+    unlink.clear();
     try {
       await api.disconnect(which);
       await refreshSettings();
       toast("info", `${which} disconnected`);
     } catch (e) {
-      fail(e);
+      unlink.fail(e);
     }
   }
 
   async function saveWorktreeRoot(path: string) {
+    general.clear();
     try {
       await api.setWorktreeRoot(path.trim() || null);
       await refreshSettings();
     } catch (e) {
-      fail(e);
+      general.fail(e);
     }
   }
 
@@ -156,7 +165,7 @@ export function Settings() {
             <button
               key={id}
               className="ui-tab" role="tab" aria-selected={section === id}
-              onClick={() => setSection(id)}
+              onClick={() => { unlink.clear(); setSection(id); }}
             >
               {label}
             </button>
@@ -185,6 +194,7 @@ export function Settings() {
               </button>
             </div>
           )}
+          <ErrorMessage>{unlink.error}</ErrorMessage>
           <Field label="Site URL">
             <input className="ui-field"
               value={jiraUrl}
@@ -247,6 +257,7 @@ export function Settings() {
           >
             {busy ? "Verifying…" : settings?.jira_connected ? "Save & reconnect" : "Connect"}
           </button>
+          <ErrorMessage>{jira.error}</ErrorMessage>
           {settings?.jira_connected && <TicketFlowSettings />}
         </>
       )}
@@ -268,6 +279,7 @@ export function Settings() {
               </button>
             </div>
           )}
+          <ErrorMessage>{unlink.error}</ErrorMessage>
           <Field
             label="API URL"
             hint="github.com uses https://api.github.com. Enterprise Server uses https://ghe.example.com/api/v3."
@@ -307,6 +319,7 @@ export function Settings() {
           >
             {busy ? "Verifying…" : settings?.github_connected ? "Save & reconnect" : "Connect"}
           </button>
+          <ErrorMessage>{github.error}</ErrorMessage>
         </>
       )}
 
@@ -335,6 +348,7 @@ export function Settings() {
               />
               <button className="ui-button" onClick={() => void pickWorktreeRoot()}>Browse…</button>
             </div>
+            <ErrorMessage>{general.error}</ErrorMessage>
           </Field>
           <Field
             label="Version"

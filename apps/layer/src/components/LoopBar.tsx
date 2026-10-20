@@ -6,7 +6,7 @@ import { read, write } from "../lib/persist";
 import { useStore } from "../store";
 import type { AcpSetting, LoopCheckRun, LoopView, PaneInfo, TaskView } from "../lib/types";
 import { LoopIcon } from "./icons";
-import { Field, Modal, Spinner } from "./ui";
+import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 
 /**
  * An agent on a loop (§21): the button in the pane bar that starts one, the
@@ -64,7 +64,8 @@ export function LoopButton({ pane, task }: { pane: PaneInfo | undefined; task: T
 function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; onClose: () => void }) {
   const projects = useStore((s) => s.projects);
   const refreshRepos = useStore((s) => s.refreshRepos);
-  const fail = useStore((s) => s.fail);
+  // Fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
   const repos = reposOf(pane, task);
   const saved = (projectId: string) => projects.find((p) => p.id === projectId)?.check ?? "";
   const [commands, setCommands] = useState<Record<string, string>>(() =>
@@ -98,6 +99,7 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
     if (once.current || !any) return;
     once.current = true;
     setBusy(true);
+    failure.clear();
     try {
       // A command typed here is the repository's own from now on (LOOP-1).
       for (const c of repos) {
@@ -111,7 +113,7 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
       await api.startLoop(pane.id, n);
       onClose();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       once.current = false;
       setBusy(false);
@@ -175,6 +177,7 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
           style={{ width: 80 }}
         />
       </Field>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }
@@ -196,7 +199,8 @@ function what(view: LoopView, agent: string): string {
 /** The pane's loop, under the pane bar (LOOP-9). */
 export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
   const view = useLoop(pane?.id);
-  const fail = useStore((s) => s.fail);
+  // Stop and Start again fail in the bar, under its buttons (NOTE-6).
+  const failure = useFailure();
   const [open, setOpen] = useState(false);
   /** The loop whose ended bar was put away, by when it started. */
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -217,10 +221,10 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
           </button>
         )}
         {!ended && (
-          <button className="ui-button" onClick={() => void api.stopLoop(pane.id).catch(fail)}>Stop</button>
+          <button className="ui-button" onClick={() => { failure.clear(); void api.stopLoop(pane.id).catch(failure.fail); }}>Stop</button>
         )}
         {ended && pane.running && (
-          <button className="ui-button" onClick={() => void api.startLoop(pane.id, view.rounds).catch(fail)}>
+          <button className="ui-button" onClick={() => { failure.clear(); void api.startLoop(pane.id, view.rounds).catch(failure.fail); }}>
             Start again
           </button>
         )}
@@ -230,6 +234,7 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
           </button>
         )}
       </div>
+      <ErrorMessage>{failure.error}</ErrorMessage>
       {open && (
         <div className="loop-runs">
           {view.runs.map((run, i) => <Run key={run.at} run={run} n={view.runs.length - i} />)}

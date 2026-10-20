@@ -4,7 +4,7 @@ import { approveWarning, questions } from "../lib/questions";
 import { approvedText, editorText, partView, slotKey, useSpecs, type SpecFile } from "../lib/specs";
 import { useStore } from "../store";
 import type { SpecKind, SpecPart, TaskSpec, TaskView } from "../lib/types";
-import { Confirm, Spinner } from "./ui";
+import { Confirm, ErrorMessage, Spinner, useFailure } from "./ui";
 import { SpecBanners } from "./spec/SpecBanners";
 import { SpecQuestions } from "./spec/SpecQuestions";
 import { SpecSide } from "./spec/SpecSide";
@@ -44,7 +44,13 @@ export function SpecView({ task }: { task: TaskView }) {
   const pending = useSpecs((s) => s.pending);
   const setPending = useSpecs((s) => s.setPending);
   const running = useStore((s) => s.panes.filter((p) => p.task_id === task.id && p.running && p.kind === "agent").length);
+  // Loading, the draft Start work asked for, and telling the agents (its
+  // banner closes on the click) fail in the top bar. What the user drafts or
+  // approves here fails under the row of buttons they used, whichever is
+  // showing: a quick spec that fails part way has moved from the start
+  // screen to the editor by then (NOTE-6).
   const fail = useStore((s) => s.fail);
+  const actions = useFailure();
   const toast = useStore((s) => s.toast);
 
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
@@ -103,7 +109,8 @@ export function SpecView({ task }: { task: TaskView }) {
         from={task.issue_key ? "the ticket" : "the task's name"}
         legacy={spec.legacy}
         busy={busy}
-        onDraft={() => void draft(task.id, "requirements", kind).catch(fail)}
+        error={actions.error}
+        onDraft={() => { actions.clear(); void draft(task.id, "requirements", kind).catch(actions.fail); }}
         onQuick={() => void quick()}
         onWrite={(text) => edit(task.id, { part: "requirements", checkoutId: null }, text)}
       />
@@ -131,13 +138,14 @@ export function SpecView({ task }: { task: TaskView }) {
 
   async function quick() {
     setBusy(true);
+    actions.clear();
     try {
       await draft(task.id, "requirements", kind);
       await draft(task.id, "design", null);
       await draft(task.id, "tasks", null);
       setPart("requirements");
     } catch (e) {
-      fail(e);
+      actions.fail(e);
     } finally {
       setBusy(false);
     }
@@ -147,12 +155,13 @@ export function SpecView({ task }: { task: TaskView }) {
   async function sync() {
     if (!spec) return;
     setBusy(true);
+    actions.clear();
     try {
       const design = partView(spec, "design", null);
       if (design?.stale) await draft(task.id, "design", null);
       if (design?.stale || spec.parts.some((p) => p.part === "tasks" && p.stale)) await draft(task.id, "tasks", null);
     } catch (e) {
-      fail(e);
+      actions.fail(e);
     } finally {
       setBusy(false);
     }
@@ -160,13 +169,15 @@ export function SpecView({ task }: { task: TaskView }) {
 
   async function approveFiles(files: SpecFile[]) {
     setBusy(true);
+    actions.clear();
     try {
       const failed = await approve(task.id, files, files.some((f) => f.part === "requirements") ? kind : null);
       // The task's files go into every repository; tasks into their own.
       const reached = files.some((f) => f.part !== "tasks") ? repos : repos.filter((r) => files.some((f) => f.checkoutId === r.checkout_id));
       const inRepo = reached.filter((r) => r.in_repo && !failed.some((f) => f.folder === r.folder));
       if (failed.length > 0) {
-        toast("error", `Not written in ${failed.map((f) => `${f.folder} (${f.error})`).join(", ")}. The others have it.`);
+        const rest = reached.length > failed.length ? "The others have it." : "Try again.";
+        actions.fail(`Couldn't write it in ${failed.map((f) => `${f.folder} (${f.error})`).join(", ")}. ${rest}`);
       } else {
         toast("success", inRepo.length > 0 ? `Approved and committed in ${inRepo.map((r) => r.folder).join(", ")}.` : "Approved.");
       }
@@ -175,7 +186,7 @@ export function SpecView({ task }: { task: TaskView }) {
       const next = PARTS[PARTS.indexOf(parts[parts.length - 1]) + 1];
       if (next && new Set(parts).size === 1) setPart(next);
     } catch (e) {
-      fail(e);
+      actions.fail(e);
     } finally {
       setBusy(false);
     }
@@ -189,7 +200,8 @@ export function SpecView({ task }: { task: TaskView }) {
   }
 
   function redraft() {
-    void draft(task.id, current, null).catch(fail);
+    actions.clear();
+    void draft(task.id, current, null).catch(actions.fail);
   }
 
   const many = repos.length > 1;
@@ -299,6 +311,7 @@ export function SpecView({ task }: { task: TaskView }) {
           Approve {partName(current, spec.kind).toLowerCase()}{current === "tasks" && toApprove.length > 1 ? ` of ${toApprove.length} repositories` : ""}
         </button>
       </div>
+      <ErrorMessage>{actions.error}</ErrorMessage>
       <div className="spec-body">
         <textarea
           className="ui-field spec-editor"
@@ -344,13 +357,15 @@ function firstOpen(spec: TaskSpec): SpecPart {
 }
 
 /** Before any spec: what it is, a bug or a feature, and how to start one. */
-function SpecStart({ kind, setKind, many, from, legacy, busy, onDraft, onQuick, onWrite }: {
+function SpecStart({ kind, setKind, many, from, legacy, busy, error, onDraft, onQuick, onWrite }: {
   kind: SpecKind;
   setKind: (k: SpecKind) => void;
   many: boolean;
   from: string;
   legacy: string | null;
   busy: boolean;
+  /** Why the last draft failed, under the buttons. */
+  error: string | null;
   onDraft: () => void;
   onQuick: () => void;
   onWrite: (text: string) => void;
@@ -375,6 +390,7 @@ function SpecStart({ kind, setKind, many, from, legacy, busy, onDraft, onQuick, 
         <button className="ui-button" disabled={busy} onClick={onQuick} title="Requirements, design and tasks in one go, to approve together">Quick spec</button>
         <button className="ui-button" disabled={busy} onClick={() => onWrite(TEMPLATE[kind])}>Write it yourself</button>
       </div>
+      <ErrorMessage>{error}</ErrorMessage>
       {legacy && (
         <p className="muted">
           This task has a spec from before, kept beside the task.{" "}

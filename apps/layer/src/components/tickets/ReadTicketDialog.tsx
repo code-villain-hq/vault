@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../../lib/api";
-import { useStore } from "../../store";
 import type { JiraIssue, JiraTransition } from "../../lib/types";
-import { Field, Modal } from "../ui";
+import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { statusClass } from "./status";
 
@@ -22,7 +21,8 @@ export function ReadTicketDialog({
   onStart: () => void;
   onMoved: (toStatus: string) => void;
 }) {
-  const fail = useStore((s) => s.fail);
+  // A move or the browser fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
   const [transitions, setTransitions] = useState<JiraTransition[]>([]);
   const [moving, setMoving] = useState(false);
 
@@ -31,20 +31,22 @@ export function ReadTicketDialog({
   // ones valid from before, which Jira then refused.
   useEffect(() => {
     let current = true;
+    failure.clear();
     setTransitions([]);
     api.jiraTransitions(issue.key)
       .then((t) => { if (current) setTransitions(t); })
       .catch(() => { if (current) setTransitions([]); });
     return () => { current = false; };
-  }, [issue.key, issue.status]);
+  }, [issue.key, issue.status, failure.clear]);
 
   async function doTransition(t: JiraTransition) {
     setMoving(true);
+    failure.clear();
     try {
       await api.jiraTransition(issue.key, t.id);
       onMoved(t.to_status);
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setMoving(false);
     }
@@ -60,7 +62,10 @@ export function ReadTicketDialog({
           <button className="ui-button" onClick={onClose}>Close</button>
           <button
             className="ui-link"
-            onClick={() => void openUrl(issue.url).catch(fail)}
+            onClick={() => {
+              failure.clear();
+              void openUrl(issue.url).catch(() => failure.fail("Couldn't open the browser. Try again."));
+            }}
             title="The same ticket, on the website"
           >
             Open in Jira ↗
@@ -127,6 +132,7 @@ export function ReadTicketDialog({
       ) : (
         <div className="muted">This ticket has no description.</div>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

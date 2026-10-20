@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, errMessage } from "../../lib/api";
+import { api } from "../../lib/api";
 import type { ProfileView } from "../../lib/types-profiles";
 import { useStore } from "../../store";
-import { Confirm, Field, Floating, Modal } from "../ui";
+import { Confirm, ErrorMessage, Field, Floating, Modal, useFailure } from "../ui";
 import { ChevronIcon } from "../icons";
 
 /**
@@ -15,6 +15,9 @@ import { ChevronIcon } from "../icons";
  * another window may have made, renamed or deleted one since.
  */
 export function ProfileMenu() {
+  // The list loads in the background, and opening one is a menu item that
+  // closes its menu: neither has a place of its own, so both fail in the
+  // top bar (WIN-2).
   const fail = useStore((s) => s.fail);
   const toast = useStore((s) => s.toast);
   const [profiles, setProfiles] = useState<ProfileView[]>([]);
@@ -145,15 +148,15 @@ function ColourPicker({
 function NewProfile({ onClose, onMade }: { onClose: () => void; onMade: (p: ProfileView) => void }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const failure = useFailure();
 
   function make() {
     if (!name.trim() || busy) return;
     setBusy(true);
-    setError(null);
+    failure.clear();
     api.createProfile(name)
       .then(onMade)
-      .catch((e) => setError(errMessage(e)))
+      .catch(failure.fail)
       .finally(() => setBusy(false));
   }
 
@@ -183,7 +186,7 @@ function NewProfile({ onClose, onMade }: { onClose: () => void; onMade: (p: Prof
           onKeyDown={(e) => e.key === "Enter" && make()}
         />
       </Field>
-      {error && <div className="profile-error">{error}</div>}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }
@@ -195,22 +198,26 @@ function ManageProfiles({
   reload: () => void;
   onClose: () => void;
 }) {
-  const fail = useStore((s) => s.fail);
   const toast = useStore((s) => s.toast);
+  // Renaming and recolouring fail above the dialog's button, deleting in
+  // its own dialog (NOTE-6).
+  const failure = useFailure();
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<ProfileView | null>(null);
   const [picking, setPicking] = useState<{ profile: ProfileView; x: number; y: number } | null>(null);
 
   function recolour(p: ProfileView, colour: number) {
     if (colour === p.colour) return;
-    api.setProfileColour(p.id, colour).then(reload).catch(fail);
+    failure.clear();
+    api.setProfileColour(p.id, colour).then(reload).catch(failure.fail);
   }
 
   function rename() {
     if (!renaming) return;
+    failure.clear();
     api.renameProfile(renaming.id, renaming.name)
       .then(() => { setRenaming(null); reload(); })
-      .catch(fail);
+      .catch(failure.fail);
   }
 
   /** Why a profile cannot be deleted, if it cannot (PROF-9). */
@@ -280,6 +287,8 @@ function ManageProfiles({
         ))}
       </div>
 
+      <ErrorMessage>{failure.error}</ErrorMessage>
+
       {picking && (
         <ColourPicker
           profile={picking.profile}
@@ -312,7 +321,6 @@ function ManageProfiles({
                 setDeleting(null);
                 reload();
               })
-              .catch((e) => { setDeleting(null); fail(e); })
           }
         />
       )}

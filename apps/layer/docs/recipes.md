@@ -140,7 +140,12 @@ Don't make the UI ask on a timer.
    is blocked. Confirmations use `Confirm`, never `window.confirm`. A
    submit button that can be double-clicked needs a ref guard, not only
    state.
-5. **Errors** go to `toast("error", errMessage(e))`. For a multi-repo
+5. **Errors** of something the user just did show where they did it:
+   `const failure = useFailure()`, `failure.fail(e)` in the `catch`,
+   `failure.clear()` before trying again, and `<ErrorMessage>{failure.error}</ErrorMessage>`
+   above a dialog's buttons or under the row of actions (NOTE-6). Only a
+   failure with no place of its own, or one in the background, goes to the
+   store's `fail(e)`: the top bar's status (WIN-2). For a multi-repo
    result, use `reportRepoResults`.
 6. **Styles** go in `src/styles.css`, in the section for that area, using
    the studio's colour, type and radius names (`src/theme.css`, from the

@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { api } from "../lib/api";
+import { api, failureText } from "../lib/api";
 import { useStore } from "../store";
 import type { FoundRepo } from "../lib/types";
-import { Combo, Field, Modal, Spinner } from "./ui";
+import { Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 
 /**
  * Adding repos one folder-picker at a time does not scale past a handful, so
@@ -13,7 +13,9 @@ import { Combo, Field, Modal, Spinner } from "./ui";
 export function AddRepos({ onClose }: { onClose: () => void }) {
   const refreshAll = useStore((s) => s.refreshAll);
   const toast = useStore((s) => s.toast);
-  const fail = useStore((s) => s.fail);
+  // Fails in the dialog, above its buttons (NOTE-6).
+  const failure = useFailure();
+  const fail = failure.fail;
 
   const [found, setFound] = useState<FoundRepo[] | null>(null);
   const [scanned, setScanned] = useState("");
@@ -50,6 +52,7 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
 
     setScanning(true);
     setFound(null);
+    failure.clear();
     try {
       const repos = await api.scanRepos(root, 3);
       setScanned(root);
@@ -68,15 +71,23 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
 
   async function register(paths: string[], into: string | null = group.trim() || null) {
     setBusy(true);
+    failure.clear();
     try {
       const { added, skipped } = await api.addProjects(paths, into);
       await refreshAll();
       if (added.length > 0) {
         toast("success", `Added ${added.length} repositor${added.length === 1 ? "y" : "ies"}`);
       }
-      // Each one named, with why: a partial failure stays visible.
-      for (const s of skipped) toast("error", `Not added: ${s.path} — ${s.error}`);
-      onClose();
+      if (skipped.length === 0) {
+        onClose();
+        return;
+      }
+      // Each one named, with why, and the dialog stays: what went in is
+      // marked added, the rest stays picked to try again.
+      const now = new Set(added.map((p) => p.path));
+      setFound((f) => f && f.map((r) => (now.has(r.path) ? { ...r, registered: true } : r)));
+      setPicked(skipped.map((s) => s.path));
+      fail(skipped.map((s) => failureText(`Couldn't add ${s.path}: ${s.error}`)).join("\n"));
     } catch (e) {
       fail(e);
     } finally {
@@ -189,6 +200,7 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
   );
 }

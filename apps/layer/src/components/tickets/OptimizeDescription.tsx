@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "../../lib/api";
 import { useStore } from "../../store";
-import { Spinner } from "../ui";
+import { ErrorMessage, Spinner, useFailure } from "../ui";
 
 /**
  * One-shot polish for a Jira description, same path as PR drafting: a cheap
@@ -22,7 +22,8 @@ export function OptimizeDescription({
   onChange: (next: string) => void;
   disabled?: boolean;
 }) {
-  const fail = useStore((s) => s.fail);
+  // Fails under its own button, inside whichever dialog holds it (NOTE-6).
+  const failure = useFailure();
   const toast = useStore((s) => s.toast);
   const [busy, setBusy] = useState(false);
   const requestId = useRef("");
@@ -48,6 +49,7 @@ export function OptimizeDescription({
     requestId.current = nextId;
     streamed.current = "";
     setBusy(true);
+    failure.clear();
     // Cleared so streamed text is not appended to the old draft.
     onChange("");
     try {
@@ -61,7 +63,7 @@ export function OptimizeDescription({
       toast("success", "Description updated — edit it before filing.");
     } catch (e) {
       onChange(prior);
-      fail(e);
+      failure.fail(e);
     } finally {
       setBusy(false);
     }
@@ -70,24 +72,27 @@ export function OptimizeDescription({
   const canRun = summary.trim().length > 0 || description.trim().length > 0;
 
   return (
-    <div className="row" style={{ marginTop: 8 }}>
-      <button
-        className="ui-button"
-        disabled={disabled || busy || !canRun}
-        title={
-          description.trim()
-            ? "Tighten this description for engineers and coding agents"
-            : "Draft a description from the summary"
-        }
-        onClick={() => void optimize()}
-      >
-        {busy
-          ? "Optimizing…"
-          : description.trim()
-            ? "✨ Optimize description"
-            : "✨ Draft description"}
-      </button>
-      {busy && <Spinner />}
-    </div>
+    <>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button
+          className="ui-button"
+          disabled={disabled || busy || !canRun}
+          title={
+            description.trim()
+              ? "Tighten this description for engineers and coding agents"
+              : "Draft a description from the summary"
+          }
+          onClick={() => void optimize()}
+        >
+          {busy
+            ? "Optimizing…"
+            : description.trim()
+              ? "✨ Optimize description"
+              : "✨ Draft description"}
+        </button>
+        {busy && <Spinner />}
+      </div>
+      <ErrorMessage>{failure.error}</ErrorMessage>
+    </>
   );
 }

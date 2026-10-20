@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { api } from "../lib/api";
 import { ago } from "../lib/time";
-import { useNow, useStore } from "../store";
+import { useNow } from "../store";
 import type { Project, RepoNote } from "../lib/types";
-import { Confirm } from "./ui";
+import { Confirm, ErrorMessage, useFailure } from "./ui";
 
 /** The most a note may say, as `notes::NOTE_MAX` has it. */
 const NOTE_MAX = 500;
@@ -18,7 +18,8 @@ export function RepoNotes({ project, notes, onChanged }: {
   notes: RepoNote[];
   onChanged: () => void;
 }) {
-  const fail = useStore((s) => s.fail);
+  // Fails in the editor while one is open, else under the notes (NOTE-6).
+  const failure = useFailure();
   const now = useNow(60_000);
   // A note's id, "new" for one being added, or nothing.
   const [editing, setEditing] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export function RepoNotes({ project, notes, onChanged }: {
   const [deleting, setDeleting] = useState<RepoNote | null>(null);
 
   function start(n?: RepoNote) {
+    failure.clear();
     setEditing(n?.id ?? "new");
     setText(n?.text ?? "");
     setPaths(n?.paths.join(", ") ?? "");
@@ -35,12 +37,13 @@ export function RepoNotes({ project, notes, onChanged }: {
 
   async function run(work: Promise<unknown>) {
     setBusy(true);
+    failure.clear();
     try {
       await work;
       setEditing(null);
       onChanged();
     } catch (e) {
-      fail(e);
+      failure.fail(e);
     } finally {
       setBusy(false);
     }
@@ -71,9 +74,10 @@ export function RepoNotes({ project, notes, onChanged }: {
         <button className="ui-button ui-button-primary" disabled={busy || !text.trim()} onClick={save}>
           {editing === "new" ? "Add note" : "Save"}
         </button>
-        <button className="ui-button" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
+        <button className="ui-button" disabled={busy} onClick={() => { failure.clear(); setEditing(null); }}>Cancel</button>
         <span className="muted">{text.length}/{NOTE_MAX}</span>
       </div>
+      <ErrorMessage>{failure.error}</ErrorMessage>
     </div>
   );
 
@@ -116,6 +120,7 @@ export function RepoNotes({ project, notes, onChanged }: {
       {editing === "new" ? editor : (
         <button className="ui-button" style={{ marginTop: 6 }} onClick={() => start()}>Add a note</button>
       )}
+      {!editing && <ErrorMessage>{failure.error}</ErrorMessage>}
       {deleting && (
         <Confirm
           title="Delete note"
