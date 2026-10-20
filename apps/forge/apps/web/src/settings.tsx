@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ChevronsUpDown } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
-import { GITHUB_PROBLEMS, useGitHubLogin } from "./auth";
+import { GITHUB_PROBLEMS, useProviders } from "./auth";
 import { type Confirmation, ConfirmDialog } from "./confirm";
 import { Avatar } from "./icons";
 import { PageHeader } from "./layout";
@@ -320,7 +320,7 @@ function RoleSelect({
 /** Connecting a GitHub account, to sign in with it; offered when the server can. */
 function GitHubConnection() {
   const { me } = useWorkspace();
-  const available = useGitHubLogin();
+  const available = useProviders()?.github;
   // Why connecting didn't work, when GitHub sent us back here.
   const [problem] = useState(() => {
     const code = new URLSearchParams(location.search).get("github_error");
@@ -414,6 +414,8 @@ function NameField({ name }: { name: string }) {
 
 export function AccountPage() {
   const { me } = useWorkspace();
+  // With Code Villain accounts, passwords live there, not here.
+  const passwords = useProviders()?.password;
   const navigate = useNavigate();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -460,65 +462,67 @@ export function AccountPage() {
 
           <GitHubConnection />
 
-          <section>
-            <h2 className="mb-3 font-medium">Password</h2>
-            {!me.has_password && (
-              <p className="-mt-1 mb-3 text-muted">
-                You joined with GitHub. A password lets you sign in without it too.
-              </p>
-            )}
-            {done && <p className="mb-3 text-ok-ink">Password saved.</p>}
-            {!changing ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setChanging(true);
-                  setDone(false);
-                }}
-              >
-                {me.has_password ? "Change password" : "Set a password"}
-              </Button>
-            ) : (
-              <form onSubmit={changePassword} className="flex flex-col gap-4">
-                {me.has_password && (
+          {passwords && (
+            <section>
+              <h2 className="mb-3 font-medium">Password</h2>
+              {!me.has_password && (
+                <p className="-mt-1 mb-3 text-muted">
+                  You joined with GitHub. A password lets you sign in without it too.
+                </p>
+              )}
+              {done && <p className="mb-3 text-ok-ink">Password saved.</p>}
+              {!changing ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setChanging(true);
+                    setDone(false);
+                  }}
+                >
+                  {me.has_password ? "Change password" : "Set a password"}
+                </Button>
+              ) : (
+                <form onSubmit={changePassword} className="flex flex-col gap-4">
+                  {me.has_password && (
+                    <TextField
+                      label="Current password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={current}
+                      onChange={(e) => setCurrent(e.target.value)}
+                    />
+                  )}
                   <TextField
-                    label="Current password"
+                    label="New password"
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     required
-                    value={current}
-                    onChange={(e) => setCurrent(e.target.value)}
+                    minLength={8}
+                    hint="At least 8 characters. Other devices will be signed out."
+                    value={next}
+                    onChange={(e) => setNext(e.target.value)}
                   />
-                )}
-                <TextField
-                  label="New password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  hint="At least 8 characters. Other devices will be signed out."
-                  value={next}
-                  onChange={(e) => setNext(e.target.value)}
-                />
-                <ErrorMessage>{error}</ErrorMessage>
-                <div className="flex items-center gap-3">
-                  <Button type="submit" disabled={busy}>
-                    {me.has_password ? "Change password" : "Set password"}
-                  </Button>
-                  <button
-                    type="button"
-                    className="text-muted hover:text-fg"
-                    onClick={() => {
-                      setChanging(false);
-                      setError(null);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-          </section>
+                  <ErrorMessage>{error}</ErrorMessage>
+                  <div className="flex items-center gap-3">
+                    <Button type="submit" disabled={busy}>
+                      {me.has_password ? "Change password" : "Set password"}
+                    </Button>
+                    <button
+                      type="button"
+                      className="text-muted hover:text-fg"
+                      onClick={() => {
+                        setChanging(false);
+                        setError(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </section>
+          )}
 
           <section>
             <h2 className="mb-1 font-medium">Sign out</h2>

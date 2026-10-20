@@ -55,16 +55,26 @@ function useServerChoice() {
   return { field, apply };
 }
 
-/** Whether this server offers signing in with GitHub (not in the packaged desktop app). */
-export function useGitHubLogin() {
-  const [available, setAvailable] = useState(false);
+/** The ways in this server offers. */
+export type Providers = { oidc: boolean; password: boolean; github: boolean };
+
+/** Before the server answers, or when it can't: email and password. */
+const PASSWORD_ONLY: Providers = { oidc: false, password: true, github: false };
+
+/**
+ * How this server signs people in; null until it says, so the page doesn't
+ * flash the wrong way in. The packaged desktop app chooses its server at
+ * sign-in, so it offers a password.
+ */
+export function useProviders() {
+  const [providers, setProviders] = useState<Providers | null>(bundled ? PASSWORD_ONLY : null);
   useEffect(() => {
     if (bundled) return;
-    api<{ github: boolean }>("GET", "/api/auth/providers")
-      .then((p) => setAvailable(p.github))
-      .catch(() => {});
+    api<Providers>("GET", "/api/auth/providers")
+      .then(setProviders)
+      .catch(() => setProviders(PASSWORD_ONLY));
   }, []);
-  return available;
+  return providers;
 }
 
 /** What went wrong signing in with GitHub, by the code the server sends back. */
@@ -82,6 +92,40 @@ export const GITHUB_PROBLEMS: Record<string, string> = {
   github_taken: "That GitHub account is connected to another Forge account.",
   github_failed: "Something went wrong. Try again.",
 };
+
+/** What went wrong signing in with Code Villain, by the code the server sends back. */
+const OIDC_PROBLEMS: Record<string, string> = {
+  oidc_not_set_up: "Signing in with Code Villain isn't set up on this server.",
+  oidc_expired: "That took too long. Try again.",
+  oidc_other_browser: "Start signing in from Forge, in this browser.",
+  oidc_refused: "Code Villain didn't sign you in. Try again.",
+  oidc_no_email: "Your Code Villain account has no email address Forge can use.",
+  oidc_no_account:
+    "This Code Villain account has no Forge account yet. Ask your team for an invite link.",
+  invite_gone: "That invite link has expired or was revoked. Ask for a new one.",
+  oidc_taken: "The Forge account with your email is linked to another Code Villain account.",
+  oidc_failed: "Something went wrong. Try again.",
+};
+
+/** Why signing in didn't work, for a code in the page's address. */
+function problemOf(code: string, providers: Providers) {
+  return providers.oidc
+    ? (OIDC_PROBLEMS[code] ?? OIDC_PROBLEMS.oidc_failed)
+    : (GITHUB_PROBLEMS[code] ?? GITHUB_PROBLEMS.github_failed);
+}
+
+/** Off to the studio's sign-in; the server brings people back signed in. */
+function CodeVillainButton({ label, query }: { label: string; query: Record<string, string> }) {
+  const params = new URLSearchParams(query).toString();
+  return (
+    <a
+      href={`/api/auth/oidc${params ? `?${params}` : ""}`}
+      className={`${buttonClass("primary")} flex`}
+    >
+      {label}
+    </a>
+  );
+}
 
 /** Off to GitHub; the server brings people back signed in. */
 function GitHubButton({ label, query }: { label: string; query: Record<string, string> }) {
@@ -119,7 +163,7 @@ export function LoginPage() {
     error?: string;
   };
   const navigate = useNavigate();
-  const github = useGitHubLogin();
+  const providers = useProviders();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const server = useServerChoice();
@@ -144,22 +188,38 @@ export function LoginPage() {
     }
     return <Redirect to={safeRedirect(redirect)} />;
   }
+  if (!providers) return <Splash />;
+  const problem = githubError ? problemOf(githubError, providers) : null;
+  const query: Record<string, string> = redirect ? { redirect: safeRedirect(redirect) } : {};
+
+  if (providers.oidc) {
+    return (
+      <AuthScreen title="Sign in to Forge">
+        {problem && (
+          <div className="mb-4">
+            <ErrorMessage>{problem}</ErrorMessage>
+          </div>
+        )}
+        <CodeVillainButton label="Sign in with Code Villain" query={query} />
+        <p className="mt-6 text-center text-muted">
+          One account for every Code Villain app.
+          <br />
+          New here? Ask your team for an invite.
+        </p>
+      </AuthScreen>
+    );
+  }
   return (
     <AuthScreen title="Sign in to Forge">
-      {github && (
+      {providers.github && (
         <>
-          <GitHubButton
-            label="Continue with GitHub"
-            query={redirect ? { redirect: safeRedirect(redirect) } : {}}
-          />
+          <GitHubButton label="Continue with GitHub" query={query} />
           <Or />
         </>
       )}
-      {githubError && !error && (
+      {problem && !error && (
         <div className="mb-4">
-          <ErrorMessage>
-            {GITHUB_PROBLEMS[githubError] ?? GITHUB_PROBLEMS.github_failed}
-          </ErrorMessage>
+          <ErrorMessage>{problem}</ErrorMessage>
         </div>
       )}
       <form onSubmit={submit} className="flex flex-col gap-4">
@@ -198,6 +258,7 @@ export function LoginPage() {
 export function SignupPage() {
   const session = useSession();
   const navigate = useNavigate();
+  const providers = useProviders();
   const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
   const field = (key: keyof typeof form) => ({
     value: form[key],
@@ -215,6 +276,9 @@ export function SignupPage() {
   });
 
   if (session.status === "signed-in" && !busy) return <Redirect to="/" />;
+  if (!providers) return <Splash />;
+  // With Code Villain accounts, people come in through invites only.
+  if (providers.oidc) return <Redirect to="/login" />;
   return (
     <AuthScreen title="Create your Forge account">
       <form onSubmit={submit} className="flex flex-col gap-4">
@@ -251,7 +315,7 @@ export function SignupPage() {
   );
 }
 
-/** Where an invite link lands: join as the signed-in user, or sign up. */
+/** Where an invite link lands: join as the signed-in user, or sign in or up first. */
 export function JoinPage() {
   const { token } = useParams({ strict: false }) as { token: string };
   const session = useSession();
@@ -259,7 +323,7 @@ export function JoinPage() {
   const [invite, setInvite] = useState<InvitePreview | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const github = useGitHubLogin();
+  const providers = useProviders();
 
   useEffect(() => {
     api<InvitePreview>("GET", `/api/invites/${encodeURIComponent(token)}`)
@@ -287,12 +351,12 @@ export function JoinPage() {
       </AuthScreen>
     );
   }
-  if (!invite || session.status === "loading") return <Splash />;
+  if (!invite || !providers || session.status === "loading") return <Splash />;
 
-  const title = `Join ${invite.workspace_name}`;
+  const title = `Join ${invite.workspace_name} on Forge`;
   const subtitle = (
     <p className="-mt-3 mb-6 text-center text-muted">
-      {invite.invited_by} invited you to their workspace on Forge.
+      {invite.invited_by} invited you as {invite.role === "admin" ? "an admin" : "a member"}.
     </p>
   );
 
@@ -313,6 +377,18 @@ export function JoinPage() {
     );
   }
 
+  if (providers.oidc) {
+    return (
+      <AuthScreen title={title}>
+        {subtitle}
+        <CodeVillainButton label="Sign in with Code Villain to join" query={{ invite: token }} />
+        <p className="mt-6 text-center text-muted">
+          No Code Villain account yet? Ask {invite.invited_by} for one.
+        </p>
+      </AuthScreen>
+    );
+  }
+
   const field = (key: keyof typeof form) => ({
     value: form[key],
     onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
@@ -320,7 +396,7 @@ export function JoinPage() {
   return (
     <AuthScreen title={title}>
       {subtitle}
-      {github && (
+      {providers.github && (
         <>
           <GitHubButton label="Join with GitHub" query={{ invite: token }} />
           <Or />

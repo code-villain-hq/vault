@@ -142,19 +142,20 @@ pub async fn preview(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> Result<Json<InvitePreview>, AppError> {
-    let row: Option<(String, String, String)> = sqlx::query_as(
-        "SELECT w.name, w.url_key, u.name FROM invites i \
+    let row: Option<(String, String, String, String)> = sqlx::query_as(
+        "SELECT w.name, w.url_key, u.name, i.role FROM invites i \
          JOIN workspaces w ON w.id = i.workspace_id JOIN users u ON u.id = i.created_by \
          WHERE i.token_hash = $1 AND i.revoked_at IS NULL AND i.expires_at > now()",
     )
     .bind(hash_token(&token))
     .fetch_optional(&state.pool)
     .await?;
-    let (workspace_name, workspace_url_key, invited_by) = row.ok_or_else(gone)?;
+    let (workspace_name, workspace_url_key, invited_by, role) = row.ok_or_else(gone)?;
     Ok(Json(InvitePreview {
         workspace_name,
         workspace_url_key,
         invited_by,
+        role: Role::parse(&role).ok_or_else(gone)?,
     }))
 }
 
