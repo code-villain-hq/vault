@@ -37,8 +37,10 @@ Run `bun run design:sync` after changing them in the vault.
 - `bun run seed`: the local account, its "Code Villain" workspace and a
   few dozen calls; needs `bun run dev`. The password is in `scripts/seed.ts`.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
-- `bun run check`: fmt, clippy, Rust tests, design copies, Biome,
-  typecheck, web build. It must pass before you finish.
+- `bun run check`: fmt, clippy, Rust tests, generated types and design
+  copies up to date, Biome, typecheck, the bun tests (the sync kit's too),
+  web build. It must pass before you finish. CI runs it on every push that
+  touches Raven (`.forgejo/workflows/raven.yml`).
   `RAVEN_CHECK_SKIP_DESKTOP=1` leaves the desktop app out.
 - `cargo run -p raven-server -- reset-password <email>` sets a new password.
 
