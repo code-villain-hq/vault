@@ -19,7 +19,7 @@ Every terminal takes one 16-colour table, `ansi` in `studio/design/tokens/syntax
 Neovim, with lazy.nvim:
 
 ```lua
-{ dir = "~/code/villain/villain-vault/apps/theme/nvim", name = "code-villain", lazy = false, priority = 1000,
+{ dir = "~/code/villain/villain-vault/code/apps/theme/nvim", name = "code-villain", lazy = false, priority = 1000,
   config = function() vim.cmd.colorscheme("code-villain") end }
 ```
 
@@ -33,7 +33,7 @@ cursor --install-extension /tmp/code-villain.vsix   # or: code --install-extensi
 WezTerm: point `color_scheme_dirs` at this folder's `wezterm/` and pick the scheme by the system appearance:
 
 ```lua
-config.color_scheme_dirs = { wezterm.home_dir .. "/code/villain/villain-vault/apps/theme/wezterm" }
+config.color_scheme_dirs = { wezterm.home_dir .. "/code/villain/villain-vault/code/apps/theme/wezterm" }
 config.color_scheme = wezterm.gui.get_appearance():find("Dark") and "Code Villain Night" or "Code Villain Day"
 ```
 
