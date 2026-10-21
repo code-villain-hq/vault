@@ -292,6 +292,38 @@ async fn a_repository_is_one_whichever_way_it_was_cloned(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn null_clears_a_repositorys_settings(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    let id = Uuid::now_v7();
+    let mut data = repository("github.com/code-villain/api");
+    data["group_name"] = json!("backend");
+    data["check_command"] = json!("bun run check");
+    let added = app
+        .sync(
+            &ada,
+            &workspace,
+            json!([{ "action": "create", "model": "Repository", "id": id, "data": data }]),
+        )
+        .await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+
+    let cleared = app
+        .sync(
+            &ada,
+            &workspace,
+            json!([{ "action": "update", "model": "Repository", "id": id,
+            "data": { "group_name": null, "check_command": null } }]),
+        )
+        .await;
+    assert_eq!(cleared.status, StatusCode::OK, "{}", cleared.body);
+    let repository = &app.records(&ada, &workspace, "Repository").await[0];
+    assert_eq!(repository["group_name"], Value::Null);
+    assert_eq!(repository["check_command"], Value::Null);
+    assert_eq!(repository["name"], "api");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_repository_keeps_at_most_fifty_notes(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;

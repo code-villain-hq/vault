@@ -32,3 +32,6 @@ dist-ssr
 
 # Cargo builds here for the whole workspace: the app and the server.
 /target/
+
+# The web app, as the server serves it (bun run build:web).
+/dist-web/

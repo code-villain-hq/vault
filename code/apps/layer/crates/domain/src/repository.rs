@@ -67,11 +67,11 @@ pub struct RepositoryCreate {
 pub struct RepositoryPatch {
     pub name: Option<String>,
     pub default_branch: Option<String>,
-    /// `null` takes it out of its group.
-    pub group_name: Option<String>,
-    pub update_by: Option<UpdateBy>,
-    pub check_command: Option<String>,
-    pub spec_folder: Option<String>,
+    /// `null` takes it out of its group, and clears the three below.
+    pub group_name: Option<Option<String>>,
+    pub update_by: Option<Option<UpdateBy>>,
+    pub check_command: Option<Option<String>>,
+    pub spec_folder: Option<Option<String>>,
     pub specs_in_app: Option<bool>,
 }
 
@@ -80,7 +80,11 @@ impl Validate for RepositoryCreate {
         remote(&self.remote_key)?;
         text(&self.name, "A repository's name", 100)?;
         branch(&self.default_branch)?;
-        settings(&self.group_name, &self.check_command, &self.spec_folder)
+        settings(
+            self.group_name.as_deref(),
+            self.check_command.as_deref(),
+            self.spec_folder.as_deref(),
+        )
     }
 }
 
@@ -91,24 +95,22 @@ impl Validate for RepositoryPatch {
             .map(|n| text(n, "A repository's name", 100))
             .transpose()?;
         self.default_branch.as_deref().map(branch).transpose()?;
-        settings(&self.group_name, &self.check_command, &self.spec_folder)
+        settings(
+            self.group_name.as_ref().and_then(Option::as_deref),
+            self.check_command.as_ref().and_then(Option::as_deref),
+            self.spec_folder.as_ref().and_then(Option::as_deref),
+        )
     }
 }
 
 fn settings(
-    group: &Option<String>,
-    check: &Option<String>,
-    spec_folder: &Option<String>,
+    group: Option<&str>,
+    check: Option<&str>,
+    spec_folder: Option<&str>,
 ) -> Result<(), ValidationError> {
-    group
-        .as_deref()
-        .map(|g| text(g, "A group", 60))
-        .transpose()?;
-    check
-        .as_deref()
-        .map(|c| text(c, "A check", 500))
-        .transpose()?;
-    spec_folder.as_deref().map(folder).transpose()?;
+    group.map(|g| text(g, "A group", 60)).transpose()?;
+    check.map(|c| text(c, "A check", 500)).transpose()?;
+    spec_folder.map(folder).transpose()?;
     Ok(())
 }
 

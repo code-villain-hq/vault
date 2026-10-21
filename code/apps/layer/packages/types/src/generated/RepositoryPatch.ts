@@ -3,6 +3,6 @@ import type { UpdateBy } from "./UpdateBy";
 
 export type RepositoryPatch = { name?: string, default_branch?: string, 
 /**
- * `null` takes it out of its group.
+ * `null` takes it out of its group, and clears the three below.
  */
-group_name?: string, update_by?: UpdateBy, check_command?: string, spec_folder?: string, specs_in_app?: boolean, };
+group_name?: string | null, update_by?: UpdateBy | null, check_command?: string | null, spec_folder?: string | null, specs_in_app?: boolean, };
