@@ -11,14 +11,16 @@ enum Weather {
     /// Location from IP (ipapi.co), then current conditions from open-meteo.
     /// Both free, no API key.
     static func fetch(completion: @escaping ([ResultItem]) -> Void) {
-        URLSession.shared.dataTask(with: URL(string: "https://ipapi.co/json/")!) { data, _, _ in
+        URLSession.shared.dataTask(with: URL(string: "https://ipapi.co/json/")!) { data, _, error in
             guard let data,
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let lat = object["latitude"] as? Double,
                   let lon = object["longitude"] as? Double
             else {
-                completion([ResultItem(icon: nil, title: "Location lookup failed",
-                                       subtitle: "ipapi.co unreachable or rate-limited", action: nil)])
+                // Unreachable or rate-limited; the detail is for the log.
+                NSLog("Caster location lookup failed: \(error.map { "\($0)" } ?? "no coordinates from ipapi.co")")
+                completion([ResultItem(icon: nil, title: "Couldn't find your location. Try again.",
+                                       subtitle: nil, action: nil)])
                 return
             }
             let city = object["city"] as? String ?? "Current location"
@@ -32,15 +34,16 @@ enum Weather {
             + "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"
             + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
             + "&timezone=auto&forecast_days=4")!
-        URLSession.shared.dataTask(with: url) { data, _, _ in
+        URLSession.shared.dataTask(with: url) { data, _, error in
             guard let data,
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let current = object["current"] as? [String: Any],
                   let temp = current["temperature_2m"] as? Double,
                   let code = (current["weather_code"] as? NSNumber)?.intValue
             else {
-                completion([ResultItem(icon: nil, title: "Weather fetch failed",
-                                       subtitle: "open-meteo.com unreachable", action: nil)])
+                NSLog("Caster weather fetch failed: \(error.map { "\($0)" } ?? "no conditions from open-meteo.com")")
+                completion([ResultItem(icon: nil, title: "Couldn't reach the weather service. Check your connection.",
+                                       subtitle: nil, action: nil)])
                 return
             }
             let feels = current["apparent_temperature"] as? Double ?? temp

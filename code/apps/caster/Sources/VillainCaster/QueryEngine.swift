@@ -163,7 +163,7 @@ final class QueryEngine {
             deliver(.answer(Answer(.currency, value: "…", copyValue: nil)))
             debounced(gen) { finish in
                 Currency.convert(currencyQuery) { display, copyValue in
-                    finish(.answer(Answer(.currency, value: copyValue == nil ? "No rate" : display,
+                    finish(.answer(Answer(.currency, value: copyValue == nil ? "Couldn't get a rate. Check your connection." : display,
                                           copyValue: copyValue)))
                 }
             } deliver: { deliver($0) }
