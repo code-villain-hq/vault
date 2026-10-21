@@ -1,9 +1,9 @@
+import { Redirect } from "@code-villain/web";
 import type { InvitePreview, Me } from "@forge/types";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
 import { isDesktop, onAppLink, openInBrowser } from "./platform";
-import { Redirect } from "./redirect";
 import {
   apiUrl,
   authPlace,

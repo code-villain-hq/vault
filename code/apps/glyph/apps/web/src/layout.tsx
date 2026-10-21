@@ -1,4 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
+import { Redirect, SyncIndicator } from "@code-villain/web";
 import {
   Link,
   Outlet,
@@ -24,7 +25,6 @@ import {
 import { type ReactNode, useEffect } from "react";
 import { Initial, NavIcon } from "./icons";
 import { isDesktop } from "./platform";
-import { Redirect } from "./redirect";
 import { bundled, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
@@ -34,9 +34,8 @@ import {
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";
-import { SyncIndicator } from "./sync-indicator";
 import { AuthScreen, Button, Splash } from "./ui";
-import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
+import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in; the desktop app
@@ -236,7 +235,7 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <AppNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator />
+        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
       </div>
     </aside>
   );

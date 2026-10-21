@@ -6,6 +6,8 @@ import { $ } from "bun";
 const root = new URL("..", import.meta.url).pathname;
 // The studio's sync client, which the web app builds on (`code/kit/sync`).
 const kitClient = `${root}../../kit/sync/client`;
+// The parts every studio web app shares (`code/kit/web`).
+const kitWeb = `${root}../../kit/web`;
 const biome = `${root}web/node_modules/.bin/biome`;
 
 const steps: [string, () => Promise<unknown>][] = [
@@ -33,12 +35,15 @@ const steps: [string, () => Promise<unknown>][] = [
   ["biome (web)", () => $`${biome} check .`.cwd(`${root}web`)],
   // The kit's client, with its own settings: Biome checks only under its root.
   ["biome (sync kit)", () => $`${biome} check .`.cwd(kitClient)],
+  ["biome (web kit)", () => $`${biome} check .`.cwd(kitWeb)],
   ["tsc (web)", () => $`bunx tsc -p web --noEmit`.cwd(root)],
+  ["tsc (web kit)", () => $`bunx tsc -p ${kitWeb} --noEmit`.cwd(root)],
   [
     "bun test (web, sync kit)",
     async () => {
       await $`bun test src`.cwd(`${root}web`);
       await $`bun test`.cwd(kitClient);
+      await $`bun test`.cwd(kitWeb);
     },
   ],
   ["web build", () => $`bun run --cwd web build`.cwd(root).quiet()],

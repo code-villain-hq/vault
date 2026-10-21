@@ -1,3 +1,4 @@
+import { Redirect } from "@code-villain/web";
 import type { StateType } from "@forge/types";
 import { Link, useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -10,7 +11,6 @@ import { EmptyState, type GroupBy, IssueList, SharedFields } from "./issue-list"
 import { PageHeader } from "./layout";
 import { useNewIssue } from "./new-issue";
 import { NewButton } from "./page-parts";
-import { Redirect } from "./redirect";
 import { SuggestionCard, TriageSuggestion, useOpenSuggestions } from "./suggestions";
 import { useRecords, useWorkspace } from "./workspace";
 

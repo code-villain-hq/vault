@@ -5,6 +5,8 @@
 @import "./design/shape.css";
 @import "./design/fonts/fonts.css";
 @import "./design/components.css";
+/* The shared kit's classes, which Tailwind wouldn't find outside this app. */
+@source "../../../../../kit/web/src";
 
 /* Forge-specific roles derived from Nightshade's shared tokens. */
 :root {

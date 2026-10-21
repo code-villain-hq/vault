@@ -1,11 +1,11 @@
 import { Select } from "@base-ui/react/select";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { CreatedInvite, Invite, Me, MemberInfo, Role } from "@raven/types";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronsUpDown } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
 import { useProviders } from "./auth";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { Initial } from "./icons";
 import { PageHeader } from "./layout";
 import { MoreMenu } from "./page-parts";

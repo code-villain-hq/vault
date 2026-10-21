@@ -7,7 +7,7 @@
   "homepage": "https://www.codevillain.eu/",
   "repository": { "type": "git", "url": "https://git.codevillain.eu/code-villain/vault.git", "directory": "code/apps/layer" },
   "type": "module",
-  "workspaces": ["packages/*", "web", "../../kit/sync/client"],
+  "workspaces": ["packages/*", "web", "../../kit/sync/client", "../../kit/web"],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

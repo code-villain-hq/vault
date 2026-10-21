@@ -1,6 +1,6 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { type ReactNode, useState } from "react";
-import { Button } from "./ui";
+import { Button } from "./button";
 
 /** Something that can't be undone, waiting for a yes. */
 export interface Confirmation {

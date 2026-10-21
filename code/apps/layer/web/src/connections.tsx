@@ -1,6 +1,6 @@
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { Connection, ConnectionKind, ConnectionSettings } from "@layer/types";
 import { type FormEvent, useState } from "react";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { PageBody, PageHeader } from "./layout";
 import { MoreMenu } from "./page-parts";
 import { Button, Section, TextField } from "./ui";

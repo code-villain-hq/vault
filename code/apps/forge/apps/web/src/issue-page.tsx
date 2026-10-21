@@ -1,4 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type {
   Comment,
   Decision,
@@ -12,7 +13,6 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ChevronRight, Ellipsis, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentWorkLine } from "./agent-work";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import {
   branchName,
   byId,

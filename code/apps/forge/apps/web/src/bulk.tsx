@@ -1,10 +1,11 @@
 // Changing many issues at once: the bar shown while issues are selected in a
 // list (X selects). Each change is one transaction, so it applies to all of
 // them or none.
+
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { Issue, Operation } from "@forge/types";
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { PRIORITY_LABELS, STATE_TYPE_ORDER, useLabels, useUsers } from "./data";
 import { Avatar, LabelDot, PriorityIcon, StateIcon } from "./icons";
 import { Picker } from "./picker";

@@ -1,8 +1,8 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { App, AppKey } from "@raven/types";
 import { type FormEvent, useState } from "react";
 import { api, messageOf } from "./api";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { PageHeader, useApps, useStatuses } from "./layout";
 import { CreateDialog } from "./page-parts";
 import { Button, ErrorMessage, TextField } from "./ui";

@@ -2,6 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { Popover } from "@base-ui/react/popover";
+import { type Confirmation, ConfirmDialog, Redirect } from "@code-villain/web";
 import type {
   Decision,
   DecisionPatch,
@@ -25,7 +26,6 @@ import {
 } from "lucide-react";
 import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { conventionWarnings } from "./convention";
 import { byId, formatDate, identifier, servicesOf, timeAgo, useStates, useTeams } from "./data";
 import { ServiceDriftChecks, useServiceChecks } from "./drift-checks";
@@ -40,7 +40,6 @@ import { CreateDialog, chip, DateChip, Dot, MoreMenu, NewButton, StatusChip } fr
 import { COLORS, ColorChoice, CustomColor, RAINBOW } from "./palette";
 import { Picker } from "./picker";
 import { EditableHeader } from "./planning";
-import { Redirect } from "./redirect";
 import { useGitHubStatus } from "./settings-github";
 import {
   type HistoryEntry,

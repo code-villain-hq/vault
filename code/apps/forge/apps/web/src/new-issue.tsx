@@ -1,7 +1,7 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { useDialogFocus } from "@code-villain/web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { PRIORITY_LABELS, useLabels, useTeamStates, useTeams, useUsers } from "./data";
-import { useDialogFocus } from "./dialog-focus";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { LabelChip } from "./issue-fields";
 import { MentionTextarea } from "./mentions";

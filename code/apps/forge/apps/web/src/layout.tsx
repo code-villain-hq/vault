@@ -1,4 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
+import { Redirect, SyncIndicator } from "@code-villain/web";
 import {
   Link,
   Outlet,
@@ -39,7 +40,6 @@ import { Initial, NavIcon, ServiceIcon } from "./icons";
 import { useDesktopNotifications, useUnreadCount } from "./inbox";
 import { type NewIssueDefaults, NewIssueProvider, useNewIssue } from "./new-issue";
 import { isDesktop } from "./platform";
-import { Redirect } from "./redirect";
 import { bundled, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
@@ -50,9 +50,8 @@ import {
   workspaceEntries,
 } from "./session";
 import { openShortcuts, Shortcuts } from "./shortcuts";
-import { SyncIndicator } from "./sync-indicator";
 import { AuthScreen, Button, Splash } from "./ui";
-import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
+import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in; the desktop app
@@ -236,7 +235,7 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <AppNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator />
+        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
         <button
           type="button"
           aria-label="Keyboard shortcuts"

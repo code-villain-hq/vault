@@ -3,12 +3,12 @@
 // for rare actions, and properties as quiet chips under the title.
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
+import { useDialogFocus } from "@code-villain/web";
 import type { User } from "@forge/types";
 import { CalendarDays, Ellipsis, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { statusStyle } from "./contrast";
 import { formatDate } from "./data";
-import { useDialogFocus } from "./dialog-focus";
 import { Avatar } from "./icons";
 import { Picker } from "./picker";
 

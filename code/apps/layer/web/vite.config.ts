@@ -1,9 +1,17 @@
+import { cargoVersion } from "@code-villain/web/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+// Settings end with it; the Rust workspace keeps the one version.
+const version = cargoVersion(new URL("../src-tauri/Cargo.toml", import.meta.url));
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: { __APP_VERSION__: JSON.stringify(version) },
+  // The shared kit (`code/kit/web`) sits outside this app: it must use the
+  // app's React and router, not a second copy beside the kit.
+  resolve: { dedupe: ["react", "react-dom", "@base-ui/react", "@tanstack/react-router"] },
   // What the Layer server serves (LAYER_WEB_DIR, by default dist-web).
   build: { outDir: "../dist-web", emptyOutDir: true },
   server: {

@@ -1,4 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { useDialogFocus } from "@code-villain/web";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   Bot,
@@ -28,7 +29,6 @@ import {
   useTeamStates,
   useTeams,
 } from "./data";
-import { useDialogFocus } from "./dialog-focus";
 import { NavIcon, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { useNewIssue } from "./new-issue";
 import { placeName } from "./server";

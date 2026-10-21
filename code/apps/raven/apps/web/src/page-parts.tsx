@@ -2,9 +2,9 @@
 // menu for rare actions.
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
+import { useDialogFocus } from "@code-villain/web";
 import { Ellipsis } from "lucide-react";
 import type { ReactNode } from "react";
-import { useDialogFocus } from "./dialog-focus";
 
 /** The window things are made in, like New key; its form renders only while open. */
 export function CreateDialog({
