@@ -5,7 +5,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Models {
     /// The program that serves a model, for the ones the server starts
@@ -29,23 +29,27 @@ pub struct Model {
     pub endpoint: String,
     /// OpenAI-style `/v1/chat/completions`, which llama-server offers for
     /// every model; `false` uses the raw `/completion`.
-    #[serde(default = "yes")]
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
     pub chat_mode: bool,
     /// A local GGUF file, for starting the server with `-m`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub model_path: String,
     /// A Hugging Face repository and file, for `--hf-repo` / `--hf-file`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub hf_repo: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub hf_file: String,
     /// More arguments for the server, such as `["-c", "4096"]`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_args: Vec<String>,
 }
 
 fn yes() -> bool {
     true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 impl Default for Model {
@@ -76,6 +80,11 @@ pub enum ModelsError {
     },
     #[error("{0}")]
     Invalid(String),
+    #[error("couldn't write {path}: {source}")]
+    Write {
+        path: String,
+        source: std::io::Error,
+    },
 }
 
 impl Models {
@@ -110,21 +119,43 @@ impl Models {
             path: "the models file".into(),
             source: Box::new(source),
         })?;
-        for (i, m) in models.models.iter().enumerate() {
+        models.check()?;
+        Ok(models)
+    }
+
+    /// Every model has a name and an endpoint, and no two share a name.
+    pub fn check(&self) -> Result<(), ModelsError> {
+        for (i, m) in self.models.iter().enumerate() {
             if m.name.trim().is_empty() || m.endpoint.trim().is_empty() {
                 return Err(ModelsError::Invalid(format!(
                     "model {} needs a name and an endpoint",
                     i + 1
                 )));
             }
-            if models.models[..i].iter().any(|o| o.name == m.name) {
+            if self.models[..i].iter().any(|o| o.name == m.name) {
                 return Err(ModelsError::Invalid(format!(
                     "two models are called {:?}",
                     m.name
                 )));
             }
         }
-        Ok(models)
+        Ok(())
+    }
+
+    /// Writes the file, whole or not at all: a half-written file would
+    /// lose every model on the next start.
+    pub fn save(&self, path: &Path) -> Result<(), ModelsError> {
+        let failed = |source| ModelsError::Write {
+            path: path.display().to_string(),
+            source,
+        };
+        let text = toml::to_string(self).map_err(|e| ModelsError::Invalid(e.to_string()))?;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).map_err(failed)?;
+        }
+        let next = path.with_extension("toml.next");
+        std::fs::write(&next, text).map_err(failed)?;
+        std::fs::rename(&next, path).map_err(failed)
     }
 
     /// The model called `name`, or the first one when `name` is empty or
@@ -175,7 +206,7 @@ impl Model {
     }
 
     /// The port in the endpoint, or the scheme's.
-    fn port(&self) -> Result<u16, String> {
+    pub fn port(&self) -> Result<u16, String> {
         let bad = || format!("The endpoint {:?} isn't a URL.", self.endpoint);
         let (scheme, rest) = self.endpoint.trim().split_once("://").ok_or_else(bad)?;
         let host = rest.split('/').next().unwrap_or_default();
@@ -257,6 +288,15 @@ chat_mode = false
                 .models
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn a_saved_file_reads_back_the_same() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("glyph/models.toml");
+        let models = Models::parse(FILE).unwrap();
+        models.save(&path).unwrap();
+        assert_eq!(Models::load(&path).unwrap(), models);
     }
 
     #[test]

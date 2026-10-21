@@ -24,7 +24,7 @@ Every app except Caster, the theme and the site is built the same way:
 
 The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge and Glyph use it; Raven gets it next, and Layer still keeps its state in local files.
 
-The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge has it (`apps/desktop/src-tauri/src/this_mac.rs`); Glyph and Raven follow it.
+The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge and Glyph have it (`apps/desktop/src-tauri/src/this_mac.rs`); Raven follows it.
 
 ## Signing in with Code Villain
 

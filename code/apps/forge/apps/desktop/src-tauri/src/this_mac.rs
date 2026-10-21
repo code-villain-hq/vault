@@ -15,8 +15,9 @@ use sqlx::postgres::PgPoolOptions;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-/// The port the app's server takes when it's free (Postgres takes 7386).
+/// The ports the app's server and Postgres take when they're free.
 const SERVER_PORT: u16 = 7385;
+const POSTGRES_PORT: u16 = 7386;
 
 /// Where the web app finds the workspaces on this Mac.
 #[derive(Clone, Serialize)]
@@ -125,7 +126,7 @@ impl ThisMac {
 }
 
 async fn start(dir: &Path) -> Result<Running, String> {
-    let postgres = LocalPostgres::start(&dir.join("postgres"))
+    let postgres = LocalPostgres::start(&dir.join("postgres"), POSTGRES_PORT)
         .await
         .map_err(|e| e.to_string())?;
     let url = postgres

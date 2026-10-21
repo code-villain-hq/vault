@@ -198,7 +198,7 @@ async fn settings(
     .await?;
     let (name, temperature) = pair.unwrap_or_else(|| (String::new(), 0.2));
     let model = state
-        .models
+        .models()
         .pick(&name)
         .cloned()
         .ok_or_else(|| AppError::invalid(NO_MODEL))?;

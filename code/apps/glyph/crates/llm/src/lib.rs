@@ -18,4 +18,4 @@ mod prompt;
 pub use check::{GlossaryTerm, Violation, glossary_violations, placeholders_kept};
 pub use client::{BROKEN_CONFIDENCE, Client, LlmError, RETRIES, Request, Translated};
 pub use models::{Model, Models, ModelsError};
-pub use process::{ProcessError, Processes, Status};
+pub use process::{ProcessError, Processes, Status, find_program};

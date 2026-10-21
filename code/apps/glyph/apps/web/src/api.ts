@@ -1,5 +1,5 @@
 import type { ApiError } from "@glyph/types";
-import { apiUrl, authHeaders, credentials, rememberToken } from "./server";
+import { apiUrl, authHeaders, credentialsFor, type Place, placeFor, rememberToken } from "./server";
 
 /** A failed API call, with the server's error code and message. */
 export class RequestError extends Error {
@@ -17,21 +17,27 @@ export class RequestError extends Error {
   }
 }
 
-let onSessionEnded = () => {};
+let onSessionEnded = (_place: Place) => {};
 
-/** What to do when the server says the session has ended (outside of signing in). */
-export function setSessionEndedHandler(handler: () => void) {
+/** What to do when a place says its session has ended (outside of signing in). */
+export function setSessionEndedHandler(handler: (place: Place) => void) {
   onSessionEnded = handler;
 }
 
-export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Calls the API in a place: the one named, or the one the path belongs to. */
+export async function api<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  place = placeFor(path),
+): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
+    response = await fetch(apiUrl(path, place), {
       method,
-      credentials,
+      credentials: credentialsFor(place),
       headers: {
-        ...authHeaders(),
+        ...authHeaders(place),
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -39,9 +45,9 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   } catch {
     throw new RequestError(0, "offline", "Can't reach Glyph. Check your connection.");
   }
-  await rememberToken(response);
+  await rememberToken(response, place);
 
-  if (response.status === 401 && !path.startsWith("/api/auth/")) onSessionEnded();
+  if (response.status === 401 && !path.startsWith("/api/auth/")) onSessionEnded(place);
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
   if (!response.ok) {

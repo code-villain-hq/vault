@@ -26,7 +26,7 @@ pub use account::{
 };
 pub use glossary::{GlossaryEntry, GlossaryEntryCreate, GlossaryEntryPatch};
 pub use language::{Language, LanguageCreate, LanguagePatch};
-pub use llm::{ModelInfo, ModelProcess, Variants, VariantsRequest};
+pub use llm::{ModelCreate, ModelInfo, ModelProcess, Variants, VariantsRequest};
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use pair::{LanguagePair, LanguagePairCreate, LanguagePairPatch};
 pub use protocol::{

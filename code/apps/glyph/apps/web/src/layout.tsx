@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   BookA,
+  Check,
   ChevronsUpDown,
   Cpu,
   Gauge,
@@ -24,28 +25,41 @@ import { type ReactNode, useEffect } from "react";
 import { Initial, NavIcon } from "./icons";
 import { isDesktop } from "./platform";
 import { Redirect } from "./redirect";
-import { defaultWorkspace, rememberWorkspace, signOut, useSession } from "./session";
+import { bundled, placeName, setCurrentPlace } from "./server";
+import {
+  defaultWorkspace,
+  rememberWorkspace,
+  signOut,
+  useSession,
+  type WorkspaceEntry,
+  workspaceEntries,
+} from "./session";
 import { SyncIndicator } from "./sync-indicator";
 import { AuthScreen, Button, Splash } from "./ui";
 import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
 
-/** `/`: opens the workspace used last, or asks to sign in. */
+/**
+ * `/`: opens the workspace used last, or asks to sign in; the desktop app
+ * first asks where to start.
+ */
 export function Home() {
   const session = useSession();
   if (session.status === "loading") return <Splash />;
-  if (session.status === "signed-out") return <Redirect to="/login" />;
-  const workspace = defaultWorkspace(session.me);
+  if (session.status === "signed-out") return <Redirect to={isDesktop ? "/start" : "/login"} />;
+  const workspace = defaultWorkspace(workspaceEntries(session.places));
   if (!workspace) {
+    const signOutEverywhere = () =>
+      void Promise.all(session.places.map(({ place }) => signOut(place)));
     return (
       <AuthScreen title="You're not in any workspace">
         <p className="mb-6 text-center text-muted">Ask a workspace admin for an invite link.</p>
-        <Button variant="secondary" className="w-full" onClick={() => void signOut()}>
+        <Button variant="secondary" className="w-full" onClick={signOutEverywhere}>
           Sign out
         </Button>
       </AuthScreen>
     );
   }
-  return <Redirect to="/$workspace" params={{ workspace: workspace.url_key }} />;
+  return <Redirect to="/$workspace" params={{ workspace: workspace.key }} />;
 }
 
 /** `/$workspace/...`: needs a signed-in member; shows the sidebar around the page. */
@@ -56,14 +70,21 @@ export function WorkspaceLayout() {
 
   if (session.status === "loading") return <Splash />;
   if (session.status === "signed-out") {
+    if (isDesktop) return <Redirect to="/start" />;
     return <Redirect to="/login" search={{ redirect: location.href }} />;
   }
-  const workspace = session.me.workspaces.find((w) => w.url_key === urlKey);
-  if (!workspace) return <NotFound />;
-  rememberWorkspace(workspace.url_key);
+  const entry = workspaceEntries(session.places).find((e) => e.key === urlKey);
+  if (!entry) return <NotFound />;
+  rememberWorkspace(entry.key);
+  setCurrentPlace(entry.place);
 
   return (
-    <WorkspaceProvider me={session.me} workspace={workspace}>
+    <WorkspaceProvider
+      place={entry.place}
+      me={entry.me}
+      workspace={entry.workspace}
+      routeKey={entry.key}
+    >
       <Shell />
     </WorkspaceProvider>
   );
@@ -321,10 +342,22 @@ function SettingsNav() {
   );
 }
 
+/** Workspaces grouped by where they live, in the order of the places. */
+function byPlace(entries: WorkspaceEntry[]) {
+  const groups: { first: WorkspaceEntry; entries: WorkspaceEntry[] }[] = [];
+  for (const entry of entries) {
+    const group = groups.find((g) => g.first.place.id === entry.place.id);
+    if (group) group.entries.push(entry);
+    else groups.push({ first: entry, entries: [entry] });
+  }
+  return groups;
+}
+
 function WorkspaceMenu() {
-  const { me, workspace } = useWorkspace();
+  const { place, workspace } = useWorkspace();
+  const session = useSession();
   const navigate = useNavigate();
-  const others = me.workspaces.filter((w) => w.id !== workspace.id);
+  const groups = byPlace(session.status === "signed-in" ? workspaceEntries(session.places) : []);
   const item =
     "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
   const settings = (page: "languages" | "members") =>
@@ -351,29 +384,67 @@ function WorkspaceMenu() {
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
           <Menu.Popup className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-            <div className="truncate px-2 py-1.5 text-xs text-faint">{me.user.email}</div>
-            {others.map((other) => (
-              <Menu.Item
-                key={other.id}
-                className={item}
-                onClick={() =>
-                  void navigate({ to: "/$workspace", params: { workspace: other.url_key } })
-                }
-              >
-                <Initial name={other.name} square />
-                {other.name}
-              </Menu.Item>
+            {groups.map(({ first, entries }, index) => (
+              <Menu.Group key={first.place.id}>
+                <Menu.GroupLabel
+                  className={`truncate px-2 pb-1.5 text-xs text-faint ${index ? "pt-2" : "pt-1.5"}`}
+                >
+                  {/* In the browser there's one place, and the account names it. */}
+                  {first.place.kind === "here" ? first.me.user.email : placeName(first.place)}
+                </Menu.GroupLabel>
+                {entries.map((entry) => (
+                  <Menu.Item
+                    key={entry.key}
+                    className={item}
+                    onClick={() =>
+                      void navigate({ to: "/$workspace", params: { workspace: entry.key } })
+                    }
+                  >
+                    <Initial name={entry.workspace.name} square />
+                    <span className="truncate">{entry.workspace.name}</span>
+                    {entry.place === place && entry.workspace.id === workspace.id && (
+                      <Check
+                        size={15}
+                        strokeWidth={2}
+                        aria-label="Open"
+                        className="ml-auto shrink-0 text-muted"
+                      />
+                    )}
+                  </Menu.Item>
+                ))}
+              </Menu.Group>
             ))}
             <Menu.Separator className="my-1 h-px bg-line" />
             <Menu.Item className={item} onClick={() => settings("languages")}>
               Settings
             </Menu.Item>
-            <Menu.Item className={item} onClick={() => settings("members")}>
-              Invite people
-            </Menu.Item>
-            <Menu.Item className={item} onClick={() => void signOut()}>
-              Sign out
-            </Menu.Item>
+            {/* Only you are in a workspace on this Mac. */}
+            {place.kind !== "mac" && (
+              <Menu.Item className={item} onClick={() => settings("members")}>
+                Invite people
+              </Menu.Item>
+            )}
+            {isDesktop && (
+              <Menu.Item className={item} onClick={() => void navigate({ to: "/start" })}>
+                New workspace on this Mac…
+              </Menu.Item>
+            )}
+            {bundled && (
+              <Menu.Item className={item} onClick={() => void navigate({ to: "/login" })}>
+                Sign in to a server…
+              </Menu.Item>
+            )}
+            {place.kind !== "mac" && (
+              <Menu.Item
+                className={item}
+                onClick={async () => {
+                  await signOut(place);
+                  await navigate({ to: "/" });
+                }}
+              >
+                {place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out"}
+              </Menu.Item>
+            )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

@@ -58,11 +58,12 @@ pub fn router(state: AppState) -> Router {
         .route("/api/me/password", put(accounts::change_password))
         .route("/api/invites/{token}", get(invites::preview))
         .route("/api/invites/{token}/accept", post(invites::accept))
-        .route("/api/models", get(models::list))
+        .route("/api/models", get(models::list).post(models::add))
+        .route("/api/models/{name}", delete(models::remove))
         .route("/api/models/{name}/start", post(models::start))
         .route("/api/models/{name}/stop", post(models::stop))
         .nest("/api/w/{workspace_id}", workspace)
-        .layer(desktop_cors())
+        .layer(desktop_cors(&state.extra_origins))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -92,6 +93,9 @@ async fn transaction(
 /// `GET /api/auth/providers`: the ways to sign in. Signing in with Code
 /// Villain, when on, is the only one.
 async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
+    if state.on_this_mac {
+        return Json(serde_json::json!({ "oidc": false, "password": false }));
+    }
     let oidc = state.oidc_login.is_some();
     Json(serde_json::json!({ "oidc": oidc, "password": !oidc }))
 }
@@ -99,13 +103,18 @@ async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
 /// The packaged desktop app runs from its own origin (`tauri://localhost`,
 /// or `http://tauri.localhost` on Windows) and signs requests with a bearer
 /// token, so it may call the API across origins. No cookies are involved.
-fn desktop_cors() -> CorsLayer {
+fn desktop_cors(extra_origins: &[String]) -> CorsLayer {
     use axum::http::{HeaderName, HeaderValue, Method, header};
+    let origins = ["tauri://localhost", "http://tauri.localhost"]
+        .into_iter()
+        .map(HeaderValue::from_static)
+        .chain(
+            extra_origins
+                .iter()
+                .filter_map(|o| HeaderValue::from_str(o).ok()),
+        );
     CorsLayer::new()
-        .allow_origin(AllowOrigin::list([
-            HeaderValue::from_static("tauri://localhost"),
-            HeaderValue::from_static("http://tauri.localhost"),
-        ]))
+        .allow_origin(AllowOrigin::list(origins))
         .allow_methods([
             Method::GET,
             Method::POST,

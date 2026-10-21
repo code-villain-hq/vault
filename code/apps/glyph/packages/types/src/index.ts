@@ -18,6 +18,7 @@ export type * from "./generated/LanguagePatch";
 export type * from "./generated/LoginRequest";
 export type * from "./generated/Me";
 export type * from "./generated/MemberInfo";
+export type * from "./generated/ModelCreate";
 export type * from "./generated/ModelInfo";
 export type * from "./generated/ModelKind";
 export type * from "./generated/ModelProcess";
