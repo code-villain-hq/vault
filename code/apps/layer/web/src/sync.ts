@@ -1,34 +1,6 @@
 import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-client";
-import type {
-  AgentModel,
-  AgentModelCreate,
-  AgentModelPatch,
-  Connection,
-  ConnectionCreate,
-  ConnectionPatch,
-  LogSource,
-  LogSourceCreate,
-  LogSourcePatch,
-  Note,
-  NoteCreate,
-  NotePatch,
-  Repository,
-  RepositoryCreate,
-  RepositoryPatch,
-  User,
-} from "@layer/types";
+import type { Schema } from "@layer/types";
 import { authHeaders, credentialsFor, type Place, socketProtocols } from "./server";
-
-// What a team shares syncs. Tasks, panes, runs and messages stay on the
-// Mac that runs them, and never reach a server.
-export type Schema = {
-  Repository: { record: Repository; create: RepositoryCreate; patch: RepositoryPatch };
-  Connection: { record: Connection; create: ConnectionCreate; patch: ConnectionPatch };
-  LogSource: { record: LogSource; create: LogSourceCreate; patch: LogSourcePatch };
-  AgentModel: { record: AgentModel; create: AgentModelCreate; patch: AgentModelPatch };
-  Note: { record: Note; create: NoteCreate; patch: NotePatch };
-  User: { record: User; create: never; patch: never };
-};
 
 /** Each person's copy of each workspace lives in its own database. */
 export function databaseName(userId: string, workspaceId: string) {

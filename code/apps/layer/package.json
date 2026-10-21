@@ -28,6 +28,8 @@
     "release:mac": "if pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then echo 'Layer is running. Quit it first — replacing the bundle under a running app kills it, and takes its agents with it.'; exit 1; fi; tauri build --bundles app && rm -rf '/Applications/Villain Layer.app' '/Applications/Layer.app' && ditto 'target/release/bundle/macos/Layer.app' '/Applications/Layer.app'"
   },
   "dependencies": {
+    "@code-villain/sync-client": "workspace:*",
+    "@layer/types": "workspace:*",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
     "@tauri-apps/plugin-dialog": "^2.7.3",

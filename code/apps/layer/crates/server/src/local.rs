@@ -52,6 +52,17 @@ pub async fn new_workspace(pool: &PgPool, user_id: Uuid, name: &str) -> Result<U
     Ok(workspace_id)
 }
 
+/// The workspaces `user_id` is in, the first made first.
+pub async fn workspaces(pool: &PgPool, user_id: Uuid) -> Result<Vec<Uuid>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT w.id FROM workspaces w JOIN workspace_members m ON m.workspace_id = w.id
+         WHERE m.user_id = $1 ORDER BY w.created_at, w.id",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 /// A session for the app, made fresh on every launch, so the app keeps no
 /// token of its own.
 pub async fn session(pool: &PgPool, user_id: Uuid) -> Result<String, AppError> {
