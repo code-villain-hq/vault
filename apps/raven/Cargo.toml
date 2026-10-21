@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = ["crates/*", "apps/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -26,7 +26,7 @@ sha2 = "0.11"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-none", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
 tokio = { version = "1.53", features = ["full"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.7", features = ["fs", "trace"] }
+tower-http = { version = "0.7", features = ["cors", "fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.28", features = ["v7", "serde"] }

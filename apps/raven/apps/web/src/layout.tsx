@@ -4,6 +4,7 @@ import { Activity, ChevronsUpDown, HeartPulse } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { useApi } from "./api";
 import { Initial, NavIcon } from "./icons";
+import { isDesktop } from "./platform";
 import { Redirect } from "./redirect";
 import { signOut, useSession } from "./session";
 import type { AppSummary, Level } from "./types";
@@ -72,7 +73,12 @@ export function PageHeader({
 }) {
   return (
     <>
-      <header className="app-topbar @container flex min-h-12 shrink-0 items-center gap-3 px-4">
+      {/* In the desktop app the native title bar is hidden, so this bar and the
+          sidebar's top row are what the window is moved by. */}
+      <header
+        className="app-topbar @container flex min-h-12 shrink-0 items-center gap-3 px-4"
+        data-tauri-drag-region="deep"
+      >
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
           {parent}
           <span aria-hidden="true" className="text-faint">
@@ -195,10 +201,19 @@ function Sidebar({ name, email }: { name: string; email: string }) {
       aria-label="Sidebar"
     >
       <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-        <div className="sidebar-heading sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 bg-bg">
-          <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
-            <span className="font-display text-wordmark font-bold">Raven</span>
-          </div>
+        {/* The top row lines up with the page's toolbar. In the desktop app
+            macOS draws the traffic lights here, in the wordmark's place. */}
+        <div
+          className="sidebar-heading sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 bg-bg"
+          data-tauri-drag-region="deep"
+        >
+          {isDesktop ? (
+            <div className="min-w-0 flex-1" />
+          ) : (
+            <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
+              <span className="font-display text-wordmark font-bold">Raven</span>
+            </div>
+          )}
         </div>
         <nav aria-label="Apps" className="flex flex-col gap-0.5">
           <span className="sidebar-group-label px-2 pb-1 text-xs text-faint">Apps</span>

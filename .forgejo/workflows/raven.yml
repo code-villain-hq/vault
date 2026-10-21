@@ -1,5 +1,5 @@
 # `bun run check` for Raven on every push that touches it: fmt, clippy and
-# the Rust tests, design copies up to date, Biome, tsc and the web build.
+# the Rust tests (the desktop shell too), design copies up to date, Biome, tsc and the web build.
 # It runs on the MacBook's runner (label `macos`).
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { api, RequestError, setSessionEndedHandler } from "./api";
+import { forgetToken, hasSession, loadToken } from "./server";
 import type { Me } from "./types";
 
 export type Session =
@@ -27,11 +28,17 @@ export function useSession(): Session {
 
 /** Asks the server who is signed in. */
 export async function loadSession(): Promise<void> {
+  await loadToken();
+  if (!hasSession()) {
+    // The packaged app hasn't signed in to a server yet.
+    set({ status: "signed-out" });
+    return;
+  }
   try {
     signedIn(await api<Me>("GET", "/api/me"));
   } catch (error) {
     if (error instanceof RequestError && error.status === 401) {
-      set({ status: "signed-out" });
+      ended();
       return;
     }
     // The server is restarting or out of reach: try again shortly.
@@ -43,9 +50,15 @@ export function signedIn(me: Me) {
   set({ status: "signed-in", me });
 }
 
-setSessionEndedHandler(() => set({ status: "signed-out" }));
+/** The session ended on the server, or here. */
+function ended() {
+  void forgetToken();
+  set({ status: "signed-out" });
+}
+
+setSessionEndedHandler(ended);
 
 export async function signOut(): Promise<void> {
   await api("POST", "/api/auth/logout").catch(() => {});
-  set({ status: "signed-out" });
+  ended();
 }

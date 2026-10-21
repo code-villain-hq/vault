@@ -3,7 +3,8 @@
 Raven watches the studio's running apps on three levels: Health for
 anyone, Technical for developers, Product for the PO (not built yet). The
 README says what each level shows and what's decided. It is built the
-way Glyph is: a Rust server on Postgres and a React app, without sync.
+way Glyph is: a Rust server on Postgres, a React app (`apps/web`) and a
+Tauri desktop shell (`apps/desktop`), without sync.
 When something here works like Glyph or Forge, their code is the
 reference; keep them alike.
 
@@ -27,10 +28,14 @@ Run `bun run design:sync` after changing them in the vault.
 - `bun run db`: start Postgres (Docker, port 5435). `bun run db:reset` wipes it.
 - `bun run dev`: Rust server (:7580) plus web app (:5175, proxies `/api`).
   It sets `RAVEN_VERSION` to the commit, so calls carry their version.
+- `bun run dev:desktop`: the Tauri app against the running dev server.
+  `bun run build:desktop` packages it; the packaged app asks for a server
+  (the Rust port, 7580, not Vite's).
 - `bun run seed`: the local account and a few dozen calls; needs
   `bun run dev`. The password is in `scripts/seed.ts`.
 - `bun run check`: fmt, clippy, Rust tests, design copies, Biome,
   typecheck, web build. It must pass before you finish.
+  `RAVEN_CHECK_SKIP_DESKTOP=1` leaves the desktop app out.
 - `cargo run -p raven-server -- ingest-key <app>`: a new key an app sends
   its calls with. `reset-password <email>` sets a new password.
 
@@ -44,6 +49,17 @@ Run `bun run design:sync` after changing them in the vault.
   Bearer key; Raven stores only its hash.
 - `health::watch` checks every app every 30 seconds and clears records
   older than 30 days.
+
+## The desktop app
+
+The same web app in a Tauri window, as Glyph's. It keeps its session
+token in the system keychain and sends it as a bearer token with
+`x-raven-client: desktop`; the server allows the `tauri://localhost`
+origin. Signing in with Code Villain happens in the browser, and comes
+back through a `raven://signed-in` link with a one-time code only this
+app can trade (`oidc.rs` says how). Deep links only reach an app macOS
+has registered from a real folder: try a test build, with its own
+identifier, from `~/Applications`.
 
 ## Rules
 

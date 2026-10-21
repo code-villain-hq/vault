@@ -1,6 +1,6 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
 import { ActionPage, type ActionSearch } from "./action";
-import { LoginPage } from "./auth";
+import { LoginPage, SignedInPage } from "./auth";
 import { CallPage } from "./call";
 import { HealthPage } from "./health";
 import { AppLayout, Home, NotFound } from "./layout";
@@ -26,6 +26,20 @@ const login = createRoute({
     error: text(search.error),
   }),
   component: LoginPage,
+});
+
+/** Where a desktop sign-in ends in the browser, to hand back to the app. */
+const signedIn = createRoute({
+  getParentRoute: () => root,
+  path: "/signed-in",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { code?: string; next?: string; error?: string } => ({
+    code: text(search.code),
+    next: text(search.next),
+    error: text(search.error),
+  }),
+  component: SignedInPage,
 });
 
 /** Everything about one watched app: `/<app key>/...`. */
@@ -54,6 +68,7 @@ const call = createRoute({ getParentRoute: () => app, path: "/calls/$trace", com
 const routeTree = root.addChildren([
   index,
   login,
+  signedIn,
   app.addChildren([health, technical, action, call]),
 ]);
 

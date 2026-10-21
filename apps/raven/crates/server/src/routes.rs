@@ -1,6 +1,7 @@
 use axum::extract::State;
 use axum::routing::{any, get, post};
 use axum::{Json, Router, middleware};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -33,6 +34,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/providers", get(providers))
         .route("/api/auth/oidc", get(oidc::start))
         .route("/api/auth/oidc/callback", get(oidc::callback))
+        .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/me", get(accounts::me))
         .route("/api/apps", get(metrics::apps))
         .route("/api/apps/{app}/health", get(metrics::health_page))
@@ -45,6 +47,8 @@ pub fn router(state: AppState) -> Router {
             state.clone(),
             telemetry::record_calls,
         ))
+        // Outside the recording, so the desktop app's preflights aren't calls.
+        .layer(desktop_cors())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -62,4 +66,23 @@ async fn providers(State(state): State<AppState>) -> Result<Json<serde_json::Val
     Ok(Json(
         serde_json::json!({ "oidc": oidc, "password": !oidc, "setup": setup }),
     ))
+}
+
+/// The packaged desktop app runs from its own origin (`tauri://localhost`,
+/// or `http://tauri.localhost` on Windows) and signs requests with a bearer
+/// token, so it may call the API across origins. No cookies are involved.
+fn desktop_cors() -> CorsLayer {
+    use axum::http::{HeaderName, HeaderValue, Method, header};
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list([
+            HeaderValue::from_static("tauri://localhost"),
+            HeaderValue::from_static("http://tauri.localhost"),
+        ]))
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            HeaderName::from_static(crate::auth::CLIENT_HEADER),
+        ])
+        .expose_headers([HeaderName::from_static(crate::auth::SESSION_HEADER)])
 }

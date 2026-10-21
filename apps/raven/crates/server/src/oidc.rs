@@ -12,16 +12,29 @@
 //! the account with the provider's verified email if there is one.
 //!
 //! The round trip carries a signed `state` and a cookie with the nonce and
-//! the PKCE verifier. A copy of Glyph's `oidc.rs` without invites and the
-//! desktop app; keep the two alike. Raven trades the code for tokens itself,
+//! the PKCE verifier. A copy of Glyph's `oidc.rs` without invites; keep the
+//! two alike. Raven trades the code for tokens itself,
 //! with its client secret over TLS, so it checks the ID token's issuer,
 //! audience, expiry and nonce but not its signature (OpenID Connect Core
 //! 1.0, 3.1.3.7, step 6). The provider must therefore be https, except on
 //! this machine.
+//!
+//! The desktop app can't see the browser's cookies. It opens the system
+//! browser at `/api/auth/oidc?desktop=<challenge>`, the hex SHA-256 of a
+//! secret it keeps. Once signed in, the browser lands on the web app's
+//! `/signed-in?code=<code>&next=<path>` page, which opens
+//! `raven://signed-in` with the same query and says the tab can close. The
+//! app trades that one-time code and its secret at
+//! `POST /api/auth/oidc/desktop` for a session. When signing in fails, the
+//! page gets `?error=<problem>` instead and passes it on, so the app stops
+//! waiting and says why.
 
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use anyhow::bail;
+use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::header::{COOKIE, LOCATION, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
@@ -37,14 +50,19 @@ use sqlx::PgConnection;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
-use crate::accounts::{clean_name, normalize_email};
-use crate::auth::{new_token, session_cookie, start_session};
+use crate::accounts::{clean_name, normalize_email, signed_in};
+use crate::auth::{hash_token, new_token, session_cookie, start_session};
+use crate::error::AppError;
 use crate::state::AppState;
 
 /// Ties a sign-in to the browser that started it, against login CSRF.
 const NONCE_COOKIE: &str = "raven_oidc_login";
 /// How long someone has to finish signing in at the provider.
 const VALID_FOR: i64 = 10 * 60;
+/// The web app's page that hands a desktop sign-in back to the app.
+pub const DESKTOP_RETURN: &str = "/signed-in";
+/// How long the desktop app has to collect its session.
+const HANDOFF_FOR: Duration = Duration::from_secs(5 * 60);
 
 pub struct OidcLogin {
     /// Without a trailing slash.
@@ -57,6 +75,8 @@ pub struct OidcLogin {
     client: reqwest::Client,
     /// The provider's endpoints, from its discovery document on first use.
     endpoints: OnceCell<Endpoints>,
+    /// Desktop sign-ins waiting for the app, by the hash of their code.
+    handoffs: Mutex<HashMap<Vec<u8>, Handoff>>,
 }
 
 struct Endpoints {
@@ -64,11 +84,19 @@ struct Endpoints {
     token: String,
 }
 
+struct Handoff {
+    user: Uuid,
+    challenge: String,
+    until: Instant,
+}
+
 /// What the `state` round trip remembers.
 #[derive(Debug, PartialEq)]
 struct Trip {
     nonce: String,
     redirect: String,
+    /// A desktop sign-in: the challenge the app's secret must answer.
+    desktop: Option<String>,
 }
 
 /// The ID token's claims that matter here.
@@ -192,6 +220,7 @@ impl OidcLogin {
             key,
             client,
             endpoints: OnceCell::new(),
+            handoffs: Mutex::default(),
         })
     }
 
@@ -199,13 +228,14 @@ impl OidcLogin {
         Hmac::<Sha256>::new_from_slice(&self.key).expect("HMAC takes any key")
     }
 
-    /// `nonce.expires.redirect` (the redirect hex-encoded), signed.
+    /// `nonce.expires.redirect.desktop` (free text hex-encoded), signed.
     fn state(&self, trip: &Trip) -> String {
         let payload = format!(
-            "{}.{}.{}",
+            "{}.{}.{}.{}",
             trip.nonce,
             Utc::now().timestamp() + VALID_FOR,
             hex::encode(&trip.redirect),
+            trip.desktop.as_deref().unwrap_or_default(),
         );
         let mut mac = self.mac();
         mac.update(payload.as_bytes());
@@ -225,7 +255,12 @@ impl OidcLogin {
             return None;
         }
         let redirect = String::from_utf8(hex::decode(parts.next()?).ok()?).ok()?;
-        Some(Trip { nonce, redirect })
+        let desktop = Some(parts.next()?.to_string()).filter(|d| !d.is_empty());
+        Some(Trip {
+            nonce,
+            redirect,
+            desktop,
+        })
     }
 
     async fn endpoints(&self) -> Result<&Endpoints, Problem> {
@@ -312,6 +347,35 @@ impl OidcLogin {
         }
         Ok(())
     }
+
+    /// A one-time code the desktop app trades for a session.
+    fn hand_off(&self, user: Uuid, challenge: String) -> String {
+        let code = new_token();
+        let now = Instant::now();
+        let mut handoffs = self.handoffs.lock().expect("no handoff panics while held");
+        handoffs.retain(|_, h| h.until > now);
+        handoffs.insert(
+            hash_token(&code),
+            Handoff {
+                user,
+                challenge,
+                until: now + HANDOFF_FOR,
+            },
+        );
+        code
+    }
+
+    /// Who signed in with this code, if the secret answers its challenge.
+    /// A code works once, right or wrong.
+    fn take(&self, code: &str, secret: &str) -> Option<Uuid> {
+        let handoff = self
+            .handoffs
+            .lock()
+            .expect("no handoff panics while held")
+            .remove(&hash_token(code))?;
+        let answered = hex::encode(Sha256::digest(secret.as_bytes())) == handoff.challenge;
+        (answered && handoff.until > Instant::now()).then_some(handoff.user)
+    }
 }
 
 /// A path on this site, nothing that a browser could read as another one:
@@ -357,6 +421,11 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
         })
 }
 
+/// Hex of the given length: tokens and challenges, nothing else.
+fn is_hex(text: &str, len: usize) -> bool {
+    text.len() == len && text.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 /// `nonce.verifier`, both hex, for this flow's paths only.
 fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     let secure = if secure { "; Secure" } else { "" };
@@ -366,32 +435,41 @@ fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     .expect("a cookie made of hex and ASCII is a valid header")
 }
 
-/// Back to the sign-in screen, which explains the problem.
-fn failed(problem: Problem, secure: bool) -> Response {
-    let to = format!("/login?error={}", problem.code());
+/// Back to the sign-in screen, which explains the problem; for a desktop
+/// sign-in, to the page that hands it back to the app.
+fn failed(problem: Problem, desktop: bool, secure: bool) -> Response {
+    let page = if desktop { DESKTOP_RETURN } else { "/login" };
+    let to = format!("{page}?error={}", problem.code());
     redirect(&to, &[nonce_cookie("", 0, secure)])
 }
 
 #[derive(Deserialize)]
 pub struct StartParams {
     redirect: Option<String>,
+    /// From the desktop app: the hex SHA-256 of its secret.
+    desktop: Option<String>,
 }
 
 /// `GET /api/auth/oidc`: off to the provider to sign in.
 pub async fn start(State(state): State<AppState>, Query(params): Query<StartParams>) -> Response {
     let secure = state.cookie_secure;
+    let desktop = params.desktop.is_some();
     let Some(login) = state.oidc_login.as_ref() else {
-        return failed(Problem::NotSetUp, secure);
+        return failed(Problem::NotSetUp, desktop, secure);
     };
     let endpoints = match login.endpoints().await {
         Ok(endpoints) => endpoints,
-        Err(problem) => return failed(problem, secure),
+        Err(problem) => return failed(problem, desktop, secure),
     };
     let nonce = new_token();
     let verifier = new_token();
     let state_param = login.state(&Trip {
         nonce: nonce.clone(),
         redirect: safe_redirect(params.redirect.as_deref()),
+        desktop: params
+            .desktop
+            .filter(|d| is_hex(d, 64))
+            .map(|d| d.to_ascii_lowercase()),
     });
     let cookie = format!("{nonce}.{verifier}");
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
@@ -418,6 +496,12 @@ pub struct CallbackParams {
     error: Option<String>,
 }
 
+/// How a sign-in ends.
+enum Done {
+    Browser { session: String, to: String },
+    Desktop { code: String, to: String },
+}
+
 /// `GET /api/auth/oidc/callback`: where the provider sends people back.
 pub async fn callback(
     State(state): State<AppState>,
@@ -425,24 +509,29 @@ pub async fn callback(
     Query(params): Query<CallbackParams>,
 ) -> Response {
     let secure = state.cookie_secure;
+    let clear = nonce_cookie("", 0, secure);
+    // A trip that can't be read can't say it came from the app.
+    let desktop = (state.oidc_login.as_ref())
+        .zip(params.state.as_deref())
+        .and_then(|(login, s)| login.read_state(s))
+        .is_some_and(|trip| trip.desktop.is_some());
     match finish(&state, &headers, params).await {
-        Ok((session, to)) => redirect(
-            &to,
-            &[
-                session_cookie(&session, secure),
-                nonce_cookie("", 0, secure),
-            ],
+        Ok(Done::Browser { session, to }) => {
+            redirect(&to, &[session_cookie(&session, secure), clear])
+        }
+        Ok(Done::Desktop { code, to }) => redirect(
+            &format!("{DESKTOP_RETURN}?code={code}&next={}", urlencode(&to)),
+            &[clear],
         ),
-        Err(problem) => failed(problem, secure),
+        Err(problem) => failed(problem, desktop, secure),
     }
 }
 
-/// Signs in, returning the new session and where to go.
 async fn finish(
     state: &AppState,
     headers: &HeaderMap,
     params: CallbackParams,
-) -> Result<(String, String), Problem> {
+) -> Result<Done, Problem> {
     let login = state.oidc_login.as_ref().ok_or(Problem::NotSetUp)?;
     if params.error.is_some() {
         return Err(Problem::Provider);
@@ -463,11 +552,21 @@ async fn finish(
 
     let mut db = state.pool.begin().await?;
     let user = account(&mut db, &claims).await?;
-    let session = start_session(&mut *db, user)
-        .await
-        .map_err(|_| Problem::Failed)?;
-    db.commit().await?;
-    Ok((session, trip.redirect))
+    let to = trip.redirect;
+    match trip.desktop {
+        Some(challenge) => {
+            db.commit().await?;
+            let code = login.hand_off(user, challenge);
+            Ok(Done::Desktop { code, to })
+        }
+        None => {
+            let session = start_session(&mut *db, user)
+                .await
+                .map_err(|_| Problem::Failed)?;
+            db.commit().await?;
+            Ok(Done::Browser { session, to })
+        }
+    }
 }
 
 /// The Raven account behind the studio account: linked already, linked now
@@ -523,6 +622,30 @@ async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem
     }
 }
 
+#[derive(Deserialize)]
+pub struct DesktopRequest {
+    code: String,
+    secret: String,
+}
+
+/// `POST /api/auth/oidc/desktop`: the desktop app collects the session its
+/// browser sign-in started.
+pub async fn desktop(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<DesktopRequest>,
+) -> Result<Response, AppError> {
+    let login = state
+        .oidc_login
+        .as_ref()
+        .ok_or_else(|| AppError::not_found("signing in with Code Villain is off"))?;
+    let user = login
+        .take(&request.code, &request.secret)
+        .ok_or_else(|| AppError::unauthorized("this sign-in has expired: start again"))?;
+    let token = start_session(&state.pool, user).await?;
+    signed_in(&state, &headers, &token, user).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543,6 +666,7 @@ mod tests {
         let trip = Trip {
             nonce: "abc".into(),
             redirect: "/forge/technical".into(),
+            desktop: Some("ab".repeat(32)),
         };
         let state = ours.state(&trip);
         assert_eq!(ours.read_state(&state), Some(trip));
@@ -569,5 +693,23 @@ mod tests {
         ] {
             assert!(!trusted_url(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn desktop_codes_work_once_and_only_with_the_secret() {
+        let login = login();
+        let user = Uuid::now_v7();
+        let challenge = hex::encode(Sha256::digest(b"the app's secret"));
+        let code = login.hand_off(user, challenge.clone());
+        assert_eq!(login.take(&code, "a guess"), None);
+        assert_eq!(
+            login.take(&code, "the app's secret"),
+            None,
+            "spent by the guess"
+        );
+
+        let code = login.hand_off(user, challenge);
+        assert_eq!(login.take(&code, "the app's secret"), Some(user));
+        assert_eq!(login.take(&code, "the app's secret"), None);
     }
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiUrl, authHeaders, credentials, rememberToken } from "./server";
 import type { ApiError } from "./types";
 
 /** A failed API call, with the server's error code and message. */
@@ -27,15 +28,19 @@ export function setSessionEndedHandler(handler: () => void) {
 export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await fetch(apiUrl(path), {
       method,
-      credentials: "same-origin",
-      headers: body === undefined ? {} : { "content-type": "application/json" },
+      credentials,
+      headers: {
+        ...authHeaders(),
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new RequestError(0, "offline", "Can't reach Raven. Check your connection.");
   }
+  await rememberToken(response);
 
   if (response.status === 401 && !path.startsWith("/api/auth/")) onSessionEnded();
   if (response.status === 204) return undefined as T;

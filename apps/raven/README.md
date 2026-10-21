@@ -24,6 +24,10 @@ bun run dev     # server on :7580, web app on http://localhost:5175
 bun run seed    # a local account and some calls; password in scripts/seed.ts
 ```
 
+`bun run dev:desktop` opens the desktop app on the dev server, and
+`bun run build:desktop` packages it. The packaged app asks which Raven to
+use and signs in with Code Villain through the browser.
+
 The first person to open Raven sets it up with a password; after that,
 nobody else can sign up with one. With `RAVEN_OIDC_ISSUER`,
 `RAVEN_OIDC_CLIENT_ID`, `RAVEN_OIDC_CLIENT_SECRET` and `RAVEN_PUBLIC_URL`
@@ -53,6 +57,9 @@ running shows as down, which is the truth.
   OpenTelemetry over HTTP as JSON to `/v1/traces` and `/v1/logs`, with a
   key from `cargo run -p raven-server -- ingest-key <app>`. Forge and
   Glyph don't send yet.
+- **Desktop app:** Raven in its own window on macOS, like Glyph. It
+  keeps its session in the keychain and signs in with Code Villain
+  through the browser and a `raven://` link.
 - **Kept:** 30 days of calls, logs and checks, in Postgres.
 
 ## What's decided, not built

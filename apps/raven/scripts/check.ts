@@ -2,11 +2,15 @@
 import { $ } from "bun";
 
 const root = new URL("..", import.meta.url).pathname;
+// Leaves the desktop shell out, for a quick check of the server and web app.
+const crates = process.env.RAVEN_CHECK_SKIP_DESKTOP
+  ? ["--workspace", "--exclude", "raven-desktop"]
+  : ["--workspace"];
 
 const steps: [string, () => Promise<unknown>][] = [
   ["cargo fmt", () => $`cargo fmt --all --check`.cwd(root)],
-  ["cargo clippy", () => $`cargo clippy --workspace --all-targets -- -D warnings`.cwd(root)],
-  ["cargo test", () => $`cargo test --workspace --quiet`.cwd(root)],
+  ["cargo clippy", () => $`cargo clippy ${crates} --all-targets -- -D warnings`.cwd(root)],
+  ["cargo test", () => $`cargo test ${crates} --quiet`.cwd(root)],
   // Shared tokens are generated, and Raven bundles a copy: neither may drift.
   [
     "design tokens are current",

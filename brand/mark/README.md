@@ -63,7 +63,7 @@ its native icons from it:
 | Layer | `apps/layer/src-tauri/icons/icon.svg` | `bun tauri icon src-tauri/icons/icon.svg` (keep the macOS and Windows sizes) |
 | Caster | `apps/caster/Resources/AppIcon.svg` | `make icon` |
 | Glyph | `apps/glyph/apps/web/public/icon.svg` | `bun run design:sync` |
-| Raven | `apps/raven/apps/web/public/icon.svg` | `bun run design:sync` |
+| Raven | `apps/raven/apps/web/public/icon.svg` | `bun run design:sync`; desktop: `tauri icon ../web/public/icon.svg` in `apps/desktop` (keep the macOS and Windows sizes) |
 
 An app icon is the product mark as drawn: the full tile, the strike edge to edge. The tile is the app's night `bg`, so on a night page it blends in and only the letter and its strike show. That is intended. Never add a border, a gradient, a shadow, or a second colour to lift it.
 

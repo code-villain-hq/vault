@@ -1,6 +1,5 @@
 //! Who is making a request: sessions, password hashing, and the extractor
-//! handlers use to require a signed-in user. Glyph's, without workspaces and
-//! the desktop app.
+//! handlers use to require a signed-in user. Glyph's, without workspaces.
 
 use argon2::Argon2;
 use argon2::password_hash::phc::PasswordHash;
@@ -18,6 +17,11 @@ use crate::error::AppError;
 use crate::state::AppState;
 
 pub const SESSION_COOKIE: &str = "raven_session";
+/// Sent by the packaged desktop app, which keeps its session token itself
+/// (in the system keychain) instead of in a cookie.
+pub const CLIENT_HEADER: &str = "x-raven-client";
+/// Where the desktop app gets its session token when it signs in.
+pub const SESSION_HEADER: &str = "x-raven-session";
 const SESSION_DAYS: i64 = 60;
 
 /// A random 256-bit token, hex-encoded, for sessions and ingest keys.

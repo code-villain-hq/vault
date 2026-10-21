@@ -11,6 +11,8 @@
     "db:reset": "docker compose down -v && docker compose up -d --wait",
     "seed": "bun scripts/seed.ts",
     "dev": "bun scripts/dev.ts",
+    "dev:desktop": "bun run --cwd apps/desktop tauri dev",
+    "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
     "typecheck": "tsc -p apps/web",
     "lint": "biome check .",
     "format": "biome check --write .",

@@ -5,16 +5,16 @@
 
 use axum::Json;
 use axum::extract::State;
-use axum::http::StatusCode;
 use axum::http::header::SET_COOKIE;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::auth::{
-    CurrentUser, clear_session_cookie, hash_password, hash_token, session_cookie, session_token,
-    start_session, verify_password,
+    CLIENT_HEADER, CurrentUser, SESSION_HEADER, clear_session_cookie, hash_password, hash_token,
+    session_cookie, session_token, start_session, verify_password,
 };
 use crate::error::AppError;
 use crate::limits::ClientAddress;
@@ -116,6 +116,7 @@ pub async fn has_accounts(pool: &PgPool) -> Result<bool, AppError> {
 pub async fn signup(
     State(state): State<AppState>,
     client: ClientAddress,
+    headers: HeaderMap,
     Json(request): Json<SignupRequest>,
 ) -> Result<Response, AppError> {
     passwords_open(&state)?;
@@ -151,11 +152,12 @@ pub async fn signup(
         .await?;
     let token = start_session(&mut *db, user_id).await?;
     db.commit().await?;
-    signed_in(&state, &token, user_id).await
+    signed_in(&state, &headers, &token, user_id).await
 }
 
 pub async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<Response, AppError> {
     passwords_open(&state)?;
@@ -180,13 +182,13 @@ pub async fn login(
     attempt.succeeded();
 
     let token = start_session(&state.pool, user_id).await?;
-    signed_in(&state, &token, user_id).await
+    signed_in(&state, &headers, &token, user_id).await
 }
 
 /// Ends the current session, if there is one, and clears the cookie.
 pub async fn logout(
     State(state): State<AppState>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
 ) -> Result<Response, AppError> {
     if let Some(token) = session_token(&headers) {
         sqlx::query("DELETE FROM sessions WHERE token_hash = $1")
@@ -247,9 +249,18 @@ fn readable_password() -> String {
         .join("-")
 }
 
-/// The response to signing in: who you are, and the session as a cookie.
-pub async fn signed_in(state: &AppState, token: &str, user_id: Uuid) -> Result<Response, AppError> {
+/// The response to signing in: who you are, and the session as a cookie,
+/// or for the desktop app as a header it keeps in the keychain.
+pub async fn signed_in(
+    state: &AppState,
+    headers: &HeaderMap,
+    token: &str,
+    user_id: Uuid,
+) -> Result<Response, AppError> {
     let me = load_me(&state.pool, user_id).await?;
+    if headers.get(CLIENT_HEADER).is_some_and(|v| v == "desktop") {
+        return Ok(([(SESSION_HEADER, token)], Json(me)).into_response());
+    }
     Ok((
         [(SET_COOKIE, session_cookie(token, state.cookie_secure))],
         Json(me),

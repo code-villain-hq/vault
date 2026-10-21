@@ -1,7 +1,16 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
+import { onAppLink, openInBrowser } from "./platform";
 import { Redirect } from "./redirect";
+import {
+  apiUrl,
+  bundled,
+  DEFAULT_SERVER,
+  normalizeServer,
+  serverUrl,
+  setServerUrl,
+} from "./server";
 import { signedIn, useSession } from "./session";
 import type { Me } from "./types";
 import { AuthScreen, Button, buttonClass, ErrorMessage, Splash, TextField } from "./ui";
@@ -24,18 +33,75 @@ function useSubmit(action: () => Promise<void>) {
   return { busy, error, submit };
 }
 
+/** The server address someone typed, or "" when it doesn't look like one. */
+function serverOrNothing(input: string) {
+  try {
+    return normalizeServer(input);
+  } catch {
+    return "";
+  }
+}
+
+type ServerChoice = {
+  field: ReactNode;
+  apply: () => void;
+  checked: string;
+};
+
+/**
+ * The packaged desktop app asks which server to use; the browser app is
+ * already on it. Returns the field, a function that applies the choice, and
+ * the server whose ways in to show (checked when the field is left).
+ */
+function useServerChoice(): ServerChoice {
+  const [server, setServer] = useState(serverUrl() || DEFAULT_SERVER);
+  // In the browser the app is on its server already: ask it ("").
+  const [checked, setChecked] = useState(() => (bundled ? serverOrNothing(server) : ""));
+  const field = bundled ? (
+    <TextField
+      label="Server"
+      type="url"
+      required
+      placeholder={DEFAULT_SERVER}
+      hint="Where the studio's Raven runs."
+      value={server}
+      onChange={(e) => setServer(e.target.value)}
+      onBlur={() => setChecked(serverOrNothing(server))}
+    />
+  ) : null;
+  const apply = () => {
+    if (!bundled) return;
+    let url: string;
+    try {
+      url = normalizeServer(server);
+    } catch {
+      throw new Error("That server address doesn't look right.");
+    }
+    setServerUrl(url);
+  };
+  return { field, apply, checked };
+}
+
 /** The ways in this server offers, and whether it still needs its first account. */
 export type Providers = { oidc: boolean; password: boolean; setup: boolean };
 
 /** Before the server answers, or when it can't: email and password. */
 const PASSWORD_ONLY: Providers = { oidc: false, password: true, setup: false };
 
-/** How Raven signs people in; null until it first says, so the page doesn't flash. */
-export function useProviders() {
+/**
+ * How a server signs people in; null until it first says, so the page
+ * doesn't flash the wrong way in. The packaged desktop app asks the server
+ * chosen at sign-in.
+ */
+export function useProviders(server = serverUrl()) {
   const [providers, setProviders] = useState<Providers | null>(null);
   useEffect(() => {
+    if (bundled && !server) {
+      setProviders(PASSWORD_ONLY);
+      return;
+    }
     let current = true;
-    fetch("/api/auth/providers")
+    fetch(`${server}/api/auth/providers`)
       .then((r) => (r.ok ? (r.json() as Promise<Providers>) : PASSWORD_ONLY))
       .catch(() => PASSWORD_ONLY)
       .then((p) => {
@@ -44,7 +110,7 @@ export function useProviders() {
     return () => {
       current = false;
     };
-  }, []);
+  }, [server]);
   return providers;
 }
 
@@ -64,8 +130,17 @@ function oidcCode(code: string) {
   return Object.hasOwn(OIDC_PROBLEMS, code) ? code : "oidc_failed";
 }
 
+type SignInProps = {
+  label: string;
+  /** Where to go afterwards. */
+  query: Record<string, string>;
+  /** Runs first: the desktop app applies its choice of server. */
+  before?: () => void;
+};
+
 /** Off to the studio's sign-in; the server brings people back signed in. */
-function CodeVillainButton({ label, query }: { label: string; query: Record<string, string> }) {
+function CodeVillainButton({ label, query, before }: SignInProps) {
+  if (bundled) return <DesktopSignIn label={label} query={query} before={before} />;
   const params = new URLSearchParams(query).toString();
   return (
     <a
@@ -74,6 +149,73 @@ function CodeVillainButton({ label, query }: { label: string; query: Record<stri
     >
       {label}
     </a>
+  );
+}
+
+function hex(bytes: ArrayBuffer | Uint8Array) {
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * The packaged app signs in in the browser, where passkeys and the studio's
+ * session are. The server sends back a one-time code through a
+ * `raven://signed-in` link, and only this app, which knows the secret behind
+ * the challenge, can trade it for a session.
+ */
+function DesktopSignIn({ label, query, before }: SignInProps) {
+  const navigate = useNavigate();
+  const [secret, setSecret] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!secret) return;
+    return onAppLink(async (url) => {
+      if (!url.href.startsWith("raven://signed-in")) return;
+      // The browser says why it didn't work; stop waiting and say so here.
+      const problem = url.searchParams.get("error");
+      if (problem) {
+        setSecret(null);
+        setError(OIDC_PROBLEMS[oidcCode(problem)] ?? null);
+        return;
+      }
+      const code = url.searchParams.get("code");
+      if (!code) return;
+      setSecret(null);
+      try {
+        signedIn(await api<Me>("POST", "/api/auth/oidc/desktop", { code, secret }));
+        await navigate({ to: safeRedirect(url.searchParams.get("next") ?? undefined) });
+      } catch (e) {
+        setError(messageOf(e));
+      }
+    });
+  }, [secret, navigate]);
+
+  const start = async () => {
+    setError(null);
+    try {
+      before?.();
+      const fresh = hex(crypto.getRandomValues(new Uint8Array(32)));
+      const challenge = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fresh)));
+      setSecret(fresh);
+      const params = new URLSearchParams({ ...query, desktop: challenge });
+      await openInBrowser(apiUrl(`/api/auth/oidc?${params}`));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+  };
+
+  return (
+    <>
+      {error && (
+        <div className="mb-4">
+          <ErrorMessage>{error}</ErrorMessage>
+        </div>
+      )}
+      <Button className="w-full" onClick={() => void start()}>
+        {label}
+      </Button>
+      {secret && <p className="mt-3 text-center text-muted">Finish signing in in your browser.</p>}
+    </>
   );
 }
 
@@ -91,7 +233,8 @@ export function LoginPage() {
     redirect?: string;
     error?: string;
   };
-  const providers = useProviders();
+  const server = useServerChoice();
+  const providers = useProviders(server.checked);
 
   if (session.status === "signed-in") return <Redirect to={safeRedirect(redirect)} />;
   if (!providers || session.status === "loading") return <Splash />;
@@ -106,7 +249,8 @@ export function LoginPage() {
             <ErrorMessage>{problem}</ErrorMessage>
           </div>
         )}
-        <CodeVillainButton label="Sign in with Code Villain" query={query} />
+        {server.field && <div className="mb-4">{server.field}</div>}
+        <CodeVillainButton label="Sign in with Code Villain" query={query} before={server.apply} />
         <p className="mt-6 text-center text-muted">
           One account for every Code Villain app.
           <br />
@@ -115,15 +259,24 @@ export function LoginPage() {
       </AuthScreen>
     );
   }
-  if (providers.setup) return <SetupForm redirect={redirect} />;
-  return <PasswordForm redirect={redirect} problem={problem} />;
+  if (providers.setup) return <SetupForm redirect={redirect} server={server} />;
+  return <PasswordForm redirect={redirect} problem={problem} server={server} />;
 }
 
-function PasswordForm({ redirect, problem }: { redirect?: string; problem: string | null }) {
+function PasswordForm({
+  redirect,
+  problem,
+  server,
+}: {
+  redirect?: string;
+  problem: string | null;
+  server: ServerChoice;
+}) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { busy, error, submit } = useSubmit(async () => {
+    server.apply();
     signedIn(await api<Me>("POST", "/api/auth/login", { email, password }));
     await navigate({ to: safeRedirect(redirect) });
   });
@@ -135,6 +288,7 @@ function PasswordForm({ redirect, problem }: { redirect?: string; problem: strin
         </div>
       )}
       <form onSubmit={submit} className="flex flex-col gap-4">
+        {server.field}
         <TextField
           label="Email"
           type="email"
@@ -161,7 +315,7 @@ function PasswordForm({ redirect, problem }: { redirect?: string; problem: strin
 }
 
 /** A Raven without accounts asks for its first one; after that, nobody signs up. */
-function SetupForm({ redirect }: { redirect?: string }) {
+function SetupForm({ redirect, server }: { redirect?: string; server: ServerChoice }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const field = (key: keyof typeof form) => ({
@@ -169,6 +323,7 @@ function SetupForm({ redirect }: { redirect?: string }) {
     onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
   });
   const { busy, error, submit } = useSubmit(async () => {
+    server.apply();
     signedIn(await api<Me>("POST", "/api/auth/signup", form));
     await navigate({ to: safeRedirect(redirect) });
   });
@@ -178,6 +333,7 @@ function SetupForm({ redirect }: { redirect?: string }) {
         Raven has no accounts yet. Yours is the first, and the only one with a password.
       </p>
       <form onSubmit={submit} className="flex flex-col gap-4">
+        {server.field}
         <TextField label="Your name" autoComplete="name" required {...field("name")} />
         <TextField label="Email" type="email" autoComplete="email" required {...field("email")} />
         <TextField
@@ -194,6 +350,49 @@ function SetupForm({ redirect }: { redirect?: string }) {
           {busy ? "Setting up…" : "Set up Raven"}
         </Button>
       </form>
+    </AuthScreen>
+  );
+}
+
+/**
+ * Where a desktop sign-in ends in the browser: opens the desktop app with
+ * the one-time code, and leaves a page that says the tab can go. The code
+ * is no use without the secret only that app holds. When signing in failed,
+ * it says why, and tells the app so it stops waiting.
+ */
+export function SignedInPage() {
+  const { code, next, error } = useSearch({ from: "/signed-in" });
+  const problem = error ? oidcCode(error) : null;
+  const link = problem
+    ? `raven://signed-in?${new URLSearchParams({ error: problem })}`
+    : /^[0-9a-f]{64}$/.test(code ?? "")
+      ? `raven://signed-in?${new URLSearchParams({ code: code ?? "", next: safeRedirect(next) })}`
+      : null;
+
+  useEffect(() => {
+    if (link) window.location.href = link;
+  }, [link]);
+
+  if (!link) return <Redirect to="/" />;
+  if (problem) {
+    return (
+      <AuthScreen title="Couldn't sign you in">
+        <div className="mb-4">
+          <ErrorMessage>{OIDC_PROBLEMS[problem]}</ErrorMessage>
+        </div>
+        <p className="mb-6 text-center text-muted">Raven shows this too. You can close this tab.</p>
+        <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
+          Back to Raven
+        </a>
+      </AuthScreen>
+    );
+  }
+  return (
+    <AuthScreen title="You're signed in">
+      <p className="-mt-3 mb-6 text-center text-muted">Raven is opening. You can close this tab.</p>
+      <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
+        Open Raven
+      </a>
     </AuthScreen>
   );
 }
