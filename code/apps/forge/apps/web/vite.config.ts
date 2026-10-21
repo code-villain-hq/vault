@@ -1,6 +1,6 @@
+import { cargoVersion } from "@code-villain/web/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { cargoVersion } from "@code-villain/web/vite";
 import { defineConfig } from "vite";
 
 // Settings end with it; the Rust workspace keeps the one version.
