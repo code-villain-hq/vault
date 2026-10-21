@@ -28,6 +28,7 @@ private final class PanelBackground: NSView {
 
 final class LauncherPanel: NSPanel {
     var onScreenshot: (() -> Void)?
+    var onSettings: (() -> Void)?
     var onCancel: (() -> Void)?
 
     override var canBecomeKey: Bool { true }
@@ -57,6 +58,9 @@ final class LauncherPanel: NSPanel {
                 return NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: self)
             case "a":
                 return NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self)
+            case ",":
+                onSettings?()
+                return true
             default:
                 break
             }
@@ -113,6 +117,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         configureField()
         configureTable()
         panel.onScreenshot = { [weak self] in self?.captureScreenshot() }
+        // ⌘, opens settings, as in every desktop app (studio/design/behaviour.md).
+        panel.onSettings = { [weak self] in
+            self?.hide()
+            SettingsWindowController.shared.show()
+        }
         panel.onCancel = { [weak self] in self?.hide() }
         engine.refreshApps()
     }

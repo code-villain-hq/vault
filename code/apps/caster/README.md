@@ -90,6 +90,7 @@ Then start Caster.
 | ⏎ | launch app / copy result |
 | Esc | close |
 | ⌘S / ⌘⇧S | save screenshot of the panel to Desktop³ |
+| ⌘, | open settings |
 
 ³ with Screen Recording permission the desktop around the panel is captured;
 without it you get the panel on its own

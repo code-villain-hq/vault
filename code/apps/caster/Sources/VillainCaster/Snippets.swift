@@ -29,8 +29,8 @@ enum Snippets {
     }
 }
 
-/// One field per snippet on the `panel` tone, opened from the status item's
-/// right-click menu. A field saves when you leave it or press Enter
+/// One field per snippet on the `panel` tone, opened with ⌘, in the panel or
+/// from the status item's right-click menu. A field saves when you leave it or press Enter
 /// (studio/design/behaviour.md), and the window ends with Caster's version.
 final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
     static let shared = SettingsWindowController()
