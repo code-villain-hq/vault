@@ -22,7 +22,8 @@ still calls a signature you changed.
 
 The pre-commit hook (`.githooks/pre-commit`, enabled with
 `git config core.hooksPath .githooks`) runs the guard and `tsc`, which take
-seconds. CI runs all of `bun run check`.
+seconds. Git reads that path from the vault's root, where the vault's own
+hook runs Layer's whenever a commit touches `apps/layer`. CI runs all of `bun run check`.
 
 ## Rust tests
 

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Git resolves core.hooksPath from the vault's root, so the vault has one
+# pre-commit: it runs each app's own .githooks/pre-commit, from that app's
+# folder, when the commit touches the app.
+# Enable once per clone: git config core.hooksPath .githooks
+set -e
+root=$(git rev-parse --show-toplevel)
+for hook in "$root"/apps/*/.githooks/pre-commit; do
+  [ -x "$hook" ] || continue
+  app=$(dirname "$(dirname "$hook")")
+  if git diff --cached --quiet -- "$app"; then continue; fi
+  echo "pre-commit: ${app#"$root"/}"
+  (cd "$app" && "$hook")
+done

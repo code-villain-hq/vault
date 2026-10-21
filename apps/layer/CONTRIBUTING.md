@@ -4,7 +4,7 @@
 
 ```bash
 bun install
-git config core.hooksPath .githooks   # the pre-commit guard, once per clone
+git config core.hooksPath .githooks   # the pre-commit guard, once per clone (the vault's hook runs Layer's)
 bun run check                         # everything should pass before you start
 ```
 
