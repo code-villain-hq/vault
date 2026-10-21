@@ -12,8 +12,7 @@ the Fold wordmark is composed from the original outlined brand lettering.
 
 ## Wallpapers
 
-[`wallpapers/`](wallpapers) has four designs, each for three screens (the
-cubes in two palettes). The
+[`wallpapers/`](wallpapers) has four designs, each for three screens. The
 first three use the marks' own construction: `fg` letters on `bg`, cut
 into a poison strike that runs edge to edge, the way the homepage logo
 extends it.
@@ -26,8 +25,8 @@ extends it.
   step above night. They run up to the lit name and its strike, with the
   brand's thin cut around both, so it reads as one name called out of many.
 - **Cubes**: a pattern alone, with no letters. Tumbling blocks lit from
-  the left, in two palettes: `cubes-poison` (the brand colour fading into
-  dark olive) and `cubes-cloak` (the supporting violet fading into wash).
+  the left: `cubes-cloak`, the supporting violet fading into wash. Poison
+  stays out, since a pattern has no strike to carry it.
   The top is one engraved face, its stripes parallel to the back-right
   edge and thinning towards the front; the lit face turns into shade
   through a fan of rays from the bottom corner.

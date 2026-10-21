@@ -23,8 +23,6 @@ TEXTURE = "#1B1B1B"
 # The cube pattern: tumbling blocks, no letters. Each palette lights the
 # left face, fans it into shade, and engraves a grey top over night.
 CUBES = {
-    # Poison, the brand colour, fading into a dark olive.
-    "cubes-poison": dict(lit="#C9E265", shade="#252919", dark=GROUND, top_line="#303030"),
     # Cloak, the supporting colour, fading into wash.
     "cubes-cloak": dict(lit="#5A1470", shade="#1A0D24", dark=GROUND, top_line="#303030"),
 }
