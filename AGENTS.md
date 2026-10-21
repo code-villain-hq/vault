@@ -3,7 +3,7 @@
 The vault holds the whole studio. `studio/` is the company: its look, its words, its decisions. `code/` is everything that builds.
 
 - `studio/brand/`: decisions about look and voice. Change these when the feeling should change. A new palette or a new tone starts here.
-- `studio/design/`: principles, tokens, and reference layouts taken from `studio/brand/`. Apps implement them in their own toolkit. Caster is AppKit; Forge, Layer, Glyph and the site are web; the Code Villain theme (`code/apps/theme`) dresses VS Code, Cursor, Neovim, WezTerm and the Starship prompt. They share the decisions. Read `studio/design/principles.md` before any UI change, in any app, and `studio/design/behaviour.md` before changing what an app does: sign-in, errors, empty states, keys, settings, sync. An issue isn't done until its app follows both.
+- `studio/design/`: principles, tokens, and reference layouts taken from `studio/brand/`. Apps implement them in their own toolkit. Caster is AppKit; Forge, Layer, Glyph, Raven and the site are web; the Code Villain theme (`code/apps/theme`) dresses VS Code, Cursor, Neovim, WezTerm and the Starship prompt. They share the decisions. Read `studio/design/principles.md` before any UI change, in any app, and `studio/design/behaviour.md` before changing what an app does: sign-in, errors, empty states, keys, settings, sync. An issue isn't done until its app follows both.
 - `studio/content/`: blog posts and social posts. The site renders the blog. The posts live in `studio/content/blog`.
 - `code/apps/<app>/`: one product. Read `code/apps/<app>/AGENTS.md` before working there, and run commands from that folder.
 

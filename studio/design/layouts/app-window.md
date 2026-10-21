@@ -1,6 +1,6 @@
 # App window
 
-The frame Forge uses: a sidebar and a top bar that control the content. Layer keeps a full-width top bar instead; see [Layer's exception](#layers-exception). It follows [`../principles.md`](../principles.md) (chrome dims, content leads; tone, not lines) and uses the controls in [`../components.md`](../components.md).
+The frame Forge uses, and Glyph and Raven with it: a sidebar and a top bar that control the content. Layer keeps a full-width top bar instead; see [Layer's exception](#layers-exception). It follows [`../principles.md`](../principles.md) (chrome dims, content leads; tone, not lines) and uses the controls in [`../components.md`](../components.md).
 
 ## Regions
 

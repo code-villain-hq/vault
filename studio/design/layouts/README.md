@@ -6,6 +6,6 @@ Each one shows the hierarchy, the spacing, and the type from `studio/brand/`, so
 
 | Layout | State |
 | --- | --- |
-| [`app-window.md`](app-window.md) | Written. The frame Forge and Layer share. |
+| [`app-window.md`](app-window.md) | Written. The frame every app shares: Forge's, with Layer's exception. |
 | [`blog-post.md`](blog-post.md) | Written. The blog index and post page. |
 | A social card | Not drawn yet. |
