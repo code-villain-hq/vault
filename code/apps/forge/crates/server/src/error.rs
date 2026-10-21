@@ -14,6 +14,14 @@ pub struct AppError {
     message: String,
 }
 
+/// The message, as the response would carry it (for callers outside HTTP,
+/// such as the desktop app's own commands).
+impl Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 impl AppError {
     fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
         AppError {

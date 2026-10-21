@@ -8,3 +8,5 @@ FORGE_COOKIE_SECURE = "0"
 # the vault, where Forge's own services use villain-vault). Drift checks also
 # need ANTHROPIC_API_KEY.
 FORGE_LOCAL_REPOS_ROOT = { value = "../../../..", relative = true }
+# The Postgres the desktop app bundles (code/kit/desktop).
+POSTGRESQL_VERSION = "=18.6.1"

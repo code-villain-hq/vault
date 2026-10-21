@@ -6,13 +6,17 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
 } from "react";
+import type { Place } from "./server";
 import { loadSession } from "./session";
 import { createSyncClient, type Schema } from "./sync";
 
 interface WorkspaceContext {
+  /** Where the workspace lives: this Mac, or a server. */
+  place: Place;
   me: Me;
   workspace: WorkspaceInfo;
   sync: SyncClient<Schema>;
@@ -22,16 +26,25 @@ interface WorkspaceContext {
 
 const Context = createContext<WorkspaceContext | null>(null);
 
-/** Opens the workspace's local copy and keeps it in sync while mounted. */
+/**
+ * Opens the workspace's local copy and keeps it in sync while mounted.
+ * Inside, the workspace's `url_key` is its key in the app's addresses,
+ * which names its server when another place has the same key.
+ */
 export function WorkspaceProvider({
+  place,
   me,
-  workspace,
+  workspace: info,
+  routeKey,
   children,
 }: {
+  place: Place;
   me: Me;
   workspace: WorkspaceInfo;
+  routeKey: string;
   children: ReactNode;
 }) {
+  const workspace = useMemo(() => ({ ...info, url_key: routeKey }), [info, routeKey]);
   const [connection, setConnection] = useState<{
     sync: SyncClient<Schema>;
     refusals: EventTarget;
@@ -42,6 +55,7 @@ export function WorkspaceProvider({
   useEffect(() => {
     const refusals = new EventTarget();
     const sync = createSyncClient({
+      place,
       userId,
       workspaceId,
       // Ask again: maybe signed out, maybe just removed from this workspace.
@@ -57,10 +71,12 @@ export function WorkspaceProvider({
       window.removeEventListener("online", online);
       sync.stop();
     };
-  }, [userId, workspaceId]);
+  }, [place, userId, workspaceId]);
 
   if (!connection) return null;
-  return <Context.Provider value={{ me, workspace, ...connection }}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={{ place, me, workspace, ...connection }}>{children}</Context.Provider>
+  );
 }
 
 export function useWorkspace(): WorkspaceContext {

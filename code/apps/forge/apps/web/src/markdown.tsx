@@ -3,7 +3,7 @@ import { marked } from "marked";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useDraft } from "./draft";
 import { highlightMentions, useMentionNames } from "./mentions";
-import { apiUrl, authHeaders, bundled } from "./server";
+import { apiUrl, authHeaders, placeFor } from "./server";
 
 /** Renders Markdown, sanitised: the text comes from people and agents. */
 export function Markdown({ text, empty }: { text: string; empty?: string }) {
@@ -49,22 +49,25 @@ function prepareMarkdown(root: HTMLElement) {
 }
 
 /**
- * The packaged desktop app isn't on the server's origin and signs requests
- * with a token, which images can't send: fetch attached images with it and
- * show them from memory, and point attachment links at the server. Returns
- * a cleanup. Nothing to do in the browser.
+ * A workspace on this Mac or on a server the packaged app signed in to
+ * isn't on the page's origin, and signs requests with a token, which images
+ * can't send: fetch attached images with it and show them from memory, and
+ * point attachment links at its place. Returns a cleanup. Nothing to do
+ * when the page comes from the workspace's server.
  */
 function showAttachments(root: HTMLElement): (() => void) | undefined {
-  if (!bundled) return;
   const urls: string[] = [];
   let cancelled = false;
   for (const link of root.querySelectorAll<HTMLAnchorElement>('a[href^="/api/"]')) {
-    link.href = apiUrl(link.getAttribute("href") ?? "");
+    const href = link.getAttribute("href") ?? "";
+    if (placeFor(href).kind !== "here") link.href = apiUrl(href);
   }
   for (const image of root.querySelectorAll<HTMLImageElement>('img[src^="/api/"]')) {
     const src = image.getAttribute("src") ?? "";
+    const place = placeFor(src);
+    if (place.kind === "here") continue;
     image.removeAttribute("src");
-    void fetch(apiUrl(src), { headers: authHeaders() })
+    void fetch(apiUrl(src, place), { headers: authHeaders(place) })
       .then((r) => (r.ok ? r.blob() : null))
       .then((blob) => {
         if (!blob || cancelled) return;

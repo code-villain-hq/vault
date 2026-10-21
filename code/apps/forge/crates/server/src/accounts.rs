@@ -37,6 +37,9 @@ pub fn signup_refused() -> AppError {
 
 /// With Code Villain sign-in on, it's the only way in: no passwords.
 fn passwords_open(state: &AppState) -> Result<(), AppError> {
+    if state.on_this_mac {
+        return Err(AppError::not_found("this Forge is the desktop app's own"));
+    }
     match state.oidc_login {
         Some(_) => Err(AppError::not_found("sign in with Code Villain instead")),
         None => Ok(()),

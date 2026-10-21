@@ -1,0 +1,26 @@
+[package]
+name = "code-villain-desktop"
+description = "What a studio desktop app needs to run on its own: Postgres in the app, and the app's server on loopback"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# The archive for POSTGRESQL_VERSION is downloaded once at build time and
+# compiled in, so the app needs no network to start. Each app's
+# .cargo/config.toml pins the version, as this crate's does for its tests.
+postgresql_embedded = { version = "0.22", default-features = false, features = ["bundled", "tokio", "tls-rustls-aws-lc-rs"] }
+rand = "0.10"
+thiserror = "2"
+tokio = { version = "1.53", features = ["full"] }
+tracing = "0.1"
+
+[dev-dependencies]
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-none", "postgres"] }
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

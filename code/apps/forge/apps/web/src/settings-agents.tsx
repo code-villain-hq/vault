@@ -519,7 +519,8 @@ function SecretNotice({ name, secret }: { name: string; secret: string }) {
 
 /** Shown once: the key, and the command that connects Claude Code. */
 function TokenNotice({ name, token }: { name: string; token: string }) {
-  const url = publicUrl("/mcp");
+  const { place } = useWorkspace();
+  const url = publicUrl("/mcp", place);
   const command = `claude mcp add --transport http forge ${url} --header "Authorization: Bearer ${token}"`;
   const [copied, setCopied] = useState(false);
   return (

@@ -31,7 +31,8 @@ import {
 import { useDialogFocus } from "./dialog-focus";
 import { NavIcon, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { useNewIssue } from "./new-issue";
-import { signOut } from "./session";
+import { placeName } from "./server";
+import { signOut, useSession, workspaceEntries } from "./session";
 import { useRecords, useWorkspace } from "./workspace";
 
 interface Command {
@@ -86,7 +87,12 @@ export function CommandMenu() {
 }
 
 function Commands({ onDone }: { onDone: () => void }) {
-  const { sync, me, workspace } = useWorkspace();
+  const { sync, place, me, workspace } = useWorkspace();
+  const session = useSession();
+  const entries = useMemo(
+    () => (session.status === "signed-in" ? workspaceEntries(session.places) : []),
+    [session],
+  );
   const navigate = useNavigate();
   const newIssue = useNewIssue();
   const teams = useTeams();
@@ -206,18 +212,39 @@ function Commands({ onDone }: { onDone: () => void }) {
         icon: <NavIcon icon={icon} />,
         run: go(to),
       })),
-      ...me.workspaces
-        .filter((w) => w.id !== workspace.id)
-        .map((w) => ({
-          id: `workspace-${w.id}`,
+      ...entries
+        .filter((e) => e.key !== workspace.url_key)
+        .map((e) => ({
+          id: `workspace-${e.key}`,
           group: "Workspaces",
-          label: `Switch to ${w.name}`,
-          run: () => void navigate({ to: "/$workspace", params: { workspace: w.url_key } }),
+          label: `Switch to ${e.workspace.name}`,
+          run: () => void navigate({ to: "/$workspace", params: { workspace: e.key } }),
         })),
-      { id: "sign-out", group: "Account", label: "Sign out", run: () => void signOut() },
     );
+    // A workspace on this Mac has no one to sign out.
+    if (place.kind !== "mac") {
+      list.push({
+        id: "sign-out",
+        group: "Account",
+        label: place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out",
+        run: () => void signOut(place).then(() => navigate({ to: "/" })),
+      });
+    }
     return list;
-  }, [current, currentStates, teams, teamsById, projects, me, workspace, sync, navigate, newIssue]);
+  }, [
+    current,
+    currentStates,
+    teams,
+    teamsById,
+    projects,
+    me,
+    workspace,
+    entries,
+    place,
+    sync,
+    navigate,
+    newIssue,
+  ]);
 
   const services = useRecords("Service");
   const specs = useRecords("Spec");

@@ -41,6 +41,12 @@ pub struct AppState {
     pub trust_forwarded_for: bool,
     /// Where files live: attachments, and the GitHub connection's clones.
     pub data_dir: std::path::PathBuf,
+    /// The desktop app's own server, for the workspaces on this Mac: nobody
+    /// signs up or in; the app gets its session from [`crate::local`].
+    pub on_this_mac: bool,
+    /// Origins besides the desktop app's that may call the API across
+    /// origins (the dev web app, for a desktop app in development).
+    pub extra_origins: Vec<String>,
 }
 
 impl AppState {
@@ -61,6 +67,8 @@ impl AppState {
             signup_attempts: Arc::new(Attempts::sign_ups()),
             trust_forwarded_for: false,
             data_dir: "data".into(),
+            on_this_mac: false,
+            extra_origins: Vec::new(),
         }
     }
 
@@ -68,6 +76,18 @@ impl AppState {
     /// proxy that sets it.
     pub fn trusting_forwarded_for(mut self, trust: bool) -> Self {
         self.trust_forwarded_for = trust;
+        self
+    }
+
+    /// The desktop app's own server: no sign-ups and no sign-ins.
+    pub fn on_this_mac(mut self) -> Self {
+        self.on_this_mac = true;
+        self
+    }
+
+    /// Lets `origin` call the API across origins, as the desktop app may.
+    pub fn allowing_origin(mut self, origin: impl Into<String>) -> Self {
+        self.extra_origins.push(origin.into());
         self
     }
 

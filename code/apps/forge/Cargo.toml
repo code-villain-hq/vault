@@ -40,8 +40,10 @@ ts-rs = { version = "12", features = ["uuid-impl", "chrono-impl", "serde-json-im
 uuid = { version = "1.28", features = ["v7", "serde"] }
 
 forge-ai = { path = "crates/ai" }
+code-villain-desktop = { path = "../../kit/desktop" }
 code-villain-sync = { path = "../../kit/sync" }
 forge-domain = { path = "crates/domain" }
+forge-server = { path = "crates/server" }
 forge-sync = { path = "crates/sync" }
 
 # Password hashing is deliberately slow; unoptimised it makes tests crawl.

@@ -42,7 +42,7 @@ export function useGitHubStatus() {
 }
 
 export function GitHubSettingsPage() {
-  const { workspace } = useWorkspace();
+  const { place, workspace } = useWorkspace();
   const { status, error, reload } = useGitHubStatus();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -80,16 +80,16 @@ export function GitHubSettingsPage() {
                 The app needs read access to repository contents, metadata, pull requests, checks
                 and commit statuses, and the push, pull request, check suite, check run, status,
                 installation and installation repositories events. Point its webhook at{" "}
-                <code>{publicUrl("/api/github/webhook")}</code> and its setup URL at{" "}
-                <code>{publicUrl("/api/github/setup")}</code>.
+                <code>{publicUrl("/api/github/webhook", place)}</code> and its setup URL at{" "}
+                <code>{publicUrl("/api/github/setup", place)}</code>.
               </p>
               <p className="text-muted">
                 To let people sign in with GitHub too, also set <code>FORGE_GITHUB_CLIENT_ID</code>{" "}
                 and <code>FORGE_GITHUB_CLIENT_SECRET</code> from the app, give it the "Email
                 addresses" account permission (read), and set its callback URL to{" "}
-                <code>{publicUrl("/api/auth/github/callback")}</code>. Then also turn on "Request
-                user authorization (OAuth) during installation", so Forge can confirm that whoever
-                connects an installation can access it on GitHub.
+                <code>{publicUrl("/api/auth/github/callback", place)}</code>. Then also turn on
+                "Request user authorization (OAuth) during installation", so Forge can confirm that
+                whoever connects an installation can access it on GitHub.
               </p>
             </section>
           )}
