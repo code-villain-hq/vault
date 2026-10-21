@@ -426,4 +426,41 @@ mod tests {
         assert!(seen.iter().any(|r| r.starts_with("POST /repos/acme/web/git/refs ")));
         assert!(seen.iter().any(|r| r.starts_with("PATCH /repos/acme/web/git/refs/pr-images/12 ")));
     }
+
+    /// Against a real pull request: `VILLAIN_PR_IMAGES` is its URL,
+    /// `VILLAIN_PR_IMAGES_FILES` the images, comma-separated, and
+    /// `GITHUB_TOKEN` a token that may write to the repository.
+    #[tokio::test]
+    #[ignore]
+    async fn a_real_pull_request_shows_its_images() {
+        let (Ok(url), Ok(files), Ok(token)) = (
+            std::env::var("VILLAIN_PR_IMAGES"),
+            std::env::var("VILLAIN_PR_IMAGES_FILES"),
+            std::env::var("GITHUB_TOKEN"),
+        ) else {
+            return;
+        };
+        let parts: Vec<&str> = url.trim_end_matches('/').rsplit('/').collect();
+        let (number, owner, repo, host) = (parts[0].parse().unwrap(), parts[3], parts[2], parts[4]);
+        let api_url = match host {
+            "github.com" => "https://api.github.com".to_string(),
+            host => format!("https://{host}/api/v3"),
+        };
+        let images: Vec<Image> = files
+            .split(',')
+            .map(|path| {
+                let bytes = std::fs::read(path).unwrap();
+                let caption = std::path::Path::new(path).file_stem().unwrap().to_string_lossy().to_string();
+                Image { caption, ext: kind_of(&bytes).unwrap(), bytes }
+            })
+            .collect();
+        let gh = GitHub::new(&GithubConfig { api_url, ..Default::default() }, &token).unwrap();
+
+        let shown = gh.show_images(owner, repo, number, &url, &images).await.unwrap();
+
+        for s in &shown {
+            println!("{}: {}", s.caption, s.url);
+        }
+        assert_eq!(shown.len(), images.len());
+    }
 }
