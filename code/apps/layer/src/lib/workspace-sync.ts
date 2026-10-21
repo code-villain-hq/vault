@@ -98,6 +98,7 @@ export async function startWorkspaceSync(hooks: {
           log_sources: client.query("LogSource"),
           agent_models: client.query("AgentModel"),
           notes: client.query("Note"),
+          users: client.query("User"),
         };
         const lists = Object.values(snapshot);
         if (lists.length === last.length && lists.every((list, i) => list === last[i])) continue;

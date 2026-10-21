@@ -229,7 +229,7 @@ fn scan_repos_inner(
 
 /// What a path on disk would become as a project. Git only — no config lock
 /// held, so a batch can ask git about every path before it writes once.
-fn describe_project(path: &str, group: Option<&str>) -> Result<Project> {
+pub(super) fn describe_project(path: &str, group: Option<&str>) -> Result<Project> {
     let dir = PathBuf::from(path);
     if !dir.is_dir() {
         return Err(Error::NotFound(format!("{path} is not a directory")));

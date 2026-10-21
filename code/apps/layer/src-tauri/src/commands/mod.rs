@@ -120,6 +120,7 @@ pub fn notify(app: &tauri::AppHandle, kind: &str, text: impl Into<String>) {
 
 mod projects;
 mod repos;
+mod elsewhere;
 mod cleanup;
 mod cleanup_folders;
 mod cleanup_remote;
@@ -160,6 +161,7 @@ mod workspace;
 
 pub use projects::*;
 pub use repos::*;
+pub use elsewhere::*;
 pub use cleanup::*;
 pub use tasks::*;
 pub use panes::*;

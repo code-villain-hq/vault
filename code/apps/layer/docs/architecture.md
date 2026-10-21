@@ -94,7 +94,9 @@ places, so agents and startup never wait on the workspace:
 - **In** (PROF-14): the window hands every new snapshot to `apply_setup`
   (`workspace/mirror.rs`), which merges only the shared fields. It takes
   nothing while the outbox holds changes the workspace has not seen; the
-  window sends them, then the snapshot again.
+  window sends them, then the snapshot again. A repository with no clone
+  here is not a project: it waits in `shared.elsewhere` (REPO-9), and the
+  first clone of it added takes its record, so nothing is sent.
 - **The move** (PROF-12, `workspace/moving.rs`): the first start makes the
   person and the workspace, records it in `config.json`, and that change
   queues every record as a create.

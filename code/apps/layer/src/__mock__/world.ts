@@ -31,6 +31,7 @@ import type {
   UiPrefs,
   WaitingPane,
 } from "../lib/types";
+import type { Elsewhere } from "../lib/types-profiles";
 
 export interface World {
   projects: Project[];
@@ -58,6 +59,8 @@ export interface World {
   messages: Message[];
   /** Repo notes by project id (MEM-6). */
   notes: Record<string, RepoNote[]>;
+  /** The workspace's repositories with no clone here (REPO-9). */
+  notHere: Elsewhere[];
   /** The Slack bot's connection and threads (§24). */
   slackBot: SlackBotView;
 }
@@ -505,6 +508,7 @@ function busy(): World {
       threads: [{ room: CHAT_ROOM, label: "#ops", link: "https://acme.slack.com/archives/C01/p1760270400000100", pane_id: "pane-chat" }],
     },
     notes: notes(),
+    notHere: [{ id: "r-billing", remote_key: "github.com/acme/billing", name: "billing", default_branch: "main", group: null, added_by: "Ada" }],
   };
 }
 
@@ -550,6 +554,7 @@ function empty(): World {
     issues: [], elsewhere: [], issueTypes: [], transitions: [], requiredFields: [], changed: [], feedback: [], output: {},
     messages: [],
     notes: {},
+    notHere: [],
     slackBot: { status: { state: "off", error: null }, threads: [] },
   };
 }

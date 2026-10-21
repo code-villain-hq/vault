@@ -91,6 +91,35 @@ pub fn forget_origins() {
     ORIGINS.lock().clear();
 }
 
+/// Clone the repository a workspace knows by its remote key
+/// (`github.com/acme/billing`) into `into`, which must not exist yet
+/// (REPO-9). Over SSH first, as most clones on a developer's Mac are, then
+/// over HTTPS, for a public repository or one a credential helper knows.
+pub fn clone_by_key(key: &str, into: &Path) -> Result<()> {
+    let Some((host, path)) = key.split_once('/').filter(|(host, _)| !host.is_empty()) else {
+        return Err(Error::Git(format!("{key} is a folder on another Mac, so there is nothing to clone it from")));
+    };
+    if into.exists() {
+        return Err(Error::Other(format!("{} is there already", into.display())));
+    }
+    let parent = into.parent().ok_or_else(|| Error::Other(format!("{} has no folder around it", into.display())))?;
+    let target = into.to_string_lossy();
+    let said = |e: Error| match e {
+        Error::Git(m) => m,
+        e => e.to_string(),
+    };
+    let ssh = format!("git@{host}:{path}.git");
+    let Err(over_ssh) = run(parent, &["clone", "--quiet", "--", &ssh, &target]) else { return Ok(()) };
+    let https = format!("https://{key}.git");
+    run(parent, &["clone", "--quiet", "--", &https, &target]).map(|_| ()).map_err(|over_https| {
+        Error::Other(format!(
+            "Could not clone {key}.\nOver SSH: {}\nOver HTTPS: {}",
+            said(over_ssh),
+            said(over_https)
+        ))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +137,14 @@ mod tests {
         forget_origins();
         assert_eq!(origin_slug_cached(&dir).unwrap().1, "api");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_repository_kept_by_a_folder_elsewhere_is_not_cloned_and_a_folder_there_is_kept() {
+        let err = clone_by_key("/Users/ada/code/billing", Path::new("/tmp/billing")).unwrap_err();
+        assert!(err.to_string().contains("a folder on another Mac"), "{err}");
+        let there = std::env::temp_dir();
+        let err = clone_by_key("github.com/acme/billing", &there).unwrap_err();
+        assert!(err.to_string().contains("is there already"), "{err}");
     }
 }

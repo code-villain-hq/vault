@@ -72,7 +72,7 @@ import type {
 import type { RunLog } from "./types-runs";
 import type { Operation } from "@layer/types";
 import type {
-  ProfileView, ServerSignedIn, ServerWays, SetupApplied, SetupSnapshot, WorkspacePlace,
+  Elsewhere, ProfileView, ServerSignedIn, ServerWays, SetupApplied, SetupSnapshot, WorkspacePlace,
 } from "./types-profiles";
 
 export const api = {
@@ -90,6 +90,11 @@ export const api = {
   repoHealth: () => invoke<RepoHealth[]>("repo_health"),
   locateProject: (projectId: string, path: string) =>
     invoke<Project>("locate_project", { projectId, path }),
+  listElsewhere: () => invoke<Elsewhere[]>("list_elsewhere"),
+  locateElsewhere: (repositoryId: string, path: string) =>
+    invoke<Project>("locate_elsewhere", { repositoryId, path }),
+  cloneElsewhere: (repositoryId: string, folder: string) =>
+    invoke<Project>("clone_elsewhere", { repositoryId, folder }),
   setProjectUpdateBy: (projectId: string, by: UpdateBy | null) =>
     invoke<void>("set_project_update_by", { projectId, by }),
   /** The command a loop runs in a repository (LOOP-1); null clears it. */

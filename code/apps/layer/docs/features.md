@@ -126,11 +126,21 @@ a loop runs (LOOP-1).
 
   A worktree is removed through git, which refuses one with changes. A
   folder is removed only once it is empty.
+- **REPO-9** In a workspace (§25), a repository the workspace has and this
+  Mac has no clone of MUST be listed as Not on this Mac, above the groups,
+  with where it fetches from and who added it, and counted in the header.
+  It offers Clone, into a folder of its name inside one picked, over SSH
+  and then HTTPS, and Locate…, for a clone already here, taken only when it
+  fetches from the same repository. Either makes it a repository here
+  with the workspace's name, group and settings, sends the workspace
+  nothing, and gets the app's own copy as an added one does (REPO-4). A
+  clone added by Add repositories that fetches from it does the same.
 
 Code: `commands/projects.rs`, `commands/repos.rs`, `commands/cleanup.rs`,
 `commands/cleanup_folders.rs`, `commands/cleanup_remote.rs`, `git/store.rs`,
 `git/upkeep.rs`, `integrations/github/branches.rs`, `ReposView.tsx`,
-`AddRepos.tsx`, `CleanUp.tsx`.
+`AddRepos.tsx`, `CleanUp.tsx`; not on this Mac: `commands/elsewhere.rs`,
+`workspace/mirror.rs`, `ReposElsewhere.tsx`.
 
 Known gaps:
 - Removing a repo leaves panes running in *surviving* tasks' checkouts of
@@ -145,6 +155,10 @@ Known gaps:
   request of yours from it, Clean up cannot tell it from unpushed work and
   does not pre-select it.
 - Task branches are not in the user's clone until pushed and fetched.
+- In a workspace, Remove takes the repository out of the workspace, for
+  everyone in it, not only off this Mac; its dialog does not say so.
+- Clone shows no progress, and a large repository holds its row at
+  Cloning… until it is done.
 
 ## 2. Tasks
 

@@ -57,4 +57,15 @@ export interface SetupSnapshot {
   log_sources: Schema["LogSource"]["record"][];
   agent_models: Schema["AgentModel"]["record"][];
   notes: Schema["Note"]["record"][];
+  users: Schema["User"]["record"][];
+}
+
+/** A repository of the workspace's with no clone on this Mac (REPO-9). */
+export interface Elsewhere {
+  id: string;
+  remote_key: string;
+  name: string;
+  default_branch: string;
+  group: string | null;
+  added_by: string | null;
 }
