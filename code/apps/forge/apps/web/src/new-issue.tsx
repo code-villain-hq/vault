@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { useDialogFocus } from "@code-villain/web";
+import { isTyping, useDialogFocus } from "@code-villain/web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { PRIORITY_LABELS, useLabels, useTeamStates, useTeams, useUsers } from "./data";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
@@ -262,9 +262,4 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
   );
 }
 
-export function isTyping(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-  );
-}
+export { isTyping };

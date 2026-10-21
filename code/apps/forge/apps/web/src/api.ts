@@ -1,3 +1,4 @@
+import { messageOf, UNKNOWN_PROBLEM } from "@code-villain/web";
 import type { ApiError } from "@forge/types";
 import { apiUrl, authHeaders, credentialsFor, type Place, placeFor, rememberToken } from "./server";
 
@@ -55,17 +56,13 @@ export async function api<T>(
     throw new RequestError(
       response.status,
       error?.code ?? "error",
-      error?.message ?? response.statusText,
+      error?.message ?? UNKNOWN_PROBLEM,
     );
   }
   return data as T;
 }
 
-/** A message to show for a failed request. */
-export function messageOf(error: unknown): string {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return message.charAt(0).toUpperCase() + message.slice(1);
-}
+export { messageOf };
 
 /** An uploaded file, and the Markdown that shows or links to it. */
 export async function uploadAttachment(workspaceId: string, file: File): Promise<string> {

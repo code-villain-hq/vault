@@ -1,5 +1,4 @@
-import { Dialog } from "@base-ui/react/dialog";
-import { useDialogFocus } from "@code-villain/web";
+import { type Command, CommandMenu, matching } from "@code-villain/web";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   Bot,
@@ -19,7 +18,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import {
   branchName,
   byId,
@@ -35,58 +34,17 @@ import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
 import { useRecords, useWorkspace } from "./workspace";
 
-interface Command {
-  id: string;
-  group: string;
-  label: string;
-  hint?: string;
-  icon?: ReactNode;
-  run: () => void;
-}
-
-/** ⌘K: jump anywhere, find issues, or act on the open issue. */
-/** Opens the command menu, as ⌘K does. */
-export function openCommandMenu() {
-  window.dispatchEvent(new Event("forge:command-menu"));
-}
-
-export function CommandMenu() {
-  const [open, setOpen] = useState(false);
-  const finalFocus = useDialogFocus(open);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        setOpen((o) => !o);
-      }
-    };
-    const onOpen = () => setOpen(true);
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("forge:command-menu", onOpen);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("forge:command-menu", onOpen);
-    };
-  }, []);
-
+/** ⌘K in Forge: act on the open issue, create, go to, settings, workspaces, and search. */
+export function ForgeCommandMenu() {
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="ui-backdrop fixed inset-0 z-40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup
-          finalFocus={finalFocus}
-          className="ui-dialog fixed top-[14vh] left-1/2 z-40 w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden outline-none transition-[opacity,scale] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
-        >
-          <Dialog.Title className="sr-only">Command menu</Dialog.Title>
-          {open && <Commands onDone={() => setOpen(false)} />}
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <CommandMenu
+      useCommands={useForgeCommands}
+      placeholder="Type a command, or search issues, specs and more…"
+    />
   );
 }
 
-function Commands({ onDone }: { onDone: () => void }) {
+function useForgeCommands(q: string): Command[] {
   const { sync, place, me, workspace } = useWorkspace();
   const session = useSession();
   const entries = useMemo(
@@ -102,9 +60,6 @@ function Commands({ onDone }: { onDone: () => void }) {
   const params = useParams({ strict: false }) as { identifier?: string };
   const current = useIssueByIdentifier(params.identifier ?? "");
   const currentStates = useTeamStates(current?.team_id);
-  const [query, setQuery] = useState("");
-  const [active, setActive] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
 
   const commands = useMemo(() => {
     const ws = { workspace: workspace.url_key };
@@ -322,10 +277,9 @@ function Commands({ onDone }: { onDone: () => void }) {
     [services, specs, decisions, initiatives, navigate, workspace.url_key],
   );
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const matching = q ? commands.filter((c) => c.label.toLowerCase().includes(q)) : commands;
-    if (!q) return matching;
+  return useMemo(() => {
+    const commandsFound = matching(commands, q);
+    if (!q) return commandsFound;
     const found = issues
       .filter((issue) => {
         const id = identifier(issue, teamsById).toLowerCase();
@@ -347,86 +301,6 @@ function Commands({ onDone }: { onDone: () => void }) {
             }),
         }),
       );
-    return [...found, ...findKnowledge(q), ...matching];
-  }, [commands, issues, query, teamsById, navigate, workspace.url_key, findKnowledge]);
-
-  useEffect(() => {
-    listRef.current
-      ?.querySelector(`[data-index="${active}"]`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [active]);
-
-  const run = (command: Command | undefined) => {
-    if (!command) return;
-    onDone();
-    command.run();
-  };
-
-  let lastGroup = "";
-  return (
-    <div>
-      <input
-        // biome-ignore lint/a11y/noAutofocus: the menu opens to type into it
-        autoFocus
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setActive(0);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActive((i) => Math.min(i + 1, results.length - 1));
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActive((i) => Math.max(i - 1, 0));
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            run(results[active]);
-          }
-        }}
-        placeholder="Type a command, or search issues, specs and more…"
-        aria-label="Command"
-        role="combobox"
-        aria-expanded="true"
-        aria-controls="command-list"
-        aria-activedescendant={results[active] ? `command-${results[active].id}` : undefined}
-        className="h-14 w-full bg-transparent px-4 text-query outline-none placeholder:text-faint"
-      />
-      <div
-        ref={listRef}
-        id="command-list"
-        role="listbox"
-        className="max-h-96 overflow-y-auto p-1.5"
-      >
-        {results.length === 0 && <p className="px-3 py-6 text-center text-muted">No results</p>}
-        {results.map((command, index) => {
-          const header = command.group !== lastGroup ? command.group : null;
-          lastGroup = command.group;
-          return (
-            <div key={command.id}>
-              {header && <div className="px-2.5 pt-2 pb-1 text-xs text-faint">{header}</div>}
-              <div
-                id={`command-${command.id}`}
-                role="option"
-                aria-selected={index === active}
-                tabIndex={-1}
-                data-index={index}
-                onMouseMove={() => setActive(index)}
-                onClick={() => run(command)}
-                onKeyDown={() => {}}
-                className="ui-option flex h-9 cursor-default items-center gap-2.5 px-2.5"
-              >
-                {command.icon}
-                <span className="truncate">{command.label}</span>
-                {command.hint && (
-                  <span className="ml-auto font-mono text-xs text-faint">{command.hint}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+    return [...found, ...findKnowledge(q), ...commandsFound];
+  }, [commands, issues, q, teamsById, navigate, workspace.url_key, findKnowledge]);
 }
