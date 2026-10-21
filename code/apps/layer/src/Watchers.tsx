@@ -10,7 +10,7 @@ import { goTo } from "./lib/goto";
 import type { SpecPart, Target } from "./lib/types";
 import { useTheme } from "./lib/theme";
 import { themeTerminals } from "./components/Terminal";
-import { startWorkspaceSync } from "./lib/workspace-sync";
+import { startWorkspaceSync, useSession } from "./lib/workspace-sync";
 
 /**
  * Tauri emits an unfocused event while the window is still coming up.
@@ -69,7 +69,9 @@ export function Watchers() {
   );
 
   useEffect(() => { void refreshAll().catch(fail); }, [refreshAll, fail]);
-  // The shared setup, to the workspace and back (§25).
+  // The shared setup, to the workspace and back (§25), again after
+  // signing in again (PROF-16).
+  const { turn } = useSession();
   useEffect(() => {
     let stop: (() => void) | undefined;
     let gone = false;
@@ -84,7 +86,7 @@ export function Watchers() {
       gone = true;
       stop?.();
     };
-  }, [fail]);
+  }, [fail, turn]);
   // Once at launch too, so a repo in trouble shows on the Repos tab before
   // anyone opens it.
   useEffect(() => { void refreshRepoHealth().catch(fail); }, [refreshRepoHealth, fail]);

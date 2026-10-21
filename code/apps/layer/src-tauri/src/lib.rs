@@ -120,6 +120,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_deep_link::init())
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::ThemeChanged(_) => theme::repaint(window),
@@ -162,6 +163,11 @@ pub fn run() {
             app.manage(workspace::ThisMac::new());
             workspace::attach(handle);
             handle.state::<workspace::ThisMac>().resume(handle.clone());
+            // Code Villain sign-in comes back on `layer://signed-in` (PROF-17).
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                handle.deep_link().on_open_url(|event| workspace::server::arrived(&event.urls()));
+            }
             profiles::show_identity(handle);
             // The profiles that were open with this one last time (PROF-7).
             if !others.is_empty() {
@@ -414,6 +420,13 @@ pub fn run() {
             commands::workspace_place,
             commands::take_setup_writes,
             commands::apply_setup,
+            commands::server_ways,
+            commands::server_sign_in,
+            commands::server_sign_in_browser,
+            commands::server_sign_in_cancel,
+            commands::server_open,
+            commands::server_resume,
+            commands::open_members,
         ])
         .build(context)
         // guard: allow panic — startup, before any agent exists; without a window there is nothing to run.

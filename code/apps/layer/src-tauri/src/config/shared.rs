@@ -42,8 +42,12 @@ pub struct Shared {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceAt {
     /// `this_mac`: the app's own server, on the workspace's own Postgres.
+    /// Otherwise a Layer server's origin (PROF-15).
     pub place: String,
     pub id: String,
+    /// Who signed in to the server, so the window's offline copy is theirs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 pub const THIS_MAC: &str = "this_mac";
@@ -285,7 +289,7 @@ mod tests {
 
     fn in_a_workspace(projects: Vec<Project>) -> AppConfig {
         let mut cfg = AppConfig { projects, ..Default::default() };
-        cfg.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: new_id() });
+        cfg.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: new_id(), user_id: None });
         cfg
     }
 

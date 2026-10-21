@@ -1,17 +1,26 @@
 /**
  * Profiles (§25) for the mock harness: this window is Default, a second
- * profile is open in another window, and a third is closed. Opening one only
- * marks it open; there is no second window to show.
+ * profile is open in another window, a third is closed, and a fourth is on
+ * layer.codevillain.eu. Opening one only marks it open; there is no second
+ * window to show. Signing in to a server signs in at once, as Ada, with
+ * Code Villain or a password, and an invite link joins Code Villain. With
+ * `?place=server` this window is the server's workspace, signed out.
  */
 import { emit } from "@tauri-apps/api/event";
-import type { ProfileView } from "../lib/types-profiles";
+import type { ProfileView, ServerSignedIn } from "../lib/types-profiles";
 
 export function profileAnswers() {
   const profiles: ProfileView[] = [
-    { id: "default", name: "ACME", open: true, current: true, worktree_root: "/Users/you/.villain-worktrees", colour: 0 },
-    { id: "personal", name: "Personal", open: true, current: false, worktree_root: "/Users/you/.villain-worktrees-personal", colour: 2 },
-    { id: "spare", name: "Spare", open: false, current: false, worktree_root: "/Users/you/.villain-worktrees-spare", colour: 4 },
+    { id: "default", name: "ACME", open: true, current: true, worktree_root: "/Users/you/.villain-worktrees", colour: 0, server: null },
+    { id: "personal", name: "Personal", open: true, current: false, worktree_root: "/Users/you/.villain-worktrees-personal", colour: 2, server: null },
+    { id: "spare", name: "Spare", open: false, current: false, worktree_root: "/Users/you/.villain-worktrees-spare", colour: 4, server: null },
+    { id: "code-villain", name: "Code Villain", open: false, current: false, worktree_root: "/Users/you/.villain-worktrees-code-villain", colour: 1, server: "layer.codevillain.eu" },
   ];
+  // `?place=server`: this window is Code Villain's, on the server, signed out.
+  if (new URLSearchParams(location.search).get("place") === "server") {
+    for (const p of profiles) p.current = p.id === "code-villain";
+    profiles[3].open = true;
+  }
   const changed = () => void emit("profiles:changed");
   const find = (id: unknown) => {
     const p = profiles.find((x) => x.id === id);
@@ -20,12 +29,44 @@ export function profileAnswers() {
   };
   const taken = (name: string, except?: string) =>
     profiles.some((p) => p.id !== except && p.name.toLowerCase() === name.trim().toLowerCase());
+  const workspaces: ServerSignedIn["workspaces"] = [
+    { id: "0199a000-0000-7000-8000-000000000001", name: "Code Villain", url_key: "code-villain", role: "member" },
+    { id: "0199a000-0000-7000-8000-000000000002", name: "Billing", url_key: "billing", role: "admin" },
+  ];
+  const signedIn = (address: string): ServerSignedIn => ({
+    host: address.replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
+    email: "ada@codevillain.eu",
+    workspaces,
+    joined: address.includes("/join/") ? workspaces[0].id : null,
+  });
   return {
     list_profiles: () => structuredClone(profiles),
     // The harness has no workspace server: the window works without one.
     workspace_place: () => null,
     take_setup_writes: () => [],
     apply_setup: () => ({ applied: true, setup: false }),
+    server_ways: (a: Record<string, unknown>) => {
+      const address = String(a.address);
+      if (!address.includes(".") && !address.startsWith("localhost")) throw new Error(`“${address}” is not a server address.`);
+      return { oidc: !address.startsWith("localhost"), password: address.startsWith("localhost") };
+    },
+    server_sign_in: (a: Record<string, unknown>) => signedIn(String(a.address)),
+    server_sign_in_browser: async (a: Record<string, unknown>) => {
+      await new Promise((done) => setTimeout(done, 1500));
+      return signedIn(String(a.address));
+    },
+    server_sign_in_cancel: () => null,
+    server_open: (a: Record<string, unknown>) => {
+      const workspace = workspaces.find((w) => w.id === a.id);
+      if (!workspace) throw new Error(`not found: workspace ${String(a.id)}`);
+      const known = profiles.find((p) => p.server === "layer.codevillain.eu" && p.name === workspace.name);
+      if (known) known.open = true;
+      else profiles.push({ id: workspace.url_key, name: workspace.name, open: true, current: false, worktree_root: `/Users/you/.villain-worktrees-${workspace.url_key}`, colour: 3, server: "layer.codevillain.eu" });
+      changed();
+      return null;
+    },
+    server_resume: () => null,
+    open_members: () => null,
     open_profile: (a: Record<string, unknown>) => {
       find(a.id).open = true;
       return null;
@@ -35,7 +76,7 @@ export function profileAnswers() {
       if (!name || name.length > 40) throw new Error("A profile's name is 1 to 40 characters.");
       if (taken(name)) throw new Error(`There is a workspace called ${name} already.`);
       const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "profile";
-      const made: ProfileView = { id, name, open: true, current: false, worktree_root: `/Users/you/.villain-worktrees-${id}`, colour: profiles.length % 6 };
+      const made: ProfileView = { id, name, open: true, current: false, worktree_root: `/Users/you/.villain-worktrees-${id}`, colour: profiles.length % 6, server: null };
       profiles.push(made);
       changed();
       return structuredClone(made);

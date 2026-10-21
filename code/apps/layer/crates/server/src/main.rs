@@ -34,8 +34,13 @@ async fn main() -> anyhow::Result<()> {
         .as_slice()
     {
         [] | ["serve"] => {
-            let state = AppState::new(pool.clone(), config.cookie_secure)
+            let mut state = AppState::new(pool.clone(), config.cookie_secure)
                 .trusting_forwarded_for(config.trust_forwarded_for);
+            if cfg!(debug_assertions) {
+                // `bun run tauri dev` shows the desktop window from Vite, and
+                // a server workspace there calls this server (PROF-15).
+                state = state.allowing_origin("http://localhost:1420");
+            }
             let state = match OidcLogin::from_env()? {
                 Some(login) => {
                     tracing::info!("signing in with Code Villain is on: passwords are off");

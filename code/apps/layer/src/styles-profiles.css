@@ -51,7 +51,10 @@
 
   font-weight: 600;
 }
+/* A server's workspaces under this Mac's (PROF-15). */
+.profile-menu-group + .profile-menu-group { margin-top: 4px; }
 .ctx-item.profile-item { display: flex; align-items: center; gap: 8px; }
+.new-workspace-invite { margin-top: 4px; }
 .profile-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-state { color: var(--muted); font-size: var(--type-ui-small-size); margin-left: 8px; }
 .profile-rows { display: flex; flex-direction: column; gap: 8px; }

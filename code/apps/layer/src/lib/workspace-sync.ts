@@ -11,10 +11,35 @@
 import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-client";
 import type { Schema } from "@layer/types";
 import { listen } from "@tauri-apps/api/event";
+import { useSyncExternalStore } from "react";
 import { api } from "./api";
 import type { SetupSnapshot } from "./types-profiles";
 
 type Lists = SetupSnapshot[keyof SetupSnapshot][];
+
+/**
+ * Whether the server stopped taking this workspace's session, and how many
+ * times it was signed in to again since launch (PROF-16): the sync starts
+ * again on each.
+ */
+let session = { signedOut: false, turn: 0 };
+const watching = new Set<() => void>();
+function setSession(next: typeof session) {
+  session = next;
+  for (const tell of watching) tell();
+}
+export function useSession() {
+  return useSyncExternalStore((tell) => {
+    watching.add(tell);
+    return () => void watching.delete(tell);
+  }, () => session);
+}
+export function signedInAgain() {
+  setSession({ signedOut: false, turn: session.turn + 1 });
+}
+function signedOut() {
+  if (!session.signedOut) setSession({ ...session, signedOut: true });
+}
 
 /**
  * Starts once the workspace's server has (it may never: then nothing does).
@@ -26,7 +51,12 @@ export async function startWorkspaceSync(hooks: {
   onRefused: (message: string) => void;
 }): Promise<() => void> {
   const place = await api.workspacePlace();
-  if (!place) return () => {};
+  if (!place) {
+    // A server workspace with no session: the menu offers Sign in again.
+    const me = (await api.listProfiles()).find((p) => p.current);
+    if (me?.server) signedOut();
+    return () => {};
+  }
   const client = new SyncClient<Schema>({
     store: new IndexedDbStore(`layer-${place.user_id}-${place.workspace_id}`),
     transport: new HttpTransport({
@@ -35,6 +65,10 @@ export async function startWorkspaceSync(hooks: {
       credentials: "omit",
       headers: () => ({ authorization: `Bearer ${place.token}`, "x-layer-client": "desktop" }),
       protocols: () => ["layer", `bearer.${place.token}`],
+      onUnauthorized: () => {
+        signedOut();
+        client.stop();
+      },
     }),
     onReject: (_transaction, error) => hooks.onRefused(error.message),
   });

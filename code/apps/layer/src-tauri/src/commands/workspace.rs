@@ -4,8 +4,10 @@
 use serde::Serialize;
 use serde_json::Value;
 use tauri::{AppHandle, State};
+use tauri_plugin_opener::OpenerExt;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
+use crate::workspace::server::{self, SignedIn, Ways};
 use crate::workspace::{Place, Snapshot, ThisMac};
 
 /// Where the window's sync client finds the workspace, once its server has
@@ -51,4 +53,65 @@ pub async fn apply_setup(app: AppHandle, snapshot: Snapshot) -> Result<Applied> 
         crate::notes::changed(&app);
     }
     Ok(Applied { applied: true, setup })
+}
+
+/// How the server at `address` signs people in (PROF-15). An invite link
+/// is read as its server.
+#[tauri::command]
+pub async fn server_ways(address: String) -> Result<Ways> {
+    let (origin, _) = server::read_address(&address)?;
+    server::ways(&origin).await
+}
+
+/// Sign in to the server at `address` with an email and password.
+#[tauri::command]
+pub async fn server_sign_in(address: String, email: String, password: String) -> Result<SignedIn> {
+    let (origin, invite) = server::read_address(&address)?;
+    server::sign_in(&origin, invite.as_deref(), &email, &password).await
+}
+
+/// Sign in to the server at `address` with Code Villain, in the browser
+/// (PROF-17).
+#[tauri::command]
+pub async fn server_sign_in_browser(app: AppHandle, address: String) -> Result<SignedIn> {
+    let (origin, invite) = server::read_address(&address)?;
+    server::sign_in_browser(&app, &origin, invite.as_deref()).await
+}
+
+#[tauri::command]
+pub fn server_sign_in_cancel() {
+    server::cancel();
+}
+
+/// Open workspace `id` on the server signed in to, in its own window.
+#[tauri::command]
+pub async fn server_open(app: AppHandle, id: String) -> Result<()> {
+    super::off_runtime(move || {
+        server::open(&id)?;
+        super::profiles::changed(&app);
+        Ok(())
+    })
+    .await?
+}
+
+/// Signed in again (PROF-16): the new session becomes this workspace's,
+/// and the window's sync client goes on with it.
+#[tauri::command]
+pub async fn server_resume(app: AppHandle, this_mac: State<'_, ThisMac>) -> Result<Place> {
+    let place = super::blocking(app, |state| {
+        let at = state.config.with(|c| c.shared.workspace.clone());
+        server::resume(&at.ok_or_else(|| Error::Other("This workspace is not on a server.".into()))?)
+    })
+    .await?;
+    this_mac.signed_in(place.clone());
+    Ok(place)
+}
+
+/// The workspace's members page on its server, opened in the browser
+/// (PROF-18).
+#[tauri::command]
+pub async fn open_members(app: AppHandle, this_mac: State<'_, ThisMac>) -> Result<()> {
+    let place = this_mac.place().await.map_err(|_| Error::Other("Sign in to the server first.".into()))?;
+    let page = server::members_page(&place).await?;
+    app.opener().open_url(page, None::<&str>).map_err(|e| Error::Other(e.to_string()))
 }

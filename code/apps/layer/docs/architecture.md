@@ -99,8 +99,31 @@ places, so agents and startup never wait on the workspace:
   person and the workspace, records it in `config.json`, and that change
   queues every record as a create.
 
-A workspace on another server, with sign-in, members and "Not on this Mac",
-is the next change.
+### A workspace on a server
+
+A workspace can live on a Layer server instead (PROF-15). Its profile's
+`config.json` says so (`shared.workspace.place` is the server's origin),
+and the window starts no Postgres and no server: `ThisMac` hands the
+window the server's address and the session from the profile's keychain
+item (PROF-16). Everything above works the same; the sync client talks to
+the server instead of to this Mac.
+
+Signing in (`workspace/server.rs`) is done by Rust, not the page, so the
+session goes from the server to the keychain without passing a page:
+
+```
+ New workspace ──▶ server_sign_in_browser ──▶ browser: /api/auth/oidc?desktop=<sha256 of secret>
+ browser ──▶ layer://signed-in?code= ──▶ whichever copy macOS picks: its own wait,
+     or <base>/signed-in.json for the copy that waits (PROF-17)
+ code + secret ──▶ /api/auth/oidc/desktop ──▶ session, held in this copy
+ server_open(id) ──▶ new profile: registry entry, config.json, keychain item ──▶ its own window
+```
+
+A server with passwords signs in with `server_sign_in` instead. An invite
+link pasted for the address joins its workspace once signed in. When the
+server stops taking the session (401), the window says "signed out" and
+offers Sign in again (`server_resume`), and what changed waits in the
+outbox meanwhile.
 
 ## Where work runs
 
