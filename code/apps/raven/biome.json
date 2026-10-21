@@ -6,7 +6,14 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!storyboards", "!apps/web/src/design", "!**/*.json"]
+    "includes": [
+      "**",
+      "!storyboards",
+      "!packages/types/src",
+      "!apps/web/src/design",
+      "!**/src-tauri/gen",
+      "!**/*.json"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

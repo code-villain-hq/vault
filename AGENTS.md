@@ -22,13 +22,13 @@ Every app except Caster, the theme and the site is built the same way:
 - One sync engine. Each client keeps a local copy of a workspace and works on it offline.
 - A desktop app that runs on its own, with no server. It starts its own server on its own Postgres for the workspaces on that Mac.
 
-The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge and Glyph use it; Raven gets it next, and Layer still keeps its state in local files.
+The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge, Glyph and Raven use it; Layer still keeps its state in local files.
 
-The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge and Glyph have it (`apps/desktop/src-tauri/src/this_mac.rs`); Raven follows it.
+The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge, Glyph and Raven have it (`apps/desktop/src-tauri/src/this_mac.rs`).
 
 ## Signing in with Code Villain
 
-One studio account signs people in to every app: Pocket ID at id.codevillain.eu, over OpenID Connect. The provider says who someone is; each app keeps its own workspaces, roles and invites. Forge and Glyph have it. For the next app:
+One studio account signs people in to every app: Pocket ID at id.codevillain.eu, over OpenID Connect. The provider says who someone is; each app keeps its own workspaces, roles and invites. Forge, Glyph and Raven have it. For the next app:
 
 - Copy Forge's `crates/server/src/oidc.rs` and `crates/server/tests/oidc_login.rs`, the `users.oidc_sub` migration, the `passwords_open` guard and `/api/auth/providers`. On the web side copy `useProviders`, `CodeVillainButton`, `DesktopSignIn` and `OIDC_PROBLEMS` from `auth.tsx`. For the desktop app copy the `<app>://` deep link (tauri-plugin-deep-link 2.6.1) and `openInBrowser`/`onAppLink` in `platform.ts`. Glyph shows the changes a copy needs.
 - In Pocket ID, register a confidential client with the callback `<public url>/api/auth/oidc/callback`, and a group for the people allowed in.

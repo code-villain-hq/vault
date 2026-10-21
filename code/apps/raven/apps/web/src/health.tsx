@@ -2,9 +2,18 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useApi } from "./api";
 import { ago, clock, ms, percent } from "./format";
-import { levelWords, PageBody, PageHeader, useAppKey } from "./layout";
+import {
+  levelWords,
+  NotAvailableOffline,
+  PageBody,
+  PageHeader,
+  useAppName,
+  useAppParams,
+  useAppPath,
+} from "./layout";
 import type { HealthPage as Health, Level, Slot } from "./types";
 import { buttonClass, ErrorMessage, Section, Stat } from "./ui";
+import { useIsAdmin } from "./workspace";
 
 const STATUS_CLASS: Record<Level, string> = {
   up: "ui-status ui-status-ok",
@@ -15,20 +24,25 @@ const STATUS_CLASS: Record<Level, string> = {
 
 /** Level 1, for anyone: is the app up and well, and if not, what to do. */
 export function HealthPage() {
-  const app = useAppKey();
-  const { data, error } = useApi<Health>(`/api/apps/${app}/health`);
+  const name = useAppName();
+  const { data, error, offline, reload } = useApi<Health>(useAppPath("health"));
+  if (offline) {
+    return <NotAvailableOffline title="Health" what={`${name}'s health`} onRetry={reload} />;
+  }
   return (
     <>
-      <PageHeader title="Health" parent={data?.name ?? app} />
+      <PageHeader title="Health" parent={name} />
       <PageBody>
         <ErrorMessage>{error}</ErrorMessage>
-        {data && <HealthBody app={app} health={data} />}
+        {data && <HealthBody health={data} />}
       </PageBody>
     </>
   );
 }
 
-function HealthBody({ app, health }: { app: string; health: Health }) {
+function HealthBody({ health }: { health: Health }) {
+  const params = useAppParams();
+  const isAdmin = useIsAdmin();
   const { status } = health;
   return (
     <>
@@ -47,8 +61,8 @@ function HealthBody({ app, health }: { app: string; health: Health }) {
         </p>
         {status.action && (
           <Link
-            to="/$app/action"
-            params={{ app }}
+            to="/$workspace/$app/action"
+            params={params}
             search={{ name: status.action, window: 900 }}
             className={`${buttonClass("primary")} mt-1 flex`}
           >
@@ -75,10 +89,10 @@ function HealthBody({ app, health }: { app: string; health: Health }) {
         />
         <Stat
           label="Calls"
-          value={health.sending || app === "raven" ? "Sending" : "Not yet"}
+          value={health.sending || health.is_self ? "Sending" : "Not yet"}
           note={
-            health.sending || app === "raven" ? (
-              <Link to="/$app/technical" params={{ app }} className="ui-link">
+            health.sending || health.is_self ? (
+              <Link to="/$workspace/$app/technical" params={params} className="ui-link">
                 See them in Technical
               </Link>
             ) : (
@@ -88,11 +102,18 @@ function HealthBody({ app, health }: { app: string; health: Health }) {
         />
       </div>
 
-      {!health.sending && app !== "raven" && (
+      {!health.sending && !health.is_self && (
         <p className="rounded-lg bg-surface px-4 py-3 text-muted">
           {health.name} doesn't send its calls yet, so Raven knows whether it answers, not how it is
-          doing. Give it a key with <code className="font-mono">raven-server ingest-key {app}</code>{" "}
-          and point its OpenTelemetry exporter at Raven.
+          doing. {isAdmin ? "Give it a key in " : "An admin gives it a key in "}
+          <Link
+            to="/$workspace/settings/apps"
+            params={{ workspace: params.workspace }}
+            className="ui-link"
+          >
+            Settings › Apps
+          </Link>{" "}
+          and points its OpenTelemetry exporter at Raven.
         </p>
       )}
 

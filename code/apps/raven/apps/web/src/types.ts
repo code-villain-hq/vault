@@ -1,9 +1,6 @@
-// What the server sends, as `crates/server/src` writes it (snake_case).
-// Times are ISO strings.
-
-export type ApiError = { code: string; message: string };
-
-export type Me = { user: { id: string; email: string; name: string } };
+// The pages' data, as `crates/server/src/metrics.rs` writes it (snake_case).
+// Times are ISO strings. The synced models and the account API come from
+// `@raven/types`, generated from the Rust.
 
 export type Level = "up" | "warn" | "down" | "unknown";
 
@@ -18,9 +15,8 @@ export type Status = {
 };
 
 export type AppSummary = {
+  id: string;
   key: string;
-  name: string;
-  health_url: string | null;
   /** Whether the app has a key to send its calls with. */
   sending: boolean;
   status: Status;
@@ -45,6 +41,8 @@ export type Check = {
 export type HealthPage = {
   name: string;
   health_url: string | null;
+  /** Raven itself, checked at its own address. */
+  is_self: boolean;
   sending: boolean;
   status: Status;
   uptime: number | null;

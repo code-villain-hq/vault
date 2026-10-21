@@ -1,7 +1,10 @@
 // The verification gate: everything here must pass before a change is done.
+import { readdir } from "node:fs/promises";
 import { $ } from "bun";
 
 const root = new URL("..", import.meta.url).pathname;
+// The studio's sync client, which Raven builds on (`code/kit/sync`).
+const kitClient = `${root}../../kit/sync/client`;
 // Leaves the desktop shell out, for a quick check of the server and web app.
 const crates = process.env.RAVEN_CHECK_SKIP_DESKTOP
   ? ["--workspace", "--exclude", "raven-desktop"]
@@ -11,6 +14,18 @@ const steps: [string, () => Promise<unknown>][] = [
   ["cargo fmt", () => $`cargo fmt --all --check`.cwd(root)],
   ["cargo clippy", () => $`cargo clippy ${crates} --all-targets -- -D warnings`.cwd(root)],
   ["cargo test", () => $`cargo test ${crates} --quiet`.cwd(root)],
+  [
+    "generated types are current",
+    async () => {
+      const before = await snapshot(`${root}packages/types/src`);
+      await $`bun scripts/gen-types.ts`.cwd(root).quiet();
+      if (before !== (await snapshot(`${root}packages/types/src`))) {
+        throw new Error(
+          "packages/types was out of date; it has been regenerated, review and commit it",
+        );
+      }
+    },
+  ],
   // Shared tokens are generated, and Raven bundles a copy: neither may drift.
   [
     "design tokens are current",
@@ -20,7 +35,16 @@ const steps: [string, () => Promise<unknown>][] = [
     },
   ],
   ["biome", () => $`bunx biome check .`.cwd(root)],
+  // The kit's client, with its own settings: Biome checks only under its root.
+  ["biome (sync kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitClient)],
   ["typecheck", () => $`bun run typecheck`.cwd(root)],
+  [
+    "bun test",
+    async () => {
+      await $`bun test`.cwd(root);
+      await $`bun test`.cwd(kitClient);
+    },
+  ],
   ["web build", () => $`bun run --cwd apps/web build`.cwd(root).quiet()],
 ];
 
@@ -35,3 +59,9 @@ for (const [name, run] of steps) {
   }
 }
 console.log("\n✓ all checks passed");
+
+async function snapshot(dir: string): Promise<string> {
+  const files = (await readdir(dir, { recursive: true })).filter((f) => f.endsWith(".ts")).sort();
+  const contents = await Promise.all(files.map((f) => Bun.file(`${dir}/${f}`).text()));
+  return JSON.stringify(files.map((f, i) => [f, contents[i]]));
+}

@@ -1,7 +1,14 @@
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useApi } from "./api";
 import { ago, ms, percent, rate, windowName } from "./format";
-import { PageBody, PageHeader, useAppKey } from "./layout";
+import {
+  NotAvailableOffline,
+  PageBody,
+  PageHeader,
+  useAppName,
+  useAppParams,
+  useAppPath,
+} from "./layout";
 import type { ActionRow, ErrorGroup, TechnicalPage as Technical } from "./types";
 import { ErrorMessage, Section, Stat, WindowPicker } from "./ui";
 
@@ -9,29 +16,35 @@ export type WindowSearch = { window?: number };
 
 /** Level 2, for developers: how stable and fast each action is, and what failed. */
 export function TechnicalPage() {
-  const app = useAppKey();
+  const params = useAppParams();
   const { window = 3600 } = useSearch({ strict: false }) as WindowSearch;
   const navigate = useNavigate();
-  const { data, error } = useApi<Technical>(`/api/apps/${app}/technical?window=${window}`);
+  const name = useAppName();
+  const { data, error, offline, reload } = useApi<Technical>(
+    `${useAppPath("technical")}?window=${window}`,
+  );
+  if (offline) {
+    return <NotAvailableOffline title="Technical" what={`${name}'s calls`} onRetry={reload} />;
+  }
   return (
     <>
-      <PageHeader title="Technical" parent={data?.name ?? app}>
+      <PageHeader title="Technical" parent={name}>
         <WindowPicker
           value={window}
           onChange={(secs) =>
-            void navigate({ to: "/$app/technical", params: { app }, search: { window: secs } })
+            void navigate({ to: "/$workspace/$app/technical", params, search: { window: secs } })
           }
         />
       </PageHeader>
       <PageBody>
         <ErrorMessage>{error}</ErrorMessage>
-        {data && <TechnicalBody app={app} page={data} />}
+        {data && <TechnicalBody page={data} />}
       </PageBody>
     </>
   );
 }
 
-function TechnicalBody({ app, page }: { app: string; page: Technical }) {
+function TechnicalBody({ page }: { page: Technical }) {
   const window = page.window_secs;
   if (page.actions.length === 0) {
     return (
@@ -71,7 +84,7 @@ function TechnicalBody({ app, page }: { app: string; page: Technical }) {
 
       {page.errors.length > 0 && (
         <Section title="Errors" aside={`In ${windowName(window)}, latest first`}>
-          <Errors app={app} errors={page.errors} />
+          <Errors errors={page.errors} />
         </Section>
       )}
 
@@ -79,20 +92,21 @@ function TechnicalBody({ app, page }: { app: string; page: Technical }) {
         title="Actions"
         aside={`Worst first · slowest: ${slowest.name}, ${ms(slowest.p95_ms)}`}
       >
-        <Actions app={app} actions={page.actions} window={window} />
+        <Actions actions={page.actions} window={window} />
       </Section>
     </>
   );
 }
 
-export function Errors({ app, errors }: { app: string; errors: ErrorGroup[] }) {
+export function Errors({ errors }: { errors: ErrorGroup[] }) {
+  const params = useAppParams();
   return (
     <ul className="flex flex-col gap-1">
       {errors.map((group) => (
         <li key={`${group.action} ${group.message}`}>
           <Link
-            to="/$app/calls/$trace"
-            params={{ app, trace: group.last_trace_id }}
+            to="/$workspace/$app/calls/$trace"
+            params={{ ...params, trace: group.last_trace_id }}
             className="ui-row flex flex-col gap-0.5 px-3 py-2"
           >
             <span className="flex items-baseline gap-3">
@@ -120,7 +134,8 @@ export function Errors({ app, errors }: { app: string; errors: ErrorGroup[] }) {
   );
 }
 
-function Actions({ app, actions, window }: { app: string; actions: ActionRow[]; window: number }) {
+function Actions({ actions, window }: { actions: ActionRow[]; window: number }) {
+  const params = useAppParams();
   const cell = "px-3 py-2 text-right tabular-nums";
   return (
     <div className="overflow-x-auto">
@@ -140,8 +155,8 @@ function Actions({ app, actions, window }: { app: string; actions: ActionRow[]; 
             <tr key={action.name} className="ui-row">
               <td className="px-3 py-2">
                 <Link
-                  to="/$app/action"
-                  params={{ app }}
+                  to="/$workspace/$app/action"
+                  params={params}
                   search={{ name: action.name, window }}
                   className="font-mono whitespace-nowrap hover:underline"
                   title={action.name}

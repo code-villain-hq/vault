@@ -1,29 +1,48 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { useApi } from "./api";
 import { ago, ms } from "./format";
-import { PageBody, PageHeader, useAppKey } from "./layout";
+import {
+  NotAvailableOffline,
+  PageBody,
+  PageHeader,
+  useAppName,
+  useAppParams,
+  useAppPath,
+} from "./layout";
 import type { CallPage as Call, LogLine, Span } from "./types";
 import { ErrorMessage, Section } from "./ui";
 
 /** One call: where its time went, step by step, and what it logged. */
 export function CallPage() {
-  const app = useAppKey();
+  const params = useAppParams();
   const { trace } = useParams({ strict: false }) as { trace: string };
-  const { data, error } = useApi<Call>(`/api/apps/${app}/calls/${trace}`);
+  const name = useAppName();
+  const { data, error, offline, reload } = useApi<Call>(
+    useAppPath(`calls/${encodeURIComponent(trace)}`),
+  );
   const root = data?.spans[0];
+  if (offline) {
+    return (
+      <NotAvailableOffline
+        title={`Call ${trace.slice(0, 12)}`}
+        what={`${name}'s calls`}
+        onRetry={reload}
+      />
+    );
+  }
   return (
     <>
       <PageHeader
         title={`Call ${trace.slice(0, 12)}`}
         parent={
-          <Link to="/$app/technical" params={{ app }} className="hover:text-fg">
+          <Link to="/$workspace/$app/technical" params={params} className="hover:text-fg">
             Technical
           </Link>
         }
       />
       <PageBody>
         <ErrorMessage>{error}</ErrorMessage>
-        {data && root && <CallBody app={app} call={data} root={root} />}
+        {data && root && <CallBody call={data} root={root} />}
       </PageBody>
     </>
   );
@@ -48,7 +67,8 @@ function tree(spans: Span[]): [Span, number][] {
   return out;
 }
 
-function CallBody({ app, call, root }: { app: string; call: Call; root: Span }) {
+function CallBody({ call, root }: { call: Call; root: Span }) {
+  const params = useAppParams();
   const start = Date.parse(root.started_at);
   const total = Math.max(root.duration_ms, 0.001);
   const failed = call.spans.find((s) => s.is_error && s.error_message);
@@ -56,8 +76,8 @@ function CallBody({ app, call, root }: { app: string; call: Call; root: Span }) 
     <>
       <section className="flex flex-col gap-2">
         <Link
-          to="/$app/action"
-          params={{ app }}
+          to="/$workspace/$app/action"
+          params={params}
           search={{ name: root.name, window: 3600 }}
           className="font-mono text-title font-semibold break-all hover:underline"
         >

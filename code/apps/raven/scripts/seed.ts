@@ -1,6 +1,7 @@
 // A local test account, for development only. Needs `bun run dev` running,
 // with passwords on (RAVEN_OIDC_ISSUER empty), and no account yet: Raven
-// takes a password sign-up for its first account only.
+// takes a password sign-up for its first account only, which sets it up
+// with a workspace. Everyone after joins by invite.
 // Then it calls a few pages, so Raven has calls of its own to show.
 
 const server = process.env.RAVEN_URL ?? "http://127.0.0.1:7580";
@@ -8,6 +9,7 @@ export const account = {
   name: "Local Villain",
   email: "villain@raven.test",
   password: "raven-local-only",
+  workspace_name: "Code Villain",
 };
 
 const signup = await fetch(`${server}/api/auth/signup`, {
@@ -34,16 +36,19 @@ if (!login.ok || !cookie) {
   console.error(`Couldn't sign in: ${login.status} ${await login.text()}`);
   process.exit(1);
 }
+const me = (await (await fetch(`${server}/api/me`, { headers: { cookie } })).json()) as {
+  workspaces: { id: string }[];
+};
+const w = `/api/w/${me.workspaces[0]?.id}`;
 
 // Some ordinary use, and a few calls that miss, so the pages have something on them.
 const paths = [
   "/api/me",
-  "/api/apps",
-  "/api/apps/raven/health",
-  "/api/apps/raven/technical",
-  "/api/apps/forge/health",
-  "/api/apps/glyph/technical",
-  "/api/apps/nobody/health",
+  `${w}/apps`,
+  `${w}/apps/raven/health`,
+  `${w}/apps/raven/technical`,
+  `${w}/apps/raven/technical?window=86400`,
+  `${w}/apps/nobody/health`,
 ];
 for (let round = 0; round < 6; round++) {
   for (const path of paths) await fetch(`${server}${path}`, { headers: { cookie } });

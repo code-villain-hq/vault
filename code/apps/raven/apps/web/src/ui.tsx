@@ -23,6 +23,7 @@ export function Button({
 export function TextField({
   label,
   hint,
+  className = "",
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
   const id = useId();
@@ -31,7 +32,7 @@ export function TextField({
       <label htmlFor={id} className="text-xs font-medium text-muted">
         {label}
       </label>
-      <input id={id} {...props} className="ui-field h-9 rounded-md px-3" />
+      <input id={id} {...props} className={`ui-field h-9 rounded-md px-3 ${className}`} />
       {hint && <p className="text-xs text-faint">{hint}</p>}
     </div>
   );

@@ -94,11 +94,14 @@ fn service_name(value: &str) -> Result<(), ValidationError> {
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         && !value.starts_with('-');
-    if valid {
-        Ok(())
-    } else {
-        invalid("A service name is lowercase letters, digits and dashes, like forge.")
+    if !valid {
+        return invalid("A service name is lowercase letters, digits and dashes, like forge.");
     }
+    // `/<workspace>/settings` is the workspace's settings, not an app.
+    if value == "settings" {
+        return invalid("\"settings\" can't be a service name in Raven.");
+    }
+    Ok(())
 }
 
 /// An http or https address Raven can call.
@@ -131,6 +134,7 @@ mod tests {
             "-forge",
             "for ge",
             "forge_dev",
+            "settings",
             &"a".repeat(65),
         ] {
             assert!(service_name(bad).is_err(), "{bad}");

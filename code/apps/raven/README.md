@@ -21,22 +21,23 @@ You start at Health and only go deeper when something catches your eye.
 bun install
 bun run db      # Postgres in Docker, on 127.0.0.1:5435
 bun run dev     # server on :7580, web app on http://localhost:5175
-bun run seed    # a local account and some calls; password in scripts/seed.ts
+bun run seed    # a local account, a workspace and some calls; password in scripts/seed.ts
 ```
 
 `bun run dev:desktop` opens the desktop app on the dev server, and
-`bun run build:desktop` packages it. The packaged app asks which Raven to
-use and signs in with Code Villain through the browser.
+`bun run build:desktop` packages it. The packaged app runs Raven on this
+Mac, or signs in to a server with Code Villain through the browser.
 
-The first person to open Raven sets it up with a password; after that,
-nobody else can sign up with one. With `RAVEN_OIDC_ISSUER`,
+The first person to open a Raven server sets it up, with a password and a
+workspace; everyone after joins by invite. With `RAVEN_OIDC_ISSUER`,
 `RAVEN_OIDC_CLIENT_ID`, `RAVEN_OIDC_CLIENT_SECRET` and `RAVEN_PUBLIC_URL`
-set, people sign in with Code Villain and passwords are off.
+set, people sign in with Code Villain and passwords are off; a new
+account still needs an invite.
 
-Raven watches itself, Forge and Glyph. It checks itself from the start.
-For the others, set `RAVEN_FORGE_HEALTH_URL` and `RAVEN_GLYPH_HEALTH_URL`;
-locally they default to their dev servers (7380, 7480). An app that isn't
-running shows as down, which is the truth.
+A workspace is a team's apps. Its admins add the apps it watches in
+Settings → Apps, with each one's health address, and make the key the app
+sends its calls with. Raven checks itself from the start. An app that
+isn't running shows as down, which is the truth.
 
 ## What works
 
@@ -53,13 +54,18 @@ running shows as down, which is the truth.
   bars with the failed part marked, and its slowest calls.
 - **A call:** where its time went, step by step, down to each database
   query, with the logs it wrote and the app's logs just before.
+- **Workspaces:** each watches its team's apps, with members, roles and
+  invites as in Forge. The apps and members sync, so Settings works
+  offline; calls, logs and checks are read live, and say so when the
+  server can't be reached.
 - **Data in:** Raven records its own calls the same way. Other apps send
-  OpenTelemetry over HTTP as JSON to `/v1/traces` and `/v1/logs`, with a
-  key from `cargo run -p raven-server -- ingest-key <app>`. Forge and
-  Glyph don't send yet.
-- **Desktop app:** Raven in its own window on macOS, like Glyph. It
-  keeps its session in the keychain and signs in with Code Villain
-  through the browser and a `raven://` link.
+  OpenTelemetry over HTTP as JSON to `/v1/traces` and `/v1/logs`, with
+  the key from Settings → Apps. Forge and Glyph don't send yet.
+- **Desktop app:** Raven in its own window on macOS, like Glyph. It runs
+  Raven on this Mac, watching the apps on this Mac: itself, the installed
+  Forge and Glyph and their dev servers. For a server it keeps its session
+  in the keychain and signs in with Code Villain through the browser and a
+  `raven://` link.
 - **Kept:** 30 days of calls, logs and checks, in Postgres.
 
 ## What's decided, not built
