@@ -215,8 +215,10 @@ export function ReposView() {
       <div className="wide-head">
         <h2>Repositories</h2>
         <span className="sub">
-          {projects.length} in {groups.length} group{groups.length === 1 ? "" : "s"}
-          {elsewhere.length > 0 && <> · {elsewhere.length} not on this Mac</>}
+          {/* Nothing cloned yet: "0 in 0 groups" says nothing. */}
+          {(projects.length > 0 || elsewhere.length === 0) && <>{projects.length} in {groups.length} group{groups.length === 1 ? "" : "s"}</>}
+          {projects.length > 0 && elsewhere.length > 0 && " · "}
+          {elsewhere.length > 0 && <>{elsewhere.length} not on this Mac</>}
           {troubled > 0 && <> · <span className="trouble-text">{troubled} to fix</span></>}
           {lastSync > 0 && <> · last synced {ago(lastSync * 1000, now)}</>}
         </span>

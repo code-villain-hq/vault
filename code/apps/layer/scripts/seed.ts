@@ -9,7 +9,7 @@ const server = process.env.LAYER_URL ?? "http://127.0.0.1:7680";
 export const account = {
   name: "Local Villain",
   email: "villain@layer.test",
-  password: "layer-local-only",
+  password: "",
   workspace_name: "Code Villain",
 };
 
