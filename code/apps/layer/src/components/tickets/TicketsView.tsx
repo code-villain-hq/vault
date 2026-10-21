@@ -8,7 +8,7 @@ import { readOneOf, write } from "../../lib/persist";
 import { groupByStatus, TICKET_GROUP_LABEL, TICKET_GROUPS, type TicketGroup } from "../../lib/ticket-group";
 import { sortTickets, TICKET_SORT_LABEL, TICKET_SORTS, type TicketSort } from "../../lib/ticket-sort";
 import type { JiraIssue, JiraPage } from "../../lib/types";
-import { ContextMenu, ErrorMessage, useFailure, type MenuItem } from "../ui";
+import { BusyLabel, ContextMenu, ErrorMessage, useFailure, type MenuItem } from "../ui";
 import { isEpicType, typeMap } from "../IssueType";
 import { BrowsePanel } from "./BrowsePanel";
 import { CreateEpicDialog } from "./CreateEpicDialog";
@@ -365,7 +365,7 @@ export function TicketsView() {
               New epic…
             </button>
             <button className="ui-button" onClick={() => void refreshIssues()}>
-              {issuesLoading ? "Refreshing…" : "Refresh"}
+              <BusyLabel busy={issuesLoading} idle="Refresh" working="Refreshing…" />
             </button>
           </>
         ) : (

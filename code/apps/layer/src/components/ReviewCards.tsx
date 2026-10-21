@@ -5,7 +5,7 @@ import { goTo } from "../lib/goto";
 import { ago } from "../lib/time";
 import { useStore } from "../store";
 import type { AuthoredPr, ReviewRequest } from "../lib/types";
-import { ErrorMessage, Spinner, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, useFailure } from "./ui";
 
 const NO_BROWSER = "Couldn't open the browser. Try again.";
 
@@ -195,7 +195,7 @@ export function AuthoredCard({
             title={`A task on ${pr.head}, to work on it here`}
             onClick={(e) => { e.stopPropagation(); void start(); }}
           >
-            {starting ? <Spinner /> : "Start task"}
+            <BusyLabel busy={starting} idle="Start task" working="Starting…" />
           </button>
         )}
       </div>

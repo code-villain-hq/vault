@@ -13,7 +13,7 @@ import { CleanUp } from "./CleanUp";
 import { ReposElsewhere } from "./ReposElsewhere";
 import { RepoNotes } from "./RepoNotes";
 import { ChevronIcon } from "./icons";
-import { Combo, Confirm, ErrorMessage, Spinner, useFailure } from "./ui";
+import { BusyLabel, Combo, Confirm, ErrorMessage, useFailure } from "./ui";
 
 export function ReposView() {
   const projects = useStore((s) => s.projects);
@@ -249,7 +249,7 @@ export function ReposView() {
           title="Fetch every repo into the app's copy, and fast-forward each clone's default branch where that is safe"
           onClick={() => void sync(projects.map((p) => p.id))}
         >
-          {syncingAll ? <span className="btn-busy"><Spinner />Syncing…</span> : "Sync all"}
+          <BusyLabel busy={syncingAll} idle="Sync all" working="Syncing…" />
         </button>
         {/* The primary while nothing needs fixing or cloning; a repository
             in trouble or not on this Mac has its own next action. */}
@@ -348,7 +348,7 @@ export function ReposView() {
                     {noted.length ? `${noted.length} note${noted.length === 1 ? "" : "s"}` : "Notes"}
                   </button>
                   <button className="ui-button" disabled={busy} onClick={() => void sync([p.id])}>
-                    {busy ? <span className="btn-busy"><Spinner />Syncing…</span> : "Sync"}
+                    <BusyLabel busy={busy} idle="Sync" working="Syncing…" />
                   </button>
                   <button className="ui-button ui-button-danger" onClick={() => askRemove(p)}>
                     Remove

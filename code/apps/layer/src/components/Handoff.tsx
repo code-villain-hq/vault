@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { markStopping, useStore } from "../store";
 import type { PaneInfo, TaskView } from "../lib/types";
-import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
 
 /**
  * Hand a pane's work to another agent (PANE-9): what opens the dialog, and
@@ -101,14 +101,11 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
             disabled={handoffBusy || handoffLoading || !handoffPrompt.trim()}
             onClick={() => void runHandoff()}
           >
-            {handoffBusy ? (
-              <span className="btn-busy">
-                <Spinner />
-                {stopOld ? "Starting and stopping…" : "Starting…"}
-              </span>
-            ) : (
-              `Start ${agents.find((a) => a.id === handoff.agentId)?.name ?? "agent"}`
-            )}
+            <BusyLabel
+              busy={handoffBusy}
+              idle={`Start ${agents.find((a) => a.id === handoff.agentId)?.name ?? "agent"}`}
+              working={stopOld ? "Starting and stopping…" : "Starting…"}
+            />
           </button>
         </>
       }

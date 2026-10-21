@@ -10,7 +10,7 @@ import { useStore } from "../store";
 import type { AuthoredPr, ReviewRequest, TeamReviews } from "../lib/types";
 import { ChevronIcon } from "./icons";
 import { AuthoredCard, identity, ReviewCard } from "./ReviewCards";
-import { ContextMenu, type MenuItem } from "./ui";
+import { BusyLabel, ContextMenu, type MenuItem } from "./ui";
 
 /** `@fe` when that is all we know; the team's own name when GitHub sent one. */
 function teamLabel(team: TeamReviews): string {
@@ -249,7 +249,7 @@ export function ReviewsView() {
         </button>
         <div className="spacer" />
         <button type="button" className="ui-button" onClick={() => void refresh()}>
-          {loading ? "Refreshing…" : "Refresh"}
+          <BusyLabel busy={loading} idle="Refresh" working="Refreshing…" />
         </button>
       </div>
 

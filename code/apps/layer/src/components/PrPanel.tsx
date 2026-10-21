@@ -9,7 +9,7 @@ import { useStore } from "../store";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
 import { ChevronIcon, CopyIcon, ExternalIcon, PlusIcon } from "./icons";
-import { Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
+import { BusyLabel, Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 import { PrFeedback } from "./PrFeedback";
 import { Outgoing } from "./Outgoing";
 import { PrReadErrors } from "./PrReadErrors";
@@ -463,7 +463,7 @@ export function PrPanel({
           <b>Pull requests</b>
         )}
         <div className="spacer" />
-        <button className="ui-button" onClick={() => void load()}>{loading ? "Refreshing…" : "Refresh"}</button>
+        <button className="ui-button" onClick={() => void load()}><BusyLabel busy={loading} idle="Refresh" working="Refreshing…" /></button>
         <button className="ui-button" disabled={busy} onClick={() => void push()}>
           Push all
         </button>

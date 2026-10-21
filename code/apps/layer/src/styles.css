@@ -831,17 +831,11 @@ body.dragging * { pointer-events: none; }
 /* The browser panel runs edge to edge; its note keeps off the edges. */
 .browser > .error-message { margin: 6px 8px; }
 
-/* A spinner standing in for a button's label: same box, so the button does
-   not change width the moment it starts working. */
-.btn-busy {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-.btn-busy .spin {
-  border-color: color-mix(in srgb, currentColor 35%, transparent);
-  border-top-color: currentColor;
-}
+/* A button's label and its busy label in one cell (BusyLabel): the button
+   keeps the width of the longer, so it does not jump when it starts. */
+.busy-label { display: inline-grid; }
+.busy-label > span { grid-area: 1 / 1; text-align: center; }
+.busy-label > [data-off] { visibility: hidden; }
 .spin {
   width: 11px;
   height: 11px;

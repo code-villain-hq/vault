@@ -88,6 +88,22 @@ export function Spinner() {
 }
 
 /**
+ * A button's label that becomes its busy label while the work runs ("Sync"
+ * becomes "Syncing…"): a busy button keeps its place and changes its label
+ * (studio/design/behaviour.md), with no spinner in it. Both labels share one
+ * grid cell and the one not showing is only hidden, so the button keeps the
+ * width of the longer and does not jump the moment it starts.
+ */
+export function BusyLabel({ busy, idle, working }: { busy: boolean; idle: ReactNode; working: ReactNode }) {
+  return (
+    <span className="busy-label">
+      <span data-off={busy || undefined}>{idle}</span>
+      <span data-off={!busy || undefined}>{working}</span>
+    </span>
+  );
+}
+
+/**
  * Show or hide the task list.
  *
  * It lives at the left edge of the main panel rather than in the title bar:
@@ -281,8 +297,8 @@ export function ContextMenu({
  * `window.confirm` cannot be used: the webview returns true without ever
  * drawing a dialog, so every guard written that way silently approves itself.
  *
- * If `onConfirm` returns a promise the dialog stays up and spins until it
- * settles, then closes itself. Closing first and acting after is how removing
+ * If `onConfirm` returns a promise the dialog stays up, its button saying it
+ * is busy, until it settles, then closes itself. Closing first and acting after is how removing
  * a repository from a task looked like nothing had happened at all for the
  * seconds git spent on the worktree — and left the button there to be pressed
  * again while the first one was still running. An `onConfirm` that returns
@@ -337,11 +353,7 @@ export function Confirm({
             disabled={running}
             onClick={go}
           >
-            {running ? (
-              <span className="btn-busy"><Spinner />{busyLabel ?? "Working…"}</span>
-            ) : (
-              confirmLabel
-            )}
+            <BusyLabel busy={running} idle={confirmLabel} working={busyLabel ?? "Working…"} />
           </button>
         </>
       }
