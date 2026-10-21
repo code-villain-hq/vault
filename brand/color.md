@@ -106,19 +106,16 @@ hosts are defined in [`design/components.md`](../design/components.md).
 
 ## The palette
 
-The names above are built from these.
+Poison and cloak seed the names above: poison the main action and live
+signals, cloak the focus colour. The greys are pure greys, worked out
+rather than picked. Poison-deep and wash are brand hues for the marks
+and images.
 
 | Colour       | Value     |
 | ------------ | --------- |
-| night        | `#0A0B0D` |
 | cloak        | `#5A1470` |
-| cloak-hover  | `#6B1884` |
 | poison       | `#C9E265` |
 | poison-deep  | `#4C6A00` |
 | wash         | `#1A0D24` |
-| ink          | `#ECECF1` |
-| muted        | `#9B9BA8` |
-| panel        | `#12131A` |
-| line         | `#2A2B36` |
 
 The numbers live in [`design/tokens/color.json`](../design/tokens/color.json).
