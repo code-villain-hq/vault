@@ -119,13 +119,13 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 ## Layout
 
 - `crates/domain`: models, validation, sync protocol types (no database).
-- `crates/sync`: the sync engine: applying transactions, change log, snapshots.
+- `crates/sync`: Forge's rules for the studio's sync engine (`code/kit/sync`):
+  who may write what, server-set fields, reviews, spec changes, work.
 - `crates/server`: axum server: HTTP API, WebSocket feed, accounts, invites,
   MCP, the GitHub and Forgejo connections, Code Villain sign-in (`oidc.rs`),
   drift checks.
 - `crates/ai`: model provider (Claude), agent loop, read-only repository
   access.
-- `packages/sync-client`: client side of sync (local store, outbox, feed).
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `apps/desktop`: Tauri shell.
 - `migrations`: SQL schema, applied by the server on start.
@@ -155,5 +155,6 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
    `updated_at` columns.
 2. In `crates/domain`: the record, create and patch types, a `ModelKind`
    variant, and the `match` arms the compiler asks for.
-3. In `crates/sync`: any fields only the server may set (`add_server_fields`).
+3. In `crates/sync/src/rules.rs`: any fields only the server may set
+   (`add_server_fields`).
 4. `bun run gen:types`, then use it from the app.

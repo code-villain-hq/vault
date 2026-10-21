@@ -699,6 +699,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
+name = "code-villain-sync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "futures",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1464,9 +1480,9 @@ name = "forge-domain"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "code-villain-sync",
  "serde",
  "serde_json",
- "thiserror 2.0.21",
  "ts-rs",
  "uuid",
 ]
@@ -1480,6 +1496,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
+ "code-villain-sync",
  "forge-ai",
  "forge-domain",
  "forge-sync",
@@ -1512,10 +1529,10 @@ name = "forge-sync"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "code-villain-sync",
  "forge-domain",
  "serde_json",
  "sqlx",
- "thiserror 2.0.21",
  "tokio",
  "uuid",
 ]

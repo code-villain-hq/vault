@@ -10,6 +10,16 @@
         "typescript": "7.0.2",
       },
     },
+    "../../kit/sync/client": {
+      "name": "@code-villain/sync-client",
+      "dependencies": {
+        "idb": "8.0.4",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.3",
+        "fake-indexeddb": "6.2.5",
+      },
+    },
     "apps/desktop": {
       "name": "@forge/desktop",
       "devDependencies": {
@@ -20,7 +30,7 @@
       "name": "@forge/web",
       "dependencies": {
         "@base-ui/react": "1.9.0",
-        "@forge/sync-client": "workspace:*",
+        "@code-villain/sync-client": "workspace:*",
         "@forge/types": "workspace:*",
         "@tabler/icons-react": "3.48.0",
         "@tanstack/react-router": "1.170.44",
@@ -44,18 +54,11 @@
         "vite": "8.3.4",
       },
     },
-    "packages/sync-client": {
-      "name": "@forge/sync-client",
-      "dependencies": {
-        "@forge/types": "workspace:*",
-        "idb": "8.0.4",
-      },
-      "devDependencies": {
-        "fake-indexeddb": "6.2.5",
-      },
-    },
     "packages/types": {
       "name": "@forge/types",
+      "dependencies": {
+        "@code-villain/sync-client": "workspace:*",
+      },
     },
   },
   "packages": {
@@ -83,6 +86,8 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.15", "", { "os": "win32", "cpu": "x64" }, "sha512-yAzh4UqEImV6Hcy0zjUqNfJAsUhoD64FBQCdTG8Md/Z2wQeVP/ZmJ3XRYAs1g8J9fjTFyl2fCtc5FB5til47+g=="],
 
+    "@code-villain/sync-client": ["@code-villain/sync-client@workspace:../../kit/sync/client"],
+
     "@floating-ui/core": ["@floating-ui/core@1.8.0", "", { "dependencies": { "@floating-ui/utils": "^0.2.12" } }, "sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ=="],
 
     "@floating-ui/dom": ["@floating-ui/dom@1.8.0", "", { "dependencies": { "@floating-ui/core": "^1.8.0", "@floating-ui/utils": "^0.2.12" } }, "sha512-yXSrzeHZBTZadLOlfyhCkJHNeLJnHRnRInwdZ40L7ZiaAtrBwoYlsDrX3v5zB1Utk7CLfzcOVnVVWoXEky7Ceg=="],
@@ -92,8 +97,6 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
     "@forge/desktop": ["@forge/desktop@workspace:apps/desktop"],
-
-    "@forge/sync-client": ["@forge/sync-client@workspace:packages/sync-client"],
 
     "@forge/types": ["@forge/types@workspace:packages/types"],
 

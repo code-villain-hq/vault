@@ -1,4 +1,4 @@
-import type { SyncClient } from "@glyph/sync-client";
+import type { SyncClient } from "@code-villain/sync-client";
 import type { Me, ModelKind, WorkspaceInfo } from "@glyph/types";
 import {
   createContext,

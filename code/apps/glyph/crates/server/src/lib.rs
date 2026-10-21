@@ -10,7 +10,6 @@ pub mod invites;
 pub mod limits;
 pub mod members;
 pub mod models;
-pub mod notify;
 pub mod oidc;
 pub mod routes;
 pub mod state;

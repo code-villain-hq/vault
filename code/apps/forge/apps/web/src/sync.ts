@@ -1,4 +1,4 @@
-import { HttpTransport, IndexedDbStore, SyncClient } from "@forge/sync-client";
+import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-client";
 import type {
   AiRun,
   Comment,

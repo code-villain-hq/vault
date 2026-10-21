@@ -7,7 +7,7 @@ use forge_server::drift::{self, DriftSettings};
 use forge_server::github::GitHubApp;
 use forge_server::github::login::GitHubLogin;
 use forge_server::oidc::OidcLogin;
-use forge_server::{AppState, accounts, app, forgejo, notify, runners};
+use forge_server::{AppState, accounts, app, forgejo, runners};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -70,7 +70,11 @@ async fn main() -> anyhow::Result<()> {
                 );
                 state = state.with_oidc_login(login);
             }
-            tokio::spawn(notify::listen(state.pool.clone(), state.wake.clone()));
+            tokio::spawn(code_villain_sync::listen(
+                state.pool.clone(),
+                forge_sync::NOTIFY_CHANNEL,
+                state.wake.clone(),
+            ));
             tokio::spawn(drift::worker(state.clone()));
             tokio::spawn(runners::worker(state.clone()));
             tokio::spawn(forgejo::worker(state.clone()));

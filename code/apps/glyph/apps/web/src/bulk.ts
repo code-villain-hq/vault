@@ -1,6 +1,6 @@
 // Changes too big for one transaction, such as an import or renaming a
 // namespace, go to the server in batches.
-import type { SyncClient } from "@glyph/sync-client";
+import type { SyncClient } from "@code-villain/sync-client";
 import type { Operation, Suggestion, Translation } from "@glyph/types";
 import type { Schema } from "./sync";
 

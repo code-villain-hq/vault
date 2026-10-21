@@ -8,7 +8,7 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::SyncError;
-use crate::apply::uuid_at;
+use crate::rules::uuid_at;
 
 /// A team's review status: the last of its started statuses when it has
 /// several, as `forge_domain::review_state` has it.

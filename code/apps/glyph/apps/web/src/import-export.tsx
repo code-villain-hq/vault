@@ -1,4 +1,4 @@
-import { uuidv7 } from "@glyph/sync-client";
+import { uuidv7 } from "@code-villain/sync-client";
 import { useMemo, useState } from "react";
 import { messageOf } from "./api";
 import { transactInBatches } from "./bulk";

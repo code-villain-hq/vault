@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
-    "@glyph/sync-client": "workspace:*",
+    "@code-villain/sync-client": "workspace:*",
     "@glyph/types": "workspace:*",
     "@tanstack/react-router": "1.170.44",
     "@tauri-apps/api": "2.12.3",

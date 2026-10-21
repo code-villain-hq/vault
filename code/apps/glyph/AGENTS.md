@@ -2,7 +2,7 @@
 
 Glyph translates an app's i18n strings with local models, and a team reviews
 what the models propose. It is built the way Forge is: a Rust server on
-Postgres with Forge's sync engine (the same protocol and tables), a React
+Postgres with the studio's sync engine (`code/kit/sync`, the one Forge uses), a React
 app that keeps a local copy of the workspace, and a Tauri shell around it.
 When something here works like Forge, Forge's code is the reference; keep
 the two alike rather than letting them drift apart.
@@ -84,13 +84,12 @@ text's confidence and origin.
 ## Layout
 
 - `crates/domain`: models, validation, sync protocol types (no database).
-- `crates/sync`: the sync engine: applying transactions, change log,
-  snapshots. A copy of Forge's.
+- `crates/sync`: Glyph's rules for the studio's sync engine (`code/kit/sync`):
+  admins' models, texts written by hand, what a language takes with it.
 - `crates/llm`: model client, prompts, reading the models file, starting
   llama-server.
 - `crates/server`: axum server: HTTP API, WebSocket feed, accounts,
   invites, runs, models.
-- `packages/sync-client`: client side of sync (local store, outbox, feed).
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `apps/desktop`: Tauri shell.
 - `migrations`: SQL schema, applied by the server on start.
@@ -122,5 +121,5 @@ text's confidence and origin.
    `updated_at` columns.
 2. In `crates/domain`: the record, create and patch types, a `ModelKind`
    variant, and the `match` arms the compiler asks for.
-3. In `crates/sync`: any fields only the server may set.
+3. In `crates/sync/src/rules.rs`: any fields only the server may set.
 4. `bun run gen:types`, then add it to `Schema` in `apps/web/src/sync.ts`.

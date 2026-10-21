@@ -1,4 +1,4 @@
-import { uuidv7 } from "@glyph/sync-client";
+import { uuidv7 } from "@code-villain/sync-client";
 import type { Language, Operation } from "@glyph/types";
 import { type FormEvent, useState } from "react";
 import { type Confirmation, ConfirmDialog } from "./confirm";
