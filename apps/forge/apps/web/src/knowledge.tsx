@@ -815,8 +815,8 @@ function newestDecisionFirst(a: Decision, b: Decision): number {
 }
 
 /**
- * A decision in a list of its own: its title and the first line of what was
- * decided, then when. A proposed one says so in a pill, and other states that
+ * A decision in a list of its own, on one line: its title and the first line of
+ * what was decided, then when. A proposed one says so in a pill, and other states that
  * aren't accepted in a word.
  */
 function DecisionListItem({
@@ -844,14 +844,13 @@ function DecisionListItem({
       <Link
         to="/$workspace/decision/$decision"
         params={{ workspace: workspace.url_key, decision: decision.id }}
-        className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-hover"
+        className="flex h-10 items-center gap-3 rounded-md px-3 hover:bg-hover"
       >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-medium" title={decision.title}>
-            {decisionTitle(decision.title)}
-          </span>
-          {what && <span className="truncate text-xs text-muted">{what}</span>}
+        <span className="truncate" title={decision.title}>
+          {decisionTitle(decision.title)}
         </span>
+        {/* Takes what room the title leaves, so every row stays one line. */}
+        <span className="min-w-0 flex-1 truncate text-muted">{what}</span>
         {withService && service && (
           <span className="hidden shrink-0 text-xs text-faint @md:inline">{service.name}</span>
         )}
@@ -873,6 +872,11 @@ function DecisionListItem({
   );
 }
 
+// Groups sit under a band, as the Issues list's do: the first one flush with
+// the top of the list, each band staying in view while its group scrolls.
+const DECISION_GROUP = "first:-mt-2 not-first:mt-1.5";
+const DECISION_BAND = "sticky top-0 z-10 flex h-9 items-center gap-2 bg-band text-xs";
+
 /** A group of decisions on the Decisions page, under its label and count. */
 function DecisionGroup({
   heading,
@@ -884,10 +888,10 @@ function DecisionGroup({
   withService?: boolean;
 }) {
   return (
-    <li>
-      <h2 className="flex h-9 items-center gap-2 px-3 pt-2 text-xs text-faint">
+    <li className={DECISION_GROUP}>
+      <h2 className={`${DECISION_BAND} px-3`}>
         {heading}
-        <span>{decisions.length}</span>
+        <span className="text-faint">{decisions.length}</span>
       </h2>
       <ul className="flex flex-col gap-0.5">
         {decisions.map((decision) => (
@@ -1952,7 +1956,12 @@ export function DecisionsPage() {
           key="workspace"
           heading={
             <>
-              <Globe size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+              <Globe
+                size={15}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className="shrink-0 text-muted"
+              />
               Whole workspace
             </>
           }
@@ -1969,7 +1978,7 @@ export function DecisionsPage() {
               <Link
                 to="/$workspace/service/$service"
                 params={{ workspace: workspace.url_key, service: service.id }}
-                className="flex items-center gap-2 hover:text-fg"
+                className="flex items-center gap-2 hover:underline"
               >
                 <ServiceIcon service={service} />
                 {service.name}
@@ -1980,22 +1989,24 @@ export function DecisionsPage() {
         );
       })}
       {past.length > 0 && (
-        <li key="past">
-          <button
-            type="button"
-            aria-expanded={showPast}
-            onClick={() => setShowPast(!showPast)}
-            className="flex h-9 items-center gap-2 rounded-md px-3 pt-2 text-xs text-faint hover:text-fg"
-          >
-            <ChevronRight
-              size={12}
-              strokeWidth={1.75}
-              aria-hidden="true"
-              className={`shrink-0 transition-transform ${showPast ? "rotate-90" : ""}`}
-            />
-            No longer in force
-            <span>{past.length}</span>
-          </button>
+        <li key="past" className={DECISION_GROUP}>
+          <h2 className={DECISION_BAND}>
+            <button
+              type="button"
+              aria-expanded={showPast}
+              onClick={() => setShowPast(!showPast)}
+              className="flex h-full flex-1 items-center gap-2 px-3 hover:underline"
+            >
+              <ChevronRight
+                size={12}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className={`shrink-0 text-muted transition-transform ${showPast ? "rotate-90" : ""}`}
+              />
+              No longer in force
+              <span className="text-faint">{past.length}</span>
+            </button>
+          </h2>
           {showPast && (
             <ul className="flex flex-col gap-0.5">
               {past.map((decision) => (
