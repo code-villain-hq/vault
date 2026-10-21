@@ -126,11 +126,21 @@ a loop runs (LOOP-1).
 
   A worktree is removed through git, which refuses one with changes. A
   folder is removed only once it is empty.
+- **REPO-9** In a workspace (§25), a repository the workspace has and this
+  Mac has no clone of MUST be listed as Not on this Mac, above the groups,
+  with where it fetches from and who added it, and counted in the header.
+  It offers Clone, into a folder of its name inside one picked, over SSH
+  and then HTTPS, and Locate…, for a clone already here, taken only when it
+  fetches from the same repository. Either makes it a repository here
+  with the workspace's name, group and settings, sends the workspace
+  nothing, and gets the app's own copy as an added one does (REPO-4). A
+  clone added by Add repositories that fetches from it does the same.
 
 Code: `commands/projects.rs`, `commands/repos.rs`, `commands/cleanup.rs`,
 `commands/cleanup_folders.rs`, `commands/cleanup_remote.rs`, `git/store.rs`,
 `git/upkeep.rs`, `integrations/github/branches.rs`, `ReposView.tsx`,
-`AddRepos.tsx`, `CleanUp.tsx`.
+`AddRepos.tsx`, `CleanUp.tsx`; not on this Mac: `commands/elsewhere.rs`,
+`workspace/mirror.rs`, `ReposElsewhere.tsx`.
 
 Known gaps:
 - Removing a repo leaves panes running in *surviving* tasks' checkouts of
@@ -145,6 +155,10 @@ Known gaps:
   request of yours from it, Clean up cannot tell it from unpushed work and
   does not pre-select it.
 - Task branches are not in the user's clone until pushed and fetched.
+- In a workspace, Remove takes the repository out of the workspace, for
+  everyone in it, not only off this Mac; its dialog does not say so.
+- Clone shows no progress, and a large repository holds its row at
+  Cloning… until it is done.
 
 ## 2. Tasks
 
@@ -2595,11 +2609,17 @@ preferences, the phone, the browser, and what is one person's own: tokens,
 the Jira email, Slack's notify switches, the Slack bot, a log source's AWS
 profile.
 
+A workspace can live on a Layer server instead, shared with a team: the
+studio's is `layer.codevillain.eu`, signed in to with Code Villain. It is
+the same workspace in the browser, where its members change the shared
+setup, and in each member's Layer, where their tasks and agents stay on
+their own Mac.
+
 The workspace button at the foot of the task list names the window's
-workspace. Its menu lists every workspace on this Mac and says which are
-open. Choosing one opens it in a new window, or brings forward the window it
-already has. The menu also makes a new workspace, and renames or deletes
-one.
+workspace. Its menu lists every workspace, those on this Mac first, then
+those on each server, and says which are open. Choosing one opens it in a
+new window, or brings forward the window it already has. The menu also makes
+a new workspace, and renames or deletes one.
 
 - **PROF-1** A workspace MUST keep apart everything the app saves:
   `config.json` (repositories, tasks, settings, connections, saved panes),
@@ -2690,6 +2710,29 @@ one.
   reach `config.json` and `notes.json` without touching what is this
   Mac's: a repository's path, the app's copy, its tasks; a connection's
   email and switches; a log source's AWS profile.
+- **PROF-15** New workspace MUST ask where the workspace lives: this Mac,
+  as before, or a server, by its address (`layer.codevillain.eu` unless
+  another is given). For a server, the app signs in first: with Code
+  Villain in the browser, where the server has it, or else with the email
+  and password of an account there. Then it lists the person's workspaces
+  on that server, and choosing one opens it in a window of its own, like
+  any workspace, named as the server names it. An invite link pasted
+  instead of choosing joins its workspace and opens it. A workspace on a
+  server runs no Postgres or server on this Mac (PROF-11); its last copy
+  is kept as PROF-13 says.
+- **PROF-16** A workspace's session on its server MUST be kept in the
+  workspace's own keychain item (PROF-1), never in `config.json`, and sent
+  only to that server. When the server no longer takes it, the window says
+  so and offers Sign in again; until then the app works from its last copy
+  and keeps what changes here, as PROF-13 says.
+- **PROF-17** Signing in with Code Villain MUST come back to the window
+  that started it, whichever copy of the app macOS hands the
+  `layer://signed-in` link to: a copy that is not waiting for it passes it
+  on through `signed-in.json` in the config folder. A sign-in not finished
+  within five minutes, or cancelled, stops waiting and says so.
+- **PROF-18** A workspace on a server MUST offer Members… in the workspace
+  menu, which opens the workspace's members on the server in the browser:
+  inviting, roles and removing someone happen there.
 
 Code: `profiles.rs` (the registry `profiles.json`, the lock, choosing what
 to open at launch, launching a copy), `profiles/mac.rs` (bringing another
@@ -2697,7 +2740,9 @@ copy forward, the Dock icon), `commands/profiles.rs`,
 `sidebar/ProfileMenu.tsx`; the workspace: `workspace.rs` (Postgres and the
 server, PROF-11), `workspace/moving.rs` (PROF-12), `config/shared.rs`
 (what a change sends, PROF-13), `workspace/mirror.rs` (what the workspace
-sends, PROF-14), `lib/workspace-sync.ts` (the window's sync client).
+sends, PROF-14), `lib/workspace-sync.ts` (the window's sync client);
+a workspace on a server: `workspace/server.rs` (signing in, PROF-15 to
+PROF-17), `sidebar/NewWorkspace.tsx`.
 
 Known gaps:
 - The agent CLIs keep their own sign-ins in the home folder (Claude Code's
@@ -2709,10 +2754,12 @@ Known gaps:
   events between them (§24).
 - Installing an update replaces the app under every open profile, and all
   of them quit. The next launch reopens them (PROF-7).
-- A workspace lives only on this Mac: one on a Layer server, shared with a
-  team, signed in to with Code Villain, comes next. Until then nothing
-  else writes to a workspace. A repository removed from one elsewhere
-  will stay here.
+- A repository removed from the workspace elsewhere stays here.
+- Settings shows a server workspace's shared connection settings as fields
+  anyone may change; the server refuses what a member may not.
+- A workspace on this Mac cannot move to a server yet.
+- Signing up on a server whose accounts have passwords happens in the
+  browser, from the invite link.
 - Renaming a workspace renames it in the menu and the window; its server
   keeps the first name, which nothing shows yet.
 

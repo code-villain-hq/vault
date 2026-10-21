@@ -71,7 +71,9 @@ import type {
 } from "./types";
 import type { RunLog } from "./types-runs";
 import type { Operation } from "@layer/types";
-import type { ProfileView, SetupApplied, SetupSnapshot, WorkspacePlace } from "./types-profiles";
+import type {
+  Elsewhere, ProfileView, ServerSignedIn, ServerWays, SetupApplied, SetupSnapshot, WorkspacePlace,
+} from "./types-profiles";
 
 export const api = {
   // projects
@@ -88,6 +90,11 @@ export const api = {
   repoHealth: () => invoke<RepoHealth[]>("repo_health"),
   locateProject: (projectId: string, path: string) =>
     invoke<Project>("locate_project", { projectId, path }),
+  listElsewhere: () => invoke<Elsewhere[]>("list_elsewhere"),
+  locateElsewhere: (repositoryId: string, path: string) =>
+    invoke<Project>("locate_elsewhere", { repositoryId, path }),
+  cloneElsewhere: (repositoryId: string, folder: string) =>
+    invoke<Project>("clone_elsewhere", { repositoryId, folder }),
   setProjectUpdateBy: (projectId: string, by: UpdateBy | null) =>
     invoke<void>("set_project_update_by", { projectId, by }),
   /** The command a loop runs in a repository (LOOP-1); null clears it. */
@@ -395,6 +402,16 @@ export const api = {
   takeSetupWrites: () => invoke<Operation[]>("take_setup_writes"),
   /** What the workspace keeps, into this Mac's setup and notes (PROF-14). */
   applySetup: (snapshot: SetupSnapshot) => invoke<SetupApplied>("apply_setup", { snapshot }),
+  // A workspace on a server (PROF-15 to PROF-18). `address` is a server's
+  // address or an invite link.
+  serverWays: (address: string) => invoke<ServerWays>("server_ways", { address }),
+  serverSignIn: (address: string, email: string, password: string) =>
+    invoke<ServerSignedIn>("server_sign_in", { address, email, password }),
+  serverSignInBrowser: (address: string) => invoke<ServerSignedIn>("server_sign_in_browser", { address }),
+  serverSignInCancel: () => invoke<void>("server_sign_in_cancel"),
+  serverOpen: (id: string) => invoke<void>("server_open", { id }),
+  serverResume: () => invoke<WorkspacePlace>("server_resume"),
+  openMembers: () => invoke<void>("open_members"),
   setWorktreeRoot: (path: string | null) => invoke<void>("set_worktree_root", { path }),
   setUiPrefs: (ui: UiPrefs) => invoke<void>("set_ui_prefs", { ui }),
   disconnect: (which: "jira" | "github" | "slack" | "grafana") => invoke<void>("disconnect", { which }),

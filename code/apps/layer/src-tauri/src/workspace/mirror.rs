@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::config::shared::{take_record, Elsewhere};
 use crate::config::{AppConfig, AthenaTable, LogSource, ModelChoice, TicketFlow};
 use crate::commands::AppState;
 use crate::error::Result;
@@ -30,6 +31,14 @@ pub struct Snapshot {
     log_sources: Vec<LogSourceRecord>,
     agent_models: Vec<AgentModelRecord>,
     notes: Vec<NoteRecord>,
+    /// The members, for who added a repository not on this Mac.
+    users: Vec<UserRecord>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UserRecord {
+    id: String,
+    name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,6 +57,8 @@ struct RepositoryRecord {
     spec_folder: Option<String>,
     #[serde(default)]
     specs_in_app: bool,
+    #[serde(default)]
+    added_by: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,7 +125,7 @@ struct Settings {
 /// Bring `snapshot` in. `Ok(None)` when changes made here are still on
 /// their way; otherwise whether the setup and whether the notes changed.
 pub fn apply(state: &AppState, snapshot: Snapshot) -> Result<Option<(bool, bool)>> {
-    let Snapshot { repositories, connections, log_sources, agent_models, notes } = snapshot;
+    let Snapshot { repositories, connections, log_sources, agent_models, notes, users } = snapshot;
     let mut waiting = false;
     let setup = state.config.mirror(|c| {
         if c.shared.workspace.is_none() || !c.shared.outbox.is_empty() {
@@ -122,7 +133,7 @@ pub fn apply(state: &AppState, snapshot: Snapshot) -> Result<Option<(bool, bool)
             return false;
         }
         let before = shared_view(c);
-        merge(c, repositories, connections, log_sources, agent_models);
+        merge(c, repositories, &users, connections, log_sources, agent_models);
         shared_view(c) != before
     })?;
     if waiting {
@@ -138,25 +149,39 @@ pub fn apply(state: &AppState, snapshot: Snapshot) -> Result<Option<(bool, bool)
 fn merge(
     c: &mut AppConfig,
     repositories: Vec<RepositoryRecord>,
+    users: &[UserRecord],
     connections: Vec<ConnectionRecord>,
     log_sources: Vec<LogSourceRecord>,
     agent_models: Vec<AgentModelRecord>,
 ) {
     // Every clone of a repository takes its record. One with no clone here
-    // stays out of the list: a clone is what a project is.
+    // is not a project, since a clone is what a project is: it waits in
+    // `elsewhere` for one (REPO-9).
+    c.shared.elsewhere.clear();
     for r in repositories {
+        let added_by = r.added_by.as_ref().and_then(|id| users.iter().find(|u| &u.id == id)).map(|u| u.name.clone());
+        let record = Elsewhere {
+            id: r.id,
+            remote_key: r.remote_key,
+            name: r.name,
+            default_branch: r.default_branch,
+            group: r.group_name,
+            update_by: r.update_by,
+            check: r.check_command,
+            spec_folder: r.spec_folder,
+            specs_in_app: r.specs_in_app,
+            added_by,
+        };
+        let mut here = false;
         for p in c.projects.iter_mut().filter(|p| {
-            p.repository_id.as_deref() == Some(r.id.as_str())
-                || (p.repository_id.is_none() && p.remote.as_deref() == Some(r.remote_key.as_str()))
+            p.repository_id.as_deref() == Some(record.id.as_str())
+                || (p.repository_id.is_none() && p.remote.as_deref() == Some(record.remote_key.as_str()))
         }) {
-            p.repository_id = Some(r.id.clone());
-            p.name = r.name.clone();
-            p.default_branch = r.default_branch.clone();
-            p.group = r.group_name.clone();
-            p.update_by = r.update_by;
-            p.check = r.check_command.clone();
-            p.spec_folder = r.spec_folder.clone();
-            p.specs_in_app = r.specs_in_app;
+            take_record(p, record.clone());
+            here = true;
+        }
+        if !here {
+            c.shared.elsewhere.push(record);
         }
     }
 
@@ -258,7 +283,7 @@ mod tests {
             true
         })
         .unwrap();
-        let mut held = json!({ "repositories": [], "connections": [], "log_sources": [], "agent_models": [], "notes": [] });
+        let mut held = json!({ "repositories": [], "connections": [], "log_sources": [], "agent_models": [], "notes": [], "users": [] });
         for op in sent {
             let mut record = op["data"].clone();
             record["id"] = op["id"].clone();
@@ -305,6 +330,41 @@ mod tests {
         assert_eq!(notes[0].text, "Tests need bun run db, then bun run seed.");
         let scratch = cfg.projects[1].path.clone();
         assert_eq!(state.notes.of(&scratch).len(), 1, "a note kept by a clone's path is this Mac's");
+    }
+
+    #[test]
+    fn a_repository_with_no_clone_here_waits_for_one_and_its_clone_sends_nothing() {
+        let (state, mut held) = moved();
+        let ada = uuid::Uuid::now_v7().to_string();
+        held["users"] = json!([{ "id": ada, "name": "Ada" }]);
+        held["repositories"].as_array_mut().unwrap().push(json!({
+            "id": uuid::Uuid::now_v7().to_string(),
+            "remote_key": "github.com/acme/billing",
+            "name": "billing",
+            "default_branch": "trunk",
+            "check_command": "make test",
+            "added_by": ada,
+        }));
+
+        assert_eq!(apply(&state, snapshot(&held)).unwrap(), Some((true, false)));
+        let cfg = state.config.read();
+        assert_eq!(cfg.projects.len(), 2, "no project without a clone");
+        let billing = &cfg.shared.elsewhere[0];
+        assert_eq!((billing.name.as_str(), billing.added_by.as_deref()), ("billing", Some("Ada")));
+        drop(cfg);
+
+        let mut clone = state.config.read().projects[0].clone();
+        clone.id = uuid::Uuid::new_v4().to_string();
+        clone.path = "/elsewhere/billing".into();
+        clone.name = "billing-clone".into();
+        clone.remote = Some("github.com/acme/billing".into());
+        clone.repository_id = None;
+        state.config.update(|c| c.projects.push(clone)).unwrap();
+        let cfg = state.config.read();
+        assert!(cfg.shared.outbox.is_empty(), "the workspace has it already");
+        assert!(cfg.shared.elsewhere.is_empty());
+        let billing = cfg.projects.iter().find(|p| p.path == "/elsewhere/billing").unwrap();
+        assert_eq!((billing.name.as_str(), billing.check.as_deref()), ("billing", Some("make test")));
     }
 
     #[test]

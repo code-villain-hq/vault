@@ -361,3 +361,31 @@ async fn a_repository_keeps_at_most_fifty_notes(pool: PgPool) {
     .await;
     assert_eq!(other.status, StatusCode::OK, "{}", other.body);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn in_development_a_page_asked_of_the_server_opens_from_vite(pool: PgPool) {
+    use tower::ServiceExt;
+    let app = layer_server::app(
+        common::state(pool),
+        layer_server::Web::SentTo("http://localhost:5176/"),
+    );
+    let ask = |uri: &str| {
+        axum::http::Request::get(uri)
+            .body(axum::body::Body::empty())
+            .unwrap()
+    };
+
+    let page = app
+        .clone()
+        .oneshot(ask("/code-villain/settings/members?tab=1"))
+        .await
+        .unwrap();
+    assert_eq!(page.status(), StatusCode::TEMPORARY_REDIRECT);
+    assert_eq!(
+        page.headers()[axum::http::header::LOCATION],
+        "http://localhost:5176/code-villain/settings/members?tab=1"
+    );
+    // The API stays the server's.
+    let api = app.oneshot(ask("/api/nothing")).await.unwrap();
+    assert_eq!(api.status(), StatusCode::NOT_FOUND);
+}

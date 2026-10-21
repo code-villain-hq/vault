@@ -59,6 +59,17 @@ const overrides = new Map<string, Answer>();
 const PRIORITIES = ["Highest", "High", "Medium", "Low", "Lowest"];
 
 /** Base64 of the UTF-8 bytes, as the backend sends it, and how many bytes that was. */
+/** A repository not on this Mac becomes one here, as the workspace has it. */
+function placeElsewhere(id: string, path: string): Project {
+  const at = world.notHere.findIndex((x) => x.id === id);
+  if (at < 0) throw "that repository: it is on this Mac now, or gone from the workspace";
+  const [e] = world.notHere.splice(at, 1);
+  const p: Project = { id: `p-${e.name}`, name: e.name, path, default_branch: e.default_branch, group: e.group, store: null };
+  world.projects.push(p);
+  world.health.push({ project_id: p.id, clone: "ok", origin: `git@${e.remote_key.replace("/", ":")}.git`, store: null, synced_at: null, behind: 0, ahead: 0, found: null, update_guess: null, update_reason: null });
+  return p;
+}
+
 function encode(text: string): { data: string; end: number } {
   const bytes = new TextEncoder().encode(text);
   return { data: btoa(String.fromCharCode(...bytes)), end: bytes.length };
@@ -556,6 +567,14 @@ const answer: Record<string, Answer> = {
         : moved ? `Fetched. main moved forward ${moved} commits.` : "Fetched. main is up to date.";
       return { project_id: id, repo: p.name, ok: true, detail };
     }),
+  // billing is the workspace's, added by Ada, with no clone here (REPO-9).
+  list_elsewhere: () => world.notHere,
+  locate_elsewhere: (a) => placeElsewhere(String(a.repositoryId), String(a.path)),
+  clone_elsewhere: async (a) => {
+    await new Promise((done) => setTimeout(done, 1200));
+    const e = world.notHere.find((x) => x.id === a.repositoryId);
+    return placeElsewhere(String(a.repositoryId), `${String(a.folder)}/${e?.name ?? "repo"}`);
+  },
   locate_project: (a) => {
     const p = world.projects.find((x) => x.id === a.projectId);
     const h = world.health.find((x) => x.project_id === a.projectId);
@@ -738,6 +757,9 @@ const answer: Record<string, Answer> = {
 
   // Plugins the UI reaches through @tauri-apps packages.
   "plugin:notification|is_permission_granted": () => true,
+  // A folder picker that picks: Locate and Clone of a repository not on
+  // this Mac (REPO-9) go through it.
+  "plugin:dialog|open": () => "/Users/you/code",
   "plugin:app|version": () => "0.0.0-mock",
   "plugin:window|is_focused": () => true,
 };

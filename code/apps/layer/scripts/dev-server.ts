@@ -5,10 +5,11 @@
 const root = new URL("..", import.meta.url).pathname;
 
 const processes = [
-  { name: "server", color: 35, cmd: ["cargo", "run", "-p", "layer-server"] },
-  { name: "web", color: 36, cmd: ["bun", "run", "--cwd", "web", "dev"] },
-].map(({ name, color, cmd }) => {
-  const child = Bun.spawn(cmd, { cwd: root, stdout: "pipe", stderr: "pipe" });
+  // Pages asked of the server (the desktop app's Members…) go on to Vite.
+  { name: "server", color: 35, cmd: ["cargo", "run", "-p", "layer-server"], env: { LAYER_WEB_DEV_URL: "http://localhost:5176" } },
+  { name: "web", color: 36, cmd: ["bun", "run", "--cwd", "web", "dev"], env: {} },
+].map(({ name, color, cmd, env }) => {
+  const child = Bun.spawn(cmd, { cwd: root, env: { ...process.env, ...env }, stdout: "pipe", stderr: "pipe" });
   const prefix = `\x1b[${color}m${name.padEnd(6)}\x1b[0m │ `;
   pipe(child.stdout, prefix);
   pipe(child.stderr, prefix);

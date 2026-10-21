@@ -53,11 +53,17 @@ pub struct Entry {
     /// The colour chosen for it (PROF-10), an index into `COLOURS`.
     #[serde(default)]
     pub colour: Option<usize>,
+    /// The server it lives on, by origin, and its id there (PROF-15). None
+    /// for a workspace on this Mac.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
 }
 
 impl Entry {
     pub fn new(id: String, name: String) -> Self {
-        Self { id, name, opened_at: None, quit_at: None, colour: None }
+        Self { id, name, opened_at: None, quit_at: None, colour: None, server: None, workspace: None }
     }
 
     /// Its colour: the one chosen, or the one its id gives it.

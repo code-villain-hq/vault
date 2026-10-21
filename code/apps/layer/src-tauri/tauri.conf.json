@@ -27,6 +27,11 @@
       "csp": null
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["layer"] }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],

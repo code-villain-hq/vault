@@ -60,6 +60,13 @@ layer-domain = { workspace = true }
 layer-server = { workspace = true }
 layer-sync = { workspace = true }
 sqlx = { workspace = true }
+# Signing in to a Layer server with Code Villain (PROF-15, PROF-17): the
+# browser hands the sign-in back on `layer://signed-in`, and the app proves
+# it started it with the SHA-256 of a secret. sha2 and hex are in the build
+# already, through layer-server; the plugin is the studio's (Forge, Glyph).
+tauri-plugin-deep-link = "2.6.1"
+sha2 = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 # A mock runtime, so the PTY layer can be driven through real processes in

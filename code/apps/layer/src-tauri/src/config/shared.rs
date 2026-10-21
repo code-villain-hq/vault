@@ -12,7 +12,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use super::AppConfig;
+use super::{AppConfig, Project};
+use crate::git::UpdateBy;
 
 pub const REPOSITORY: &str = "Repository";
 pub const CONNECTION: &str = "Connection";
@@ -36,14 +37,44 @@ pub struct Shared {
     /// kept here so none is lost to a quit before the window loaded.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub outbox: Vec<Value>,
+    /// The workspace's repositories with no clone on this Mac (REPO-9), as
+    /// the workspace keeps them. A clone added later takes one's record.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub elsewhere: Vec<Elsewhere>,
+}
+
+/// A repository of the workspace's that is not on this Mac.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Elsewhere {
+    pub id: String,
+    pub remote_key: String,
+    pub name: String,
+    pub default_branch: String,
+    #[serde(default)]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub update_by: Option<UpdateBy>,
+    #[serde(default)]
+    pub check: Option<String>,
+    #[serde(default)]
+    pub spec_folder: Option<String>,
+    #[serde(default)]
+    pub specs_in_app: bool,
+    /// Who added it, by name, when the workspace says.
+    #[serde(default)]
+    pub added_by: Option<String>,
 }
 
 /// Where the workspace is.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkspaceAt {
     /// `this_mac`: the app's own server, on the workspace's own Postgres.
+    /// Otherwise a Layer server's origin (PROF-15).
     pub place: String,
     pub id: String,
+    /// Who signed in to the server, so the window's offline copy is theirs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
 }
 
 pub const THIS_MAC: &str = "this_mac";
@@ -78,6 +109,21 @@ pub fn records(cfg: &AppConfig) -> Records {
                 "check_command": p.check,
                 "spec_folder": p.spec_folder,
                 "specs_in_app": p.specs_in_app,
+            }))
+        });
+    }
+    // Not on this Mac, but the workspace's all the same: kept as it came.
+    for e in &cfg.shared.elsewhere {
+        out.entry((REPOSITORY, e.id.clone())).or_insert_with(|| {
+            object(json!({
+                "remote_key": e.remote_key,
+                "name": e.name,
+                "default_branch": e.default_branch,
+                "group_name": e.group,
+                "update_by": e.update_by,
+                "check_command": e.check,
+                "spec_folder": e.spec_folder,
+                "specs_in_app": e.specs_in_app,
             }))
         });
     }
@@ -149,12 +195,18 @@ pub fn record_changes(cfg: &mut AppConfig, before: &Records) -> Sent {
 }
 
 /// Ids for what has none yet: a repository by its remote (a second clone
-/// takes the first's), a connection and an agent's models by their kind.
+/// takes the first's, a first clone the workspace's record), a connection
+/// and an agent's models by their kind.
 fn stamp(cfg: &mut AppConfig) {
     for i in 0..cfg.projects.len() {
         let p = &cfg.projects[i];
         let Some(remote) = p.remote.clone() else { continue };
         if p.repository_id.is_some() {
+            continue;
+        }
+        if let Some(at) = cfg.shared.elsewhere.iter().position(|e| e.remote_key == remote) {
+            let e = cfg.shared.elsewhere.remove(at);
+            take_record(&mut cfg.projects[i], e);
             continue;
         }
         let sibling = cfg
@@ -178,6 +230,19 @@ fn stamp(cfg: &mut AppConfig) {
     for agent in agents {
         cfg.shared.agent_models.entry(agent).or_insert_with(new_id);
     }
+}
+
+/// A clone of a repository the workspace has: its settings are the
+/// workspace's, so taking it here changes nothing there (REPO-9).
+pub fn take_record(p: &mut Project, e: Elsewhere) {
+    p.repository_id = Some(e.id);
+    p.name = e.name;
+    p.default_branch = e.default_branch;
+    p.group = e.group;
+    p.update_by = e.update_by;
+    p.check = e.check;
+    p.spec_folder = e.spec_folder;
+    p.specs_in_app = e.specs_in_app;
 }
 
 pub fn new_id() -> String {
@@ -285,7 +350,7 @@ mod tests {
 
     fn in_a_workspace(projects: Vec<Project>) -> AppConfig {
         let mut cfg = AppConfig { projects, ..Default::default() };
-        cfg.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: new_id() });
+        cfg.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: new_id(), user_id: None });
         cfg
     }
 

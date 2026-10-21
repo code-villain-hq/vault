@@ -22,6 +22,8 @@ pub struct ProfileView {
     pub worktree_root: String,
     /// Its colour, as on its Dock icon (PROF-6).
     pub colour: usize,
+    /// The server it lives on, by host; None on this Mac (PROF-15).
+    pub server: Option<String>,
 }
 
 /// Every profile, Default first.
@@ -44,6 +46,7 @@ pub(crate) fn list_in(base: &Path, me: &str, my_root: PathBuf) -> Vec<ProfileVie
             let root = if current { my_root.clone() } else { root_in(&folder, &p.id) };
             ProfileView {
                 colour: p.colour(),
+                server: p.server.as_deref().map(crate::workspace::server::host),
                 open: current || profiles::holder(&folder).is_some(),
                 current,
                 worktree_root: root.to_string_lossy().to_string(),
@@ -114,6 +117,7 @@ pub(crate) fn create_in(base: &Path, name: &str) -> Result<ProfileView> {
         name: entry.name,
         open: false,
         current: false,
+        server: None,
     })
 }
 
@@ -198,7 +202,7 @@ pub(crate) fn delete_in(base: &Path, me: &str, id: &str, forget_tokens: impl FnO
 }
 
 /// The profiles changed: this window's title, Dock icon and menu say so.
-fn changed(app: &AppHandle) {
+pub(super) fn changed(app: &AppHandle) {
     profiles::show_identity(app);
     let _ = app.emit("profiles:changed", ());
 }

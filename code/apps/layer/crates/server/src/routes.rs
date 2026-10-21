@@ -12,19 +12,40 @@ use crate::error::AppError;
 use crate::state::AppState;
 use crate::{accounts, invites, members, oidc, ws};
 
-/// The API, plus the built web app from `web_dir` when given (in production
-/// the server serves both; in development Vite serves the app).
-pub fn app(state: AppState, web_dir: Option<&std::path::Path>) -> Router {
+/// What the server answers outside `/api`.
+#[derive(Clone, Copy)]
+pub enum Web<'a> {
+    /// Nothing: the desktop app's own server, which only the app calls.
+    None,
+    /// The built web app (`dist-web`): in production the server serves both.
+    Dir(&'a std::path::Path),
+    /// Development, where Vite serves the web app: its pages are sent on
+    /// there, so a link to the server (Members…) opens the page.
+    SentTo(&'a str),
+}
+
+pub fn app(state: AppState, web: Web<'_>) -> Router {
     let router = router(state);
-    let Some(dir) = web_dir else { return router };
-    // Paths the app doesn't know get index.html, so its own router can show them.
-    let files = ServeDir::new(dir).fallback(ServeFile::new(dir.join("index.html")));
-    router
-        .route(
-            "/api/{*rest}",
-            any(|| async { AppError::not_found("no such endpoint") }),
-        )
-        .fallback_service(files)
+    let unknown_api = any(|| async { AppError::not_found("no such endpoint") });
+    match web {
+        Web::None => router,
+        Web::Dir(dir) => {
+            // Paths the app doesn't know get index.html, so its own router can show them.
+            let files = ServeDir::new(dir).fallback(ServeFile::new(dir.join("index.html")));
+            router
+                .route("/api/{*rest}", unknown_api)
+                .fallback_service(files)
+        }
+        Web::SentTo(origin) => {
+            let origin = origin.trim_end_matches('/').to_owned();
+            router.route("/api/{*rest}", unknown_api).fallback(
+                move |uri: axum::http::Uri| async move {
+                    let path = uri.path_and_query().map_or("/", |p| p.as_str());
+                    axum::response::Redirect::temporary(&format!("{origin}{path}"))
+                },
+            )
+        }
+    }
 }
 
 pub fn router(state: AppState) -> Router {

@@ -11,6 +11,7 @@
 
 mod mirror;
 mod moving;
+pub mod server;
 
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -23,7 +24,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{watch, Mutex};
 
 use crate::commands::AppState;
-use crate::config::shared::Sent;
+use crate::config::shared::{Sent, THIS_MAC};
 
 pub use mirror::{apply, Snapshot};
 
@@ -67,9 +68,11 @@ impl ThisMac {
         tauri::async_runtime::spawn(async move {
             let result = match start(&app).await {
                 Ok((running, at)) => {
-                    *slot = Some(running);
+                    *slot = running;
                     Ok(at)
                 }
+                // The window says so, and offers Sign in again (PROF-16).
+                Err(e) if e == server::SIGNED_OUT => Err(e),
                 Err(e) => {
                     crate::commands::notify(
                         &app,
@@ -93,6 +96,11 @@ impl ThisMac {
         ready.clone().unwrap_or_else(|| Err("not started".into()))
     }
 
+    /// Signed in again (PROF-16): the window's sync client reads this.
+    pub fn signed_in(&self, place: Place) {
+        self.place.send_replace(Some(Ok(place)));
+    }
+
     /// On quit, after the agents: the server first, so nothing writes while
     /// Postgres stops.
     pub async fn stop(&self) {
@@ -105,11 +113,16 @@ impl ThisMac {
     }
 }
 
-async fn start(app: &AppHandle) -> std::result::Result<(Running, Place), String> {
-    let folder = app.state::<AppState>().config.folder().join("postgres");
+async fn start(app: &AppHandle) -> std::result::Result<(Option<Running>, Place), String> {
+    let state = app.state::<AppState>();
+    // A workspace on a server runs nothing here (PROF-15).
+    if let Some(at) = state.config.with(|c| c.shared.workspace.clone()).filter(|at| at.place != THIS_MAC) {
+        return server::place(at).await.map(|place| (None, place));
+    }
+    let folder = state.config.folder().join("postgres");
     let postgres = LocalPostgres::start(&folder, POSTGRES_PORT).await.map_err(|e| e.to_string())?;
     match serve(app, &postgres).await {
-        Ok((server, pool, place)) => Ok((Running { postgres, server, pool }, place)),
+        Ok((server, pool, place)) => Ok((Some(Running { postgres, server, pool }), place)),
         Err(e) => {
             let _ = postgres.stop().await;
             Err(e)
@@ -133,7 +146,7 @@ async fn serve(app: &AppHandle, postgres: &LocalPostgres) -> std::result::Result
         state = state.allowing_origin("http://localhost:1420");
     }
     let server = LocalServer::spawn(SERVER_PORT, |listener, shutdown| {
-        layer_server::serve(state, None, listener, shutdown)
+        layer_server::serve(state, layer_server::Web::None, listener, shutdown)
     })
     .await
     .map_err(|e| e.to_string())?;

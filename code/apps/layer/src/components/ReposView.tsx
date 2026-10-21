@@ -7,8 +7,10 @@ import { ago } from "../lib/time";
 import { useNow, useStore } from "../store";
 import { groupProjects, repoTrouble, updateByFor } from "../lib/derive";
 import type { Project, RepoHealth, RepoNote, Synced, UpdateBy } from "../lib/types";
+import type { Elsewhere } from "../lib/types-profiles";
 import { AddRepos } from "./AddRepos";
 import { CleanUp } from "./CleanUp";
+import { ReposElsewhere } from "./ReposElsewhere";
 import { RepoNotes } from "./RepoNotes";
 import { ChevronIcon } from "./icons";
 import { Combo, Confirm, ErrorMessage, Spinner, useFailure } from "./ui";
@@ -37,6 +39,7 @@ export function ReposView() {
   const [synced, setSynced] = useState<Record<string, Synced>>({});
   const [notes, setNotes] = useState<Record<string, RepoNote[]>>({});
   const [notesOpen, setNotesOpen] = useState<Set<string>>(new Set());
+  const [elsewhere, setElsewhere] = useState<Elsewhere[]>([]);
   const [confirming, setConfirming] = useState<{
     title: string;
     body: ReactNode;
@@ -48,6 +51,10 @@ export function ReposView() {
   // Read again whenever the view opens: what it says is only as fresh as
   // the last look (REPO-5).
   useEffect(() => { void refreshRepoHealth().catch(fail); }, [refreshRepoHealth, fail]);
+
+  // The workspace's repositories with no clone here (REPO-9): read again
+  // whenever the list is, which the workspace's changes also read again.
+  useEffect(() => { void api.listElsewhere().then(setElsewhere).catch(fail); }, [projects, fail]);
 
   // Read when the view opens and whenever an agent changes one (MEM-6).
   const loadNotes = useCallback(() => {
@@ -208,7 +215,10 @@ export function ReposView() {
       <div className="wide-head">
         <h2>Repositories</h2>
         <span className="sub">
-          {projects.length} in {groups.length} group{groups.length === 1 ? "" : "s"}
+          {/* Nothing cloned yet: "0 in 0 groups" says nothing. */}
+          {(projects.length > 0 || elsewhere.length === 0) && <>{projects.length} in {groups.length} group{groups.length === 1 ? "" : "s"}</>}
+          {projects.length > 0 && elsewhere.length > 0 && " · "}
+          {elsewhere.length > 0 && <>{elsewhere.length} not on this Mac</>}
           {troubled > 0 && <> · <span className="trouble-text">{troubled} to fix</span></>}
           {lastSync > 0 && <> · last synced {ago(lastSync * 1000, now)}</>}
         </span>
@@ -241,15 +251,23 @@ export function ReposView() {
         >
           {syncingAll ? <span className="btn-busy"><Spinner />Syncing…</span> : "Sync all"}
         </button>
-        {/* The primary while nothing needs fixing; a repository in trouble
-            has its own fix, and that is the one action to lead with. */}
-        <button className={`ui-button${troubled > 0 ? "" : " ui-button-primary"}`} onClick={() => setAdding(true)}>
+        {/* The primary while nothing needs fixing or cloning; a repository
+            in trouble or not on this Mac has its own next action. */}
+        <button className={`ui-button${troubled > 0 || elsewhere.length > 0 ? "" : " ui-button-primary"}`} onClick={() => setAdding(true)}>
           Add repositories
         </button>
       </div>
       <ErrorMessage>{head.error}</ErrorMessage>
 
-      {projects.length === 0 && (
+      <ReposElsewhere
+        repos={elsewhere}
+        onPlaced={(name, path) => {
+          toast("success", `${name} is at ${path}, with the workspace's settings.`);
+          void Promise.all([refreshRepos(), refreshRepoHealth()]).catch(fail);
+        }}
+      />
+
+      {projects.length === 0 && elsewhere.length === 0 && (
         <div className="card">
           <div className="muted" style={{ lineHeight: 1.6 }}>
             None registered yet. <b>Add repositories</b> can scan a parent folder and

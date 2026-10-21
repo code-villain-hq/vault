@@ -43,6 +43,9 @@ pub const GRAFANA: &str = "grafana-token";
 pub const SLACK_BOT: &str = "slack-bot-token";
 pub const SLACK_BOT_APP: &str = "slack-bot-app-token";
 
+/// The session a workspace on a server signed in with (PROF-16).
+pub const SESSION: &str = "layer-session";
+
 /// Where a saved browser sign-in's password is kept (BRW-18).
 pub fn sign_in_key(id: &str) -> String {
     format!("browser-sign-in-{id}")
@@ -181,6 +184,24 @@ pub fn forget_service(service: &str) -> Result<()> {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.into()),
     }
+}
+
+/// Save `secret` under `key` in another profile's own item: a workspace
+/// opened from this window keeps the session it signed in with (PROF-16).
+/// The item is new, so nothing in it is lost.
+pub fn seed(service: &str, key: &str, secret: &str) -> Result<()> {
+    if cfg!(test) {
+        return Ok(());
+    }
+    let item = keyring::Entry::new(service, BUNDLE)?;
+    let mut bundle: Bundle = match item.get_password() {
+        Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
+        Err(keyring::Error::NoEntry) => Bundle::new(),
+        Err(e) => return Err(e.into()),
+    };
+    bundle.insert(key.to_string(), secret.to_string());
+    item.set_password(&serde_json::to_string(&bundle)?)?;
+    Ok(())
 }
 
 /// Copy the tokens `from`, another identifier, saved into this build's own

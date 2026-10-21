@@ -2,14 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "../../lib/api";
 import type { ProfileView } from "../../lib/types-profiles";
+import { useSession } from "../../lib/workspace-sync";
 import { useStore } from "../../store";
-import { Confirm, ErrorMessage, Field, Floating, Modal, useFailure } from "../ui";
+import { Confirm, ErrorMessage, Floating, Modal, useFailure } from "../ui";
 import { ChevronIcon } from "../icons";
+import { NewWorkspace } from "./NewWorkspace";
 
 /**
- * The window's profile, at the foot of the sidebar (§25), and the way to the
- * others: each opens in a copy of the app of its own (PROF-2), or brings that
- * copy forward if it is open already (PROF-3).
+ * The window's workspace, at the foot of the sidebar (§25), and the way to
+ * the others, grouped by where they live: this Mac, then each server
+ * (PROF-15). Each opens in a copy of the app of its own (PROF-2), or brings
+ * that copy forward if it is open already (PROF-3).
  *
  * The list is read when the menu opens and when `profiles:changed` says so:
  * another window may have made, renamed or deleted one since.
@@ -24,6 +27,8 @@ export function ProfileMenu() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [making, setMaking] = useState(false);
   const [managing, setManaging] = useState(false);
+  const [again, setAgain] = useState(false);
+  const { signedOut } = useSession();
   const button = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(() => {
@@ -37,6 +42,13 @@ export function ProfileMenu() {
   }, [load]);
 
   const me = profiles.find((p) => p.current);
+  // This Mac's first, then each server's, in the order first seen.
+  const places = [null, ...new Set(profiles.flatMap((p) => (p.server ? [p.server] : [])))];
+
+  function members() {
+    setMenu(null);
+    api.openMembers().catch(fail);
+  }
 
   function toggle() {
     if (menu) return setMenu(null);
@@ -63,6 +75,7 @@ export function ProfileMenu() {
       >
         <Initial profile={me} />
         <span className="profile-name">{me?.name ?? "Workspace"}</span>
+        {signedOut && <span className="profile-state">signed out</span>}
         <span className="profile-chev" aria-hidden><ChevronIcon /></span>
       </button>
 
@@ -76,15 +89,29 @@ export function ProfileMenu() {
           className="ui-menu ctx-menu profile-menu"
           measureKey={profiles.length}
         >
-          <div className="profile-menu-head">On this Mac</div>
-          {profiles.map((p) => (
-            <button key={p.id} className="ctx-item ui-option profile-item" onClick={() => open(p)}>
-              <Initial profile={p} />
-              <span className="profile-item-name">{p.name}</span>
-              <span className="profile-state">{p.current ? "this window" : p.open ? "open" : ""}</span>
-            </button>
+          {places.map((place) => (
+            <div key={place ?? "this-mac"} className="profile-menu-group">
+              <div className="profile-menu-head">{place ?? "On this Mac"}</div>
+              {profiles.filter((p) => p.server === place).map((p) => (
+                <button key={p.id} className="ctx-item ui-option profile-item" onClick={() => open(p)}>
+                  <Initial profile={p} />
+                  <span className="profile-item-name">{p.name}</span>
+                  <span className="profile-state">{p.current ? "this window" : p.open ? "open" : ""}</span>
+                </button>
+              ))}
+            </div>
           ))}
-          <button className="ctx-item ui-option separated" onClick={() => { setMenu(null); setMaking(true); }}>
+          {me?.server && signedOut && (
+            <button className="ctx-item ui-option separated" onClick={() => { setMenu(null); setAgain(true); }}>
+              Sign in again…
+            </button>
+          )}
+          {me?.server && !signedOut && (
+            <button className="ctx-item ui-option separated" onClick={members} title="Opens the workspace's members on its server, in your browser">
+              Members…
+            </button>
+          )}
+          <button className={`ctx-item ui-option${me?.server ? "" : " separated"}`} onClick={() => { setMenu(null); setMaking(true); }}>
             New workspace…
           </button>
           <button className="ctx-item ui-option" onClick={() => { setMenu(null); setManaging(true); }}>
@@ -93,13 +120,14 @@ export function ProfileMenu() {
         </Floating>
       )}
 
-      {making && (
-        <NewProfile
-          onClose={() => setMaking(false)}
-          onMade={(p) => {
+      {(making || again) && (
+        <NewWorkspace
+          again={again ? (me?.server ?? undefined) : undefined}
+          onClose={() => { setMaking(false); setAgain(false); }}
+          onOpened={(name) => {
             setMaking(false);
             load();
-            toast("success", `${p.name} is opening in a window of its own.`);
+            toast("success", `${name} is opening in a window of its own.`);
           }}
         />
       )}
@@ -142,52 +170,6 @@ function ColourPicker({
         />
       ))}
     </Floating>
-  );
-}
-
-function NewProfile({ onClose, onMade }: { onClose: () => void; onMade: (p: ProfileView) => void }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const failure = useFailure();
-
-  function make() {
-    if (!name.trim() || busy) return;
-    setBusy(true);
-    failure.clear();
-    api.createProfile(name)
-      .then(onMade)
-      .catch(failure.fail)
-      .finally(() => setBusy(false));
-  }
-
-  return (
-    <Modal
-      title="New workspace"
-      onClose={onClose}
-      footer={
-        <>
-          <button className="ui-button" onClick={onClose}>Cancel</button>
-          <button className="ui-button ui-button-primary" disabled={!name.trim() || busy} onClick={make}>
-            {busy ? "Opening…" : "Create and open"}
-          </button>
-        </>
-      }
-    >
-      <Field
-        label="Name"
-        hint="A Layer of its own, empty: its own repositories, tasks, connections and tokens. It opens in a new window, beside this one."
-      >
-        <input className="ui-field"
-          value={name}
-          maxLength={40}
-          autoFocus
-          placeholder="My project"
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && make()}
-        />
-      </Field>
-      <ErrorMessage>{failure.error}</ErrorMessage>
-    </Modal>
   );
 }
 

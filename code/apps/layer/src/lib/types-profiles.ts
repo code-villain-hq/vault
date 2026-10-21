@@ -2,7 +2,7 @@
  * Profiles (§25), as `commands/profiles.rs` sends them. A file of its own:
  * `types.ts` is at its size ceiling.
  */
-import type { Schema } from "@layer/types";
+import type { Schema, WorkspaceInfo } from "@layer/types";
 
 export interface ProfileView {
   id: string;
@@ -15,6 +15,23 @@ export interface ProfileView {
   worktree_root: string;
   /** Its colour, `--profile-<n>`, as on its Dock icon (PROF-6). */
   colour: number;
+  /** The server it lives on, by host; null on this Mac (PROF-15). */
+  server: string | null;
+}
+
+/** How a server signs people in (PROF-15). */
+export interface ServerWays {
+  oidc: boolean;
+  password: boolean;
+}
+
+/** Signed in to a server: the person's workspaces there (PROF-15). */
+export interface ServerSignedIn {
+  host: string;
+  email: string;
+  workspaces: WorkspaceInfo[];
+  /** The workspace an invite link joined. */
+  joined: string | null;
 }
 
 /** Where the window's sync client finds this workspace (PROF-11). */
@@ -40,4 +57,15 @@ export interface SetupSnapshot {
   log_sources: Schema["LogSource"]["record"][];
   agent_models: Schema["AgentModel"]["record"][];
   notes: Schema["Note"]["record"][];
+  users: Schema["User"]["record"][];
+}
+
+/** A repository of the workspace's with no clone on this Mac (REPO-9). */
+export interface Elsewhere {
+  id: string;
+  remote_key: string;
+  name: string;
+  default_branch: string;
+  group: string | null;
+  added_by: string | null;
 }
