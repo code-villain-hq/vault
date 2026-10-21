@@ -9,6 +9,25 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* Starting up (WIN-4): the mark, breathing in size, never fading the
+   strike below full strength, as Forge's does. */
+.splash {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+.splash img {
+  width: 32px;
+  height: 32px;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe { 50% { transform: scale(0.9); } }
+@media (prefers-reduced-motion: reduce) {
+  .splash img { animation: none; }
+}
+
 body {
   background: var(--bg);
   color: var(--fg);

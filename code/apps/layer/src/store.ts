@@ -144,6 +144,11 @@ interface State {
    */
   fail: (e: unknown, opts?: ToastOpts) => void;
 
+  /**
+   * The first `refreshAll` has come back, or failed. Until then the window
+   * is Layer's mark and nothing else (WIN-4), not views of empty lists.
+   */
+  booted: boolean;
   refreshAll: () => Promise<void>;
   refreshRepos: () => Promise<void>;
   refreshRepoHealth: () => Promise<void>;
@@ -370,6 +375,7 @@ export const useStore = create<State>((set, get) => {
   watchFailing: false,
   cursorIde: false,
   appActive: true,
+  booted: false,
 
   // Selecting a task is always a request to look at it.
   select: (id) => set({ selectedTask: id, tab: "terminals", view: "work" }),
@@ -443,7 +449,13 @@ export const useStore = create<State>((set, get) => {
       });
       watchOk();
     });
-    await Promise.all([settingsP, coreP]);
+    try {
+      await Promise.all([settingsP, coreP]);
+    } finally {
+      // A failed first read still opens the window: the failure is in the
+      // top bar's status, and a splash that never ends would hide it.
+      if (!get().booted) set({ booted: true });
+    }
   },
 
   refreshRepos: async () => {

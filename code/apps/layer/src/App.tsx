@@ -26,6 +26,7 @@ import { SidebarToggle } from "./components/ui";
 import { MessageCenter } from "./components/MessageCenter";
 import { FrameStatus } from "./components/FrameStatus";
 import { Watchers } from "./Watchers";
+import { Splash } from "./components/Splash";
 import { goTo } from "./lib/goto";
 
 /**
@@ -356,6 +357,19 @@ function Toasts() {
 }
 
 export default function App() {
+  const booted = useStore((s) => s.booted);
+  // The watchers start the first refresh, so they run under the splash, and
+  // in the same place in the tree either way: moved, they would remount and
+  // start every listener and the workspace's sync a second time.
+  return (
+    <>
+      <Watchers />
+      {booted ? <Shell /> : <Splash />}
+    </>
+  );
+}
+
+function Shell() {
   const task = useStore(selectedTask);
   const view = useStore((s) => s.view);
   const settingsOpen = useStore((s) => s.settingsOpen);
@@ -364,7 +378,6 @@ export default function App() {
 
   return (
     <div className="shell" style={{ ["--ui-scale" as string]: scale }}>
-      <Watchers />
       <TopBar />
 
       <div className="views">

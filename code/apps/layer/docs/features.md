@@ -1293,7 +1293,13 @@ to fix on Repos. A running agent or chat is a live dot.
 - **WIN-3** A confirmation MUST open with Cancel focused, so Enter never
   confirms a delete by accident (`studio/design/behaviour.md`, "Confirming").
 
-Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Confirm`), `src-tauri/capabilities/default.json`.
+- **WIN-4** Starting up MUST show Layer's mark, breathing, and nothing
+  else, until the first read of repositories, tasks, panes and settings has
+  come back or failed; then the window. A view never shows a spinner or a
+  skeleton while it waits: it shows its content once it has it
+  (`studio/design/behaviour.md`, "Empty and loading").
+
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Confirm`), `Splash.tsx`, `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 
