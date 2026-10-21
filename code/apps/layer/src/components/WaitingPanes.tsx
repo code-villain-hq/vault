@@ -61,8 +61,8 @@ function useActions(taskId: string) {
       confirmLabel="Forget"
       body={
         forgetting.kind === "shell"
-          ? "It will not be listed here again."
-          : "It will not be listed here again. Its conversation stays in the agent's own history on disk."
+          ? "It will not be listed here again. This can't be undone."
+          : "It will not be listed here again. Its conversation stays in the agent's own history on disk. This can't be undone."
       }
       onCancel={() => setForgetting(null)}
       onConfirm={async () => {

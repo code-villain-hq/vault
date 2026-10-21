@@ -212,7 +212,7 @@ export function UsageView() {
       {clearing && (
         <Confirm
           title="Clear the run log?"
-          body="Every run and finished task kept here is forgotten. Agents, tasks and their work are not touched."
+          body="Every run and finished task kept here is forgotten. Agents, tasks and their work are not touched. This can't be undone."
           confirmLabel="Clear"
           onConfirm={() =>
             api.clearRuns().then(() => {

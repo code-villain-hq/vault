@@ -288,11 +288,12 @@ function ManageProfiles({
           body={
             <>
               Its repositories, tasks, settings, connections and tokens, its notes, its messages and its
-              run log are deleted. This cannot be undone.
+              run log are deleted.
               <div className="confirm-detail">
                 Its task folders stay where they are, since they can hold work not yet committed:
                 <div><b>{deleting.worktree_root}</b></div>
               </div>
+              <div style={{ marginTop: 8 }}>This can't be undone.</div>
             </>
           }
           onCancel={() => setDeleting(null)}

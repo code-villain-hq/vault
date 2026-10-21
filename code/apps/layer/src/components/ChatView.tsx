@@ -258,6 +258,7 @@ export function ChatView() {
             <>
               <b>{doomed.title}</b> will be stopped and its scrollback discarded.
               {doomed.running && " Anything it is part-way through is lost."}
+              {" This can't be undone."}
             </>
           }
           onCancel={() => setClosing(null)}

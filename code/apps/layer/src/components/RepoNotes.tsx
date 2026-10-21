@@ -128,6 +128,7 @@ export function RepoNotes({ project, notes, onChanged }: {
           body={<>
             No later task on <b>{project.name}</b> will be told this:
             <div className="confirm-detail">{deleting.text}</div>
+            This can't be undone.
           </>}
           busyLabel="Deleting…"
           onConfirm={() => run(api.deleteRepoNote(deleting.id))}

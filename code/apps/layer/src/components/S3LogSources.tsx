@@ -127,7 +127,7 @@ export function S3LogSources() {
           confirmLabel="Remove"
           body={
             <>
-              Agents will no longer read <span className="mono">s3://{removing.bucket}/{removing.prefix}</span>. Nothing in S3 changes.
+              Agents will no longer read <span className="mono">s3://{removing.bucket}/{removing.prefix}</span>. Nothing in S3 changes. This can't be undone.
             </>
           }
           onCancel={() => setRemoving(null)}
