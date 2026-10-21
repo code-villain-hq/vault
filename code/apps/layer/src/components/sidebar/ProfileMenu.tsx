@@ -196,6 +196,9 @@ function ManageProfiles({
 
   function rename() {
     if (!renaming) return;
+    const was = profiles.find((p) => p.id === renaming.id)?.name;
+    // Left empty or as it was: nothing to send, the field just closes.
+    if (!renaming.name.trim() || renaming.name === was) { setRenaming(null); return; }
     failure.clear();
     api.renameProfile(renaming.id, renaming.name)
       .then(() => { setRenaming(null); reload(); })
@@ -236,9 +239,17 @@ function ManageProfiles({
                 // Typing replaces the name, as renaming in Finder does.
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setRenaming({ id: p.id, name: e.target.value })}
+                // Saves when you leave it or press Enter, with no Save button
+                // (studio/design/behaviour.md); Esc keeps the old name.
+                onBlur={(e) => { if (!e.currentTarget.dataset.cancelled) rename(); }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") rename();
-                  if (e.key === "Escape") { e.stopPropagation(); setRenaming(null); }
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    // The field goes; a blur on its way out must not rename.
+                    e.currentTarget.dataset.cancelled = "1";
+                    setRenaming(null);
+                  }
                 }}
               />
             ) : (
@@ -247,12 +258,7 @@ function ManageProfiles({
                 <span className="profile-state">{p.current ? "this window" : p.open ? "open" : ""}</span>
               </span>
             )}
-            {renaming?.id === p.id ? (
-              <>
-                <button className="ui-button ui-button-primary" disabled={!renaming.name.trim()} onClick={rename}>Save</button>
-                <button className="ui-button" onClick={() => setRenaming(null)}>Cancel</button>
-              </>
-            ) : (
+            {renaming?.id === p.id ? null : (
               <>
                 <button className="ui-button" onClick={() => setRenaming({ id: p.id, name: p.name })}>Rename</button>
                 <button

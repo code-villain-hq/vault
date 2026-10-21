@@ -38,9 +38,12 @@ export function RepoNotes({ project, notes, onChanged }: {
   async function run(work: Promise<unknown>) {
     setBusy(true);
     failure.clear();
+    const at = editing;
     try {
       await work;
-      setEditing(null);
+      // Only the editor this was for: leaving one note's editor for another's
+      // Edit saves the first, and its answer must not close the second.
+      setEditing((now) => (now === at ? null : now));
       onChanged();
     } catch (e) {
       failure.fail(e);
@@ -50,32 +53,73 @@ export function RepoNotes({ project, notes, onChanged }: {
   }
 
   function save() {
+    if (busy || !text.trim()) return;
     const list = paths.split(",").map((p) => p.trim()).filter(Boolean);
+    const was = notes.find((n) => n.id === editing);
+    // Left as it was: nothing to send, the editor just closes.
+    if (was && was.text === text && was.paths.join(",") === list.join(",")) {
+      setEditing(null);
+      return;
+    }
     void run(editing === "new"
       ? api.addRepoNote(project.id, text, list)
       : api.editRepoNote(editing ?? "", text, list));
   }
 
+  function cancel() {
+    failure.clear();
+    setEditing(null);
+  }
+
+  // A note being edited saves when you leave it, or on ⌘Enter, with no Save
+  // button (studio/design/behaviour.md); Esc puts it back. Leaving means
+  // focus going outside the editor, not from the text to its files. A new
+  // note is only added by Add note or ⌘Enter: clicking away from one half
+  // written is not asking to keep it.
   const editor = (
-    <div className="repo-note-edit">
+    <div
+      className="repo-note-edit"
+      onBlur={(e) => {
+        if (editing === "new" || e.currentTarget.dataset.cancelled) return;
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        save();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          // The editor goes; a blur on its way out must not save it.
+          e.currentTarget.dataset.cancelled = "1";
+          cancel();
+        }
+      }}
+    >
       <textarea className="ui-field"
         autoFocus
         value={text}
         maxLength={NOTE_MAX}
         placeholder={`One fact about ${project.name} that holds for every task: how to run its tests, a trap in its setup, where something lives.`}
         onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) { e.preventDefault(); save(); } }}
       />
       <input className="ui-field"
         value={paths}
         placeholder="Files or folders it is about, comma separated (optional): marks it when they change"
         onChange={(e) => setPaths(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
       />
       <div className="note-actions">
-        <button className="ui-button ui-button-primary" disabled={busy || !text.trim()} onClick={save}>
-          {editing === "new" ? "Add note" : "Save"}
-        </button>
-        <button className="ui-button" disabled={busy} onClick={() => { failure.clear(); setEditing(null); }}>Cancel</button>
-        <span className="muted">{text.length}/{NOTE_MAX}</span>
+        {editing === "new" && (
+          <>
+            <button className="ui-button ui-button-primary" disabled={busy || !text.trim()} onClick={save}>
+              Add note
+            </button>
+            <button className="ui-button" disabled={busy} onClick={cancel}>Cancel</button>
+          </>
+        )}
+        <span className="muted">
+          {text.length}/{NOTE_MAX}
+          {editing !== "new" && " · saves when you leave it or press ⌘Enter · Esc puts it back"}
+        </span>
       </div>
       <ErrorMessage>{failure.error}</ErrorMessage>
     </div>
