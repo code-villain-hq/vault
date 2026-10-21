@@ -7,13 +7,14 @@
 //! else. An hour without a sign of life means the run stopped; clients show
 //! that from `working_seen_at`, with the same [`WORK_LEASE_MINUTES`].
 
+use code_villain_sync::{lock_workspace, log, notify};
 use forge_domain::{Actor, ModelKind, SyncAction};
 use serde_json::Value;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::SyncError;
-use crate::apply::{lock_workspace, log, notify, uuid_at};
+use crate::rules::{Forge, uuid_at};
 use crate::spec_change;
 
 /// How long an agent can go without a call before its work counts as
@@ -110,7 +111,7 @@ pub async fn start_work(pool: &PgPool, actor: Actor, issue: Uuid) -> Result<(), 
     .execute(&mut *db)
     .await?;
     log_user(&mut db, actor, Uuid::now_v7(), actor.user_id).await?;
-    notify(&mut db, actor.workspace_id).await?;
+    notify::<Forge>(&mut db, actor.workspace_id).await?;
     db.commit().await?;
     Ok(())
 }
@@ -132,7 +133,7 @@ pub async fn finish_work(pool: &PgPool, actor: Actor, issue: Uuid) -> Result<boo
         return Ok(false);
     }
     log_user(&mut db, actor, Uuid::now_v7(), actor.user_id).await?;
-    notify(&mut db, actor.workspace_id).await?;
+    notify::<Forge>(&mut db, actor.workspace_id).await?;
     db.commit().await?;
     Ok(true)
 }
@@ -174,7 +175,7 @@ pub async fn renew_work(pool: &PgPool, actor: Actor) -> Result<(), SyncError> {
     .rows_affected();
     if renewed > 0 {
         log_user(&mut db, actor, Uuid::now_v7(), actor.user_id).await?;
-        notify(&mut db, actor.workspace_id).await?;
+        notify::<Forge>(&mut db, actor.workspace_id).await?;
     }
     db.commit().await?;
     Ok(())

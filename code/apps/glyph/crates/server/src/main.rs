@@ -4,7 +4,7 @@ use std::time::Duration;
 use glyph_llm::Models;
 use glyph_server::config::Config;
 use glyph_server::oidc::OidcLogin;
-use glyph_server::{AppState, accounts, app, models, notify, translate};
+use glyph_server::{AppState, accounts, app, models, translate};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -60,7 +60,11 @@ async fn main() -> anyhow::Result<()> {
                 None => state,
             };
             let processes = state.processes.clone();
-            tokio::spawn(notify::listen(state.pool.clone(), state.wake.clone()));
+            tokio::spawn(code_villain_sync::listen(
+                state.pool.clone(),
+                glyph_sync::NOTIFY_CHANNEL,
+                state.wake.clone(),
+            ));
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
             // With each connection's address, for limits per client.

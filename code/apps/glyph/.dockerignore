@@ -1,7 +1,0 @@
-target
-node_modules
-**/node_modules
-apps/web/dist
-apps/desktop/src-tauri/gen
-.git
-.claude

@@ -16,7 +16,7 @@ use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::SyncError;
-use crate::apply::uuid_at;
+use crate::rules::uuid_at;
 
 /// The spec changes of open issues (not done or canceled) that haven't
 /// taken effect.

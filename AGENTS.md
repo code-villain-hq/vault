@@ -22,7 +22,7 @@ Every app except Caster, the theme and the site is built the same way:
 - One sync engine. Each client keeps a local copy of a workspace and works on it offline.
 - A desktop app that runs on its own, with no server. It starts its own server on its own Postgres for the workspaces on that Mac.
 
-Forge's sync engine is the reference until it moves to `code/kit/sync`, where every app takes it from. Glyph and Raven follow Forge; Layer still keeps its state in local files.
+The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge and Glyph use it; Raven gets it next, and Layer still keeps its state in local files.
 
 ## Signing in with Code Villain
 

@@ -1,0 +1,9 @@
+# The build context is code/ (docker-compose.yml), so the image can use the
+# studio's kit. Only Glyph and the kit go in.
+*
+!apps/glyph
+!kit/sync
+**/target
+**/node_modules
+apps/glyph/apps/web/dist
+apps/glyph/apps/desktop/src-tauri/gen

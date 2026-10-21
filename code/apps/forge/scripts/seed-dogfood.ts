@@ -17,7 +17,7 @@ const SERVICES: { name: string; description: string; paths: string[] }[] = [
       "Keeps every client's local copy in step with Postgres: transactions, the change log, snapshots, the live feed, and the client's store and outbox.",
     paths: [
       "crates/sync/**",
-      "packages/sync-client/**",
+      "/code/kit/sync/**",
       "crates/domain/src/protocol.rs",
       "crates/server/src/ws.rs",
     ],
@@ -84,7 +84,8 @@ const operations = SERVICES.map((service) => {
   const data = {
     ...service,
     repository: REPOSITORY,
-    paths: service.paths.map((path) => FORGE + path),
+    // Paths start in Forge's folder, or with "/" at the vault's root.
+    paths: service.paths.map((path) => (path.startsWith("/") ? path.slice(1) : FORGE + path)),
   };
   const found = existing.find((s) => s.name.toLowerCase() === service.name.toLowerCase());
   return found

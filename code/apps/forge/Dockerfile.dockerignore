@@ -1,0 +1,9 @@
+# The build context is code/ (docker-compose.yml), so the image can use the
+# studio's kit. Only Forge and the kit go in.
+*
+!apps/forge
+!kit/sync
+**/target
+**/node_modules
+apps/forge/apps/web/dist
+apps/forge/apps/desktop/src-tauri/gen

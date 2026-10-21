@@ -1,4 +1,4 @@
-import type { SyncClient } from "@forge/sync-client";
+import type { SyncClient } from "@code-villain/sync-client";
 import type { Me, ModelKind, WorkspaceInfo } from "@forge/types";
 import {
   createContext,

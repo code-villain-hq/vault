@@ -23,7 +23,10 @@ services:
   # The whole app, as the team uses it: `bun run app`, then http://localhost:7390.
   forge:
     profiles: ["app"]
-    build: .
+    # From code/, so the image can use the studio's kit (code/kit/sync).
+    build:
+      context: ../..
+      dockerfile: apps/forge/Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:

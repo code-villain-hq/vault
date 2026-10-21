@@ -1,4 +1,4 @@
-import { uuidv7 } from "@glyph/sync-client";
+import { uuidv7 } from "@code-villain/sync-client";
 import type { Suggestion } from "@glyph/types";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";

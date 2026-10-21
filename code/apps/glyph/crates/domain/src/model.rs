@@ -2,7 +2,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ts_rs::TS;
-use uuid::Uuid;
+
+pub use code_villain_sync::{Actor, ValidationError, Write};
 
 use crate::glossary::{GlossaryEntryCreate, GlossaryEntryPatch};
 use crate::language::{LanguageCreate, LanguagePatch};
@@ -10,13 +11,6 @@ use crate::pair::{LanguagePairCreate, LanguagePairPatch};
 use crate::run::{TranslationRunCreate, TranslationRunPatch};
 use crate::suggestion::{SuggestionCreate, SuggestionPatch};
 use crate::translation::{TranslationCreate, TranslationPatch};
-
-/// Who is making a change, and in which workspace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Actor {
-    pub user_id: Uuid,
-    pub workspace_id: Uuid,
-}
 
 /// Every kind of record that clients sync.
 ///
@@ -33,14 +27,6 @@ pub enum ModelKind {
     Suggestion,
     TranslationRun,
     User,
-}
-
-/// The three kinds of write.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Write {
-    Create,
-    Update,
-    Delete,
 }
 
 impl ModelKind {
@@ -129,14 +115,39 @@ impl ModelKind {
     }
 }
 
+/// How the sync engine knows Glyph's models.
+impl code_villain_sync::Model for ModelKind {
+    const ALL: &'static [ModelKind] = ModelKind::ALL;
+
+    fn table(self) -> &'static str {
+        ModelKind::table(self)
+    }
+
+    fn name(self) -> &'static str {
+        ModelKind::name(self)
+    }
+
+    fn client_may(self, write: Write) -> bool {
+        ModelKind::client_may(self, write)
+    }
+
+    fn private_to_user(self) -> bool {
+        ModelKind::private_to_user(self)
+    }
+
+    fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
+        ModelKind::validate_create(self, data)
+    }
+
+    fn validate_patch(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
+        ModelKind::validate_patch(self, data)
+    }
+}
+
 /// Business rules a create or patch input must satisfy, beyond its types.
 pub trait Validate {
     fn validate(&self) -> Result<(), ValidationError>;
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("{0}")]
-pub struct ValidationError(pub String);
 
 /// Parses `data` as `T`, which rejects unknown fields and wrong types, then
 /// applies `T`'s rules.
