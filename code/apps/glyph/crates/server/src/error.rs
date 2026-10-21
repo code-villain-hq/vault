@@ -14,6 +14,12 @@ pub struct AppError {
     message: String,
 }
 
+impl Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 impl AppError {
     fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
         AppError {

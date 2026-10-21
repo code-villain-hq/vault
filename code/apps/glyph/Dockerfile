@@ -22,6 +22,7 @@ COPY apps/glyph/Cargo.toml apps/glyph/Cargo.lock ./
 COPY apps/glyph/crates crates
 COPY apps/glyph/migrations migrations
 COPY kit/sync /code/kit/sync
+COPY kit/desktop /code/kit/desktop
 # Cargo needs every workspace member's manifest, even when not building it.
 COPY apps/glyph/apps/desktop/src-tauri apps/desktop/src-tauri
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

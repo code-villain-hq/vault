@@ -1,10 +1,17 @@
 //! Glyph's desktop app. It shows the web app (apps/web) and adds links
 //! opened in the browser, the session token kept in the system keychain, and
-//! `glyph://` links, which bring a sign-in in the browser back to the app;
-//! the web app calls them when it runs here.
+//! `glyph://` links, which bring a sign-in in the browser back to the app,
+//! and a file picker for a model on this Mac; the web app calls them when
+//! it runs here. It also runs Glyph itself for the workspaces on this Mac
+//! (`this_mac`).
 
 // Don't open a console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod this_mac;
+
+use tauri::{Manager, RunEvent, State};
+use this_mac::{Place, ThisMac};
 
 /// Keychain entries are named after the app, one per server.
 const KEYCHAIN_SERVICE: &str = "Glyph";
@@ -38,15 +45,58 @@ fn forget_session_token(server: String) -> Result<(), String> {
     }
 }
 
+/// The workspaces on this Mac, once someone has started here; waits while
+/// Glyph starts.
+#[tauri::command]
+async fn this_mac(this_mac: State<'_, ThisMac>) -> Result<Option<Place>, String> {
+    this_mac.place().await
+}
+
+/// "Start on this Mac", or a further workspace once started.
+#[tauri::command]
+async fn start_on_this_mac(
+    this_mac: State<'_, ThisMac>,
+    name: String,
+    workspace_name: String,
+) -> Result<Place, String> {
+    this_mac.start_here(&name, &workspace_name).await
+}
+
+/// The Mac account's name, suggested as yours.
+#[tauri::command]
+fn mac_user_name() -> String {
+    this_mac::account_name()
+}
+
 fn main() {
-    tauri::Builder::default()
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "glyph_desktop=info,glyph_server=info".into()),
+        )
+        .init();
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            app.manage(ThisMac::new(app.path().app_data_dir()?));
+            app.state::<ThisMac>().resume();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             session_token,
             save_session_token,
-            forget_session_token
+            forget_session_token,
+            this_mac,
+            start_on_this_mac,
+            mac_user_name
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("Glyph failed to start");
+    app.run(|app, event| {
+        if let RunEvent::Exit = event {
+            tauri::async_runtime::block_on(app.state::<ThisMac>().stop());
+        }
+    });
 }
