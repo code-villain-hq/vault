@@ -3,6 +3,11 @@
 
 const root = new URL("..", import.meta.url).pathname;
 
+// In development people reach Forge through Vite, so that's where Code Villain
+// sign-in sends them back. Set here rather than in `.env`, which `bun run app`
+// reads too, and whose Forge is at 7390.
+process.env.FORGE_PUBLIC_URL ||= "http://localhost:5173";
+
 const processes = [
   { name: "server", color: 35, cmd: ["cargo", "run", "-p", "forge-server"] },
   { name: "web", color: 36, cmd: ["bun", "run", "--cwd", "apps/web", "dev"] },
