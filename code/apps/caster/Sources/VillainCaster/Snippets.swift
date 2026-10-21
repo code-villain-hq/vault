@@ -30,8 +30,9 @@ enum Snippets {
 }
 
 /// One field per snippet on the `panel` tone, opened from the status item's
-/// right-click menu. Save is the window's one primary action.
-final class SettingsWindowController: NSWindowController {
+/// right-click menu. A field saves when you leave it or press Enter
+/// (studio/design/behaviour.md).
+final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
     private var inputs: [String: NSTextField] = [:]
@@ -47,6 +48,7 @@ final class SettingsWindowController: NSWindowController {
         window.titlebarAppearsTransparent = true
         window.backgroundColor = Nightshade.panel
         super.init(window: window)
+        window.delegate = self
 
         let grid = NSGridView()
         grid.rowSpacing = 8
@@ -59,18 +61,13 @@ final class SettingsWindowController: NSWindowController {
             label.alignment = .right
             let box = FieldBox()
             box.widthAnchor.constraint(greaterThanOrEqualToConstant: 300).isActive = true
+            box.input.delegate = self
             inputs[field.defaultsKey] = box.input
             grid.addRow(with: [label, box])
         }
         grid.column(at: 0).xPlacement = .trailing
         grid.rowAlignment = .none
         for row in 0..<grid.numberOfRows { grid.row(at: row).yPlacement = .center }
-
-        let saveButton = PrimaryButton(title: "Save", target: self, action: #selector(save))
-        saveButton.keyEquivalent = "\r"
-        grid.addRow(with: [NSGridCell.emptyContentView, saveButton])
-        grid.cell(for: saveButton)?.xPlacement = .trailing
-        grid.row(at: grid.numberOfRows - 1).topPadding = 8
 
         let content = NSView()
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -116,11 +113,17 @@ final class SettingsWindowController: NSWindowController {
         try data.write(to: url)
     }
 
-    @objc private func save() {
-        for (key, input) in inputs {
-            Snippets.set(input.stringValue, for: key)
-        }
-        window?.close()
+    // Leaving a field (Tab, a click elsewhere) and Enter both end editing.
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let input = obj.object as? NSTextField,
+              let key = inputs.first(where: { $0.value === input })?.key
+        else { return }
+        Snippets.set(input.stringValue, for: key)
+    }
+
+    // Closing the window is leaving the field too: end its editing so it saves.
+    func windowWillClose(_ notification: Notification) {
+        window?.makeFirstResponder(nil)
     }
 }
 
