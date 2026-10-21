@@ -1,13 +1,13 @@
 //! How Forge and Glyph send their calls and logs: OpenTelemetry over HTTP
 //! (OTLP), in its JSON form, at `/v1/traces` and `/v1/logs`. Each app sends
-//! with its own key (`raven-server ingest-key <app>`), which says which app
-//! it is.
+//! with its own key, from Settings → Apps, which says which app it is.
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, header};
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value, json};
+use uuid::Uuid;
 
 use crate::auth::hash_token;
 use crate::error::AppError;
@@ -24,7 +24,7 @@ pub async fn traces(
     let request = json_body(&headers, &body)?;
     let batch = Batch {
         spans: spans(&request),
-        app,
+        app: Some(app),
         logs: Vec::new(),
     };
     telemetry::insert(&state.pool, &batch).await?;
@@ -41,7 +41,7 @@ pub async fn logs(
     let request = json_body(&headers, &body)?;
     let batch = Batch {
         logs: log_records(&request),
-        app,
+        app: Some(app),
         spans: Vec::new(),
     };
     telemetry::insert(&state.pool, &batch).await?;
@@ -49,17 +49,22 @@ pub async fn logs(
 }
 
 /// The app whose key the request carries.
-async fn sender(state: &AppState, headers: &HeaderMap) -> Result<String, AppError> {
+async fn sender(state: &AppState, headers: &HeaderMap) -> Result<Uuid, AppError> {
     let key = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .ok_or_else(|| AppError::unauthorized("send with the app's Raven key"))?;
-    sqlx::query_scalar("SELECT key FROM apps WHERE ingest_key_hash = $1")
-        .bind(hash_token(key.trim()))
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::unauthorized("that key isn't one of Raven's"))
+    const SQL: &str = "SELECT app_id FROM app_keys WHERE key_hash = $1";
+    telemetry::timed(
+        "find sender",
+        SQL,
+        sqlx::query_scalar(SQL)
+            .bind(hash_token(key.trim()))
+            .fetch_optional(&state.pool),
+    )
+    .await?
+    .ok_or_else(|| AppError::unauthorized("that key isn't one of Raven's"))
 }
 
 fn json_body(headers: &HeaderMap, body: &[u8]) -> Result<Value, AppError> {

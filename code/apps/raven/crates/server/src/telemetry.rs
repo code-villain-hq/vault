@@ -21,12 +21,11 @@ use tracing::field::{Field, Visit};
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::Layer;
 use tracing_subscriber::layer::Context;
+use uuid::Uuid;
 
 use crate::error::ErrorNote;
 use crate::state::AppState;
 
-/// Raven's own key among the apps.
-pub const RAVEN: &str = "raven";
 /// Each response names its call, so a problem someone reports can be found.
 pub const TRACE_HEADER: &str = "x-raven-trace";
 
@@ -60,7 +59,8 @@ pub struct LogRecord {
 /// What one app said at once.
 #[derive(Debug, Default)]
 pub struct Batch {
-    pub app: String,
+    /// The app, or `None` for Raven itself.
+    pub app: Option<Uuid>,
     pub spans: Vec<SpanRecord>,
     pub logs: Vec<LogRecord>,
 }
@@ -94,9 +94,23 @@ impl Recorder {
     }
 }
 
-/// Writes what the recorder hears until the server stops.
+/// Writes what the recorder hears until the server stops. Raven's own
+/// records go to the app that is Raven itself; until a workspace watches
+/// it, they're dropped.
 pub async fn write(pool: PgPool, mut rx: mpsc::Receiver<Batch>) {
-    while let Some(batch) = rx.recv().await {
+    let mut raven: Option<Uuid> = None;
+    while let Some(mut batch) = rx.recv().await {
+        if batch.app.is_none() {
+            if raven.is_none() {
+                raven = sqlx::query_scalar("SELECT id FROM apps WHERE is_self")
+                    .fetch_optional(&pool)
+                    .await
+                    .ok()
+                    .flatten();
+            }
+            let Some(raven) = raven else { continue };
+            batch.app = Some(raven);
+        }
         if let Err(e) = insert(&pool, &batch).await {
             // This target is left out of the record, so failing here can't loop.
             tracing::warn!(target: "raven_server::telemetry", error = %e, "couldn't record a batch");
@@ -106,14 +120,15 @@ pub async fn write(pool: PgPool, mut rx: mpsc::Receiver<Batch>) {
 
 /// Stores a batch in one transaction.
 pub async fn insert(pool: &PgPool, batch: &Batch) -> Result<(), sqlx::Error> {
+    let Some(app) = batch.app else { return Ok(()) };
     let mut db = pool.begin().await?;
     for span in &batch.spans {
         sqlx::query(
-            "INSERT INTO spans (app, trace_id, span_id, parent_span_id, name, kind, started_at, \
+            "INSERT INTO spans (app_id, trace_id, span_id, parent_span_id, name, kind, started_at, \
              duration_ms, is_error, error_message, http_status, version, attributes) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
         )
-        .bind(&batch.app)
+        .bind(app)
         .bind(&span.trace_id)
         .bind(&span.span_id)
         .bind(&span.parent_span_id)
@@ -131,10 +146,10 @@ pub async fn insert(pool: &PgPool, batch: &Batch) -> Result<(), sqlx::Error> {
     }
     for log in &batch.logs {
         sqlx::query(
-            "INSERT INTO logs (app, at, level, message, target, trace_id, span_id, attributes) \
+            "INSERT INTO logs (app_id, at, level, message, target, trace_id, span_id, attributes) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         )
-        .bind(&batch.app)
+        .bind(app)
         .bind(log.at)
         .bind(&log.level)
         .bind(&log.message)
@@ -229,7 +244,7 @@ pub async fn record_calls(State(state): State<AppState>, request: Request, next:
         ..child
     }));
     state.recorder.send(Batch {
-        app: RAVEN.into(),
+        app: None,
         spans,
         logs: call.logs,
     });
@@ -341,7 +356,7 @@ impl<S: Subscriber> Layer<S> for Capture {
         });
         if kept.is_err() {
             self.recorder.send(Batch {
-                app: RAVEN.into(),
+                app: None,
                 spans: Vec::new(),
                 logs: vec![log],
             });

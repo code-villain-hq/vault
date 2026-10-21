@@ -1,14 +1,17 @@
-//! Who is making a request: sessions, password hashing, and the extractor
-//! handlers use to require a signed-in user. Glyph's, without workspaces.
+//! Who is making a request: sessions, password hashing, and the extractors
+//! handlers use to require a signed-in user or a workspace member.
+
+use std::collections::HashMap;
 
 use argon2::Argon2;
 use argon2::password_hash::phc::PasswordHash;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier};
-use axum::extract::FromRequestParts;
-use axum::http::header::{AUTHORIZATION, COOKIE};
+use axum::extract::{FromRequestParts, Path};
+use axum::http::header::{AUTHORIZATION, COOKIE, SEC_WEBSOCKET_PROTOCOL};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, HeaderValue};
 use chrono::{Duration, Utc};
+use raven_domain::{Actor, Role};
 use sha2::{Digest, Sha256};
 use sqlx::PgExecutor;
 use uuid::Uuid;
@@ -22,9 +25,14 @@ pub const SESSION_COOKIE: &str = "raven_session";
 pub const CLIENT_HEADER: &str = "x-raven-client";
 /// Where the desktop app gets its session token when it signs in.
 pub const SESSION_HEADER: &str = "x-raven-session";
+/// Browsers can't set headers on a WebSocket, so the desktop app offers its
+/// token as a subprotocol, `bearer.<token>`, next to [`SYNC_PROTOCOL`].
+pub const BEARER_PROTOCOL_PREFIX: &str = "bearer.";
+pub const SYNC_PROTOCOL: &str = "raven";
 const SESSION_DAYS: i64 = 60;
 
-/// A random 256-bit token, hex-encoded, for sessions and ingest keys.
+/// A random 256-bit token, hex-encoded, for sessions, invite links and
+/// ingest keys.
 pub fn new_token() -> String {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes).expect("the OS random number generator works");
@@ -103,6 +111,15 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
     if let Some(token) = bearer {
         return Some(token.trim().to_string());
     }
+    let protocol = headers
+        .get_all(SEC_WEBSOCKET_PROTOCOL)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .find_map(|p| p.trim().strip_prefix(BEARER_PROTOCOL_PREFIX));
+    if let Some(token) = protocol {
+        return Some(token.to_string());
+    }
     headers
         .get_all(COOKIE)
         .iter()
@@ -140,4 +157,79 @@ impl FromRequestParts<AppState> for CurrentUser {
             .ok_or_else(|| AppError::unauthorized("your session has ended; sign in again"))?;
         Ok(CurrentUser { id, token_hash })
     }
+}
+
+/// The signed-in user as a member of the workspace in the path
+/// (`/api/w/{workspace_id}/...`). Anyone else gets 404, so workspaces you
+/// aren't in don't reveal that they exist.
+pub struct Member {
+    pub actor: Actor,
+    pub role: Role,
+    pub token_hash: Vec<u8>,
+}
+
+impl Member {
+    pub fn require_admin(&self) -> Result<(), AppError> {
+        match self.role {
+            Role::Admin => Ok(()),
+            Role::Member => Err(AppError::forbidden("only workspace admins can do that")),
+        }
+    }
+}
+
+impl FromRequestParts<AppState> for Member {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = CurrentUser::from_request_parts(parts, state).await?;
+        let not_found = || AppError::not_found("workspace not found");
+        let Path(params) = Path::<HashMap<String, String>>::from_request_parts(parts, state)
+            .await
+            .map_err(|_| not_found())?;
+        let workspace_id: Uuid = params
+            .get("workspace_id")
+            .and_then(|id| id.parse().ok())
+            .ok_or_else(not_found)?;
+        let role: Option<String> = sqlx::query_scalar(
+            "SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
+        )
+        .bind(workspace_id)
+        .bind(user.id)
+        .fetch_optional(&state.pool)
+        .await?;
+        let role = role
+            .as_deref()
+            .and_then(Role::parse)
+            .ok_or_else(not_found)?;
+        Ok(Member {
+            actor: Actor {
+                user_id: user.id,
+                workspace_id,
+            },
+            role,
+            token_hash: user.token_hash,
+        })
+    }
+}
+
+/// Whether a session is still valid and its user still in the workspace.
+/// Long-lived connections check this now and then.
+pub async fn still_member(
+    db: impl PgExecutor<'_>,
+    token_hash: &[u8],
+    actor: Actor,
+) -> Result<bool, AppError> {
+    let found: Option<i32> = sqlx::query_scalar(
+        "SELECT 1 FROM sessions s JOIN workspace_members m ON m.user_id = s.user_id \
+         WHERE s.token_hash = $1 AND s.expires_at > now() AND m.workspace_id = $2 AND m.user_id = $3",
+    )
+    .bind(token_hash)
+    .bind(actor.workspace_id)
+    .bind(actor.user_id)
+    .fetch_optional(db)
+    .await?;
+    Ok(found.is_some())
 }

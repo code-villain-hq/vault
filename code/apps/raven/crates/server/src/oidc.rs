@@ -6,18 +6,21 @@
 //! without them. When it's on, it's the only way people sign in: email and
 //! password are closed.
 //!
-//! The provider says who someone is, and its group for Raven says who may
-//! come in: Raven has no workspaces or invites, so a studio account the
-//! provider lets through gets a Raven account the first time. It links to
-//! the account with the provider's verified email if there is one.
+//! The provider says who someone is; Raven says what they may do here
+//! (workspaces, roles and invites stay in Raven). A studio account signs in
+//! to the Raven account it's linked to (`users.oidc_sub`). The first time, it
+//! links to the account with the provider's verified email: the studio keeps
+//! those emails, and with this on nobody can sign up here with an address of
+//! their choosing. Someone without an account gets one when they come from an
+//! invite link, and confirms joining on the invite page.
 //!
-//! The round trip carries a signed `state` and a cookie with the nonce and
-//! the PKCE verifier. A copy of Glyph's `oidc.rs` without invites; keep the
-//! two alike. Raven trades the code for tokens itself,
-//! with its client secret over TLS, so it checks the ID token's issuer,
-//! audience, expiry and nonce but not its signature (OpenID Connect Core
-//! 1.0, 3.1.3.7, step 6). The provider must therefore be https, except on
-//! this machine.
+//! The round trip carries a signed `state` and a cookie with the nonce, the
+//! PKCE verifier and any invite. A copy of Forge's `oidc.rs`; keep the two
+//! alike. Raven trades the code for tokens itself, with its
+//! client secret over TLS, so it checks the ID token's issuer, audience,
+//! expiry and nonce but not its signature (OpenID Connect Core 1.0,
+//! 3.1.3.7, step 6). The provider must therefore be https, except on this
+//! machine.
 //!
 //! The desktop app can't see the browser's cookies. It opens the system
 //! browser at `/api/auth/oidc?desktop=<challenge>`, the hex SHA-256 of a
@@ -43,6 +46,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::Utc;
 use hmac::{Hmac, KeyInit, Mac};
+use raven_domain::{clean_name, normalize_email};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -50,9 +54,10 @@ use sqlx::PgConnection;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
-use crate::accounts::{clean_name, normalize_email, signed_in};
+use crate::accounts::signed_in;
 use crate::auth::{hash_token, new_token, session_cookie, start_session};
 use crate::error::AppError;
+use crate::invites;
 use crate::state::AppState;
 
 /// Ties a sign-in to the browser that started it, against login CSRF.
@@ -123,6 +128,8 @@ enum Problem {
     OtherBrowser,
     Provider,
     NoEmail,
+    NoAccount,
+    InviteGone,
     /// The Raven account with this email is linked to another studio account.
     Taken,
     Failed,
@@ -136,6 +143,8 @@ impl Problem {
             Problem::OtherBrowser => "oidc_other_browser",
             Problem::Provider => "oidc_refused",
             Problem::NoEmail => "oidc_no_email",
+            Problem::NoAccount => "oidc_no_account",
+            Problem::InviteGone => "invite_gone",
             Problem::Taken => "oidc_taken",
             Problem::Failed => "oidc_failed",
         }
@@ -426,7 +435,8 @@ fn is_hex(text: &str, len: usize) -> bool {
     text.len() == len && text.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// `nonce.verifier`, both hex, for this flow's paths only.
+/// `nonce.verifier` or `nonce.verifier.invite`, all hex, for this flow's
+/// paths only.
 fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     let secure = if secure { "; Secure" } else { "" };
     HeaderValue::from_str(&format!(
@@ -445,6 +455,7 @@ fn failed(problem: Problem, desktop: bool, secure: bool) -> Response {
 
 #[derive(Deserialize)]
 pub struct StartParams {
+    invite: Option<String>,
     redirect: Option<String>,
     /// From the desktop app: the hex SHA-256 of its secret.
     desktop: Option<String>,
@@ -471,7 +482,11 @@ pub async fn start(State(state): State<AppState>, Query(params): Query<StartPara
             .filter(|d| is_hex(d, 64))
             .map(|d| d.to_ascii_lowercase()),
     });
-    let cookie = format!("{nonce}.{verifier}");
+    // The invite rides in the cookie, never in the URL sent to the provider.
+    let cookie = match params.invite.filter(|i| is_hex(i, 64)) {
+        Some(invite) => format!("{nonce}.{verifier}.{invite}"),
+        None => format!("{nonce}.{verifier}"),
+    };
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     let join = if endpoints.authorization.contains('?') {
         '&'
@@ -542,7 +557,10 @@ async fn finish(
         .and_then(|s| login.read_state(s))
         .ok_or(Problem::Expired)?;
     let cookie = cookie_value(headers, NONCE_COOKIE).unwrap_or_default();
-    let (nonce, verifier) = cookie.split_once('.').unwrap_or_default();
+    let mut parts = cookie.split('.');
+    let nonce = parts.next().unwrap_or_default();
+    let verifier = parts.next().unwrap_or_default();
+    let invite = parts.next();
     if nonce.is_empty() || nonce != trip.nonce {
         return Err(Problem::OtherBrowser);
     }
@@ -551,8 +569,12 @@ async fn finish(
     login.check(&claims, &trip.nonce)?;
 
     let mut db = state.pool.begin().await?;
-    let user = account(&mut db, &claims).await?;
-    let to = trip.redirect;
+    let user = account(&mut db, &claims, invite).await?;
+    // People confirm joining a workspace themselves, on the invite page.
+    let to = match invite {
+        Some(invite) => format!("/join/{invite}"),
+        None => trip.redirect,
+    };
     match trip.desktop {
         Some(challenge) => {
             db.commit().await?;
@@ -570,8 +592,12 @@ async fn finish(
 }
 
 /// The Raven account behind the studio account: linked already, linked now
-/// by email, or new.
-async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem> {
+/// by email, or new from an invite.
+async fn account(
+    db: &mut PgConnection,
+    claims: &Claims,
+    invite: Option<&str>,
+) -> Result<Uuid, Problem> {
     let linked: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE oidc_sub = $1")
         .bind(&claims.sub)
         .fetch_optional(&mut *db)
@@ -602,6 +628,14 @@ async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem
         }
         Some((_, false)) => Err(Problem::Taken),
         None => {
+            let invite = invite.ok_or(Problem::NoAccount)?;
+            if invites::find_valid(&mut *db, invite)
+                .await
+                .map_err(|_| Problem::Failed)?
+                .is_none()
+            {
+                return Err(Problem::InviteGone);
+            }
             let fallback = email.split('@').next().unwrap_or_default().to_string();
             let name = [&claims.name, &claims.preferred_username]
                 .into_iter()
@@ -655,7 +689,7 @@ mod tests {
             "https://id.example".into(),
             "raven".into(),
             "secret".into(),
-            "https://glyph.example/",
+            "https://raven.example/",
         )
         .unwrap()
     }
@@ -665,7 +699,7 @@ mod tests {
         let ours = login();
         let trip = Trip {
             nonce: "abc".into(),
-            redirect: "/forge/technical".into(),
+            redirect: "/studio/forge/technical".into(),
             desktop: Some("ab".repeat(32)),
         };
         let state = ours.state(&trip);
