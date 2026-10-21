@@ -456,7 +456,7 @@ body.dragging * { pointer-events: none; }
 .outgoing-leftover .text { font-family: var(--font-mono); font-size: var(--type-ui-small-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .md .suggestion { background: var(--surface); border-radius: var(--radius-md); overflow: hidden; margin: 6px 0; }
 .md .suggestion > span { display: block; padding: 3px 8px; font-size: var(--type-ui-small-size); color: var(--muted); }
-.md .suggestion pre { margin: 0; border-radius: 0; background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.md .suggestion pre { margin: 0; border-radius: 0; background: color-mix(in srgb, var(--ok) var(--status-tint), transparent); }
 
 /* A size container, so a note can be as wide as the pane showing it — see
    `.inline-comment`. */
@@ -499,7 +499,7 @@ body.dragging * { pointer-events: none; }
 .diff-line.del mark { background: var(--code-diff-removed-text); }
 .diff-line.hunk { background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); color: var(--muted); }
 .diff-line.meta { color: var(--faint); }
-.diff-line.commented { background: color-mix(in srgb, var(--warn) 8%, transparent); }
+.diff-line.commented { background: color-mix(in srgb, var(--warn) var(--highlight-tint), transparent); }
 /* The lines a note being written covers (DIFF-8): one, or a shift-clicked range. */
 .diff-line.picked { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
 
@@ -656,7 +656,7 @@ body.dragging * { pointer-events: none; }
   padding: 8px 10px;
   max-height: 320px;
   overflow: auto;
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
   border-radius: var(--radius-md);
 }
 .md pre code { padding: 0; border: none; background: none; font-size: var(--type-ui-small-size); line-height: 1.45; white-space: pre; }
@@ -671,7 +671,7 @@ body.dragging * { pointer-events: none; }
   padding: 8px 10px;
   max-height: 280px;
   overflow: auto;
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
   border-radius: var(--radius-md);
   font-family: var(--font-mono);
   font-size: var(--type-ui-small-size);
@@ -1302,7 +1302,7 @@ body.dragging * { pointer-events: none; }
   padding: 8px 10px;
   border-radius: var(--radius-md);
 }
-.repo-manage:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.repo-manage:hover { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
 .repo-line { display: flex; align-items: center; gap: 10px; }
 .repo-manage .rname { min-width: 140px; font-weight: 700; }
 .repo-manage .rstore { color: var(--faint); font-size: var(--type-ui-small-size); white-space: nowrap; }
@@ -1374,16 +1374,14 @@ body.dragging * { pointer-events: none; }
 .cleanup-detail { color: var(--muted); font-size: var(--type-ui-small-size); line-height: 1.5; margin-top: 2px; }
 .cleanup-item.risky .cleanup-detail { color: var(--status-warn-ink); }
 
-/* Branch composer: a fixed ticket key with an optional suffix after it. */
+/* Branch composer: a fixed ticket key with an optional suffix after it.
+   It is a ui-field itself, so it has the field's tone and focus ring; the
+   input inside has neither. */
 .branch-compose {
   display: flex;
   align-items: stretch;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--field);
 }
-.branch-compose:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .branch-key {
   display: flex;
   align-items: center;
@@ -1469,8 +1467,8 @@ body.dragging * { pointer-events: none; }
 .message.unread { color: var(--fg); }
 .message .dot {
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   margin-top: 6px;
   border-radius: 50%;
   background: var(--status-info-ink);
@@ -1491,7 +1489,7 @@ body.dragging * { pointer-events: none; }
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-.message .times { font: 11px var(--font-mono); color: var(--muted); }
+.message .times { font-family: var(--font-mono); font-size: var(--type-ui-code-size); line-height: var(--type-ui-code-leading); color: var(--muted); }
 .message .when { margin-left: auto; flex: none; font-size: var(--type-ui-small-size); color: var(--faint); }
 .message .body {
   font-size: var(--type-ui-small-size);
@@ -1525,7 +1523,7 @@ body.dragging * { pointer-events: none; }
 }
 .ctx-item:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
 .ctx-item.danger { color: var(--status-danger-ink); }
-.ctx-item.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.ctx-item.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) var(--highlight-tint), transparent); }
 .ctx-item.separated { margin-top: 5px; border-top: 1px solid var(--line); padding-top: 8px; }
 
 .confirm-detail {
@@ -1666,7 +1664,7 @@ body.dragging * { pointer-events: none; }
 .loop-result .dim { color: var(--faint); font-size: var(--type-ui-small-size); }
 .loop-output {
   margin: 4px 0 6px 20px; padding: 8px 10px; max-height: 260px; overflow: auto;
-  background: color-mix(in srgb, var(--fg) 5%, transparent); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); border-radius: var(--radius-md);
   font-family: var(--font-mono); font-size: var(--type-ui-small-size); white-space: pre-wrap; color: var(--muted);
 }
 .loop-intro { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
@@ -1675,7 +1673,7 @@ input.mono { font-family: var(--font-mono); }
 .type-pick {
   cursor: pointer;
 }
-.type-pick:hover:not(:disabled) { color: var(--fg); background: color-mix(in srgb, var(--fg) 12%, transparent); }
+.type-pick:hover:not(:disabled) { color: var(--fg); background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
 .type-pick.active { color: var(--fg); background: var(--selected); }
 
 /* The pane bar's single launcher. Wider than its glyph so it stays an easy
