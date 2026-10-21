@@ -423,13 +423,14 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 </button>
               ))}
               <button className="ui-button" onClick={() => void launchShell()}>Open shell</button>
+              {/* Another app, so a link, as the task header's is (components.md). */}
               {cursorIde && (
                 <button
-                  className="ui-button"
+                  className="ui-link"
                   title={`Open ${task.root} in Cursor`}
                   onClick={() => { start.clear(); void api.openInCursor(task.root).catch(start.fail); }}
                 >
-                  Open in Cursor
+                  Cursor ↗
                 </button>
               )}
             </div>
