@@ -1,18 +1,29 @@
 import type { InvitePreview, Me } from "@forge/types";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
-import { onAppLink, openInBrowser } from "./platform";
+import { isDesktop, onAppLink, openInBrowser } from "./platform";
 import { Redirect } from "./redirect";
 import {
   apiUrl,
+  authPlace,
   bundled,
   DEFAULT_SERVER,
+  macUserName,
   normalizeServer,
+  type Place,
   serverUrl,
   setServerUrl,
+  startOnThisMac,
 } from "./server";
-import { defaultWorkspace, signedIn, signOut, useSession } from "./session";
+import {
+  defaultWorkspace,
+  signedIn,
+  signOut,
+  useSession,
+  workspaceEntries,
+  workspaceKey,
+} from "./session";
 import { AuthScreen, Button, buttonClass, ErrorMessage, Splash, TextField } from "./ui";
 
 /** Runs a form submission, tracking whether it's busy and what went wrong. */
@@ -183,7 +194,7 @@ function hex(bytes: ArrayBuffer | Uint8Array) {
  * the challenge, can trade it for a session.
  */
 function DesktopSignIn({ label, query, before }: SignInProps) {
-  const navigate = useNavigate();
+  const afterSignIn = useAfterSignIn();
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,13 +213,15 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
       if (!code) return;
       setSecret(null);
       try {
-        signedIn(await api<Me>("POST", "/api/auth/oidc/desktop", { code, secret }));
-        await navigate({ to: safeRedirect(url.searchParams.get("next") ?? undefined) });
+        const place = authPlace();
+        const me = await api<Me>("POST", "/api/auth/oidc/desktop", { code, secret });
+        signedIn(me, place);
+        await afterSignIn(me, place, url.searchParams.get("next") ?? undefined);
       } catch (e) {
         setError(messageOf(e));
       }
     });
-  }, [secret, navigate]);
+  }, [secret, afterSignIn]);
 
   const start = async () => {
     setError(null);
@@ -268,32 +281,67 @@ function safeRedirect(path: string | undefined) {
   return [...path].some((c) => c.charCodeAt(0) < 32) ? "/" : path;
 }
 
+/**
+ * Where to go once signed in: where the link asked, or else the first
+ * workspace in the place just signed in to (the desktop app may have others).
+ */
+function useAfterSignIn() {
+  const navigate = useNavigate();
+  return useCallback(
+    async (me: Me, place: Place, redirect?: string) => {
+      const asked = safeRedirect(redirect);
+      const first = me.workspaces[0];
+      const key = first && workspaceKey(place, first.id);
+      if (asked === "/" && key) await navigate({ to: "/$workspace", params: { workspace: key } });
+      else await navigate({ to: asked });
+    },
+    [navigate],
+  );
+}
+
+/** The desktop app's sign-in screens lead back to its workspaces, or the start. */
+function BackLink() {
+  if (!isDesktop) return null;
+  return (
+    <p className="mt-3 text-center text-muted">
+      <Link to="/" className="ui-link">
+        Back
+      </Link>
+    </p>
+  );
+}
+
 export function LoginPage() {
   const session = useSession();
   const { redirect, error: githubError } = useSearch({ strict: false }) as {
     redirect?: string;
     error?: string;
   };
-  const navigate = useNavigate();
+  const afterSignIn = useAfterSignIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const server = useServerChoice();
   const providers = useProviders(server.checked);
   const { busy, error, submit } = useSubmit(async () => {
     server.apply();
-    signedIn(await api<Me>("POST", "/api/auth/login", { email, password }));
-    await navigate({ to: safeRedirect(redirect) });
+    const place = authPlace();
+    const me = await api<Me>("POST", "/api/auth/login", { email, password });
+    signedIn(me, place);
+    await afterSignIn(me, place, redirect);
   });
 
-  if (session.status === "signed-in" && !busy) {
+  // The packaged app signs in to another server here, next to the ones it has.
+  if (session.status === "signed-in" && !busy && !bundled) {
     // Connecting GitHub from Account can come back here when its trip can't
     // be read (expired, or the server restarted); say why on Account.
-    const workspace = githubError?.startsWith("github") ? defaultWorkspace(session.me) : undefined;
+    const workspace = githubError?.startsWith("github")
+      ? defaultWorkspace(workspaceEntries(session.places))
+      : undefined;
     if (workspace) {
       return (
         <Redirect
           to="/$workspace/settings/account"
-          params={{ workspace: workspace.url_key }}
+          params={{ workspace: workspace.key }}
           search={{ github_error: githubError }}
         />
       );
@@ -319,6 +367,7 @@ export function LoginPage() {
           <br />
           New here? Ask your team for an invite.
         </p>
+        <BackLink />
       </AuthScreen>
     );
   }
@@ -364,13 +413,14 @@ export function LoginPage() {
           Create an account
         </Link>
       </p>
+      <BackLink />
     </AuthScreen>
   );
 }
 
 export function SignupPage() {
   const session = useSession();
-  const navigate = useNavigate();
+  const afterSignIn = useAfterSignIn();
   const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
   const field = (key: keyof typeof form) => ({
     value: form[key],
@@ -380,15 +430,13 @@ export function SignupPage() {
   const providers = useProviders(server.checked);
   const { busy, error, submit } = useSubmit(async () => {
     server.apply();
+    const place = authPlace();
     const me = await api<Me>("POST", "/api/auth/signup", form);
-    signedIn(me);
-    const workspace = me.workspaces[0];
-    await navigate(
-      workspace ? { to: "/$workspace", params: { workspace: workspace.url_key } } : { to: "/" },
-    );
+    signedIn(me, place);
+    await afterSignIn(me, place);
   });
 
-  if (session.status === "signed-in" && !busy) return <Redirect to="/" />;
+  if (session.status === "signed-in" && !busy && !bundled) return <Redirect to="/" />;
   if (!providers) return <Splash />;
   // With Code Villain accounts, people come in through invites only.
   if (providers.oidc) return <Redirect to="/login" />;
@@ -424,6 +472,7 @@ export function SignupPage() {
           Sign in
         </Link>
       </p>
+      <BackLink />
     </AuthScreen>
   );
 }
@@ -437,6 +486,11 @@ export function JoinPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const providers = useProviders();
+  // Invite links open in the browser, on the inviting server: "here".
+  const here =
+    session.status === "signed-in"
+      ? session.places.find((s) => s.place.kind === "here")
+      : undefined;
 
   useEffect(() => {
     api<InvitePreview>("GET", `/api/invites/${encodeURIComponent(token)}`)
@@ -473,17 +527,17 @@ export function JoinPage() {
     </p>
   );
 
-  if (session.status === "signed-in") {
+  if (here) {
     return (
       <AuthScreen title={title}>
         {subtitle}
         <form onSubmit={accept.submit} className="flex flex-col gap-4">
           <ErrorMessage>{accept.error}</ErrorMessage>
           <Button type="submit" disabled={accept.busy}>
-            Join as {session.me.user.name}
+            Join as {here.me.user.name}
           </Button>
-          <Button variant="secondary" onClick={() => void signOut()}>
-            Not {session.me.user.name}? Sign out
+          <Button variant="secondary" onClick={() => void signOut(here.place)}>
+            Not {here.me.user.name}? Sign out
           </Button>
         </form>
       </AuthScreen>
@@ -581,6 +635,94 @@ export function SignedInPage() {
       <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
         Open Forge
       </a>
+    </AuthScreen>
+  );
+}
+
+/**
+ * `/start`, the desktop app's first screen: start on this Mac, with no
+ * server and no password, or sign in to one. Once started, it makes
+ * another workspace on this Mac.
+ */
+export function StartPage() {
+  const session = useSession();
+  const navigate = useNavigate();
+  const signedInHere = session.status === "signed-in" ? session.places : [];
+  const started = signedInHere.find((s) => s.place.kind === "mac");
+  const [name, setName] = useState("");
+  const [workspace, setWorkspace] = useState("");
+
+  useEffect(() => {
+    void macUserName().then((suggested) => setName((typed) => typed || suggested));
+  }, []);
+
+  const { busy, error, submit } = useSubmit(async () => {
+    const before = new Set(started?.me.workspaces.map((w) => w.id));
+    const place = await startOnThisMac(name, workspace);
+    const me = await api<Me>("GET", "/api/me", undefined, place);
+    signedIn(me, place);
+    const made = me.workspaces.find((w) => !before.has(w.id)) ?? me.workspaces[0];
+    const key = made && workspaceKey(place, made.id);
+    if (key) await navigate({ to: "/$workspace", params: { workspace: key } });
+    else await navigate({ to: "/" });
+  });
+
+  if (!isDesktop) return <Redirect to="/" />;
+  if (session.status === "loading") return <Splash />;
+
+  const workspaceField = (
+    <TextField
+      label="Workspace"
+      required
+      placeholder="Villain Corp"
+      value={workspace}
+      onChange={(e) => setWorkspace(e.target.value)}
+    />
+  );
+  const cancel = signedInHere.length > 0 && (
+    <p className="mt-6 text-center text-muted">
+      <Link to="/" className="ui-link">
+        Cancel
+      </Link>
+    </p>
+  );
+
+  if (started) {
+    return (
+      <AuthScreen title="New workspace on this Mac">
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          {workspaceField}
+          <ErrorMessage>{error}</ErrorMessage>
+          <Button type="submit" disabled={busy}>
+            {busy ? "Making…" : "Make workspace"}
+          </Button>
+        </form>
+        {cancel}
+      </AuthScreen>
+    );
+  }
+  return (
+    <AuthScreen title="Start with Forge">
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <TextField
+          label="Your name"
+          autoComplete="name"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        {workspaceField}
+        <ErrorMessage>{error}</ErrorMessage>
+        <Button type="submit" disabled={busy}>
+          {busy ? "Starting…" : "Start on this Mac"}
+        </Button>
+        <p className="text-center text-xs text-faint">Works offline. Only you, on this Mac.</p>
+      </form>
+      <Or />
+      <Link to="/login" className={`${buttonClass("secondary")} flex`}>
+        Sign in to a server
+      </Link>
+      {cancel}
     </AuthScreen>
   );
 }

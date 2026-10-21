@@ -1,5 +1,5 @@
 import type { ApiError } from "@forge/types";
-import { apiUrl, authHeaders, credentials, rememberToken } from "./server";
+import { apiUrl, authHeaders, credentialsFor, type Place, placeFor, rememberToken } from "./server";
 
 /** A failed API call, with the server's error code and message. */
 export class RequestError extends Error {
@@ -17,21 +17,27 @@ export class RequestError extends Error {
   }
 }
 
-let onSessionEnded = () => {};
+let onSessionEnded = (_place: Place) => {};
 
-/** What to do when the server says the session has ended (outside of signing in). */
-export function setSessionEndedHandler(handler: () => void) {
+/** What to do when a place says its session has ended (outside of signing in). */
+export function setSessionEndedHandler(handler: (place: Place) => void) {
   onSessionEnded = handler;
 }
 
-export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Calls the API in a place: the one named, or the one the path belongs to. */
+export async function api<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  place = placeFor(path),
+): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
+    response = await fetch(apiUrl(path, place), {
       method,
-      credentials,
+      credentials: credentialsFor(place),
       headers: {
-        ...authHeaders(),
+        ...authHeaders(place),
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -39,9 +45,9 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   } catch {
     throw new RequestError(0, "offline", "Can't reach Forge. Check your connection.");
   }
-  await rememberToken(response);
+  await rememberToken(response, place);
 
-  if (response.status === 401 && !path.startsWith("/api/auth/")) onSessionEnded();
+  if (response.status === 401 && !path.startsWith("/api/auth/")) onSessionEnded(place);
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
   if (!response.ok) {
@@ -64,12 +70,13 @@ export function messageOf(error: unknown): string {
 /** An uploaded file, and the Markdown that shows or links to it. */
 export async function uploadAttachment(workspaceId: string, file: File): Promise<string> {
   const path = `/api/w/${workspaceId}/attachments?name=${encodeURIComponent(file.name || "file")}`;
+  const place = placeFor(path);
   let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
+    response = await fetch(apiUrl(path, place), {
       method: "POST",
-      credentials,
-      headers: { ...authHeaders(), "content-type": file.type || "application/octet-stream" },
+      credentials: credentialsFor(place),
+      headers: { ...authHeaders(place), "content-type": file.type || "application/octet-stream" },
       body: file,
     });
   } catch {

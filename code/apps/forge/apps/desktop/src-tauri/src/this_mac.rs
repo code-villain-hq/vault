@@ -105,22 +105,6 @@ impl ThisMac {
         })
     }
 
-    /// Another workspace on this Mac.
-    pub async fn new_workspace(&self, name: &str) -> Result<Uuid, String> {
-        let running = self.running.lock().await;
-        let Some(Running {
-            pool,
-            session: Some((person, _)),
-            ..
-        }) = running.as_ref().map_err(Clone::clone)?
-        else {
-            return Err("Start on this Mac first.".into());
-        };
-        local::new_workspace(pool, *person, name)
-            .await
-            .map_err(|e| e.to_string())
-    }
-
     /// On quit: the server first, so nothing writes while Postgres stops.
     pub async fn stop(&self) {
         let mut running = self.running.lock().await;

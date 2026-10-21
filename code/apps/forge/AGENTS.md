@@ -87,8 +87,10 @@ issue is done.
 - `bun run db`: start Postgres (Docker, port 5433). `bun run db:reset` wipes it.
 - `bun run dev`: Rust server (:7380) plus web app (:5173, proxies `/api`).
 - `bun run dev:desktop`: Tauri app against the running dev server.
-  `bun run build:desktop` packages it (it then talks to a server chosen at
-  sign-in; see the "Desktop app" spec).
+  `bun run build:desktop` packages it. The app runs Forge itself, on its own
+  Postgres, for the workspaces on this Mac, and signs in to servers for the
+  others (see the "Desktop app" spec). Its data is in
+  `~/Library/Application Support/com.villain.forge`.
 - `bun run app`: the whole app in Docker at http://localhost:7390 (one image:
   server plus built web app). `bun run app:logs` follows it.
 - `bun run seed`: local test accounts (admin and member of "Forge"); the
@@ -123,11 +125,17 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
   who may write what, server-set fields, reviews, spec changes, work.
 - `crates/server`: axum server: HTTP API, WebSocket feed, accounts, invites,
   MCP, the GitHub and Forgejo connections, Code Villain sign-in (`oidc.rs`),
-  drift checks.
+  drift checks. `serve.rs` runs it on a listener until told to stop, for the
+  server binary and the desktop app alike; `local.rs` is the one person of
+  the desktop app's own Forge, who has no password.
 - `crates/ai`: model provider (Claude), agent loop, read-only repository
   access.
 - `packages/types`: generated from Rust. Never edit by hand.
-- `apps/web`: React + Base UI + Tailwind. `apps/desktop`: Tauri shell.
+- `apps/web`: React + Base UI + Tailwind. Its workspaces come from places
+  (`server.ts`): this Mac, the server it came from, or servers the desktop
+  app signed in to, each with its own session.
+- `apps/desktop`: Tauri shell. `this_mac.rs` starts Forge on Postgres for
+  the workspaces on this Mac, with `code/kit/desktop`.
 - `migrations`: SQL schema, applied by the server on start.
 - `scripts`: dev, check, seeding, type generation, and Claude Code's runner
   (`agent-runner`).

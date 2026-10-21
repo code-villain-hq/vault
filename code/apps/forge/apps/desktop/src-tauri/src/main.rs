@@ -62,15 +62,6 @@ async fn start_on_this_mac(
     this_mac.start_here(&name, &workspace_name).await
 }
 
-/// Another workspace on this Mac; returns its id.
-#[tauri::command]
-async fn new_workspace_on_this_mac(
-    this_mac: State<'_, ThisMac>,
-    name: String,
-) -> Result<String, String> {
-    Ok(this_mac.new_workspace(&name).await?.to_string())
-}
-
 /// The Mac account's name, suggested as yours.
 #[tauri::command]
 fn mac_user_name() -> String {
@@ -99,7 +90,6 @@ fn main() {
             forget_session_token,
             this_mac,
             start_on_this_mac,
-            new_workspace_on_this_mac,
             mac_user_name
         ])
         .build(tauri::generate_context!())
