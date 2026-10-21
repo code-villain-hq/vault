@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 enum Weather {
     /// Only a query that starts with "weather", so "g weather berlin" stays
@@ -48,11 +48,11 @@ enum Weather {
             }
             let feels = current["apparent_temperature"] as? Double ?? temp
             let wind = current["wind_speed_10m"] as? Double ?? 0
-            let (emoji, description) = describe(code)
+            let (symbol, description) = describe(code)
 
             var items = [ResultItem(
-                icon: nil,
-                title: "\(emoji) \(Int(temp.rounded()))° \(description) — \(city)",
+                icon: symbolIcon(symbol, description),
+                title: "\(Int(temp.rounded()))° \(description) — \(city)",
                 subtitle: "Feels like \(Int(feels.rounded()))° · wind \(Int(wind.rounded())) km/h",
                 action: nil
             )]
@@ -78,11 +78,11 @@ enum Weather {
         var rows: [ResultItem] = []
         let days = min(4, dates.count, codeNumbers.count, highs.count, lows.count)
         for i in stride(from: 1, to: days, by: 1) { // tolerates short/empty arrays
-            let (emoji, description) = describe(codeNumbers[i].intValue)
+            let (symbol, description) = describe(codeNumbers[i].intValue)
             let weekday = dateParser.date(from: dates[i]).map(weekdayFormatter.string(from:)) ?? dates[i]
             rows.append(ResultItem(
-                icon: nil,
-                title: "\(emoji) \(weekday) — \(description)",
+                icon: symbolIcon(symbol, description),
+                title: "\(weekday) — \(description)",
                 subtitle: "\(Int(lows[i].rounded()))° to \(Int(highs[i].rounded()))°",
                 action: nil
             ))
@@ -90,21 +90,22 @@ enum Weather {
         return rows
     }
 
-    /// WMO weather interpretation codes.
-    private static func describe(_ code: Int) -> (String, String) {
+    /// WMO weather interpretation codes: an SF Symbol for the row's icon,
+    /// like every other row's, and the words for its title.
+    private static func describe(_ code: Int) -> (symbol: String, description: String) {
         switch code {
-        case 0: return ("☀️", "Clear")
-        case 1: return ("🌤", "Mostly clear")
-        case 2: return ("⛅️", "Partly cloudy")
-        case 3: return ("☁️", "Overcast")
-        case 45, 48: return ("🌫", "Fog")
-        case 51...57: return ("🌦", "Drizzle")
-        case 61...67: return ("🌧", "Rain")
-        case 71...77: return ("🌨", "Snow")
-        case 80...82: return ("🌧", "Rain showers")
-        case 85, 86: return ("🌨", "Snow showers")
-        case 95...99: return ("⛈", "Thunderstorm")
-        default: return ("🌡", "Weather")
+        case 0: return ("sun.max", "Clear")
+        case 1: return ("cloud.sun", "Mostly clear")
+        case 2: return ("cloud.sun", "Partly cloudy")
+        case 3: return ("cloud", "Overcast")
+        case 45, 48: return ("cloud.fog", "Fog")
+        case 51...57: return ("cloud.drizzle", "Drizzle")
+        case 61...67: return ("cloud.rain", "Rain")
+        case 71...77: return ("cloud.snow", "Snow")
+        case 80...82: return ("cloud.sun.rain", "Rain showers")
+        case 85, 86: return ("cloud.snow", "Snow showers")
+        case 95...99: return ("cloud.bolt.rain", "Thunderstorm")
+        default: return ("thermometer.medium", "Weather")
         }
     }
 }
