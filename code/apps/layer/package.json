@@ -19,7 +19,7 @@
     "guard": "bun scripts/guard.ts",
     "design:sync": "bun scripts/sync-design.ts",
     "design:check": "bun scripts/sync-design.ts --check",
-    "check": "bun scripts/guard.ts && bun scripts/sync-design.ts --check && bun test scripts && tsc && vite build && cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test --lib",
+    "check": "bun scripts/check.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:app": "tauri dev --config src-tauri/tauri.dev.conf.json",

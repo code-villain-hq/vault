@@ -8,7 +8,9 @@ change; it is short on purpose.
 Layer is a macOS desktop app (Tauri 2: Rust backend, React 19
 frontend) that runs coding-agent CLIs in terminals. Each **task** is one
 ticket, given a git worktree of every repository it touches. The app connects
-those tasks to Jira, GitHub and Slack. What it does, feature by feature, is in
+those tasks to Jira, GitHub and Slack. A team shares its setup (repositories,
+notes, connections) through Layer's server, which has a small web app. What
+it does, feature by feature, is in
 [`docs/features.md`](docs/features.md). How it works is in
 [`docs/architecture.md`](docs/architecture.md).
 
@@ -27,7 +29,8 @@ those tasks to Jira, GitHub and Slack. What it does, feature by feature, is in
    what exists over adding a parallel version of it: one helper, one store
    action, one way to run blocking work.
 4. **Prove it.** `bun run check` must pass. It runs the guard, the
-   frontend's tests, tsc, the frontend build, clippy and the Rust tests.
+   frontend's tests, tsc, the frontend build, clippy and the Rust tests,
+   the server's included (`scripts/check.ts`; `bun run db` first).
    A UI change is looked at and
    clicked through in the mock harness ([`docs/testing.md`](docs/testing.md)).
    A bug fix comes with a test that fails without it.
@@ -196,6 +199,10 @@ bun run build          # tsc && vite build
 bun run dev:app        # the app, as a dev build under its own identity
 bun run dev            # Vite alone; the mock harness is at /mock.html
 bun run release:mac    # release build, installed over /Applications
+bun run db             # Postgres for the server, in Docker on 5436
+bun run dev:server     # the server (7680) and its web app (5176) together
+bun run seed           # a test account, with a repository, a note and GitHub
+bun run gen:types      # packages/types from crates/domain, after changing a record
 ```
 
 Releases for everyone else are built on this Mac and published on Forgejo
@@ -203,9 +210,9 @@ Releases for everyone else are built on this Mac and published on Forgejo
 [`docs/releasing.md`](docs/releasing.md).
 
 ```bash
-cd src-tauri
-cargo clippy --all-targets -- -D warnings
-cargo test --lib
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p villain-layer --lib
+cargo test -p layer-domain -p layer-sync -p layer-server   # needs bun run db
 ```
 
 `cargo check` does not compile tests. It passes while a test still calls a
@@ -255,6 +262,21 @@ build does the same.
 | `src/components/` | one file per view or dialog; `sidebar/`, `tickets/` for those areas |
 | `src/__mock__/`, `mock.html` | the UI against a fake backend, for looking and clicking |
 | `scripts/guard.ts` | the guard |
+| `crates/domain`, `crates/sync`, `crates/server`, `migrations/` | Layer's server: the synced records, who may write them, the HTTP and sync routes, the schema ([architecture](docs/architecture.md#layers-server)) |
+| `web/` | the server's web app; `packages/types` holds the records' types, generated |
+
+## Adding a synced model
+
+1. A migration for its table, with `id`, `workspace_id`, `created_at` and
+   `updated_at` columns. Columns are unquoted in the engine's SQL, so no
+   SQL words (`group`, `check`).
+2. In `crates/domain`: the record, create and patch types, a `ModelKind`
+   variant, and the `match` arms the compiler asks for. A field a patch can
+   clear is `Option<Option<T>>`.
+3. In `crates/sync/src/rules.rs`: who may write it, and any fields only the
+   server may set. A test in `crates/server/tests/api.rs`.
+4. `bun run gen:types`, then add it to `Schema` and its defaults in
+   `web/src/sync.ts`.
 
 ## Limits
 
