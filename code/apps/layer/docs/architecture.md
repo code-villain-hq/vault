@@ -63,7 +63,9 @@ Each client keeps a copy of a workspace and works on it offline.
 never a token or an email), `LogSource`, `AgentModel` and `Note`. Tasks,
 checkouts, panes, runs, messages and every token stay on the Mac that has
 them. Members write repositories, notes and models; admins write
-connections and log sources (`rules.rs`).
+connections and log sources (`rules.rs`). `User`, the workspace's members
+with their roles, comes down read-only: membership changes go through the
+account API.
 
 **Errors** come back as the engine's: a check that fails is 422 with its
 words, a write the person may not make is 403, a second repository with the
@@ -154,9 +156,11 @@ that shells out, called from a command, still counts: check what you call.
 ## State
 
 **Persistent: `config.json`** (`config.rs`), in
-`~/Library/Application Support/<identifier>/`. One `AppConfig`: repos,
-tasks, checkouts, saved panes, UI prefs, integration settings (never
-tokens), and a schema `version`.
+`~/Library/Application Support/<identifier>/`, or
+`<identifier>/profiles/<id>/` for a profile other than Default. One
+`AppConfig`: repos, tasks, checkouts, saved panes, UI prefs, integration
+settings (never tokens), `shared` (the workspace that keeps the shared
+setup, and what is on its way there), and a schema `version`.
 
 - Read once at launch. `config.read()` returns a clone.
 - Changed only through `config.update(|c| …)`. That takes a disk lock,
@@ -225,7 +229,7 @@ for, and the reverse, and that each is in this table.
 | `panes:waiting` | none | the panes a launch did not put back changed: marked at launch, reopened, forgotten (PANE-7), a Slack thread's chat stopped or picked up again (BOT-14) | `Watchers.tsx` → `refreshWaiting` |
 | `messages:changed` | none | the message center's log changed: recorded, read or cleared (`messages.rs`) | `Watchers.tsx` → `refreshMessages` |
 | `runs:changed` | none | an agent's run was recorded, a task finished or deleted, or the log cleared (`runs.rs`, RUN-1, RUN-9) | `UsageView.tsx`, while open → `listRuns` |
-| `notes:changed` | none | an agent remembered, checked or forgot a repo note (`notes.rs`, MEM-5) | `ReposView.tsx`, while open → `listRepoNotes` |
+| `notes:changed` | none | an agent remembered, checked or forgot a repo note (`notes.rs`, MEM-5), or the workspace's snapshot changed the notes (`commands/workspace.rs`, PROF-14) | `ReposView.tsx`, while open → `listRepoNotes` |
 | `browser:changed` | task id, or `""` for every task | a task's tab changed: made, navigated, retitled, loading, an agent acted, closed; or the browser went away (`browser/`) | `BrowserPanel.tsx` (`useBrowserView`) → `browser_view` |
 | `loop:changed` | pane id | a pane's loop changed: started, waiting, checking, a check run, ended (`loops.rs`, LOOP-9) | `LoopBar.tsx` (`useLoop`) → `loop_view` |
 | `slackbot:changed` | none | the Slack bot's connection changed (off, connecting, connected, failing), or a thread was handed to a chat (`slack_bot/`, BOT-10) | `lib/slackBot.ts` (`useSlackBot`) → `slack_bot_view`, for Settings and the chat list |
@@ -458,7 +462,7 @@ nothing is seen while the app is closed.
 
 ## Git
 
-`git.rs` (and `git/store.rs`, its submodule) is the only place git runs,
+`git.rs` (and its submodules in `git/`) is the only place git runs,
 through a private `run`. Every call
 sets `GIT_OPTIONAL_LOCKS=0` (the status poll must not take `index.lock`
 while an agent commits) and `GIT_TERMINAL_PROMPT=0`. It also uses the login
@@ -510,9 +514,9 @@ the network, and the branch moves by `merge --ff-only` where it is
 checked out or by a compare-and-swap `update-ref` where it is not. Clean
 up lists before it removes, and removes by id from a list made again at
 that moment, so nothing is taken on the strength of an old look. What the
-other build uses is read from its `config.json` beside this build's
-(`ConfigStore::other_builds`), since both default to the same task folder
-location.
+other build and every profile of either use is read from their
+`config.json` files (`ConfigStore::other_configs`), since they can share a
+task folder location, the two builds' by default.
 
 **Branch point and lease.** `Checkout.base_commit` is where the branch was
 cut. It moves to what was merged in or rebased onto. `git::baseline` uses
@@ -706,7 +710,7 @@ picks it up.
   seconds where `lib/time.ts` says "just now" for 5.
 - `DiffView` has its own "which agent gets this" flow instead of
   `useAgentTarget`.
-- The terminal palettes in `lib/terminal.ts` repeat the other themes' CSS values; Nightshade's come from the bundled `studio/design/color.json`.
+- The terminal palettes in `lib/terminal.ts` repeat the other themes' CSS values; Nightshade's come from `src/design/syntax.json`, the copy of the vault's `studio/design/tokens/syntax.resolved.json`.
 - Tests for tasks, Jira, panes and Slack live in `commands/mod.rs` instead
   of beside their code.
 - Context files (`AGENTS.md`/`CLAUDE.md` in a task folder) are written with
