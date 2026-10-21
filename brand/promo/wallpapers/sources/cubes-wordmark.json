@@ -1,6 +1,0 @@
-{
-  "generator": "built-in image_gen",
-  "source": "../../teams/code-villain-cubes.png",
-  "prompt": "Edit supplied cube wallpaper: remove ONLY the small horizontal chartreuse line at the upper-left edge, seamlessly replacing it with the surrounding near-black texture. Preserve the exact cube positions, engraved top surfaces, violet-lit faces, background, lighting, composition and dimensions. No other changes, no new text or marks. No green anywhere. Output same landscape ratio and resolution.",
-  "composition": "../build_cubes_wordmark.py composites the original brand/mark/logo-night.svg."
-}

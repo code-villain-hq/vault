@@ -1,0 +1,46 @@
+{
+  "name": "villain-layer",
+  "private": true,
+  "description": "An agent development environment for macOS",
+  "license": "MIT OR Apache-2.0",
+  "author": "Code Villain <codevillain@proton.me> (https://www.codevillain.eu/)",
+  "homepage": "https://www.codevillain.eu/",
+  "repository": { "type": "git", "url": "https://git.codevillain.eu/code-villain/vault.git", "directory": "code/apps/layer" },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "guard": "bun scripts/guard.ts",
+    "design:sync": "bun scripts/sync-design.ts",
+    "design:check": "bun scripts/sync-design.ts --check",
+    "check": "bun scripts/guard.ts && bun scripts/sync-design.ts --check && bun test scripts && tsc && vite build && cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test --lib",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "dev:app": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "release": "bun scripts/release.ts",
+    "release:publish": "bun scripts/release.ts publish",
+    "release:mac": "if pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then echo 'Layer is running. Quit it first — replacing the bundle under a running app kills it, and takes its agents with it.'; exit 1; fi; tauri build --bundles app && rm -rf '/Applications/Villain Layer.app' '/Applications/Layer.app' && ditto 'src-tauri/target/release/bundle/macos/Layer.app' '/Applications/Layer.app'"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-notification": "^2.4.0",
+    "@tauri-apps/plugin-opener": "^2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-webgl": "^0.19.0",
+    "@xterm/xterm": "^6.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "shiki": "4.5.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "@tauri-apps/cli": "^2"
+  }
+}

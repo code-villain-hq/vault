@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "apps/caster/**"
+      - "code/apps/caster/**"
       - ".forgejo/workflows/caster.yml"
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
     runs-on: macos
     defaults:
       run:
-        working-directory: apps/caster
+        working-directory: code/apps/caster
     steps:
       - uses: actions/checkout@v4
       - run: make design-check

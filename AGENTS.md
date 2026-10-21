@@ -1,17 +1,28 @@
 # Code Villain Vault: notes for coding agents
 
-The vault holds the whole studio. Apps are one part of it.
+The vault holds the whole studio. `studio/` is the company: its look, its words, its decisions. `code/` is everything that builds.
 
-- `brand/`: decisions about look and voice. Change these when the feeling should change. A new palette or a new tone starts here.
-- `design/`: principles, tokens, and reference layouts taken from `brand/`. Apps implement them in their own toolkit. Caster is AppKit; Forge, Layer, Glyph and the site are web; the Code Villain theme (`apps/theme`) dresses VS Code, Cursor, Neovim, WezTerm and the Starship prompt. They share the decisions. Read `design/principles.md` before any UI change, in any app, and `design/behaviour.md` before changing what an app does: sign-in, errors, empty states, keys, settings, sync. An issue isn't done until its app follows both.
-- `content/`: blog posts and social posts. The site renders the blog. The posts live in `content/blog`.
-- `apps/<app>/`: one product. Read `apps/<app>/AGENTS.md` before working there, and run commands from that folder.
+- `studio/brand/`: decisions about look and voice. Change these when the feeling should change. A new palette or a new tone starts here.
+- `studio/design/`: principles, tokens, and reference layouts taken from `studio/brand/`. Apps implement them in their own toolkit. Caster is AppKit; Forge, Layer, Glyph and the site are web; the Code Villain theme (`code/apps/theme`) dresses VS Code, Cursor, Neovim, WezTerm and the Starship prompt. They share the decisions. Read `studio/design/principles.md` before any UI change, in any app, and `studio/design/behaviour.md` before changing what an app does: sign-in, errors, empty states, keys, settings, sync. An issue isn't done until its app follows both.
+- `studio/content/`: blog posts and social posts. The site renders the blog. The posts live in `studio/content/blog`.
+- `code/apps/<app>/`: one product. Read `code/apps/<app>/AGENTS.md` before working there, and run commands from that folder.
 
-Nightshade is every app's default theme, in night and day. An app's theme picker, like Layer's, can add themes that fill the same colour names. The studio surfaces — the mark, the site, the blog, social — follow `brand/` and stay night.
+Nightshade is every app's default theme, in night and day. An app's theme picker, like Layer's, can add themes that fill the same colour names. The studio surfaces — the mark, the site, the blog, social — follow `studio/brand/` and stay night.
 
-A change to how Code Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.
+A change to how Code Villain feels starts in `studio/brand/` or `studio/design/`, then the apps catch up. A change to one product's behavior stays in that app.
 
 A pull request for a Forge issue says "Fixes <ID>" in its body. Pull requests pushed to `refs/for/main` (AGit) have no branch for Forge to read, so without it the issue never reaches review and isn't closed by the merge.
+
+## How an app is built
+
+Every app except Caster, the theme and the site is built the same way:
+
+- A server and its clients: a Rust server on Postgres, a React web app, and a Tauri desktop app.
+- Workspaces, as Forge has them: a team's space with its members and roles.
+- One sync engine. Each client keeps a local copy of a workspace and works on it offline.
+- A desktop app that runs on its own, with no server. It starts its own server on its own Postgres for the workspaces on that Mac.
+
+Forge's sync engine is the reference until it moves to `code/kit/sync`, where every app takes it from. Glyph and Raven follow Forge; Layer still keeps its state in local files.
 
 ## Signing in with Code Villain
 

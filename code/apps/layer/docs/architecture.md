@@ -1,0 +1,623 @@
+# Architecture
+
+How Layer is put together, why it is shaped this way, and what has
+gone wrong in each part before. Read the section for the part you are about
+to change. What the app *does* is in [`features.md`](features.md).
+
+## The shape
+
+```
+ ┌───────────────────────── webview (React 19, zustand) ─────────────────────────┐
+ │  views & dialogs ── store.ts (all state, refreshes) ── lib/api.ts (IPC only)  │
+ │  Terminal.tsx: one pooled xterm per pane            ▲ events    │ invoke      │
+ └──────────────────────────────────────────────────────┼───────────┼────────────┘
+                                                        │           ▼
+ ┌──────────────────────────── Rust (Tauri 2) ──────────┴─────────────────────────┐
+ │ commands/*  ── every command the UI can call; thin orchestration               │
+ │   ├─ config.rs    AppConfig → config.json (whole-file writes)                  │
+ │   ├─ git.rs       the only place git runs                                      │
+ │   ├─ pty.rs       panes: PTYs, output buffer, stop/kill, activity state        │
+ │   ├─ agents.rs    agent CLI catalogue, per-CLI launch wiring                   │
+ │   ├─ integrations/ Jira, GitHub, Slack, Grafana; AWS (the aws CLI) · secrets.rs │
+ │ mcp.rs     MCP server on 127.0.0.1 for agents; /hook/<pane> for their states   │
+ │ phone/     a paired phone's server, on the network only while a way in is on  │
+ │ attention.rs, news.rs   background watchers: dock count, banners, keep awake   │
+ └───────────────┬───────────────────────────────────────────────┬──────────────┘
+                 │ PTY                                             │ HTTPS
+        agent CLIs, shells ── MCP over HTTP ──▶ mcp.rs       Jira · GitHub · Slack · Grafana
+                                                             (S3, Athena: aws CLI)
+        (in task folders)  ── curl ─────────▶ /hook
+```
+
+A task is a folder holding one worktree per repo. The worktrees belong to
+the app's own copy of each repository, not to the user's clone:
+
+```
+~/.villain-worktrees/
+  .repos/api.git, .repos/web.git    ← the app's bare copies (hard-linked from ~/code/api, …)
+  ACME-123/                         ← task folder; agents start here
+    AGENTS.md, CLAUDE.md            ← task context, written by the app
+    .mcp.json                       ← the app's MCP server (0600)
+    api/                            ← worktree of .repos/api.git, branch ACME-123
+    web/                            ← worktree of .repos/web.git, branch ACME-123
+```
+
+## Where work runs
+
+| Thread | What runs there | Rule |
+|---|---|---|
+| main | plain `#[tauri::command] fn`, the event loop, AppKit | Nothing that waits. While it waits, no event reaches the webview. |
+| tokio workers | `async fn` commands, HTTP clients, the MCP server | Nothing that blocks. The MCP server shares these. |
+| blocking pool | `commands::blocking(app, \|state\| …)`, `commands::off_runtime(\|\| …)` | git, file walks, child processes, the keychain |
+| per pane | a reader, a writer and a waiter thread, plus flush timers | owned by `pty.rs` |
+| browser | a reader and a writer thread on Chrome's pipe | owned by `browser/cdp.rs`; events are handled on the reader, which never waits on Chrome |
+| background | `attention` (5s), `news` (3 min while away), restore and login-shell warm-up at startup | started in `lib.rs` |
+| a loop | one async task per agent on a loop (`loops.rs`), waiting on its pane's turns; the loop's git, its checks and what it types go to the blocking pool | at most two loops' checks at once (`AT_ONCE`) |
+
+`commands::blocking` exists because `delete_task` once froze the whole app
+for fifteen seconds, stopping three agents on the main thread. The guard's
+`main-thread` and `runtime-blocking` rules catch the direct cases. A helper
+that shells out, called from a command, still counts: check what you call.
+
+## State
+
+**Persistent: `config.json`** (`config.rs`), in
+`~/Library/Application Support/<identifier>/`. One `AppConfig`: repos,
+tasks, checkouts, saved panes, UI prefs, integration settings (never
+tokens), and a schema `version`.
+
+- Read once at launch. `config.read()` returns a clone.
+- Changed only through `config.update(|c| …)`. That takes a disk lock,
+  applies the change under the write lock, then writes the whole file to a
+  temp file, fsyncs and renames. **Do not call any `ConfigStore` accessor
+  inside the closure**: the locks are not reentrant and it deadlocks.
+- Every field has `#[serde(default)]`. A field without one made a config
+  missing that key unreadable, and the app started with no tasks.
+- `AppConfig` does not deny unknown fields. Removing a field silently drops
+  that key on the next write. That is usually what you want, unless it held
+  something.
+- A newer schema than the build knows is copied to `config.json.v<N>` and
+  never migrated down. A file that will not parse is kept as
+  `config.json.unreadable`.
+
+**Secrets: the keychain** (`secrets.rs`). One item per build identifier
+holds every token as JSON. It is one item because macOS prompts per item
+per process: three items meant a stack of password dialogs on every launch.
+It is read once per process and cached, and written under a lock.
+
+**In memory: `AppState`** (`commands/mod.rs`) holds the config store, the
+PTY manager, per-run caches (Jira issue types, the Epic Link field
+lookup, git status per checkout), notices queued before the UI listened,
+and what news has been seen.
+
+**Frontend: `store.ts`.** One zustand store holds every list the UI shows,
+the refresh actions and the derived helpers. Layout that should survive a
+restart (selected task, view, tab, sidebar) goes to `localStorage` through
+`lib/persist.ts`, which never throws.
+
+## The IPC contract
+
+- **Commands.** A `#[tauri::command]` in `commands/<area>.rs`, registered
+  in `generate_handler!` in `lib.rs`, wrapped once in `src/lib/api.ts`.
+  Tauri renames parameters, so `task_id` in Rust is `taskId` in the invoke.
+  A struct parameter (`req: NewTask`) keeps its fields snake_case. The guard
+  checks names and argument keys on both sides.
+- **Types.** Return types are `Serialize` structs, mirrored by hand in
+  `src/lib/types.ts` with the same snake_case field names. Change both
+  together. The mock harness's fixtures are typed against `types.ts`, so a
+  change there breaks `tsc` until the fixtures follow.
+- **Errors.** `error::Error` serialises as its message. The UI shows it
+  with `errMessage`, where the user acted (`useFailure`, `ErrorMessage`) or
+  in the top bar's status (`fail`). A command over several repos returns one
+  row per repo instead (`RepoResult`, a row `error`) and shows them with
+  `reportRepoResults`.
+
+## Events
+
+Backend → frontend. The guard checks that every event emitted is listened
+for, and the reverse, and that each is in this table.
+
+| Event | Payload | Emitted when | Listened in |
+|---|---|---|---|
+| `pty:output` | `{ pane_id, data: base64, end }` | a watched pane printed (batched, ~33ms) | `lib/ptyOutput.ts`, one listener for all panes |
+| `pty:activity` | pane id | a pane's state changed: a hook report, a keystroke, a notice cleared, a pane shown, a Slack thread's idle chat stopped (BOT-14) | `Watchers.tsx` → `refreshPanes` |
+| `pty:notice` | `{ pane_id, notice }` | a usage-limit or trust prompt appeared | `Watchers.tsx` → refresh and toast |
+| `pty:exit` | `{ pane_id, code }` | a pane's process ended | `Watchers.tsx` → refresh, toast, Slack |
+| `acp:update` | pane id | an ACP pane's conversation changed while it is on screen (batched, ~40ms; ACP-7) | `lib/acpUpdates.ts`, one listener for all → `AcpPane.tsx` asks `acp_view` for what changed |
+| `pr:draft` | `{ task_id, text }` | a chunk of a drafted PR description | `PrPanel.tsx` |
+| `issue:draft` | `{ request_id, text }` | a chunk of an improved ticket description | `tickets/OptimizeDescription.tsx` |
+| `spec:draft` | `{ request_id, part, checkout_id, text }` | one file's draft so far, whole each time: the task's requirements or design (`checkout_id` null), or one repository's tasks (SPEC-5); the requirements as Apply answers rewrites them (SPEC-20); or the merge of specs from before (SPEC-25) | `Watchers.tsx` → `useSpecs.chunk`, into that editor |
+| `spec:changed` | task id | an agent ticked a step of the task's spec (`spec_task`, SPEC-13) or proposed a change (`spec_propose`, SPEC-24) | `Watchers.tsx` → `useSpecs.changed`, which reads it again if it has been read; `pty:activity` for an agent that stopped does the same, to show a spec file it changed outside the app (SPEC-22) |
+| `system-notify-click` | a `Target` (`target.rs`) | a banner was clicked | `Watchers.tsx` → `goTo`, which opens what it is about (NOTE-4) |
+| `app:notices` | none | a notice was queued after startup (`commands::notify`) | `Watchers.tsx` → `takeNotices`, as toasts, failures in the top bar's status |
+| `panes:waiting` | none | the panes a launch did not put back changed: marked at launch, reopened, forgotten (PANE-7), a Slack thread's chat stopped or picked up again (BOT-14) | `Watchers.tsx` → `refreshWaiting` |
+| `messages:changed` | none | the message center's log changed: recorded, read or cleared (`messages.rs`) | `Watchers.tsx` → `refreshMessages` |
+| `runs:changed` | none | an agent's run was recorded, a task finished or deleted, or the log cleared (`runs.rs`, RUN-1, RUN-9) | `UsageView.tsx`, while open → `listRuns` |
+| `notes:changed` | none | an agent remembered, checked or forgot a repo note (`notes.rs`, MEM-5) | `ReposView.tsx`, while open → `listRepoNotes` |
+| `browser:changed` | task id, or `""` for every task | a task's tab changed: made, navigated, retitled, loading, an agent acted, closed; or the browser went away (`browser/`) | `BrowserPanel.tsx` (`useBrowserView`) → `browser_view` |
+| `loop:changed` | pane id | a pane's loop changed: started, waiting, checking, a check run, ended (`loops.rs`, LOOP-9) | `LoopBar.tsx` (`useLoop`) → `loop_view` |
+| `slackbot:changed` | none | the Slack bot's connection changed (off, connecting, connected, failing), or a thread was handed to a chat (`slack_bot/`, BOT-10) | `lib/slackBot.ts` (`useSlackBot`) → `slack_bot_view`, for Settings and the chat list |
+| `profiles:changed` | none | the profiles changed: one made, renamed or deleted in this window, or, when this window is brought forward, in another (`profiles.rs`, PROF-6) | `sidebar/ProfileMenu.tsx` → `listProfiles` |
+| `phone:changed` | none | phone access changed: a way in switched, a phone paired, forgotten, connected or gone (`phone/`) | `PhoneSettings.tsx` → `phoneStatus`, for Settings and the top bar's phone |
+
+What still polls, and why, is marked at each `setInterval` with
+`// guard: allow poll — <reason>`. Everything polls only while the window is
+in front, and slower once nobody has touched it for 45 seconds
+(`Watchers.tsx`).
+
+## Panes
+
+`pty.rs` owns every pane. `commands/panes.rs` decides what to start where.
+
+- **Spawning.** The cwd must exist (PANE-3). The environment is cleared,
+  then filled from the login shell's (`shellenv.rs`, scraped once behind a
+  marker, with a timeout), then `VILLAIN_PANE`. The pane cap is checked
+  under the map lock, counting spawns in flight.
+- **Output.** Each pane keeps 256KB of scrollback with a running byte
+  position. It travels base64-encoded, so a multi-byte character split
+  across two chunks is never mangled. A pane that nothing shows is not
+  sent anything. When it comes on screen, `pty_attach(since)` hands over
+  exactly what came after `since`, or says `reset` when that is gone.
+  While watched, output is batched to ~33ms. A keystroke's echo goes out
+  within 4ms.
+- **The frontend's side** (`Terminal.tsx`): one xterm per pane, created
+  once and moved into whichever view shows it. Unmounting parks it and
+  hiding detaches it. It is disposed when the pane leaves the store's
+  list. At most six hold a WebGL context, and one that gives its context
+  up loses it at once rather than leaving it for the collector; one whose
+  context is taken back while on screen asks for another, once. After
+  every fit, the size is pushed with `pty_resize`, because xterm only
+  reports a change of its own grid.
+- **Stopping.** `request_stop` sends SIGTERM to an agent's process group
+  (SIGHUP to a shell's). `stop` waits out a grace period, then
+  `force_kill` sends SIGKILL to the group. `close_matching` signals every
+  pane of a task at once and waits once. The map lock is never held while
+  waiting.
+- **Activity state** (`PaneMeta::state`), in order: a shell is idle; an
+  exited pane is idle; a notice makes it asking; otherwise the agent's own
+  last report; otherwise output timing, for a CLI that reports nothing.
+  Reports arrive at `/hook/<pane>` and are applied under one lock by
+  `report_with`. Keystrokes adjust it too (`typed`): Esc at a question is a
+  refusal.
+
+## The browser
+
+`browser/` runs one headless Chrome for the app, with a tab per task
+(§18 in `features.md`). Chrome is the user's installed one, on a profile in
+the config folder, started by the first call that needs a tab.
+
+- **The pipe.** Chrome reads DevTools Protocol messages on its fd 3 and
+  writes on its fd 4 (`--remote-debugging-pipe`), each ended by a NUL.
+  `cdp.rs` writes from one thread and reads on another. A call waits on a
+  oneshot, so the async side awaits without blocking; `send` does not wait
+  at all, for input and for anything sent from the reader itself.
+- **Tabs.** `Target.attachToTarget` with `flatten` gives each tab a session
+  id that every message about it carries. A task has a list of tabs and an
+  active one (`tabs.rs`); everything that acts on "the task's tab" (the
+  tools, the panel's view, frames and input, dialogs) acts on the active
+  one. The reader routes each event to its tab wherever it is among a
+  task's tabs (`events.rs`): navigations, loading, the console, dialogs. A
+  window a page opens (`Target.targetCreated` with an `openerId`, reported
+  even for a `noopener` link) is attached off the reader and becomes a tab
+  beside its opener (BRW-14); an action that opened one waits for it
+  (`adopting`), so its answer is the new tab. Chrome never announces a
+  page's own title, only its address as one, so a tab is asked for both
+  when it stops loading, when it changes route, and once adopted. Each
+  change of a task's tabs is saved to it (BRW-6), except while the browser
+  shuts down: Chrome reports every tab destroyed as it closes, and taken at
+  its word, quitting forgot them all.
+- **Tools** (`tools.rs`) find the task from the calling pane, check the
+  page's site against `sites.rs` before reading or acting, and answer with
+  the page's outline (`snapshot.rs`), built from the accessibility tree:
+  roles and names, with the backend node id of anything actionable as its
+  ref.
+- **The panel** (`BrowserPanel.tsx`) is not a web view of the page but a
+  picture of it: `Page.startScreencast` frames, JPEGs, sent raw over a
+  Tauri `Channel` (an event would carry them as base64 inside JSON) and
+  drawn on a canvas, newest only. Only the watched tab is sent frames, and
+  each is acknowledged before it is decoded and sent, no sooner than 16ms
+  after the last (60 a second), so Chrome draws the next while one
+  crosses. Chrome runs with `--force-device-scale-factor=2`: a screencast
+  is drawn at the window's scale, not the one a tab emulates, and without
+  it a Retina panel showed half its pixels, stretched. The screencast runs
+  sharp, drops to one pixel per CSS pixel while the page moves (the user
+  scrolling, or three changes within 250ms), and is restarted sharp once
+  it has been still for 150ms (`panel.rs`, `sharpen`): sharp all the time,
+  a scroll took 40ms to arrive at three times the bytes, which was the
+  lag. Every change counted as moving, a blinking caret or a click
+  flipped text between sharp and blurred. Not a screenshot for the still: taking one makes Chrome draw a
+  frame, which replaced it. `scroll_latency` measures it. Each frame is
+  measured from its JPEG header, not its metadata, which on a busy
+  machine said the panel's size for a squeezed frame. A frame of another
+  shape is dropped and the tab's size set again. Chrome numbers each
+  screencast started on a tab, and a frame's acknowledgement carries its
+  number. A frame from before a restart, still on its way, carries the
+  old number, and after acknowledging one Chrome sent nothing more. So the
+  panel counts the screencasts it starts (`Tab::screencasts`); a frame of
+  an older one is dropped and the screencast restarted. If the sharp frame
+  is 400ms late, a clipped screenshot stands in, and the screencast is
+  restarted again. The user's input goes back through
+  `browser_input` without waiting for Chrome's answer, mouse moves
+  coalesced to one per animation frame. Keys arrive at an off-screen
+  textarea, so the window's paste and input methods have somewhere to land.
+- **Saved sign-ins** (`sign_in.rs`, BRW-18..20). The site and username
+  are in the config; the password is in the keychain bundle under
+  `secrets::sign_in_key(id)`, read only when it is filled in. It goes
+  from the keychain to the page by `Input.insertText` and is never in a
+  tool's answer. The tab remembers the field it went into (`Tab.secret`)
+  until the page navigates: the outline marks that field protected, and
+  `browser_evaluate` and `browser_screenshot` are refused meanwhile. A
+  test build keeps the keychain bundle in memory, so a test run never
+  touches the user's own item.
+- **Copying a sign-in** (`session.rs`, BRW-21) reads the other tab's
+  storages with `Runtime.evaluate` and its cookies with
+  `Network.getCookies`, and writes them into the active tab the same way.
+  The values stay in the backend; the agent is told the keys. Cookies are
+  set by URL, so they belong to the active page's host alone.
+- **A page's dialog** stops its scripts, and Chrome answers an input event
+  only once the page's handlers have run: a click whose handler calls
+  `confirm()` is not answered until the dialog is. Actions run through
+  `Browser::until_dialog`, which stops waiting when any tab opens one, and
+  nothing else calls into a page while its dialog is open.
+- **Headless Chrome on macOS** has no menu bar, and it is the menu that
+  makes ⌘A select all; `keys.rs` sends the editing command with the key.
+  It also calls itself `HeadlessChrome` in its user agent, which some
+  sites turn away; each tab gets Chrome's own.
+
+## Agents
+
+`agents.rs` has the catalogue: `AGENTS`, one `AgentDef` per CLI. Each CLI
+has an `Integration` variant saying how it reports its state and how it
+gets the MCP server. `prepare_launch` writes that CLI's files into the
+app's config folder and returns its extra arguments and environment.
+`commands/panes.rs` (`plug_in`) adds the hook URL and tokens.
+
+- **Hooks** (Claude, Copilot) are shell commands the CLI runs on events.
+  Each posts `{"hook_event_name": …}` with curl and the hook token. It
+  drains stdin: a PostToolUse payload can be megabytes. It always exits 0,
+  so a down server never fails the agent's turn. Notification and
+  SessionStart post their payload whole: the words of a notification, and
+  the `session_id` a restart resumes (`hook_session`, PANE-14).
+- **OpenCode** loads a plugin that posts its state. **Gemini** is read from
+  the mark it puts in its window title, parsed from the output.
+- **`hook_activity`** turns a post into a state, chosen by what the *pane*
+  runs, never by anything in the post.
+- **The MCP server** (`mcp.rs`) is axum on `127.0.0.1:0` with a fresh
+  bearer token per run. It speaks JSON-RPC over `POST /mcp`. Tools are
+  defined in `tools()` and handled in `call()`. Those in `DANGER` need
+  `confirm: true`. The endpoint's `hook_token` is separate and accepted
+  only by `/hook`.
+- **Context files.** `write_task_context` (`commands/task_context.rs`)
+  writes the same text as `AGENTS.md` and `CLAUDE.md` into a task folder:
+  the ticket (from the `TICKET.md` saved beside it, PANE-13), the layout,
+  the tools. Chat rooms get their own version. Nothing goes into a
+  worktree (DISK-1).
+
+
+## Agents over ACP
+
+An agent over ACP (§20) has no terminal. `acp/` speaks the protocol and
+`pty/acp.rs` puts it in a pane, so the pane map, the cap, stopping,
+`attention.rs`, restore and the phone see an ordinary pane: a `Pane` whose
+`Io` is `Acp(Conn)` rather than `Pty`.
+
+- **The protocol** (`acp/conn.rs`, `user.rs`) is a state machine that runs
+  nothing: it is handed the agent's lines and puts what to send on a
+  channel, which is how its tests drive it with no process. Each step works
+  out its effects under the connection's lock and carries them out after:
+  lines sent, state reported, text printed, the pane told.
+- **The process** (`acp/process.rs`) starts in its own process group with
+  the login shell's environment (PANE-4), with a thread each to write, read,
+  keep the end of stderr and wait for the exit, as a terminal pane has.
+  Nothing runs on the async runtime or the main thread.
+- **The conversation** (`acp/conversation.rs`) is a list of entries with a
+  revision each: the window asks `acp_view(since)` for what changed after
+  the last revision it saw. The same updates write a plain-text copy into
+  the pane's scrollback, which is what `transcript`, the phone's feed and a
+  handoff read.
+- **State** comes from the protocol (`Sink::report`, ACP-2): `take_report`
+  as for a hook. Keys (`PtyManager::write`) map to cancel and answers;
+  `submit` sends a prompt whole.
+- **What it reads** is loose JSON (`acp/read.rs`), not a schema crate's
+  types: each agent adds fields of its own, and an update kind this does
+  not know is skipped, not an error that loses the message. The
+  `agent-client-protocol` crate would bring its own runtime-neutral process
+  and blocking machinery beside tokio for what is a few hundred lines here.
+## The Slack bot
+
+The bot (§24) is a Slack app of the user's own, reached over Socket Mode:
+the app opens a websocket to Slack, so nothing listens on the network and
+nothing is seen while the app is closed.
+
+- **The connection** (`slack_bot/socket.rs`) is one task on the async
+  runtime for the app's life. It asks `apps.connections.open` for an
+  address with the app-level token, connects, acknowledges each envelope
+  before handling it (Slack sends again after three seconds), reconnects
+  when Slack asks, and backs off to a minute when it fails. A change to the
+  bot's settings moves `Bot::generation`, which closes it and starts over.
+- **An event** (`slack_bot/handle.rs`) is handled one at a time: two
+  mentions in one thread must not both find it without a chat. `event.rs`
+  decides, purely, whether it is the owner's (BOT-2) and whether it starts a
+  chat or goes to one. Someone else's mention is refused on a task of its
+  own (`slack_bot/refuse.rs`), outside that order: its `oneshot_haiku` run
+  takes seconds. Opening the chat is `open_chat` through `blocking`.
+- **A thread and its chat** are tied by the chat's room folder in
+  `config.slack_threads`, which outlives pane ids. `remember_pane` calls
+  `Bot::adopt` for every chat it records, so a chat put back at launch or
+  restarted is followed again with no event from Slack.
+- **The relay** (`slack_bot/relay.rs`) is a task per followed chat. It
+  waits on the pane's `turns` (as a loop does) and its printing, reads the
+  conversation by revision (`acp_read`, which does not mark it seen), and
+  posts the turn's last reply when a turn ends. It counts from the moment
+  the conversation is ready, so a conversation picked up again does not
+  post its replayed history (BOT-9). A turn's permission questions are one
+  card (`slack_bot/card.rs`), posted with `chat.postMessage` and changed
+  with `chat.update`. A button carries the chat's room, the question's
+  entry and the answer; its click arrives as an `interactive` envelope on
+  the same socket and is answered with `acp_answer`, the owner's alone.
+- **A chat left alone** (`slack_bot/idle.rs`, BOT-14) is stopped by its
+  own relay: each pass waits on a timer as well, for what is left of 30
+  minutes since anything happened in it (`acp_quiet`), and any turn or
+  printing starts the wait again. The stop takes the event lock, asks
+  again, closes the pane (`PtyManager::close`) and marks its saved row
+  waiting with its conversation's id, which the thread's next message
+  resumes.
+
+## Git
+
+`git.rs` (and `git/store.rs`, its submodule) is the only place git runs,
+through a private `run`. Every call
+sets `GIT_OPTIONAL_LOCKS=0` (the status poll must not take `index.lock`
+while an agent commits) and `GIT_TERMINAL_PROMPT=0`. It also uses the login
+shell's PATH, so hooks find `node`.
+
+The user's own git config applies to every git the app runs, so anything
+the app relies on is spelled out:
+
+| Their config | What broke | What we pass |
+|---|---|---|
+| `merge.ff = only` | every Update from base: "Not possible to fast-forward" | `merge --ff` |
+| `status.showUntrackedFiles = no` | a worktree of only new files read as clean, and was removed with them | `--untracked-files=normal`, `-c status.showUntrackedFiles=normal` |
+| `diff.external` (difftastic) | the Diff view showed no hunks | `--no-ext-diff` |
+| `diff.mnemonicPrefix`, `diff.noprefix` | the reviewer's findings all read as off the diff | `--src-prefix=a/ --dst-prefix=b/` |
+| `rebase.autoStash`, `autoSquash`, `updateRefs` | rebases that did more than asked | `-c rebase.*=false` |
+| a `--single-branch` clone | fetches that updated nothing | explicit refspecs |
+
+Use `-c` for what has no flag. An older git ignores a config key it does
+not know, but refuses an option it does not know.
+
+Anything from outside that reaches a git argument is checked:
+`check_names`, `commit_id`, the leading-`-` guards, `--` before paths. A
+base of `--upload-pack=<cmd>` once ran the command.
+
+**The app's own copies** (`git/store.rs`). Adding a repo makes
+`<task folder location>/.repos/<name>.git` with `git clone --bare --local`.
+That hard-links the objects, so it costs little disk, and the links
+outlive the user's clone. The copy fetches from the clone's `origin`,
+keeps reflogs, and takes the clone's repo-local settings (identity,
+signing, `sshCommand`, hooks path) once, when it is made. At every launch,
+before panes come back, `adopt_worktrees` moves any worktree still
+registered in a user's clone onto the copy, in place. The branch comes
+across first, and the index is copied so staging survives. A folder whose
+link is already gone is linked back at `Checkout.last_head`, which the
+status poll keeps current. A folder cloned again in place is linked back
+too (`reclaim_clone`), but only when that loses nothing: its branch must
+fast-forward the copy's, and it must hold nothing the copy would not keep. Per-worktree operations (remove, prune, the
+branch deleted at finish) ask the worktree which repository owns it
+(`owner_of`), so a worktree that could not be moved is still handled.
+
+**Keeping them in shape** (`git/upkeep.rs`, `commands/repos.rs`,
+`commands/cleanup.rs`). Whether a folder is "the same repository" is
+decided one way everywhere: it fetches from where the copy does,
+`same_remote` treating ssh and https spellings as one (`is_store_of`).
+Sync fetches origin into the copy with `--prune`, carries the clone's
+settings again, and fast-forwards the clone's default branch: its
+`origin/<branch>` is written from the copy, so there is no second trip to
+the network, and the branch moves by `merge --ff-only` where it is
+checked out or by a compare-and-swap `update-ref` where it is not. Clean
+up lists before it removes, and removes by id from a list made again at
+that moment, so nothing is taken on the strength of an old look. What the
+other build uses is read from its `config.json` beside this build's
+(`ConfigStore::other_builds`), since both default to the same task folder
+location.
+
+**Branch point and lease.** `Checkout.base_commit` is where the branch was
+cut. It moves to what was merged in or rebased onto. `git::baseline` uses
+it, and falls back to the merge base when HEAD never reached it (a merge
+abandoned half way). `Checkout.push_lease` is the remote tip at the last
+rebase. `git::push` sends `--force-with-lease=<branch>:<lease>`, drops the
+lease if the branch still contains it, and the caller clears it after a
+push.
+
+## Integrations
+
+- **One HTTP client** (`integrations::http_client`), cloned: a 30s timeout,
+  a 10s connect timeout, a user agent and a shared connection pool. A new
+  client per command paid a TLS handshake every time. A call that can take
+  longer (job logs) sets its own timeout.
+- **Tokens** come from `secrets.rs` per call. `stored_or` decides whether a
+  blank token field may reuse the saved one (same origin only).
+- **Jira** is REST v3 with Basic auth. JQL strings go through `jql_string`,
+  path segments through `segment()`. Search pages by `nextPageToken`, and
+  `createmeta` pages too. Names are never assumed (TKT-2). Where a ticket
+  goes as its PRs move (TKT-8) is a status id chosen per project, since the
+  categories cannot tell Review from In Progress; `commands/ticket_flow.rs`
+  runs it inside the PR sweep and reports each move back with the rows.
+- **GitHub** is REST, plus GraphQL for review threads. Refs go through
+  `path_segment`. `head` goes in the query, not the path, since `#` and `+`
+  in branch names cut a path short. Listing is `state=all` wherever history
+  matters, since `state=open` drops a PR the moment it closes.
+- **Slack** notifications post with the Slack bot's token (BOT-15). Posts are gated by
+  `slack_allows` in the backend and clipped to Slack's 3000-character
+  section limit.
+
+## The phone server
+
+`phone/` is a second axum server, apart from the MCP server so the agents'
+way to Jira, GitHub and Slack never leaves loopback (PHONE-1). It runs while
+Settings → Remote access has a way in on, on a fixed port, and checks in this
+order: the caller's address against the ways that are on (`net.rs`, a
+middleware on every route), then a paired phone's bearer token (the
+`Device` extractor) on everything but the page and pairing.
+
+- **The page** is `phone.html` and `src/phone/`, a small React app of its
+  own built beside the window's (`vite.config.ts`). It talks `fetch`, never
+  `invoke`. The server reads it through Tauri's asset resolver: embedded in
+  a release, from `dist/` in a dev build.
+- **Streams** are newline-delimited JSON on a plain response, read with
+  `fetch`: `EventSource` cannot send the token as a header. Each has a
+  heartbeat every 20 s, so a phone that went away is found out on the next
+  write, and the phone takes 45 s of silence as a dead connection.
+- **The overview** is pushed: the server listens inside Rust for
+  `pty:activity`, `pty:exit` and `pty:notice` and rings a `watch` channel
+  that every `/api/changes` stream waits on; the phone then asks for the
+  overview again.
+- **A pane's output** comes from `pty/feed.rs`: a `watch` the reader thread
+  rings on every read and on exit, and reads by byte position from the same
+  scrollback the window's catch-up uses. It never touches `watched` or
+  `sent`, which say what the window has been given.
+- **State** is one `static` (`phone()`): the ways in, the tokens read from
+  the keychain once, a pairing code, and the streams open per phone (the
+  top bar's phone). `apply` starts, stops or adjusts the server, one at a
+  time; stopping signals the streams to end so the graceful shutdown does
+  not wait on them forever.
+
+## The frontend
+
+- **`Watchers`** (`Watchers.tsx`) holds every poll and event listener and
+  draws nothing. It is kept apart from the views because together, a pane
+  poll re-rendered whatever view was open.
+- **Refreshes go through `coalesce`** (`store.ts`). A poll that finds a
+  call in flight shares it. An explicit refresh queues one follow-up
+  shared by everyone who asked. Dropping the later call outright once
+  dropped the refresh that mattered.
+- **A late answer never overwrites a newer one.** Look for `prsFetchedAt`,
+  and for sequence refs (`loadSeq`, `searchSeq`, `handoffAsk`) and
+  `current` flags in effects. Copy the pattern for anything async whose
+  inputs can change while it runs.
+- **Double actions are guarded by a ref**, not state. Two clicks in one
+  frame both saw the state false (`Terminals.tsx`, `ChatView.tsx`).
+- **`TaskMain` is keyed by task id.** Everything under it remounts on a task
+  switch, so per-task state cannot leak into the next task.
+- **UI kit**: `ui.tsx`. `Modal` (Esc and backdrop close it, `busy` blocks
+  that), `Field`, `Combo`, `Confirm` (never `window.confirm`: the webview
+  returns true without drawing anything), `ContextMenu`, `Switch`,
+  `Spinner`, `BusyOverlay`. Stylesheets `styles*.css` with plain
+  kebab-case classes, drawn in the studio's colour, type and radius names:
+  `theme.css` imports them from `src/design/` (the vault's `studio/design/tokens`
+  and fonts, copied by `bun run design:sync`) and fills them for the other
+  themes. The frame keeps Layer's full-width top bar with the views as tabs (an
+  exception to `studio/design/layouts/app-window.md`), in `bg` with Work's task
+  list; each view is an inset `panel`.
+
+## Why it is shaped this way
+
+- **A worktree per repo per task**, not branches switched in one clone.
+  Agents work in parallel, and a checkout switch under a running agent
+  loses its work.
+- **Worktrees belong to the app's copy, not the user's clone.** When they
+  were the clone's, re-cloning it (2026-09-23) cut seven task folders off
+  at once, and a `git worktree prune`, `gc` or branch deletion there could
+  do the same. The clone is the user's to do anything with. The cost: task
+  branches show in it only after a push and a fetch.
+- **One branch name across a task's repos**, and one folder with the repos
+  as siblings. A ticket that touches `api` and `web` is one piece of work,
+  and the agent can see both.
+- **Agents talk to the app, not to Jira or GitHub.** Credentials stay in
+  one keychain item. Writes go through one set of rules (confirm, Slack
+  switches), and every agent gets the same tools whatever CLI it is.
+- **State from reports, not guesses.** Output timing read a two-day-idle
+  agent as working, because Claude Code repaints its prompt.
+- **Banners from the backend.** The webview's timers are throttled
+  precisely when the window is away, which is when banners matter.
+- **Whole-file config**, one JSON file, written atomically. Simple enough
+  to inspect and to back up. The cost is that two instances cannot share
+  it, hence a separate identity for the dev build.
+- **Ceilings, not settings** (`MAX_PANES`, `RESTORE_LIMIT`). They stop a
+  runaway; nobody needs to tune them.
+- **The git CLI, not libgit2**, so the user's hooks, credential helpers and
+  signing keep working. The price is the config table under "Git".
+- **Handoff moves the work, not the conversation.** No CLI can resume
+  another's session, and translating transcripts would break on every
+  release. Running out of budget is exactly when an agent cannot summarise
+  itself, so the briefing is built from git and the terminal instead.
+- **The ticket is the hub.** Sibling PRs are linked through one comment on
+  the Jira ticket, which is already where non-engineers look. Each PR also
+  lists the others, since a reviewer of one side could not otherwise tell
+  from GitHub that there was another. That list is a marked section of the
+  body, written in a second pass once every PR exists and rewritten in all
+  of them whenever a repo's PR joins the set, so it does not go stale.
+- **Chat is the user's own CLI in a terminal**, not a chat UI. No second API
+  key, no second set of tool integrations, and the user's own MCP servers
+  come along.
+- **Connection status comes from the config, not the keychain.** A config
+  section is written only after its token verified, so launching the app
+  reads the keychain zero times and nothing prompts until an API is called.
+- **Interface scale and terminal text size are separate.** xterm measures a
+  cell grid, and a page zoom leaves that fractionally out.
+
+## Things that have bitten
+
+Each of these is recorded at the code it shaped. Leave those comments alone.
+
+- **A GUI app's working directory is `/`**, and every child inherits it. A
+  CLI started at `/` treats the disk as its project, and macOS asks for
+  Photos, Downloads and Music. `run()` in `lib.rs` sets it to `$HOME` once,
+  so a new spawn site cannot forget.
+- **A GUI app does not see the login shell's PATH**, so `~/.local/bin` and
+  friends were missing and agent CLIs "not installed". `shellenv.rs` asks
+  the login shell once, behind a marker so a chatty `.zshrc` is not read as
+  the environment, with a timeout.
+- **macOS walls off other apps' folders**, `~/Library/Containers/…`,
+  from an app the user never allowed in, and everything it spawns. An ssh
+  config reading a key agent's `.pub` from there (Secretive) worked in a
+  terminal and failed on every fetch here. `explain` in `git.rs` says so
+  and what to do. A best-effort fetch that fails says nothing, so it went
+  unseen until Sync showed a row per repo.
+- **A terminal drops a long typed line.** macOS keeps about 1 KB of
+  input for a program that is not reading in raw mode, and threw away
+  the start of a 1,090-byte conflict hand-off every time. `submit`
+  refuses more than `MAX_TYPED`; `commands::hand_over` leaves longer
+  text in a file and types where it is (PANE-11).
+- **A panic that crosses into AppKit aborts** with no location. The panic
+  hook in `lib.rs` writes `~/Library/Logs/villain-layer/panic.log` first,
+  and must not panic itself.
+- **portable-pty's `ChildKiller::kill` is a SIGHUP to the leader.** An agent
+  ignoring SIGTERM ignored that too, and ran on after its pane was gone.
+- **xterm reports only its own grid changes**, so a process spawned at
+  100×30 stayed there if the first fit happened to agree. Push the size
+  after every fit.
+- **A hidden tab's terminal must not be fitted**: fitted while its container
+  had no height, it kept those rows.
+- **`window.confirm` returns true without showing anything** in the webview.
+  Use `Confirm`.
+- **Focus follows the terminal.** A pasted token went to the agent because a
+  terminal took focus from a settings field (`Terminal.tsx`, `mayTakeFocus`).
+- **Two instances on one config erase each other's tasks**, and two on one
+  keychain item erase each other's tokens. Hence the dev build's own
+  identity.
+- **Jira names differ per site** ("Done", "Won't Do", "Closed" are all
+  done). Pre-selecting the first done transition once closed a merged ticket
+  as Won't Do.
+- **GitHub allows 30 searches a minute.** Refreshing the review queue on
+  every settings save spent them.
+- **Lists that page were read as one page**: review threads, reviews,
+  createmeta fields, check runs. Each looked complete and was not.
+
+## Known debt
+
+Real, known, and not to be copied. Each is its own change when someone
+picks it up.
+
+- `Terminals.tsx` keeps its own `ago()`, which says "just now" for 90
+  seconds where `lib/time.ts` says "just now" for 5.
+- `DiffView` has its own "which agent gets this" flow instead of
+  `useAgentTarget`.
+- The terminal palettes in `lib/terminal.ts` repeat the other themes' CSS values; Nightshade's come from the bundled `studio/design/color.json`.
+- Tests for tasks, Jira, panes and Slack live in `commands/mod.rs` instead
+  of beside their code.
+- Context files (`AGENTS.md`/`CLAUDE.md` in a task folder) are written with
+  `fs::write`, not `agents::replace_file`, so a CLI starting at that moment
+  can read a half-written file.
+- The untracked-file path of `git::file_diff` reads `dir.join(path)` without
+  checking that the path stays inside the worktree.

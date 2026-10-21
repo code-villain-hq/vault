@@ -6,7 +6,7 @@
 # The token is the "Claude Code" agent's, from Forge's Settings → Agents. It's
 # read from FORGE_MCP_TOKEN_FILE (default ~/.config/forge/mcp-token), or else
 # from the `forge` server Claude Code already has for a project (this vault, where Forge
-# is apps/forge).
+# is code/apps/forge).
 import json
 import os
 import sys

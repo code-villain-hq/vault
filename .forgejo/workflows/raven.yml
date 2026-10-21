@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "apps/raven/**"
-      - "design/tokens/**"
-      - "design/components.css"
-      - "brand/mark/raven.svg"
+      - "code/apps/raven/**"
+      - "studio/design/tokens/**"
+      - "studio/design/components.css"
+      - "studio/brand/mark/raven.svg"
       - ".forgejo/workflows/raven.yml"
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
     runs-on: macos
     defaults:
       run:
-        working-directory: apps/raven
+        working-directory: code/apps/raven
     env:
       # Line numbers for a failing test's backtrace, without the rest of the
       # debug info: less to compile and link.

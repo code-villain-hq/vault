@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "apps/layer/**"
+      - "code/apps/layer/**"
       - ".forgejo/workflows/layer.yml"
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
     runs-on: macos
     defaults:
       run:
-        working-directory: apps/layer
+        working-directory: code/apps/layer
     env:
       # Line numbers for a failing test's backtrace, without the rest of the
       # debug info: less to compile and link.

@@ -134,7 +134,7 @@ components:
 
 # Design System: Code Villain
 
-This file summarises `brand/` and `design/` for design tools. Those folders are the source. The frontmatter above is generated from `design/tokens` by `python3 build.py` there, and CI fails if it drifts; the prose below follows the same sources.
+This file summarises `studio/brand/` and `studio/design/` for design tools. Those folders are the source. The frontmatter above is generated from `studio/design/tokens` by `python3 build.py` there, and CI fails if it drifts; the prose below follows the same sources.
 
 ## Overview
 
@@ -151,13 +151,13 @@ Grey does most of the work. Poison (chartreuse) is the brand: the strike in ever
 - One primary per screen, in poison with dark ink; everything else steps back.
 - Every colour at one level shares an OKLCH lightness, so none shouts.
 
-**The mark** is the strike: a gothic C and V with a poison bar behind them, low and heavy, cut where the letters cross (`brand/mark/`). It is the surface's one brand moment. Each app's icon is its initial built the same way; a menu bar glyph is the mark without its tile, in colour.
+**The mark** is the strike: a gothic C and V with a poison bar behind them, low and heavy, cut where the letters cross (`studio/brand/mark/`). It is the surface's one brand moment. Each app's icon is its initial built the same way; a menu bar glyph is the mark without its tile, in colour.
 
-Principles: `design/principles.md`. Components: `design/components.md`. Behaviour: `design/behaviour.md`.
+Principles: `studio/design/principles.md`. Components: `studio/design/components.md`. Behaviour: `studio/design/behaviour.md`.
 
 ## Colors
 
-Shared names, filled for night and day (full table in `brand/color.md`, numbers in `design/tokens/`). Themes are calculated from three inputs (`base` poison, `accent` cloak, `contrast`), not hand-tuned lists.
+Shared names, filled for night and day (full table in `studio/brand/color.md`, numbers in `studio/design/tokens/`). Themes are calculated from three inputs (`base` poison, `accent` cloak, `contrast`), not hand-tuned lists.
 
 - **bg / panel / surface / dialog**: frame, content, raised notes, dialogs. Elevation is a step in tone.
 - **field / dialog-field**: form controls, a tone step from their host.
@@ -182,7 +182,7 @@ Shared names, filled for night and day (full table in `brand/color.md`, numbers 
 
 Studio roles (splash to code) serve the site, blog and social cards; `label` is 17px. Interface roles serve app windows: `title` 21px/700, `query` 21px/400 for a launcher's or command menu's query, `ui` 14px, `ui-small` 13px, `control` 13px/600 for buttons and chips, `ui-code` 13px.
 
-The gothic is the costume; Atkinson is the person inside it. Source: `brand/type.md`.
+The gothic is the costume; Atkinson is the person inside it. Source: `studio/brand/type.md`.
 
 ### Named Rules
 **The 28px Floor.** Grenze never goes below 28px. Under that, use Atkinson 700.
@@ -193,7 +193,7 @@ The gothic is the costume; Atkinson is the person inside it. Source: `brand/type
 
 ## Layout
 
-Apps share one frame: sidebar and top bar on `bg`; content rises one step onto a rounded `panel` inset 0.5rem (`design/layouts/app-window.md`). Prose keeps a 66ch measure. A spacing scale is still a draft (`design/spacing.draft.md`); use rem rhythm consistently.
+Apps share one frame: sidebar and top bar on `bg`; content rises one step onto a rounded `panel` inset 0.5rem (`studio/design/layouts/app-window.md`). Prose keeps a 66ch measure. A spacing scale is still a draft (`studio/design/spacing.draft.md`); use rem rhythm consistently.
 
 ## Elevation & Depth
 
@@ -218,7 +218,7 @@ Flat. Depth is tone: bg → panel → surface → dialog. No shadows or borders 
 
 ## Code
 
-Code uses the Nightshade code palette (`design/tokens/syntax.json`, rules in `design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette dresses the Code Villain editor theme (`apps/theme`: VS Code and Cursor, Neovim, WezTerm, Starship), the apps, and code on the site. Every terminal takes one 16-colour table: the same hues at a calmer chroma, with poison as the green.
+Code uses the Nightshade code palette (`studio/design/tokens/syntax.json`, rules in `studio/design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette dresses the Code Villain editor theme (`code/apps/theme`: VS Code and Cursor, Neovim, WezTerm, Starship), the apps, and code on the site. Every terminal takes one 16-colour table: the same hues at a calmer chroma, with poison as the green.
 
 ## Do's and Don'ts
 

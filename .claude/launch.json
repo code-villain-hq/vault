@@ -19,7 +19,7 @@
       "runtimeArgs": [
         "run",
         "--cwd",
-        "apps/forge",
+        "code/apps/forge",
         "dev"
       ],
       "port": 5173
@@ -32,7 +32,7 @@
         "bun",
         "run",
         "--cwd",
-        "apps/forge",
+        "code/apps/forge",
         "dev"
       ],
       "port": 5173
@@ -43,7 +43,7 @@
       "runtimeArgs": [
         "run",
         "--cwd",
-        "apps/layer",
+        "code/apps/layer",
         "dev"
       ],
       "port": 1420
@@ -54,7 +54,7 @@
       "runtimeArgs": [
         "run",
         "--cwd",
-        "apps/glyph",
+        "code/apps/glyph",
         "dev"
       ],
       "port": 5174
@@ -65,7 +65,7 @@
       "runtimeArgs": [
         "run",
         "--cwd",
-        "apps/raven",
+        "code/apps/raven",
         "dev"
       ],
       "port": 5175
