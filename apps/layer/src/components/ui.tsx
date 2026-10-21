@@ -330,10 +330,10 @@ export function Confirm({
       onClose={() => { if (!running) onCancel(); }}
       footer={
         <>
-          <button className="ui-button" disabled={running} onClick={onCancel}>Cancel</button>
+          {/* Cancel takes the focus, so Enter can't delete by accident (WIN-3). */}
+          <button className="ui-button" autoFocus disabled={running} onClick={onCancel}>Cancel</button>
           <button
             className={`ui-button ${danger ? "ui-button-danger" : "ui-button-primary"}`}
-            autoFocus
             disabled={running}
             onClick={go}
           >

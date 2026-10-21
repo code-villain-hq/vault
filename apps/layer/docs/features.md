@@ -1231,7 +1231,10 @@ to fix on Repos. A running agent or chat is a live dot.
   shown. A long one is cut short with "…" and kept whole in its title and
   the message center. While all is well it shows nothing.
 
-Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `src-tauri/capabilities/default.json`.
+- **WIN-3** A confirmation MUST open with Cancel focused, so Enter never
+  confirms a delete by accident (`design/behaviour.md`, "Confirming").
+
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Confirm`), `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 
