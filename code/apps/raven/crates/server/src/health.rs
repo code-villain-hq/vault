@@ -1,5 +1,6 @@
-//! Level 1: is each app up and well. Raven calls every app's health URL
-//! every half minute. An app is down when its last two checks failed, and
+//! Level 1: is each app up and well. Raven calls every watched app's health
+//! URL, in every workspace, every half minute, and its own at the address
+//! it listens on. An app is down when its last two checks failed, and
 //! needs a look when it missed only the last one, or when level 2 sees
 //! failing calls or an action slower than its own last week. Old records
 //! are cleared out here too.
@@ -9,6 +10,7 @@ use std::time::{Duration, Instant};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::metrics::{self, ActionStats};
 
@@ -17,8 +19,9 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 /// What Raven keeps of calls, logs and checks.
 const KEEP_DAYS: i32 = 30;
 
-/// Checks every app with a health URL, now and every half minute.
-pub async fn watch(pool: PgPool) {
+/// Checks every app with a health URL, now and every half minute. Raven
+/// itself answers at `self_url`.
+pub async fn watch(pool: PgPool, self_url: String) {
     let client = reqwest::Client::builder()
         .timeout(TIMEOUT)
         .user_agent("raven")
@@ -28,9 +31,11 @@ pub async fn watch(pool: PgPool) {
     let mut last_cleanup: Option<Instant> = None;
     loop {
         ticks.tick().await;
-        let apps: Vec<(String, String)> = match sqlx::query_as(
-            "SELECT key, health_url FROM apps WHERE health_url IS NOT NULL ORDER BY position",
+        let apps: Vec<(Uuid, String)> = match sqlx::query_as(
+            "SELECT id, CASE WHEN is_self THEN $1 ELSE health_url END FROM apps \
+             WHERE health_url IS NOT NULL OR is_self",
         )
+        .bind(&self_url)
         .fetch_all(&pool)
         .await
         {
@@ -46,10 +51,10 @@ pub async fn watch(pool: PgPool) {
             async move {
                 let check = check(&client, &url).await;
                 let saved = sqlx::query(
-                    "INSERT INTO health_checks (app, ok, status_code, duration_ms, error) \
+                    "INSERT INTO health_checks (app_id, ok, status_code, duration_ms, error) \
                      VALUES ($1, $2, $3, $4, $5)",
                 )
-                .bind(&app)
+                .bind(app)
                 .bind(check.ok)
                 .bind(check.status_code)
                 .bind(check.duration_ms)
@@ -57,7 +62,7 @@ pub async fn watch(pool: PgPool) {
                 .execute(&pool)
                 .await;
                 if let Err(e) = saved {
-                    tracing::warn!(app, error = %e, "couldn't save a health check");
+                    tracing::warn!(%app, error = %e, "couldn't save a health check");
                 }
             }
         });
@@ -156,9 +161,9 @@ fn sentence(text: &str) -> String {
 pub const RECENT_SECS: f64 = 15.0 * 60.0;
 
 /// The app's status now.
-pub async fn status(pool: &PgPool, app: &str) -> Result<Status, sqlx::Error> {
+pub async fn status(pool: &PgPool, app: Uuid) -> Result<Status, sqlx::Error> {
     let checks: Vec<(DateTime<Utc>, bool, Option<String>)> = sqlx::query_as(
-        "SELECT checked_at, ok, error FROM health_checks WHERE app = $1 \
+        "SELECT checked_at, ok, error FROM health_checks WHERE app_id = $1 \
          ORDER BY checked_at DESC LIMIT 2",
     )
     .bind(app)
@@ -167,8 +172,8 @@ pub async fn status(pool: &PgPool, app: &str) -> Result<Status, sqlx::Error> {
     let last_check = checks.first().map(|c| c.0);
     if checks.len() == 2 && checks.iter().all(|c| !c.1) {
         let since: Option<DateTime<Utc>> = sqlx::query_scalar(
-            "SELECT min(checked_at) FROM health_checks WHERE app = $1 AND checked_at > \
-             coalesce((SELECT max(checked_at) FROM health_checks WHERE app = $1 AND ok), '-infinity')",
+            "SELECT min(checked_at) FROM health_checks WHERE app_id = $1 AND checked_at > \
+             coalesce((SELECT max(checked_at) FROM health_checks WHERE app_id = $1 AND ok), '-infinity')",
         )
         .bind(app)
         .fetch_one(pool)

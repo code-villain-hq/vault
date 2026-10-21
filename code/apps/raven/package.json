@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*",
+    "../../kit/sync/client"
   ],
   "scripts": {
     "design:sync": "bun scripts/sync-design.ts",
@@ -13,7 +15,8 @@
     "dev": "bun scripts/dev.ts",
     "dev:desktop": "bun run --cwd apps/desktop tauri dev",
     "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
-    "typecheck": "tsc -p apps/web",
+    "gen:types": "bun scripts/gen-types.ts",
+    "typecheck": "tsc -p apps/web && tsc -p ../../kit/sync/client",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "cargo test --workspace && bun test",

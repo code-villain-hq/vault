@@ -15,9 +15,6 @@ pub struct Config {
     /// header it adds. Only set it when a proxy always sets that header,
     /// or anyone could claim any address.
     pub trust_forwarded_for: bool,
-    /// Where each watched app answers its health check, from
-    /// `RAVEN_<APP>_HEALTH_URL`; apps without one keep the address they have.
-    pub health_urls: Vec<(String, String)>,
 }
 
 impl Config {
@@ -34,23 +31,12 @@ impl Config {
             .map(Into::into);
         let trust_forwarded_for =
             std::env::var("RAVEN_TRUST_FORWARDED_FOR").is_ok_and(|v| v.trim() == "1");
-        let mut health_urls: Vec<(String, String)> = ["forge", "glyph"]
-            .into_iter()
-            .filter_map(|app| {
-                let var = format!("RAVEN_{}_HEALTH_URL", app.to_uppercase());
-                let url = std::env::var(var).ok().filter(|u| !u.trim().is_empty())?;
-                Some((app.to_string(), url.trim().to_string()))
-            })
-            .collect();
-        // Raven checks itself the way it checks the others.
-        health_urls.push(("raven".into(), format!("http://{addr}/api/health")));
         Ok(Config {
             database_url,
             addr,
             cookie_secure,
             web_dir,
             trust_forwarded_for,
-            health_urls,
         })
     }
 }

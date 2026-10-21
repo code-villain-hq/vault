@@ -2,7 +2,14 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useApi } from "./api";
 import { CallsChart, DurationChart } from "./charts";
 import { ago, clock, ms, percent, rate, windowName } from "./format";
-import { PageBody, PageHeader, useAppKey } from "./layout";
+import {
+  NotAvailableOffline,
+  PageBody,
+  PageHeader,
+  useAppName,
+  useAppParams,
+  useAppPath,
+} from "./layout";
 import { Errors } from "./technical";
 import type { ActionPage as Action } from "./types";
 import { ErrorMessage, Section, Stat, WindowPicker } from "./ui";
@@ -11,18 +18,27 @@ export type ActionSearch = { name?: string; window?: number };
 
 /** One action up close: how its speed and failures moved, and its slowest calls. */
 export function ActionPage() {
-  const app = useAppKey();
+  const params = useAppParams();
   const { name = "", window = 3600 } = useSearch({ strict: false }) as ActionSearch;
   const navigate = useNavigate();
-  const { data, error } = useApi<Action>(
-    `/api/apps/${app}/action?name=${encodeURIComponent(name)}&window=${window}`,
+  const appName = useAppName();
+  const { data, error, offline, reload } = useApi<Action>(
+    `${useAppPath("action")}?name=${encodeURIComponent(name)}&window=${window}`,
   );
+  if (offline) {
+    return <NotAvailableOffline title={name} what={`${appName}'s calls`} onRetry={reload} />;
+  }
   return (
     <>
       <PageHeader
         title={name}
         parent={
-          <Link to="/$app/technical" params={{ app }} search={{ window }} className="hover:text-fg">
+          <Link
+            to="/$workspace/$app/technical"
+            params={params}
+            search={{ window }}
+            className="hover:text-fg"
+          >
             Technical
           </Link>
         }
@@ -30,19 +46,20 @@ export function ActionPage() {
         <WindowPicker
           value={window}
           onChange={(secs) =>
-            void navigate({ to: "/$app/action", params: { app }, search: { name, window: secs } })
+            void navigate({ to: "/$workspace/$app/action", params, search: { name, window: secs } })
           }
         />
       </PageHeader>
       <PageBody>
         <ErrorMessage>{error}</ErrorMessage>
-        {data && <ActionBody app={app} page={data} />}
+        {data && <ActionBody page={data} />}
       </PageBody>
     </>
   );
 }
 
-function ActionBody({ app, page }: { app: string; page: Action }) {
+function ActionBody({ page }: { page: Action }) {
+  const params = useAppParams();
   const { stats } = page;
   if (!stats) {
     return (
@@ -91,7 +108,7 @@ function ActionBody({ app, page }: { app: string; page: Action }) {
 
       {page.errors.length > 0 && (
         <Section title="Errors">
-          <Errors app={app} errors={page.errors} />
+          <Errors errors={page.errors} />
         </Section>
       )}
 
@@ -100,8 +117,8 @@ function ActionBody({ app, page }: { app: string; page: Action }) {
           {page.slowest.map((call) => (
             <li key={call.trace_id}>
               <Link
-                to="/$app/calls/$trace"
-                params={{ app, trace: call.trace_id }}
+                to="/$workspace/$app/calls/$trace"
+                params={{ ...params, trace: call.trace_id }}
                 className="ui-row flex items-center gap-4 px-2 py-1.5 tabular-nums"
               >
                 <span className="w-16 font-semibold">{ms(call.duration_ms)}</span>

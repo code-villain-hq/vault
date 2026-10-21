@@ -1,0 +1,16 @@
+[package]
+name = "raven-sync"
+description = "Raven's rules for the studio's sync engine (code/kit/sync), and its calls named with Raven's types"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+code-villain-sync.workspace = true
+raven-domain.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

@@ -11,8 +11,10 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{FromRow, PgPool};
+use uuid::Uuid;
 
-use crate::auth::CurrentUser;
+use crate::apps;
+use crate::auth::Member;
 use crate::error::AppError;
 use crate::health::{self, Status};
 use crate::state::AppState;
@@ -34,53 +36,48 @@ impl WindowQuery {
     }
 }
 
+/// How a watched app is. Its name and addresses come from sync; this is
+/// what Raven heard.
 #[derive(Serialize)]
 pub struct AppSummary {
+    id: Uuid,
     key: String,
-    name: String,
-    health_url: Option<String>,
     /// Whether the app has a key to send its data with.
     sending: bool,
     status: Status,
 }
 
-/// `GET /api/apps`: every watched app and how it is.
+/// `GET /api/w/{workspace}/apps`: how each app the workspace watches is.
 pub async fn apps(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    member: Member,
 ) -> Result<Json<Vec<AppSummary>>, AppError> {
-    const SQL: &str =
-        "SELECT key, name, health_url, ingest_key_hash IS NOT NULL FROM apps ORDER BY position";
-    let rows: Vec<(String, String, Option<String>, bool)> =
-        timed("list apps", SQL, sqlx::query_as(SQL).fetch_all(&state.pool)).await?;
+    const SQL: &str = "SELECT a.id, a.key, k.app_id IS NOT NULL FROM apps a \
+        LEFT JOIN app_keys k ON k.app_id = a.id WHERE a.workspace_id = $1 ORDER BY a.position";
+    let rows: Vec<(Uuid, String, bool)> = timed(
+        "list apps",
+        SQL,
+        sqlx::query_as(SQL)
+            .bind(member.actor.workspace_id)
+            .fetch_all(&state.pool),
+    )
+    .await?;
     let mut apps = Vec::with_capacity(rows.len());
-    for (key, name, health_url, sending) in rows {
+    for (id, key, sending) in rows {
         let status = timed(
             "app status",
             "health::status",
-            health::status(&state.pool, &key),
+            health::status(&state.pool, id),
         )
         .await?;
         apps.push(AppSummary {
+            id,
             key,
-            name,
-            health_url,
             sending,
             status,
         });
     }
     Ok(Json(apps))
-}
-
-async fn known_app(pool: &PgPool, app: &str) -> Result<String, AppError> {
-    const SQL: &str = "SELECT name FROM apps WHERE key = $1";
-    timed(
-        "find app",
-        SQL,
-        sqlx::query_scalar(SQL).bind(app).fetch_optional(pool),
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("Raven doesn't watch that app"))
 }
 
 #[derive(Serialize)]
@@ -106,6 +103,8 @@ pub struct CheckRow {
 pub struct HealthPage {
     name: String,
     health_url: Option<String>,
+    /// Raven itself, checked at its own address.
+    is_self: bool,
     /// Whether the app has a key to send its calls with.
     sending: bool,
     status: Status,
@@ -121,43 +120,36 @@ pub struct HealthPage {
 const SLOT_SECS: i64 = 30 * 60;
 const SLOTS: i64 = 48;
 
-/// `GET /api/apps/{app}/health`
+/// `GET /api/w/{workspace}/apps/{app}/health`
 pub async fn health_page(
     State(state): State<AppState>,
-    _user: CurrentUser,
-    Path(app): Path<String>,
+    member: Member,
+    Path((_, app)): Path<(Uuid, String)>,
 ) -> Result<Json<HealthPage>, AppError> {
     let pool = &state.pool;
-    let name = known_app(pool, &app).await?;
-    const URL: &str = "SELECT health_url, ingest_key_hash IS NOT NULL FROM apps WHERE key = $1";
-    let (health_url, sending): (Option<String>, bool) = timed(
-        "health url",
-        URL,
-        sqlx::query_as(URL).bind(&app).fetch_one(pool),
-    )
-    .await?;
-    let status = timed("app status", "health::status", health::status(pool, &app)).await?;
+    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
+    let status = timed("app status", "health::status", health::status(pool, app.id)).await?;
 
     const CHECKS: &str = "SELECT floor(extract(epoch FROM checked_at) / $2)::bigint, count(*), \
         count(*) FILTER (WHERE NOT ok) FROM health_checks \
-        WHERE app = $1 AND checked_at > now() - interval '24 hours' GROUP BY 1";
+        WHERE app_id = $1 AND checked_at > now() - interval '24 hours' GROUP BY 1";
     let checks: Vec<(i64, i64, i64)> = timed(
         "checks per half hour",
         CHECKS,
         sqlx::query_as(CHECKS)
-            .bind(&app)
+            .bind(app.id)
             .bind(SLOT_SECS as f64)
             .fetch_all(pool),
     )
     .await?;
     const CALLS: &str = "SELECT floor(extract(epoch FROM started_at) / $2)::bigint, count(*), \
         count(*) FILTER (WHERE is_error) FROM spans \
-        WHERE app = $1 AND kind = 'server' AND started_at > now() - interval '24 hours' GROUP BY 1";
+        WHERE app_id = $1 AND kind = 'server' AND started_at > now() - interval '24 hours' GROUP BY 1";
     let calls: HashMap<i64, (i64, i64)> = timed(
         "calls per half hour",
         CALLS,
         sqlx::query_as::<_, (i64, i64, i64)>(CALLS)
-            .bind(&app)
+            .bind(app.id)
             .bind(SLOT_SECS as f64)
             .fetch_all(pool),
     )
@@ -193,26 +185,27 @@ pub async fn health_page(
 
     const DAY: &str = "SELECT count(*), count(*) FILTER (WHERE ok), \
         percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE ok) \
-        FROM health_checks WHERE app = $1 AND checked_at > now() - interval '24 hours'";
+        FROM health_checks WHERE app_id = $1 AND checked_at > now() - interval '24 hours'";
     let (total, passed, typical): (i64, i64, Option<f64>) = timed(
         "uptime",
         DAY,
-        sqlx::query_as(DAY).bind(&app).fetch_one(pool),
+        sqlx::query_as(DAY).bind(app.id).fetch_one(pool),
     )
     .await?;
     const RECENT: &str = "SELECT checked_at, ok, status_code, duration_ms, error FROM health_checks \
-        WHERE app = $1 ORDER BY checked_at DESC LIMIT 6";
+        WHERE app_id = $1 ORDER BY checked_at DESC LIMIT 6";
     let recent_checks = timed(
         "recent checks",
         RECENT,
-        sqlx::query_as(RECENT).bind(&app).fetch_all(pool),
+        sqlx::query_as(RECENT).bind(app.id).fetch_all(pool),
     )
     .await?;
 
     Ok(Json(HealthPage {
-        name,
-        health_url,
-        sending,
+        name: app.name,
+        health_url: app.health_url,
+        is_self: app.is_self,
+        sending: app.sending,
         status,
         uptime: (total > 0).then(|| passed as f64 / total as f64),
         typical_check_ms: typical,
@@ -237,13 +230,13 @@ const ACTIONS: &str = "WITH recent AS ( \
         SELECT name, count(*) AS calls, count(*) FILTER (WHERE is_error) AS errors, \
           percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms, \
           percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms \
-        FROM spans WHERE app = $1 AND kind = 'server' \
+        FROM spans WHERE app_id = $1 AND kind = 'server' \
           AND started_at > now() - make_interval(secs => $2) \
         GROUP BY name), \
       normal AS ( \
         SELECT name, count(*) AS normal_calls, \
           percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS normal_p95_ms \
-        FROM spans WHERE app = $1 AND kind = 'server' \
+        FROM spans WHERE app_id = $1 AND kind = 'server' \
           AND started_at > now() - interval '7 days' \
         GROUP BY name) \
     SELECT r.name, r.calls, r.errors, r.p50_ms, r.p95_ms, n.normal_p95_ms, n.normal_calls \
@@ -252,7 +245,7 @@ const ACTIONS: &str = "WITH recent AS ( \
 /// Each action's calls over the last `secs` seconds.
 pub async fn action_stats(
     pool: &PgPool,
-    app: &str,
+    app: Uuid,
     secs: f64,
 ) -> Result<Vec<ActionStats>, sqlx::Error> {
     timed(
@@ -301,14 +294,14 @@ const ERROR_GROUPS: &str = "SELECT name AS action, \
       min(started_at) AS first_seen, max(started_at) AS last_seen, \
       (array_agg(version ORDER BY started_at))[1] AS first_version, \
       (array_agg(trace_id ORDER BY started_at DESC))[1] AS last_trace_id \
-    FROM spans WHERE app = $1 AND kind = 'server' AND is_error AND ($3::text IS NULL OR name = $3) \
+    FROM spans WHERE app_id = $1 AND kind = 'server' AND is_error AND ($3::text IS NULL OR name = $3) \
     GROUP BY 1, 2 \
     HAVING count(*) FILTER (WHERE started_at > now() - make_interval(secs => $2)) > 0 \
     ORDER BY last_seen DESC LIMIT 20";
 
 async fn error_groups(
     pool: &PgPool,
-    app: &str,
+    app: Uuid,
     secs: f64,
     action: Option<&str>,
 ) -> Result<Vec<ErrorGroup>, sqlx::Error> {
@@ -340,17 +333,17 @@ pub struct TechnicalPage {
     versions: Vec<VersionMark>,
 }
 
-/// `GET /api/apps/{app}/technical?window=<secs>`
+/// `GET /api/w/{workspace}/apps/{app}/technical?window=<secs>`
 pub async fn technical_page(
     State(state): State<AppState>,
-    _user: CurrentUser,
-    Path(app): Path<String>,
+    member: Member,
+    Path((_, app)): Path<(Uuid, String)>,
     Query(query): Query<WindowQuery>,
 ) -> Result<Json<TechnicalPage>, AppError> {
     let pool = &state.pool;
-    let name = known_app(pool, &app).await?;
+    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
     let secs = query.secs();
-    let mut actions: Vec<ActionRow> = action_stats(pool, &app, secs)
+    let mut actions: Vec<ActionRow> = action_stats(pool, app.id, secs)
         .await?
         .into_iter()
         .map(|stats| ActionRow::new(stats, secs))
@@ -362,18 +355,18 @@ pub async fn technical_page(
             .then(b.slower_than_usual.cmp(&a.slower_than_usual))
             .then(b.stats.p95_ms.total_cmp(&a.stats.p95_ms))
     });
-    let errors = error_groups(pool, &app, secs, None).await?;
+    let errors = error_groups(pool, app.id, secs, None).await?;
     const VERSIONS: &str = "SELECT version, min(started_at) AS first_seen FROM spans \
-        WHERE app = $1 AND kind = 'server' AND version IS NOT NULL \
+        WHERE app_id = $1 AND kind = 'server' AND version IS NOT NULL \
         GROUP BY version ORDER BY first_seen DESC LIMIT 5";
     let versions = timed(
         "versions",
         VERSIONS,
-        sqlx::query_as(VERSIONS).bind(&app).fetch_all(pool),
+        sqlx::query_as(VERSIONS).bind(app.id).fetch_all(pool),
     )
     .await?;
     Ok(Json(TechnicalPage {
-        name,
+        name: app.name,
         window_secs: secs,
         actions,
         errors,
@@ -442,20 +435,20 @@ pub struct ActionPage {
     errors: Vec<ErrorGroup>,
 }
 
-/// `GET /api/apps/{app}/action?name=<action>&window=<secs>`
+/// `GET /api/w/{workspace}/apps/{app}/action?name=<action>&window=<secs>`
 pub async fn action_page(
     State(state): State<AppState>,
-    _user: CurrentUser,
-    Path(app): Path<String>,
+    member: Member,
+    Path((_, app)): Path<(Uuid, String)>,
     Query(query): Query<ActionQuery>,
 ) -> Result<Json<ActionPage>, AppError> {
     let pool = &state.pool;
-    let app_name = known_app(pool, &app).await?;
+    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
     let secs = WindowQuery {
         window: query.window,
     }
     .secs();
-    let stats = action_stats(pool, &app, secs)
+    let stats = action_stats(pool, app.id, secs)
         .await?
         .into_iter()
         .find(|a| a.name == query.name)
@@ -469,14 +462,14 @@ pub async fn action_page(
           count(*) AS calls, count(*) FILTER (WHERE is_error) AS errors, \
           percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms, \
           percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms \
-        FROM spans WHERE app = $1 AND kind = 'server' AND name = $2 \
+        FROM spans WHERE app_id = $1 AND kind = 'server' AND name = $2 \
           AND started_at > now() - make_interval(secs => $4) \
         GROUP BY 1 ORDER BY 1";
     let filled: Vec<Point> = timed(
         "calls over time",
         SERIES,
         sqlx::query_as(SERIES)
-            .bind(&app)
+            .bind(app.id)
             .bind(&query.name)
             .bind(bucket_secs)
             .bind(secs)
@@ -485,22 +478,22 @@ pub async fn action_page(
     .await?;
     let series = whole_window(filled, secs, bucket_secs, Utc::now());
     const SLOWEST: &str = "SELECT trace_id, started_at, duration_ms, http_status, is_error FROM spans \
-        WHERE app = $1 AND kind = 'server' AND name = $2 \
+        WHERE app_id = $1 AND kind = 'server' AND name = $2 \
           AND started_at > now() - make_interval(secs => $3) \
         ORDER BY duration_ms DESC LIMIT 8";
     let slowest = timed(
         "slowest calls",
         SLOWEST,
         sqlx::query_as(SLOWEST)
-            .bind(&app)
+            .bind(app.id)
             .bind(&query.name)
             .bind(secs)
             .fetch_all(pool),
     )
     .await?;
-    let errors = error_groups(pool, &app, secs, Some(&query.name)).await?;
+    let errors = error_groups(pool, app.id, secs, Some(&query.name)).await?;
     Ok(Json(ActionPage {
-        app_name,
+        app_name: app.name,
         name: query.name,
         window_secs: secs,
         bucket_secs,
@@ -547,22 +540,23 @@ pub struct CallPage {
     logs_before: Vec<LogRow>,
 }
 
-/// `GET /api/apps/{app}/calls/{trace_id}`: one call with what happened inside it.
+/// `GET /api/w/{workspace}/apps/{app}/calls/{trace_id}`: one call with what
+/// happened inside it.
 pub async fn call_page(
     State(state): State<AppState>,
-    _user: CurrentUser,
-    Path((app, trace_id)): Path<(String, String)>,
+    member: Member,
+    Path((_, app, trace_id)): Path<(Uuid, String, String)>,
 ) -> Result<Json<CallPage>, AppError> {
     let pool = &state.pool;
-    let app_name = known_app(pool, &app).await?;
+    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
     const SPANS: &str = "SELECT span_id, parent_span_id, name, kind, started_at, duration_ms, is_error, \
         error_message, http_status, version, attributes FROM spans \
-        WHERE app = $1 AND trace_id = $2 ORDER BY started_at, (parent_span_id IS NOT NULL)";
+        WHERE app_id = $1 AND trace_id = $2 ORDER BY started_at, (parent_span_id IS NOT NULL)";
     let spans: Vec<SpanRow> = timed(
         "spans of a call",
         SPANS,
         sqlx::query_as(SPANS)
-            .bind(&app)
+            .bind(app.id)
             .bind(&trace_id)
             .fetch_all(pool),
     )
@@ -574,24 +568,24 @@ pub async fn call_page(
     };
     let started = first.started_at;
     const LOGS: &str = "SELECT at, level, message, target, span_id, attributes FROM logs \
-        WHERE app = $1 AND trace_id = $2 ORDER BY at, id";
+        WHERE app_id = $1 AND trace_id = $2 ORDER BY at, id";
     let logs = timed(
         "logs of a call",
         LOGS,
         sqlx::query_as(LOGS)
-            .bind(&app)
+            .bind(app.id)
             .bind(&trace_id)
             .fetch_all(pool),
     )
     .await?;
     const BEFORE: &str = "SELECT at, level, message, target, span_id, attributes FROM logs \
-        WHERE app = $1 AND at BETWEEN $2 AND $3 AND trace_id IS DISTINCT FROM $4 \
+        WHERE app_id = $1 AND at BETWEEN $2 AND $3 AND trace_id IS DISTINCT FROM $4 \
         ORDER BY at DESC, id DESC LIMIT 5";
     let mut logs_before: Vec<LogRow> = timed(
         "logs before a call",
         BEFORE,
         sqlx::query_as(BEFORE)
-            .bind(&app)
+            .bind(app.id)
             .bind(started - Duration::minutes(5))
             .bind(started)
             .bind(&trace_id)
@@ -600,7 +594,7 @@ pub async fn call_page(
     .await?;
     logs_before.reverse();
     Ok(Json(CallPage {
-        app_name,
+        app_name: app.name,
         trace_id,
         spans,
         logs,

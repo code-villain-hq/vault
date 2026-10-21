@@ -3,7 +3,8 @@ use std::fmt::Display;
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
+use raven_domain::{ApiError, ValidationError};
+use raven_sync::SyncError;
 
 /// An error response: a status and an [`ApiError`] body.
 #[derive(Debug)]
@@ -16,16 +17,15 @@ pub struct AppError {
     cause: Option<String>,
 }
 
-/// The body of every error response.
-#[derive(Serialize)]
-pub struct ApiError {
-    pub code: String,
-    pub message: String,
-}
-
 /// Rides on an error response so the call recorder can say what went wrong.
 #[derive(Clone, Debug)]
 pub struct ErrorNote(pub String);
+
+impl Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
 
 impl AppError {
     fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
@@ -52,6 +52,10 @@ impl AppError {
 
     pub fn not_found(message: impl Into<String>) -> Self {
         Self::new(StatusCode::NOT_FOUND, "not_found", message)
+    }
+
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::CONFLICT, "conflict", message)
     }
 
     pub fn unsupported(message: impl Into<String>) -> Self {
@@ -90,6 +94,24 @@ impl AppError {
                 "something went wrong",
             )
         }
+    }
+}
+
+impl From<SyncError> for AppError {
+    fn from(e: SyncError) -> Self {
+        match e {
+            SyncError::Invalid(message) => AppError::invalid(message),
+            SyncError::NotFound(what) => AppError::not_found(format!("{what} not found")),
+            SyncError::Forbidden(message) => AppError::forbidden(message),
+            SyncError::Conflict(message) => AppError::conflict(message),
+            SyncError::Database(db) => AppError::internal(db),
+        }
+    }
+}
+
+impl From<ValidationError> for AppError {
+    fn from(e: ValidationError) -> Self {
+        AppError::invalid(e.0)
     }
 }
 

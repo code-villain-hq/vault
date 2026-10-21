@@ -1,51 +1,176 @@
 import { Menu } from "@base-ui/react/menu";
-import { Link, Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
-import { Activity, ChevronsUpDown, HeartPulse } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import type { App } from "@raven/types";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+  useRouter,
+} from "@tanstack/react-router";
+import {
+  Activity,
+  ArrowLeft,
+  Check,
+  ChevronsUpDown,
+  HeartPulse,
+  LayoutGrid,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo } from "react";
 import { useApi } from "./api";
 import { Initial, NavIcon } from "./icons";
 import { isDesktop } from "./platform";
 import { Redirect } from "./redirect";
-import { signOut, useSession } from "./session";
+import { bundled, type Place, placeName, setCurrentPlace } from "./server";
+import {
+  defaultWorkspace,
+  rememberWorkspace,
+  signOut,
+  useSession,
+  type WorkspaceEntry,
+  workspaceEntries,
+} from "./session";
+import { SyncIndicator } from "./sync-indicator";
 import type { AppSummary, Level } from "./types";
-import { AuthScreen, Splash } from "./ui";
+import { AuthScreen, Button, buttonClass, Splash } from "./ui";
+import {
+  useIsAdmin,
+  useRecords,
+  useSyncStatus,
+  useWorkspace,
+  WorkspaceProvider,
+} from "./workspace";
 
-/** `/`: the first app that needs a look, or the first app. */
+/**
+ * `/`: opens the workspace used last, or asks to sign in; the desktop app
+ * first asks where to start.
+ */
 export function Home() {
   const session = useSession();
   if (session.status === "loading") return <Splash />;
-  if (session.status === "signed-out") return <Redirect to="/login" />;
-  return <FirstApp />;
+  if (session.status === "signed-out") return <Redirect to={isDesktop ? "/start" : "/login"} />;
+  const workspace = defaultWorkspace(workspaceEntries(session.places));
+  if (!workspace) {
+    const signOutEverywhere = () =>
+      void Promise.all(session.places.map(({ place }) => signOut(place)));
+    return (
+      <AuthScreen title="You're not in any workspace">
+        <p className="mb-6 text-center text-muted">Ask a workspace admin for an invite link.</p>
+        <Button variant="secondary" className="w-full" onClick={signOutEverywhere}>
+          Sign out
+        </Button>
+      </AuthScreen>
+    );
+  }
+  return <Redirect to="/$workspace" params={{ workspace: workspace.key }} />;
 }
 
-function FirstApp() {
-  const { data: apps } = useApi<AppSummary[]>("/api/apps");
-  if (!apps) return <Splash />;
-  const first =
-    apps.find((a) => a.status.level === "down") ??
-    apps.find((a) => a.status.level === "warn") ??
-    apps[0];
-  if (!first) return <NotFound />;
-  return <Redirect to="/$app" params={{ app: first.key }} />;
-}
-
-/** `/$app/...`: needs someone signed in; shows the sidebar around the page. */
-export function AppLayout() {
+/** `/$workspace/...`: needs a signed-in member; shows the sidebar around the page. */
+export function WorkspaceLayout() {
   const session = useSession();
   const location = useLocation();
+  const { workspace: urlKey } = useParams({ strict: false }) as { workspace: string };
+
   if (session.status === "loading") return <Splash />;
   if (session.status === "signed-out") {
+    if (isDesktop) return <Redirect to="/start" />;
     return <Redirect to="/login" search={{ redirect: location.href }} />;
   }
-  return <Shell name={session.me.user.name} email={session.me.user.email} />;
+  const entry = workspaceEntries(session.places).find((e) => e.key === urlKey);
+  if (!entry) return <NotFound />;
+  rememberWorkspace(entry.key);
+  setCurrentPlace(entry.place);
+
+  return (
+    <WorkspaceProvider
+      place={entry.place}
+      me={entry.me}
+      workspace={entry.workspace}
+      routeKey={entry.key}
+    >
+      <Shell />
+    </WorkspaceProvider>
+  );
+}
+
+/** The apps the workspace watches, in their order, from its local copy. */
+export function useApps(): App[] {
+  const apps = useRecords("App");
+  return useMemo(() => [...apps].sort((a, b) => a.position - b.position), [apps]);
+}
+
+/**
+ * How each app is, by id, as its place last said; empty while it can't be
+ * reached. `settled` once the place has answered or failed to.
+ */
+const Statuses = createContext<{ byId: Map<string, AppSummary>; settled: boolean }>({
+  byId: new Map(),
+  settled: false,
+});
+
+export function useStatuses() {
+  return useContext(Statuses);
+}
+
+/**
+ * `/$workspace`: the first app that's down, else the first that needs a
+ * look, else the first app. Offline, the first app.
+ */
+export function WorkspaceHome() {
+  const { workspace } = useWorkspace();
+  const apps = useApps();
+  const { byId, settled } = useStatuses();
+  const { ready } = useSyncStatus();
+  if (!ready || (!settled && apps.length > 1)) return null;
+  const level = (app: App) => byId.get(app.id)?.status.level;
+  const first =
+    apps.find((a) => level(a) === "down") ?? apps.find((a) => level(a) === "warn") ?? apps[0];
+  if (!first) return <NoApps />;
+  return (
+    <Redirect to="/$workspace/$app" params={{ workspace: workspace.url_key, app: first.key }} />
+  );
+}
+
+/** A workspace that watches nothing yet: the one thing to do is add an app. */
+function NoApps() {
+  const { workspace } = useWorkspace();
+  const isAdmin = useIsAdmin();
+  return (
+    <>
+      <PageHeader title="Apps" />
+      <PageBody>
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-3 py-16 text-center">
+          <h2 className="font-medium">This workspace watches no apps yet</h2>
+          <p className="text-muted">
+            {isAdmin
+              ? "Add an app with its health address, and give it a key to send its calls with."
+              : "An admin adds the apps it watches."}
+          </p>
+          {isAdmin && (
+            <Link
+              to="/$workspace/settings/apps"
+              params={{ workspace: workspace.url_key }}
+              className={buttonClass("primary")}
+            >
+              Add app
+            </Link>
+          )}
+        </div>
+      </PageBody>
+    </>
+  );
 }
 
 export function NotFound() {
   return (
     <AuthScreen title="Nothing here">
-      <p className="mb-6 text-center text-muted">This page doesn't exist.</p>
+      <p className="mb-6 text-center text-muted">
+        This page doesn't exist, or you're not a member of its workspace.
+      </p>
       <Link to="/" className="ui-link block text-center">
-        Go to Raven
+        Go to your workspace
       </Link>
     </AuthScreen>
   );
@@ -56,9 +181,33 @@ export function useAppKey() {
   return (useParams({ strict: false }) as { app: string }).app;
 }
 
+/** The open app, from the local copy; undefined while it loads or if it's gone. */
+export function useOpenApp(): App | undefined {
+  const key = useAppKey();
+  return useApps().find((a) => a.key === key);
+}
+
+/** The open app's name, or its key until the local copy has it. */
+export function useAppName(): string {
+  const key = useAppKey();
+  return useOpenApp()?.name ?? key;
+}
+
+/** The route params of the open app's pages. */
+export function useAppParams() {
+  const { workspace } = useWorkspace();
+  return { workspace: workspace.url_key, app: useAppKey() };
+}
+
+/** Where the open app's pages come from, for its API paths. */
+export function useAppPath(page: string) {
+  const { workspace } = useWorkspace();
+  return `/api/w/${workspace.id}/apps/${encodeURIComponent(useAppKey())}/${page}`;
+}
+
 /**
- * The bar at the top of each page: where it sits, its title, anything shown
- * by it (`meta`), then the page's controls.
+ * The bar at the top of each page: where it sits (the workspace, unless
+ * said), its title, anything shown by it (`meta`), then the page's controls.
  */
 export function PageHeader({
   title,
@@ -67,10 +216,11 @@ export function PageHeader({
   children,
 }: {
   title: string;
-  parent: ReactNode;
+  parent?: ReactNode;
   meta?: ReactNode;
   children?: ReactNode;
 }) {
+  const { workspace } = useWorkspace();
   return (
     <>
       {/* In the desktop app the native title bar is hidden, so this bar and the
@@ -80,7 +230,7 @@ export function PageHeader({
         data-tauri-drag-region="deep"
       >
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
-          {parent}
+          {parent ?? workspace.name}
           <span aria-hidden="true" className="text-faint">
             ›
           </span>
@@ -107,10 +257,49 @@ export function PageBody({ children }: { children: ReactNode }) {
   );
 }
 
-/** "G" then a letter goes to a page, as in Forge. */
+/** Where a place is, in a sentence: "raven.codevillain.eu", or "this Mac". */
+export function placeWords(place: Place) {
+  return place.kind === "mac" ? "Raven on this Mac" : placeName(place);
+}
+
+/**
+ * What Raven heard about an app lives in the workspace's place, not in the
+ * local copy: while that place can't be reached, the page says so and
+ * offers to ask again.
+ */
+export function NotAvailableOffline({
+  what,
+  title,
+  onRetry,
+}: {
+  /** "Forge's health" */
+  what: string;
+  title: string;
+  onRetry: () => void;
+}) {
+  const { place } = useWorkspace();
+  return (
+    <>
+      <PageHeader title={title} parent={useAppName()} />
+      <PageBody>
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-3 py-16 text-center">
+          <h2 className="font-medium">Not available offline</h2>
+          <p className="text-muted">
+            Raven reads {what} live from {placeWords(place)}, and can't reach it right now.
+          </p>
+          <Button variant="secondary" onClick={onRetry}>
+            Check again
+          </Button>
+        </div>
+      </PageBody>
+    </>
+  );
+}
+
+/** "G" then a letter goes to a page of the open app, as in Forge. */
 const GO_TO: Record<string, string> = {
-  h: "/$app",
-  t: "/$app/technical",
+  h: "/$workspace/$app",
+  t: "/$workspace/$app/technical",
 };
 
 /** True while the key goes to a field, so letters are typed rather than shortcuts. */
@@ -121,13 +310,23 @@ function isTyping(target: EventTarget | null) {
   );
 }
 
-function Shell({ name, email }: { name: string; email: string }) {
+/** The workspace frame: sidebar and page, with the apps' statuses for both. */
+function Shell() {
+  const { workspace } = useWorkspace();
   const app = useAppKey();
   const navigate = useNavigate();
+  const { data, error } = useApi<AppSummary[]>(`/api/w/${workspace.id}/apps`);
+  const statuses = useMemo(
+    () => ({
+      byId: new Map((data ?? []).map((a) => [a.id, a])),
+      settled: data !== undefined || error !== undefined,
+    }),
+    [data, error],
+  );
   useEffect(() => {
     let pendingG = 0;
     const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+      if (!app || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
       if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
       const key = event.key.toLowerCase();
       if (key === "g") {
@@ -138,19 +337,21 @@ function Shell({ name, email }: { name: string; email: string }) {
       if (page && event.timeStamp - pendingG < 1500) {
         event.preventDefault();
         pendingG = 0;
-        void navigate({ to: page, params: { app } });
+        void navigate({ to: page, params: { workspace: workspace.url_key, app } });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [navigate, app]);
+  }, [navigate, workspace.url_key, app]);
   return (
-    <div className="app-shell flex h-full bg-bg">
-      <Sidebar name={name} email={email} />
-      <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
-        <Outlet />
-      </main>
-    </div>
+    <Statuses.Provider value={statuses}>
+      <div className="app-shell flex h-full bg-bg">
+        <Sidebar />
+        <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
+          <Outlet />
+        </main>
+      </div>
+    </Statuses.Provider>
   );
 }
 
@@ -191,10 +392,13 @@ export function levelWords(level: Level) {
   return LEVEL_WORDS[level];
 }
 
-function Sidebar({ name, email }: { name: string; email: string }) {
-  const app = useAppKey();
-  const { data: apps } = useApi<AppSummary[]>("/api/apps");
-  const params = { app };
+/** The last page outside settings, where "Back to …" returns. */
+let lastAppPath: string | null = null;
+
+function Sidebar() {
+  const { pathname } = useLocation();
+  const inSettings = pathname.includes("/settings/");
+  if (!inSettings) lastAppPath = pathname;
   return (
     <aside
       className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
@@ -215,31 +419,58 @@ function Sidebar({ name, email }: { name: string; email: string }) {
             </div>
           )}
         </div>
-        <nav aria-label="Apps" className="flex flex-col gap-0.5">
-          <span className="sidebar-group-label px-2 pb-1 text-xs text-faint">Apps</span>
-          {apps?.map((watched) => (
+        <div className="workspace-switcher">
+          <WorkspaceMenu />
+        </div>
+        {inSettings ? <SettingsNav /> : <AppNav />}
+      </div>
+      <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
+        <SyncIndicator />
+      </div>
+    </aside>
+  );
+}
+
+/** The apps the workspace watches, then the open app's views; each names its "G" key. */
+function AppNav() {
+  const { workspace } = useWorkspace();
+  const apps = useApps();
+  const { byId } = useStatuses();
+  const key = useAppKey();
+  const open = apps.find((a) => a.key === key);
+  return (
+    <>
+      <nav aria-label="Apps" className="flex flex-col gap-0.5">
+        <span className="sidebar-group-label px-2 pb-1 text-xs text-faint">Apps</span>
+        {apps.map((watched) => {
+          const status = byId.get(watched.id)?.status;
+          return (
             <Link
-              key={watched.key}
-              to="/$app"
-              params={{ app: watched.key }}
-              className={`${navLink} ${watched.key === app ? "bg-selected font-bold" : ""}`}
-              title={watched.status.reason}
+              key={watched.id}
+              to="/$workspace/$app"
+              params={{ workspace: workspace.url_key, app: watched.key }}
+              className={`${navLink} ${watched.key === key ? "bg-selected font-bold" : ""}`}
+              title={status?.reason}
             >
               <Initial name={watched.name} square />
-              {watched.name}
-              <span className="ml-auto flex items-center">
-                <LevelDot level={watched.status.level} />
-              </span>
+              <span className="truncate">{watched.name}</span>
+              {status && (
+                <span className="ml-auto flex items-center">
+                  <LevelDot level={status.level} />
+                </span>
+              )}
             </Link>
-          ))}
-        </nav>
+          );
+        })}
+      </nav>
+      {open && (
         <nav aria-label="Views" className="flex flex-col gap-0.5">
-          <span className="sidebar-group-label px-2 pb-1 text-xs text-faint">
-            {apps?.find((a) => a.key === app)?.name ?? " "}
+          <span className="sidebar-group-label truncate px-2 pb-1 text-xs text-faint">
+            {open.name}
           </span>
           <Link
-            to="/$app"
-            params={params}
+            to="/$workspace/$app"
+            params={{ workspace: workspace.url_key, app: open.key }}
             activeOptions={{ exact: true }}
             className={navLink}
             title="Health (G then H)"
@@ -248,8 +479,8 @@ function Sidebar({ name, email }: { name: string; email: string }) {
             Health
           </Link>
           <Link
-            to="/$app/technical"
-            params={params}
+            to="/$workspace/$app/technical"
+            params={{ workspace: workspace.url_key, app: open.key }}
             className={navLink}
             title="Technical (G then T)"
           >
@@ -257,25 +488,86 @@ function Sidebar({ name, email }: { name: string; email: string }) {
             Technical
           </Link>
         </nav>
-      </div>
-      <div className="sidebar-footer mt-auto">
-        <AccountMenu name={name} email={email} />
-      </div>
-    </aside>
+      )}
+    </>
   );
 }
 
-function AccountMenu({ name, email }: { name: string; email: string }) {
+/** Settings take the sidebar's place, with a way back. */
+function SettingsNav() {
+  const { workspace } = useWorkspace();
+  const apps = useApps();
+  const router = useRouter();
+  const params = { workspace: workspace.url_key };
+  const back = lastAppPath ?? `/${workspace.url_key}`;
+  const backTo = apps.find((a) => back.split("/")[2] === a.key)?.name;
+  return (
+    <>
+      <a
+        href={back}
+        onClick={(event) => {
+          event.preventDefault();
+          router.history.push(back);
+        }}
+        className={`${navLinkBase} text-muted`}
+      >
+        <NavIcon icon={ArrowLeft} />
+        {backTo ? `Back to ${backTo}` : "Back"}
+      </a>
+      <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
+        <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
+        <Link to="/$workspace/settings/apps" params={params} className={navLink}>
+          <NavIcon icon={LayoutGrid} />
+          Apps
+        </Link>
+        <Link to="/$workspace/settings/members" params={params} className={navLink}>
+          <NavIcon icon={UsersRound} />
+          Members
+        </Link>
+      </nav>
+      <nav aria-label="Personal settings" className="flex flex-col gap-0.5">
+        <span className="px-2 pb-1 text-xs text-faint">You</span>
+        <Link to="/$workspace/settings/account" params={params} className={navLink}>
+          <NavIcon icon={UserRound} />
+          Account
+        </Link>
+      </nav>
+    </>
+  );
+}
+
+/** Workspaces grouped by where they live, in the order of the places. */
+function byPlace(entries: WorkspaceEntry[]) {
+  const groups: { first: WorkspaceEntry; entries: WorkspaceEntry[] }[] = [];
+  for (const entry of entries) {
+    const group = groups.find((g) => g.first.place.id === entry.place.id);
+    if (group) group.entries.push(entry);
+    else groups.push({ first: entry, entries: [entry] });
+  }
+  return groups;
+}
+
+function WorkspaceMenu() {
+  const { place, workspace } = useWorkspace();
+  const session = useSession();
+  const navigate = useNavigate();
+  const groups = byPlace(session.status === "signed-in" ? workspaceEntries(session.places) : []);
   const item =
     "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
+  const settings = (page: "apps" | "members") =>
+    void navigate({
+      to: `/$workspace/settings/${page}`,
+      params: { workspace: workspace.url_key },
+    });
+
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={`Account: ${name}`}
+        aria-label={`Workspace: ${workspace.name}`}
         className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover"
       >
-        <Initial name={name} />
-        <span className="truncate">{name}</span>
+        <Initial name={workspace.name} square />
+        <span className="truncate">{workspace.name}</span>
         <ChevronsUpDown
           size={15}
           strokeWidth={1.75}
@@ -284,12 +576,69 @@ function AccountMenu({ name, email }: { name: string; email: string }) {
         />
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start" side="top">
+        <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
           <Menu.Popup className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-            <div className="truncate px-2 py-1.5 text-xs text-faint">{email}</div>
-            <Menu.Item className={item} onClick={() => void signOut()}>
-              Sign out
+            {groups.map(({ first, entries }, index) => (
+              <Menu.Group key={first.place.id}>
+                <Menu.GroupLabel
+                  className={`truncate px-2 pb-1.5 text-xs text-faint ${index ? "pt-2" : "pt-1.5"}`}
+                >
+                  {/* In the browser there's one place, and the account names it. */}
+                  {first.place.kind === "here" ? first.me.user.email : placeName(first.place)}
+                </Menu.GroupLabel>
+                {entries.map((entry) => (
+                  <Menu.Item
+                    key={entry.key}
+                    className={item}
+                    onClick={() =>
+                      void navigate({ to: "/$workspace", params: { workspace: entry.key } })
+                    }
+                  >
+                    <Initial name={entry.workspace.name} square />
+                    <span className="truncate">{entry.workspace.name}</span>
+                    {entry.place === place && entry.workspace.id === workspace.id && (
+                      <Check
+                        size={15}
+                        strokeWidth={2}
+                        aria-label="Open"
+                        className="ml-auto shrink-0 text-muted"
+                      />
+                    )}
+                  </Menu.Item>
+                ))}
+              </Menu.Group>
+            ))}
+            <Menu.Separator className="my-1 h-px bg-line" />
+            <Menu.Item className={item} onClick={() => settings("apps")}>
+              Settings
             </Menu.Item>
+            {/* Only you are in a workspace on this Mac. */}
+            {place.kind !== "mac" && (
+              <Menu.Item className={item} onClick={() => settings("members")}>
+                Invite people
+              </Menu.Item>
+            )}
+            {isDesktop && (
+              <Menu.Item className={item} onClick={() => void navigate({ to: "/start" })}>
+                New workspace on this Mac…
+              </Menu.Item>
+            )}
+            {bundled && (
+              <Menu.Item className={item} onClick={() => void navigate({ to: "/login" })}>
+                Sign in to a server…
+              </Menu.Item>
+            )}
+            {place.kind !== "mac" && (
+              <Menu.Item
+                className={item}
+                onClick={async () => {
+                  await signOut(place);
+                  await navigate({ to: "/" });
+                }}
+              >
+                {place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out"}
+              </Menu.Item>
+            )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
