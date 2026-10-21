@@ -1204,6 +1204,10 @@ Known gaps:
 - **SET-10** A member connecting a service the workspace has no
   connection for MUST keep it on this Mac, and send nothing: the page
   says so above the settings.
+- **SET-11** Settings MUST end with the app's name and version ("Layer
+  0.1.0"), faint and small, under whichever page is open
+  (`studio/design/behaviour.md`, "Settings"). Its title says where a crash
+  is written.
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `integrations/mod.rs` (`require_https`); the

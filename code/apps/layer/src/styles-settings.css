@@ -30,5 +30,13 @@
 }
 .settings-shared dd.muted { color: var(--faint); }
 
+/* The last thing in Settings, on every page: "Layer 0.1.0" (SET-11). */
+.settings-version {
+  margin: 24px 0 0;
+  color: var(--faint);
+  font-size: var(--type-ui-small-size);
+  line-height: var(--type-ui-small-leading);
+}
+
 /* A member's look at what admins change: the controls, not to be used. */
 .settings-locked { border: 0; margin: 0; padding: 0; min-width: 0; }

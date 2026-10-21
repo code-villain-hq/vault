@@ -385,17 +385,6 @@ export function Settings() {
             </div>
             <ErrorMessage>{general.error}</ErrorMessage>
           </Field>
-          <Field
-            label="Version"
-            hint={
-              <>
-                Name this in a bug report. A crash is written to{" "}
-                <code>~/Library/Logs/villain-layer/panic.log</code>.
-              </>
-            }
-          >
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: "var(--type-ui-small-size)" }}>Layer {version ?? "…"}</div>
-          </Field>
           <Field label="Detected agents">
             <div className="col">
               {agents.map((a) => (
@@ -410,6 +399,14 @@ export function Settings() {
             </div>
           </Field>
         </>
+      )}
+
+      {/* Settings ends with the app's name and version, on every page
+          (SET-11, studio/design/behaviour.md). */}
+      {version && (
+        <p className="settings-version" title="Name this in a bug report. A crash is written to ~/Library/Logs/villain-layer/panic.log.">
+          Layer {version}
+        </p>
       )}
     </Modal>
   );
