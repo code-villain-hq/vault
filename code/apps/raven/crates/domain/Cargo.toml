@@ -1,0 +1,17 @@
+[package]
+name = "raven-domain"
+description = "Raven's data model and sync protocol, shared with the clients as generated TypeScript"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono.workspace = true
+code-villain-sync.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ts-rs.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true
