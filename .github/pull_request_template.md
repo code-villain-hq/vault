@@ -5,6 +5,8 @@ and authorship as they are. This one then shows as merged, or is closed with a
 link to the commit that landed.
 -->
 
+Fixes <!-- the Forge issue's ID, such as FOR-12, so Forge moves it to review and closes it on merge. Delete this line if there is none. -->
+
 ## What changes
 
 <!-- What a reader or user sees after this lands. -->
