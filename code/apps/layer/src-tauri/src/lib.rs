@@ -25,6 +25,7 @@ mod slack_bot;
 mod spec;
 mod target;
 mod theme;
+mod workspace;
 
 use commands::AppState;
 use config::ConfigStore;
@@ -157,6 +158,10 @@ pub fn run() {
                 slack_bot: Default::default(),
             };
             app.manage(state);
+            // The workspace's Postgres and server, in the background (PROF-11).
+            app.manage(workspace::ThisMac::new());
+            workspace::attach(handle);
+            handle.state::<workspace::ThisMac>().resume(handle.clone());
             profiles::show_identity(handle);
             // The profiles that were open with this one last time (PROF-7).
             if !others.is_empty() {
@@ -406,6 +411,9 @@ pub fn run() {
             commands::rename_profile,
             commands::set_profile_colour,
             commands::delete_profile,
+            commands::workspace_place,
+            commands::take_setup_writes,
+            commands::apply_setup,
         ])
         .build(context)
         // guard: allow panic — startup, before any agent exists; without a window there is nothing to run.
@@ -435,6 +443,12 @@ pub fn run() {
                 // waits for.
                 let _ = state.runs.flush();
                 let _ = closing.join();
+                // After the agents, which write notes as they finish: the
+                // server, then its Postgres (PROF-11).
+                let this_mac = app.state::<workspace::ThisMac>();
+                tauri::async_runtime::block_on(async {
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(15), this_mac.stop()).await;
+                });
             }
         });
 }

@@ -249,6 +249,7 @@ build does the same.
 | `src-tauri/src/integrations/` | Jira, GitHub and Slack HTTP clients |
 | `src-tauri/src/secrets.rs` | tokens in the keychain |
 | `src-tauri/src/profiles.rs`, `profiles/` | profiles (§25): which one this process is, its lock, the registry `profiles.json`, launching another copy |
+| `src-tauri/src/workspace.rs`, `workspace/`, `config/shared.rs` | each profile's workspace (§25): its Postgres and server, the one-time move, what a change queues for it and what it sends back; `src/lib/workspace-sync.ts` is the window's sync client |
 | `src-tauri/src/shellenv.rs` | the login shell's environment, for spawned processes |
 | `src/App.tsx` | the shell and the top bar (views as tabs, app-wide tools) |
 | `src/theme.css`, `src/design/` | the studio's colour, code, type and radius names, from the vault's `studio/design/tokens` (`bun run design:sync`; never edit `src/design/` by hand) |

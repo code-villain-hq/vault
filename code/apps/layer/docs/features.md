@@ -1181,7 +1181,7 @@ Known gaps:
 
 | Where | What |
 |---|---|
-| `~/Library/Application Support/eu.codevillain.villain-layer/` | `config.json`: repos, tasks, settings, saved panes, the Slack threads handed to chats (BOT-4). `messages.json`: the message center (MSG-4). `notes.json`: repo notes (MEM-7). `runs.json`: the run log (RUN-5). At agent launch also `.mcp.json` (0600), `claude-hooks.json`, `copilot-plugin/`, `opencode-plugin.js` |
+| `~/Library/Application Support/eu.codevillain.villain-layer/` | `config.json`: repos, tasks, settings, saved panes, the Slack threads handed to chats (BOT-4). `messages.json`: the message center (MSG-4). `notes.json`: this Mac's copy of the repo notes (MEM-7). `runs.json`: the run log (RUN-5). `postgres/`: the workspace's Postgres, its data, password and binaries (PROF-11). At agent launch also `.mcp.json` (0600), `claude-hooks.json`, `copilot-plugin/`, `opencode-plugin.js` |
 | Keychain, service `eu.codevillain.villain-layer` | one item holding every token, paired phones' included (PHONE-3), and the passwords of the browser's saved sign-ins (BRW-18) |
 | `~/.villain-worktrees/` (settable) | task folders, `_chat/` rooms, and `.repos/`: the app's own copy of each repo (REPO-4) |
 | a task folder | the worktrees, `AGENTS.md` and `CLAUDE.md` (task context), `TICKET.md` (PANE-13), `.spec-drafts/`: spec drafts, what was approved, and checks (SPEC-2, SPEC-6, SPEC-15), `.mcp.json`, and `.gemini/settings.json`, `PR_DESCRIPTION.md`, `PR_FEEDBACK.md`, and hand-offs too long to type (`CONFLICTS.md`, `REVIEW_COMMENTS.md`, `PR_DRAFT_REQUEST.md`, `FIRST_PROMPT.md`, `CHECKS.md` (LOOP-6), PANE-11) as they come up |
@@ -1292,9 +1292,10 @@ the Repos view has a Notes list, to read, edit, check and delete them.
   was written and last checked, where it came from, and whether its paths
   changed since. Each can be edited (which counts as checking it), marked
   checked, or deleted, and a note can be added by hand.
-- **MEM-7** Notes MUST live in `notes.json` beside `config.json`, never in
-  `config.json` itself. At most 50 per repository and 500 characters per
-  note; `remember` past either says so rather than dropping the oldest.
+- **MEM-7** Notes MUST be kept in the workspace (PROF-11), and this Mac's
+  copy of them in `notes.json` beside `config.json`, never in `config.json`
+  itself. At most 50 per repository and 500 characters per note;
+  `remember` past either says so rather than dropping the oldest.
   A note belongs to the repository, not to its registration: notes are
   kept by where the repository fetches from (its `origin`, `git@host:a/b`
   and `https://host/a/b.git` alike; the clone's path when it has none), so
@@ -2572,83 +2573,131 @@ Known gaps:
 
 ---
 
-## 25. Profiles
+## 25. Workspaces
 
-A profile is a whole Layer of its own: its repositories, tasks, settings,
-connections and tokens. Like a vault in Obsidian, each open profile has a
+A workspace is a whole Layer of its own: its repositories, tasks, settings,
+connections and tokens. Like a vault in Obsidian, each open workspace has a
 window of its own. Here that window is its own copy of the app, with its own
-Dock icon, so a profile for work and one for your own projects run side by
-side and never see each other.
+Dock icon, so a workspace for work and one for your own projects run side by
+side and never see each other. Workspaces were called profiles until 0.11;
+the code and the files on disk still say profile.
 
-The profile button at the foot of the task list names the window's profile.
-Its menu lists every profile and says which are open. Choosing one opens it
-in a new window, or brings forward the window it already has. The menu also
-makes a new profile, and renames or deletes one.
+A workspace keeps its shared setup the way the studio's other apps keep
+theirs: on Postgres, through the studio's sync engine, so the same setup can
+later live on a Layer server and be shared by a team. On this Mac, the app
+runs that Postgres and Layer's server itself, one of each per workspace.
+What is shared: the repositories, by where each fetches from, with their
+group, check command, spec settings and how branches update; where Jira,
+GitHub, Slack and Grafana are and how they are used; the S3 log sources;
+the models each agent offers; repo notes (§16). What stays on this Mac:
+tasks, checkouts, panes, runs, messages, where each clone is, the UI's
+preferences, the phone, the browser, and what is one person's own: tokens,
+the Jira email, Slack's notify switches, the Slack bot, a log source's AWS
+profile.
 
-- **PROF-1** A profile MUST keep apart everything the app saves:
+The workspace button at the foot of the task list names the window's
+workspace. Its menu lists every workspace on this Mac and says which are
+open. Choosing one opens it in a new window, or brings forward the window it
+already has. The menu also makes a new workspace, and renames or deletes
+one.
+
+- **PROF-1** A workspace MUST keep apart everything the app saves:
   `config.json` (repositories, tasks, settings, connections, saved panes),
   the message center, repo notes, the run log, the browser's Chrome profile,
   the files given to agents (`.mcp.json`, the hooks), and its tokens, in a
-  keychain item of its own. Nothing one profile does may show in another: a
-  ticket, a token or a banner of one profile in another's window is the
+  keychain item of its own. Nothing one workspace does may show in another: a
+  ticket, a token or a banner of one workspace in another's window is the
   failure this area exists to prevent.
-- **PROF-2** Each open profile MUST be its own process, with its own window
+- **PROF-2** Each open workspace MUST be its own process, with its own window
   and Dock icon. Quitting one stops only its agents, and a crash in one
   leaves the others running. Release builds abort on a panic, so in one
-  shared process a fault in one profile would take every profile's agents
+  shared process a fault in one workspace would take every workspace's agents
   down.
-- **PROF-3** A profile MUST NOT be open in two copies at once. Opening one
+- **PROF-3** A workspace MUST NOT be open in two copies at once. Opening one
   that is open brings its window to the front instead. Two copies over one
   `config.json` each write the whole file back and erase each other's
   tasks (DISK-3). A lock held for the life of the copy decides, so a copy
-  that crashed does not leave its profile locked.
-- **PROF-4** The profile there before profiles existed MUST be the first
-  profile, "Default", with its files, tokens and task folders where they
+  that crashed does not leave its workspace locked.
+- **PROF-4** The workspace there before workspaces existed MUST be the first
+  workspace, "Default", with its files, tokens and task folders where they
   were: nothing is moved or entered again. Its folder is the config folder
-  itself; another profile's is `profiles/<id>/` under it, and its keychain
+  itself; another workspace's is `profiles/<id>/` under it, and its keychain
   item's service is the app's identifier with `.profile.<id>` on the end.
-- **PROF-5** A new profile MUST start empty: no repositories, tasks,
+- **PROF-5** A new workspace MUST start empty: no repositories, tasks,
   connections or tokens. Its task folders default to
   `~/.villain-worktrees-<id>`, and it goes back to that, not to another
-  profile's location, when the setting is cleared. Clean up (REPO-8)
-  treats what any other profile still uses as in use, so two profiles
+  workspace's location, when the setting is cleared. Clean up (REPO-8)
+  treats what any other workspace still uses as in use, so two workspaces
   pointed at one location do not delete each other's task folders.
-- **PROF-6** Each window MUST say which profile it is: the profile button
-  says it always. Once there is more than one profile, so do the window's
+- **PROF-6** Each window MUST say which workspace it is: the workspace button
+  says it always. Once there is more than one workspace, so do the window's
   title (the Window menu, Mission Control, the Dock icon's menu), a
-  banner's title, which starts with the profile's name, and the Dock icon,
-  which carries the profile's initial on its colour (PROF-10). A window
-  brought forward reads the profiles again, so a profile created, renamed
+  banner's title, which starts with the workspace's name, and the Dock icon,
+  which carries the workspace's initial on its colour (PROF-10). A window
+  brought forward reads the workspaces again, so a workspace created, renamed
   or recoloured in another window shows without a restart.
 - **PROF-7** Launching the app while no copy is running (the Dock, Finder,
-  Spotlight, logging in) MUST open the profiles that were open when it
-  last went away: the last profile to quit, those that quit within 30
+  Spotlight, logging in) MUST open the workspaces that were open when it
+  last went away: the last workspace to quit, those that quit within 30
   seconds before it, and any whose copy never quit, because it crashed or
-  was killed. So quitting one profile while others stay open leaves it
+  was killed. So quitting one workspace while others stay open leaves it
   closed next time, and logging out with two open reopens both. The first
-  launch opens Default. A launch naming a profile (`--profile <id>`)
+  launch opens Default. A launch naming a workspace (`--profile <id>`)
   opens only that one.
-- **PROF-8** A profile's name MUST be 1–40 characters and unique, ignoring
+- **PROF-8** A workspace's name MUST be 1–40 characters and unique, ignoring
   case. Its id is made from the name once, when it is created, and never
   changes: renaming changes the name only, so nothing on disk moves. An id
   from outside the app is only ever used after it is found among the
-  profiles, so it can never name a folder outside them.
-- **PROF-9** Deleting a profile MUST remove its folder (settings, logs, the
+  workspaces, so it can never name a folder outside them.
+- **PROF-9** Deleting a workspace MUST remove its folder (settings, logs, the
   browser's profile) and its keychain item, after asking. It MUST refuse
-  Default, and a profile that is open. Its task folders stay on disk,
+  Default, and a workspace that is open. Its task folders stay on disk,
   since they can hold uncommitted work, and the question says where they
   are.
-- **PROF-10** A profile's colour MUST be one of eight, the same in the
-  sidebar and on the Dock icon. Clicking a profile's initial in Manage
-  profiles offers the eight; the choice is kept with the profile. Until
-  one is chosen it is one of the first six, picked from the profile's id,
-  so it never changes by itself, not when the profile is renamed and not
+- **PROF-10** A workspace's colour MUST be one of eight, the same in the
+  sidebar and on the Dock icon. Clicking a workspace's initial in Manage
+  workspaces offers the eight; the choice is kept with the workspace. Until
+  one is chosen it is one of the first six, picked from the workspace's id,
+  so it never changes by itself, not when the workspace is renamed and not
   when more colours are added.
+
+- **PROF-11** Each workspace MUST keep its shared setup in a Postgres of its
+  own, in `postgres/` in its folder, run by the app on loopback beside
+  Layer's server, which takes no sign-ins and only the app's session (one
+  made fresh at each launch). Both start in the background when the window
+  opens, and stop when the app quits, after its agents: the server first,
+  then Postgres. Each open workspace runs its own, so PROF-1 and PROF-2
+  hold for them too. A workspace whose Postgres does not start still
+  opens, works from its last copy (PROF-13) and says why.
+- **PROF-12** The first launch of a workspace from before 0.11 MUST move its
+  shared setup into its workspace once: each repository that fetches from
+  somewhere (one record for several clones of it), the connections'
+  shared settings, the log sources, the agents' models and the repo notes.
+  `config.json` and `notes.json` are copied aside first, as
+  `config.json.v2` and `notes.json.v2`. Nothing on this Mac changes: the
+  repositories' paths and ids, tasks, panes, tokens. A record the workspace
+  refuses is named, and stays on this Mac as it was. A repository with no
+  `origin`, and its notes, stay on this Mac only.
+- **PROF-13** The app MUST work from its last copy of the shared setup,
+  kept in `config.json` and `notes.json`, before the window has loaded and
+  whenever the workspace cannot be reached: agents restore, tasks start,
+  notes reach task context. A change to the shared setup made meanwhile,
+  by the user or an agent (`remember`, a model an agent offered), is kept
+  and sent once the workspace can be reached, in the order it was made. A
+  change the workspace refuses says why, and is undone here too; a
+  repository added here stays, since its clone is this Mac's.
+- **PROF-14** A change to the shared setup that the workspace sends MUST
+  reach `config.json` and `notes.json` without touching what is this
+  Mac's: a repository's path, the app's copy, its tasks; a connection's
+  email and switches; a log source's AWS profile.
 
 Code: `profiles.rs` (the registry `profiles.json`, the lock, choosing what
 to open at launch, launching a copy), `profiles/mac.rs` (bringing another
 copy forward, the Dock icon), `commands/profiles.rs`,
-`sidebar/ProfileMenu.tsx`.
+`sidebar/ProfileMenu.tsx`; the workspace: `workspace.rs` (Postgres and the
+server, PROF-11), `workspace/moving.rs` (PROF-12), `config/shared.rs`
+(what a change sends, PROF-13), `workspace/mirror.rs` (what the workspace
+sends, PROF-14), `lib/workspace-sync.ts` (the window's sync client).
 
 Known gaps:
 - The agent CLIs keep their own sign-ins in the home folder (Claude Code's
@@ -2660,6 +2709,12 @@ Known gaps:
   events between them (§24).
 - Installing an update replaces the app under every open profile, and all
   of them quit. The next launch reopens them (PROF-7).
+- A workspace lives only on this Mac: one on a Layer server, shared with a
+  team, signed in to with Code Villain, comes next. Until then nothing
+  else writes to a workspace. A repository removed from one elsewhere
+  will stay here.
+- Renaming a workspace renames it in the menu and the window; its server
+  keeps the first name, which nothing shows yet.
 
 ---
 

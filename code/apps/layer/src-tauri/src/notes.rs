@@ -9,6 +9,10 @@
 //! instructions. So each one carries the commit it was last checked at and
 //! the paths it is about, and whoever reads it is told what changed since.
 //!
+//! Notes belong to the workspace (MEM-7): once they are in one, each change
+//! is queued for it as `config.json`'s shared setup is (`config/shared.rs`),
+//! and what the workspace sends replaces them (`replace`).
+//!
 //! In `notes.json`, beside `config.json` and never in it. Notes change a
 //! few times a week, always from blocking work, so each change is written
 //! whole straight away rather than by a writer thread as `messages.rs` does.
@@ -17,6 +21,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::shared::{diff, Records, Sent, NOTE};
 use crate::error::{Error, Result};
 
 /// A repository with more than this many notes has stopped curating them.
@@ -101,6 +106,10 @@ fn clean_paths(paths: &[String]) -> Result<Vec<String>> {
 #[derive(Default, Debug)]
 struct Book {
     notes: Vec<Note>,
+    /// In a workspace (PROF-12): changes are queued in `outbox` for it.
+    shared: bool,
+    /// Changes the window's sync client has not taken yet, oldest first.
+    outbox: Vec<serde_json::Value>,
 }
 
 impl Book {
@@ -114,7 +123,7 @@ impl Book {
             )));
         }
         let note = Note {
-            id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
+            id: uuid::Uuid::now_v7().to_string(),
             repo: new.repo,
             text,
             paths,
@@ -172,8 +181,35 @@ impl Book {
     fn to_json(&self) -> Result<Vec<u8>> {
         Ok(serde_json::to_vec_pretty(&serde_json::json!({
             "version": VERSION,
+            "shared": self.shared,
+            "outbox": self.outbox,
             "notes": self.notes,
         }))?)
+    }
+
+    /// The notes as the workspace's records. Not those of a repository with
+    /// no `origin`, kept by its path: like it, they stay on this Mac.
+    fn records(&self) -> Records {
+        let mut out = Records::new();
+        if !self.shared {
+            return out;
+        }
+        for n in self.notes.iter().filter(|n| syncs(n)) {
+            let serde_json::Value::Object(data) = serde_json::json!({
+                "repo": n.repo,
+                "text": n.text,
+                "paths": n.paths,
+                "source": n.source,
+                "written_commit": n.written_commit,
+                "written_at": time(n.written_at),
+                "checked_at": time(n.checked_at),
+                "checked_commit": n.checked_commit,
+            }) else {
+                continue;
+            };
+            out.insert((NOTE, n.id.clone()), data);
+        }
+        out
     }
 
     /// `None` when the file is not a notebook at all; a single note this
@@ -186,7 +222,9 @@ impl Book {
             .iter()
             .filter_map(|n| serde_json::from_value(n.clone()).ok())
             .collect();
-        Some(Self { notes })
+        let shared = value.get("shared").and_then(serde_json::Value::as_bool).unwrap_or(false);
+        let outbox = value.get("outbox").and_then(serde_json::Value::as_array).cloned().unwrap_or_default();
+        Some(Self { notes, shared, outbox })
     }
 }
 
@@ -240,12 +278,80 @@ impl Notes {
     /// Make a change and write the whole notebook, under one lock so two
     /// changes never write over each other. Blocking: called only from
     /// `commands::blocking`.
+    ///
+    /// In a workspace, what changed is queued for it (PROF-13).
     fn change<T>(&self, f: impl FnOnce(&mut Book, i64) -> Result<T>) -> Result<T> {
         let mut book = self.book.lock();
+        let before = book.records();
         let out = f(&mut book, chrono::Utc::now().timestamp_millis())?;
+        let (ops, refused) = diff(&before, &book.records());
+        let sent = Sent { queued: ops.len(), refused };
+        book.outbox.extend(ops);
         crate::config::write_whole(&self.path, &book.to_json()?)?;
+        drop(book);
+        crate::workspace::wrote(sent);
         Ok(out)
     }
+
+    /// The move (PROF-12): the notes go into the workspace. Ids become
+    /// uuids, as the workspace names records. Again after `unshare`.
+    pub fn share(&self) -> Result<()> {
+        self.change(|book, _| {
+            for n in book.notes.iter_mut().filter(|n| uuid::Uuid::parse_str(&n.id).is_err()) {
+                n.id = uuid::Uuid::now_v7().to_string();
+            }
+            book.shared = true;
+            Ok(())
+        })
+    }
+
+    /// Out of a workspace that is gone, with nothing left queued for it.
+    pub fn unshare(&self) -> Result<()> {
+        let mut book = self.book.lock();
+        book.shared = false;
+        book.outbox.clear();
+        crate::config::write_whole(&self.path, &book.to_json()?)
+    }
+
+    /// What is queued for the workspace, handed over and no longer kept.
+    pub fn take_writes(&self) -> Result<Vec<serde_json::Value>> {
+        let mut book = self.book.lock();
+        if book.outbox.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ops = std::mem::take(&mut book.outbox);
+        crate::config::write_whole(&self.path, &book.to_json()?)?;
+        Ok(ops)
+    }
+
+    /// The workspace's notes, in place of these (PROF-14). Not while changes
+    /// made here are still on their way, which the workspace has not seen:
+    /// `None`. Otherwise whether anything changed.
+    pub fn replace(&self, notes: Vec<Note>) -> Result<Option<bool>> {
+        let mut book = self.book.lock();
+        if !book.shared || !book.outbox.is_empty() {
+            return Ok(None);
+        }
+        let mut next: Vec<Note> = book.notes.iter().filter(|n| !syncs(n)).cloned().collect();
+        next.extend(notes);
+        let same = next.len() == book.notes.len() && next.iter().all(|n| book.notes.contains(n));
+        if same {
+            return Ok(Some(false));
+        }
+        book.notes = next;
+        crate::config::write_whole(&self.path, &book.to_json()?)?;
+        Ok(Some(true))
+    }
+}
+
+/// Whether a note goes to the workspace: not one kept by a clone's path.
+fn syncs(note: &Note) -> bool {
+    !note.repo.starts_with('/')
+}
+
+/// Unix milliseconds as the workspace writes times.
+fn time(ms: i64) -> Option<String> {
+    chrono::DateTime::from_timestamp_millis(ms).map(|t| t.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
 }
 
 /// Say the notes changed, so an open Repos view reads them again. For a

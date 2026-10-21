@@ -2,6 +2,8 @@
  * Profiles (§25), as `commands/profiles.rs` sends them. A file of its own:
  * `types.ts` is at its size ceiling.
  */
+import type { Schema } from "@layer/types";
+
 export interface ProfileView {
   id: string;
   name: string;
@@ -13,4 +15,29 @@ export interface ProfileView {
   worktree_root: string;
   /** Its colour, `--profile-<n>`, as on its Dock icon (PROF-6). */
   colour: number;
+}
+
+/** Where the window's sync client finds this workspace (PROF-11). */
+export interface WorkspacePlace {
+  origin: string;
+  token: string;
+  user_id: string;
+  workspace_id: string;
+}
+
+/** How `apply_setup` went (PROF-14). */
+export interface SetupApplied {
+  /** False while changes made here are on their way: send them, then again. */
+  applied: boolean;
+  /** The repositories or settings changed, so read them again. */
+  setup: boolean;
+}
+
+/** The workspace's records, as the window's sync client holds them. */
+export interface SetupSnapshot {
+  repositories: Schema["Repository"]["record"][];
+  connections: Schema["Connection"]["record"][];
+  log_sources: Schema["LogSource"]["record"][];
+  agent_models: Schema["AgentModel"]["record"][];
+  notes: Schema["Note"]["record"][];
 }

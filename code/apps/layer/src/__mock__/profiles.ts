@@ -22,6 +22,10 @@ export function profileAnswers() {
     profiles.some((p) => p.id !== except && p.name.toLowerCase() === name.trim().toLowerCase());
   return {
     list_profiles: () => structuredClone(profiles),
+    // The harness has no workspace server: the window works without one.
+    workspace_place: () => null,
+    take_setup_writes: () => [],
+    apply_setup: () => ({ applied: true, setup: false }),
     open_profile: (a: Record<string, unknown>) => {
       find(a.id).open = true;
       return null;
@@ -29,7 +33,7 @@ export function profileAnswers() {
     create_profile: (a: Record<string, unknown>) => {
       const name = String(a.name).trim();
       if (!name || name.length > 40) throw new Error("A profile's name is 1 to 40 characters.");
-      if (taken(name)) throw new Error(`There is a profile called ${name} already.`);
+      if (taken(name)) throw new Error(`There is a workspace called ${name} already.`);
       const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "profile";
       const made: ProfileView = { id, name, open: true, current: false, worktree_root: `/Users/you/.villain-worktrees-${id}`, colour: profiles.length % 6 };
       profiles.push(made);
@@ -43,7 +47,7 @@ export function profileAnswers() {
     },
     rename_profile: (a: Record<string, unknown>) => {
       const name = String(a.name).trim();
-      if (taken(name, String(a.id))) throw new Error(`There is a profile called ${name} already.`);
+      if (taken(name, String(a.id))) throw new Error(`There is a workspace called ${name} already.`);
       find(a.id).name = name;
       changed();
       return null;

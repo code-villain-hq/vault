@@ -22,9 +22,9 @@ Every app except Caster, the theme and the site is built the same way:
 - One sync engine. Each client keeps a local copy of a workspace and works on it offline.
 - A desktop app that runs on its own, with no server. It starts its own server on its own Postgres for the workspaces on that Mac.
 
-The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge, Glyph and Raven use it; Layer still keeps its state in local files.
+The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge, Glyph and Raven use it. Layer uses it for the setup a team shares: its desktop app keeps that in a workspace, and the rest of its state in local files.
 
-The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge, Glyph and Raven have it (`apps/desktop/src-tauri/src/this_mac.rs`).
+The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge, Glyph and Raven have it (`apps/desktop/src-tauri/src/this_mac.rs`), and Layer, one per profile (`src-tauri/src/workspace.rs`).
 
 ## Signing in with Code Villain
 

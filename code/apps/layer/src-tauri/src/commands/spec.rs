@@ -579,6 +579,8 @@ mod tests {
                 update_by: None,
                 spec_folder: None,
                 specs_in_app: !in_repo,
+                remote: None,
+                repository_id: None,
                 check: None,
             },
             folder: folder.into(),
