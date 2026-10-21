@@ -1,6 +1,6 @@
 # App window
 
-The frame Forge uses, and Glyph and Raven with it: a sidebar and a top bar that control the content. Layer keeps a full-width top bar instead; see [Layer's exception](#layers-exception). It follows [`../principles.md`](../principles.md) (chrome dims, content leads; tone, not lines) and uses the controls in [`../components.md`](../components.md).
+The frame Forge uses, and Glyph, Raven and Layer's web app with it: a sidebar and a top bar that control the content. Layer's desktop window keeps a full-width top bar instead; see [Layer's exception](#layers-exception). It follows [`../principles.md`](../principles.md) (chrome dims, content leads; tone, not lines) and uses the controls in [`../components.md`](../components.md).
 
 ## Regions
 
@@ -53,8 +53,8 @@ and one task list better than a sidebar of views.
   beside them clashed with them.
 - The frame's status ([`../behaviour.md`](../behaviour.md#errors)) sits in
   the top bar, left of the tools, since Layer has no sidebar foot. Layer
-  has no sync, so it says only what failed in the background, and nothing
-  while all is well.
+  syncs only the setup its workspace shares, in the background, so it says
+  only what failed, and nothing while all is well.
 - Below the bar, Work's task list runs down the left in `bg`, with the
   profile at its foot, as the sidebar does in Forge. Every view, Work's
   included, is an inset `panel` with `radius-lg`.
