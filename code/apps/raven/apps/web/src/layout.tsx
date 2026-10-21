@@ -285,7 +285,7 @@ export function NotAvailableOffline({
         <div className="mx-auto flex max-w-sm flex-col items-center gap-3 py-16 text-center">
           <h2 className="font-medium">Not available offline</h2>
           <p className="text-muted">
-            {what} comes from {placeWords(place)}. It shows again once Raven reaches it.
+            Raven reads {what} live from {placeWords(place)}, and can't reach it right now.
           </p>
           <Button variant="secondary" onClick={onRetry}>
             Check again

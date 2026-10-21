@@ -113,7 +113,7 @@ function HealthBody({ health }: { health: Health }) {
           >
             Settings › Apps
           </Link>{" "}
-          and points its OpenTelemetry exporter at Raven.
+          and {isAdmin ? "point" : "points"} its OpenTelemetry exporter at Raven.
         </p>
       )}
 
