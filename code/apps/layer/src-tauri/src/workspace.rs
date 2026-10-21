@@ -146,7 +146,7 @@ async fn serve(app: &AppHandle, postgres: &LocalPostgres) -> std::result::Result
         state = state.allowing_origin("http://localhost:1420");
     }
     let server = LocalServer::spawn(SERVER_PORT, |listener, shutdown| {
-        layer_server::serve(state, None, listener, shutdown)
+        layer_server::serve(state, layer_server::Web::None, listener, shutdown)
     })
     .await
     .map_err(|e| e.to_string())?;

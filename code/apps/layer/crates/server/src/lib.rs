@@ -18,6 +18,6 @@ mod serve;
 pub mod state;
 pub mod ws;
 
-pub use routes::{app, router};
+pub use routes::{Web, app, router};
 pub use serve::serve;
 pub use state::AppState;

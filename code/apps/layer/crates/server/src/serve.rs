@@ -1,12 +1,12 @@
 use std::future::{Future, IntoFuture};
 use std::net::SocketAddr;
-use std::path::Path;
 use std::time::Duration;
 
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinSet;
 
+use crate::routes::Web;
 use crate::{AppState, app};
 
 /// How long open connections (live feeds above all) get to finish once
@@ -17,7 +17,7 @@ const GRACE: Duration = Duration::from_secs(3);
 /// resolves. The server binary and the desktop app both start it this way.
 pub async fn serve(
     state: AppState,
-    web_dir: Option<&Path>,
+    web: Web<'_>,
     listener: TcpListener,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
@@ -29,7 +29,7 @@ pub async fn serve(
     ));
 
     // With each connection's address, for limits per client.
-    let service = app(state, web_dir).into_make_service_with_connect_info::<SocketAddr>();
+    let service = app(state, web).into_make_service_with_connect_info::<SocketAddr>();
     let (stopping, stopped) = oneshot::channel();
     let server = axum::serve(listener, service)
         .with_graceful_shutdown(async move {

@@ -78,7 +78,7 @@ async fn serve_answers_and_stops_when_asked(pool: PgPool) {
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(layer_server::serve(
         common::state(pool.clone()).on_this_mac(),
-        None,
+        layer_server::Web::None,
         listener,
         async {
             let _ = stopped.await;

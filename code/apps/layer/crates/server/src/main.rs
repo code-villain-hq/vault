@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
             };
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
-            layer_server::serve(state, config.web_dir.as_deref(), listener, async {
+            layer_server::serve(state, config.web(), listener, async {
                 let _ = tokio::signal::ctrl_c().await;
             })
             .await?;
