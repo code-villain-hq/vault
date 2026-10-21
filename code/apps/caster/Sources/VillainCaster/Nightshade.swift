@@ -24,6 +24,8 @@ enum Nightshade {
     static let highlight = color(\.fg, alpha: ColorTokens.Opacity.highlightTint)
     /// The field's focus glow: `accent` at 22%.
     static let focusGlow = color(\.accent, alpha: 0.22)
+    /// A problem's text: `status-danger-ink`.
+    static let dangerInk = color(\.statusDangerInk)
 
     static func isNight(_ appearance: NSAppearance) -> Bool {
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
