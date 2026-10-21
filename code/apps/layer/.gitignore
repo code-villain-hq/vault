@@ -29,3 +29,6 @@ dist-ssr
 # Claude Code's per-agent worktrees and personal settings.
 .claude/worktrees/
 .claude/settings.local.json
+
+# Cargo builds here for the whole workspace: the app and the server.
+/target/

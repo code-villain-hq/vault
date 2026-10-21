@@ -112,7 +112,7 @@ async function draft() {
   run(["bun", "run", "check"]);
   run(["bun", "tauri", "build", "--bundles", "app,dmg"], { env });
 
-  const bundle = "src-tauri/target/release/bundle";
+  const bundle = "target/release/bundle";
   if (signing === "developer-id") {
     // What a Mac that downloads it will check.
     const app = `${bundle}/macos/Layer.app`;
