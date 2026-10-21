@@ -177,9 +177,13 @@ impl OidcLogin {
     /// An issuer without the rest is a mistake, not a reason to leave
     /// passwords open.
     pub fn from_env() -> anyhow::Result<Option<Self>> {
+        Self::from_settings(|name| std::env::var(name).ok())
+    }
+
+    /// [`Self::from_env`], with the settings looked up by `setting`.
+    fn from_settings(setting: impl Fn(&str) -> Option<String>) -> anyhow::Result<Option<Self>> {
         let var = |name: &str| {
-            std::env::var(name)
-                .ok()
+            setting(name)
                 .map(|v| v.trim().to_string())
                 .filter(|v| !v.is_empty())
         };
@@ -191,9 +195,21 @@ impl OidcLogin {
             var("FORGE_OIDC_CLIENT_SECRET"),
             var("FORGE_PUBLIC_URL"),
         ) else {
-            bail!(
-                "FORGE_OIDC_ISSUER is set: also set FORGE_OIDC_CLIENT_ID, FORGE_OIDC_CLIENT_SECRET and FORGE_PUBLIC_URL"
-            );
+            let missing: Vec<&str> = [
+                "FORGE_OIDC_CLIENT_ID",
+                "FORGE_OIDC_CLIENT_SECRET",
+                "FORGE_PUBLIC_URL",
+            ]
+            .into_iter()
+            .filter(|name| var(name).is_none())
+            .collect();
+            let missing = match missing.as_slice() {
+                [rest @ .., last] if !rest.is_empty() => {
+                    format!("{} and {last}", rest.join(", "))
+                }
+                _ => missing.join(""),
+            };
+            bail!("FORGE_OIDC_ISSUER is set: also set {missing}");
         };
         Self::new(issuer, client_id, client_secret, &public_url).map(Some)
     }
@@ -703,5 +719,49 @@ mod tests {
         let code = login.hand_off(user, challenge);
         assert_eq!(login.take(&code, "the app's secret"), Some(user));
         assert_eq!(login.take(&code, "the app's secret"), None);
+    }
+
+    #[test]
+    fn half_set_up_names_only_the_missing_settings() {
+        let settings = |set: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                set.iter()
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| value.to_string())
+            }
+        };
+        let error = |set| {
+            OidcLogin::from_settings(settings(set))
+                .err()
+                .unwrap()
+                .to_string()
+        };
+
+        assert_eq!(
+            error(&[
+                ("FORGE_OIDC_ISSUER", "https://id.example"),
+                ("FORGE_OIDC_CLIENT_ID", "forge"),
+                ("FORGE_PUBLIC_URL", "https://forge.example"),
+            ]),
+            "FORGE_OIDC_ISSUER is set: also set FORGE_OIDC_CLIENT_SECRET"
+        );
+        assert_eq!(
+            error(&[
+                ("FORGE_OIDC_ISSUER", "https://id.example"),
+                ("FORGE_OIDC_CLIENT_SECRET", " "),
+            ]),
+            "FORGE_OIDC_ISSUER is set: also set FORGE_OIDC_CLIENT_ID, FORGE_OIDC_CLIENT_SECRET and FORGE_PUBLIC_URL"
+        );
+        assert!(OidcLogin::from_settings(settings(&[])).unwrap().is_none());
+        assert!(
+            OidcLogin::from_settings(settings(&[
+                ("FORGE_OIDC_ISSUER", "https://id.example"),
+                ("FORGE_OIDC_CLIENT_ID", "forge"),
+                ("FORGE_OIDC_CLIENT_SECRET", "secret"),
+                ("FORGE_PUBLIC_URL", "https://forge.example"),
+            ]))
+            .unwrap()
+            .is_some()
+        );
     }
 }
