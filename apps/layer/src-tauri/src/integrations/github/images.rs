@@ -444,6 +444,7 @@ mod tests {
         let (number, owner, repo, host) = (parts[0].parse().unwrap(), parts[3], parts[2], parts[4]);
         let api_url = match host {
             "github.com" => "https://api.github.com".to_string(),
+            host if host.ends_with(".ghe.com") => format!("https://api.{host}"),
             host => format!("https://{host}/api/v3"),
         };
         let images: Vec<Image> = files
