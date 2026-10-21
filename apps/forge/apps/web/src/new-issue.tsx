@@ -4,6 +4,7 @@ import { PRIORITY_LABELS, useLabels, useTeamStates, useTeams, useUsers } from ".
 import { useDialogFocus } from "./dialog-focus";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { LabelChip } from "./issue-fields";
+import { MentionTextarea } from "./mentions";
 import { Picker } from "./picker";
 import { Button } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
@@ -90,13 +91,16 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
   const [assigneeId, setAssigneeId] = useState(defaults.assigneeId ?? "");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [projectId, setProjectId] = useState(defaults.projectId ?? "");
+  // A half-typed mention or a file still uploading isn't created with the issue.
+  const [mentioning, setMentioning] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const team = teams.find((t) => t.id === teamId);
   const state = states.find((s) => s.id === stateId) ?? firstState;
   const parent = issues.find((i) => i.id === defaults.parentId);
 
   const create = () => {
-    if (!title.trim() || !team || !state) return;
+    if (!title.trim() || !team || !state || mentioning || uploading) return;
     sync.create("Issue", {
       team_id: team.id,
       title: title.trim(),
@@ -156,10 +160,13 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
           aria-label="Issue title"
           className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
-        <textarea
+        <MentionTextarea
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Add description… (Markdown)"
+          onChange={setDescription}
+          onMentioning={setMentioning}
+          onUploading={setUploading}
+          inlineSuggestions
+          placeholder="Add description… (Markdown, @ to mention)"
           aria-label="Description"
           rows={4}
           className="resize-none bg-transparent outline-none placeholder:text-faint"
@@ -247,7 +254,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
 
       <div className="flex items-center justify-end gap-3 px-4 py-3">
         <span className="text-xs text-faint">⌘↵ to create</span>
-        <Button type="submit" disabled={!title.trim() || !team}>
+        <Button type="submit" disabled={!title.trim() || !team || uploading}>
           Create issue
         </Button>
       </div>

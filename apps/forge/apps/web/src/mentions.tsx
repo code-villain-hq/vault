@@ -38,12 +38,27 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChan
    * focus, so the parent can save the text then and there.
    */
   onCommit?: (value: string) => void;
+  /**
+   * Shows the suggestions in the flow, pushing what follows down, for a field
+   * in a container that scrolls (a dialog) and would cut a floating list off.
+   */
+  inlineSuggestions?: boolean;
 };
 
 /** A textarea where "@" offers the workspace's people and agents. */
 export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
   function MentionTextarea(
-    { value, onChange, onMentioning, onUploading, onCommit, onKeyDown, onBlur, ...props },
+    {
+      value,
+      onChange,
+      onMentioning,
+      onUploading,
+      onCommit,
+      inlineSuggestions,
+      onKeyDown,
+      onBlur,
+      ...props
+    },
     ref,
   ) {
     const field = useRef<HTMLTextAreaElement>(null);
@@ -190,7 +205,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
           <div
             role="listbox"
             aria-label="People to mention"
-            className="absolute top-full left-0 z-20 mt-1 w-60 rounded-md bg-surface p-1"
+            className={`${inlineSuggestions ? "" : "absolute top-full left-0 z-20 "}mt-1 w-60 rounded-md bg-surface p-1`}
           >
             {matches.map((person, i) => (
               <div
