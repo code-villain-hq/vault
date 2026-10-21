@@ -1,7 +1,8 @@
-# `bun run check` for Layer on every push that touches it: the guard, the
-# app's tests, tsc and build, clippy, the app's and the server's Rust tests,
-# and the web app. It runs on the MacBook's runner (label `macos`), because
-# the app and its PTY tests are macOS-only.
+# `bun run check` for Layer on every push that touches it: the guard, design
+# copies up to date, the app's tests, tsc and build, rustfmt on the server,
+# clippy, the app's and the server's Rust tests, generated types up to date,
+# and the web app's Biome, tsc, tests and build. It runs on the MacBook's
+# runner (label `macos`), because the app and its PTY tests are macOS-only.
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a
 # pull request from someone else's fork would run their code there.
@@ -13,6 +14,8 @@ on:
     paths:
       - "code/apps/layer/**"
       - "code/kit/**"
+      - "studio/design/tokens/**"
+      - "studio/design/components.css"
       - ".forgejo/workflows/layer.yml"
 
 jobs:
