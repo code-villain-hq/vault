@@ -36,7 +36,13 @@ const steps: [string, () => Promise<unknown>][] = [
   // The kit's client, with its own settings: Biome checks only under its root.
   ["biome (sync kit)", () => $`${biome} check .`.cwd(kitClient)],
   ["biome (web kit)", () => $`${biome} check .`.cwd(kitWeb)],
-  ["tsc (web)", () => $`bunx tsc -p web --noEmit`.cwd(root)],
+  [
+    "tsc (web)",
+    async () => {
+      await $`bunx tsc -p web --noEmit`.cwd(root);
+      await $`bunx tsc -p web/tsconfig.test.json --noEmit`.cwd(root);
+    },
+  ],
   ["tsc (web kit)", () => $`bunx tsc -p ${kitWeb} --noEmit`.cwd(root)],
   [
     "bun test (web, sync kit)",

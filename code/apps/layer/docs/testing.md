@@ -21,7 +21,7 @@ Run before every commit. It stops at the first failure.
 | `cargo test` (server) | the server's, against Postgres (`bun run db`) |
 | generated types are current | `packages/types` matches `crates/domain` (`bun scripts/gen-types.ts`) |
 | Biome (web, sync kit) | the web app and the studio's sync client are linted and formatted |
-| `tsc` (web) | the web app type-checks |
+| `tsc` (web) | the web app type-checks, and its tests (`web/tsconfig.test.json`) |
 | `bun test` (web, sync kit) | the web app's tests, and the sync client's |
 | web build | the web app bundles, as the server serves it |
 
