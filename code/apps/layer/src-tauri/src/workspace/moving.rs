@@ -99,7 +99,7 @@ pub(super) fn move_in(state: &AppState, workspace: Uuid) -> crate::error::Result
                 p.remote = Some(remote);
             }
         }
-        c.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: workspace.to_string(), user_id: None });
+        c.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: workspace.to_string(), user_id: None, admin: false });
     })?;
     state.notes.share()
 }

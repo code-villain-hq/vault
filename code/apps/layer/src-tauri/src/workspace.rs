@@ -117,7 +117,9 @@ async fn start(app: &AppHandle) -> std::result::Result<(Option<Running>, Place),
     let state = app.state::<AppState>();
     // A workspace on a server runs nothing here (PROF-15).
     if let Some(at) = state.config.with(|c| c.shared.workspace.clone()).filter(|at| at.place != THIS_MAC) {
-        return server::place(at).await.map(|place| (None, place));
+        let place = server::place(at).await?;
+        learn_role(app.clone(), place.clone());
+        return Ok((None, place));
     }
     let folder = state.config.folder().join("postgres");
     let postgres = LocalPostgres::start(&folder, POSTGRES_PORT).await.map_err(|e| e.to_string())?;
@@ -169,6 +171,22 @@ async fn serve(app: &AppHandle, postgres: &LocalPostgres) -> std::result::Result
             Err(e)
         }
     }
+}
+
+/// Ask the server whether the person is the workspace's admin (SET-7), in
+/// the background: unreachable, the last answer stays.
+fn learn_role(app: AppHandle, place: Place) {
+    tauri::async_runtime::spawn(async move {
+        let Ok(admin) = server::admin(&place).await else { return };
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            app.state::<AppState>().config.update(|c| {
+                if let Some(at) = c.shared.workspace.as_mut() {
+                    at.admin = admin;
+                }
+            })
+        })
+        .await;
+    });
 }
 
 static APP: OnceLock<AppHandle> = OnceLock::new();

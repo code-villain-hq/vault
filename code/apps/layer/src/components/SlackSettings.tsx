@@ -5,6 +5,7 @@ import { BOT_NAME_MAX, botManifest, newAppUrl, useSlackBot } from "../lib/slackB
 import { useStore } from "../store";
 import type { AgentStatus, SlackBotConfig, SlackBotStatus, SlackConfig } from "../lib/types";
 import { ErrorMessage, Field, Switch, useFailure } from "./ui";
+import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
   connected: ["connected", "ui-status ui-status-ok"],
@@ -331,9 +332,13 @@ function Notifications({ botName }: { botName: string }) {
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
   const failure = useFailure();
-  const [channel, setChannel] = useState(slack?.channel ?? "");
+  const workspace = useWorkspace();
+  // The channel is the workspace's (SET-7): a member posts their test there.
+  const heldChannel = heldText(useHeld("slack"), "channel");
+  const [channel, setChannel] = useState(slack?.channel || heldChannel || "");
   const [busy, setBusy] = useState(false);
   const chosen = slack !== null && slack.channel !== "";
+  const memberToTest = workspace?.admin === false && heldChannel !== null && slack?.channel !== heldChannel;
 
   async function saveChannel() {
     setBusy(true);
@@ -362,6 +367,7 @@ function Notifications({ botName }: { botName: string }) {
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <h3>Notifications</h3>
+      <Theirs kind="slack" what="Slack" rows={[["Channel", channel]]}>
       <Field
         label="Channel"
         hint={<>A channel name or ID. The bot posts only where it is invited: <code>/invite @{botName}</code> there first.</>}
@@ -377,7 +383,14 @@ function Notifications({ botName }: { botName: string }) {
           </button>
         </div>
       </Field>
+      </Theirs>
+      {memberToTest && (
+        <button className="ui-button" disabled={busy} onClick={() => void saveChannel()} style={{ marginBottom: 14 }}>
+          {busy ? "Posting…" : "Post a test there"}
+        </button>
+      )}
       {chosen && (
+        <Yours>
         <Field label="What gets posted" hint="Muting is enforced in the backend, so an agent cannot route around it.">
           <div className="switch-list">
             <Switch
@@ -407,6 +420,7 @@ function Notifications({ botName }: { botName: string }) {
             />
           </div>
         </Field>
+        </Yours>
       )}
       <ErrorMessage>{failure.error}</ErrorMessage>
     </div>

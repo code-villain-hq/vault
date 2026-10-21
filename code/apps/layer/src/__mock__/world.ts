@@ -101,6 +101,7 @@ const disconnected: Settings = {
   phone_open: false,
   browser_sites: [],
   browser_sign_ins: [],
+  workspace: null,
 };
 
 const agents: AgentStatus[] = [
@@ -427,6 +428,16 @@ function busy(): World {
       slack_connected: true,
       browser_sites: ["docs.acme.dev"],
       browser_sign_ins: [{ id: "si-1", site: "localhost", username: "ada@acme.test" }],
+      // Jira, GitHub and Slack are the workspace's; Grafana it has none of (SET-10).
+      workspace: {
+        name: "ACME",
+        admin: true,
+        connections: {
+          jira: { base_url: "https://acme.atlassian.net", project_key: "ACME", jql: null },
+          github: { api_url: "https://api.github.com", web_url: "https://github.com", review_team: null },
+          slack: { channel: "#dev" },
+        },
+      },
     },
     prs,
     reviews: {

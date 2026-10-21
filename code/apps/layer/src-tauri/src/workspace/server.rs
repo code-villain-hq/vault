@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use layer_domain::{Me, WorkspaceInfo};
+use layer_domain::{Me, Role, WorkspaceInfo};
 use parking_lot::Mutex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -378,7 +378,12 @@ fn make(base: &Path, origin: &str, workspace: &WorkspaceInfo, user: Uuid) -> Res
     })?;
     let folder = profiles::folder_of(base, &entry.id);
     std::fs::create_dir_all(&folder)?;
-    let at = WorkspaceAt { place: origin.to_string(), id: workspace.id.to_string(), user_id: Some(user.to_string()) };
+    let at = WorkspaceAt {
+        place: origin.to_string(),
+        id: workspace.id.to_string(),
+        user_id: Some(user.to_string()),
+        admin: workspace.role == Role::Admin,
+    };
     let cfg = crate::config::AppConfig {
         version: crate::config::SCHEMA_VERSION,
         shared: crate::config::shared::Shared { workspace: Some(at), ..Default::default() },
@@ -427,6 +432,17 @@ pub fn resume(at: &WorkspaceAt) -> Result<Place> {
 
 /// The workspace's members page on its server (PROF-18).
 pub async fn members_page(place: &Place) -> Result<String> {
+    let key = mine(place).await?.url_key;
+    Ok(format!("{}/{key}/settings/members", place.origin))
+}
+
+/// Whether the person is the workspace's admin now, as its server says (SET-7).
+pub async fn admin(place: &Place) -> Result<bool> {
+    Ok(mine(place).await?.role == Role::Admin)
+}
+
+/// The workspace, as the server tells the person in it.
+async fn mine(place: &Place) -> Result<WorkspaceInfo> {
     let response = crate::integrations::http_client()
         .get(format!("{}/api/me", place.origin))
         .bearer_auth(&place.token)
@@ -437,13 +453,10 @@ pub async fn members_page(place: &Place) -> Result<String> {
         return Err(refused(response).await);
     }
     let me: Me = response.json().await?;
-    let key = me
-        .workspaces
-        .iter()
+    me.workspaces
+        .into_iter()
         .find(|w| w.id.to_string() == place.workspace_id)
-        .map(|w| w.url_key.clone())
-        .ok_or_else(|| Error::Other("You're no longer a member of this workspace.".into()))?;
-    Ok(format!("{}/{key}/settings/members", place.origin))
+        .ok_or_else(|| Error::Other("You're no longer a member of this workspace.".into()))
 }
 
 #[cfg(test)]

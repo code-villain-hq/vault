@@ -3,6 +3,7 @@ import { api } from "../lib/api";
 import { useStore } from "../store";
 import type { AwsSetup, LogSource, S3Found } from "../lib/types";
 import { Combo, Confirm, ErrorMessage, Field, useFailure } from "./ui";
+import { useWorkspace } from "./SharedSettings";
 
 /**
  * Settings → Observability → S3 log sources (OBS-8, OBS-9): logs kept in S3,
@@ -29,6 +30,9 @@ export function S3LogSources() {
   const [setup, setSetup] = useState<AwsSetup | null>(null);
   const [editing, setEditing] = useState<LogSource | null>(null);
   const [removing, setRemoving] = useState<LogSource | null>(null);
+  // The sources are the workspace's; a member picks only their AWS profile (SET-7).
+  const workspace = useWorkspace();
+  const locked = workspace?.admin === false;
 
   const look = () => {
     looking.clear();
@@ -62,6 +66,13 @@ export function S3LogSources() {
         </div>
       )}
       <ErrorMessage>{looking.error}</ErrorMessage>
+      {locked && (
+        <p className="settings-alone">
+          {sources.length > 0
+            ? `${workspace.name}'s, so admins add and remove them. Which of your AWS profiles reads each is yours.`
+            : `${workspace.name} has no S3 log sources yet. Admins add them.`}
+        </p>
+      )}
 
       {sources.length > 0 && (
         <div className="s3-sources">
@@ -84,8 +95,8 @@ export function S3LogSources() {
                   )}
                 </div>
               </div>
-              <button className="ui-button" disabled={!!editing} onClick={() => setEditing(s)}>Edit</button>
-              <button className="ui-button ui-button-danger" onClick={() => setRemoving(s)}>Remove</button>
+              <button className="ui-button" disabled={!!editing} onClick={() => setEditing(s)}>{locked ? "Your profile" : "Edit"}</button>
+              {!locked && <button className="ui-button ui-button-danger" onClick={() => setRemoving(s)}>Remove</button>}
             </div>
           ))}
         </div>
@@ -96,9 +107,10 @@ export function S3LogSources() {
           key={editing.id || "new"}
           start={editing}
           setup={setup}
+          locked={locked}
           onDone={() => setEditing(null)}
         />
-      ) : (
+      ) : locked ? null : (
         <button
           className="ui-button ui-button-primary"
           disabled={!setup?.cli || setup.profiles.length === 0}
@@ -155,7 +167,7 @@ function blank(setup: AwsSetup | null): LogSource {
  * profile: its folders, to narrow the prefix, and the Athena tables over it,
  * to pick one. Save checks the profile can list the bucket before keeping it.
  */
-function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSetup | null; onDone: () => void }) {
+function SourceEditor({ start, setup, locked, onDone }: { start: LogSource; setup: AwsSetup | null; locked: boolean; onDone: () => void }) {
   const refreshSettings = useStore((s) => s.refreshSettings);
   const toast = useStore((s) => s.toast);
   // Find fails under its button, saving under the Save row (NOTE-6).
@@ -206,9 +218,11 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
 
   return (
     <div className="s3-editor">
+      <fieldset className="settings-locked" disabled={locked}>
       <Field label="Name" hint="What agents ask for it by, e.g. Production request logs.">
-        <input className="ui-field" value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Production request logs" autoFocus />
+        <input className="ui-field" value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Production request logs" autoFocus={!locked} />
       </Field>
+      </fieldset>
       <div className="row s3-editor-pair">
         <Field label="AWS profile" hint="From ~/.aws/config. SSO profiles sign in with aws sso login.">
           <select className="ui-field" value={s.profile} onChange={(e) => { set({ profile: e.target.value }); setFound(null); }}>
@@ -216,9 +230,10 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
           </select>
         </Field>
         <Field label="Region" hint={profile?.region ? `The profile's is ${profile.region}.` : "The profile sets none: give one."}>
-          <input className="ui-field" value={s.region ?? ""} onChange={(e) => set({ region: e.target.value || null })} placeholder={profile?.region ?? "eu-central-1"} />
+          <input className="ui-field" disabled={locked} value={s.region ?? ""} onChange={(e) => set({ region: e.target.value || null })} placeholder={profile?.region ?? "eu-central-1"} />
         </Field>
       </div>
+      <fieldset className="settings-locked" disabled={locked}>
       <div className="row s3-editor-pair">
         <Field label="Bucket">
           <input value={s.bucket} onChange={(e) => { set({ bucket: e.target.value }); setFound(null); }} placeholder="acme-request-logs" className="ui-field mono" />
@@ -227,9 +242,11 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
           <input value={s.prefix} onChange={(e) => set({ prefix: e.target.value })} placeholder="all of the bucket" className="ui-field mono" />
         </Field>
       </div>
+      {!locked && (
       <button className="ui-button" disabled={!!busy || !s.bucket.trim() || !s.profile} onClick={() => void find()}>
         {busy === "find" ? "Looking…" : "Find"}
       </button>
+      )}
       <ErrorMessage>{finding.error}</ErrorMessage>
 
       {found && (
@@ -307,6 +324,7 @@ function SourceEditor({ start, setup, onDone }: { start: LogSource; setup: AwsSe
           />
         </Field>
       )}
+      </fieldset>
 
       <div className="row" style={{ marginTop: 12 }}>
         <button

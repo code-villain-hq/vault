@@ -431,6 +431,11 @@ pub struct Identity {
 
 static IDENTITY: Mutex<Option<Identity>> = Mutex::new(None);
 
+/// The window's workspace as it is named, once shown (PROF-6).
+pub fn name() -> Option<String> {
+    IDENTITY.lock().as_ref().map(|i| i.name.clone())
+}
+
 /// What a banner's title starts with, if anything (PROF-6).
 pub fn banner_title(title: &str) -> String {
     match IDENTITY.lock().as_ref() {
