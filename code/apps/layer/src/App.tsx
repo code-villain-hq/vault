@@ -220,9 +220,10 @@ function TaskMain({ task }: { task: TaskView }) {
           {task.checkouts.map((c) => (
             <span
               key={c.id}
-              className="ui-chip"
+              // A missing or broken checkout is a state, so a status pill,
+              // not a chip painted red by hand (components.md).
+              className={!c.exists || c.broken ? "ui-status ui-status-danger" : "ui-chip"}
               title={c.broken ?? c.path}
-              style={!c.exists || c.broken ? { color: "var(--status-danger-ink)" } : undefined}
             >
               {c.project_name}
             </span>
