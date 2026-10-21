@@ -48,7 +48,7 @@ function Fallback({ level, size }: { level: number; size: number }) {
           d="M4.6 4v4.2a1.6 1.6 0 0 0 1.6 1.6h5"
           fill="none"
           stroke="var(--panel)"
-          strokeWidth="1.6"
+          strokeWidth="1.75"
           strokeLinecap="round"
         />
       ) : (
