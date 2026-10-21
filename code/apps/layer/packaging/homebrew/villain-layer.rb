@@ -1,0 +1,59 @@
+# The cask in code-villain/homebrew-tap on git.codevillain.eu, written from
+# this file by `bun run release:publish` (scripts/release.ts): it fills in the
+# version and the .dmg's SHA-256 (docs/releasing.md). Change the cask here,
+# not in the tap, which is overwritten.
+cask "villain-layer" do
+  version "@VERSION@"
+  sha256 "@SHA256@"
+
+  url "https://git.codevillain.eu/code-villain/vault/releases/download/layer-v#{version}/Layer-#{version}-macos-arm64.dmg"
+  name "Layer"
+  desc "Agent development environment"
+  homepage "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/layer"
+
+  livecheck do
+    url "https://git.codevillain.eu/code-villain/vault/releases"
+    regex(/layer-v?(\d+(?:\.\d+)+)/i)
+  end
+
+  # macOS 26 is the oldest Layer has been tested on. Lower this
+  # once an older one has been tried.
+  depends_on arch: :arm64
+  depends_on macos: :tahoe
+
+  app "Layer.app"
+
+  # Replacing the bundle under a running app kills it, and every agent
+  # running in it. `uninstall quit:` would not help: quitting ends them too.
+  # This runs before an upgrade or uninstall touches anything, so refusing
+  # here leaves the installed app as it was.
+  uninstall_preflight_steps do
+    run "/bin/sh",
+        args: [
+          "-c",
+          "if /usr/bin/pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then " \
+          "echo 'Layer is running. Quit it first, from a terminal outside it: replacing " \
+          "the app while it runs kills it, and every agent running in it.' >&2; exit 1; fi",
+        ]
+  end
+
+  # Not ~/.villain-worktrees: the task folders hold work that may not be
+  # pushed. Not the keychain item, which brew cannot remove.
+  zap trash: [
+    "~/Library/Application Support/eu.codevillain.villain-layer",
+    "~/Library/Caches/eu.codevillain.villain-layer",
+    "~/Library/Logs/villain-layer",
+    "~/Library/Preferences/eu.codevillain.villain-layer.plist",
+    "~/Library/WebKit/eu.codevillain.villain-layer",
+  ]
+
+  caveats <<~EOS
+    Layer is not notarised by Apple yet, so macOS stops it the first
+    time with "Apple could not verify…". Choose Done, then System Settings →
+    Privacy & Security → Open Anyway. macOS also asks for keychain access
+    again after each upgrade.
+
+    Its tokens stay in the keychain (item eu.codevillain.villain-layer)
+    after `brew uninstall --zap`. Delete them in Keychain Access.
+  EOS
+end

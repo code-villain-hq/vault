@@ -1,0 +1,14 @@
+{
+  "name": "code-villain-design-lint",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun run check:css && bun run check:classes",
+    "check:css": "stylelint --max-warnings 0 \"../components.css\" \"../../../code/apps/site/*.css\" \"../../../code/apps/forge/apps/web/src/**/*.css\" \"../../../code/apps/layer/src/**/*.css\" \"../../../code/apps/glyph/apps/web/src/**/*.css\" \"../../../code/apps/raven/apps/web/src/**/*.css\"",
+    "check:classes": "bun check-classes.ts"
+  },
+  "devDependencies": {
+    "stylelint": "16.26.1",
+    "stylelint-declaration-strict-value": "1.12.1"
+  }
+}

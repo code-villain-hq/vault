@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "apps/site/**"
-      - "design/tokens/**"
-      - "brand/mark/**"
-      - "content/blog/**"
+      - "code/apps/site/**"
+      - "studio/design/tokens/**"
+      - "studio/brand/mark/**"
+      - "studio/content/blog/**"
       - ".forgejo/workflows/site.yml"
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: macos
     defaults:
       run:
-        working-directory: apps/site
+        working-directory: code/apps/site
     steps:
       - uses: actions/checkout@v4
       - run: python3 build.py

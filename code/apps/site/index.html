@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Villain</title>
+  <meta name="description" content="Code Villain builds Forge, Layer, Caster, and Glyph: real tools for shipping with AI.">
+  <link rel="canonical" href="https://www.codevillain.eu/">
+  <meta property="og:site_name" content="Code Villain">
+  <meta property="og:title" content="Code Villain">
+  <meta property="og:description" content="Code Villain builds Forge, Layer, Caster, and Glyph: real tools for shipping with AI.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.codevillain.eu/">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="icon" href="../../../studio/brand/mark/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../studio/design/tokens/color.css">
+  <link rel="stylesheet" href="../../../studio/design/tokens/type.css">
+  <link rel="stylesheet" href="../../../studio/design/tokens/shape.css">
+  <link rel="stylesheet" href="../../../studio/design/components.css">
+  <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="home.css">
+</head>
+<body>
+  <a class="skip" href="#products">Skip to the tools</a>
+  <header class="hero" aria-label="Code Villain">
+    <nav class="home-nav" aria-label="Main">
+      <a href="#forge">Forge</a>
+      <a href="#layer">Layer</a>
+      <a href="#caster">Caster</a>
+      <a href="#glyph">Glyph</a>
+      <a href="blog/">The log</a>
+    </nav>
+      <h1 class="splash">
+        <svg viewBox="10 10 327.48 51.58" role="img" aria-label="Code Villain">
+          <use href="../../../studio/brand/mark/logo-home.svg#homepage-logo"/>
+        </svg>
+      </h1>
+  </header>
+  <main>
+    <div class="intro page-width">
+      <h2>Ships real tools.</h2>
+    </div>
+
+    <section class="showcase page-width" id="products" aria-label="The tools">
+      <article class="product product-forge" id="forge" aria-labelledby="forge-title">
+        <header class="product-head">
+          <div class="product-name"><img src="../forge/apps/web/public/icon.svg" width="44" height="44" alt=""><div><h3 id="forge-title">Forge</h3><p>AI-first issue tracker</p></div></div>
+        </header>
+        <figure class="product-figure">
+          <div class="capture-stage">
+            <img src="assets/captures/forge-issue.png" width="952" height="640" alt="Forge's issue page for FOR-31, “Rewrite the behaviour specs in OpenSpec's convention”: marked Done, assigned to Claude Code, with the plan and the start of the checklist of specs it covers, the first two ticked.">
+          </div>
+          <figcaption>Forge’s own workspace · an issue that drives its specs</figcaption>
+        </figure>
+      </article>
+
+      <article class="product product-layer" id="layer" aria-labelledby="layer-title">
+        <header class="product-head"><div class="product-name"><img src="../layer/src-tauri/icons/icon.svg" width="44" height="44" alt=""><div><h3 id="layer-title">Layer</h3><p>Agent development environment for macOS</p></div></div></header>
+        <figure class="product-figure">
+          <div class="capture-stage">
+            <img src="assets/captures/layer-task.png" width="1280" height="836" alt="Layer's task view for ACME-123, “Fix login race”: the views run as tabs across the top and the tasks down the left; an agent works through its plan, shows the file it wants to write, and asks to write it.">
+          </div>
+          <figcaption>Layer’s task view · example task from its test harness</figcaption>
+        </figure>
+        <p class="product-note">A task, its worktrees, and the agents doing the work.</p>
+      </article>
+
+      <article class="product product-caster" id="caster" aria-labelledby="caster-title">
+        <header class="product-head"><div class="product-name"><img src="../caster/Resources/AppIcon.svg" width="44" height="44" alt=""><div><h3 id="caster-title">Caster</h3><p>Launcher for macOS</p></div></div></header>
+        <figure class="product-figure">
+          <div class="capture-stage capture-stack">
+            <img src="assets/captures/caster-calculator.png" width="680" height="144" alt="Caster with the query “33 / 3” and the answer 11 from its calculator.">
+            <img src="assets/captures/caster-currency.png" width="680" height="144" alt="Caster with the query “32 sek to eur” and the answer 2.87 EUR.">
+            <img src="assets/captures/caster-apps.png" width="680" height="112" alt="Caster with the query “saf” and Safari as the app to open.">
+          </div>
+          <figcaption>Caster’s own window · a sum, a currency, an app</figcaption>
+        </figure>
+        <p class="product-note">Apps, calculations, and quick answers. A shortcut away.</p>
+      </article>
+
+      <article class="product product-glyph" id="glyph" aria-labelledby="glyph-title">
+        <header class="product-head"><div class="product-name"><img src="../glyph/apps/web/public/icon.svg" width="44" height="44" alt=""><div><h3 id="glyph-title">Glyph</h3><p>Translation with models you run yourself</p></div></div></header>
+        <figure class="product-figure">
+          <div class="capture-stage">
+            <img src="assets/captures/glyph-translations.png" width="1280" height="800" alt="Glyph's translations view for the henchmen namespace: the key “contractRenews”, “Renews on {{date}}”, is open with its English source, no Finnish yet, a French text at 77% by mistral and a Swedish one at 59% by viking.">
+          </div>
+          <figcaption>Glyph’s translations view · made-up strings from its demo data</figcaption>
+        </figure>
+        <p class="product-note">Every language of a key, the model that wrote it, and how sure it was.</p>
+      </article>
+    </section>
+  </main>
+  <footer class="home-foot page-width"><span>Code Villain</span><a class="ui-link" href="blog/">The log <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a></footer>
+</body>
+</html>

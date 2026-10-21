@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "apps/forge/**"
-      - "design/tokens/**"
-      - "design/components.css"
-      - "brand/mark/forge.svg"
+      - "code/apps/forge/**"
+      - "studio/design/tokens/**"
+      - "studio/design/components.css"
+      - "studio/brand/mark/forge.svg"
       - ".forgejo/workflows/forge.yml"
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
     runs-on: macos
     defaults:
       run:
-        working-directory: apps/forge
+        working-directory: code/apps/forge
     env:
       # Line numbers for a failing test's backtrace, without the rest of the
       # debug info: less to compile and link.

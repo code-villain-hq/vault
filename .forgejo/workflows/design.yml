@@ -1,7 +1,7 @@
 # Design drift on every push that could cause it: the theme tests, the
-# generated outputs in design/tokens against build.py, Forge's, Layer's,
+# generated outputs in studio/design/tokens against build.py, Forge's, Layer's,
 # Caster's, Glyph's and the editor themes' copies against the vault, and the lint
-# guard over the web CSS and the apps' TSX (design/lint; not the site's
+# guard over the web CSS and the apps' TSX (studio/design/lint; not the site's
 # HTML). Each check
 # writes nothing and fails with the fix.
 name: design
@@ -10,32 +10,32 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "design/tokens/**"
-      - "design/components.css"
-      - "design/lint/**"
-      - "apps/site/**/*.css"
-      - "apps/forge/apps/web/src/**"
-      - "apps/layer/src/**"
+      - "studio/design/tokens/**"
+      - "studio/design/components.css"
+      - "studio/design/lint/**"
+      - "code/apps/site/**/*.css"
+      - "code/apps/forge/apps/web/src/**"
+      - "code/apps/layer/src/**"
       - "DESIGN.md"
-      - "brand/mark/**"
-      - "apps/site/assets/fonts/**"
-      - "apps/forge/apps/web/src/design/**"
-      - "apps/forge/apps/web/public/icon.svg"
-      - "apps/forge/scripts/sync-design.ts"
-      - "apps/layer/src/design/**"
-      - "apps/layer/scripts/sync-design.ts"
-      - "apps/caster/Sources/VillainCaster/Design/**"
-      - "apps/caster/Sources/VillainCaster/MenuBarIcon.swift"
-      - "apps/caster/Resources/Fonts/**"
-      - "apps/caster/Resources/AppIcon.svg"
-      - "apps/caster/Makefile"
-      - "apps/theme/**"
-      - "apps/glyph/apps/web/src/**"
-      - "apps/glyph/apps/web/public/icon.svg"
-      - "apps/glyph/scripts/sync-design.ts"
-      - "apps/raven/apps/web/src/**"
-      - "apps/raven/apps/web/public/icon.svg"
-      - "apps/raven/scripts/sync-design.ts"
+      - "studio/brand/mark/**"
+      - "code/apps/site/assets/fonts/**"
+      - "code/apps/forge/apps/web/src/design/**"
+      - "code/apps/forge/apps/web/public/icon.svg"
+      - "code/apps/forge/scripts/sync-design.ts"
+      - "code/apps/layer/src/design/**"
+      - "code/apps/layer/scripts/sync-design.ts"
+      - "code/apps/caster/Sources/VillainCaster/Design/**"
+      - "code/apps/caster/Sources/VillainCaster/MenuBarIcon.swift"
+      - "code/apps/caster/Resources/Fonts/**"
+      - "code/apps/caster/Resources/AppIcon.svg"
+      - "code/apps/caster/Makefile"
+      - "code/apps/theme/**"
+      - "code/apps/glyph/apps/web/src/**"
+      - "code/apps/glyph/apps/web/public/icon.svg"
+      - "code/apps/glyph/scripts/sync-design.ts"
+      - "code/apps/raven/apps/web/src/**"
+      - "code/apps/raven/apps/web/public/icon.svg"
+      - "code/apps/raven/scripts/sync-design.ts"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -44,20 +44,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m unittest discover -s . -p 'test_*.py'
-        working-directory: design/tokens
+        working-directory: studio/design/tokens
       - run: python3 build.py --check
-        working-directory: design/tokens
+        working-directory: studio/design/tokens
       - run: bun scripts/sync-design.ts --check
-        working-directory: apps/forge
+        working-directory: code/apps/forge
       - run: bun scripts/sync-design.ts --check
-        working-directory: apps/layer
+        working-directory: code/apps/layer
       - run: make design-check
-        working-directory: apps/caster
+        working-directory: code/apps/caster
       - run: bun build.ts --check
-        working-directory: apps/theme
+        working-directory: code/apps/theme
       - run: bun scripts/sync-design.ts --check
-        working-directory: apps/glyph
+        working-directory: code/apps/glyph
       - run: bun scripts/sync-design.ts --check
-        working-directory: apps/raven
+        working-directory: code/apps/raven
       - run: bun install --frozen-lockfile && bun run check
-        working-directory: design/lint
+        working-directory: studio/design/lint

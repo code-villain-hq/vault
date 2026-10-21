@@ -50,8 +50,8 @@ xcuserdata/
 build/
 
 # Forge local database dumps and attachment storage
-apps/forge/backups/
-apps/forge/data/
+code/apps/forge/backups/
+code/apps/forge/data/
 
 # Per-machine agent state
 .claude/settings.local.json
@@ -59,8 +59,8 @@ apps/forge/data/
 .serena/
 
 
-# The site's blog pages: build.py renders them from content/blog
-apps/site/blog/
+# The site's blog pages: build.py renders them from studio/content/blog
+code/apps/site/blog/
 
 # Playwright MCP snapshots
 .playwright-mcp/
