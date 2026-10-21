@@ -8,6 +8,7 @@
 name: forge
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "apps/forge/**"

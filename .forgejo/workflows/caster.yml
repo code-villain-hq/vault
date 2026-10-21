@@ -2,6 +2,7 @@
 name: caster
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "apps/caster/**"

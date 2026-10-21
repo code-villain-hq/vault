@@ -3,6 +3,7 @@
 name: site
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "apps/site/**"

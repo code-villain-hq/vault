@@ -8,6 +8,7 @@
 name: layer
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "apps/layer/**"
