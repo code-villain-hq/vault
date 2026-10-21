@@ -306,11 +306,15 @@ export function ContextMenu({
  * screen or open a second dialog of their own.
  */
 export function Confirm({
-  title, body, confirmLabel = "Delete", busyLabel, danger = true, onConfirm, onCancel,
+  title, body, confirmLabel, busyLabel, danger = true, onConfirm, onCancel,
 }: {
   title: string;
   body: ReactNode;
-  confirmLabel?: string;
+  /**
+   * Names the action ("Remove agent"), never "OK" or a bare "Delete"
+   * (studio/design/behaviour.md), so it has no default to fall back on.
+   */
+  confirmLabel: string;
   /** Replaces the confirm label while the work runs. */
   busyLabel?: string;
   danger?: boolean;

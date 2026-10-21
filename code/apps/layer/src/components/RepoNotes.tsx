@@ -124,6 +124,7 @@ export function RepoNotes({ project, notes, onChanged }: {
       {deleting && (
         <Confirm
           title="Delete note"
+          confirmLabel="Delete note"
           body={<>
             No later task on <b>{project.name}</b> will be told this:
             <div className="confirm-detail">{deleting.text}</div>
