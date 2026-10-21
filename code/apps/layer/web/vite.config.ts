@@ -11,7 +11,9 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) },
   // The shared kit (`code/kit/web`) sits outside this app: it must use the
   // app's React and router, not a second copy beside the kit.
-  resolve: { dedupe: ["react", "react-dom", "@base-ui/react", "@tanstack/react-router", "lucide-react"] },
+  resolve: {
+    dedupe: ["react", "react-dom", "@base-ui/react", "@tanstack/react-router", "lucide-react"],
+  },
   // What the Layer server serves (LAYER_WEB_DIR, by default dist-web).
   build: { outDir: "../dist-web", emptyOutDir: true },
   server: {
