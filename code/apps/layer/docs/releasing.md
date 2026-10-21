@@ -21,7 +21,7 @@ repository; from 0.9.0 they are Apple silicon only.
 1. **Bump the version** in `src-tauri/Cargo.toml`, and only there. The app's
    About line, the bundle and the MCP server all read it from Cargo, and the
    tag is made from it.
-2. Run `cd src-tauri && cargo check`, so `Cargo.lock` follows.
+2. Run `cargo check -p villain-layer`, so `Cargo.lock` follows.
 3. Commit (*Release 0.9.0.*) and push `main`. The script refuses a tree with
    uncommitted changes, a `main` that differs from `origin/main`, and a tag
    that already exists.

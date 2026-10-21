@@ -1,0 +1,25 @@
+name: code-villain-layer
+
+# Layer's local database. `bun run db` starts it.
+services:
+  postgres:
+    image: postgres:18
+    # Come back after Docker restarts, unless stopped on purpose.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: layer
+      POSTGRES_PASSWORD: layer
+      POSTGRES_DB: layer
+    ports:
+      # 5436 on this machine only: Forge has 5433, Glyph 5434, Raven 5435.
+      - "127.0.0.1:5436:5432"
+    volumes:
+      - layer-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U layer"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  layer-db:

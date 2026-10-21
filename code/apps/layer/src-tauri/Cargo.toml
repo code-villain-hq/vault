@@ -55,10 +55,3 @@ objc2-app-kit = { version = "0.3", default-features = false, features = ["std", 
 # A mock runtime, so the PTY layer can be driven through real processes in
 # tests without a window.
 tauri = { version = "2", features = ["test"] }
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-panic = "abort"
-strip = true

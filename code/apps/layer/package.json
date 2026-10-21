@@ -7,19 +7,25 @@
   "homepage": "https://www.codevillain.eu/",
   "repository": { "type": "git", "url": "https://git.codevillain.eu/code-villain/vault.git", "directory": "code/apps/layer" },
   "type": "module",
+  "workspaces": ["packages/*", "web", "../../kit/sync/client"],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "db": "docker compose up -d --wait",
+    "dev:server": "bun scripts/dev-server.ts",
+    "build:web": "bun run --cwd web build",
+    "seed": "bun scripts/seed.ts",
+    "gen:types": "bun scripts/gen-types.ts",
     "guard": "bun scripts/guard.ts",
     "design:sync": "bun scripts/sync-design.ts",
     "design:check": "bun scripts/sync-design.ts --check",
-    "check": "bun scripts/guard.ts && bun scripts/sync-design.ts --check && bun test scripts && tsc && vite build && cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test --lib",
+    "check": "bun scripts/check.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:app": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "release": "bun scripts/release.ts",
     "release:publish": "bun scripts/release.ts publish",
-    "release:mac": "if pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then echo 'Layer is running. Quit it first — replacing the bundle under a running app kills it, and takes its agents with it.'; exit 1; fi; tauri build --bundles app && rm -rf '/Applications/Villain Layer.app' '/Applications/Layer.app' && ditto 'src-tauri/target/release/bundle/macos/Layer.app' '/Applications/Layer.app'"
+    "release:mac": "if pgrep -f 'Layer[.]app/Contents/MacOS/villain-layer' >/dev/null; then echo 'Layer is running. Quit it first — replacing the bundle under a running app kills it, and takes its agents with it.'; exit 1; fi; tauri build --bundles app && rm -rf '/Applications/Villain Layer.app' '/Applications/Layer.app' && ditto 'target/release/bundle/macos/Layer.app' '/Applications/Layer.app'"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

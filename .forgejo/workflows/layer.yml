@@ -1,7 +1,7 @@
 # `bun run check` for Layer on every push that touches it: the guard, the
-# frontend's tests, tsc, the frontend build, clippy and the Rust tests. It
-# runs on the MacBook's runner (label `macos`), because the app and its PTY
-# tests are macOS-only.
+# app's tests, tsc and build, clippy, the app's and the server's Rust tests,
+# and the web app. It runs on the MacBook's runner (label `macos`), because
+# the app and its PTY tests are macOS-only.
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a
 # pull request from someone else's fork would run their code there.
@@ -12,6 +12,7 @@ on:
   push:
     paths:
       - "code/apps/layer/**"
+      - "code/kit/**"
       - ".forgejo/workflows/layer.yml"
 
 jobs:
@@ -27,6 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bun install --frozen-lockfile
+      # The server's tests need Postgres: the same container as local
+      # development (port 5436), started if it isn't running. Each test gets
+      # a database of its own and drops it, so the dev data is never touched.
+      - run: bun run db
       # The git tests commit in temp repos and need an identity: a global
       # config of the job's own, since on this Mac `git config --global`
       # would be the owner's. Not GIT_AUTHOR_*/GIT_COMMITTER_*: those beat

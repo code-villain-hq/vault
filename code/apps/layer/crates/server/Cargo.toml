@@ -1,0 +1,40 @@
+[package]
+name = "layer-server"
+description = "Layer's server: accounts, workspaces, and the sync feed of a workspace's shared setup"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+argon2.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+code-villain-sync.workspace = true
+futures.workspace = true
+getrandom.workspace = true
+hex.workspace = true
+hmac.workspace = true
+http.workspace = true
+jsonwebtoken.workspace = true
+layer-domain.workspace = true
+layer-sync.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+base64.workspace = true
+tempfile.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

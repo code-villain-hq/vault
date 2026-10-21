@@ -1,0 +1,10 @@
+{
+  "name": "@layer/types",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript types generated from the Rust models in crates/domain, and the sync protocol named with them (`sync.ts`). Regenerate with `bun run gen:types`.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@code-villain/sync-client": "workspace:*"
+  }
+}

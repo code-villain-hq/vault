@@ -42,6 +42,36 @@ the app's own copy of each repository, not to the user's clone:
     web/                            ← worktree of .repos/web.git, branch ACME-123
 ```
 
+## Layer's server
+
+A team shares its setup through Layer's server (`crates/server`), built like
+Forge's, Glyph's and Raven's: Rust on Postgres, Forge's workspaces with
+members, roles and invites, and the studio's sync engine (`code/kit/sync`).
+Each client keeps a copy of a workspace and works on it offline.
+
+```
+ crates/domain   the synced records and their checks → ts-rs → packages/types
+ crates/sync     the engine's rules for Layer: who writes what (rules.rs)
+ crates/server   accounts, sign-in (passwords, or Code Villain over OIDC),
+                 workspaces, members, invites, the sync routes; serves dist-web
+ migrations/     one schema: the kit's sync tables, accounts, the five models
+ web/            the server's web app (React, TanStack Router, the kit client)
+```
+
+**What syncs** is the setup a team shares: `Repository` (by its remote,
+`remote_key`), `Connection` (one per kind: Jira, GitHub, Slack, Grafana;
+never a token or an email), `LogSource`, `AgentModel` and `Note`. Tasks,
+checkouts, panes, runs, messages and every token stay on the Mac that has
+them. Members write repositories, notes and models; admins write
+connections and log sources (`rules.rs`).
+
+**Errors** come back as the engine's: a check that fails is 422 with its
+words, a write the person may not make is 403, a second repository with the
+same remote is 409, and a workspace you aren't in is 404.
+
+The desktop app doesn't use the server yet: it still reads `config.json`.
+Its move onto a workspace is the next change.
+
 ## Where work runs
 
 | Thread | What runs there | Rule |

@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+@import "../../src/design/color.css";
+@import "../../src/design/type.css";
+@import "../../src/design/shape.css";
+@import "../../src/design/fonts/fonts.css";
+@import "../../src/design/components.css";
+
+/* Layer-specific roles derived from Nightshade's shared tokens. */
+:root {
+  --band: var(--surface);
+  --line-strong: var(--faint);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-hover: var(--hover);
+  /* Translucent, so the active option shows on any host, dialogs included. */
+  --color-highlight: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
+  /* The quiet chip tint, for initials and other detail that isn't a signal. */
+  --color-chip: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
+  --color-band: var(--band);
+  --color-accent: var(--accent);
+  --color-signal: var(--signal);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-selected: var(--selected);
+  --color-line-strong: var(--line-strong);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  /* Status text: checked on the status tint as well as on plain tones. */
+  --color-danger-ink: var(--status-danger-ink);
+  --color-ok-ink: var(--status-ok-ink);
+  --color-warn-ink: var(--status-warn-ink);
+  --color-info-ink: var(--status-info-ink);
+  --font-sans: var(--font-reading);
+  /* Secondary text: 13px, a step under the 14px body. */
+  --text-xs: var(--type-ui-small-size);
+  --text-xs--line-height: var(--type-ui-small-leading);
+  --text-sm: var(--type-ui-size);
+  --text-sm--line-height: var(--type-ui-leading);
+  --text-wordmark: var(--type-wordmark-size);
+  --text-wordmark--line-height: var(--type-wordmark-leading);
+  --text-title: var(--type-title-size);
+  --text-title--line-height: var(--type-title-leading);
+  --text-query: var(--type-query-size);
+  --text-query--line-height: var(--type-query-leading);
+  --font-weight-medium: var(--type-control-weight);
+  --font-weight-semibold: var(--type-title-weight);
+}
+
+/* Loading: the mark breathes in size, never fading the strike below full strength. */
+@theme {
+  --animate-breathe: breathe 1.6s ease-in-out infinite;
+  @keyframes breathe {
+    50% {
+      transform: scale(0.9);
+    }
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+.app-topbar {
+  --field: var(--panel);
+  background: var(--bg);
+}
+:where(.workspace-content) > :where(main, div, p, section) {
+  background: var(--panel);
+}
+/* The first content region owns the corner; the frame shows behind its radius. */
+:where(.workspace-content) > h1 + :where(main, div, p, section) {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.app-sidebar .nav-link.active .nav-count {
+  display: none;
+}
+.app-sidebar {
+  --field: var(--panel);
+}
+
+/* The shared frame becomes a horizontal navigation row below 560px. */
+@media (width < 560px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .app-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+  }
+  .sidebar-navigation {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .app-sidebar nav,
+  .sidebar-section-items,
+  .sidebar-actions {
+    display: contents;
+  }
+  .app-sidebar .nav-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .app-brand,
+  .sidebar-group-label,
+  .app-sidebar nav > span {
+    display: none;
+  }
+  .workspace-switcher {
+    flex: 0 0 auto;
+    max-width: 9rem;
+  }
+  .sidebar-footer {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0 0.5rem;
+    background: var(--bg);
+  }
+  .sidebar-footer .sync-label {
+    max-inline-size: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workspace-content {
+    margin-inline: 0.5rem;
+  }
+  .app-topbar {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+  }
+  .app-topbar > nav {
+    max-width: 100%;
+  }
+  .app-topbar > div {
+    width: 100%;
+    margin-left: 0;
+  }
+  .workspace-content > .page-content > div,
+  .workspace-content > .page-content > article {
+    padding-inline: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-breathe {
+    animation: none;
+  }
+  [role="dialog"],
+  [role="alertdialog"],
+  [role="menu"] {
+    transition: opacity 0.1s;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  caret-color: var(--fg);
+  scrollbar-color: var(--line-strong) var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Neutral, so the text stays readable by night and day; poison never backs text. */
+::selection {
+  background: color-mix(in srgb, var(--fg) 25%, transparent);
+  color: var(--fg);
+}
