@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "bun run check:css && bun run check:classes",
-    "check:css": "stylelint --max-warnings 0 \"../components.css\" \"../../apps/site/*.css\" \"../../apps/forge/apps/web/src/**/*.css\" \"../../apps/layer/src/**/*.css\" \"../../apps/glyph/apps/web/src/**/*.css\"",
+    "check:css": "stylelint --max-warnings 0 \"../components.css\" \"../../apps/site/*.css\" \"../../apps/forge/apps/web/src/**/*.css\" \"../../apps/layer/src/**/*.css\" \"../../apps/glyph/apps/web/src/**/*.css\" \"../../apps/raven/apps/web/src/**/*.css\"",
     "check:classes": "bun check-classes.ts"
   },
   "devDependencies": {

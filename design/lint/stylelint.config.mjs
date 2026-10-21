@@ -8,6 +8,7 @@ export default {
     "../../apps/forge/apps/web/src/design/**",
     "../../apps/layer/src/design/**",
     "../../apps/glyph/apps/web/src/design/**",
+    "../../apps/raven/apps/web/src/design/**",
     // The phone's page: the mobile redesign is deferred (design/layouts/app-window.md).
     "../../apps/layer/src/phone/**",
     // Layer's theme sources: its extra themes (Tokyo Night, Cursor, Ayu) and

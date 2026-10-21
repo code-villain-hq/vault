@@ -9,7 +9,7 @@ The strike. A gothic C and V with a poison bar behind them, cut where the letter
 | [`layer.svg`](layer.svg) | Layer's L, built the same way. |
 | [`caster.svg`](caster.svg) | Caster's C, built the same way. |
 | [`glyph.svg`](glyph.svg) | Glyph's G, built the same way. |
-| [`glyph.svg`](glyph.svg) | Glyph's G, built the same way. |
+| [`raven.svg`](raven.svg) | Raven's R, built the same way. |
 | [`logo-night.svg`](logo-night.svg) | “Code Villain” with the strike, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 | [`logo-home.svg`](logo-home.svg) | Homepage variant on night: cropped lettering with an extended strike. |
@@ -27,7 +27,7 @@ On a 200-unit tile:
 
 Black and white are the apps' own `bg` and `fg` from [`color.md`](../color.md): achromatic, so a mark beside an app's frame or text matches it exactly. Only the strike carries colour.
 
-The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes the tile marks (`mark.svg` and the four product marks) from the font. The logo files are kept by hand.
+The bar is low and heavy: it crosses the letters below the middle. `python3 products.py` writes the tile marks (`mark.svg` and the product marks) from the font. The logo files are kept by hand.
 
 The V alone was the mark until October 2026. It said Villain but not Code, so the C joined it after the rename.
 
@@ -51,9 +51,9 @@ This variant is the exception to the standard logo’s clear space at the horizo
 
 ## App icons
 
-Each app's icon is its initial built the same way: Forge is an F, Layer an L, Caster a C, Glyph a G, each on the night tile with the strike behind it.
+Each app's icon is its initial built the same way: Forge is an F, Layer an L, Caster a C, Glyph a G, Raven an R, each on the night tile with the strike behind it.
 
-`python3 products.py` writes all four from the font with `outline.swift`
+`python3 products.py` writes all five from the font with `outline.swift`
 (Swift and CoreText, nothing to install). Each app keeps a copy and builds
 its native icons from it:
 
@@ -63,6 +63,7 @@ its native icons from it:
 | Layer | `apps/layer/src-tauri/icons/icon.svg` | `bun tauri icon src-tauri/icons/icon.svg` (keep the macOS and Windows sizes) |
 | Caster | `apps/caster/Resources/AppIcon.svg` | `make icon` |
 | Glyph | `apps/glyph/apps/web/public/icon.svg` | `bun run design:sync` |
+| Raven | `apps/raven/apps/web/public/icon.svg` | `bun run design:sync` |
 
 An app icon is the product mark as drawn: the full tile, the strike edge to edge. The tile is the app's night `bg`, so on a night page it blends in and only the letter and its strike show. That is intended. Never add a border, a gradient, a shadow, or a second colour to lift it.
 

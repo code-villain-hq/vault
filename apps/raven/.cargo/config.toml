@@ -1,0 +1,5 @@
+# Environment for `cargo run` and `cargo test` in local development.
+[env]
+DATABASE_URL = "postgres://raven:raven@localhost:5435/raven"
+# Local development runs on plain http, so session cookies can't be Secure.
+RAVEN_COOKIE_SECURE = "0"

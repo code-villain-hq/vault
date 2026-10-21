@@ -11,7 +11,7 @@ import subprocess
 
 HERE = pathlib.Path(__file__).parent
 FONT = HERE / "../../apps/site/assets/fonts/grenze-gotisch.ttf"
-PRODUCTS = {"forge": "Forge", "layer": "Layer", "caster": "Caster", "glyph": "Glyph"}
+PRODUCTS = {"forge": "Forge", "layer": "Layer", "caster": "Caster", "glyph": "Glyph", "raven": "Raven"}
 # The studio pair: C and V at 0.88 of a product initial, 1 unit apart, so
 # their cuts meet and the strike stops between them. Centred on the tile,
 # with the pair's middle at y=104.5, so the strike crosses it low as before.

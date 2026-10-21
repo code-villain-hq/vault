@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Raven: PO path</title>
+<link rel="stylesheet" href="../../../design/tokens/color.css">
+<link rel="stylesheet" href="../../../design/tokens/type.css">
+<link rel="stylesheet" href="../../../design/tokens/shape.css">
+<link rel="stylesheet" href="../../../design/components.css">
+<script>if (location.hash === "#day") document.documentElement.dataset.theme = "day";</script>
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-mono.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+}
+.page { width: 1140px; margin: 0 auto; display: grid; gap: 44px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); margin-top: 6px; max-width: 70ch; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.step > p { color: var(--muted); margin: 4px 0 14px; max-width: 80ch; }
+
+/* App window */
+.win { position: relative; display: grid; grid-template-columns: 210px 1fr; grid-template-rows: 48px 1fr; height: 600px; background: var(--bg); border-radius: 12px; overflow: hidden; }
+.side { grid-row: 1 / 3; padding: 0 10px; display: flex; flex-direction: column; gap: 2px; }
+.wordmark { height: 48px; display: flex; align-items: center; padding-left: 6px; font-family: var(--font-display); font-size: 28px; font-weight: 700; }
+.picker { display: flex; align-items: center; gap: 8px; padding: 6px; margin-bottom: 10px; }
+.avatar { width: 20px; height: 20px; border-radius: 5px; background: var(--cloak); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.picker .chev { margin-left: auto; color: var(--muted); }
+.nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; }
+.nav svg { color: var(--muted); }
+.nav.is-selected { font-weight: 700; }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 14px 8px 4px; }
+.top { display: flex; align-items: center; padding: 0 16px 0 8px; gap: 6px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; position: relative; }
+.inner { padding: 22px 28px; }
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.mono { font-family: var(--font-mono); font-size: var(--type-ui-code-size); }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+.small { font-size: var(--type-ui-small-size); }
+.chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.ui-chip, .ui-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* Event list */
+.list { padding: 8px; }
+.ev { display: grid; grid-template-columns: 200px 1fr 150px 90px; align-items: center; gap: 16px; padding: 10px 12px; }
+.ev .n { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.listhead { display: flex; align-items: center; padding: 18px 20px 6px; gap: 10px; }
+.listhead .ui-button-primary { margin-left: auto; }
+
+/* Dialog */
+.backdrop { position: absolute; inset: 0; display: grid; place-items: center; }
+.dlg { width: 560px; padding: 22px 24px; }
+.field { display: grid; gap: 6px; margin-top: 14px; }
+.field label { font-size: var(--type-ui-small-size); color: var(--muted); }
+.field .ui-field { padding: 6px 10px; }
+.props { display: grid; grid-template-columns: 110px 80px 1fr; gap: 6px; }
+.props .ui-field { padding: 5px 9px; font-size: var(--type-ui-small-size); }
+.check { display: flex; gap: 9px; align-items: center; margin-top: 16px; }
+.box { width: 16px; height: 16px; border-radius: 4px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* Decision bar */
+.bar { display: flex; align-items: center; gap: 12px; padding: 12px 28px; }
+.bar .ui-button-primary { margin-left: auto; }
+.cols { display: grid; grid-template-columns: 1fr 300px; gap: 28px; padding: 6px 28px 22px; }
+.h3 { font-weight: 700; margin: 14px 0 8px; display: flex; align-items: center; gap: 8px; }
+.feed .r { display: grid; grid-template-columns: 52px 54px 1fr; gap: 10px; padding: 7px 10px; align-items: baseline; }
+.kv { display: inline-flex; gap: 4px; margin-right: 12px; }
+.kv i { font-style: normal; color: var(--faint); }
+.stat { font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 56px; margin-top: 14px; }
+.spark span { flex: 1; background: color-mix(in srgb, var(--fg) 40%, transparent); border-radius: 2px 2px 0 0; min-height: 2px; }
+.spark span.zero { background: color-mix(in srgb, var(--fg) 10%, transparent); }
+.axis { display: flex; justify-content: space-between; color: var(--faint); font-size: 11px; margin-top: 4px; }
+.cover { display: grid; grid-template-columns: 70px 1fr 50px; gap: 8px; align-items: center; padding: 4px 0; }
+.meter { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 10%, transparent); overflow: hidden; }
+.meter span { display: block; height: 100%; background: color-mix(in srgb, var(--fg) 45%, transparent); border-radius: 3px; }
+
+/* Funnel */
+.build { display: grid; grid-template-columns: 330px minmax(0, 1fr); height: 100%; }
+.def { padding: 20px 22px; background: color-mix(in srgb, var(--fg) 2.5%, transparent); }
+.stepsl { display: grid; gap: 6px; margin-top: 8px; }
+.stp { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--radius-md); background: var(--field); }
+.stp .k { color: var(--faint); width: 14px; }
+.between { color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 0 0 34px; }
+.res { padding: 20px 26px; }
+.fun { display: grid; gap: 14px; margin-top: 18px; }
+.fr { display: grid; grid-template-columns: 170px 1fr 92px; gap: 14px; align-items: center; }
+.track { height: 28px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 7%, transparent); position: relative; }
+.track span { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--fg) 45%, transparent); border-radius: 4px; }
+.fr .v { text-align: right; font-variant-numeric: tabular-nums; }
+.fr .v b { font-size: 15px; }
+.drop { margin: 0; padding: 10px 12px; border-radius: var(--radius-md); display: flex; gap: 10px; align-items: center; }
+.split { margin-top: 22px; }
+.split .row { display: grid; grid-template-columns: 170px 1fr 92px; gap: 14px; align-items: center; padding: 5px 0; }
+.split .track { height: 10px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>The PO's path</h1>
+  <p>Forge, level 3. Ada, the PO, wants to know whether spec search helps people find a requirement and use it on an issue. Four screens, start to finish.</p>
+</header>
+
+<!-- Sidebar markup, reused -->
+<template id="side">
+  <aside class="side">
+    <div class="wordmark">Raven</div>
+    <div class="picker"><span class="avatar">F</span><b>Forge</b><span class="chev">▾</span></div>
+    <div class="nav ui-row" data-k="health"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Health<span class="ui-status ui-status-ok" style="margin-left:auto;padding:0;background:none"><span class="dot"></span></span></div>
+    <div class="nav ui-row" data-k="tech"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>Technical</div>
+    <div class="group">Product</div>
+    <div class="nav ui-row" data-k="events"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><circle cx="12" cy="12" r="4"/></svg>Events</div>
+    <div class="nav ui-row" data-k="metrics"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16v-3"/><path d="M12 16V8"/><path d="M17 16v-6"/></svg>Metrics</div>
+  </aside>
+</template>
+
+<!-- 1 -->
+<section class="step">
+  <h2><span class="n">1</span>See what's tracked</h2>
+  <p>Events lists everything Forge is meant to send. Each event says whether it's arriving. Spec search isn't on the list yet, so Ada adds it.</p>
+  <div class="win" data-sel="events" style="height:420px">
+    <div class="top">Forge <span>›</span> <b>Events</b></div>
+    <main class="content">
+      <div class="listhead">
+        <span class="muted small">7 events</span>
+        <button class="ui-button ui-button-primary">New event</button>
+      </div>
+      <div class="list">
+        <div class="ev ui-row"><span class="mono">issue.created</span><span class="muted">Someone created an issue</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">412 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">issue.started</span><span class="muted">Work started on an issue</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">301 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">issue.done</span><span class="muted">An issue moved to Done</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">268 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">spec.opened</span><span class="muted">Someone opened a spec</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">903 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">spec.linked</span><span class="muted">A requirement was linked to an issue</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">58 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">decision.saved</span><span class="muted">Someone saved a decision</span><span><span class="ui-status ui-status-warn"><span class="dot"></span>Not sent yet</span></span><span class="n"><a class="ui-link" style="font-size:var(--type-control-size)">FOR-58</a></span></div>
+        <div class="ev ui-row"><span class="mono">review.requested</span><span class="muted faint">Forge sends this, but nobody defined it</span><span><span class="ui-status ui-status-info"><span class="dot"></span>Not defined</span></span><span class="n"><button class="ui-link">Define</button></span></div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="step">
+  <h2><span class="n">2</span>Define an event</h2>
+  <p>Ada names the event, says in plain words what it means, and lists what it should carry. Who sent it and when come with every event, so she doesn't list them. Saving files the work for the developers as a Forge issue.</p>
+  <div class="win" data-sel="events" style="height:500px">
+    <div class="top">Forge <span>›</span> <b>Events</b></div>
+    <main class="content">
+      <div class="listhead"><span class="muted small">7 events</span><button class="ui-button ui-button-primary">New event</button></div>
+      <div class="list" style="opacity:.9">
+        <div class="ev ui-row"><span class="mono">issue.created</span><span class="muted">Someone created an issue</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">412 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">issue.started</span><span class="muted">Work started on an issue</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">301 / wk</span></div>
+        <div class="ev ui-row"><span class="mono">issue.done</span><span class="muted">An issue moved to Done</span><span><span class="ui-status ui-status-ok"><span class="dot"></span>Arriving</span></span><span class="n">268 / wk</span></div>
+      </div>
+    </main>
+    <div class="backdrop ui-backdrop">
+      <div class="dlg ui-dialog">
+        <div class="title">New event</div>
+        <div class="field"><label>Name</label><div class="ui-field mono">spec.searched</div></div>
+        <div class="field"><label>What it means</label><div class="ui-field">Someone searched the specs.</div></div>
+        <div class="field"><label>What it carries</label>
+          <div class="props">
+            <div class="ui-field mono">query</div><div class="ui-field">Text</div><div class="ui-field">What they typed</div>
+            <div class="ui-field mono">results</div><div class="ui-field">Number</div><div class="ui-field">How many requirements came back</div>
+            <div class="ui-field mono">from</div><div class="ui-field">Text</div><div class="ui-field">The page they searched from</div>
+          </div>
+          <div style="margin-top:6px"><button class="ui-link">Add a property</button></div>
+        </div>
+        <div class="check"><span class="box">✓</span>File an issue for the developers in <b>&nbsp;Platform</b></div>
+        <div class="actions"><button class="ui-button">Cancel</button><button class="ui-button ui-button-primary">Save event</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="step">
+  <h2><span class="n">3</span>See it arrive</h2>
+  <p>A developer finishes the issue. The event page says it's arriving and since when, shows the latest ones as they come in, and checks every property is filled. The page's one action is to use it.</p>
+  <div class="win" data-sel="events" style="height:550px">
+    <div class="top">Forge <span>›</span> Events <span>›</span> <b>spec.searched</b></div>
+    <main class="content">
+      <div class="bar ui-tint-ok">
+        <span class="dot"></span><b>Arriving since 10:42 today.</b><span>FOR-61 brought it in.</span>
+        <button class="ui-button ui-button-primary">Build a metric</button>
+      </div>
+      <div class="inner" style="padding-bottom:0">
+        <div class="title mono" style="font-size:20px">spec.searched</div>
+        <div class="muted" style="margin-top:4px">Someone searched the specs.</div>
+        <div class="chips"><span class="ui-chip">3 properties</span><span class="ui-chip">Defined by Ada</span></div>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="h3"><span class="ui-live-dot"></span>Latest</div>
+          <div class="feed">
+            <div class="r ui-row"><span class="faint">10:58</span><b>Ada</b><span><span class="kv"><i>query</i>invite</span><span class="kv"><i>results</i>4</span><span class="kv"><i>from</i>issue</span></span></div>
+            <div class="r ui-row"><span class="faint">10:57</span><b>Bo</b><span><span class="kv"><i>query</i>drift check</span><span class="kv"><i>results</i>0</span><span class="kv"><i>from</i>search</span></span></div>
+            <div class="r ui-row"><span class="faint">10:55</span><b>Mia</b><span><span class="kv"><i>query</i>sign in</span><span class="kv"><i>results</i>7</span><span class="kv"><i>from</i>issue</span></span></div>
+            <div class="r ui-row"><span class="faint">10:51</span><b>Bo</b><span><span class="kv"><i>query</i>drift</span><span class="kv"><i>results</i>3</span><span class="kv faint"><i>from</i>missing</span></span></div>
+            <div class="r ui-row"><span class="faint">10:48</span><b>Ada</b><span><span class="kv"><i>query</i>roles</span><span class="kv"><i>results</i>2</span><span class="kv"><i>from</i>spec</span></span></div>
+          </div>
+        </div>
+        <div>
+          <div class="h3">Today</div>
+          <div class="stat">37</div>
+          <div class="spark" aria-label="Per hour since 10:00">
+            <span style="height:30%"></span><span style="height:55%"></span><span style="height:40%"></span><span style="height:80%"></span><span style="height:62%"></span><span style="height:100%"></span><span style="height:70%"></span><span style="height:48%"></span>
+          </div>
+          <div class="axis"><span>10:40</span><span>per 2 min</span><span>11:00</span></div>
+          <div class="h3" style="margin-top:22px">Filled in</div>
+          <div class="cover"><span class="mono">query</span><span class="meter"><span style="width:100%"></span></span><span class="small muted" style="text-align:right">37 / 37</span></div>
+          <div class="cover"><span class="mono">results</span><span class="meter"><span style="width:100%"></span></span><span class="small muted" style="text-align:right">37 / 37</span></div>
+          <div class="cover"><span class="mono">from</span><span class="meter"><span style="width:95%"></span></span><span class="small" style="text-align:right;color:var(--status-warn-ink)">35 / 37</span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="step">
+  <h2><span class="n">4</span>Build a funnel</h2>
+  <p>Ada puts steps in order and sees, per person, how far they get. The biggest drop is named in words. Splitting by a property shows why: searches that find nothing almost never end on an issue.</p>
+  <div class="win" data-sel="metrics">
+    <div class="top">Forge <span>›</span> Metrics <span>›</span> <b>New metric</b></div>
+    <main class="content">
+      <div class="build">
+        <div class="def">
+          <div class="field" style="margin-top:0"><label>Name</label><div class="ui-field">From search to a linked requirement</div></div>
+          <div class="field"><label>Kind</label>
+            <div class="ui-segmented" style="width:max-content"><button class="ui-segment">Count</button><button class="ui-segment">Duration</button><button class="ui-segment" aria-pressed="true">Funnel</button></div>
+          </div>
+          <div class="field"><label>Steps, for the same person</label>
+            <div class="stepsl">
+              <div class="stp"><span class="k">1</span><span class="mono">spec.searched</span></div>
+              <div class="between">then within 10 min</div>
+              <div class="stp"><span class="k">2</span><span class="mono">spec.opened</span></div>
+              <div class="between">then within 1 day</div>
+              <div class="stp"><span class="k">3</span><span class="mono">spec.linked</span></div>
+            </div>
+            <div style="margin-top:8px"><button class="ui-link">Add a step</button></div>
+          </div>
+          <div class="field"><label>Split by</label><div class="ui-field"><span class="mono">results</span><span class="faint">&nbsp; of step 1</span></div></div>
+          <div class="actions" style="justify-content:flex-start"><button class="ui-button ui-button-primary">Save metric</button></div>
+        </div>
+        <div class="res">
+          <div style="display:flex;align-items:center">
+            <div class="title">64 people searched</div>
+            <div class="ui-segmented" style="margin-left:auto"><button class="ui-segment">7 days</button><button class="ui-segment" aria-pressed="true">30 days</button><button class="ui-segment">90 days</button></div>
+          </div>
+          <div class="fun">
+            <div class="fr"><span>Searched</span><span class="track"><span style="width:100%"></span></span><span class="v"><b>64</b> <span class="faint">100%</span></span></div>
+            <div class="fr"><span>Opened a result</span><span class="track"><span style="width:70%"></span></span><span class="v"><b>45</b> <span class="faint">70%</span></span></div>
+            <div class="fr"><span>Linked it to an issue</span><span class="track"><span style="width:19%"></span></span><span class="v"><b>12</b> <span class="faint">19%</span></span></div>
+          </div>
+          <div class="drop ui-tint-warn" style="margin-top:14px"><b>Biggest drop: opened → linked.</b><span>33 people stop there.</span><button class="ui-link" style="margin-left:auto;color:inherit">See them</button></div>
+          <div class="split">
+            <div class="h3" style="margin-top:0">Reached step 3, by results</div>
+            <div class="row"><span>No results</span><span class="track"><span style="width:3%"></span></span><span class="v small">1 of 18 · <b>6%</b></span></div>
+            <div class="row"><span>1–5 results</span><span class="track"><span style="width:31%"></span></span><span class="v small">9 of 29 · <b>31%</b></span></div>
+            <div class="row"><span>More than 5</span><span class="track"><span style="width:12%"></span></span><span class="v small">2 of 17 · <b>12%</b></span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+</div>
+<script>
+  const tpl = document.getElementById("side");
+  document.querySelectorAll(".win").forEach((win) => {
+    const side = tpl.content.cloneNode(true);
+    side.querySelector(`[data-k="${win.dataset.sel}"]`).classList.add("is-selected");
+    win.prepend(side);
+  });
+</script>
+</body>
+</html>

@@ -58,6 +58,17 @@
         "dev"
       ],
       "port": 5174
+    },
+    {
+      "name": "raven-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "run",
+        "--cwd",
+        "apps/raven",
+        "dev"
+      ],
+      "port": 5175
     }
   ]
 }

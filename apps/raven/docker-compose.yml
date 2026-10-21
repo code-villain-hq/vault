@@ -1,0 +1,25 @@
+name: code-villain-raven
+
+# Raven's local database. `bun run db` starts it.
+services:
+  postgres:
+    image: postgres:18
+    # Come back after Docker restarts, unless stopped on purpose.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: raven
+      POSTGRES_PASSWORD: raven
+      POSTGRES_DB: raven
+    ports:
+      # 5435 on this machine only: Forge has 5433, Glyph 5434.
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - raven-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raven"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  raven-db:

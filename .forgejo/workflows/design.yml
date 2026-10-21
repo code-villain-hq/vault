@@ -33,6 +33,9 @@ on:
       - "apps/glyph/apps/web/src/**"
       - "apps/glyph/apps/web/public/icon.svg"
       - "apps/glyph/scripts/sync-design.ts"
+      - "apps/raven/apps/web/src/**"
+      - "apps/raven/apps/web/public/icon.svg"
+      - "apps/raven/scripts/sync-design.ts"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -54,5 +57,7 @@ jobs:
         working-directory: apps/theme
       - run: bun scripts/sync-design.ts --check
         working-directory: apps/glyph
+      - run: bun scripts/sync-design.ts --check
+        working-directory: apps/raven
       - run: bun install --frozen-lockfile && bun run check
         working-directory: design/lint
