@@ -12,7 +12,7 @@ on:
   push:
     paths:
       - "code/apps/glyph/**"
-      - "code/kit/sync/**"
+      - "code/kit/**"
       - "studio/design/tokens/**"
       - "studio/design/components.css"
       - "studio/brand/mark/glyph.svg"
