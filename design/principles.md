@@ -14,7 +14,7 @@ Linear's account of its redesign is the reference for the thinking, not for the 
 
 ## The system
 
-6. **The accent stays out of the neutrals.** Greys stay achromatic in both modes. Base and accent colours never tint the large neutral surfaces. Cloak and poison stay the only colours that mean something.
+6. **The accent stays out of the neutrals.** Greys stay achromatic in both modes. Base and accent colours never tint the large neutral surfaces. Cloak and poison are the only brand colours. The four status colours (ok, warn, danger, info) each name a state and are never decoration.
 7. **Elevation is lightness.** Frame, panel, surface, and dialog are steps in lightness. No shadows or borders to lift a surface.
 8. **Display for headings, plain for everything else.** Grenze Gotisch carries large titles; Atkinson Hyperlegible carries everything read or clicked ([`brand/type.md`](../brand/type.md)).
 9. **One frame for every app.** Forge and Layer share the frame that controls the content: the sidebar and the top bar. The sidebar, top bar, and view header are defined in [`layouts/`](layouts); Layer keeps a full-width top bar with its views as tabs, an exception recorded there. Tabs are defined in [`components.md`](components.md#tabs); shared app-header behavior is not defined yet.
