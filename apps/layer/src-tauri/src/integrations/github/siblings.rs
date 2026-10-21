@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use super::GitHub;
 use crate::error::Result;
 
-const START: &str = "<!-- villain-layer:siblings -->";
+pub(super) const START: &str = "<!-- villain-layer:siblings -->";
 const END: &str = "<!-- /villain-layer:siblings -->";
 
 /// One pull request of the set.

@@ -723,8 +723,27 @@ send feedback to an agent, and finish a merged task.
   rejected" in place of "connected", which only ever meant a token was
   saved. Saving a token sweeps every task's PRs at once, or straight after
   a sweep already under way, so the refusal does not linger.
+- **PR-13** An agent MAY show images in a task's open pull request with
+  `pr_images` (after the user agrees): screenshots of a visible change,
+  night and day. GitHub has no API for the attachments its own editor
+  uploads, so the app stores the images in the repository, in a commit
+  that only `refs/pr-images/<number>` points at: not a branch, so no
+  branch list, clone or pull fetches or shows it. Each PR has its own,
+  holding only the images its description shows now: a later call moves
+  the ref onto a new commit, by force, through the API (the one forced
+  move the app makes, on a ref that is its alone). The ref is kept after
+  the PR closes, so a merged PR keeps its pictures. The images go in a
+  marked section of the description that the
+  app owns, the way PR-2's list does: a later call replaces the section
+  and nothing else, and a new section goes above PR-2's list. Only PNG,
+  JPEG, GIF and WebP files are sent, read by their first bytes rather
+  than their names, at most 10 of 10 MB each: the tool reads a path an
+  agent gives it, and must not publish a key file renamed `.png`.
+  `browser_screenshot` with `save` writes the tab's image to a file for
+  this. A repository with no open pull request is refused: images are
+  added to a PR, never the reason one is opened.
 
-Code: `commands/github.rs`, `commands/open_prs.rs`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `PrPanel.tsx`, `PrReadErrors.tsx`,
+Code: `commands/github.rs`, `commands/open_prs.rs`, `commands/pr_images.rs`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `integrations/github/images.rs`, `PrPanel.tsx`, `PrReadErrors.tsx`,
 `PrFeedback.tsx`, `Markdown.tsx`, `lib/markdown.ts`.
 
 Known gaps:
@@ -1028,6 +1047,7 @@ never hold credentials themselves.
 | `forget_repo` | unregister a repo (never deletes files) | yes |
 | `create_task` | a task with no ticket | |
 | `open_prs` | push and open PRs for a task | yes |
+| `pr_images` | show image files in a repo's open PR, in a section the app owns (PR-13) | yes |
 | `repo_notes` | a repository's notes, with what changed since each was checked (MEM-5) | |
 | `remember` | keep a lasting fact about a repository, after asking the user (MEM-1) | yes |
 | `check_note` | say a note still holds, as of now | |
@@ -1044,7 +1064,7 @@ never hold credentials themselves.
 | `browser_select` | choose options in a list | |
 | `browser_scroll` | scroll the page, or the part under an element | |
 | `browser_wait` | wait for text to show, or for some seconds | |
-| `browser_screenshot` | an image of the tab | |
+| `browser_screenshot` | an image of the tab; with `save`, also as a file for `pr_images` | |
 | `browser_console` | the page's console messages and uncaught errors | |
 | `browser_evaluate` | run JavaScript in the page | |
 | `browser_request_site` | ask the user to let agents use a site (BRW-11) | |

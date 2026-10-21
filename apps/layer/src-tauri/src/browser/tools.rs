@@ -125,8 +125,9 @@ pub fn list() -> Vec<Value> {
             "browser_screenshot",
             "An image of what the tab shows now. For how the page looks: layout, colours, \
              what is cut off. To find what to act on, browser_snapshot is cheaper and \
-             names the elements.",
-            json!({}),
+             names the elements. With save, also written to a file whose path comes back, \
+             for pr_images.",
+            json!({ "save": bool_prop("Also save the image as a file, to show in a pull request") }),
             vec![],
         ),
         tool(
@@ -294,6 +295,26 @@ async fn report<R: Runtime>(app: &AppHandle<R>, state: &AppState, task: &str, di
         }
     }
     report_once(app, state, task, did).await
+}
+
+/// A screenshot as a file, for `pr_images` (PR-13), which reads paths: the
+/// image itself only ever reached the agent. Outside every worktree, so it
+/// is never committed by mistake.
+async fn save_shot(task: &str, data: &str) -> Result<std::path::PathBuf> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|e| Error::Other(format!("the screenshot could not be read: {e}")))?;
+    let dir = std::env::temp_dir().join("villain-layer-screenshots").join(task.replace(['/', '\\'], "-"));
+    let path = dir.join(format!("{}.jpg", chrono::Utc::now().format("%Y%m%d-%H%M%S%.3f")));
+    let file = path.clone();
+    crate::commands::off_runtime(move || {
+        std::fs::create_dir_all(&dir)?;
+        std::fs::write(&file, bytes)
+    })
+    .await?
+    .map_err(|e| Error::Other(format!("the screenshot could not be saved: {e}")))?;
+    Ok(path)
 }
 
 /// Chrome's word for a tab that closed under a call.
@@ -522,9 +543,14 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
             let (url, _) = allowed_page(&page, &state).await?;
             browser.record(app, &task, "Took a screenshot", None);
             let data = page.screenshot(browser.viewport(&task)).await?;
+            let mut said = format!("The tab, at {url}.");
+            if args.get("save").and_then(Value::as_bool) == Some(true) {
+                let path = save_shot(&task, &data).await?;
+                said.push_str(&format!(" Saved as {}.", path.display()));
+            }
             Ok(vec![
                 json!({ "type": "image", "data": data, "mimeType": "image/jpeg" }),
-                json!({ "type": "text", "text": format!("The tab, at {url}.") }),
+                json!({ "type": "text", "text": said }),
             ])
         }
 
