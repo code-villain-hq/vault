@@ -3,7 +3,7 @@ import { api, errMessage, failureText } from "../lib/api";
 import { useStore } from "../store";
 import { taskTotals } from "../lib/derive";
 import type { JiraTransition, TaskView } from "../lib/types";
-import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
+import { ErrorMessage, Field, Modal, useFailure } from "./ui";
 import { flowOf, mergedTransition } from "./TicketFlow";
 
 /**
@@ -165,9 +165,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
                   : "Moved only once the worktrees are gone."
           }
         >
-          {done === null ? (
-            <div className="row muted"><Spinner /> Asking Jira…</div>
-          ) : (
+          {done === null ? null : (
             <select className="ui-field"
               value={transition}
               disabled={busy || done.length === 0}

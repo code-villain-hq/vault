@@ -5,7 +5,7 @@ import { read, write } from "../lib/persist";
 import { useStore } from "../store";
 import type { CodeLine, FeedbackItem, FeedbackNote, RepoFeedback, TaskView } from "../lib/types";
 import { ChevronIcon, ExternalIcon } from "./icons";
-import { ErrorMessage, Modal, Spinner, useFailure } from "./ui";
+import { ErrorMessage, Modal, useFailure } from "./ui";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
 import { Markdown } from "./Markdown";
 
@@ -336,9 +336,6 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
   return (
     <Modal title={title} wide tall onClose={() => !busy && onClose()} footer={footer} toolbar={tabs || undefined}>
       <ErrorMessage>{reading.error}</ErrorMessage>
-      {!rows && !reading.error && (
-        <div className="row muted"><Spinner /> Reading reviews and checks…</div>
-      )}
       {rows && rows.length === 0 && (
         <div className="muted">No repository in this task has an open pull request.</div>
       )}

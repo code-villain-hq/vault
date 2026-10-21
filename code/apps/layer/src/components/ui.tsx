@@ -357,14 +357,14 @@ export function Confirm({
  * started it and must not be interrupted.
  *
  * Deleting a task is the case it was written for: the sidebar row it belongs
- * to is still on screen and spinning, so the wait cannot live in a dialog
- * that has already closed.
+ * to is still on screen, so the wait cannot live in a dialog that has already
+ * closed. It says what is happening in words, without a spinner: views have
+ * none (studio/design/behaviour.md).
  */
 export function BusyOverlay({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className="ui-backdrop overlay deleting-overlay" aria-busy="true">
       <div className="deleting-card">
-        <Spinner />
         <div className="deleting-copy">
           <div>{title}</div>
           {detail && <div className="muted">{detail}</div>}

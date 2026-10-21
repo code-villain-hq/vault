@@ -10,7 +10,7 @@ import { RunRow } from "./runs/RunRow";
 import { TaskTable } from "./runs/TaskTable";
 import { UsageBreakdown } from "./runs/UsageBreakdown";
 import { UsageChart } from "./runs/UsageChart";
-import { Confirm, Spinner } from "./ui";
+import { Confirm } from "./ui";
 
 /** What `runs.rs` keeps of each; said once the log is that full (RUN-5). */
 const CAP = 1000;
@@ -132,9 +132,7 @@ export function UsageView() {
         )}
       </div>
 
-      {log === null ? (
-        <div className="empty"><Spinner /></div>
-      ) : empty ? (
+      {log === null ? null : empty ? (
         <div className="empty">
           <h2>Nothing used yet</h2>
           <p>

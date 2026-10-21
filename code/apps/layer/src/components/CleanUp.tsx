@@ -97,9 +97,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
     >
       {broken ? (
         <ErrorMessage>{broken}</ErrorMessage>
-      ) : items === null ? (
-        <div className="muted"><span className="btn-busy"><Spinner />Looking through task folders and copies…</span></div>
-      ) : items.length === 0 ? (
+      ) : items === null ? null : items.length === 0 ? (
         <div className="muted">Nothing to clean up: every folder, branch and copy is in use.</div>
       ) : (
         <>

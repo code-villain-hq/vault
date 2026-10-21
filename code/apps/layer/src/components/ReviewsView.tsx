@@ -10,7 +10,7 @@ import { useStore } from "../store";
 import type { AuthoredPr, ReviewRequest, TeamReviews } from "../lib/types";
 import { ChevronIcon } from "./icons";
 import { AuthoredCard, identity, ReviewCard } from "./ReviewCards";
-import { ContextMenu, Spinner, type MenuItem } from "./ui";
+import { ContextMenu, type MenuItem } from "./ui";
 
 /** `@fe` when that is all we know; the team's own name when GitHub sent one. */
 function teamLabel(team: TeamReviews): string {
@@ -188,13 +188,7 @@ export function ReviewsView() {
     by === "epic",
   );
 
-  if (!settings) {
-    return (
-      <div className="empty">
-        <h2>Loading…</h2>
-      </div>
-    );
-  }
+  if (!settings) return null;
 
   if (!settings.github_connected) {
     return (
@@ -254,8 +248,9 @@ export function ReviewsView() {
           {SORT_LABEL[sort]} ▾
         </button>
         <div className="spacer" />
-        {loading && <Spinner />}
-        <button type="button" className="ui-button" onClick={() => void refresh()}>Refresh</button>
+        <button type="button" className="ui-button" onClick={() => void refresh()}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </button>
       </div>
 
       <div className="ui-tabs sub-tabs" role="tablist">
@@ -324,7 +319,6 @@ export function ReviewsView() {
           {authored?.more && !authored.error && (
             <p className="review-note">Showing the 50 most recently updated.</p>
           )}
-          {!queue && loading && <p className="review-note">Loading…</p>}
         </div>
       )}
 
@@ -332,7 +326,6 @@ export function ReviewsView() {
         <>
           {queue?.team?.error && <p className="review-note warn">{queue.team.error}</p>}
           {queue && requested.length === 0 && <p className="review-note">Nothing is waiting on you or your team.</p>}
-          {!queue && loading && <p className="review-note">Loading…</p>}
           {regroup(sortPrs(requested.map((r) => r.pr), sort), by, (pr) => {
             const key = ticketOf(pr);
             return key ? epics[key] : null;
@@ -382,7 +375,6 @@ export function ReviewsView() {
                 onContextMenu={(e) => openMenu(e, pr)}
               />
             ))}
-            {!queue && loading && <p className="review-note">Loading…</p>}
           </ReviewList>
 
           {team ? (

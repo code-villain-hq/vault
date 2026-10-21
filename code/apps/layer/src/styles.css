@@ -714,12 +714,6 @@ body.dragging * { pointer-events: none; }
   padding: 18px 22px;
   max-width: 360px;
 }
-.deleting-card .spin {
-  width: 18px;
-  height: 18px;
-  border-width: 2px;
-  flex: none;
-}
 .deleting-copy {
   display: flex;
   flex-direction: column;

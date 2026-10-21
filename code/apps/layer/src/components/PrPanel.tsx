@@ -463,8 +463,7 @@ export function PrPanel({
           <b>Pull requests</b>
         )}
         <div className="spacer" />
-        {loading && <Spinner />}
-        <button className="ui-button" onClick={() => void load()}>Refresh</button>
+        <button className="ui-button" onClick={() => void load()}>{loading ? "Refreshing…" : "Refresh"}</button>
         <button className="ui-button" disabled={busy} onClick={() => void push()}>
           Push all
         </button>

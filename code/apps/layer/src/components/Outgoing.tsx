@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useStore, type ReviewNote } from "../store";
 import type { RepoOutgoing } from "../lib/types";
-import { ErrorMessage, Spinner, useFailure } from "./ui";
+import { ErrorMessage, useFailure } from "./ui";
 
 const NO_NOTES: ReviewNote[] = [];
 const KIND_TONE = { debug: "ui-status-danger", "focused test": "ui-status-danger", "conflict marker": "ui-status-danger", todo: "ui-status-warn" } as const;
@@ -40,9 +40,7 @@ export function Outgoing({ taskId, onFlags }: { taskId: string; onFlags: (n: num
 
   useEffect(() => { onFlags(leftovers + unsent + specOutside.length); }, [leftovers, unsent, specOutside.length, onFlags]);
 
-  if (rows === null) {
-    return <div className="outgoing muted"><Spinner /> Looking at what this would push…</div>;
-  }
+  if (rows === null) return null;
   if (failure.error) return <ErrorMessage>{failure.error}</ErrorMessage>;
   if (going.length === 0 && specOutside.length === 0) return null;
 

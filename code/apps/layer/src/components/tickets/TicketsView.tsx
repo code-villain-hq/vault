@@ -8,7 +8,7 @@ import { readOneOf, write } from "../../lib/persist";
 import { groupByStatus, TICKET_GROUP_LABEL, TICKET_GROUPS, type TicketGroup } from "../../lib/ticket-group";
 import { sortTickets, TICKET_SORT_LABEL, TICKET_SORTS, type TicketSort } from "../../lib/ticket-sort";
 import type { JiraIssue, JiraPage } from "../../lib/types";
-import { ContextMenu, ErrorMessage, Spinner, useFailure, type MenuItem } from "../ui";
+import { ContextMenu, ErrorMessage, useFailure, type MenuItem } from "../ui";
 import { isEpicType, typeMap } from "../IssueType";
 import { BrowsePanel } from "./BrowsePanel";
 import { CreateEpicDialog } from "./CreateEpicDialog";
@@ -271,13 +271,7 @@ export function TicketsView() {
   const statuses = useMemo(() => groupByStatus(filtered), [filtered]);
   const taskFor = (key: string) => taskByKey.get(key) ?? null;
 
-  if (!settings) {
-    return (
-      <div className="empty">
-        <h2>Loading…</h2>
-      </div>
-    );
-  }
+  if (!settings) return null;
 
   if (!settings.jira_connected) {
     return (
@@ -348,7 +342,6 @@ export function TicketsView() {
             <span className="sub">
               {filtered.length} issue{filtered.length === 1 ? "" : "s"}{groupCount}
             </span>
-            {issuesLoading && <Spinner />}
             <input className="ui-field ticket-filter"
               type="text"
               placeholder="Filter by key, title, label…"
@@ -371,7 +364,9 @@ export function TicketsView() {
             <button className="ui-button" onClick={() => setCreatingEpic(true)}>
               New epic…
             </button>
-            <button className="ui-button" onClick={() => void refreshIssues()}>Refresh</button>
+            <button className="ui-button" onClick={() => void refreshIssues()}>
+              {issuesLoading ? "Refreshing…" : "Refresh"}
+            </button>
           </>
         ) : (
           <span className="sub">
@@ -429,12 +424,6 @@ export function TicketsView() {
             Your JQL matches more than the {issues.length} shown, so the epics below
             are missing some of their tickets. Narrow it in Settings.
           </div>
-        </div>
-      )}
-
-      {sub === "mine" && filtered.length === 0 && issuesLoading && (
-        <div className="card">
-          <div className="muted">Loading tickets…</div>
         </div>
       )}
 
