@@ -1,11 +1,11 @@
 // The filter menu and the bar of filters in use, over a list or board of
 // issues (see issue-filter.ts for what they mean). "F" opens the menu.
+import { shortcutFree } from "@code-villain/web";
 import { X } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { PRIORITY_LABELS, useLabels, useUsers } from "./data";
 import { Avatar, LabelDot, PriorityIcon, ProjectIcon } from "./icons";
 import { FIELDS, type FilterField, type Filters, toggle } from "./issue-filter";
-import { isTyping } from "./new-issue";
 import { Picker, type PickerOption } from "./picker";
 import { buttonClass } from "./ui";
 import { useRecords } from "./workspace";
@@ -87,12 +87,7 @@ export function FilterButton({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "f" || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (
-        isTyping(event.target) ||
-        document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")
-      )
-        return;
+      if (event.key.toLowerCase() !== "f" || !shortcutFree(event)) return;
       event.preventDefault();
       document.getElementById(FILTER_BUTTON)?.click();
     };

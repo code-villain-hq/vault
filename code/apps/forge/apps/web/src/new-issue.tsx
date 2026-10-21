@@ -261,5 +261,3 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
     </form>
   );
 }
-
-export { isTyping };

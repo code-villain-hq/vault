@@ -1,6 +1,7 @@
 // A team's issues as a board: a column per status, in workflow order. Drag a
 // card, or press Shift with ← or →, to move it to another status. The arrow
 // keys (or h j k l) move between cards; Enter opens one.
+import { shortcutFree } from "@code-villain/web";
 import type { Issue, WorkflowState } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
@@ -8,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { byId, byPriority, formatDate, identifier } from "./data";
 import { StateIcon } from "./icons";
 import { AssigneePicker, LabelChip, PriorityPicker } from "./issue-fields";
-import { isTyping, useNewIssue } from "./new-issue";
+import { useNewIssue } from "./new-issue";
 import { useIsPending, useRecords, useWorkspace } from "./workspace";
 
 const DRAG_TYPE = "application/x-forge-issue";
@@ -45,8 +46,7 @@ export function IssueBoard({ issues, states }: { issues: Issue[]; states: Workfl
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
+      if (!shortcutFree(event)) return;
       const step = (column: number) => {
         const next = Math.max(0, Math.min(columns.length - 1, column));
         const length = columns[next]?.issues.length ?? 0;

@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useDialogFocus } from "./dialog-focus";
 
 /** One line of the command menu. */
@@ -87,7 +87,9 @@ function Commands({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  const results = useCommands(query.trim().toLowerCase());
+  // Typing stays quick while a long list is still being searched.
+  const searched = useDeferredValue(query);
+  const results = useCommands(searched.trim().toLowerCase());
 
   useEffect(() => {
     listRef.current

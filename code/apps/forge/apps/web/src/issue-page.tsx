@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { type Confirmation, ConfirmDialog } from "@code-villain/web";
+import { type Confirmation, ConfirmDialog, isTyping } from "@code-villain/web";
 import type {
   Comment,
   Decision,
@@ -43,7 +43,7 @@ import { DecisionRow, SpecRow } from "./knowledge";
 import { PageHeader } from "./layout";
 import { Markdown } from "./markdown";
 import { MentionTextarea } from "./mentions";
-import { isTyping, useNewIssue } from "./new-issue";
+import { useNewIssue } from "./new-issue";
 import { chip, NewButton } from "./page-parts";
 import { Picker } from "./picker";
 import { describeDelta } from "./spec-change";

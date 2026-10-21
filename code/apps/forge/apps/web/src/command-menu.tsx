@@ -18,7 +18,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import {
   branchName,
   byId,
@@ -205,102 +205,132 @@ function useForgeCommands(q: string): Command[] {
   const specs = useRecords("Spec");
   const decisions = useRecords("Decision");
   const initiatives = useRecords("Initiative");
-  /** Services, specs, decisions and initiatives: names first, then their text. */
-  const findKnowledge = useCallback(
-    (q: string): Command[] => {
-      const ws = workspace.url_key;
-      const search = <T,>(
-        group: string,
-        records: T[],
-        name: (r: T) => string,
-        text: (r: T) => string,
-        open: (r: T) => void,
-        id: (r: T) => string,
-      ): Command[] =>
-        records
-          .map((r) => ({
-            r,
-            rank: name(r).toLowerCase().includes(q) ? 0 : text(r).toLowerCase().includes(q) ? 1 : 2,
-          }))
-          .filter((m) => m.rank < 2)
-          .sort((a, b) => a.rank - b.rank)
-          .slice(0, 5)
-          .map(({ r }) => ({ id: `${group}-${id(r)}`, group, label: name(r), run: () => open(r) }));
-      return [
-        ...search(
-          "Services",
-          services,
-          (s) => s.name,
-          (s) => `${s.description} ${s.current_state}`,
-          (s) =>
-            void navigate({
-              to: "/$workspace/service/$service",
-              params: { workspace: ws, service: s.id },
-            }),
-          (s) => s.id,
-        ),
-        ...search(
-          "Specs",
-          specs,
-          (s) => s.title,
-          (s) => s.body,
-          (s) =>
-            void navigate({ to: "/$workspace/spec/$spec", params: { workspace: ws, spec: s.id } }),
-          (s) => s.id,
-        ),
-        ...search(
-          "Decisions",
-          decisions,
-          (d) => d.title,
-          (d) => `${d.context} ${d.decision} ${d.consequences}`,
-          (d) =>
-            void navigate({
-              to: "/$workspace/decision/$decision",
-              params: { workspace: ws, decision: d.id },
-            }),
-          (d) => d.id,
-        ),
-        ...search(
-          "Initiatives",
-          initiatives,
-          (i) => i.name,
-          (i) => i.description,
-          (i) =>
-            void navigate({
-              to: "/$workspace/initiative/$initiative",
-              params: { workspace: ws, initiative: i.id },
-            }),
-          (i) => i.id,
-        ),
-      ];
-    },
-    [services, specs, decisions, initiatives, navigate, workspace.url_key],
+
+  // What a query is matched against, lowercased once per change of the
+  // records rather than on every key: spec bodies are long.
+  const knowledge = useMemo(() => {
+    const ws = workspace.url_key;
+    const index = <T,>(
+      group: string,
+      records: T[],
+      name: (r: T) => string,
+      text: (r: T) => string,
+      id: (r: T) => string,
+      open: (r: T) => void,
+    ): Searchable[] =>
+      records.map((r) => ({
+        group,
+        id: id(r),
+        label: name(r),
+        name: name(r).toLowerCase(),
+        text: text(r).toLowerCase(),
+        open: () => open(r),
+      }));
+    return [
+      index(
+        "Services",
+        services,
+        (s) => s.name,
+        (s) => `${s.description} ${s.current_state}`,
+        (s) => s.id,
+        (s) =>
+          void navigate({
+            to: "/$workspace/service/$service",
+            params: { workspace: ws, service: s.id },
+          }),
+      ),
+      index(
+        "Specs",
+        specs,
+        (s) => s.title,
+        (s) => s.body,
+        (s) => s.id,
+        (s) =>
+          void navigate({ to: "/$workspace/spec/$spec", params: { workspace: ws, spec: s.id } }),
+      ),
+      index(
+        "Decisions",
+        decisions,
+        (d) => d.title,
+        (d) => `${d.context} ${d.decision} ${d.consequences}`,
+        (d) => d.id,
+        (d) =>
+          void navigate({
+            to: "/$workspace/decision/$decision",
+            params: { workspace: ws, decision: d.id },
+          }),
+      ),
+      index(
+        "Initiatives",
+        initiatives,
+        (i) => i.name,
+        (i) => i.description,
+        (i) => i.id,
+        (i) =>
+          void navigate({
+            to: "/$workspace/initiative/$initiative",
+            params: { workspace: ws, initiative: i.id },
+          }),
+      ),
+    ];
+  }, [services, specs, decisions, initiatives, navigate, workspace.url_key]);
+
+  // Made offline, an issue opens once the server has given it a number.
+  const issueIndex = useMemo(
+    () =>
+      issues
+        .filter((issue) => issue.number)
+        .map((issue) => {
+          const key = identifier(issue, teamsById);
+          return { issue, key, id: key.toLowerCase(), title: issue.title.toLowerCase() };
+        }),
+    [issues, teamsById],
   );
 
   return useMemo(() => {
     const commandsFound = matching(commands, q);
     if (!q) return commandsFound;
-    const found = issues
-      .filter((issue) => {
-        const id = identifier(issue, teamsById).toLowerCase();
-        return id.includes(q) || issue.title.toLowerCase().includes(q);
-      })
-      // Made offline, an issue opens once the server has given it a number.
-      .filter((issue) => issue.number)
-      .slice(0, 8)
-      .map(
-        (issue): Command => ({
-          id: `issue-${issue.id}`,
-          group: "Issues",
-          label: issue.title,
-          hint: identifier(issue, teamsById),
-          run: () =>
-            void navigate({
-              to: "/$workspace/issue/$identifier",
-              params: { workspace: workspace.url_key, identifier: identifier(issue, teamsById) },
-            }),
-        }),
-      );
-    return [...found, ...findKnowledge(q), ...commandsFound];
-  }, [commands, issues, q, teamsById, navigate, workspace.url_key, findKnowledge]);
+    const found: Command[] = [];
+    for (const { issue, key, id, title } of issueIndex) {
+      if (!id.includes(q) && !title.includes(q)) continue;
+      found.push({
+        id: `issue-${issue.id}`,
+        group: "Issues",
+        label: issue.title,
+        hint: key,
+        run: () =>
+          void navigate({
+            to: "/$workspace/issue/$identifier",
+            params: { workspace: workspace.url_key, identifier: key },
+          }),
+      });
+      if (found.length === 8) break;
+    }
+    return [...found, ...knowledge.flatMap((group) => findIn(group, q)), ...commandsFound];
+  }, [commands, issueIndex, q, navigate, workspace.url_key, knowledge]);
+}
+
+/** A record the command menu can find: its name and text, lowercased. */
+interface Searchable {
+  group: string;
+  id: string;
+  label: string;
+  name: string;
+  text: string;
+  open: () => void;
+}
+
+/** Up to five of a group: names that match first, then texts. */
+function findIn(records: Searchable[], q: string): Command[] {
+  const byName: Searchable[] = [];
+  const byText: Searchable[] = [];
+  for (const r of records) {
+    if (r.name.includes(q)) {
+      byName.push(r);
+      if (byName.length === 5) break;
+    } else if (byText.length < 5 && r.text.includes(q)) byText.push(r);
+  }
+  return [...byName, ...byText]
+    .slice(0, 5)
+    .map((r) => ({ id: `${r.group}-${r.id}`, group: r.group, label: r.label, run: r.open }));
 }
