@@ -11,6 +11,15 @@ tauri-build = { version = "2.7", features = [] }
 [dependencies]
 tauri = { version = "2.12", features = [] }
 keyring = "4.2"
+code-villain-desktop.workspace = true
+forge-server.workspace = true
+forge-sync.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
 # The plugin settings in tauri.conf.json are compiled in as JSON.
 serde_json.workspace = true
 tauri-plugin-deep-link = "2.6"
