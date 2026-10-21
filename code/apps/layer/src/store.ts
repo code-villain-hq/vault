@@ -268,6 +268,9 @@ function sameMessages(a: Message[], b: Message[]): boolean {
  * rows — the PR just opened — it put back the world from before, and the
  * panel offered to open the PR again.
  */
+/** How long the splash waits for the first lists before the window opens anyway. */
+const BOOT_WAIT = 1500;
+
 const prsFetchedAt = new Map<string, number>();
 /** "ACME:review": a project and stage already told to choose a status, this run. */
 const askedFlow = new Set<string>();
@@ -449,9 +452,15 @@ export const useStore = create<State>((set, get) => {
       });
       watchOk();
     });
+    // The splash waits for both, but no longer than BOOT_WAIT: a slow git
+    // status then fills the lists in an open window rather than holding it.
+    const opened = setTimeout(() => {
+      if (!get().booted) set({ booted: true });
+    }, BOOT_WAIT);
     try {
       await Promise.all([settingsP, coreP]);
     } finally {
+      clearTimeout(opened);
       // A failed first read still opens the window: the failure is in the
       // top bar's status, and a splash that never ends would hide it.
       if (!get().booted) set({ booted: true });

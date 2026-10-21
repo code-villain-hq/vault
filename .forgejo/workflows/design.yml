@@ -14,6 +14,7 @@ on:
       - "studio/design/components.css"
       - "studio/design/lint/**"
       - "code/apps/site/**/*.css"
+      - "code/kit/web/src/**"
       - "code/apps/forge/apps/web/src/**"
       - "code/apps/layer/src/**"
       - "code/apps/layer/web/src/**"

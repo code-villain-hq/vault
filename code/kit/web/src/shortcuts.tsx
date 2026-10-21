@@ -46,7 +46,8 @@ export function Shortcuts({
   latest.current = { goTo, onSettings };
 
   useEffect(() => {
-    let pendingG = 0;
+    // When "g" was pressed: the next key, within 1.5 seconds, picks the page.
+    let pendingG = Number.NEGATIVE_INFINITY;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "," && event.metaKey && latest.current.onSettings) {
         event.preventDefault();
@@ -65,9 +66,11 @@ export function Shortcuts({
         return;
       }
       const target = latest.current.goTo.find((page) => page.key === key);
-      if (target && event.timeStamp - pendingG < 1500) {
+      const afterG = event.timeStamp - pendingG < 1500;
+      // Any other key ends "g": "g x i" isn't "g i".
+      pendingG = Number.NEGATIVE_INFINITY;
+      if (target && afterG) {
         event.preventDefault();
-        pendingG = 0;
         target.go();
       }
     };

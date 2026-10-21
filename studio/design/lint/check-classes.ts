@@ -1,10 +1,11 @@
 // Tailwind arbitrary values and palette colours in markup bypass the tokens
 // where stylelint can't see them: `text-[12px]`, `bg-[#111]`, `bg-zinc-800`,
-// `text-white`. Scans the TSX/TS of Forge, Layer (the app and its server's web app), Glyph and Raven. A
+// `text-white`. Scans the TSX/TS of the web kit, Forge, Layer (the app and its server's web app), Glyph and Raven. A
 // line that must keep one says why with `design-lint-ignore` in a comment.
 import { Glob } from "bun";
 
 const roots: [string, string][] = [
+  ["../../../code/kit/web/src", "**/*.{ts,tsx}"],
   ["../../../code/apps/forge/apps/web/src", "**/*.{ts,tsx}"],
   ["../../../code/apps/layer/src", "**/*.{ts,tsx}"],
   ["../../../code/apps/layer/web/src", "**/*.{ts,tsx}"],
@@ -42,4 +43,4 @@ if (found.length) {
   console.error(`${found.join("\n")}\n\n${found.length} class(es) bypass the design tokens. Use a token-backed class, or say why with design-lint-ignore.`);
   process.exit(1);
 }
-console.log("No arbitrary colours, sizes or radii in Forge's, Layer's, Glyph's or Raven's markup.");
+console.log("No arbitrary colours, sizes or radii in the web kit's, Forge's, Layer's, Glyph's or Raven's markup.");

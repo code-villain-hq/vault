@@ -11,7 +11,7 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) },
   // The shared kit (`code/kit/web`) sits outside this app: it must use the
   // app's React and router, not a second copy beside the kit.
-  resolve: { dedupe: ["react", "react-dom", "@base-ui/react", "@tanstack/react-router"] },
+  resolve: { dedupe: ["react", "react-dom", "@base-ui/react", "@tanstack/react-router", "lucide-react"] },
   server: {
     port: 5173,
     strictPort: true,

@@ -28,3 +28,7 @@ test("another year names the year", () => {
 test("no time reads never", () => {
   expect(ago(null, now)).toBe("never");
 });
+
+test("a time that isn't one reads nothing", () => {
+  expect(ago("soon", now)).toBe("");
+});

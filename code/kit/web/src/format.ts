@@ -4,6 +4,7 @@ const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return "never";
   const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
   const seconds = Math.max(0, (now - then.getTime()) / 1000);
   if (seconds < 45) return "just now";
   const minutes = Math.round(seconds / 60);

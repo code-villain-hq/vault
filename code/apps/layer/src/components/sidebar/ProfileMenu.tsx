@@ -200,8 +200,10 @@ function ManageProfiles({
     // Left empty or as it was: nothing to send, the field just closes.
     if (!renaming.name.trim() || renaming.name === was) { setRenaming(null); return; }
     failure.clear();
-    api.renameProfile(renaming.id, renaming.name)
-      .then(() => { setRenaming(null); reload(); })
+    const { id } = renaming;
+    api.renameProfile(id, renaming.name)
+      // Only this field closes: Rename on another profile may have opened its own.
+      .then(() => { setRenaming((r) => (r?.id === id ? null : r)); reload(); })
       .catch(failure.fail);
   }
 

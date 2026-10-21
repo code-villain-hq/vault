@@ -1,4 +1,5 @@
 import { uuidv7 } from "@code-villain/sync-client";
+import { shortcutFree } from "@code-villain/web";
 import type { Suggestion } from "@glyph/types";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -198,15 +199,14 @@ export function ReviewPage() {
   };
 
   // j/k move, ↵ suggests or accepts, w writes, esc rejects, x skips.
-  const keys = useRef({ current, items, selected });
-  keys.current = { current, items, selected };
+  // An open dialog (the shortcuts list, the command menu) keeps them, so Esc
+  // closing it never rejects the suggestion behind it.
+  const keys = useRef({ current, items, selected, accept, reject, suggest });
+  keys.current = { current, items, selected, accept, reject, suggest };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const typing =
-        event.target instanceof HTMLElement &&
-        (event.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName));
-      if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
-      const { current, items, selected } = keys.current;
+      if (!shortcutFree(event)) return;
+      const { current, items, selected, accept, reject, suggest } = keys.current;
       const move = (by: number) =>
         setSelected(Math.max(0, Math.min(items.length - 1, selected + by)));
       if (event.key === "j" || event.key === "ArrowDown") move(1);
@@ -226,7 +226,7 @@ export function ReviewPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, []);
 
   // Keep the selected row in view.
   useEffect(() => {
