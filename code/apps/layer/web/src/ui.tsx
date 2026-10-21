@@ -1,80 +1,10 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
-import { useId } from "react";
-
-export { Button, buttonClass } from "@code-villain/web";
-
-export function TextField({
-  label,
-  hint,
-  className = "",
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
-  const id = useId();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted">
-        {label}
-      </label>
-      <input id={id} {...props} className={`ui-field h-9 rounded-md px-3 ${className}`} />
-      {hint && <p className="text-xs text-faint">{hint}</p>}
-    </div>
-  );
-}
-
-export function ErrorMessage({ children }: { children: ReactNode }) {
-  if (!children) return null;
-  return (
-    <p role="alert" className="ui-tint-danger rounded-md px-3 py-2">
-      {children}
-    </p>
-  );
-}
-
-/** The Layer mark. */
-export function Logo({ className = "size-5" }: { className?: string }) {
-  return <img src="/icon.svg" alt="" className={className} />;
-}
-
-/** A centred screen for signing in and setting up. */
-export function AuthScreen({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="flex min-h-full items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm">
-        {/* Clear space: a quarter of the mark's 80px height. */}
-        <Logo className="mx-auto mb-5 size-20" />
-        <h1 className="mb-6 text-center text-title font-semibold">{title}</h1>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/** Shown while something loads; quiet on purpose. */
-export function Splash() {
-  return (
-    <div className="flex h-full items-center justify-center">
-      <Logo className="size-8 animate-breathe" />
-    </div>
-  );
-}
-
-/** A labelled part of a page: a quiet heading over its content. */
-export function Section({
-  title,
-  aside,
-  children,
-}: {
-  title: string;
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline gap-3">
-        <h2 className="text-xs font-semibold text-muted">{title}</h2>
-        {aside && <div className="ml-auto text-xs text-faint">{aside}</div>}
-      </div>
-      {children}
-    </section>
-  );
-}
+export {
+  AuthScreen,
+  Button,
+  buttonClass,
+  ErrorMessage,
+  Logo,
+  Section,
+  Splash,
+  TextField,
+} from "@code-villain/web";

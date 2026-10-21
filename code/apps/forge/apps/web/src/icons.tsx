@@ -1,3 +1,4 @@
+import { Initial } from "@code-villain/web";
 import type { StateType, WorkflowState } from "@forge/types";
 import { IconServer } from "@tabler/icons-react";
 import {
@@ -19,6 +20,8 @@ import {
 import { readable } from "./contrast";
 import { useReviewStateIds } from "./data";
 import { ICONS } from "./icon-set";
+
+export { Initial, NavIcon } from "@code-villain/web";
 
 /** Lucide's size and stroke: 15px beside text, 12px inside chips and pills. */
 type IconSize = 12 | 15;
@@ -109,33 +112,6 @@ export function PriorityIcon({ priority, size = 15 }: { priority: number; size?:
   );
 }
 
-/**
- * A neutral initial on the chip tint, in the control role: round for a
- * person, square for an agent or a workspace. Grey does the work; a
- * person's avatar is detail, not a signal.
- */
-export function Initial({
-  name,
-  square = false,
-  size = "size-5",
-  title,
-}: {
-  name: string;
-  square?: boolean;
-  size?: string;
-  title?: string;
-}) {
-  return (
-    <span
-      className={`${size} ui-control flex shrink-0 items-center justify-center bg-chip text-muted ${square ? "rounded-sm" : "rounded-full"}`}
-      aria-hidden="true"
-      title={title}
-    >
-      {name.trim().charAt(0).toUpperCase()}
-    </span>
-  );
-}
-
 /** A person's initial (a square for agents); dashed for nobody. */
 export function Avatar({
   user,
@@ -203,9 +179,4 @@ export function ServiceIcon({
       stroke={1.75}
     />
   );
-}
-
-/** A page's icon, as the sidebar and the command menu show it. */
-export function NavIcon({ icon: Icon }: { icon: LucideIcon }) {
-  return <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />;
 }
