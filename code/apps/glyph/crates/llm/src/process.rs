@@ -2,6 +2,7 @@
 //! with the last lines they printed, for when one fails to come up.
 
 use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -12,6 +13,24 @@ use tokio::process::Command;
 
 /// Lines kept from each server's output.
 const LINES: usize = 200;
+
+/// Where Homebrew puts programs. An app opened from the Finder gets a short
+/// `PATH` without them, so they're looked in too.
+const MORE_PLACES: [&str; 2] = ["/opt/homebrew/bin", "/usr/local/bin"];
+
+/// The program to run for `binary`: a path as it is, else the first match on
+/// `PATH` or in Homebrew's folders, else the name, for the error to show.
+pub fn find_program(binary: &str) -> PathBuf {
+    if binary.contains(std::path::MAIN_SEPARATOR) {
+        return binary.into();
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .chain(MORE_PLACES.iter().map(PathBuf::from))
+        .map(|dir| dir.join(binary))
+        .find(|candidate| candidate.is_file())
+        .unwrap_or_else(|| binary.into())
+}
 
 /// A started server, as the API shows it.
 #[derive(Debug, Clone, Serialize)]
@@ -77,7 +96,7 @@ impl Processes {
         if running.get(name).is_some_and(|p| p.running()) {
             return Err(ProcessError::AlreadyRunning);
         }
-        let mut command = Command::new(binary);
+        let mut command = Command::new(find_program(binary));
         command
             .args(args)
             .stdin(Stdio::null())

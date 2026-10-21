@@ -4,3 +4,5 @@ DATABASE_URL = "postgres://glyph:glyph@localhost:5434/glyph"
 TS_RS_EXPORT_DIR = { value = "packages/types/src/generated", relative = true }
 # Local development runs on plain http, so session cookies can't be Secure.
 GLYPH_COOKIE_SECURE = "0"
+# The Postgres the desktop app bundles (code/kit/desktop).
+POSTGRESQL_VERSION = "=18.6.1"

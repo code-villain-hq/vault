@@ -1,6 +1,6 @@
 //! Glyph's server: the HTTP API, the sync feed and accounts, the same as
-//! Forge's, plus translating with local models. `main.rs` runs it; tests
-//! drive [`router`] directly.
+//! Forge's, plus translating with local models. [`serve`] runs it, from
+//! `main.rs` or the desktop app; tests drive [`router`] directly.
 
 pub mod accounts;
 pub mod auth;
@@ -8,13 +8,16 @@ pub mod config;
 pub mod error;
 pub mod invites;
 pub mod limits;
+pub mod local;
 pub mod members;
 pub mod models;
 pub mod oidc;
 pub mod routes;
+mod serve;
 pub mod state;
 pub mod translate;
 pub mod ws;
 
 pub use routes::{app, router};
+pub use serve::serve;
 pub use state::AppState;

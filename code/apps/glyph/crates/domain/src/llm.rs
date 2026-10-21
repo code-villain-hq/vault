@@ -31,6 +31,54 @@ pub struct ModelProcess {
     pub recent_output: Vec<String>,
 }
 
+/// A model added in Settings, on a Glyph whose models file the app may
+/// write (the desktop app's own). It comes from one place: a GGUF file, a
+/// download from Hugging Face, or a server someone runs (`endpoint`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields, default)]
+#[ts(export)]
+pub struct ModelCreate {
+    pub name: String,
+    pub model_path: String,
+    pub hf_repo: String,
+    pub hf_file: String,
+    pub endpoint: String,
+}
+
+impl Validate for ModelCreate {
+    fn validate(&self) -> Result<(), ValidationError> {
+        rules::text(&self.name, "name", rules::NAME)?;
+        let file = !self.model_path.trim().is_empty();
+        let download = !self.hf_repo.trim().is_empty() || !self.hf_file.trim().is_empty();
+        let server = !self.endpoint.trim().is_empty();
+        match (file, download, server) {
+            (true, false, false) => {
+                if !self.model_path.trim().ends_with(".gguf") {
+                    return Err(ValidationError("Choose a .gguf file.".into()));
+                }
+            }
+            (false, true, false) => {
+                rules::text(&self.hf_repo, "repository", rules::NAME * 2)?;
+                rules::text(&self.hf_file, "file", rules::NAME * 2)?;
+            }
+            (false, false, true) => {
+                let endpoint = self.endpoint.trim();
+                if !(endpoint.starts_with("http://") || endpoint.starts_with("https://")) {
+                    return Err(ValidationError(
+                        "The address starts with http:// or https://.".into(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(ValidationError(
+                    "Give a file, a download or a server, one of them.".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Asks a pair's model for the grammatical forms of a glossary term.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]

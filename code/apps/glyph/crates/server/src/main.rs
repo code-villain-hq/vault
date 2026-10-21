@@ -1,10 +1,9 @@
-use std::net::SocketAddr;
 use std::time::Duration;
 
 use glyph_llm::Models;
 use glyph_server::config::Config;
 use glyph_server::oidc::OidcLogin;
-use glyph_server::{AppState, accounts, app, models, translate};
+use glyph_server::{AppState, accounts, translate};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -59,23 +58,12 @@ async fn main() -> anyhow::Result<()> {
                 }
                 None => state,
             };
-            let processes = state.processes.clone();
-            tokio::spawn(code_villain_sync::listen(
-                state.pool.clone(),
-                glyph_sync::NOTIFY_CHANNEL,
-                state.wake.clone(),
-            ));
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
-            // With each connection's address, for limits per client.
-            let service = app(state, config.web_dir.as_deref())
-                .into_make_service_with_connect_info::<SocketAddr>();
-            axum::serve(listener, service)
-                .with_graceful_shutdown(async {
-                    let _ = tokio::signal::ctrl_c().await;
-                })
-                .await?;
-            processes.stop_all(models::GRACE).await;
+            glyph_server::serve(state, config.web_dir.as_deref(), listener, async {
+                let _ = tokio::signal::ctrl_c().await;
+            })
+            .await?;
         }
         ["reset-password", email] => {
             let password = accounts::reset_password(&pool, email).await?;

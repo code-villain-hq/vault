@@ -9,9 +9,6 @@ use rand::distr::Alphanumeric;
 
 use crate::Result;
 
-/// The port Postgres takes when it's free; another one when it isn't.
-const PREFERRED_PORT: u16 = 7386;
-
 /// Postgres run by the app from the archive compiled into it, with its data
 /// in a folder of the app's own. It listens on loopback only and asks for a
 /// password, kept beside the data where only this user can read it.
@@ -23,10 +20,11 @@ pub struct LocalPostgres {
 }
 
 impl LocalPostgres {
-    /// Starts Postgres on the data in `root`, creating it the first time.
-    /// A server left running by an app that didn't quit cleanly is stopped
+    /// Starts Postgres on the data in `root`, creating it the first time, on
+    /// `preferred_port` when it's free and another port when it isn't (0:
+    /// any). A server left running by an app that didn't quit cleanly is stopped
     /// first, so this one starts on the same data.
-    pub async fn start(root: &Path) -> Result<Self> {
+    pub async fn start(root: &Path, preferred_port: u16) -> Result<Self> {
         std::fs::create_dir_all(root)?;
         let mut settings = Settings {
             installation_dir: root.join("runtime"),
@@ -34,7 +32,7 @@ impl LocalPostgres {
             password_file: root.join("pgpass"),
             password: password(&root.join("password"))?,
             host: Ipv4Addr::LOCALHOST.to_string(),
-            port: free_port(),
+            port: free_port(preferred_port),
             temporary: false,
             // The first start unpacks the binaries and creates the cluster.
             timeout: Some(Duration::from_secs(120)),
@@ -117,12 +115,12 @@ fn password(file: &PathBuf) -> std::io::Result<String> {
     Ok(password)
 }
 
-fn free_port() -> u16 {
-    [PREFERRED_PORT, 0]
+fn free_port(preferred: u16) -> u16 {
+    [preferred, 0]
         .into_iter()
         .find_map(|port| {
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).ok()?;
             Some(listener.local_addr().ok()?.port())
         })
-        .unwrap_or(PREFERRED_PORT)
+        .unwrap_or(preferred)
 }

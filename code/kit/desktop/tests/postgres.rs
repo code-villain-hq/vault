@@ -41,7 +41,7 @@ fn postmaster_pid(postgres: &LocalPostgres) -> String {
 async fn keeps_its_data_to_itself_across_restarts_and_crashes() {
     let root = tempfile::tempdir().unwrap();
 
-    let postgres = LocalPostgres::start(root.path()).await.unwrap();
+    let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
     // Loopback only, and only with the password, kept where only we can read it.
     assert!(postgres.url("app").contains("@127.0.0.1:"));
     let wrong = format!(
@@ -56,13 +56,13 @@ async fn keeps_its_data_to_itself_across_restarts_and_crashes() {
     postgres.stop().await.unwrap();
 
     // A quit that didn't stop Postgres: it's still running on the data.
-    let postgres = LocalPostgres::start(root.path()).await.unwrap();
+    let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
     assert_eq!(read(&postgres).await, ["first"]);
     write(&postgres, "second").await;
     std::mem::forget(postgres);
 
     // Killed outright: the pid file stays behind.
-    let postgres = LocalPostgres::start(root.path()).await.unwrap();
+    let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
     assert_eq!(read(&postgres).await, ["first", "second"]);
     let pid = postmaster_pid(&postgres);
     std::mem::forget(postgres);
@@ -71,7 +71,7 @@ async fn keeps_its_data_to_itself_across_restarts_and_crashes() {
         .status();
     assert!(killed.unwrap().success());
 
-    let postgres = LocalPostgres::start(root.path()).await.unwrap();
+    let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
     assert_eq!(read(&postgres).await, ["first", "second"]);
     postgres.stop().await.unwrap();
 }
