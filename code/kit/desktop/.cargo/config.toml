@@ -1,0 +1,4 @@
+# Postgres compiled into the app (and into these tests). Every app that uses
+# this crate pins the same version in its own .cargo/config.toml.
+[env]
+POSTGRESQL_VERSION = "=18.6.1"
