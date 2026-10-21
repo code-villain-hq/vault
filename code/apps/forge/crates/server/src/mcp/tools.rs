@@ -674,7 +674,15 @@ pub async fn create_issue(pool: &PgPool, actor: Actor, input: CreateIssue) -> To
                     let assignee = s
                         .user_name(i.assignee_id)
                         .unwrap_or_else(|| "unassigned".into());
-                    format!("- {}: {} ({status}, {assignee})", s.identifier(i), i.title)
+                    // Only issues waiting for an agent have a place in its queue.
+                    let queue = s.queue.get(&i.id).map_or(String::new(), |position| {
+                        format!(", queue_position {position}")
+                    });
+                    format!(
+                        "- {}: {} ({status}, {assignee}{queue})",
+                        s.identifier(i),
+                        i.title
+                    )
                 })
                 .collect();
             return Err(format!(

@@ -2408,6 +2408,17 @@ async fn agents_take_their_issues_in_queue_order(pool: PgPool) {
     assert_eq!(issue["title"], "Started");
     assert_eq!(issue["queue_position"], 2);
 
+    // So do the similar issues create_issue shows before filing.
+    let similar = create_issue(pool, s.agent, new_issue("Urgent", "Todo", None))
+        .await
+        .unwrap_err();
+    assert!(similar.contains("FOR-2: Urgent (Todo, "), "{similar}");
+    assert!(similar.contains(", queue_position 1)"), "{similar}");
+    let waiting = create_issue(pool, s.agent, new_issue("Waiting for review", "Todo", None))
+        .await
+        .unwrap_err();
+    assert!(!waiting.contains("queue_position"), "{waiting}");
+
     // People have no queue: their issues have no place in one.
     move_issue(pool, s.agent, "FOR-1", None, Some("Ada")).await;
     let ada = parse(
