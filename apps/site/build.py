@@ -100,7 +100,7 @@ def main() -> None:
     for path in (VAULT / 'design/tokens').glob('*.css'):
         copy(path, 'assets/tokens/' + path.name)
     copy(VAULT / 'design/components.css', 'assets/components.css')
-    for path in (VAULT / 'content/blog/images').glob('*.svg'):
+    for path in (p for p in (VAULT / 'content/blog/images').glob('*') if p.is_file() and not p.name.startswith('.')):
         copy(path, 'assets/blog/' + path.name)
     for product, path in {
         'forge': 'apps/forge/apps/web/public/icon.svg',

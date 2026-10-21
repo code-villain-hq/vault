@@ -30,5 +30,5 @@ extra_args = ["-c", "4096"]
 #
 # [[models]]
 # name = "external"
-# endpoint = "http://localhost:7483"
+# endpoint = "http://localhost:7484"
 # chat_mode = false   # use the raw /completion endpoint
