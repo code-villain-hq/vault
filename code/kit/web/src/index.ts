@@ -5,6 +5,7 @@ export {
   accountPages,
   type Role,
 } from "./account";
+export { api, RequestError, setSessionEndedHandler, useApi } from "./api";
 export { Button, type ButtonVariant, buttonClass } from "./button";
 export { type Command, CommandMenu, matching, openCommandMenu } from "./command-menu";
 export { type Confirmation, ConfirmDialog } from "./confirm";
@@ -23,8 +24,44 @@ export { useDialogFocus } from "./dialog-focus";
 export { ago } from "./format";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";
 export { CreateDialog, chip, MoreMenu, NewButton, RowAction } from "./page-parts";
+export {
+  type AppConfig,
+  apiUrl,
+  appConfig,
+  authHeaders,
+  authPlace,
+  bundled,
+  configureApp,
+  credentialsFor,
+  databaseName,
+  forgetPlace,
+  getPlaces,
+  isDesktop,
+  loadPlaces,
+  macUserName,
+  normalizeServer,
+  type Place,
+  placeFor,
+  placeName,
+  placeWorkspaces,
+  publicUrl,
+  rememberToken,
+  serverUrl,
+  setCurrentPlace,
+  setServerUrl,
+  socketProtocols,
+  startOnThisMac,
+} from "./places";
 export { messageOf, UNKNOWN_PROBLEM } from "./problems";
 export { Redirect } from "./redirect";
+export {
+  createSession,
+  type Session,
+  type SessionMe,
+  type SignedIn,
+  type WorkspaceEntry,
+  workspaceEntries,
+} from "./session";
 export { type GoTo, openShortcuts, type ShortcutSection, Shortcuts } from "./shortcuts";
 export { SearchButton, ShortcutsButton } from "./sidebar";
 export { SyncIndicator, type SyncState } from "./sync-indicator";

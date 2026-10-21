@@ -2,7 +2,7 @@
   "name": "@code-villain/web",
   "private": true,
   "type": "module",
-  "description": "The parts every studio web app shares: the command menu, the shortcuts list, confirming, the sync indicator, time in words.",
+  "description": "The parts every studio web app shares: places, the API and the session; the command menu, the shortcuts list, confirming, the account pages, the sync indicator, time in words.",
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./src/vite.ts"

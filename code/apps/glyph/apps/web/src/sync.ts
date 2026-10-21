@@ -1,4 +1,5 @@
 import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-client";
+import { databaseName } from "@code-villain/web";
 import type {
   GlossaryEntry,
   GlossaryEntryCreate,
@@ -32,11 +33,6 @@ export type Schema = {
   TranslationRun: { record: TranslationRun; create: never; patch: never };
   User: { record: User; create: never; patch: never };
 };
-
-/** Each person's copy of each workspace lives in its own database. */
-export function databaseName(userId: string, workspaceId: string) {
-  return `glyph-${userId}-${workspaceId}`;
-}
 
 const timestamps = () => {
   const now = new Date().toISOString();
