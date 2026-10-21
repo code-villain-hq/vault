@@ -1,13 +1,25 @@
-/** How long ago, in a word: "just now", "4m ago", "3d ago". */
+// English, like the rest of the app's words, so a Mac set to another
+// language does not get "vor 5 Minuten" in the middle of an English sentence.
+const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+/**
+ * How long ago, in words: "just now", "5 minutes ago", "yesterday", then a
+ * date ("Oct 3"), as every Code Villain app says it (studio/design/behaviour.md;
+ * Forge's `timeAgo`). A time a little in the future, from a clock that runs
+ * ahead, reads "just now" rather than "in 2 minutes".
+ */
 export function ago(when: string | number, now: number = Date.now()): string {
   const t = typeof when === "number" ? when : Date.parse(when);
   if (Number.isNaN(t)) return "";
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 5) return "just now";
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
+  const seconds = Math.max(0, Math.round((now - t) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return RELATIVE.format(-minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return RELATIVE.format(-hours, "hour");
+  const days = Math.round(hours / 24);
+  if (days < 7) return RELATIVE.format(-days, "day");
+  return new Date(t).toLocaleDateString("en", { month: "short", day: "numeric" });
 }
 
 /**

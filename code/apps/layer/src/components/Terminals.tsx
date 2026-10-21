@@ -3,6 +3,7 @@ import { api, errMessage } from "../lib/api";
 import { useFocusedPane } from "../lib/goto";
 import { usePanesOf } from "../lib/panes";
 import { read, write } from "../lib/persist";
+import { ago } from "../lib/time";
 import { useStore } from "../store";
 import { canRestart, paneScope, paneState } from "../lib/derive";
 import type { PaneInfo, Resumable, TaskView } from "../lib/types";
@@ -17,14 +18,6 @@ import { PaneView } from "./AcpPane";
 import { CloseIcon, PlusIcon, SwapIcon } from "./icons";
 import { ContextMenu, ErrorMessage, Field, Modal, Spinner, Switch, useFailure } from "./ui";
 import type { MenuItem } from "./ui";
-
-function ago(unixSeconds: number): string {
-  const s = Math.max(0, Math.round(Date.now() / 1000 - unixSeconds));
-  if (s < 90) return "just now";
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
-}
 
 /**
  * A task's panes. Memoised: the task header above re-renders for its tab, its
@@ -185,7 +178,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   // pane or two already open, and the list grows with every agent installed.
   const addItems: MenuItem[] = [
     ...offerResume.map((r) => ({
-      label: `⟲ Resume ${r.name}${r.last_active ? ` · ${ago(r.last_active)}` : ""}`,
+      label: `⟲ Resume ${r.name}${r.last_active ? ` · ${ago(r.last_active * 1000)}` : ""}`,
       onSelect: () => void resume(r.agent_id),
     })),
     ...installed.map((a, i) => ({
@@ -410,7 +403,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                     ⟲ Resume {r.name}
                     {r.last_active && (
                       <span style={{ opacity: 0.75, marginLeft: 6 }}>
-                        · {ago(r.last_active)}
+                        · {ago(r.last_active * 1000)}
                       </span>
                     )}
                   </button>

@@ -70,7 +70,7 @@ export function ReviewCard({
       <div className="chips standing">
         {pr.author && <span className="by">{pr.author}</span>}
         {asked && <span className="ui-chip">{asked}</span>}
-        <span className="ui-chip size" title={`${pr.changed_files} files, opened ${ago(pr.created_at)} ago`}>
+        <span className="ui-chip size" title={`${pr.changed_files} files, opened ${ago(pr.created_at)}`}>
           <span className="add">+{pr.additions}</span> <span className="del">−{pr.deletions}</span>
           {" · "}{pr.changed_files} {pr.changed_files === 1 ? "file" : "files"}
         </span>

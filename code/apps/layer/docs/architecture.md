@@ -706,8 +706,6 @@ Each of these is recorded at the code it shaped. Leave those comments alone.
 Real, known, and not to be copied. Each is its own change when someone
 picks it up.
 
-- `Terminals.tsx` keeps its own `ago()`, which says "just now" for 90
-  seconds where `lib/time.ts` says "just now" for 5.
 - `DiffView` has its own "which agent gets this" flow instead of
   `useAgentTarget`.
 - The terminal palettes in `lib/terminal.ts` repeat the other themes' CSS values; Nightshade's come from `src/design/syntax.json`, the copy of the vault's `studio/design/tokens/syntax.resolved.json`.
