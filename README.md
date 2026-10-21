@@ -17,6 +17,7 @@ Code Villain builds real tools and shows the build in public. Someone looking in
 | [`apps/layer`](apps/layer) | Layer, the agent development environment for macOS |
 | [`apps/caster`](apps/caster) | Caster, the launcher for macOS |
 | [`apps/glyph`](apps/glyph) | Glyph, the AI translation tool for i18n JSON files |
+| [`apps/theme`](apps/theme) | The Code Villain theme for VS Code, Cursor, Neovim, WezTerm and Starship |
 | [`apps/site`](apps/site) | The website. It publishes [`content/blog`](content/blog) |
 
 The studio website is [www.codevillain.eu](https://www.codevillain.eu/). Naming rules live in [`brand/name.md`](brand/name.md).

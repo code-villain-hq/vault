@@ -170,7 +170,6 @@ Complete list in [`docs/features.md`](docs/features.md#14-what-the-app-writes-on
 Possible future directions:
 
 - AI review step (second agent reviews work against the spec)
-- Local dashboard for reviewing runs (agent, duration, result, loop rounds, error rate, tokens)
 - Demo mode with mock data
 - Architecture diagram
 

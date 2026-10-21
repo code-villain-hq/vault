@@ -45,7 +45,7 @@ security add-generic-password -s git.codevillain.eu -a release -w
 ```
 
 **Git over SSH** to git.codevillain.eu, as for pushing the vault: the script
-pushes the tag and the tap with your own `git`.
+pushes the tap with your own `git`. It never pushes the tag (above).
 
 ## Homebrew
 

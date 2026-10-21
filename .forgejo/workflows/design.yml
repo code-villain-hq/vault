@@ -1,7 +1,8 @@
 # Design drift on every push that could cause it: the theme tests, the
 # generated outputs in design/tokens against build.py, Forge's, Layer's,
 # Caster's, Glyph's and the editor themes' copies against the vault, and the lint
-# guard over every web surface's CSS and markup (design/lint). Each check
+# guard over the web CSS and the apps' TSX (design/lint; not the site's
+# HTML). Each check
 # writes nothing and fails with the fix.
 name: design
 

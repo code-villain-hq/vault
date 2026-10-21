@@ -46,9 +46,8 @@ sentence that should hold:
   tests. Run one with `cargo test --lib echo_latency -- --ignored --nocapture`.
 - **Chrome**: the browser tests drive a real Chrome when one is installed,
   and skip themselves when not, or when `VL_SKIP_CHROME_TESTS` is set. CI
-  sets it for a pull request that touches nothing under
-  `src-tauri/src/browser/`, `commands/browser.rs` or the Cargo files; a
-  push to main always runs them.
+  (`.forgejo/workflows/layer.yml`, on push only) never sets it, so it
+  always runs them; set it locally to leave them out.
 
 A bug fix adds the test that fails without the fix. A test that cannot fail
 proves nothing: check it fails by breaking the code once.

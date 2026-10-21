@@ -22,8 +22,10 @@ You need Rust (stable), Bun, and the Xcode Command Line Tools.
    of change it is.
 4. **Verify it** ([`docs/testing.md`](docs/testing.md)): `bun run check`, a
    test for a bug fix, and the mock harness for a UI change.
-5. **Open a pull request.** The template asks what the change does, which
-   requirements it touches, and what was and was not verified.
+5. **Open a pull request.** Say what the change does, which requirements
+   it touches, and list what was and was not verified. On Forgejo, push to
+   `refs/for/main`; a PR for a Forge issue says "Fixes <ID>" in its body
+   (the vault's `AGENTS.md`).
 
 Keep pull requests small: one behaviour each. A refactor goes in its own
 PR, with no change in behaviour.
@@ -60,7 +62,7 @@ What to watch for in review:
 ## Pull request review checklist
 
 - [ ] The requirement in `docs/features.md` matches the code.
-- [ ] `bun run check` passes (CI runs it).
+- [ ] `bun run check` passes (CI runs it on push, not on the pull request).
 - [ ] Bug fixes have a test that fails without them.
 - [ ] Nothing that waits runs on the main thread or directly on the async
       runtime.

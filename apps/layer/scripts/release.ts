@@ -3,8 +3,8 @@
  * A Layer release, built on this Mac and published on the vault's Forgejo
  * (docs/releasing.md).
  *
- *     bun run release           check, build, tag layer-v<version>, and
- *                               draft the release with its .dmg
+ *     bun run release           check, build, and draft the layer-v<version>
+ *                               release (Forgejo makes the tag on publish) with its .dmg
  *     bun run release:publish   publish that draft and put it in the
  *                               Homebrew tap
  *

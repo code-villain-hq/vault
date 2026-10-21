@@ -37,6 +37,18 @@ Then open http://localhost:5174. For a real model, copy
 `models.example.toml` to `models.toml` and run `bun run dev` instead.
 
 `bun run app` runs the whole thing in Docker at http://localhost:7490.
+Copy `models.example.toml` to `models.toml` first: Docker mounts it.
+
+## Signing in with Code Villain
+
+Set `GLYPH_OIDC_ISSUER` (`https://id.codevillain.eu`),
+`GLYPH_OIDC_CLIENT_ID`, `GLYPH_OIDC_CLIENT_SECRET` and `GLYPH_PUBLIC_URL`
+(Glyph's address; Pocket ID sends people back to
+`<GLYPH_PUBLIC_URL>/api/auth/oidc/callback`), in your shell or a `.env`
+next to `docker-compose.yml`. With them, Code Villain is the only way in
+and `bun run seed` can't sign up its accounts. Without them, passwords stay
+on. The server also reads `GLYPH_ADDR`, `GLYPH_WEB_DIR` and
+`GLYPH_TRUST_FORWARDED_FOR` (`crates/server/src/config.rs`).
 
 See [AGENTS.md](AGENTS.md) for the commands, the layout and the rules.
 

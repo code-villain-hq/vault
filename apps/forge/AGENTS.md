@@ -92,7 +92,8 @@ issue is done.
 - `bun run app`: the whole app in Docker at http://localhost:7390 (one image:
   server plus built web app). `bun run app:logs` follows it.
 - `bun run seed`: local test accounts (admin and member of "Forge"); the
-  password is in `scripts/seed-dev.ts`. Needs `bun run dev` running.
+  password is in `scripts/seed-dev.ts`. Needs `bun run dev` running, with
+  passwords on (`FORGE_OIDC_ISSUER` empty; README, "Signing in with Code Villain").
   `bun run seed:dogfood` then describes Forge's code in the vault as
   services, for drift checks on Forge itself.
 - `bun run dev:fake-ai`: `bun run dev` with the AI features on, against a
@@ -120,7 +121,8 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 - `crates/domain`: models, validation, sync protocol types (no database).
 - `crates/sync`: the sync engine: applying transactions, change log, snapshots.
 - `crates/server`: axum server: HTTP API, WebSocket feed, accounts, invites,
-  MCP, the GitHub connection, drift checks.
+  MCP, the GitHub and Forgejo connections, Code Villain sign-in (`oidc.rs`),
+  drift checks.
 - `crates/ai`: model provider (Claude), agent loop, read-only repository
   access.
 - `packages/sync-client`: client side of sync (local store, outbox, feed).

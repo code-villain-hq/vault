@@ -9,7 +9,7 @@ web
 Two audiences share the studio:
 
 1. **Future employers and peers** watching the public build — they should see craft and growth from senior front-end work into shipping whole products with AI.
-2. **People using the products** — Forge (AI-first issue tracker), Layer (macOS agent development environment), Caster (macOS launcher), and the Code Villain editor and terminal theme.
+2. **People using the products** — Forge (AI-first issue tracker), Layer (macOS agent development environment), Caster (macOS launcher), Glyph (AI translation for i18n files), and the Code Villain editor and terminal theme.
 
 Studio surfaces (site, blog, social, mark) speak to the first audience. Apps serve the second. Company-wide design still has to hold for both.
 
@@ -21,13 +21,13 @@ The vault is the home for that record: apps, brand, design tokens, and content.
 
 ## Positioning
 
-A one-person studio that ships real tools while narrating the build in public — theatrical villain posture without corporate cruelty. Neighboring “AI portfolio” or “indie SaaS” stories cannot truthfully claim the same mix of shipped products (Forge, Layer, Caster, the Code Villain theme), Doom-inspired voice, and Nightshade brand system as one company.
+A one-person studio that ships real tools while narrating the build in public — theatrical villain posture without corporate cruelty. Neighboring “AI portfolio” or “indie SaaS” stories cannot truthfully claim the same mix of shipped products (Forge, Layer, Caster, Glyph, the Code Villain theme), Doom-inspired voice, and Nightshade brand system as one company.
 
 ## Operating Context
 
 - Brand decisions start in `brand/` (color, type, mark, voice); `design/` carries numbers and layouts; apps catch up in their own toolkits.
 - Studio surfaces follow `brand/` and stay night. Nightshade is every app's default, night and day; a theme picker like Layer's can add themes on the same colour names. Every app uses the shared tokens, with drift checks in CI.
-- Content lives in `content/blog` and `content/social`; the site shows the blog; post pages are hand-written until there is a build step.
+- Content lives in `content/blog` and `content/social`; the site renders the blog from them (`apps/site/build.py`).
 - Agents read `AGENTS.md` at the vault root and each app’s `AGENTS.md` before working there.
 - Role label in public writing: product engineer (current name; may change). The work carries the story, not the title.
 
@@ -38,9 +38,9 @@ A one-person studio that ships real tools while narrating the build in public �
 - Forge — AI-first issue tracker (web + desktop shell).
 - Layer — agent development environment for macOS.
 - Caster — launcher for macOS.
-- Code Villain theme — VS Code and Cursor, Neovim and WezTerm, generated from the tokens.
+- Code Villain theme — VS Code and Cursor, Neovim, WezTerm and a Starship prompt, generated from the tokens.
 - Glyph — AI translation tool for i18n JSON files, on local models.
-- Site — the homepage and the blog (index and post pages, hand-written for now).
+- Site — the homepage and the blog (index and post pages, built from `content/blog`).
 
 **Company-wide design**
 
@@ -50,7 +50,6 @@ A one-person studio that ships real tools while narrating the build in public �
 **Undecided**
 
 - A layout for the social card (`design/layouts/`).
-- How the site builds post pages from `content/blog`.
 - A spacing scale (`design/tokens/`).
 
 ## Brand Commitments

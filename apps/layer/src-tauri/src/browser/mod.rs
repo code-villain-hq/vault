@@ -449,9 +449,9 @@ mod tests {
 
     /// An app with one task, `t1`, and an agent's pane in it: the app, its
     /// folder, and the pane. None where no Chrome is installed, or where
-    /// `VL_SKIP_CHROME_TESTS` is set, which skips the test that asked. CI
-    /// sets it for a pull request that leaves the browser alone: these
-    /// tests were a third of the test run there, on three cores.
+    /// `VL_SKIP_CHROME_TESTS` is set, which skips the test that asked: these
+    /// tests were a third of the test run on three cores. CI, push-only,
+    /// leaves it unset.
     pub(super) fn app_with_task() -> Option<(tauri::App<MockRuntime>, std::path::PathBuf, String)> {
         if std::env::var_os("VL_SKIP_CHROME_TESTS").is_some() {
             eprintln!("skipped: VL_SKIP_CHROME_TESTS is set");

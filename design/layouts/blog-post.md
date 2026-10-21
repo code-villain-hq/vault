@@ -1,6 +1,6 @@
 # Blog
 
-The site's blog: an index of posts and the post page. It follows [`../principles.md`](../principles.md) and uses the studio type roles from [`brand/type.md`](../../brand/type.md). The site implements it in `apps/site/blog/` and `apps/site/site.css`.
+The site's blog: an index of posts and the post page. It follows [`../principles.md`](../principles.md) and uses the studio type roles from [`brand/type.md`](../../brand/type.md). The site implements it in `apps/site/templates/`, `apps/site/blog.py` and `apps/site/site.css`; `build.py` renders the pages into `apps/site/blog/`.
 
 ## Header and footer
 

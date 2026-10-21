@@ -32,7 +32,11 @@ is and why" and "Architecture overview".
   commits link to the issues they mention; a pull request moves the issues
   it works on to review once it could be merged, and merging it completes
   them; repositories are cloned for drift checks.
-- **Accounts.** Email and password or GitHub, invite links, admin and member
+- **Forgejo** (Settings → Forgejo: a server, the repositories to watch and a
+  token). Forge asks Forgejo about their pull requests about once a minute,
+  links them to the issues they name and moves those issues, as with GitHub.
+- **Accounts.** Code Villain sign-in (the studio's account, see below), or
+  without it email and password or GitHub; invite links, admin and member
   roles.
 - **Apps.** The web app, and a desktop app with native notifications and the
   unread count on the dock icon.
@@ -78,5 +82,18 @@ drift checks) and the `FORGE_GITHUB_*` settings (Settings → GitHub lists
 them) in a `.env` file next to
 `docker-compose.yml`, then run `bun run app` again.
 
-`bun run backup` saves the database and the attachments to `backups/`;
+`bun run backup` saves the database and the attachments outside the
+repository, to `FORGE_BACKUP_DIR` or else `backup/forge` next to the vault;
 `scripts/backup.ts` says how to restore them.
+
+## Signing in with Code Villain
+
+Set `FORGE_OIDC_ISSUER` (`https://id.codevillain.eu`),
+`FORGE_OIDC_CLIENT_ID`, `FORGE_OIDC_CLIENT_SECRET` and `FORGE_PUBLIC_URL`
+(this Forge's address; Pocket ID sends people back to
+`<FORGE_PUBLIC_URL>/api/auth/oidc/callback`, which the client there must
+list). With them, Code Villain is the only way in: passwords and GitHub
+sign-in are off, and so are `bun run seed` and `bun run reset-password`.
+Without them, as in plain local development, passwords stay on. Bun and
+`docker compose` both read a `.env` next to `docker-compose.yml`, so one
+there turns it on for `bun run dev` and `bun run app` alike.

@@ -218,7 +218,7 @@ Flat. Depth is tone: bg → panel → surface → dialog. No shadows or borders 
 
 ## Code
 
-Code uses the Nightshade code palette (`design/tokens/syntax.json`, rules in `design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette dresses the Code Villain editor theme (`apps/theme`: VS Code and Cursor, Neovim, WezTerm), the apps, and code on the site. Every terminal takes one 16-colour table: the same hues at a calmer chroma, with poison as the green.
+Code uses the Nightshade code palette (`design/tokens/syntax.json`, rules in `design/tokens/theme.md`): six hues at one lightness (violet keywords; cyan properties, operators and built-in types; teal strings; amber constants; blue functions; rose `this` and tags), names in `fg`, greys for brackets, punctuation and comments. The same palette dresses the Code Villain editor theme (`apps/theme`: VS Code and Cursor, Neovim, WezTerm, Starship), the apps, and code on the site. Every terminal takes one 16-colour table: the same hues at a calmer chroma, with poison as the green.
 
 ## Do's and Don'ts
 

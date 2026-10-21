@@ -38,7 +38,8 @@ snapshots by hand. `bun run check` fails when they've drifted.
   image: server plus built web app). `bun run app:logs` follows it.
 - `bun run seed`: local test accounts (an admin and a member of "Villain
   Corp") and the made-up strings in `demo/`; the password is in
-  `scripts/seed-demo.ts`. Needs `bun run dev` running.
+  `scripts/seed-demo.ts`. Needs `bun run dev` running, with passwords on
+  (`GLYPH_OIDC_ISSUER` empty; README, "Signing in with Code Villain").
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, types and design copies up to
   date, Biome, typecheck, bun tests, web build. It must pass before you

@@ -1,6 +1,6 @@
 # Site
 
-The Code Villain website at **https://www.codevillain.eu/**: the homepage, and the blog in [`blog/`](blog). Shared styles are in [`site.css`](site.css).
+The Code Villain website at **https://www.codevillain.eu/**: the homepage, and the blog, built into `blog/`. Shared styles are in [`site.css`](site.css).
 
 The blog is generated from [`content/blog`](../../content/blog). `python3 build.py` renders each post's Markdown into `blog/` through [`templates/`](templates) with [`blog.py`](blog.py): a page per post and the index, newest first. `blog/` is build output, not in git; edit the Markdown or the templates. The preview shows drafts with a pill; `dist/` leaves them out.
 
