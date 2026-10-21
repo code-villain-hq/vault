@@ -11,6 +11,8 @@ Nightshade is every app's default theme, in night and day. An app's theme picker
 
 A change to how Code Villain feels starts in `brand/` or `design/`, then the apps catch up. A change to one product's behavior stays in that app.
 
+A pull request for a Forge issue says "Fixes <ID>" in its body. Pull requests pushed to `refs/for/main` (AGit) have no branch for Forge to read, so without it the issue never reaches review and isn't closed by the merge.
+
 ## Signing in with Code Villain
 
 One studio account signs people in to every app: Pocket ID at id.codevillain.eu, over OpenID Connect. The provider says who someone is; each app keeps its own workspaces, roles and invites. Forge and Glyph have it. For the next app:
