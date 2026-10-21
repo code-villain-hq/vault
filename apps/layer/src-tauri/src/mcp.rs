@@ -224,7 +224,7 @@ async fn dispatch(app: &AppHandle, method: &str, params: Value, caller: Option<&
         "ping" => Ok(json!({})),
         "tools/list" => {
             let mut all = tools();
-            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()));
+            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()));
             Ok(json!({ "tools": all }))
         }
         "tools/call" => {
@@ -302,6 +302,7 @@ const DANGER: &[&str] = &[
     "slack_cleanup",
     "forget_repo",
     "open_prs",
+    "pr_images",
     "remember",
     "forget_note",
 ];
@@ -910,6 +911,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         n if commands::grafana_owns(n) => commands::grafana_call(&state, n, args).await,
         n if commands::s3_logs_owns(n) => commands::s3_logs_call(&state, n, args).await,
         n if commands::spec_owns(n) => commands::spec_call(app, args, caller).await,
+        n if commands::pr_images_owns(n) => commands::pr_images_call(&state, args).await,
 
         "slack_delete" => {
             let links: Vec<String> = args
@@ -1118,9 +1120,17 @@ mod tests {
         assert!(bearer_ok(&headers, "secret"));
     }
 
+    /// Every tool `tools/list` answers with, the ones defined beside their
+    /// feature included: a danger tool defined there is gated here too.
+    fn served() -> Vec<Value> {
+        let mut all = tools();
+        all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()));
+        all
+    }
+
     #[test]
     fn tools_list_names_the_danger_tier() {
-        let listed = tools();
+        let listed = served();
         let names: Vec<&str> = listed
             .iter()
             .filter_map(|t| t.get("name").and_then(Value::as_str))
@@ -1132,7 +1142,7 @@ mod tests {
 
     #[test]
     fn danger_tools_advertise_confirm() {
-        for tool in tools() {
+        for tool in served() {
             let name = tool.get("name").and_then(Value::as_str).unwrap_or_default();
             if !DANGER.contains(&name) {
                 continue;
