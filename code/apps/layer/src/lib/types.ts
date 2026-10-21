@@ -435,6 +435,19 @@ export interface Settings {
   browser_sites: string[];
   /** Saved sign-ins, without their passwords (BRW-18). */
   browser_sign_ins: SavedSignIn[];
+  /** The workspace whose settings these are (SET-7). */
+  workspace: WorkspaceView | null;
+}
+
+export type ConnectionKind = "jira" | "github" | "slack" | "grafana";
+
+/** Settings' workspace (SET-7): who changes its connections, and what they say. */
+export interface WorkspaceView {
+  name: string;
+  /** They change its connections and log sources; a member sees them. */
+  admin: boolean;
+  /** Its connections' shared settings, by kind (SET-8). */
+  connections: Partial<Record<ConnectionKind, Record<string, unknown>>>;
 }
 
 /** Settings → Remote access (PHONE-*), as `phone::status` reports it. */

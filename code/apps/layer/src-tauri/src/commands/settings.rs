@@ -41,6 +41,17 @@ pub struct Settings {
     pub browser_sites: Vec<String>,
     /// Saved sign-ins, without their passwords (BRW-18).
     pub browser_sign_ins: Vec<crate::config::SavedSignIn>,
+    /// The workspace whose settings these are (SET-7), once there is one.
+    pub workspace: Option<WorkspaceView>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkspaceView {
+    pub name: String,
+    /// They change its connections and log sources; a member sees them.
+    pub admin: bool,
+    /// Its connections' shared settings, by kind (SET-8).
+    pub connections: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 #[tauri::command]
@@ -61,6 +72,11 @@ pub fn get_settings(state: State<AppState>) -> Settings {
         browser_sign_ins: c.browser.sign_ins.clone(),
         worktree_root: state.config.worktree_root().to_string_lossy().to_string(),
         worktree_root_is_default: c.worktree_root.is_none(),
+        workspace: c.shared.workspace.as_ref().map(|at| WorkspaceView {
+            name: crate::profiles::name().unwrap_or_else(|| "The workspace".into()),
+            admin: at.is_admin(),
+            connections: c.shared.held.iter().map(|(kind, h)| (kind.clone(), h.settings.clone())).collect(),
+        }),
         jira: c.jira,
         github: c.github,
         slack: c.slack,

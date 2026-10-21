@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use super::{AppConfig, Project};
+use super::{AppConfig, Project, TicketFlow};
 use crate::git::UpdateBy;
 
 pub const REPOSITORY: &str = "Repository";
@@ -41,6 +41,19 @@ pub struct Shared {
     /// the workspace keeps them. A clone added later takes one's record.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub elsewhere: Vec<Elsewhere>,
+    /// The workspace's connections, by kind, as it last sent them: shown on
+    /// a page this Mac hasn't connected (SET-8), and kept by a Disconnect,
+    /// which removes only this Mac's half (SET-9).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub held: BTreeMap<String, Held>,
+}
+
+/// A connection of the workspace's: its record and the settings everyone shares.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Held {
+    pub id: String,
+    #[serde(default)]
+    pub settings: Value,
 }
 
 /// A repository of the workspace's that is not on this Mac.
@@ -75,6 +88,17 @@ pub struct WorkspaceAt {
     /// Who signed in to the server, so the window's offline copy is theirs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
+    /// The server said they are its admin, when last asked (SET-7).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub admin: bool,
+}
+
+impl WorkspaceAt {
+    /// Who may change the workspace's connections and log sources: on this
+    /// Mac, the one person in it.
+    pub fn is_admin(&self) -> bool {
+        self.place == THIS_MAC || self.admin
+    }
 }
 
 pub const THIS_MAC: &str = "this_mac";
@@ -127,10 +151,21 @@ pub fn records(cfg: &AppConfig) -> Records {
             }))
         });
     }
+    let admin = cfg.shared.workspace.as_ref().is_some_and(WorkspaceAt::is_admin);
     for (kind, settings) in connection_settings(cfg) {
+        // A member's own, where the workspace has none, stays here (SET-10).
+        if !admin && !cfg.shared.held.contains_key(kind) {
+            continue;
+        }
         if let Some(id) = cfg.shared.connections.get(kind) {
             out.insert((CONNECTION, id.clone()), object(json!({ "kind": kind, "settings": settings })));
         }
+    }
+    // The workspace's, where this Mac has none: disconnecting here is no
+    // change to it (SET-9).
+    for (kind, held) in &cfg.shared.held {
+        out.entry((CONNECTION, held.id.clone()))
+            .or_insert_with(|| object(json!({ "kind": kind, "settings": held.settings })));
     }
     for s in &cfg.log_sources {
         out.insert(
@@ -185,6 +220,18 @@ pub fn record_changes(cfg: &mut AppConfig, before: &Records) -> Sent {
     if cfg.shared.workspace.is_none() {
         return Sent::default();
     }
+    // Connecting what the workspace has takes what the connect form does not
+    // ask, a Jira's ticket flow or Grafana's datasource; a member, all of it,
+    // since only admins change it (SET-8).
+    let admin = cfg.shared.workspace.as_ref().is_some_and(WorkspaceAt::is_admin);
+    let new: Vec<(String, Value)> = connection_settings(cfg)
+        .into_iter()
+        .filter(|(kind, _)| !cfg.shared.connections.contains_key(*kind))
+        .filter_map(|(kind, _)| cfg.shared.held.get(kind).map(|h| (kind.to_string(), h.settings.clone())))
+        .collect();
+    for (kind, settings) in new {
+        take_held(cfg, &kind, &settings, !admin);
+    }
     stamp(cfg);
     // A record refused keeps its id, so it is not offered again with every
     // change after this one; only a change to it is.
@@ -219,7 +266,9 @@ fn stamp(cfg: &mut AppConfig) {
     let kinds: Vec<&str> = connection_settings(cfg).into_iter().map(|(kind, _)| kind).collect();
     cfg.shared.connections.retain(|kind, _| kinds.contains(&kind.as_str()));
     for kind in kinds {
-        cfg.shared.connections.entry(kind.to_string()).or_insert_with(new_id);
+        // Connecting what the workspace has is connecting to its record.
+        let held = cfg.shared.held.get(kind).map(|h| h.id.clone());
+        cfg.shared.connections.entry(kind.to_string()).or_insert_with(|| held.unwrap_or_else(new_id));
     }
     // Records are named by uuids; a source saved by hand may have another id.
     for s in cfg.log_sources.iter_mut().filter(|s| uuid::Uuid::parse_str(&s.id).is_err()) {
@@ -230,6 +279,57 @@ fn stamp(cfg: &mut AppConfig) {
     for agent in agents {
         cfg.shared.agent_models.entry(agent).or_insert_with(new_id);
     }
+}
+
+/// Settings of every kind, read leniently: what a kind has not is None.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct Settings {
+    base_url: Option<String>,
+    project_key: Option<String>,
+    jql: Option<String>,
+    epic_field: Option<String>,
+    flow: Option<std::collections::HashMap<String, TicketFlow>>,
+    api_url: Option<String>,
+    web_url: Option<String>,
+    review_team: Option<String>,
+    channel: Option<String>,
+    datasource: Option<String>,
+}
+
+/// The workspace's settings for this Mac's connection of `kind`, if it has
+/// one: `everything`, or only what its connect form does not ask.
+pub fn take_held(c: &mut AppConfig, kind: &str, settings: &Value, everything: bool) -> bool {
+    let s: Settings = serde_json::from_value(settings.clone()).unwrap_or_default();
+    let here = match kind {
+        "jira" => c.jira.as_mut().map(|j| {
+            if everything {
+                j.base_url = s.base_url.unwrap_or_else(|| j.base_url.clone());
+                j.project_key = s.project_key;
+                j.jql = s.jql;
+            }
+            j.epic_field = s.epic_field;
+            j.flow = s.flow.unwrap_or_default();
+        }),
+        "github" => c.github.as_mut().filter(|_| everything).map(|g| {
+            g.api_url = s.api_url.unwrap_or_else(|| g.api_url.clone());
+            g.web_url = s.web_url.unwrap_or_else(|| g.web_url.clone());
+            g.review_team = s.review_team;
+        }),
+        "slack" => c
+            .slack
+            .as_mut()
+            .filter(|_| everything)
+            .map(|sl| sl.channel = s.channel.unwrap_or_else(|| sl.channel.clone())),
+        "grafana" => c.grafana.as_mut().map(|g| {
+            if everything {
+                g.base_url = s.base_url.unwrap_or_else(|| g.base_url.clone());
+            }
+            g.datasource = s.datasource;
+        }),
+        _ => None,
+    };
+    here.is_some()
 }
 
 /// A clone of a repository the workspace has: its settings are the
@@ -350,7 +450,7 @@ mod tests {
 
     fn in_a_workspace(projects: Vec<Project>) -> AppConfig {
         let mut cfg = AppConfig { projects, ..Default::default() };
-        cfg.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: new_id(), user_id: None });
+        cfg.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: new_id(), user_id: None, admin: false });
         cfg
     }
 
@@ -433,5 +533,64 @@ mod tests {
 
         let again = change(&mut cfg, |c| c.ui.theme = "day".into());
         assert_eq!((again.queued, again.refused.len()), (0, 0));
+    }
+
+    fn acme_jira(email: &str) -> JiraConfig {
+        JiraConfig {
+            base_url: "https://acme.atlassian.net".into(),
+            email: email.into(),
+            project_key: Some("ACME".into()),
+            ..Default::default()
+        }
+    }
+
+    /// The workspace's Jira connection, as the mirror keeps it.
+    fn held_jira(cfg: &mut AppConfig) -> String {
+        let theirs = AppConfig { jira: Some(acme_jira("ada@acme.example")), ..Default::default() };
+        let (_, settings) = connection_settings(&theirs).remove(0);
+        let id = new_id();
+        cfg.shared.held.insert("jira".into(), Held { id: id.clone(), settings });
+        id
+    }
+
+    #[test]
+    fn disconnecting_here_leaves_the_workspaces_connection_for_everyone() {
+        let mut cfg = in_a_workspace(vec![]);
+        let id = held_jira(&mut cfg);
+        change(&mut cfg, |c| c.jira = Some(acme_jira("me@acme.example")));
+        assert_eq!(cfg.shared.connections.get("jira"), Some(&id), "connecting takes the workspace's record");
+        assert!(cfg.shared.outbox.is_empty(), "the same settings change nothing there");
+
+        change(&mut cfg, |c| c.jira = None);
+        assert!(cfg.shared.outbox.is_empty(), "no delete: {:?}", cfg.shared.outbox);
+    }
+
+    #[test]
+    fn connecting_again_keeps_what_the_form_does_not_ask() {
+        let mut cfg = in_a_workspace(vec![]);
+        held_jira(&mut cfg);
+        if let Some(h) = cfg.shared.held.get_mut("jira") {
+            h.settings["epic_field"] = json!("customfield_10014");
+        }
+        change(&mut cfg, |c| c.jira = Some(acme_jira("me@acme.example")));
+        assert_eq!(cfg.jira.and_then(|j| j.epic_field).as_deref(), Some("customfield_10014"));
+        assert!(cfg.shared.outbox.is_empty(), "the workspace's epic field is not cleared: {:?}", cfg.shared.outbox);
+    }
+
+    #[test]
+    fn a_member_connecting_what_the_workspace_has_no_connection_for_sends_nothing() {
+        let mut cfg = in_a_workspace(vec![]);
+        if let Some(at) = cfg.shared.workspace.as_mut() {
+            at.place = "https://layer.example".into();
+        }
+        change(&mut cfg, |c| c.jira = Some(acme_jira("me@acme.example")));
+        assert!(cfg.shared.outbox.is_empty(), "{:?}", cfg.shared.outbox);
+
+        // Their admin's is everyone's, and connecting here takes it.
+        let id = held_jira(&mut cfg);
+        cfg.shared.connections.clear();
+        change(&mut cfg, |c| c.jira = Some(acme_jira("me@acme.example")));
+        assert_eq!(cfg.shared.connections.get("jira"), Some(&id));
+        assert!(cfg.shared.outbox.is_empty(), "{:?}", cfg.shared.outbox);
     }
 }

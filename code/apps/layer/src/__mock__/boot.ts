@@ -15,6 +15,7 @@
  *   &tab=spec|terminals|diff|pr
  *   &loop=checking|held|passed|gave_up   the task's agents on a loop (§21)
  *   &spec=split            ACME-123 with a spec per repository from before (SPEC-25)
+ *   &role=member          a member of the workspace, who sees its settings (SET-7)
  *   &theme=night|day|tokyo-night|cursor-dark|cursor-light|ayu-dark|ayu-light|system   the saved theme (SET-5)
  *
  * From the console, or a browser tool's JavaScript:
@@ -49,6 +50,7 @@ const world = (scenarios.get(params.get("scenario") ?? "busy") ?? SCENARIOS.busy
 const calls: { cmd: string; args: Args }[] = [];
 const theme = params.get("theme");
 if (theme) world.settings.ui.theme = theme as typeof world.settings.ui.theme;
+if (params.get("role") === "member" && world.settings.workspace) world.settings.workspace.admin = false;
 for (const p of world.panes) if (p.acp) seedAcp(p.id);
 for (const p of world.panes) {
   const phase = params.get("loop");

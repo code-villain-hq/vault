@@ -1184,12 +1184,36 @@ Known gaps:
   on a light theme, xterm darkens any too faint to read (4.5:1), and answers an
   agent that asks the terminal for its background.
 
+- **SET-7** A connection's page MUST show its settings in two blocks.
+  The workspace's, named for it ("Code Villain's"), are the same for
+  everyone in it: Jira's site, project key, query and ticket flow; GitHub's
+  API and web URLs and review team; Slack's notification channel;
+  Grafana's site and Loki datasource; each S3 log source but its AWS
+  profile. Yours stay on this Mac: the Jira account email, every token,
+  Slack's bot and the four switches, a log source's AWS profile. Admins
+  change the workspace's block; a member sees it as text, marked "admins
+  change these", and adds or removes no log source. In a workspace on this
+  Mac you are its admin; on a server the server says, and the app keeps
+  its last answer for when the server can't be reached.
+- **SET-8** A connection the workspace has and this Mac hasn't MUST show
+  the workspace's settings already, so connecting asks only for yours:
+  the email and the token.
+- **SET-9** Disconnecting MUST remove only yours (SET-2): the workspace
+  keeps its connection for everyone else, and its settings stay on the
+  page for connecting again.
+- **SET-10** A member connecting a service the workspace has no
+  connection for MUST keep it on this Mac, and send nothing: the page
+  says so above the settings.
+
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `integrations/mod.rs` (`require_https`); the
+workspace's and yours (SET-7 to SET-10) in `SharedSettings.tsx` and
+`config/shared.rs` (`held`, `WorkspaceAt.admin`); the
 theme in `theme.css`, `lib/theme.ts`, `lib/terminal.ts` and `theme.rs`.
 
 Known gaps:
 - Changing Slack's channel needs the token pasted again.
+- No one can remove the workspace's connection for everyone from the app.
 
 ## 14. What the app writes on your machine
 

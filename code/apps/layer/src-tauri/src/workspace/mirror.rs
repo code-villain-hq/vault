@@ -14,8 +14,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::config::shared::{take_record, Elsewhere};
-use crate::config::{AppConfig, AthenaTable, LogSource, ModelChoice, TicketFlow};
+use crate::config::shared::{take_held, take_record, Elsewhere, Held};
+use crate::config::{AppConfig, AthenaTable, LogSource, ModelChoice};
 use crate::commands::AppState;
 use crate::error::Result;
 use crate::git::UpdateBy;
@@ -61,7 +61,7 @@ struct RepositoryRecord {
     added_by: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct ConnectionRecord {
     id: String,
     kind: String,
@@ -104,22 +104,6 @@ struct NoteRecord {
     checked_at: DateTime<Utc>,
     #[serde(default)]
     checked_commit: Option<String>,
-}
-
-/// Settings of every kind, read leniently: what a kind has not is None.
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-struct Settings {
-    base_url: Option<String>,
-    project_key: Option<String>,
-    jql: Option<String>,
-    epic_field: Option<String>,
-    flow: Option<std::collections::HashMap<String, TicketFlow>>,
-    api_url: Option<String>,
-    web_url: Option<String>,
-    review_team: Option<String>,
-    channel: Option<String>,
-    datasource: Option<String>,
 }
 
 /// Bring `snapshot` in. `Ok(None)` when changes made here are still on
@@ -187,29 +171,12 @@ fn merge(
 
     // A connection needs this Mac's half (a token, the Jira email) before it
     // is one, so only those set up here take the workspace's settings.
+    c.shared.held = connections
+        .iter()
+        .map(|r| (r.kind.clone(), Held { id: r.id.clone(), settings: r.settings.clone() }))
+        .collect();
     for record in connections {
-        let s: Settings = serde_json::from_value(record.settings).unwrap_or_default();
-        let here = match record.kind.as_str() {
-            "jira" => c.jira.as_mut().map(|j| {
-                j.base_url = s.base_url.unwrap_or_else(|| j.base_url.clone());
-                j.project_key = s.project_key;
-                j.jql = s.jql;
-                j.epic_field = s.epic_field;
-                j.flow = s.flow.unwrap_or_default();
-            }),
-            "github" => c.github.as_mut().map(|g| {
-                g.api_url = s.api_url.unwrap_or_else(|| g.api_url.clone());
-                g.web_url = s.web_url.unwrap_or_else(|| g.web_url.clone());
-                g.review_team = s.review_team;
-            }),
-            "slack" => c.slack.as_mut().map(|sl| sl.channel = s.channel.unwrap_or_else(|| sl.channel.clone())),
-            "grafana" => c.grafana.as_mut().map(|g| {
-                g.base_url = s.base_url.unwrap_or_else(|| g.base_url.clone());
-                g.datasource = s.datasource;
-            }),
-            _ => None,
-        };
-        if here.is_some() {
+        if take_held(c, &record.kind, &record.settings, true) {
             c.shared.connections.insert(record.kind, record.id);
         }
     }
@@ -306,6 +273,13 @@ mod tests {
     #[test]
     fn what_the_workspace_sent_back_unchanged_changes_nothing_here() {
         let (state, held) = moved();
+        let before = shared_view(&state.config.read());
+        // The first teaches this Mac the workspace's connections (SET-8), and nothing else.
+        assert_eq!(apply(&state, snapshot(&held)).unwrap(), Some((true, false)));
+        let mut after = shared_view(&state.config.read());
+        assert_eq!(after["shared"]["held"]["jira"]["settings"]["project_key"], "ACME");
+        after["shared"].as_object_mut().unwrap().remove("held");
+        assert_eq!(after, before);
         assert_eq!(apply(&state, snapshot(&held)).unwrap(), Some((false, false)));
     }
 

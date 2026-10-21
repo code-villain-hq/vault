@@ -12,6 +12,7 @@ import { BrowserSettings } from "./BrowserSettings";
 import { ObservabilitySettings } from "./ObservabilitySettings";
 import { SlackSettings } from "./SlackSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
 
 type Section = "appearance" | "jira" | "github" | "slack" | "observability" | "phone" | "browser" | "general";
 
@@ -50,6 +51,10 @@ export function Settings() {
   const [ghToken, setGhToken] = useState("");
 
   const [worktreeRoot, setWorktreeRoot] = useState("");
+  const workspace = useWorkspace();
+  const heldJira = useHeld("jira");
+  const heldGithub = useHeld("github");
+  const flowLocked = workspace?.admin === false && heldJira !== null;
 
   // Each form follows what is stored for it, and only when that changes.
   // Keyed on the whole settings object, every save anywhere — a switch on
@@ -57,20 +62,28 @@ export function Settings() {
   // the Jira page was gone by the time you came back to it.
   const loaded = settings !== null;
   const j = settings?.jira;
+  // Not connected here: the workspace's settings, so connecting takes only
+  // yours (SET-8), and a Disconnect leaves them showing (SET-9).
+  const jiraUrlNow = j ? j.base_url : heldText(heldJira, "base_url");
+  const jiraProjectNow = j ? j.project_key : heldText(heldJira, "project_key");
+  const jiraJqlNow = j ? j.jql : heldText(heldJira, "jql");
   useEffect(() => {
     if (!loaded) return;
-    setJiraUrl(j?.base_url ?? "");
+    setJiraUrl(jiraUrlNow ?? "");
     setJiraEmail(j?.email ?? "");
-    setJiraProject(j?.project_key ?? "");
-    setJiraJql(j?.jql ?? "");
-  }, [loaded, j?.base_url, j?.email, j?.project_key, j?.jql]);
+    setJiraProject(jiraProjectNow ?? "");
+    setJiraJql(jiraJqlNow ?? "");
+  }, [loaded, jiraUrlNow, j?.email, jiraProjectNow, jiraJqlNow]);
   const g = settings?.github;
+  const ghApiNow = g ? g.api_url : heldText(heldGithub, "api_url");
+  const ghWebNow = g ? g.web_url : heldText(heldGithub, "web_url");
+  const ghTeamNow = g ? g.review_team : heldText(heldGithub, "review_team");
   useEffect(() => {
     if (!loaded) return;
-    setGhApi(g?.api_url ?? "https://api.github.com");
-    setGhWeb(g?.web_url ?? "https://github.com");
-    setGhTeam(g?.review_team ?? "");
-  }, [loaded, g?.api_url, g?.web_url, g?.review_team]);
+    setGhApi(ghApiNow ?? "https://api.github.com");
+    setGhWeb(ghWebNow ?? "https://github.com");
+    setGhTeam(ghTeamNow ?? "");
+  }, [loaded, ghApiNow, ghWebNow, ghTeamNow]);
   const rootSaved = settings ? (settings.worktree_root_is_default ? "" : settings.worktree_root) : null;
   useEffect(() => {
     if (rootSaved !== null) setWorktreeRoot(rootSaved);
@@ -195,13 +208,34 @@ export function Settings() {
             </div>
           )}
           <ErrorMessage>{unlink.error}</ErrorMessage>
-          <Field label="Site URL">
-            <input className="ui-field"
-              value={jiraUrl}
-              onChange={(e) => setJiraUrl(e.target.value)}
-              placeholder="https://your-team.atlassian.net"
-            />
-          </Field>
+          <Theirs
+            kind="jira"
+            what="Jira"
+            rows={[["Site", jiraUrl], ["Project", jiraProject], ["Query", jiraJql, true]]}
+          >
+            <Field label="Site URL">
+              <input className="ui-field"
+                value={jiraUrl}
+                onChange={(e) => setJiraUrl(e.target.value)}
+                placeholder="https://your-team.atlassian.net"
+              />
+            </Field>
+            <Field label="Project key" hint="Optional. Scopes the default task query.">
+              <input className="ui-field"
+                value={jiraProject}
+                onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
+                placeholder="ACME"
+              />
+            </Field>
+            <Field label="JQL" hint="Optional. Overrides the default 'assigned to me, not done' query.">
+              <input className="ui-field"
+                value={jiraJql}
+                onChange={(e) => setJiraJql(e.target.value)}
+                placeholder="assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+              />
+            </Field>
+          </Theirs>
+          <Yours>
           <Field label="Account email">
             <input className="ui-field" value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} />
           </Field>
@@ -231,20 +265,7 @@ export function Settings() {
               placeholder={settings?.jira_connected ? "•••••••• (leave blank to keep)" : ""}
             />
           </Field>
-          <Field label="Project key" hint="Optional. Scopes the default task query.">
-            <input className="ui-field"
-              value={jiraProject}
-              onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
-              placeholder="ACME"
-            />
-          </Field>
-          <Field label="JQL" hint="Optional. Overrides the default 'assigned to me, not done' query.">
-            <input className="ui-field"
-              value={jiraJql}
-              onChange={(e) => setJiraJql(e.target.value)}
-              placeholder="assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-            />
-          </Field>
+          </Yours>
           <button
             className="ui-button ui-button-primary"
             // A blank token keeps the stored one, so once connected the
@@ -258,7 +279,13 @@ export function Settings() {
             {busy ? "Verifying…" : settings?.jira_connected ? "Save & reconnect" : "Connect"}
           </button>
           <ErrorMessage>{jira.error}</ErrorMessage>
-          {settings?.jira_connected && <TicketFlowSettings />}
+          {settings?.jira_connected && (
+            // Where tickets go is the workspace's too (SET-7).
+            <fieldset className="settings-locked" disabled={flowLocked}>
+              <TicketFlowSettings />
+              {flowLocked && <p className="settings-alone">How tickets follow the work is {workspace.name}'s: admins change it.</p>}
+            </fieldset>
+          )}
         </>
       )}
 
@@ -280,6 +307,11 @@ export function Settings() {
             </div>
           )}
           <ErrorMessage>{unlink.error}</ErrorMessage>
+          <Theirs
+            kind="github"
+            what="GitHub"
+            rows={[["API URL", ghApi], ["Web URL", ghWeb], ["Review team", ghTeam]]}
+          >
           <Field
             label="API URL"
             hint="github.com uses https://api.github.com. Enterprise Server uses https://ghe.example.com/api/v3."
@@ -299,6 +331,8 @@ export function Settings() {
               placeholder="@fe"
             />
           </Field>
+          </Theirs>
+          <Yours>
           <Field
             label="Personal access token"
             hint="Needs repo scope. Stored in your keychain."
@@ -310,6 +344,7 @@ export function Settings() {
               placeholder={settings?.github_connected ? "•••••••• (leave blank to keep)" : ""}
             />
           </Field>
+          </Yours>
           <button
             className="ui-button ui-button-primary"
             disabled={

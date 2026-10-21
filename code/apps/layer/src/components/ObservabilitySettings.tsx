@@ -4,6 +4,7 @@ import type { GrafanaDatasource } from "../lib/types";
 import { useStore } from "../store";
 import { ErrorMessage, Field, useFailure } from "./ui";
 import { S3LogSources } from "./S3LogSources";
+import { heldText, Theirs, useHeld, Yours } from "./SharedSettings";
 
 /**
  * Settings → Observability: where agents read your services' logs (§23):
@@ -33,7 +34,9 @@ function GrafanaSource() {
   const choosing = useFailure();
   const connecting = useFailure();
   const connected = settings?.grafana_connected ?? false;
-  const [url, setUrl] = useState(settings?.grafana?.base_url ?? "");
+  const held = useHeld("grafana");
+  // Not connected here: the workspace's site, so connecting takes only your token (SET-8).
+  const [url, setUrl] = useState(settings?.grafana?.base_url ?? heldText(held, "base_url") ?? "");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [sources, setSources] = useState<GrafanaDatasource[] | null>(null);
@@ -111,6 +114,14 @@ function GrafanaSource() {
       <p className="muted" style={{ marginTop: 0 }}>
         Logs in Loki, read with LogQL or with a Grafana Explore link from a ticket.
       </p>
+      <Theirs
+        kind="grafana"
+        what="Grafana"
+        rows={[
+          ["Site", url],
+          ["Your services' logs", sources?.find((s) => s.uid === settings?.grafana?.datasource)?.name ?? heldText(held, "datasource")],
+        ]}
+      >
       {sources && sources.length > 1 && (
         <Field
           label="Your services' logs"
@@ -130,6 +141,8 @@ function GrafanaSource() {
       <Field label="Site URL" hint="Where you open Grafana, e.g. https://acme.grafana.net.">
         <input className="ui-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://acme.grafana.net" />
       </Field>
+      </Theirs>
+      <Yours>
       <Field
         label="Service account token"
         hint="Administration → Users and access → Service accounts. Its role has to read and query datasources. Stored in your keychain."
@@ -141,6 +154,7 @@ function GrafanaSource() {
           placeholder={connected ? "•••••••• (leave blank to keep)" : "glsa_…"}
         />
       </Field>
+      </Yours>
       <button
         className="ui-button ui-button-primary"
         disabled={busy || !url.trim() || (!token.trim() && !connected)}

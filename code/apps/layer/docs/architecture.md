@@ -97,6 +97,13 @@ places, so agents and startup never wait on the workspace:
   window sends them, then the snapshot again. A repository with no clone
   here is not a project: it waits in `shared.elsewhere` (REPO-9), and the
   first clone of it added takes its record, so nothing is sent.
+- **Connections** (SET-7 to SET-10): the workspace's are kept whole in
+  `shared.held`, connected here or not, so Settings shows them and a
+  Disconnect sends no delete. Connecting what the workspace has takes its
+  record and what the connect form does not ask (a member, all of it). A
+  member's connection the workspace has none of is not a record. Whether
+  the person is an admin is `WorkspaceAt.admin`, asked of the server at
+  each start; on this Mac they always are.
 - **The move** (PROF-12, `workspace/moving.rs`): the first start makes the
   person and the workspace, records it in `config.json`, and that change
   queues every record as a create.

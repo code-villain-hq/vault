@@ -1,0 +1,34 @@
+/* ------------------------------- settings: the workspace's and yours (SET-7) */
+
+.settings-block { margin-bottom: 14px; }
+.settings-block-title {
+  margin: 0 0 8px;
+  font-size: var(--type-ui-size);
+  font-weight: 700;
+}
+.settings-block-title .muted { font-weight: 400; }
+.settings-alone {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: var(--type-ui-small-size);
+}
+
+/* A member's view of the workspace's settings: label, then value. */
+.settings-shared {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 24px;
+  margin: 0;
+}
+.settings-shared dt { color: var(--muted); }
+.settings-shared dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.settings-shared dd.muted { color: var(--faint); }
+
+/* A member's look at what admins change: the controls, not to be used. */
+.settings-locked { border: 0; margin: 0; padding: 0; min-width: 0; }

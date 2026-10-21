@@ -8,6 +8,7 @@ import "./styles-spec.css";
 import "./styles-runs.css";
 import "./styles-profiles.css";
 import "./styles-observability.css";
+import "./styles-settings.css";
 import App from "./App";
 import { fontsReady } from "./lib/terminal";
 import { paintRemembered } from "./lib/theme";
