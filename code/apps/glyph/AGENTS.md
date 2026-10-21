@@ -47,7 +47,8 @@ snapshots by hand. `bun run check` fails when they've drifted.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, types and design copies up to
   date, Biome, typecheck, bun tests, web build. It must pass before you
-  finish. CI runs it on every push (`.forgejo/workflows/glyph.yml`).
+  finish. CI runs it on every push that touches Glyph
+  (`.forgejo/workflows/glyph.yml`).
   `GLYPH_CHECK_SKIP_DESKTOP=1` leaves the desktop app out.
 
 Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
