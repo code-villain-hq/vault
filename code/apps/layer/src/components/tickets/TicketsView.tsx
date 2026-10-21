@@ -278,7 +278,7 @@ export function TicketsView() {
       <div className="empty">
         <h2>Jira not connected</h2>
         <p>Connect Jira to pull your assigned issues and start work from a ticket.</p>
-        <button className="ui-button" onClick={() => toggleSettings(true)}>Connect Jira</button>
+        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect Jira</button>
       </div>
     );
   }

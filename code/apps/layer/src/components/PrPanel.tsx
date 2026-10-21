@@ -351,7 +351,7 @@ export function PrPanel({
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub or GitHub Enterprise to open pull requests and read CI from here.</p>
-        <button className="ui-button" onClick={() => toggleSettings(true)}>Open settings</button>
+        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect GitHub</button>
       </div>
     );
   }

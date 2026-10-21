@@ -195,7 +195,7 @@ export function ReviewsView() {
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub to list pull requests waiting on your review.</p>
-        <button type="button" className="ui-button" onClick={() => toggleSettings(true)}>Connect GitHub</button>
+        <button type="button" className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect GitHub</button>
       </div>
     );
   }
