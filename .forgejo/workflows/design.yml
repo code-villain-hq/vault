@@ -1,6 +1,6 @@
 # Design drift on every push that could cause it: the theme tests, the
 # generated outputs in studio/design/tokens against build.py, Forge's, Layer's,
-# Caster's, Glyph's and the editor themes' copies against the vault, and the lint
+# Caster's, Glyph's, Raven's and the editor themes' copies against the vault, and the lint
 # guard over the web CSS and the apps' TSX (studio/design/lint; not the site's
 # HTML). Each check
 # writes nothing and fails with the fix.
@@ -16,6 +16,7 @@ on:
       - "code/apps/site/**/*.css"
       - "code/apps/forge/apps/web/src/**"
       - "code/apps/layer/src/**"
+      - "code/apps/layer/web/src/**"
       - "DESIGN.md"
       - "studio/brand/mark/**"
       - "code/apps/site/assets/fonts/**"
