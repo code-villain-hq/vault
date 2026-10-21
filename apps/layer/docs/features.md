@@ -727,10 +727,13 @@ send feedback to an agent, and finish a merged task.
   `pr_images` (after the user agrees): screenshots of a visible change,
   night and day. GitHub has no API for the attachments its own editor
   uploads, so the app stores the images in the repository, in a commit
-  that only `refs/villain-layer/images` points at: not a branch, so no
-  branch list, clone or checkout shows it. Each upload is a new commit on
-  that ref, with the one before as its parent, so earlier links keep
-  working. The images go in a marked section of the description that the
+  that only `refs/pr-images/<number>` points at: not a branch, so no
+  branch list, clone or pull fetches or shows it. Each PR has its own,
+  holding only the images its description shows now: a later call moves
+  the ref onto a new commit, by force, through the API (the one forced
+  move the app makes, on a ref that is its alone). The ref is kept after
+  the PR closes, so a merged PR keeps its pictures. The images go in a
+  marked section of the description that the
   app owns, the way PR-2's list does: a later call replaces the section
   and nothing else, and a new section goes above PR-2's list. Only PNG,
   JPEG, GIF and WebP files are sent, read by their first bytes rather

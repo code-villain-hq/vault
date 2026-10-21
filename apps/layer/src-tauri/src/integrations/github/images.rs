@@ -2,11 +2,11 @@
 //!
 //! GitHub has no API for the attachments its own editor uploads: those go
 //! through the signed-in web page. So the images go into the repository
-//! itself, as blobs in a commit that only `refs/villain-layer/images` points
+//! itself, as blobs in a commit that only `refs/pr-images/<number>` points
 //! at. That ref is not a branch: no branch list shows it, a clone's default
 //! refspec does not fetch it, and nothing can be checked out or merged from
-//! it by accident. The description links each image by its commit, so a
-//! later upload moving the ref on leaves the earlier links working.
+//! it by accident. Each pull request has its own, holding only the images
+//! its description shows now.
 
 use base64::Engine;
 use serde_json::{json, Value};
@@ -15,10 +15,8 @@ use super::siblings;
 use super::GitHub;
 use crate::error::{Error, Result};
 
-/// Under `refs/`, as the git-data endpoints spell it.
-const REF: &str = "villain-layer/images";
-const START: &str = "<!-- villain-layer:images -->";
-const END: &str = "<!-- /villain-layer:images -->";
+const START: &str = "<!-- pr-images -->";
+const END: &str = "<!-- /pr-images -->";
 
 /// How many images one call may send, and how large each may be.
 pub const MAX_IMAGES: usize = 10;
@@ -72,7 +70,7 @@ impl GitHub {
         let files: Vec<String> = images
             .iter()
             .enumerate()
-            .map(|(i, img)| format!("pr-{number}/{}-{}.{}", i + 1, slug(&img.caption), img.ext))
+            .map(|(i, img)| format!("{}-{}.{}", i + 1, slug(&img.caption), img.ext))
             .collect();
 
         let mut tree = Vec::new();
@@ -88,7 +86,7 @@ impl GitHub {
         let tree = self
             .json(self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/git/trees")).json(&json!({ "tree": tree })))
             .await?;
-        let commit = self.commit_onto_ref(owner, repo, number, sha_of(&tree)?).await?;
+        let commit = self.commit_for(owner, repo, number, sha_of(&tree)?).await?;
 
         let shown: Vec<Shown> = images
             .iter()
@@ -106,61 +104,54 @@ impl GitHub {
         Ok(shown)
     }
 
-    /// A commit of `tree` on top of the images ref, and the ref moved to it.
-    async fn commit_onto_ref(&self, owner: &str, repo: &str, number: u64, tree: &str) -> Result<String> {
-        // Two uploads at once (two repos of a task, two agents) race for the
-        // ref. Moving it is a fast-forward only, so the loser builds on the
-        // winner's commit and tries again rather than dropping its images.
-        for _ in 0..3 {
-            let parent = self.images_ref(owner, repo).await?;
-            let commit = self
-                .json(self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/git/commits")).json(&json!({
-                    "message": format!("Images for #{number}"),
-                    "tree": tree,
-                    "parents": parent.iter().collect::<Vec<_>>(),
-                })))
-                .await?;
-            let commit = sha_of(&commit)?.to_string();
-            let moved = match parent {
-                None => {
-                    self.json(self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/git/refs")).json(&json!({
-                        "ref": format!("refs/{REF}"),
-                        "sha": commit,
-                    })))
-                    .await
-                }
-                Some(_) => {
-                    self.json(self.req(reqwest::Method::PATCH, &format!("/repos/{owner}/{repo}/git/refs/{REF}")).json(&json!({
-                        "sha": commit,
-                        "force": false,
-                    })))
-                    .await
-                }
-            };
-            match moved {
-                Ok(_) => return Ok(commit),
-                // Moved under us, or created by the other upload first.
-                Err(Error::Other(e)) if e.starts_with("GitHub 422") => continue,
-                Err(e) => return Err(e),
-            }
+    /// A commit of `tree` alone, and the pull request's ref pointed at it.
+    async fn commit_for(&self, owner: &str, repo: &str, number: u64, tree: &str) -> Result<String> {
+        let commit = self
+            .json(self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/git/commits")).json(&json!({
+                "message": format!("Images for #{number}"),
+                "tree": tree,
+                "parents": [],
+            })))
+            .await?;
+        let commit = sha_of(&commit)?.to_string();
+
+        // The ref is the app's alone and holds what the description shows now,
+        // so it is moved by force: what a later call replaced is meant to go.
+        // Through the API, never `git push`, and never a branch.
+        let name = format!("pr-images/{number}");
+        let refs = format!("/repos/{owner}/{repo}/git/refs");
+        let point = || self.json(self.req(reqwest::Method::PATCH, &format!("{refs}/{name}")).json(&json!({ "sha": commit, "force": true })));
+        if self.has_ref(owner, repo, &name).await? {
+            point().await?;
+            return Ok(commit);
         }
-        Err(Error::Other(format!("{REF} kept moving while the images were stored; try again")))
+        let created = self
+            .json(self.req(reqwest::Method::POST, &refs).json(&json!({ "ref": format!("refs/{name}"), "sha": commit })))
+            .await;
+        match created {
+            Ok(_) => {}
+            // Another upload for the same PR created it in between.
+            Err(Error::Other(e)) if e.starts_with("GitHub 422") => {
+                point().await?;
+            }
+            Err(e) => return Err(e),
+        }
+        Ok(commit)
     }
 
-    /// Where the images ref points, or None before the first upload.
-    async fn images_ref(&self, owner: &str, repo: &str) -> Result<Option<String>> {
+    /// Whether `refs/<name>` exists.
+    async fn has_ref(&self, owner: &str, repo: &str, name: &str) -> Result<bool> {
         // The prefix listing answers an empty list for no ref, where asking for
         // the ref itself answers 404, which reads like a missing repository.
+        // A prefix: `pr-images/12` also lists `pr-images/120`.
         let v = self
-            .json(self.req(reqwest::Method::GET, &format!("/repos/{owner}/{repo}/git/matching-refs/{REF}")))
+            .json(self.req(reqwest::Method::GET, &format!("/repos/{owner}/{repo}/git/matching-refs/{name}")))
             .await?;
-        let want = format!("refs/{REF}");
+        let want = format!("refs/{name}");
         Ok(v.as_array()
             .into_iter()
             .flatten()
-            .find(|r| r.get("ref").and_then(Value::as_str) == Some(&want))
-            .and_then(|r| r.pointer("/object/sha").and_then(Value::as_str))
-            .map(str::to_string))
+            .any(|r| r.get("ref").and_then(Value::as_str) == Some(&want)))
     }
 }
 
@@ -239,7 +230,7 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     fn shot(caption: &str) -> Shown {
-        Shown { caption: caption.into(), url: format!("https://github.com/acme/web/raw/abc/pr-12/{caption}.png") }
+        Shown { caption: caption.into(), url: format!("https://github.com/acme/web/raw/abc/{caption}.png") }
     }
 
     #[test]
@@ -247,10 +238,10 @@ mod tests {
         let body = with_images("Darker sidebar.\n", &[shot("Night"), shot("Day")]);
         assert_eq!(
             body,
-            "Darker sidebar.\n\n<!-- villain-layer:images -->\n### Screenshots\n\n\
-             **Night**\n\n![Night](https://github.com/acme/web/raw/abc/pr-12/Night.png)\n\n\
-             **Day**\n\n![Day](https://github.com/acme/web/raw/abc/pr-12/Day.png)\n\
-             <!-- /villain-layer:images -->"
+            "Darker sidebar.\n\n<!-- pr-images -->\n### Screenshots\n\n\
+             **Night**\n\n![Night](https://github.com/acme/web/raw/abc/Night.png)\n\n\
+             **Day**\n\n![Day](https://github.com/acme/web/raw/abc/Day.png)\n\
+             <!-- /pr-images -->"
         );
     }
 
@@ -261,8 +252,8 @@ mod tests {
 
         let second = with_images(&edited, &[shot("Day")]);
 
-        assert!(second.starts_with("Darker sidebar, really.\n\n<!-- villain-layer:images -->"));
-        assert!(second.ends_with("<!-- /villain-layer:images -->\n\nThanks!"));
+        assert!(second.starts_with("Darker sidebar, really.\n\n<!-- pr-images -->"));
+        assert!(second.ends_with("<!-- /pr-images -->\n\nThanks!"));
         assert!(!second.contains("Night"));
         assert_eq!(with_images(&second, &[shot("Day")]), second);
     }
@@ -289,11 +280,11 @@ mod tests {
 
     #[test]
     fn a_caption_cannot_close_the_section_or_break_the_markdown() {
-        let caption = "Night <!-- /villain-layer:images --> **bold** [x]\nnext";
+        let caption = "Night <!-- /pr-images --> **bold** [x]\nnext";
         let body = with_images("", &[Shown { caption: caption.into(), url: "https://github.com/acme/web/raw/abc/1.png".into() }]);
-        assert_eq!(body.matches("villain-layer:images -->").count(), 2);
-        assert!(body.contains("**Night /villain-layer:images bold [x] next**"), "{body}");
-        assert!(body.contains("![Night /villain-layer:images bold x next]("), "{body}");
+        assert_eq!(body.matches("pr-images -->").count(), 2);
+        assert!(body.contains("**Night /pr-images bold [x] next**"), "{body}");
+        assert!(body.contains("![Night /pr-images bold x next]("), "{body}");
     }
 
     #[test]
@@ -309,26 +300,25 @@ mod tests {
     #[test]
     fn an_image_is_linked_beside_its_pull_request_on_any_host() {
         assert_eq!(
-            image_url("https://github.com/acme/web/pull/12", "abc", "pr-12/1-night.png"),
-            "https://github.com/acme/web/raw/abc/pr-12/1-night.png"
+            image_url("https://github.com/acme/web/pull/12", "abc", "1-night.png"),
+            "https://github.com/acme/web/raw/abc/1-night.png"
         );
         assert_eq!(
-            image_url("https://ghe.acme.test/acme/web/pull/12", "abc", "pr-12/1-day.png"),
-            "https://ghe.acme.test/acme/web/raw/abc/pr-12/1-day.png"
+            image_url("https://ghe.acme.test/acme/web/pull/12", "abc", "1-day.png"),
+            "https://ghe.acme.test/acme/web/raw/abc/1-day.png"
         );
         assert_eq!(slug("Night: the sidebar!"), "night-the-sidebar");
         assert_eq!(slug("…"), "image");
     }
 
     /// A GitHub that answers the git-data and pull endpoints, keeping every
-    /// request it was sent. `ref_at` is where the images ref already is;
-    /// `races` is how many ref moves to refuse as not a fast-forward.
-    async fn github(ref_at: Option<&'static str>, races: usize) -> (GitHub, Arc<parking_lot::Mutex<Vec<String>>>) {
+    /// request it was sent. `refs` are the refs it already has; `taken`
+    /// refuses creating one, as when another upload got there first.
+    async fn github(refs: &'static [&'static str], taken: bool) -> (GitHub, Arc<parking_lot::Mutex<Vec<String>>>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let seen = Arc::new(parking_lot::Mutex::new(Vec::<String>::new()));
         let log = seen.clone();
-        let races = Arc::new(parking_lot::Mutex::new(races));
         tokio::spawn(async move {
             while let Ok((mut sock, _)) = listener.accept().await {
                 let mut raw = Vec::new();
@@ -356,25 +346,18 @@ mod tests {
                 let body = text.split_once("\r\n\r\n").map(|(_, b)| b.to_string()).unwrap_or_default();
                 log.lock().push(format!("{line} {body}"));
                 let (status, reply) = if line.starts_with("GET /repos/acme/web/git/matching-refs/") {
-                    let refs = match ref_at {
-                        Some(sha) => json!([{ "ref": "refs/villain-layer/images", "object": { "sha": sha } }]),
-                        None => json!([]),
-                    };
-                    ("200 OK", refs)
+                    let listed: Vec<Value> = refs.iter().map(|r| json!({ "ref": r, "object": { "sha": "older" } })).collect();
+                    ("200 OK", json!(listed))
                 } else if line.starts_with("POST /repos/acme/web/git/blobs") {
                     ("201 Created", json!({ "sha": "blob1" }))
                 } else if line.starts_with("POST /repos/acme/web/git/trees") {
                     ("201 Created", json!({ "sha": "tree1" }))
                 } else if line.starts_with("POST /repos/acme/web/git/commits") {
                     ("201 Created", json!({ "sha": "commit1" }))
+                } else if line.starts_with("POST /repos/acme/web/git/refs") && taken {
+                    ("422 Unprocessable Entity", json!({ "message": "Reference already exists" }))
                 } else if line.starts_with("PATCH /repos/acme/web/git/refs/") || line.starts_with("POST /repos/acme/web/git/refs") {
-                    let mut left = races.lock();
-                    if *left > 0 {
-                        *left -= 1;
-                        ("422 Unprocessable Entity", json!({ "message": "Update is not a fast forward" }))
-                    } else {
-                        ("200 OK", json!({ "ref": "refs/villain-layer/images" }))
-                    }
+                    ("200 OK", json!({ "ref": "refs/pr-images/12" }))
                 } else if line.starts_with("GET /repos/acme/web/pulls/12") {
                     ("200 OK", json!({ "number": 12, "body": "Darker sidebar." }))
                 } else if line.starts_with("PATCH /repos/acme/web/pulls/12") {
@@ -398,45 +381,49 @@ mod tests {
         Image { caption: caption.into(), ext: "png", bytes: b"\x89PNG\r\n\x1a\nnight".to_vec() }
     }
 
+    const PR: &str = "https://github.com/acme/web/pull/12";
+
     #[tokio::test]
-    async fn the_first_upload_starts_the_ref_and_the_description_links_its_commit() {
-        let (gh, seen) = github(None, 0).await;
+    async fn the_first_upload_starts_the_prs_own_ref_and_the_description_links_its_commit() {
+        // PR 120's ref is listed when asking for 12's, and is not it.
+        let (gh, seen) = github(&["refs/pr-images/120"], false).await;
 
-        let shown = gh.show_images("acme", "web", 12, "https://github.com/acme/web/pull/12", &[png("Night")]).await.unwrap();
+        let shown = gh.show_images("acme", "web", 12, PR, &[png("Night")]).await.unwrap();
 
-        assert_eq!(shown[0].url, "https://github.com/acme/web/raw/commit1/pr-12/1-night.png");
+        assert_eq!(shown[0].url, "https://github.com/acme/web/raw/commit1/1-night.png");
         let seen = seen.lock();
         let commit = seen.iter().find(|r| r.starts_with("POST /repos/acme/web/git/commits")).unwrap();
         assert!(commit.contains(r#""parents":[]"#), "{commit}");
         let create = seen.iter().find(|r| r.starts_with("POST /repos/acme/web/git/refs ")).unwrap();
-        assert!(create.contains(r#""ref":"refs/villain-layer/images""#), "{create}");
+        assert!(create.contains(r#""ref":"refs/pr-images/12""#), "{create}");
         let tree = seen.iter().find(|r| r.starts_with("POST /repos/acme/web/git/trees")).unwrap();
-        assert!(tree.contains(r#""path":"pr-12/1-night.png""#) && !tree.contains("base_tree"), "{tree}");
+        assert!(tree.contains(r#""path":"1-night.png""#) && !tree.contains("base_tree"), "{tree}");
         let edit = seen.iter().find(|r| r.starts_with("PATCH /repos/acme/web/pulls/12")).unwrap();
-        assert!(edit.contains("Darker sidebar.") && edit.contains("raw/commit1/pr-12/1-night.png"), "{edit}");
+        assert!(edit.contains("Darker sidebar.") && edit.contains("raw/commit1/1-night.png"), "{edit}");
     }
 
     #[tokio::test]
-    async fn a_later_upload_builds_on_the_ref_and_never_forces_it() {
-        let (gh, seen) = github(Some("older"), 0).await;
+    async fn a_later_upload_replaces_what_the_prs_ref_held() {
+        let (gh, seen) = github(&["refs/pr-images/12"], false).await;
 
-        gh.show_images("acme", "web", 12, "https://github.com/acme/web/pull/12", &[png("Day")]).await.unwrap();
+        gh.show_images("acme", "web", 12, PR, &[png("Day")]).await.unwrap();
 
         let seen = seen.lock();
         let commit = seen.iter().find(|r| r.starts_with("POST /repos/acme/web/git/commits")).unwrap();
-        assert!(commit.contains(r#""parents":["older"]"#), "{commit}");
-        let moved = seen.iter().find(|r| r.starts_with("PATCH /repos/acme/web/git/refs/villain-layer/images")).unwrap();
-        assert!(moved.contains(r#""force":false"#), "{moved}");
+        assert!(commit.contains(r#""parents":[]"#), "{commit}");
+        let moved = seen.iter().find(|r| r.starts_with("PATCH /repos/acme/web/git/refs/pr-images/12 ")).unwrap();
+        assert!(moved.contains(r#""force":true"#) && moved.contains("commit1"), "{moved}");
+        assert!(!seen.iter().any(|r| r.starts_with("POST /repos/acme/web/git/refs")));
     }
 
     #[tokio::test]
-    async fn an_upload_that_loses_the_race_for_the_ref_builds_on_the_winner() {
-        let (gh, seen) = github(Some("older"), 1).await;
+    async fn a_ref_another_upload_created_first_is_moved_rather_than_failing() {
+        let (gh, seen) = github(&[], true).await;
 
-        gh.show_images("acme", "web", 12, "https://github.com/acme/web/pull/12", &[png("Day")]).await.unwrap();
+        gh.show_images("acme", "web", 12, PR, &[png("Day")]).await.unwrap();
 
         let seen = seen.lock();
-        assert_eq!(seen.iter().filter(|r| r.starts_with("PATCH /repos/acme/web/git/refs/")).count(), 2);
-        assert_eq!(seen.iter().filter(|r| r.starts_with("GET /repos/acme/web/git/matching-refs/")).count(), 2);
+        assert!(seen.iter().any(|r| r.starts_with("POST /repos/acme/web/git/refs ")));
+        assert!(seen.iter().any(|r| r.starts_with("PATCH /repos/acme/web/git/refs/pr-images/12 ")));
     }
 }
