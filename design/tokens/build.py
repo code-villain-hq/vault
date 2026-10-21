@@ -141,10 +141,10 @@ def design_md():
     md, lg = s["radius"]["md"], s["radius"]["lg"]
     out += ["components:",
             "  button-primary:", '    backgroundColor: "{colors.primary}"', '    textColor: "{colors.on-primary}"',
-            '    height: "28px"', '    padding: "0 0.7rem"', f'    rounded: "{md}px"',
+            '    height: "28px"', '    padding: "0 0.75rem"', f'    rounded: "{md}px"',
             "  button-primary-hover:", '    backgroundColor: "{colors.primary-hover}"', '    textColor: "{colors.on-primary}"',
             "  button-secondary:", '    backgroundColor: "color-mix(in srgb, {colors.fg} 10%, transparent)"', '    textColor: "{colors.fg}"',
-            '    height: "28px"', '    padding: "0 0.7rem"', f'    rounded: "{md}px"',
+            '    height: "28px"', '    padding: "0 0.75rem"', f'    rounded: "{md}px"',
             "  button-secondary-hover:", '    backgroundColor: "color-mix(in srgb, {colors.fg} 16%, transparent)"', '    textColor: "{colors.fg}"',
             "  field:", '    backgroundColor: "{colors.field}"', '    textColor: "{colors.fg}"', f'    rounded: "{md}px"',
             "  chip:", '    textColor: "{colors.muted}"', '    rounded: "999px"',

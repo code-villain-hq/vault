@@ -101,7 +101,7 @@ components:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
     height: "28px"
-    padding: "0 0.7rem"
+    padding: "0 0.75rem"
     rounded: "6px"
   button-primary-hover:
     backgroundColor: "{colors.primary-hover}"
@@ -110,7 +110,7 @@ components:
     backgroundColor: "color-mix(in srgb, {colors.fg} 10%, transparent)"
     textColor: "{colors.fg}"
     height: "28px"
-    padding: "0 0.7rem"
+    padding: "0 0.75rem"
     rounded: "6px"
   button-secondary-hover:
     backgroundColor: "color-mix(in srgb, {colors.fg} 16%, transparent)"
