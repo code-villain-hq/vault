@@ -28,7 +28,7 @@ function server(origin: string): Place {
   return { id: origin, kind: "server", origin, token: "t" };
 }
 
-const mac: Place = { id: "mac", kind: "mac", origin: "http://127.0.0.1:7485", token: "m" };
+const mac: Place = { id: "mac", kind: "mac", origin: "http://127.0.0.1:7585", token: "m" };
 
 test("a workspace keeps its key unless one before it has it", () => {
   const keys = workspaceEntries([
