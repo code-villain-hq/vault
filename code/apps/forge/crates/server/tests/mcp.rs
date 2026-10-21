@@ -1535,6 +1535,18 @@ async fn agents_see_similar_open_issues_before_filing(pool: PgPool) {
     create_issue(pool, s.agent, new_issue(duplicate, "Todo", None))
         .await
         .unwrap();
+
+    // The same title is always alike, even one made only of common words.
+    create_issue(pool, s.agent, new_issue("What is this?", "Todo", None))
+        .await
+        .unwrap();
+    let error = create_issue(pool, s.agent, new_issue(" what is THIS? ", "Todo", None))
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains(": What is this? (Todo, unassigned)"),
+        "{error}"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
