@@ -57,9 +57,9 @@ install: app
 # "VillainCaster Dev" identity when present so users' permission grants
 # survive updates.
 VERSION = $(shell /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Resources/Info.plist)
-# <name>-<version>-<os>-<arch>, e.g. Villain-Caster-0.2.0-macos-arm64.zip.
+# <name>-<version>-<os>-<arch>, e.g. Caster-0.2.0-macos-arm64.zip.
 ARCH = $(shell uname -m)
-ZIP = build/Villain-Caster-$(VERSION)-macos-$(ARCH).zip
+ZIP = build/Caster-$(VERSION)-macos-$(ARCH).zip
 
 release: app
 	codesign --verify --strict --verbose=2 "$(BUNDLE)"

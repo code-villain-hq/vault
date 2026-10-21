@@ -37,7 +37,7 @@ Type `help` (or `?`) in the launcher for this list in-app.
 
 ## Install
 
-Download `Villain-Caster-<version>-macos-arm64.zip` from the vault's
+Download `Caster-<version>-macos-arm64.zip` from the vault's
 [Releases](https://git.codevillain.eu/code-villain/vault/releases) (tagged
 `caster-v<version>`), unzip it and move **Caster.app** to `/Applications`.
 None is published there yet, so [build from source](#build--run) for now.
@@ -136,7 +136,7 @@ Maintainers only. Bump `CFBundleShortVersionString` / `CFBundleVersion` in
 [Info.plist](Resources/Info.plist), then
 
 ```sh
-make release    # → build/Villain-Caster-<version>-macos-arm64.zip
+make release    # → build/Caster-<version>-macos-arm64.zip
 ```
 
 and attach the zip to a release on the vault's Forgejo tagged
