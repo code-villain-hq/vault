@@ -31,7 +31,7 @@ enum Snippets {
 
 /// One field per snippet on the `panel` tone, opened from the status item's
 /// right-click menu. A field saves when you leave it or press Enter
-/// (studio/design/behaviour.md).
+/// (studio/design/behaviour.md), and the window ends with Caster's version.
 final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
@@ -68,6 +68,12 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, N
         grid.column(at: 0).xPlacement = .trailing
         grid.rowAlignment = .none
         for row in 0..<grid.numberOfRows { grid.row(at: row).yPlacement = .center }
+
+        let version = NSTextField(labelWithString: Self.nameAndVersion)
+        version.font = Nightshade.font(TypeTokens.uiSmall)
+        version.textColor = Nightshade.faint
+        grid.addRow(with: [NSGridCell.emptyContentView, version])
+        grid.row(at: grid.numberOfRows - 1).topPadding = 8
 
         let content = NSView()
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -111,6 +117,13 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, N
         frame.cacheDisplay(in: bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
         try data.write(to: url)
+    }
+
+    /// "Caster 0.2.0"; just "Caster" from a bare `swift build`, which has
+    /// no Info.plist.
+    private static var nameAndVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return ["Caster", version].compactMap { $0 }.joined(separator: " ")
     }
 
     // Leaving a field (Tab, a click elsewhere) and Enter both end editing.
