@@ -56,6 +56,7 @@ The selected Fold and cube studies live directly in `wallpapers/`:
 | [`code-villain-arch-poison-v3.png`](wallpapers/code-villain-arch-poison-v3.png) | 1672 × 941 | Heavier matte poison strike tucked behind the arch |
 | [`code-villain-arch-cloak-wordmark.png`](wallpapers/code-villain-arch-cloak-wordmark.png) | 1672 × 941 | The arch with the original outlined wordmark centered inside it |
 | [`code-villain-cubes-cloak-wordmark.png`](wallpapers/code-villain-cubes-cloak-wordmark.png) | 1672 × 941 | Violet engraved cubes framing the original outlined wordmark |
+| [`code-villain-cubes-cloak-panel.png`](wallpapers/code-villain-cubes-cloak-panel.png) | 900 × 941 | The engraved cubes alone, closed in for narrow panels such as the sign-in page |
 
 These retain their generated resolution. Their source image and imagegen
 prompts are in [`wallpapers/sources/`](wallpapers/sources/). Rebuild the
@@ -67,6 +68,9 @@ Rebuild the Arch wordmark's SVG and PNG with `python3 build_arch.py` from
 `wallpapers/`; it uses the original brand SVG and needs Google Chrome.
 Rebuild the Cubes wordmark with `python3 build_cubes_wordmark.py` in the
 same folder; it uses `code-villain-cubes-cloak-clean.png` as its backdrop.
+`python3 build_cubes_panel.py` builds the Cubes panel from the same image:
+it keeps both clusters at native resolution and closes the empty middle
+along a diagonal seam through the ground.
 
 ## Meeting backgrounds
 
