@@ -59,10 +59,10 @@ export function ProfileMenu() {
         ref={button}
         className={`profile-button${menu ? " active" : ""}`}
         onClick={toggle}
-        title="Profiles: each is a whole Layer of its own, in a window of its own"
+        title="Workspaces: each is a whole Layer of its own, in a window of its own"
       >
         <Initial profile={me} />
-        <span className="profile-name">{me?.name ?? "Profile"}</span>
+        <span className="profile-name">{me?.name ?? "Workspace"}</span>
         <span className="profile-chev" aria-hidden><ChevronIcon /></span>
       </button>
 
@@ -76,7 +76,7 @@ export function ProfileMenu() {
           className="ui-menu ctx-menu profile-menu"
           measureKey={profiles.length}
         >
-          <div className="profile-menu-head">Profiles</div>
+          <div className="profile-menu-head">On this Mac</div>
           {profiles.map((p) => (
             <button key={p.id} className="ctx-item ui-option profile-item" onClick={() => open(p)}>
               <Initial profile={p} />
@@ -85,10 +85,10 @@ export function ProfileMenu() {
             </button>
           ))}
           <button className="ctx-item ui-option separated" onClick={() => { setMenu(null); setMaking(true); }}>
-            New profile…
+            New workspace…
           </button>
           <button className="ctx-item ui-option" onClick={() => { setMenu(null); setManaging(true); }}>
-            Manage profiles…
+            Manage workspaces…
           </button>
         </Floating>
       )}
@@ -162,7 +162,7 @@ function NewProfile({ onClose, onMade }: { onClose: () => void; onMade: (p: Prof
 
   return (
     <Modal
-      title="New profile"
+      title="New workspace"
       onClose={onClose}
       footer={
         <>
@@ -223,15 +223,15 @@ function ManageProfiles({
   /** Why a profile cannot be deleted, if it cannot (PROF-9). */
   const kept = (p: ProfileView) =>
     p.id === "default"
-      ? "The profile Layer had before profiles stays."
+      ? "The workspace Layer had before workspaces stays."
       : p.current
-        ? "This window's profile. Delete it from another profile's window."
+        ? "This window's workspace. Delete it from another workspace's window."
         : p.open
           ? "Open in another window. Quit it first."
           : null;
 
   return (
-    <Modal title="Profiles" onClose={onClose} footer={<button className="ui-button" onClick={onClose}>Done</button>}>
+    <Modal title="Workspaces" onClose={onClose} footer={<button className="ui-button" onClick={onClose}>Done</button>}>
       <div className="profile-rows">
         {profiles.map((p) => (
           <div key={p.id} className="profile-row">
@@ -301,11 +301,11 @@ function ManageProfiles({
       {deleting && (
         <Confirm
           title={`Delete ${deleting.name}`}
-          confirmLabel="Delete profile"
+          confirmLabel="Delete workspace"
           busyLabel="Deleting…"
           body={
             <>
-              Its repositories list, tasks, settings, connections and tokens, its messages and its
+              Its repositories, tasks, settings, connections and tokens, its notes, its messages and its
               run log are deleted. This cannot be undone.
               <div className="confirm-detail">
                 Its task folders stay where they are, since they can hold work not yet committed:

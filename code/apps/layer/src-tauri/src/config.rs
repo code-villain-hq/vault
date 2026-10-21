@@ -17,55 +17,19 @@ use crate::error::{Error, Result};
 mod integrations;
 mod browser;
 mod phone;
+mod project;
+pub mod shared;
 pub use integrations::{
     AthenaTable, FlowStatus, GithubConfig, GrafanaConfig, JiraConfig, LogSource, ModelChoice, SlackBotConfig, SlackConfig, SlackThread,
     StartTo, TicketFlow,
 };
 pub use browser::{BrowserConfig, SavedSignIn, SavedTabs};
 pub use phone::{PhoneConfig, PhoneDevice};
+pub use project::Project;
+pub use shared::Shared;
 
-pub const SCHEMA_VERSION: u32 = 2;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Project {
-    pub id: String,
-    pub name: String,
-    /// Absolute path to the user's own clone: where the repository was found,
-    /// and what the app copies. Task worktrees do not come from it.
-    pub path: String,
-    pub default_branch: String,
-    /// "frontend", "backend", ... One group per repo; None means ungrouped.
-    #[serde(default)]
-    pub group: Option<String>,
-    /// The app's own bare copy of the repository, which task worktrees
-    /// belong to (`git/store.rs`). None until it has been made.
-    #[serde(default)]
-    pub store: Option<String>,
-    /// How Update from base brings the base into a branch here: set in the
-    /// Repos view, or the way this repo was last updated. None: guessed from
-    /// its history (UPD-7).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub update_by: Option<crate::git::UpdateBy>,
-    /// What says the work here is done (`bun run check`), run in a
-    /// worktree by a loop (LOOP-1). Set only by the user.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub check: Option<String>,
-    /// Where specs are committed here (SPEC-1), from its root. None: `specs`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub spec_folder: Option<String>,
-    /// Specs are kept by the app instead of committed here (SPEC-3).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub specs_in_app: bool,
-}
-
-impl Project {
-    /// The repository new task worktrees are cut from: the app's copy once
-    /// there is one, the user's clone until then. For a worktree that
-    /// already exists, ask it (`commands::owner_of`) instead.
-    pub fn repo(&self) -> PathBuf {
-        PathBuf::from(self.store.as_deref().unwrap_or(&self.path))
-    }
-}
+/// 3: the shared setup is kept in a workspace (§25), `shared` says which.
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// One ticket's worth of work, spanning one or more repositories.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -363,6 +327,10 @@ pub struct AppConfig {
     pub phone: PhoneConfig,
     #[serde(default)]
     pub browser: BrowserConfig,
+    /// The workspace that keeps the shared setup, and what is on its way
+    /// there (§25).
+    #[serde(default)]
+    pub shared: Shared,
 }
 
 impl AppConfig {
@@ -501,12 +469,17 @@ impl ConfigStore {
         };
 
         // An older build running over a newer build's config drops whatever
-        // it does not know on its first save. A copy first, once per version.
-        if inner.version > SCHEMA_VERSION {
+        // it does not know on its first save; and a migration rewrites the
+        // file for good (version 3 moves the setup into a workspace,
+        // PROF-12). A copy first, once per version.
+        if inner.version != SCHEMA_VERSION && path.exists() {
             let kept = path.with_extension(format!("json.v{}", inner.version));
             if !kept.exists() {
                 let _ = std::fs::copy(&path, &kept);
             }
+        }
+        if inner.version > SCHEMA_VERSION {
+            let kept = path.with_extension(format!("json.v{}", inner.version));
             eprintln!(
                 "config.json is from a newer build (version {}); a copy is at {}",
                 inner.version,
@@ -556,15 +529,36 @@ impl ConfigStore {
     ///
     /// Readers are not held up by the write: `inner` is released before it,
     /// and only other updates wait on `disk`.
+    ///
+    /// A change to the shared setup is queued for the workspace on the way
+    /// (PROF-13): see `shared.rs`.
     pub fn update<T>(&self, f: impl FnOnce(&mut AppConfig) -> T) -> Result<T> {
         let _disk = self.disk.lock();
-        let (out, snapshot) = {
+        let (out, snapshot, sent) = {
             let mut guard = self.inner.write();
+            let before = shared::records(&guard);
             let out = f(&mut guard);
-            (out, guard.clone())
+            let sent = shared::record_changes(&mut guard, &before);
+            (out, guard.clone(), sent)
         };
         self.persist(&snapshot)?;
+        crate::workspace::wrote(sent);
         Ok(out)
+    }
+
+    /// `update` for what the workspace sent (PROF-14): nothing is queued
+    /// back, and nothing is written unless `f` says it changed something.
+    pub fn mirror(&self, f: impl FnOnce(&mut AppConfig) -> bool) -> Result<bool> {
+        let _disk = self.disk.lock();
+        let snapshot = {
+            let mut guard = self.inner.write();
+            if !f(&mut guard) {
+                return Ok(false);
+            }
+            guard.clone()
+        };
+        self.persist(&snapshot)?;
+        Ok(true)
     }
 
     fn persist(&self, cfg: &AppConfig) -> Result<()> {

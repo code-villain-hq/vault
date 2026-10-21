@@ -253,6 +253,8 @@ fn describe_project(path: &str, group: Option<&str>) -> Result<Project> {
         check: None,
         spec_folder: None,
         specs_in_app: false,
+        remote: git::origin_url(&root_path).map(|url| git::remote_key(&url)),
+        repository_id: None,
     })
 }
 

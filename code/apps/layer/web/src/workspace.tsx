@@ -1,5 +1,5 @@
 import type { SyncClient } from "@code-villain/sync-client";
-import type { Me, ModelKind, WorkspaceInfo } from "@layer/types";
+import type { Me, ModelKind, Schema, WorkspaceInfo } from "@layer/types";
 import {
   createContext,
   type ReactNode,
@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { Place } from "./server";
 import { loadSession } from "./session";
-import { createSyncClient, type Schema } from "./sync";
+import { createSyncClient } from "./sync";
 
 interface WorkspaceContext {
   /** Where the workspace lives: this Mac, or a server. */

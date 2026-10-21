@@ -28,15 +28,18 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"
 axum = "0.8"
 portable-pty = "0.9"
 
-reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls", "rustls-native-certs", "http2", "charset", "system-proxy"] }
+# 0.13.5, for the bundled Postgres's download (`postgresql_archive`). Its
+# `rustls` checks certificates with macOS's own trust store, as the
+# `rustls-native-certs` it replaced did with the system's roots.
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "query", "rustls", "http2", "charset", "system-proxy"] }
 # The Slack bot's Socket Mode connection (BOT-1): reqwest has no
-# websocket client. rustls with the system's roots, as reqwest uses.
+# websocket client. rustls with the system's roots.
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
 
 keyring = "4"
 
 thiserror = "2"
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 base64 = "0.22"
 parking_lot = "0.12"
@@ -50,6 +53,13 @@ notify-rust = "4"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSDictionary", "NSGeometry", "NSAttributedString"] }
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSRunningApplication", "NSImage", "NSBezierPath", "NSColor", "NSFont", "NSStringDrawing", "NSAttributedString", "objc2-core-foundation", "libc"] }
+# Workspaces (§25): each runs Layer's server on its own Postgres, bundled
+# in the app (`workspace.rs`), and keeps its shared setup there.
+code-villain-desktop = { workspace = true }
+layer-domain = { workspace = true }
+layer-server = { workspace = true }
+layer-sync = { workspace = true }
+sqlx = { workspace = true }
 
 [dev-dependencies]
 # A mock runtime, so the PTY layer can be driven through real processes in

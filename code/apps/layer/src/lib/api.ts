@@ -70,7 +70,8 @@ import type {
   S3Found,
 } from "./types";
 import type { RunLog } from "./types-runs";
-import type { ProfileView } from "./types-profiles";
+import type { Operation } from "@layer/types";
+import type { ProfileView, SetupApplied, SetupSnapshot, WorkspacePlace } from "./types-profiles";
 
 export const api = {
   // projects
@@ -388,6 +389,12 @@ export const api = {
   /** One of the eight, `--profile-<n>` (PROF-10). */
   setProfileColour: (id: string, colour: number) => invoke<void>("set_profile_colour", { id, colour }),
   deleteProfile: (id: string) => invoke<void>("delete_profile", { id }),
+  /** Once its server has started; null when it did not (PROF-11). */
+  workspacePlace: () => invoke<WorkspacePlace | null>("workspace_place"),
+  /** The changes queued for the workspace, handed over (PROF-13). */
+  takeSetupWrites: () => invoke<Operation[]>("take_setup_writes"),
+  /** What the workspace keeps, into this Mac's setup and notes (PROF-14). */
+  applySetup: (snapshot: SetupSnapshot) => invoke<SetupApplied>("apply_setup", { snapshot }),
   setWorktreeRoot: (path: string | null) => invoke<void>("set_worktree_root", { path }),
   setUiPrefs: (ui: UiPrefs) => invoke<void>("set_ui_prefs", { ui }),
   disconnect: (which: "jira" | "github" | "slack" | "grafana") => invoke<void>("disconnect", { which }),

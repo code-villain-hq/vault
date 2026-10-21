@@ -345,6 +345,8 @@ pub(super) mod tests {
                 check: None,
                 spec_folder: None,
                 specs_in_app: false,
+                remote: None,
+                repository_id: None,
             }],
             ..Default::default()
         };

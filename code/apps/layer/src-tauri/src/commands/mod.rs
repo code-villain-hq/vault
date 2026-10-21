@@ -156,6 +156,7 @@ mod browser;
 mod loops;
 mod runs;
 mod profiles;
+mod workspace;
 
 pub use projects::*;
 pub use repos::*;
@@ -190,6 +191,7 @@ pub use browser::*;
 pub use loops::*;
 pub use runs::*;
 pub use profiles::*;
+pub use workspace::*;
 
 #[cfg(test)]
 mod tests {
@@ -211,6 +213,8 @@ mod tests {
             check: None,
             spec_folder: None,
             specs_in_app: false,
+            remote: None,
+            repository_id: None,
         }
     }
 

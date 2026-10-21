@@ -179,10 +179,10 @@ pub(crate) fn delete_in(base: &Path, me: &str, id: &str, forget_tokens: impl FnO
         return Err(Error::NotFound(format!("profile {id}")));
     };
     if id == DEFAULT {
-        return Err(Error::Other("The Default profile cannot be deleted.".into()));
+        return Err(Error::Other("The Default workspace cannot be deleted.".into()));
     }
     if id == me {
-        return Err(Error::Other(format!("{} is this window's profile. Delete it from another profile's window.", entry.name)));
+        return Err(Error::Other(format!("{} is this window's workspace. Delete it from another workspace's window.", entry.name)));
     }
     let folder = profiles::folder_of(base, id);
     // Held while it goes, so no copy can open it meanwhile.

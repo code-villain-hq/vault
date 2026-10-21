@@ -69,8 +69,38 @@ connections and log sources (`rules.rs`).
 words, a write the person may not make is 403, a second repository with the
 same remote is 409, and a workspace you aren't in is 404.
 
-The desktop app doesn't use the server yet: it still reads `config.json`.
-Its move onto a workspace is the next change.
+### The desktop app's workspace
+
+Each profile is a workspace (§25). Its window runs Layer's server on a
+Postgres of its own in the profile's folder (`postgres/`), both on loopback
+(`workspace.rs`, `code/kit/desktop`; ports 7685 and 7686 when free). They
+start in the background at launch and stop on quit, after the agents.
+
+The backend still reads `config.json` and `notes.json`, in about 155
+places, so agents and startup never wait on the workspace:
+
+```
+ a change here ──▶ config.update / notes ──▶ outbox in the file ── setup:write ──▶
+     window: take_setup_writes ──▶ sync client (IndexedDB outbox) ──▶ server
+ server ──▶ sync client ──▶ apply_setup(snapshot) ──▶ config.mirror / notes.replace
+```
+
+- **Out** (PROF-13): `config.update` works out the shared setup as records
+  before and after each change (`config/shared.rs`), and queues the
+  difference as the engine's operations in `config.json`'s `shared.outbox`
+  (notes in `notes.json`'s). No write site knows about the workspace.
+  What the workspace would refuse is checked with `layer-domain`'s checks
+  first, said, and kept here.
+- **In** (PROF-14): the window hands every new snapshot to `apply_setup`
+  (`workspace/mirror.rs`), which merges only the shared fields. It takes
+  nothing while the outbox holds changes the workspace has not seen; the
+  window sends them, then the snapshot again.
+- **The move** (PROF-12, `workspace/moving.rs`): the first start makes the
+  person and the workspace, records it in `config.json`, and that change
+  queues every record as a create.
+
+A workspace on another server, with sign-in, members and "Not on this Mac",
+is the next change.
 
 ## Where work runs
 
@@ -106,8 +136,8 @@ tokens), and a schema `version`.
 - `AppConfig` does not deny unknown fields. Removing a field silently drops
   that key on the next write. That is usually what you want, unless it held
   something.
-- A newer schema than the build knows is copied to `config.json.v<N>` and
-  never migrated down. A file that will not parse is kept as
+- Before a migration, and for a newer schema than the build knows, the
+  file is copied to `config.json.v<N>`. A newer one is never migrated down. A file that will not parse is kept as
   `config.json.unreadable`.
 
 **Secrets: the keychain** (`secrets.rs`). One item per build identifier
@@ -167,6 +197,7 @@ for, and the reverse, and that each is in this table.
 | `browser:changed` | task id, or `""` for every task | a task's tab changed: made, navigated, retitled, loading, an agent acted, closed; or the browser went away (`browser/`) | `BrowserPanel.tsx` (`useBrowserView`) → `browser_view` |
 | `loop:changed` | pane id | a pane's loop changed: started, waiting, checking, a check run, ended (`loops.rs`, LOOP-9) | `LoopBar.tsx` (`useLoop`) → `loop_view` |
 | `slackbot:changed` | none | the Slack bot's connection changed (off, connecting, connected, failing), or a thread was handed to a chat (`slack_bot/`, BOT-10) | `lib/slackBot.ts` (`useSlackBot`) → `slack_bot_view`, for Settings and the chat list |
+| `setup:write` | none | a change to the shared setup or notes was queued for the workspace (`workspace.rs`, PROF-13) | `lib/workspace-sync.ts` → `takeSetupWrites`, into the sync client |
 | `profiles:changed` | none | the profiles changed: one made, renamed or deleted in this window, or, when this window is brought forward, in another (`profiles.rs`, PROF-6) | `sidebar/ProfileMenu.tsx` → `listProfiles` |
 | `phone:changed` | none | phone access changed: a way in switched, a phone paired, forgotten, connected or gone (`phone/`) | `PhoneSettings.tsx` → `phoneStatus`, for Settings and the top bar's phone |
 

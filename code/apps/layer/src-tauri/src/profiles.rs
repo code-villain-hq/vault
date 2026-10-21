@@ -88,17 +88,17 @@ impl Registry {
         let name = name.trim();
         let length = name.chars().count();
         if length == 0 || length > 40 {
-            return Err(Error::Other("A profile's name is 1 to 40 characters.".into()));
+            return Err(Error::Other("A workspace's name is 1 to 40 characters.".into()));
         }
         if name.chars().any(char::is_control) {
-            return Err(Error::Other("A profile's name is one line of text.".into()));
+            return Err(Error::Other("A workspace's name is one line of text.".into()));
         }
         let taken = self
             .profiles
             .iter()
             .any(|p| Some(p.id.as_str()) != except && p.name.to_lowercase() == name.to_lowercase());
         if taken {
-            return Err(Error::Other(format!("There is a profile called {name} already.")));
+            return Err(Error::Other(format!("There is a workspace called {name} already.")));
         }
         Ok(name.to_string())
     }
@@ -391,7 +391,7 @@ pub fn launch(id: &str) -> Result<()> {
                 .output()?;
             if !out.status.success() {
                 return Err(Error::Other(format!(
-                    "the profile could not be opened: {}",
+                    "the workspace could not be opened: {}",
                     String::from_utf8_lossy(&out.stderr).trim()
                 )));
             }
