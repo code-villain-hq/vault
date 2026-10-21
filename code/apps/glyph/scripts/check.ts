@@ -7,8 +7,8 @@ const root = new URL("..", import.meta.url).pathname;
 const kitClient = `${root}../../kit/sync/client`;
 // The parts every studio web app shares (`code/kit/web`).
 const kitWeb = `${root}../../kit/web`;
-// CI checks the desktop app in a job of its own, so the main check doesn't
-// wait for Tauri to build.
+// GLYPH_CHECK_SKIP_DESKTOP leaves the desktop app out, for a quicker check
+// that doesn't wait for Tauri to build. CI checks it too, in the same run.
 const crates = process.env.GLYPH_CHECK_SKIP_DESKTOP
   ? ["--workspace", "--exclude", "glyph-desktop"]
   : ["--workspace"];
