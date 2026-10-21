@@ -5,8 +5,11 @@ import { type PointerEvent as ReactPointerEvent, useRef, useState } from "react"
 import { contrast } from "./contrast";
 
 /** Eight hues at one OKLCH lightness (0.76), so none jumps out or disappears.
- * Teal, amber, red and blue are the brand's done, waiting, error and information
- * colours. Same order as the earlier palette, so a past pick maps by position. */
+ * Teal, amber, red and blue take the hues of the brand's done, waiting, error
+ * and information colours, adjusted to one lightness, so they aren't the status
+ * tokens themselves. Labels store the hex, so changing one turns past picks into
+ * custom colours. Same order as the earlier palette, so a past pick maps by
+ * position. */
 export const COLORS = [
   "#9fa9ff", // indigo
   "#5bc8a6", // teal
