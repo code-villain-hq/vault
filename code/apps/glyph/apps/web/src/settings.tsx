@@ -20,7 +20,7 @@ const ROLES: { value: Role; label: string }[] = [
 ];
 
 export function MembersPage() {
-  const { me, workspace } = useWorkspace();
+  const { place, me, workspace } = useWorkspace();
   const isAdmin = workspace.role === "admin";
   const base = `/api/w/${workspace.id}`;
   const [members, setMembers] = useState<MemberInfo[]>([]);
@@ -59,7 +59,8 @@ export function MembersPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-10 px-6 py-8">
           <ErrorMessage>{error}</ErrorMessage>
           {isAdmin && <WorkspaceName />}
-          {isAdmin && (
+          {/* Only you are in a workspace on this Mac. */}
+          {isAdmin && place.kind !== "mac" && (
             <InviteSection
               invites={invites}
               onCreate={(role) =>
@@ -147,6 +148,7 @@ function InviteSection({
   onCreate: (role: Role) => Promise<CreatedInvite>;
   onRevoke: (id: string) => Promise<void>;
 }) {
+  const { place } = useWorkspace();
   const [role, setRole] = useState<Role>("member");
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -157,7 +159,7 @@ function InviteSection({
     setCopied(false);
     try {
       const created = await onCreate(role);
-      setLink(publicUrl(`/join/${created.token}`));
+      setLink(publicUrl(`/join/${created.token}`, place));
     } catch (e) {
       setError(messageOf(e));
     }
@@ -292,7 +294,7 @@ function RoleSelect({
 
 /** The workspace's name, for admins; saved when they leave the field or press Enter. */
 function WorkspaceName() {
-  const { workspace } = useWorkspace();
+  const { place, workspace } = useWorkspace();
   const [value, setValue] = useState(workspace.name);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
@@ -300,7 +302,7 @@ function WorkspaceName() {
     if (trimmed === workspace.name) return;
     setError(null);
     try {
-      signedIn(await api<Me>("PATCH", `/api/w/${workspace.id}`, { name: trimmed }));
+      signedIn(await api<Me>("PATCH", `/api/w/${workspace.id}`, { name: trimmed }), place);
     } catch (e) {
       setError(messageOf(e));
       setValue(workspace.name);
@@ -326,6 +328,7 @@ function WorkspaceName() {
 
 /** Your name, saved when you leave the field or press Enter. */
 function NameField({ name }: { name: string }) {
+  const { place } = useWorkspace();
   const [value, setValue] = useState(name);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
@@ -333,7 +336,7 @@ function NameField({ name }: { name: string }) {
     if (trimmed === name) return;
     setError(null);
     try {
-      signedIn(await api<Me>("PUT", "/api/me", { name: trimmed }));
+      signedIn(await api<Me>("PUT", "/api/me", { name: trimmed }), place);
     } catch (e) {
       setError(messageOf(e));
       setValue(name);
@@ -355,9 +358,9 @@ function NameField({ name }: { name: string }) {
 }
 
 export function AccountPage() {
-  const { me } = useWorkspace();
+  const { place, me } = useWorkspace();
   // With Code Villain accounts, passwords live there, not here.
-  const passwords = useProviders()?.password;
+  const passwords = useProviders(place.origin)?.password;
   const navigate = useNavigate();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -457,21 +460,23 @@ export function AccountPage() {
             </section>
           )}
 
-          <section>
-            <h2 className="mb-1 font-medium">Sign out</h2>
-            <p className="mb-3 text-muted">
-              Signing out also removes Glyph's copy of your workspaces from this device.
-            </p>
-            <Button
-              variant="secondary"
-              onClick={async () => {
-                await signOut();
-                await navigate({ to: "/login" });
-              }}
-            >
-              Sign out
-            </Button>
-          </section>
+          {place.kind !== "mac" && (
+            <section>
+              <h2 className="mb-1 font-medium">Sign out</h2>
+              <p className="mb-3 text-muted">
+                Signing out also removes Glyph's copy of your workspaces from this device.
+              </p>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  await signOut(place);
+                  await navigate({ to: "/" });
+                }}
+              >
+                Sign out
+              </Button>
+            </section>
+          )}
         </div>
       </div>
     </>

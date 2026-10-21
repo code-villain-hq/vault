@@ -33,7 +33,11 @@ snapshots by hand. `bun run check` fails when they've drifted.
   (no download, no GPU). It answers in a moment with the source text, the
   target language and the glossary terms it was told to use.
 - `bun run dev:desktop`: Tauri app against the running dev server.
-  `bun run build:desktop` packages it.
+  `bun run build:desktop` packages it. The app runs Glyph itself, on its own
+  Postgres (7486) and server (7485), for the workspaces on this Mac, and
+  signs in to servers for the others. Its data, and the models added in
+  Settings (`models.toml`), are in
+  `~/Library/Application Support/eu.codevillain.glyph`.
 - `bun run app`: the whole app in Docker at http://localhost:7490 (one
   image: server plus built web app). `bun run app:logs` follows it.
 - `bun run seed`: local test accounts (an admin and a member of "Villain
@@ -57,6 +61,14 @@ OpenAI-compatible server by `endpoint`. With `model_path`, or `hf_repo` and
 `hf_file`, a signed-in user can start and stop it from Settings, which runs
 `llm_binary` (llama-server) on the endpoint's port. A language pair picks a
 model by name; a pair without one uses the first.
+
+On the desktop app's own server, Settings → Models adds and removes models,
+written to `models.toml` in the app's data folder; Glyph picks the port
+(7481 to 7499) and the context size. Any other server refuses both
+(`POST /api/models`, `DELETE /api/models/{name}`) with 403: its models stay
+in its file, since the file names programs for the server to run. A
+packaged app's PATH is short, so llama-server is also looked for in
+`/opt/homebrew/bin` and `/usr/local/bin`.
 
 Every model call is told the glossary terms its text contains, the
 placeholder rules and the key's context. A text that leaves out a term is
@@ -89,9 +101,16 @@ text's confidence and origin.
 - `crates/llm`: model client, prompts, reading the models file, starting
   llama-server.
 - `crates/server`: axum server: HTTP API, WebSocket feed, accounts,
-  invites, runs, models.
+  invites, runs, models. `serve.rs` runs it on a listener until told to
+  stop, and stops the models it started, for the server binary and the
+  desktop app alike; `local.rs` is the one person of the desktop app's own
+  Glyph, who has no password.
 - `packages/types`: generated from Rust. Never edit by hand.
-- `apps/web`: React + Base UI + Tailwind. `apps/desktop`: Tauri shell.
+- `apps/web`: React + Base UI + Tailwind. Its workspaces come from places
+  (`server.ts`): this Mac, the server it came from, or servers the desktop
+  app signed in to, each with its own session.
+- `apps/desktop`: Tauri shell. `this_mac.rs` starts Glyph on Postgres for
+  the workspaces on this Mac, with `code/kit/desktop`.
 - `migrations`: SQL schema, applied by the server on start.
 - `demo`: made-up strings and glossary for the seed. Real strings never go
   in this repository: it is public.

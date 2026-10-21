@@ -16,7 +16,7 @@ import type {
   TranslationRun,
   User,
 } from "@glyph/types";
-import { authHeaders, credentials, serverUrl, socketProtocols } from "./server";
+import { authHeaders, credentialsFor, type Place, socketProtocols } from "./server";
 
 export type Schema = {
   Language: { record: Language; create: LanguageCreate; patch: LanguagePatch };
@@ -44,6 +44,7 @@ const timestamps = () => {
 };
 
 export function createSyncClient(options: {
+  place: Place;
   userId: string;
   workspaceId: string;
   onSessionEnded: () => void;
@@ -53,11 +54,11 @@ export function createSyncClient(options: {
     store: new IndexedDbStore(databaseName(options.userId, options.workspaceId)),
     transport: new HttpTransport({
       workspaceId: options.workspaceId,
-      baseUrl: serverUrl(),
+      baseUrl: options.place.origin,
       onUnauthorized: options.onSessionEnded,
-      credentials,
-      headers: authHeaders,
-      protocols: socketProtocols,
+      credentials: credentialsFor(options.place),
+      headers: () => authHeaders(options.place),
+      protocols: () => socketProtocols(options.place),
     }),
     // What the server would fill in, so new records look complete at once.
     defaults: {

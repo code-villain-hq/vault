@@ -50,17 +50,19 @@ export function runProgress(run: TranslationRun): string {
 }
 
 /** The server's models, and whether each answers; refreshed on demand. */
+/** The models of the open workspace's place: this Mac's, or its server's. */
 export function useModels() {
+  const { place } = useWorkspace();
   const [models, setModels] = useState<ModelInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
-      setModels(await api<ModelInfo[]>("GET", "/api/models"));
+      setModels(await api<ModelInfo[]>("GET", "/api/models", undefined, place));
       setError(null);
     } catch (e) {
       setError(messageOf(e));
     }
-  }, []);
+  }, [place]);
   useEffect(() => {
     void reload();
   }, [reload]);

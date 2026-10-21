@@ -5,6 +5,7 @@ import { PageHeader } from "./layout";
 import { Empty } from "./page-parts";
 import { useModels } from "./runs";
 import { Button, ErrorMessage } from "./ui";
+import { useWorkspace } from "./workspace";
 
 /** Running, starting (the server's process is up but the model doesn't answer yet) or stopped. */
 function status(model: ModelInfo): { label: string; tone: "ok" | "warn" | "neutral" } {
@@ -15,6 +16,7 @@ function status(model: ModelInfo): { label: string; tone: "ok" | "warn" | "neutr
 }
 
 export function ModelsPage() {
+  const { place } = useWorkspace();
   const { models, error: loadError, reload } = useModels();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -31,7 +33,12 @@ export function ModelsPage() {
     setBusy(model.name);
     setError(null);
     try {
-      await api("POST", `/api/models/${encodeURIComponent(model.name)}/${action}`);
+      await api(
+        "POST",
+        `/api/models/${encodeURIComponent(model.name)}/${action}`,
+        undefined,
+        place,
+      );
     } catch (e) {
       setError(messageOf(e));
     }
