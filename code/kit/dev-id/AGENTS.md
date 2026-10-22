@@ -14,7 +14,12 @@ are in `people.toml`.
   7580, 7680) the people in one of its groups (`forge-users`, `-admins`,
   `-guests`) and all their groups, with the token `dev`. An app that isn't
   running is skipped. Edit `people.toml` while it runs; it sends the change.
-- Each app's `bun run dev` starts it, or uses the one already running.
+- Each app's `bun run dev` starts it, or uses the one already running,
+  with `devCompany(app, root, database)` from `dev.ts`: it makes the app's
+  own database (`<app>_acme`) and sets the settings below, unless the
+  developer has their own (`<app>.toml`, `<APP>_CONFIG` or
+  `<APP>_OIDC_ISSUER`). Seed scripts sign in with `signInAs(base, who)`,
+  which follows the sign-in without a browser.
 
 Its settings in an app, as `bun run dev` sets them:
 

@@ -1,25 +1,26 @@
-# Groups from the Code Villain account: notes for coding agents
+# Groups from the company's account: notes for coding agents
 
-Pocket ID (id.codevillain.eu) signs people in to every app. With SCIM it
-also sends each app the people and groups its sign-in client allows. This
-crate, `code-villain-scim`, takes them at `/api/scim/v2` and turns them into
-workspace roles. Forge, Glyph, Raven and Layer use it.
+A server runs for one company, whose account (Pocket ID, or another OpenID
+Connect provider with SCIM) signs people in. With SCIM it also sends the
+server the people and groups its sign-in client allows. This crate,
+`code-villain-scim`, takes them at `/api/scim/v2` and turns them into roles
+in the company's workspace. Forge, Glyph, Raven and Layer use it.
 
 ## What it does
 
-- A workspace linked to a tool's groups (`workspaces.group_name`, say
-  `forge`) has `forge-users` as members, `forge-admins` as admins and
-  `forge-guests` as guests. Someone in more than one has the highest role.
-  A group without one of those endings links nowhere.
+- The company's workspace follows three groups, named in the server's
+  settings (`Groups`; by default `forge-users`, `forge-admins` and
+  `forge-guests`): their people are its members, admins and guests.
+  Someone in more than one has the highest role. The groups are kept in
+  `workspaces.users_group`, `admins_group` and `guests_group`.
 - The role's group is kept in `workspace_members.from_group`. Members shows
   it ("from forge-admins") and refuses to change the role or remove the
   person: that's done in the account.
-- Someone who came by invite, and isn't in the groups, stays as they are.
-  When a group takes them, it sets their role from then on.
-- Out of every group, someone whose role came from one leaves the
-  workspace. Deleted or turned off in the account, they also lose their
-  sessions; their account here stays.
-- Unlinking a workspace keeps everyone with their roles, as though invited.
+- Out of every group, someone leaves the workspace. Deleted or turned off in
+  the account, they also lose their sessions; their account here stays.
+- Once the account has sent its groups, anyone in the workspace without one
+  leaves, as the server starts, unless the app keeps them (`stays`: Forge's
+  agents). Before, nobody is in a group, and nobody leaves.
 
 People are matched to accounts here by their account id (`users.oidc_sub`,
 which Pocket ID sends as `externalId`), else by an email no other sign-in
@@ -29,17 +30,19 @@ has. Someone without an email is refused, and so is the sync of their groups.
 
 - A migration with `schema.sql`, as the app copied the sync engine's.
 - `impl Directory for <App>Directory`: `add_member`, `change_role` and
-  `remove_member` do what accepting an invite, changing a role and
-  "Remove" do in Members, so the app's sync records and its own rules
-  follow. `groups_changed` is for what else follows a group (Forge's linked
-  teams).
+  `remove_member` do what joining, changing a role and "Remove" do in
+  Members, so the app's sync records and its own rules follow.
+  `groups_changed` is for what else follows a group (Forge's linked teams);
+  `stays` and `refuses_email` for people the app has of its own.
+- On start, `follow_groups::<D>(db, workspace, &Groups::new(app, …))` with
+  the names from the settings' `[groups]`.
 - Mount `code_villain_scim::router::<D, S>(pool, token)` at `/api/scim/v2`
-  when `<APP>_SCIM_TOKEN` is set, and only then.
+  with the settings' `[scim] token`.
 - Members: `role_source` before a role change or a removal; `from_group`
-  in the members list; `GET`/`PUT /api/w/{id}/group` for admins with
-  `linked_group`, `group_names` and `link_workspace`, not there when the
-  token isn't set.
-- Forge's `crates/server/src/groups.rs` and `tests/scim.rs` show the whole of it.
+  in the members list. `group_names` lists the groups, for what links to
+  one (Forge's teams, at `GET /api/w/{id}/groups`).
+- Forge's `crates/server/src/{company.rs,groups.rs}` and `tests/scim.rs`
+  show the whole of it.
 
 ## What Pocket ID sends
 
@@ -56,8 +59,8 @@ ahead of its releases:
   sent at all. `group_key` reads the friendly name as a name: lowercase,
   anything but letters and digits as one `-`, so "Forge admins",
   `forge_admins` and `forge-admins` are the same group.
-- Renaming a linked group unlinks it in effect: its people leave. Link the
-  workspace again after a rename.
+- Renaming a group the settings name unlinks it in effect: its people
+  leave. Change the settings with a rename.
 - It syncs five minutes after a change, every hour, and on "Sync now".
   Responses leave out `meta.lastModified`, so it sends everyone each time
   rather than skipping what it thinks we have.

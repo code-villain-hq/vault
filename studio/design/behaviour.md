@@ -14,9 +14,9 @@ Forge is the reference. Where another app has the same thing, it does it the sam
 
 ## Signing in
 
-One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../AGENTS.md#signing-in-with-code-villain) says how to wire it.
+A server signs people in with its company's account, the only way in. [`AGENTS.md`](../../AGENTS.md#running-an-app-for-a-company) says how to set it up.
 
-- The sign-in page is titled "Sign in to <App>". With the Code Villain account set up, it holds one primary button, "Sign in with Code Villain ↗" (it opens another site), and the line "One account for every Code Villain app. New here? Ask your team for an invite." Passwords are off then.
+- The sign-in page is titled "Sign in to <App>". It holds one primary button, "Sign in with <company> ↗" (it opens another site), and the line "New here? Ask <company>'s admin to add you."
 - The desktop app signs in through the browser. It says "Finish signing in in your browser." while it waits.
 - The browser then lands on a page that hands the sign-in back to the app. It says "You're signed in. <App> is opening. You can close this tab.", with a button to open the app. When sign-in fails, the page says "Couldn't sign you in", gives the reason, and tells the app too, so the app stops waiting and shows the same reason.
 - Signing out sits in the workspace menu, the command menu and Account. It removes the app's copy of your workspaces from the device, and Account says so.
@@ -24,17 +24,16 @@ One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../
 
 ## Who gets in
 
-Who belongs where is set once, in the Code Villain account's groups, not app by app. It covers workspaces on a server; workspaces on this Mac have no accounts and stay as they are.
+A server runs for one company, and the company's account says who's in: its sign-in, and its groups. Nobody signs up, and there are no invites or passwords. Workspaces on this Mac have no accounts and stay as they are.
 
-- Each tool has three groups, named alike: `forge-users`, `forge-admins` and `forge-guests`, and the same for `glyph`, `raven` and `layer`. Being in one of a tool's groups is what lets someone sign in to it; everyone in the studio is also in `code-villain`.
-- A workspace on a server can be linked to a group, in its settings under Members. Everyone in `forge-users` is then a member of the Forge workspace linked to `forge`, everyone in `forge-admins` an admin there, and everyone in `forge-guests` a guest. Someone in more than one has the highest role.
+- A server has one workspace, the company's, made when it first starts and named after the company. There's no workspace to make or pick.
+- Each tool has three groups in the company's account, named alike: `forge-users`, `forge-admins` and `forge-guests`, and the same for `glyph`, `raven` and `layer`. A server's settings can name others. Someone in more than one has the highest role.
 - Roles are admin, member and guest. A guest sees only what they've been added to, and works there as a member does: teams in Forge, languages in Glyph, apps in Raven, repositories in Layer. A guest added to nothing sees an empty workspace that says "Ask an admin to add you to a team" (or language, app, repository).
 - In Forge a team can be linked to a group too, in the team's settings. Its people are the team's members: it's in their sidebar under "Your teams", and a guest in it sees that team.
-- People arrive before they sign in. Members lists them as soon as they're in the group, so they can be assigned or mentioned on day one. Their first sign-in just opens the workspace.
-- A role that comes from a group is changed in the Code Villain account. Members says where it comes from ("from forge-admins") and has no role menu for it.
-- Leaving the group takes the person out of the workspace within minutes, and signs them out of it. Unlinking the workspace keeps everyone, with their roles, as though they'd been invited.
-- Invites keep working, for people outside the group. Their role is changed in Members, as now.
-- The sign-in page's line stays "New here? Ask your team for an invite.": being added to the group counts as one.
+- People arrive before they sign in. Members lists them as soon as they're in a group, so they can be assigned or mentioned on day one. Their first sign-in just opens the workspace.
+- Someone who signs in but is in none of the tool's groups is told what the sign-in page says: "You don't have access to Forge yet. Ask <company>'s admin to add you."
+- A role is changed in the company's account. Members says where it comes from ("from forge-admins") and has no role menu for it. An agent, which isn't a person in the account, keeps the role it was given in the app.
+- Leaving the groups takes the person out of the workspace within minutes, and signs them out of it.
 
 ## Errors
 

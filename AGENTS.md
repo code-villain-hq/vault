@@ -26,26 +26,16 @@ The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses i
 
 The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge, Glyph and Raven have it (`apps/desktop/src-tauri/src/this_mac.rs`), and Layer, one per profile (`src-tauri/src/workspace.rs`).
 
-## Signing in with Code Villain
+## Running an app for a company
 
-One studio account signs people in to every app: Pocket ID at id.codevillain.eu, over OpenID Connect. The provider says who someone is, and its groups say who belongs to a linked workspace (below); each app keeps its own workspaces, roles and invites. Forge, Glyph, Raven and Layer have it. For the next app:
+A server runs for one company, from one settings file: `<app>.toml` (`<app>.example.toml` shows it), or `--config <file>`, with the environment over it (`[oidc] issuer` is `<APP>_OIDC_ISSUER`). `code/kit/settings` reads it; a missing or unknown setting stops the server, naming it. Required: `company`, `public_url`, the database, the company's account (`[oidc] issuer`, `client_id`, `client_secret`) and a SCIM token (`[scim] token`). Optional: `[groups] users`, `admins` and `guests`, by default `<app>-users`, `-admins` and `-guests`. `studio/design/behaviour.md` ("Who gets in") says what people see. Every app installs the same way: the settings file, a container image (`Dockerfile`, built from `code/`), and its README's "Running it for a company".
 
-- Copy Forge's `crates/server/src/oidc.rs` and `crates/server/tests/oidc_login.rs`, the `users.oidc_sub` migration, the `passwords_open` guard and `/api/auth/providers`. On the web side copy `useProviders`, `CodeVillainButton`, `DesktopSignIn` and `OIDC_PROBLEMS` from `auth.tsx`. For the desktop app copy the `<app>://` deep link (tauri-plugin-deep-link 2.6.1) and `openInBrowser`/`onAppLink` in `platform.ts`. Glyph shows the changes a copy needs.
-- In Pocket ID, register a confidential client with the callback `<public url>/api/auth/oidc/callback`, and allow only the app's own groups on it (`<app>-users`, `<app>-admins`, `<app>-guests`).
-- Set `<APP>_OIDC_ISSUER`, `<APP>_OIDC_CLIENT_ID`, `<APP>_OIDC_CLIENT_SECRET` and `<APP>_PUBLIC_URL`. With them set, passwords are off. Without them the app keeps its passwords, as local development does.
-
-### Groups and roles
-
-Pocket ID also says who belongs where, as a company's login provider does for Linear. It pushes its users and groups to each app's server over SCIM 2.0, at most five minutes after a change and at least once an hour. `studio/design/behaviour.md` ("Who gets in") says what people see.
-
-- The server takes them at `/api/scim/v2` (Users and Groups) with `code/kit/scim`, a Rust crate every app uses instead of a copy (its `AGENTS.md` says how). It keeps people and groups; the app keeps workspaces and roles. Forge, Glyph, Raven and Layer have it.
-- A user from Pocket ID gets an account straight away, keyed by the same `oidc_sub` that signing in uses. Taking them out of every linked group removes them from those workspaces and ends their sessions there. The account stays, for history and other invites.
-- A workspace links to one tool's groups, by the tool's name (`workspaces.group_name`): the studio's Forge workspace to `forge`, its Glyph workspace to `glyph`. `forge-users` makes members, `forge-admins` admins and `forge-guests` guests; there is no bare `forge` group. A role from a group can't be changed in the app (`workspace_members.from_group` says which).
-- Pocket ID's SCIM sends a group's friendly name, not its name, so the kit reads the friendly name as a name: lowercase, with spaces and other marks as `-` ("Forge admins" is `forge-admins`). Don't rename a linked group to something else, or its people leave.
-- Every app has three roles: admin, member, guest. A guest sees only the records they've been added to, and the app's sync rules and `/api/w/{id}` endpoints check it, not just the pages. What a guest is added to: Forge teams, Glyph languages, Raven apps, Layer repositories. Each app's `AGENTS.md` names it.
-- A Forge team can link to a group (`teams.group_name`), which sets the team's members. Forge gains team members for this: "Your teams" in the sidebar, and a guest's view.
-- In Pocket ID, turn on SCIM provisioning for the app's client: the endpoint `<public url>/api/scim/v2` and a token, set on the server as `<APP>_SCIM_TOKEN`. Allow the groups on the client: Pocket ID pushes only the groups a client allows, with their people.
-- Without `<APP>_SCIM_TOKEN` the endpoint is off, and invites are the only way in, as now.
+- The account signs people in over OpenID Connect (`crates/server/src/oidc.rs`) and is the only way in: no passwords, sign-up or invites. The studio's own is Pocket ID at id.codevillain.eu; a company brings its own.
+- It also sends its people and groups over SCIM 2.0 to `/api/scim/v2`, with `code/kit/scim` (its `AGENTS.md` says how). On its first start the server makes the company's workspace, and the groups its settings name say who's in it and as what (`crates/server/src/company.rs`, `groups.rs`).
+- In the account: register the app as a confidential client with the callback `<public url>/api/auth/oidc/callback`, allow only the app's groups on it, and turn on SCIM with the endpoint `<public url>/api/scim/v2` and the settings' token.
+- The desktop app's own server, for the workspaces on this Mac, signs in to nothing and reads no settings file.
+- Local development runs every app for a made-up company, Acme Inc, with `code/kit/dev-id` standing in for its account (sign-in at 127.0.0.1:7280, people in `people.toml`). Each app's `bun run dev` starts it, on a database of the app's own (`<app>_acme`); with your own `<app>.toml` or `<APP>_OIDC_ISSUER` in `.env`, it uses those instead.
+- For the next app, copy Forge's: `config.rs`, `company.rs`, `groups.rs`, `oidc.rs` and their tests, the migrations for `users.oidc_sub` and one company, `/api/auth/providers`; on the web side `useProviders`, the sign-in button, `DesktopSignIn` and the sign-in problems in `auth.tsx`; for the desktop app the `<app>://` deep link (tauri-plugin-deep-link 2.6.1) and `openInBrowser`/`onAppLink` in `platform.ts`; and `scripts/dev.ts`, `forge.example.toml` and the `Dockerfile`.
 
 ## Specs are checked against the code
 
