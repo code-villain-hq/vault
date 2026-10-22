@@ -123,6 +123,12 @@ identifier, from `~/Applications`.
 - A level's status always names its reason, and names the action to look
   into when calls are why.
 
+## Guests
+
+A guest sees only the apps an admin adds them to (`app_access`, set with
+`raven_sync::set_apps`): they sync those, and every page of any other app
+(`apps::find`) and `GET /apps` leave it out. They see no Members.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and
@@ -130,5 +136,6 @@ identifier, from `~/Applications`.
 2. In `crates/domain`: the record, create and patch types, a `ModelKind`
    variant, and the `match` arms the compiler asks for.
 3. In `crates/sync/src/rules.rs`: who may write it, and any fields only the
-   server may set.
+   server may set. In `crates/domain`'s `guest_view`: what a guest sees of
+   it.
 4. `bun run gen:types`, then add it to `Schema` in `apps/web/src/sync.ts`.

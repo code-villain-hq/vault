@@ -157,6 +157,18 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
   (`#[sqlx::test]`), the HTTP API through the router (`crates/server/tests`),
   the sync client against `FakeServer`.
 
+## Guests
+
+A guest sees only the teams they're in (`team_members`, synced as
+`TeamMember`, which only the server writes: `forge_sync::set_teams`).
+Of those teams they see the states, issues and what hangs off an issue
+(comments, links, relations, spec changes, suggestions, AI runs), the
+team's labels and the workspace's, their own notifications, and the people
+who share a team with them, plus the admins and members. No projects,
+initiatives, services, domains, specs, decisions or verdicts. A new member
+joins every team; a new guest joins none. `model.rs`'s `guest_view` holds
+the rules, and endpoints outside sync call `require_not_guest()`.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and
@@ -164,5 +176,6 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 2. In `crates/domain`: the record, create and patch types, a `ModelKind`
    variant, and the `match` arms the compiler asks for.
 3. In `crates/sync/src/rules.rs`: any fields only the server may set
-   (`add_server_fields`).
+   (`add_server_fields`). In `crates/domain`'s `guest_view`: what a guest
+   sees of it.
 4. `bun run gen:types`, then use it from the app.

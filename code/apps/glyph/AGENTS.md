@@ -135,6 +135,16 @@ text's confidence and origin.
   Postgres (`#[sqlx::test]`), the HTTP API through the router
   (`crates/server/tests`), with a stand-in model where a run needs one.
 
+## Guests
+
+A guest translates only the languages an admin adds them to
+(`language_access`, set with `glyph_sync::set_languages`), and reads the
+source language. They see those languages' translations, suggestions,
+glossary terms, pairs and runs, and the people who share a language with
+them, plus the admins and members. They change no source text, start no
+run for another language, and see no Members. `model.rs`'s `guest_view`
+holds what they see; `rules.rs` (`check_guest_language`) what they write.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and
@@ -142,4 +152,5 @@ text's confidence and origin.
 2. In `crates/domain`: the record, create and patch types, a `ModelKind`
    variant, and the `match` arms the compiler asks for.
 3. In `crates/sync/src/rules.rs`: any fields only the server may set.
+   In `crates/domain`'s `guest_view`: what a guest sees of it.
 4. `bun run gen:types`, then add it to `Schema` in `apps/web/src/sync.ts`.

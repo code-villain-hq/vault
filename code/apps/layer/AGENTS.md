@@ -277,7 +277,9 @@ build does the same.
    variant, and the `match` arms the compiler asks for. A field a patch can
    clear is `Option<Option<T>>`.
 3. In `crates/sync/src/rules.rs`: who may write it, and any fields only the
-   server may set. A test in `crates/server/tests/api.rs`.
+   server may set. In `crates/domain`'s `guest_view`: what a guest sees of
+   it (PROF-20: a guest works only in the repositories they're added to,
+   `repository_access`). A test in `crates/server/tests/api.rs`.
 4. `bun run gen:types`, then add it to `Schema` in
    `packages/types/src/sync.ts` and to its defaults in `web/src/sync.ts`.
 5. If the desktop app keeps it: add it to the window's snapshot in
