@@ -1,6 +1,6 @@
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useApi } from "./api";
-import { ago, ms, percent, rate, windowName } from "./format";
+import { ago, lasted, ms, percent, rate, windowName } from "./format";
 import {
   NotAvailableOffline,
   PageBody,
@@ -78,7 +78,7 @@ function TechnicalBody({ page }: { page: Technical }) {
         <Stat
           label="Running"
           value={<span className="font-mono">{current?.version ?? "–"}</span>}
-          note={current ? `since ${ago(current.first_seen)}` : undefined}
+          note={current ? `for ${lasted(current.first_seen)}` : undefined}
         />
       </div>
 

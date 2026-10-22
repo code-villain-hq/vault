@@ -198,9 +198,9 @@ export function ReviewPage() {
     transactInBatches(sync, operations);
   };
 
-  // j/k move, ↵ suggests or accepts, w writes, esc rejects, x skips.
-  // An open dialog (the shortcuts list, the command menu) keeps them, so Esc
-  // closing it never rejects the suggestion behind it.
+  // j/k move, ↵ suggests or accepts, w writes, x rejects, s skips, and Esc
+  // goes back, as it does everywhere: it never deletes. An open dialog (the
+  // shortcuts list, the command menu) keeps them, so Esc only closes it.
   const keys = useRef({ current, items, selected, accept, reject, suggest });
   keys.current = { current, items, selected, accept, reject, suggest };
   useEffect(() => {
@@ -211,18 +211,19 @@ export function ReviewPage() {
         setSelected(Math.max(0, Math.min(items.length - 1, selected + by)));
       if (event.key === "j" || event.key === "ArrowDown") move(1);
       else if (event.key === "k" || event.key === "ArrowUp") move(-1);
-      else if (event.key === "x") move(1);
+      else if (event.key === "s") move(1);
+      else if (event.key === "Escape") window.history.back();
       else if (!current) return;
       else if (event.key === "Enter") {
         if (current.kind === "suggestion") accept(current.suggestion);
         else void suggest([current.entry]);
-      } else if (event.key === "Escape" && current.kind === "suggestion") {
+      } else if (event.key === "x" && current.kind === "suggestion") {
         reject(current.suggestion);
       } else if (event.key === "w") {
         setWriting(current.id);
       } else return;
       event.preventDefault();
-      if (event.key === "x") setSkipped((s) => new Set(s).add(current?.id ?? ""));
+      if (event.key === "s") setSkipped((s) => new Set(s).add(current?.id ?? ""));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -380,7 +381,8 @@ export function ReviewPage() {
           <p className="text-xs text-faint">
             <kbd className="ui-kbd">j</kbd> <kbd className="ui-kbd">k</kbd> move ·{" "}
             <kbd className="ui-kbd">↵</kbd> suggest or accept · <kbd className="ui-kbd">w</kbd>{" "}
-            write · <kbd className="ui-kbd">esc</kbd> reject · <kbd className="ui-kbd">x</kbd> skip
+            write · <kbd className="ui-kbd">x</kbd> reject · <kbd className="ui-kbd">s</kbd> skip ·{" "}
+            <kbd className="ui-kbd">esc</kbd> back
           </p>
         </div>
       </div>

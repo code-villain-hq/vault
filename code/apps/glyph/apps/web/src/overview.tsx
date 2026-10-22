@@ -162,7 +162,7 @@ function CoverageRow({
           aria-valuemax={100}
           aria-label={`${languageName(row.lang)}: ${percent}% translated`}
         >
-          <span className="block h-full rounded-full bg-ok" style={{ width: `${percent}%` }} />
+          <span className="block h-full rounded-full bg-muted" style={{ width: `${percent}%` }} />
         </span>
         <span className="w-12 shrink-0 text-right text-xs tabular-nums text-muted">{percent}%</span>
         <span className="hidden w-56 shrink-0 gap-3 text-xs text-faint sm:flex">

@@ -23,7 +23,7 @@ export function rate(perMinute: number): string {
   return perMinute < 10 ? perMinute.toFixed(1) : String(Math.round(perMinute));
 }
 
-export { ago } from "@code-villain/web";
+export { ago, lasted } from "@code-villain/web";
 
 /** A clock time: "14:05". */
 export function clock(iso: string): string {

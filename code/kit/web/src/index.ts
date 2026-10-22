@@ -21,7 +21,7 @@ export {
   TextField,
 } from "./controls";
 export { useDialogFocus } from "./dialog-focus";
-export { ago } from "./format";
+export { ago, lasted } from "./format";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";
 export { CreateDialog, chip, MoreMenu, NewButton, RowAction } from "./page-parts";
 export {
