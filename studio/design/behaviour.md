@@ -22,6 +22,19 @@ One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../
 - Signing out sits in the workspace menu, the command menu and Account. It removes the app's copy of your workspaces from the device, and Account says so.
 - A signed-out visit goes to the sign-in page and comes back to where it started.
 
+## Who gets in
+
+Who belongs where is set once, in the Code Villain account's groups, not app by app. It covers workspaces on a server; workspaces on this Mac have no accounts and stay as they are.
+
+- A workspace on a server can be linked to a group, in its settings under Members. Everyone in `code-villain` is then a member of it, in every app whose workspace is linked to `code-villain`. Everyone in `code-villain-admins` is an admin there, and everyone in `code-villain-guests` a guest. Someone in more than one has the highest role.
+- Roles are admin, member and guest. A guest sees only what they've been added to, and works there as a member does: teams in Forge, languages in Glyph, apps in Raven, repositories in Layer. A guest added to nothing sees an empty workspace that says "Ask an admin to add you to a team" (or language, app, repository).
+- In Forge a team can be linked to a group too, in the team's settings. Its people are the team's members: it's in their sidebar under "Your teams", and a guest in it sees that team.
+- People arrive before they sign in. Members lists them as soon as they're in the group, so they can be assigned or mentioned on day one. Their first sign-in just opens the workspace.
+- A role that comes from a group is changed in the Code Villain account. Members says where it comes from ("from code-villain-admins") and has no role menu for it.
+- Leaving the group takes the person out of the workspace within minutes, and signs them out of it.
+- Invites keep working, for people outside the group. Their role is changed in Members, as now.
+- The sign-in page's line stays "New here? Ask your team for an invite.": being added to the group counts as one.
+
 ## Errors
 
 - A failure of something you just did shows where you did it: inline, in the danger tint, as an alert. Not a toast.
