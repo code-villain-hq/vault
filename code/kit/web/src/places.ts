@@ -189,9 +189,15 @@ export function normalizeServer(input: string): string {
   if (/^[a-z][a-z0-9+.-]*:(?!\d)/i.test(trimmed) && !/^https?:\/\//i.test(trimmed)) {
     throw new TypeError("not a web address");
   }
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
-  return new URL(withScheme).origin;
+  if (/^https?:\/\//i.test(trimmed)) return new URL(trimmed).origin;
+  // Without a scheme, a server elsewhere is https: its plain http answer is
+  // a redirect without CORS, which the app can't follow. One on this Mac is
+  // http, as the dev servers are.
+  const local = new URL(`http://${trimmed}`);
+  return LOOPBACK.test(local.hostname) ? local.origin : new URL(`https://${trimmed}`).origin;
 }
+
+const LOOPBACK = /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/i;
 
 /** Chooses the server to sign in to (packaged desktop app only). */
 export function setServerUrl(url: string) {
