@@ -77,6 +77,7 @@ pub async fn create_team(
         operations,
     };
     apply_in(db, actor, &transaction, Origin::Server).await?;
+    forge_sync::add_everyone(db, actor, team).await?;
     Ok(team)
 }
 

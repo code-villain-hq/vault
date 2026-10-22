@@ -65,7 +65,7 @@ pub async fn record_change(
 
 /// A consistent snapshot of every record the viewer syncs in the workspace.
 pub async fn bootstrap(pool: &PgPool, viewer: Actor) -> Result<Bootstrap, SyncError> {
-    code_villain_sync::bootstrap(pool, viewer).await
+    code_villain_sync::bootstrap::<Layer>(pool, viewer).await
 }
 
 /// Up to `limit` log entries after `after` that the viewer may see, and the
@@ -76,5 +76,5 @@ pub async fn entries_after(
     after: i64,
     limit: i64,
 ) -> Result<(Vec<SyncEntry>, i64), SyncError> {
-    code_villain_sync::entries_after(pool, viewer, after, limit).await
+    code_villain_sync::entries_after::<Layer>(pool, viewer, after, limit).await
 }

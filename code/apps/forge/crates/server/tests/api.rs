@@ -802,7 +802,7 @@ async fn removing_someone_unassigns_them_and_tells_clients(pool: PgPool) {
     assert_eq!(records["Issue"][0]["assignee_id"], Value::Null);
     assert_eq!(records["User"].as_array().unwrap().len(), 1);
     let log: Vec<(String, String)> =
-        sqlx::query_as("SELECT model, action FROM sync_log ORDER BY sync_id DESC LIMIT 2")
+        sqlx::query_as("SELECT model, action FROM sync_log ORDER BY sync_id DESC LIMIT 3")
             .fetch_all(&app.pool)
             .await
             .unwrap();
@@ -810,6 +810,7 @@ async fn removing_someone_unassigns_them_and_tells_clients(pool: PgPool) {
         log,
         [
             ("User".into(), "delete".into()),
+            ("TeamMember".into(), "delete".into()),
             ("Issue".into(), "update".into())
         ]
     );

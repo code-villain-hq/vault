@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ts_rs::TS;
 
-pub use code_villain_sync::{Actor, ValidationError, Write};
+pub use code_villain_sync::{Actor, GuestView, ValidationError, Write};
 
 use crate::drift::{AiRunCreate, AiRunPatch, SuggestionCreate, SuggestionPatch};
 use crate::issue::{
@@ -21,6 +21,14 @@ use crate::team::{
     LabelCreate, LabelPatch, TeamCreate, TeamPatch, WorkflowStateCreate, WorkflowStatePatch,
 };
 use crate::verdict::{RequirementVerdictCreate, RequirementVerdictPatch};
+
+/// ` IN (…)` the issues in the viewer's teams, to follow an issue id.
+macro_rules! in_their_teams {
+    () => {
+        " IN (SELECT i.id FROM issues i JOIN team_members tm ON tm.team_id = i.team_id \
+         WHERE tm.user_id = $viewer)"
+    };
+}
 
 /// Every kind of record that clients sync.
 ///
@@ -49,6 +57,7 @@ pub enum ModelKind {
     IssueLink,
     RequirementVerdict,
     SpecChange,
+    TeamMember,
 }
 
 impl ModelKind {
@@ -72,6 +81,7 @@ impl ModelKind {
         ModelKind::IssueLink,
         ModelKind::RequirementVerdict,
         ModelKind::SpecChange,
+        ModelKind::TeamMember,
     ];
 
     /// The table (or view) holding this kind of record.
@@ -96,6 +106,7 @@ impl ModelKind {
             ModelKind::IssueLink => "issue_links",
             ModelKind::RequirementVerdict => "requirement_verdicts",
             ModelKind::SpecChange => "spec_changes",
+            ModelKind::TeamMember => "team_members",
         }
     }
 
@@ -121,6 +132,7 @@ impl ModelKind {
             ModelKind::IssueLink => "IssueLink",
             ModelKind::RequirementVerdict => "RequirementVerdict",
             ModelKind::SpecChange => "SpecChange",
+            ModelKind::TeamMember => "TeamMember",
         }
     }
 
@@ -142,7 +154,8 @@ impl ModelKind {
             | ModelKind::Suggestion
             | ModelKind::IssueLink
             | ModelKind::RequirementVerdict
-            | ModelKind::SpecChange => false,
+            | ModelKind::SpecChange
+            | ModelKind::TeamMember => false,
             ModelKind::Team => write == Write::Update,
             ModelKind::Notification => write != Write::Create,
             _ => true,
@@ -178,6 +191,7 @@ impl ModelKind {
             ModelKind::IssueLink => check::<IssueLinkCreate>(data),
             ModelKind::RequirementVerdict => check::<RequirementVerdictCreate>(data),
             ModelKind::SpecChange => check::<SpecChangeCreate>(data),
+            ModelKind::TeamMember => Err(ValidationError("teams are set in Members".into())),
         }
     }
 
@@ -203,6 +217,58 @@ impl ModelKind {
             ModelKind::IssueLink => check::<IssueLinkPatch>(data),
             ModelKind::RequirementVerdict => check::<RequirementVerdictPatch>(data),
             ModelKind::SpecChange => check::<SpecChangePatch>(data),
+            ModelKind::TeamMember => Err(ValidationError("teams are set in Members".into())),
+        }
+    }
+
+    /// What a guest syncs of this kind: what's in their teams. Records of a
+    /// team's issue follow the issue; the knowledge base, projects and
+    /// initiatives span the workspace, so a guest has none.
+    pub fn guest_view(self) -> GuestView {
+        match self {
+            ModelKind::Team => GuestView::Where(
+                "t.id IN (SELECT team_id FROM team_members WHERE user_id = $viewer)",
+            ),
+            ModelKind::WorkflowState | ModelKind::Issue | ModelKind::TeamMember => {
+                GuestView::Where(
+                    "t.team_id IN (SELECT team_id FROM team_members WHERE user_id = $viewer)",
+                )
+            }
+            ModelKind::Label => GuestView::Where(
+                "t.team_id IS NULL \
+                 OR t.team_id IN (SELECT team_id FROM team_members WHERE user_id = $viewer)",
+            ),
+            ModelKind::Comment | ModelKind::IssueLink | ModelKind::SpecChange => {
+                GuestView::Where(concat!("t.issue_id", in_their_teams!()))
+            }
+            ModelKind::AiRun | ModelKind::Suggestion => GuestView::Where(concat!(
+                "t.issue_id IS NOT NULL AND t.issue_id",
+                in_their_teams!()
+            )),
+            ModelKind::Notification => GuestView::Where(concat!(
+                "t.issue_id IS NULL OR t.issue_id",
+                in_their_teams!()
+            )),
+            // Both ends, so no relation points at an issue they can't see.
+            ModelKind::IssueRelation => GuestView::Where(concat!(
+                "t.issue_id",
+                in_their_teams!(),
+                " AND t.related_issue_id",
+                in_their_teams!()
+            )),
+            // Themselves, the admins (to ask), and whoever shares a team.
+            ModelKind::User => GuestView::Where(
+                "t.id = $viewer OR t.role = 'admin' OR t.id IN (SELECT o.user_id \
+                 FROM team_members o JOIN team_members mine ON mine.team_id = o.team_id \
+                 WHERE mine.user_id = $viewer)",
+            ),
+            ModelKind::Project
+            | ModelKind::Initiative
+            | ModelKind::Service
+            | ModelKind::Domain
+            | ModelKind::Spec
+            | ModelKind::Decision
+            | ModelKind::RequirementVerdict => GuestView::Hidden,
         }
     }
 }
@@ -233,6 +299,10 @@ impl code_villain_sync::Model for ModelKind {
 
     fn validate_patch(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         ModelKind::validate_patch(self, data)
+    }
+
+    fn guest_view(self) -> GuestView {
+        ModelKind::guest_view(self)
     }
 }
 

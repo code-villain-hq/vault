@@ -171,7 +171,41 @@ impl Member {
     pub fn require_admin(&self) -> Result<(), AppError> {
         match self.role {
             Role::Admin => Ok(()),
-            Role::Member => Err(AppError::forbidden("only workspace admins can do that")),
+            Role::Member | Role::Guest => {
+                Err(AppError::forbidden("only workspace admins can do that"))
+            }
+        }
+    }
+
+    /// For what spans the whole workspace, which a guest doesn't see.
+    pub fn require_not_guest(&self) -> Result<(), AppError> {
+        match self.role {
+            Role::Guest => Err(AppError::forbidden("guests can't do that")),
+            Role::Admin | Role::Member => Ok(()),
+        }
+    }
+
+    /// For a guest, an issue outside their teams isn't there.
+    pub async fn require_sees_issue(
+        &self,
+        pool: &sqlx::PgPool,
+        issue: Uuid,
+    ) -> Result<(), AppError> {
+        if self.role != Role::Guest {
+            return Ok(());
+        }
+        let mut db = pool.acquire().await?;
+        if forge_sync::sees_issue(
+            &mut db,
+            self.actor.workspace_id,
+            self.actor.user_id,
+            Some(issue),
+        )
+        .await?
+        {
+            Ok(())
+        } else {
+            Err(AppError::not_found("issue not found"))
         }
     }
 }

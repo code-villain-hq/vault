@@ -2,4 +2,8 @@
 import type { Role } from "./Role";
 import type { UserInfo } from "./UserInfo";
 
-export type MemberInfo = { user: UserInfo, role: Role, joined_at: string, };
+export type MemberInfo = { user: UserInfo, role: Role, joined_at: string, 
+/**
+ * The teams they're in.
+ */
+access: Array<string>, };

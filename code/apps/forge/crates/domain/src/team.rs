@@ -21,6 +21,20 @@ pub struct Team {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Someone in a team. A guest sees only the teams they're in; admins and
+/// members see every team, and theirs are the ones in their sidebar. Set in
+/// Members, by the server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TeamMember {
+    pub id: Uuid,
+    pub workspace_id: Uuid,
+    pub team_id: Uuid,
+    pub user_id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Teams are created through `POST /api/w/{workspace}/teams`, which also sets
 /// up their workflow; this is that request's body.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

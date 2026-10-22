@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ts_rs::TS;
 
-pub use code_villain_sync::{Actor, ValidationError, Write};
+pub use code_villain_sync::{Actor, GuestView, ValidationError, Write};
 
 use crate::app::{AppCreate, AppPatch};
 
@@ -101,6 +101,11 @@ impl code_villain_sync::Model for ModelKind {
 
     fn validate_patch(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         ModelKind::validate_patch(self, data)
+    }
+
+    // No guests yet: everyone syncs the whole workspace.
+    fn guest_view(self) -> GuestView {
+        GuestView::All
     }
 }
 

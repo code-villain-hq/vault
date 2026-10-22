@@ -98,6 +98,7 @@ pub async fn list(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<Vec<AgentInfo>>, AppError> {
+    member.require_not_guest()?;
     let agents: Vec<(Uuid, String)> = sqlx::query_as(
         "SELECT u.id, u.name FROM workspace_members m JOIN users u ON u.id = m.user_id \
          WHERE m.workspace_id = $1 AND u.kind = 'agent' AND u.email LIKE $2 \

@@ -405,7 +405,8 @@ pub async fn create_workspace(
     ))
 }
 
-/// Adds someone to a workspace. Someone already in it keeps their role.
+/// Adds someone to a workspace, an admin or member in every team. Someone
+/// already in it keeps their role.
 pub async fn add_member(
     db: &mut PgConnection,
     workspace_id: Uuid,
@@ -427,6 +428,10 @@ pub async fn add_member(
             workspace_id,
         };
         members::log_user(db, actor, user_id, SyncAction::Insert).await?;
+        // A guest joins no team until an admin adds them to one.
+        if role != Role::Guest {
+            forge_sync::join_every_team(db, actor, user_id).await?;
+        }
     }
     Ok(())
 }

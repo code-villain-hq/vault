@@ -13,6 +13,7 @@ mod history;
 mod review;
 mod rules;
 mod spec_change;
+mod team_members;
 mod work;
 
 use forge_domain::{Actor, Bootstrap, ModelKind, SyncAction, SyncEntry, Transaction};
@@ -22,8 +23,9 @@ use uuid::Uuid;
 
 pub use code_villain_sync::{Origin, SyncError, current_sync_id, lock_workspace, workspace_epoch};
 pub use history::{issue_events, spec_versions};
-pub use rules::Forge;
+pub use rules::{Forge, sees_issue};
 pub use spec_change::{Standing, spec_change_standing};
+pub use team_members::{add_everyone, join_every_team, leave_every_team, role_changed, set_teams};
 pub use work::{WORK_LEASE_MINUTES, finish_work, renew_work, start_work};
 
 /// The Postgres channel notified, with the workspace id as payload, whenever
@@ -67,9 +69,15 @@ pub async fn record_change(
     code_villain_sync::record_change::<Forge>(db, actor, model, model_id, action, data).await
 }
 
+/// Whether the viewer sees only some of the workspace: for a guest, the
+/// version of what they may see; `None` for admins and members.
+pub async fn guest_access(db: &mut PgConnection, viewer: Actor) -> Result<Option<i64>, SyncError> {
+    <Forge as code_villain_sync::Rules>::guest_access(db, viewer).await
+}
+
 /// A consistent snapshot of every record the viewer syncs in the workspace.
 pub async fn bootstrap(pool: &PgPool, viewer: Actor) -> Result<Bootstrap, SyncError> {
-    code_villain_sync::bootstrap(pool, viewer).await
+    code_villain_sync::bootstrap::<Forge>(pool, viewer).await
 }
 
 /// Up to `limit` log entries after `after` that the viewer may see, and the
@@ -80,5 +88,5 @@ pub async fn entries_after(
     after: i64,
     limit: i64,
 ) -> Result<(Vec<SyncEntry>, i64), SyncError> {
-    code_villain_sync::entries_after(pool, viewer, after, limit).await
+    code_villain_sync::entries_after::<Forge>(pool, viewer, after, limit).await
 }

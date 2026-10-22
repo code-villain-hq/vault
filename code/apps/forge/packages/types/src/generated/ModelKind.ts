@@ -7,4 +7,4 @@
  * create and patch types; the compiler points at every `match` to extend.
  * See "Adding a synced model" in AGENTS.md.
  */
-export type ModelKind = "Team" | "WorkflowState" | "Label" | "Issue" | "IssueRelation" | "Comment" | "Project" | "Initiative" | "User" | "Notification" | "Service" | "Domain" | "Spec" | "Decision" | "AiRun" | "Suggestion" | "IssueLink" | "RequirementVerdict" | "SpecChange";
+export type ModelKind = "Team" | "WorkflowState" | "Label" | "Issue" | "IssueRelation" | "Comment" | "Project" | "Initiative" | "User" | "Notification" | "Service" | "Domain" | "Spec" | "Decision" | "AiRun" | "Suggestion" | "IssueLink" | "RequirementVerdict" | "SpecChange" | "TeamMember";

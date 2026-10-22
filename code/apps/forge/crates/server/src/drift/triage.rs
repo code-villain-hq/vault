@@ -74,6 +74,7 @@ pub async fn request(
     if !exists {
         return Err(AppError::not_found("issue not found"));
     }
+    member.require_sees_issue(&state.pool, issue_id).await?;
     let mut db = state.pool.begin().await?;
     let id = queue(&mut db, member.actor, issue_id, "manual", provider.model()).await?;
     db.commit().await?;

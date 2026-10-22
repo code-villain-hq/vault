@@ -129,6 +129,7 @@ pub async fn status(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<ForgejoStatus>, AppError> {
+    member.require_not_guest()?;
     Ok(Json(read_status(&state, member.actor.workspace_id).await?))
 }
 

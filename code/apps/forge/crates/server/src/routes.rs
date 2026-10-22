@@ -52,6 +52,7 @@ pub fn router(state: AppState) -> Router {
             "/members/{user_id}",
             patch(members::update).delete(members::remove),
         )
+        .route("/members/{user_id}/access", put(members::update_access))
         .route("/invites", get(invites::list).post(invites::create))
         .route("/invites/{invite_id}", delete(invites::revoke))
         .route("/teams", post(teams::create))
@@ -139,6 +140,7 @@ async fn issue_history(
     member: Member,
     Path((_, issue_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Vec<IssueEvent>>, AppError> {
+    member.require_sees_issue(&state.pool, issue_id).await?;
     forge_sync::issue_events(&state.pool, member.actor, issue_id)
         .await?
         .map(Json)
@@ -150,6 +152,7 @@ async fn spec_history(
     member: Member,
     Path((_, spec_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Vec<SpecVersion>>, AppError> {
+    member.require_not_guest()?;
     forge_sync::spec_versions(&state.pool, member.actor, spec_id)
         .await?
         .map(Json)

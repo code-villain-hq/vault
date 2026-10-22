@@ -18,7 +18,7 @@ import { ErrorMessage, Initial, TextField } from "./controls";
 import { MoreMenu } from "./page-parts";
 import { messageOf } from "./problems";
 
-export type Role = "admin" | "member";
+export type Role = "admin" | "member" | "guest";
 
 interface AccountUser {
   id: string;

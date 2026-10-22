@@ -28,9 +28,9 @@ pub use account::{
     AGENT_EMAIL_DOMAIN, AgentInfo, ApiTokenInfo, ChangePasswordRequest, CreateAgentRequest,
     CreateInviteRequest, CreatedInvite, CreatedToken, Invite, InvitePreview, LoginRequest,
     MIN_PASSWORD, Me, MemberInfo, Role, RunnerInfo, RunnerSecret, SetRunnerRequest, SignupRequest,
-    UpdateAgentRequest, UpdateMemberRequest, UpdateProfileRequest, UpdateWorkspaceRequest,
-    UserInfo, WakeupEvent, WakeupInfo, WakeupStatus, WorkspaceInfo, check_password, clean_name,
-    is_agent_email, normalize_email, url_key_from,
+    UpdateAccessRequest, UpdateAgentRequest, UpdateMemberRequest, UpdateProfileRequest,
+    UpdateWorkspaceRequest, UserInfo, WakeupEvent, WakeupInfo, WakeupStatus, WorkspaceInfo,
+    check_password, clean_name, is_agent_email, normalize_email, url_key_from,
 };
 pub use convention::{convention_warnings, requirement_warnings};
 pub use drift::{
@@ -69,8 +69,8 @@ pub use spec_change::{
     parse_delta, same_spec_name, spec_conflicts, spec_name_key, touched,
 };
 pub use team::{
-    Label, LabelCreate, LabelPatch, StateType, Team, TeamCreate, TeamPatch, WorkflowState,
-    WorkflowStateCreate, WorkflowStatePatch, default_workflow, team_key_from,
+    Label, LabelCreate, LabelPatch, StateType, Team, TeamCreate, TeamMember, TeamPatch,
+    WorkflowState, WorkflowStateCreate, WorkflowStatePatch, default_workflow, team_key_from,
 };
 pub use user::{User, UserKind};
 pub use verdict::{

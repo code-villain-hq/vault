@@ -7,7 +7,7 @@ use forge_domain::{
 };
 use forge_sync::{
     Origin, SyncError, apply_in, apply_transaction, bootstrap, entries_after, record_change,
-    spec_versions,
+    set_teams, spec_versions,
 };
 use serde_json::{Map, Value, json};
 use sqlx::PgPool;
@@ -2443,4 +2443,276 @@ async fn a_reviewer_is_a_person_and_hears_comments(pool: PgPool) {
             .iter()
             .any(|n| n["type"] == "comment" && n["issue_id"] == json!(id))
     );
+}
+
+/// A guest of the fixture's workspace, in the given teams.
+async fn add_guest(pool: &PgPool, f: &Fixture, name: &str, teams: &[Uuid]) -> Actor {
+    let guest = add_person(pool, f, name).await;
+    sqlx::query("UPDATE workspace_members SET role = 'guest' WHERE user_id = $1")
+        .bind(guest.user_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    put_in_teams(pool, f, guest, teams).await;
+    guest
+}
+
+async fn put_in_teams(pool: &PgPool, f: &Fixture, person: Actor, teams: &[Uuid]) {
+    let mut db = pool.begin().await.unwrap();
+    set_teams(&mut db, f.actor, person.user_id, teams)
+        .await
+        .unwrap();
+    db.commit().await.unwrap();
+}
+
+async fn ids(pool: &PgPool, viewer: Actor, model: ModelKind) -> Vec<Value> {
+    let mut ids: Vec<Value> = records(pool, viewer, model)
+        .await
+        .into_iter()
+        .map(|r| r["id"].clone())
+        .collect();
+    ids.sort_by_key(|id| id.to_string());
+    ids
+}
+
+fn sorted(mut ids: Vec<Value>) -> Vec<Value> {
+    ids.sort_by_key(|id| id.to_string());
+    ids
+}
+
+async fn comment_on(pool: &PgPool, author: Actor, issue: Uuid, body: &str) -> Uuid {
+    let id = Uuid::now_v7();
+    apply(
+        pool,
+        author,
+        vec![create(
+            ModelKind::Comment,
+            id,
+            json!({ "issue_id": issue, "body": body }),
+        )],
+    )
+    .await
+    .unwrap();
+    id
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_syncs_only_their_teams(pool: PgPool) {
+    let f = seed(&pool).await;
+    let (other, _) = create_team(&pool, f.actor, "OTH").await;
+    let mine = new_issue(&pool, &f, json!({})).await;
+    let theirs = Uuid::now_v7();
+    apply(
+        &pool,
+        f.actor,
+        vec![create(
+            ModelKind::Issue,
+            theirs,
+            json!({ "team_id": other, "title": "Elsewhere" }),
+        )],
+    )
+    .await
+    .unwrap();
+    let here = comment_on(&pool, f.actor, mine, "Here").await;
+    comment_on(&pool, f.actor, theirs, "There").await;
+    apply(
+        &pool,
+        f.actor,
+        vec![create(
+            ModelKind::Project,
+            Uuid::now_v7(),
+            json!({ "name": "Launch" }),
+        )],
+    )
+    .await
+    .unwrap();
+    let bob = add_person(&pool, &f, "Bob").await;
+    let gus = add_guest(&pool, &f, "Gus", &[f.team]).await;
+
+    assert_eq!(ids(&pool, gus, ModelKind::Team).await, vec![json!(f.team)]);
+    assert_eq!(ids(&pool, gus, ModelKind::Issue).await, vec![json!(mine)]);
+    assert_eq!(ids(&pool, gus, ModelKind::Comment).await, vec![json!(here)]);
+    assert!(records(&pool, gus, ModelKind::Project).await.is_empty());
+    // Themselves and the admin; Bob shares no team with Gus.
+    assert_eq!(
+        ids(&pool, gus, ModelKind::User).await,
+        sorted(vec![json!(gus.user_id), json!(f.actor.user_id)])
+    );
+    // Everyone else still syncs the whole workspace.
+    assert_eq!(ids(&pool, bob, ModelKind::Issue).await.len(), 2);
+    assert_eq!(ids(&pool, f.actor, ModelKind::Comment).await.len(), 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guests_log_hides_other_teams_but_confirms_their_writes(pool: PgPool) {
+    let f = seed(&pool).await;
+    let (other, _) = create_team(&pool, f.actor, "OTH").await;
+    let gus = add_guest(&pool, &f, "Gus", &[f.team]).await;
+    let (_, start) = entries_after(&pool, gus, 0, 1000).await.unwrap();
+
+    let elsewhere = Uuid::now_v7();
+    apply(
+        &pool,
+        f.actor,
+        vec![create(
+            ModelKind::Issue,
+            elsewhere,
+            json!({ "team_id": other, "title": "Elsewhere" }),
+        )],
+    )
+    .await
+    .unwrap();
+    let own = Uuid::now_v7();
+    let confirmed = apply(
+        &pool,
+        gus,
+        vec![create(
+            ModelKind::Issue,
+            own,
+            json!({ "team_id": f.team, "title": "Mine" }),
+        )],
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
+    let (entries, upto) = entries_after(&pool, gus, start, 1000).await.unwrap();
+    let issues: Vec<Uuid> = entries
+        .iter()
+        .filter(|e| e.model == ModelKind::Issue)
+        .map(|e| e.model_id)
+        .collect();
+    assert_eq!(issues, vec![own]);
+    assert_eq!(upto, confirmed);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn guests_change_only_what_is_in_their_teams(pool: PgPool) {
+    let f = seed(&pool).await;
+    let (other, _) = create_team(&pool, f.actor, "OTH").await;
+    let mine = new_issue(&pool, &f, json!({})).await;
+    let theirs = Uuid::now_v7();
+    apply(
+        &pool,
+        f.actor,
+        vec![create(
+            ModelKind::Issue,
+            theirs,
+            json!({ "team_id": other, "title": "Elsewhere" }),
+        )],
+    )
+    .await
+    .unwrap();
+    let gus = add_guest(&pool, &f, "Gus", &[f.team]).await;
+    let outside = "Guests can only change what they've been added to.";
+
+    forbidden(
+        apply(
+            &pool,
+            gus,
+            vec![create(
+                ModelKind::Issue,
+                Uuid::now_v7(),
+                json!({ "team_id": other, "title": "Sneaky" }),
+            )],
+        )
+        .await,
+        outside,
+    );
+    forbidden(
+        apply(
+            &pool,
+            gus,
+            vec![create(
+                ModelKind::Project,
+                Uuid::now_v7(),
+                json!({ "name": "Mine" }),
+            )],
+        )
+        .await,
+        outside,
+    );
+    // Other teams' issues aren't there for them.
+    for operation in [
+        update(ModelKind::Issue, theirs, json!({ "title": "Mine now" })),
+        delete(ModelKind::Issue, theirs),
+    ] {
+        let result = apply(&pool, gus, vec![operation]).await;
+        assert!(
+            matches!(result, Err(SyncError::NotFound(_))),
+            "expected NotFound, got {result:?}"
+        );
+    }
+    assert_eq!(issue(&pool, f.actor, theirs).await.title, "Elsewhere");
+
+    // In their own team they work as a member does.
+    apply(
+        &pool,
+        gus,
+        vec![update(ModelKind::Issue, mine, json!({ "title": "Better" }))],
+    )
+    .await
+    .unwrap();
+    assert_eq!(issue(&pool, gus, mine).await.title, "Better");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guests_copy_starts_over_when_their_teams_change(pool: PgPool) {
+    let f = seed(&pool).await;
+    let (other, _) = create_team(&pool, f.actor, "OTH").await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let gus = add_guest(&pool, &f, "Gus", &[f.team]).await;
+    let epoch = |viewer| {
+        let pool = pool.clone();
+        async move { bootstrap(&pool, viewer).await.unwrap().epoch }
+    };
+    let (admin, member, guest) = (epoch(f.actor).await, epoch(bob).await, epoch(gus).await);
+    assert_eq!(admin, member);
+    assert_ne!(guest, admin);
+
+    put_in_teams(&pool, &f, gus, &[f.team, other]).await;
+    assert_ne!(epoch(gus).await, guest);
+    assert_eq!(ids(&pool, gus, ModelKind::Team).await.len(), 2);
+    // Nothing changes for everyone else.
+    assert_eq!(epoch(f.actor).await, admin);
+    assert_eq!(epoch(bob).await, member);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn nobody_hears_of_or_takes_an_issue_they_cannot_see(pool: PgPool) {
+    let f = seed(&pool).await;
+    let (other, _) = create_team(&pool, f.actor, "OTH").await;
+    let gus = add_guest(&pool, &f, "Gus", &[f.team]).await;
+    let theirs = Uuid::now_v7();
+    apply(
+        &pool,
+        f.actor,
+        vec![create(
+            ModelKind::Issue,
+            theirs,
+            json!({ "team_id": other, "title": "Elsewhere" }),
+        )],
+    )
+    .await
+    .unwrap();
+
+    invalid(
+        apply(
+            &pool,
+            f.actor,
+            vec![update(
+                ModelKind::Issue,
+                theirs,
+                json!({ "assignee_id": gus.user_id }),
+            )],
+        )
+        .await,
+    );
+    comment_on(&pool, f.actor, theirs, "What do you think, @Gus?").await;
+    assert!(notifications(&pool, gus).await.is_empty());
+
+    // In their team, they hear of it as anyone does.
+    let mine = new_issue(&pool, &f, json!({})).await;
+    comment_on(&pool, f.actor, mine, "What do you think, @Gus?").await;
+    assert_eq!(notifications(&pool, gus).await.len(), 1);
 }

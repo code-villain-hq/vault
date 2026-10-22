@@ -8,7 +8,6 @@
 use axum::extract::{Query, State, WebSocketUpgrade};
 use axum::response::Response;
 use code_villain_sync::Position;
-use layer_domain::ModelKind;
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -45,7 +44,7 @@ pub async fn handler(
                     .await
                     .unwrap_or(false)
             };
-            let followed = code_villain_sync::follow::<ModelKind, _, _>(
+            let followed = code_villain_sync::follow::<layer_sync::Layer, _, _>(
                 socket,
                 &state.pool,
                 wake,

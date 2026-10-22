@@ -1,15 +1,16 @@
-//! The people in a workspace. Everyone can see them; admins change roles and
-//! remove people. A workspace always keeps at least one admin.
+//! The people in a workspace. Everyone can see them; admins change roles,
+//! put people in teams and remove people. A workspace always keeps at least
+//! one admin.
 
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use forge_domain::{
-    Actor, MemberInfo, ModelKind, Operation, Role, SyncAction, Transaction, UpdateMemberRequest,
-    UserInfo,
+    Actor, MemberInfo, ModelKind, Operation, Role, SyncAction, Transaction, UpdateAccessRequest,
+    UpdateMemberRequest, UserInfo,
 };
-use forge_sync::{Origin, apply_in, record_change};
+use forge_sync::{Origin, apply_in, leave_every_team, record_change, role_changed, set_teams};
 use serde_json::{Map, Value};
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -18,12 +19,20 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 
+/// Id, email, name, role, when they joined, and their teams.
+type MemberRow = (Uuid, String, String, String, DateTime<Utc>, Vec<Uuid>);
+
 pub async fn list(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<Vec<MemberInfo>>, AppError> {
-    let rows: Vec<(Uuid, String, String, String, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT u.id, u.email, u.name, m.role, m.created_at FROM workspace_members m \
+    // A guest's Settings are their account's alone.
+    member.require_not_guest()?;
+    let rows: Vec<MemberRow> = sqlx::query_as(
+        "SELECT u.id, u.email, u.name, m.role, m.created_at, \
+         ARRAY(SELECT tm.team_id FROM team_members tm WHERE tm.user_id = m.user_id \
+               AND tm.workspace_id = m.workspace_id ORDER BY tm.team_id) \
+         FROM workspace_members m \
          JOIN users u ON u.id = m.user_id WHERE m.workspace_id = $1 ORDER BY m.created_at",
     )
     .bind(member.actor.workspace_id)
@@ -31,11 +40,12 @@ pub async fn list(
     .await?;
     Ok(Json(
         rows.into_iter()
-            .filter_map(|(id, email, name, role, joined_at)| {
+            .filter_map(|(id, email, name, role, joined_at, access)| {
                 Some(MemberInfo {
                     user: UserInfo { id, email, name },
                     role: Role::parse(&role)?,
                     joined_at,
+                    access,
                 })
             })
             .collect(),
@@ -70,7 +80,25 @@ pub async fn update(
         .bind(user_id)
         .execute(&mut *db)
         .await?;
+    if request.role != current {
+        role_changed(&mut db, member.actor.workspace_id, user_id).await?;
+    }
     log_user(&mut db, member.actor, user_id, SyncAction::Update).await?;
+    db.commit().await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Puts someone in exactly the teams asked for.
+pub async fn update_access(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, user_id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<UpdateAccessRequest>,
+) -> Result<StatusCode, AppError> {
+    member.require_admin()?;
+    let mut db = state.pool.begin().await?;
+    lock_and_get_role(&mut db, member.actor.workspace_id, user_id).await?;
+    set_teams(&mut db, member.actor, user_id, &request.items).await?;
     db.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -86,6 +114,7 @@ pub async fn remove(
         ensure_another_admin(&mut db, member.actor.workspace_id).await?;
     }
     unassign(&mut db, member.actor, user_id).await?;
+    leave_every_team(&mut db, member.actor, user_id).await?;
     log_user(&mut db, member.actor, user_id, SyncAction::Delete).await?;
     sqlx::query("DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2")
         .bind(member.actor.workspace_id)

@@ -40,6 +40,7 @@ import type {
   Suggestion,
   Team,
   TeamCreate,
+  TeamMember,
   TeamPatch,
   User,
   WorkflowState,
@@ -68,6 +69,7 @@ export type Schema = {
   IssueLink: { record: IssueLink; create: never; patch: never };
   RequirementVerdict: { record: RequirementVerdict; create: never; patch: never };
   SpecChange: { record: SpecChange; create: never; patch: never };
+  TeamMember: { record: TeamMember; create: never; patch: never };
 };
 
 const timestamps = () => {

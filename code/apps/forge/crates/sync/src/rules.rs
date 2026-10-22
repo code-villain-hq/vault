@@ -21,6 +21,18 @@ impl Rules for Forge {
     type Model = ModelKind;
     const NOTIFY_CHANNEL: &'static str = NOTIFY_CHANNEL;
 
+    async fn guest_access(db: &mut PgConnection, actor: Actor) -> Result<Option<i64>, SyncError> {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT role, access_version FROM workspace_members \
+             WHERE workspace_id = $1 AND user_id = $2",
+        )
+        .bind(actor.workspace_id)
+        .bind(actor.user_id)
+        .fetch_optional(&mut *db)
+        .await?;
+        Ok(row.and_then(|(role, version)| (role == "guest").then_some(version)))
+    }
+
     async fn check_allowed(
         db: &mut PgConnection,
         actor: Actor,
@@ -442,20 +454,12 @@ async fn finish_notifying(
         return Ok(None);
     }
 
-    // Only people still in the workspace.
-    let recipients: Vec<Uuid> = notifications.iter().map(|n| n.0).collect();
-    let members: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND user_id = ANY($2)",
-    )
-    .bind(actor.workspace_id)
-    .bind(&recipients)
-    .fetch_all(&mut *db)
-    .await?;
-
+    // Only people still in the workspace, who can see the issue.
     let mut last = None;
-    for (user, kind, issue, comment, suggestion) in
-        notifications.into_iter().filter(|n| members.contains(&n.0))
-    {
+    for (user, kind, issue, comment, suggestion) in notifications {
+        if !sees_issue(db, actor.workspace_id, user, issue).await? {
+            continue;
+        }
         let id = Uuid::now_v7();
         let row = Map::from_iter([
             ("id".to_string(), json!(id)),
@@ -556,7 +560,8 @@ async fn add_server_fields(
         | ModelKind::Service
         | ModelKind::Domain
         | ModelKind::IssueLink
-        | ModelKind::RequirementVerdict => {}
+        | ModelKind::RequirementVerdict
+        | ModelKind::TeamMember => {}
     }
     Ok(())
 }
@@ -631,6 +636,27 @@ async fn allowed(
         }
         _ => Ok(()),
     }
+}
+
+/// Whether someone is in the workspace and can see the issue (if any): a
+/// guest only in their teams.
+pub async fn sees_issue(
+    db: &mut PgConnection,
+    workspace_id: Uuid,
+    user_id: Uuid,
+    issue: Option<Uuid>,
+) -> Result<bool, SyncError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace_id = $1 \
+         AND m.user_id = $2 AND (m.role <> 'guest' OR $3::uuid IS NULL OR EXISTS ( \
+             SELECT 1 FROM issues i JOIN team_members tm ON tm.team_id = i.team_id \
+             WHERE i.id = $3 AND tm.user_id = $2)))",
+    )
+    .bind(workspace_id)
+    .bind(user_id)
+    .bind(issue)
+    .fetch_one(&mut *db)
+    .await?)
 }
 
 /// Whether the actor is an admin of the workspace.
@@ -724,6 +750,30 @@ async fn check_rules(
     .await?;
     if unknown_labels > 0 {
         return Err(SyncError::Invalid("label not found".into()));
+    }
+
+    // Whoever works on it or reviews it can see it.
+    let (team, people): (String, Vec<(Uuid, String)>) = {
+        let row: (Uuid, Option<Uuid>, Option<Uuid>) =
+            sqlx::query_as("SELECT team_id, assignee_id, reviewer_id FROM issues WHERE id = $1")
+                .bind(id)
+                .fetch_one(&mut *db)
+                .await?;
+        let team: String = sqlx::query_scalar("SELECT name FROM teams WHERE id = $1")
+            .bind(row.0)
+            .fetch_one(&mut *db)
+            .await?;
+        let ids: Vec<Uuid> = [row.1, row.2].into_iter().flatten().collect();
+        let people = sqlx::query_as("SELECT id, name FROM users WHERE id = ANY($1)")
+            .bind(&ids)
+            .fetch_all(&mut *db)
+            .await?;
+        (team, people)
+    };
+    for (person, name) in people {
+        if !sees_issue(db, actor.workspace_id, person, Some(id)).await? {
+            return Err(SyncError::Invalid(format!("{name} isn't in {team}.")));
+        }
     }
 
     // Reviewing is a person's call.
@@ -1059,7 +1109,8 @@ async fn cascade(
         | ModelKind::Suggestion
         | ModelKind::IssueLink
         | ModelKind::RequirementVerdict
-        | ModelKind::SpecChange => {}
+        | ModelKind::SpecChange
+        | ModelKind::TeamMember => {}
         ModelKind::Team | ModelKind::User => {
             return Err(SyncError::Invalid(format!(
                 "{} records can't be deleted this way",

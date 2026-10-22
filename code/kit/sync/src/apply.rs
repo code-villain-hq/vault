@@ -5,6 +5,7 @@ use serde_json::{Map, Value, json};
 use sqlx::{AssertSqlSafe, PgConnection, PgPool};
 use uuid::Uuid;
 
+use crate::scope::guest_sees;
 use crate::{Actor, Model, Operation, SyncAction, SyncError, Transaction, Write};
 
 /// Who a transaction comes from. Client writes (the app, agents, the API)
@@ -25,6 +26,19 @@ pub trait Rules: Send + Sync + 'static {
     /// The Postgres channel notified, with the workspace id as payload,
     /// whenever a workspace's log grows.
     const NOTIFY_CHANNEL: &'static str;
+
+    /// `None` for someone who syncs the whole workspace. For a guest, their
+    /// access version: a number the app changes whenever what they may see
+    /// does (a role, a team they're added to). They then sync only what
+    /// [`Model::guest_view`] allows, and a new version makes their client
+    /// download its copy again. After changing it, call [`notify`] so the
+    /// open feeds notice.
+    fn guest_access(
+        _db: &mut PgConnection,
+        _actor: Actor,
+    ) -> impl Future<Output = Result<Option<i64>, SyncError>> + Send {
+        async { Ok(None) }
+    }
 
     /// Who may make a client's write, once [`Model::client_may`] allowed
     /// that kind of write.
@@ -226,6 +240,9 @@ pub async fn notify<R: Rules>(db: &mut PgConnection, workspace_id: Uuid) -> Resu
     Ok(())
 }
 
+/// Why a guest's write is refused when it would leave what they're in.
+const OUTSIDE: &str = "Guests can only change what they've been added to.";
+
 type Applying<'a> = Pin<Box<dyn Future<Output = Result<Option<i64>, SyncError>> + Send + 'a>>;
 
 /// Applies one operation and logs it, with what it brings along: its
@@ -244,12 +261,23 @@ pub fn apply_operation<'a, R: Rules>(
             Operation::Update { model, .. } => (*model, Write::Update),
             Operation::Delete { model, .. } => (*model, Write::Delete),
         };
+        let mut guest = false;
         if origin == Origin::Client {
             if !model.client_may(write) {
                 return Err(SyncError::Invalid(format!(
                     "{} records can't be changed this way",
                     model.name()
                 )));
+            }
+            guest = R::guest_access(db, actor).await?.is_some();
+            // What a guest can't see isn't there for them, whatever else
+            // the app's rules would say about it.
+            if let (true, Operation::Update { id, .. } | Operation::Delete { id, .. }) =
+                (guest, operation)
+                && current(db, actor, model, *id).await?.is_some()
+                && !guest_sees(db, actor, model, *id).await?
+            {
+                return Err(SyncError::NotFound(model.name().into()));
             }
             R::check_allowed(db, actor, operation).await?;
         }
@@ -264,6 +292,10 @@ pub fn apply_operation<'a, R: Rules>(
 
                 let record = insert::<R>(db, *model, row).await?;
                 R::check_rules(db, actor, *model, *id).await?;
+                // A guest creates only inside what they're in.
+                if guest && !guest_sees(db, actor, *model, *id).await? {
+                    return Err(SyncError::Forbidden(OUTSIDE.into()));
+                }
                 let visible_to = owner(*model, &record);
                 let mut last = log(
                     db,
@@ -300,6 +332,10 @@ pub fn apply_operation<'a, R: Rules>(
                     .await?
                     .ok_or_else(|| SyncError::NotFound(model.name().into()))?;
                 R::check_rules(db, actor, *model, *id).await?;
+                // Nor can they move a record out of what they're in.
+                if guest && !guest_sees(db, actor, *model, *id).await? {
+                    return Err(SyncError::Forbidden(OUTSIDE.into()));
+                }
                 let visible_to = owner(*model, &record);
                 let mut last = log(
                     db,

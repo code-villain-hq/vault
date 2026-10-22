@@ -15,6 +15,9 @@ pub enum Role {
     /// Manages the workspace: members, invites and settings.
     Admin,
     Member,
+    /// Sees only the teams they've been added to, and works there as a
+    /// member does.
+    Guest,
 }
 
 impl Role {
@@ -22,6 +25,7 @@ impl Role {
         match self {
             Role::Admin => "admin",
             Role::Member => "member",
+            Role::Guest => "guest",
         }
     }
 
@@ -29,6 +33,7 @@ impl Role {
         match value {
             "admin" => Some(Role::Admin),
             "member" => Some(Role::Member),
+            "guest" => Some(Role::Guest),
             _ => None,
         }
     }
@@ -117,6 +122,8 @@ pub struct MemberInfo {
     pub user: UserInfo,
     pub role: Role,
     pub joined_at: DateTime<Utc>,
+    /// The teams they're in.
+    pub access: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -124,6 +131,14 @@ pub struct MemberInfo {
 #[ts(export)]
 pub struct UpdateMemberRequest {
     pub role: Role,
+}
+
+/// Sets the teams someone is in.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct UpdateAccessRequest {
+    pub items: Vec<Uuid>,
 }
 
 /// An active invite link, as admins see it. The token itself is shown once,

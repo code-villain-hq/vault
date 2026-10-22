@@ -15,7 +15,8 @@ use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::RecvError;
 use uuid::Uuid;
 
-use crate::{Actor, Model, ServerMessage, current_sync_id, entries_after, workspace_epoch};
+use crate::scope::served_epoch;
+use crate::{Actor, Rules, ServerMessage, current_sync_id, entries_after, workspace_epoch};
 
 /// How many log entries to read at a time.
 const PAGE: i64 = 500;
@@ -33,7 +34,9 @@ pub struct Position {
 /// client leaves or `still_allowed` says they may no longer see it. `wake`
 /// carries workspace ids as [`listen`](crate::listen) hears of them (nil for
 /// all); subscribe to it before calling, so no change slips in between.
-pub async fn follow<M: Model, F, Fut>(
+/// When what they may see changes ([`Rules::guest_access`]), the client is
+/// asked to resync.
+pub async fn follow<R: Rules, F, Fut>(
     socket: WebSocket,
     pool: &PgPool,
     mut wake: broadcast::Receiver<Uuid>,
@@ -47,15 +50,15 @@ where
 {
     let (mut sender, mut receiver) = socket.split();
 
-    let epoch = workspace_epoch(pool, actor.workspace_id).await?;
+    let epoch = epoch_of::<R>(pool, actor).await?;
     let current = current_sync_id(pool, actor.workspace_id).await?;
     if from.epoch != Some(epoch) || from.after > current {
-        send::<M>(&mut sender, &ServerMessage::Resync).await?;
+        send::<R>(&mut sender, &ServerMessage::Resync).await?;
         return Ok(());
     }
 
     let mut last = from.after;
-    send_new::<M>(&mut sender, pool, actor, &mut last).await?;
+    send_new::<R>(&mut sender, pool, actor, &mut last).await?;
 
     let mut heartbeat = tokio::time::interval(HEARTBEAT);
     heartbeat.tick().await;
@@ -82,14 +85,26 @@ where
             sender.send(Message::Close(None)).await?;
             return Ok(());
         }
-        send_new::<M>(&mut sender, pool, actor, &mut last).await?;
+        // Added to a team, or made a guest: their copy starts over.
+        if epoch_of::<R>(pool, actor).await? != epoch {
+            send::<R>(&mut sender, &ServerMessage::Resync).await?;
+            return Ok(());
+        }
+        send_new::<R>(&mut sender, pool, actor, &mut last).await?;
     }
+}
+
+/// The epoch `actor`'s copy belongs to now.
+async fn epoch_of<R: Rules>(pool: &PgPool, actor: Actor) -> anyhow::Result<Uuid> {
+    let epoch = workspace_epoch(pool, actor.workspace_id).await?;
+    let mut db = pool.acquire().await?;
+    Ok(served_epoch(epoch, R::guest_access(&mut db, actor).await?))
 }
 
 type Sender = SplitSink<WebSocket, Message>;
 
 /// Sends every change after `last`, page by page, and advances `last`.
-async fn send_new<M: Model>(
+async fn send_new<R: Rules>(
     sender: &mut Sender,
     pool: &PgPool,
     actor: Actor,
@@ -98,12 +113,12 @@ async fn send_new<M: Model>(
     loop {
         // `upto` can pass entries meant for others; moving the client past
         // them is what confirms its transactions that created them.
-        let (entries, upto) = entries_after::<M>(pool, actor, *last, PAGE).await?;
+        let (entries, upto) = entries_after::<R>(pool, actor, *last, PAGE).await?;
         if upto == *last {
             return Ok(());
         }
         *last = upto;
-        send(
+        send::<R>(
             sender,
             &ServerMessage::Delta {
                 entries,
@@ -114,7 +129,10 @@ async fn send_new<M: Model>(
     }
 }
 
-async fn send<M: Model>(sender: &mut Sender, message: &ServerMessage<M>) -> anyhow::Result<()> {
+async fn send<R: Rules>(
+    sender: &mut Sender,
+    message: &ServerMessage<R::Model>,
+) -> anyhow::Result<()> {
     let text = serde_json::to_string(message)?;
     sender.send(Message::Text(text.into())).await?;
     Ok(())

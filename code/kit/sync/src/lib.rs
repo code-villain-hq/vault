@@ -16,6 +16,7 @@ mod listen;
 mod model;
 mod protocol;
 mod read;
+mod scope;
 
 pub use apply::{
     Origin, Rules, apply_in, apply_operation, apply_transaction, current, insert, lock_workspace,
@@ -24,9 +25,10 @@ pub use apply::{
 pub use error::SyncError;
 pub use feed::{Position, follow};
 pub use listen::listen;
-pub use model::{Actor, Model, ValidationError, Write};
+pub use model::{Actor, GuestView, Model, ValidationError, Write};
 pub use protocol::{
     ApiError, Bootstrap, Operation, ServerMessage, SyncAction, SyncEntry, Transaction,
     TransactionResult,
 };
 pub use read::{bootstrap, current_sync_id, entries_after, workspace_epoch};
+pub use scope::served_epoch;

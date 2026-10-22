@@ -156,6 +156,7 @@ pub async fn request_check(
     member: Member,
     UrlPath((_, service_id)): UrlPath<(Uuid, Uuid)>,
 ) -> Result<Json<QueuedRun>, AppError> {
+    member.require_not_guest()?;
     let provider = state.ai.as_ref().ok_or_else(|| {
         AppError::invalid("drift checks need a model: set ANTHROPIC_API_KEY on the server")
     })?;
@@ -194,6 +195,7 @@ pub async fn check_details(
     member: Member,
     UrlPath((_, run_id)): UrlPath<(Uuid, Uuid)>,
 ) -> Result<Json<DriftCheckDetails>, AppError> {
+    member.require_not_guest()?;
     let workspace_id = member.actor.workspace_id;
     #[derive(sqlx::FromRow)]
     struct Run {

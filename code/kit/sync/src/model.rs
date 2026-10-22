@@ -13,6 +13,20 @@ pub struct Actor {
     pub workspace_id: Uuid,
 }
 
+/// What a guest syncs of a kind of record. Members and admins sync the whole
+/// workspace; a guest only what they've been added to, such as their teams.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GuestView {
+    /// Every record, as for members: the source language, the people.
+    All,
+    /// The records this SQL condition holds for. It reads the record as `t`
+    /// and the guest's user id as `$viewer`, for example
+    /// `t.team_id IN (SELECT team_id FROM team_members WHERE user_id = $viewer)`.
+    Where(&'static str),
+    /// None of them: they're the workspace's, not a part a guest is in.
+    Hidden,
+}
+
 /// The three kinds of write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Write {
@@ -47,6 +61,10 @@ pub trait Model:
 
     /// Records only their owner (`user_id`) syncs, rather than the whole workspace.
     fn private_to_user(self) -> bool;
+
+    /// What a guest syncs of this kind; see [`Rules::guest_access`](crate::Rules::guest_access).
+    /// Required, so a new model can't reach guests by being forgotten.
+    fn guest_view(self) -> GuestView;
 
     /// Checks the fields sent to create a record.
     fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError>;

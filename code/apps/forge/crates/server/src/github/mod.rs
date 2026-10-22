@@ -111,6 +111,7 @@ pub async fn status(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<GitHubStatus>, AppError> {
+    member.require_not_guest()?;
     let Some(app) = state.github.as_ref() else {
         return Ok(Json(GitHubStatus {
             configured: false,

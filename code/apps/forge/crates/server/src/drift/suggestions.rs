@@ -43,14 +43,22 @@ async fn resolve(
         .bind(member.actor.workspace_id)
         .execute(&mut *db)
         .await?;
-    let found: Option<(String, Value)> = sqlx::query_as(
-        "SELECT status, operations FROM suggestions WHERE id = $1 AND workspace_id = $2 FOR UPDATE",
+    let found: Option<(String, Value, Option<Uuid>)> = sqlx::query_as(
+        "SELECT status, operations, issue_id FROM suggestions WHERE id = $1 AND workspace_id = $2 FOR UPDATE",
     )
     .bind(id)
     .bind(member.actor.workspace_id)
     .fetch_optional(&mut *db)
     .await?;
-    let (status, operations) = found.ok_or_else(|| AppError::not_found("suggestion not found"))?;
+    let not_found = || AppError::not_found("suggestion not found");
+    let (status, operations, issue) = found.ok_or_else(not_found)?;
+    // A guest sees only the suggestions on their teams' issues.
+    let (workspace, user) = (member.actor.workspace_id, member.actor.user_id);
+    if member.role == forge_domain::Role::Guest
+        && (issue.is_none() || !forge_sync::sees_issue(&mut db, workspace, user, issue).await?)
+    {
+        return Err(not_found());
+    }
     if status != "open" {
         return Err(AppError::conflict(format!(
             "this suggestion was already {status}"
