@@ -51,7 +51,6 @@ export function SpecView({ task }: { task: TaskView }) {
   // screen to the editor by then (NOTE-6).
   const fail = useStore((s) => s.fail);
   const actions = useFailure();
-  const toast = useStore((s) => s.toast);
 
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const [part, setPart] = useState<SpecPart | null>(null);
@@ -175,12 +174,11 @@ export function SpecView({ task }: { task: TaskView }) {
       const failed = await approve(task.id, files, files.some((f) => f.part === "requirements") ? kind : null);
       // The task's files go into every repository; tasks into their own.
       const reached = files.some((f) => f.part !== "tasks") ? repos : repos.filter((r) => files.some((f) => f.checkoutId === r.checkout_id));
-      const inRepo = reached.filter((r) => r.in_repo && !failed.some((f) => f.folder === r.folder));
+      // What was approved shows on its tab and banner (NOTE-7); only a
+      // repository that refused it is said.
       if (failed.length > 0) {
         const rest = reached.length > failed.length ? "The others have it." : "Try again.";
         actions.fail(`Couldn't write it in ${failed.map((f) => `${f.folder} (${f.error})`).join(", ")}. ${rest}`);
-      } else {
-        toast("success", inRepo.length > 0 ? `Approved and committed in ${inRepo.map((r) => r.folder).join(", ")}.` : "Approved.");
       }
       if (running > 0) setTell([...new Set(files.map((f) => f.part))]);
       const parts = files.map((f) => f.part);
@@ -271,7 +269,7 @@ export function SpecView({ task }: { task: TaskView }) {
         <div className="spec-tell">
           {running} agent{running === 1 ? " is" : "s are"} working in this task to the spec as it was.
           <button className="ui-button" onClick={() => {
-            void api.tellSpecChange(task.id, tell).then((n) => toast("success", `Told ${n} agent${n === 1 ? "" : "s"}.`)).catch(fail);
+            void api.tellSpecChange(task.id, tell).catch(fail);
             setTell(null);
           }}>Tell them</button>
           <button className="ui-button" onClick={() => setTell(null)}>Not now</button>

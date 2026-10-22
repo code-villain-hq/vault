@@ -22,7 +22,6 @@ export function CreateEpicDialog({
 }) {
   const settings = useStore((s) => s.settings);
   const refreshIssues = useStore((s) => s.refreshIssues);
-  const toast = useStore((s) => s.toast);
   // Creating fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
 
@@ -70,7 +69,8 @@ export function CreateEpicDialog({
     setBusy(true);
     failure.clear();
     try {
-      const issue = await api.jiraCreateIssue({
+      // The epic appears in Tickets (NOTE-7).
+      await api.jiraCreateIssue({
         summary: summary.trim(),
         description: desc.trim(),
         issue_type: epicType,
@@ -78,7 +78,6 @@ export function CreateEpicDialog({
         parent_key: null,
         fields: rf.fields(),
       });
-      toast("success", `Created ${issue.key}`);
       onClose();
       await refreshIssues();
     } catch (e) {

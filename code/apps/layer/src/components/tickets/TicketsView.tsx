@@ -36,7 +36,6 @@ export function TicketsView() {
   const refreshIssues = useStore((s) => s.refreshIssues);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const select = useStore((s) => s.select);
-  const toast = useStore((s) => s.toast);
   // A search fails under the search panel (NOTE-6). Menu items, the epic's
   // Jira link and a card's sync have no room of their own: the top bar.
   const fail = useStore((s) => s.fail);
@@ -201,12 +200,12 @@ export function TicketsView() {
     setSyncing(key);
     try {
       const moved = await api.jiraSyncStatus(key);
+      // A move shows on the card (NOTE-7); none to make is the sync failing.
       if (moved) {
-        toast("success", `${key} → ${moved}`);
         await refreshIssues();
         if (sub === "browse") void browse();
       } else {
-        toast("info", `${key} offers no transition into progress.`);
+        fail(`${key} offers no transition into progress.`);
       }
     } catch (e) {
       fail(e);
@@ -536,7 +535,6 @@ export function TicketsView() {
           onStart={() => { setOpen(reading); setReading(null); }}
           onMoved={(toStatus) => {
             const key = reading.key;
-            toast("success", `${key} → ${toStatus}`);
             setReading((r) => (r ? { ...r, status: toStatus } : r));
             // Then the ticket as Jira now has it: the status category — the
             // pill's colour — is not something the transition says.

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "../../lib/api";
-import { useStore } from "../../store";
 import { ErrorMessage, Spinner, useFailure } from "../ui";
 
 /**
@@ -24,7 +23,6 @@ export function OptimizeDescription({
 }) {
   // Fails under its own button, inside whichever dialog holds it (NOTE-6).
   const failure = useFailure();
-  const toast = useStore((s) => s.toast);
   const [busy, setBusy] = useState(false);
   const requestId = useRef("");
   // Accumulator for streamed deltas, so a late chunk cannot race a keystroke
@@ -60,7 +58,6 @@ export function OptimizeDescription({
         kind,
       });
       onChange(text.trim());
-      toast("success", "Description updated — edit it before filing.");
     } catch (e) {
       onChange(prior);
       failure.fail(e);

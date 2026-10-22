@@ -22,7 +22,6 @@ export function ReposView() {
   const refreshRepos = useStore((s) => s.refreshRepos);
   const refreshRepoHealth = useStore((s) => s.refreshRepoHealth);
   const refreshAll = useStore((s) => s.refreshAll);
-  const toast = useStore((s) => s.toast);
   // Reads the view makes on its own fail in the top bar. What the user does
   // to a repository fails under its row, Sync all under the header (NOTE-6).
   const fail = useStore((s) => s.fail);
@@ -143,10 +142,8 @@ export function ReposView() {
       const rows = await api.syncRepos(ids);
       setSynced((s) => ({ ...s, ...Object.fromEntries(rows.map((r) => [r.project_id, r])) }));
       // One repository's reason is already on its row, under the button.
-      if (all) {
-        if (rows.some((r) => !r.ok)) head.fail(syncSummary(rows));
-        else toast("success", syncSummary(rows));
-      }
+      // What worked is on its row too, so only failures are summed up (NOTE-7).
+      if (all && rows.some((r) => !r.ok)) head.fail(syncSummary(rows));
       await Promise.all([refreshRepos(), refreshRepoHealth()]);
     } catch (e) {
       (all ? head : row).fail(e);
@@ -160,11 +157,10 @@ export function ReposView() {
     if (typeof chosen !== "string") return;
     tryAt(p.id);
     try {
-      const moved = await api.locateProject(p.id, chosen);
+      await api.locateProject(p.id, chosen);
       // Its group was open only for the trouble; closing under the click
       // that fixed it hides what just happened.
       setShut((c) => ({ ...c, [p.group ?? ""]: false }));
-      toast("success", `${p.name} is at ${moved.path} now. Its tasks keep it.`);
       await Promise.all([refreshRepos(), refreshRepoHealth()]);
     } catch (e) {
       row.fail(e);
@@ -261,8 +257,7 @@ export function ReposView() {
 
       <ReposElsewhere
         repos={elsewhere}
-        onPlaced={(name, path) => {
-          toast("success", `${name} is at ${path}, with the workspace's settings.`);
+        onPlaced={() => {
           void Promise.all([refreshRepos(), refreshRepoHealth()]).catch(fail);
         }}
       />

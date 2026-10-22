@@ -23,7 +23,6 @@ export function S3LogSources() {
   const sources = useStore((s) => s.settings?.log_sources) ?? [];
   const scanned = useStore((s) => s.settings?.log_scanned_today);
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const toast = useStore((s) => s.toast);
   // Looking for the CLI fails in the card, as it opens or on Check again;
   // removing fails in its dialog (NOTE-6).
   const looking = useFailure();
@@ -43,7 +42,6 @@ export function S3LogSources() {
   async function remove(s: LogSource) {
     await api.s3LogSourceRemove(s.id);
     await refreshSettings();
-    toast("info", `${s.name} removed`);
     setRemoving(null);
   }
 
@@ -169,7 +167,6 @@ function blank(setup: AwsSetup | null): LogSource {
  */
 function SourceEditor({ start, setup, locked, onDone }: { start: LogSource; setup: AwsSetup | null; locked: boolean; onDone: () => void }) {
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const toast = useStore((s) => s.toast);
   // Find fails under its button, saving under the Save row (NOTE-6).
   const finding = useFailure();
   const saving = useFailure();
@@ -205,9 +202,8 @@ function SourceEditor({ start, setup, locked, onDone }: { start: LogSource; setu
     setBusy("save");
     saving.clear();
     try {
-      const saved = await api.s3LogSourceSave(s);
+      await api.s3LogSourceSave(s);
       await refreshSettings();
-      toast("success", `${saved.name} saved: the profile can read s3://${saved.bucket}/${saved.prefix}`);
       onDone();
     } catch (e) {
       saving.fail(e);

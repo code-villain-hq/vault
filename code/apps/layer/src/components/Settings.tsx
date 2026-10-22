@@ -5,7 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../lib/api";
 import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
-import { ErrorMessage, Field, Modal, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
 import { TicketFlowSettings } from "./TicketFlow";
 import { PhoneSettings } from "./PhoneSettings";
 import { BrowserSettings } from "./BrowserSettings";
@@ -26,7 +26,6 @@ export function Settings() {
   const refreshIssues = useStore((s) => s.refreshIssues);
   const refreshPrs = useStore((s) => s.refreshPrs);
   const ghRejected = useStore((s) => githubRejected(s.prs));
-  const toast = useStore((s) => s.toast);
   // Each section's actions fail under what was pressed (NOTE-6): connecting
   // under its button, disconnecting under the connected row.
   const jira = useFailure();
@@ -93,12 +92,12 @@ export function Settings() {
     setBusy(true);
     jira.clear();
     try {
-      const who = await api.jiraConnect(
+      // The connected row names who it signed in as: no toast (studio/design/behaviour.md).
+      await api.jiraConnect(
         jiraUrl.trim(), jiraEmail.trim(), jiraToken.trim(),
         jiraProject.trim() || null, jiraJql.trim() || null,
       );
       setJiraToken("");
-      toast("success", `Jira connected as ${who}`);
       await refreshSettings();
       await refreshIssues();
     } catch (e) {
@@ -112,11 +111,10 @@ export function Settings() {
     setBusy(true);
     github.clear();
     try {
-      const login = await api.githubConnect(
+      await api.githubConnect(
         ghApi.trim(), ghWeb.trim(), ghToken.trim(), ghTeam.trim() || null,
       );
       setGhToken("");
-      toast("success", `GitHub connected as ${login}`);
       await refreshSettings();
       // The PR tabs still hold what the old token was told.
       void refreshPrs();
@@ -132,7 +130,6 @@ export function Settings() {
     try {
       await api.disconnect(which);
       await refreshSettings();
-      toast("info", `${which} disconnected`);
     } catch (e) {
       unlink.fail(e);
     }
@@ -276,7 +273,8 @@ export function Settings() {
             }
             onClick={() => void connectJira()}
           >
-            {busy ? "Verifying…" : settings?.jira_connected ? "Save & reconnect" : "Connect"}
+            {/* One button, named by what it does (SET-12). */}
+            <BusyLabel busy={busy} idle={settings?.jira_connected ? "Reconnect" : "Connect"} working="Connecting…" />
           </button>
           <ErrorMessage>{jira.error}</ErrorMessage>
           {settings?.jira_connected && (
@@ -352,7 +350,7 @@ export function Settings() {
             }
             onClick={() => void connectGithub()}
           >
-            {busy ? "Verifying…" : settings?.github_connected ? "Save & reconnect" : "Connect"}
+            <BusyLabel busy={busy} idle={settings?.github_connected ? "Reconnect" : "Connect"} working="Connecting…" />
           </button>
           <ErrorMessage>{github.error}</ErrorMessage>
         </>

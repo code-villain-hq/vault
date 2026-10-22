@@ -15,7 +15,6 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
   // fails in the top bar; saving fails in the dialog (NOTE-6).
   const fail = useStore((s) => s.fail);
   const dialog = useFailure();
-  const toast = useStore((s) => s.toast);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const [form, setForm] = useState<SignInForm | null>(null);
   const [site, setSite] = useState("");
@@ -41,9 +40,9 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
     setBusy(true);
     dialog.clear();
     try {
-      const saved = await api.browserSaveSignIn(taskId, site.trim(), username.trim());
+      // The dialog closing on Save is the news (NOTE-7); a failure keeps it open.
+      await api.browserSaveSignIn(taskId, site.trim(), username.trim());
       await refreshSettings();
-      toast("success", `Saved the sign-in for ${saved.username} on ${saved.site}: agents can use it now.`);
       setForm(null);
     } catch (e) {
       dialog.fail(e);

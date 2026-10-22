@@ -37,7 +37,6 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
   const refreshRepos = useStore((s) => s.refreshRepos);
   const projects = useStore((s) => s.projects);
   const health = useStore((s) => s.repoHealth);
-  const toast = useStore((s) => s.toast);
   // Everything here is done in the dialog, so it fails there (NOTE-6).
   const failure = useFailure();
   const fail = failure.fail;
@@ -106,16 +105,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
       setResults(out);
       setRan(chosen);
       setAborted(new Set());
-      const updated = out.filter((r) => r.outcome === "updated");
-      const clashes = out.filter((r) => r.outcome === "conflicts").length;
-      if (updated.length > 0 && clashes === 0) {
-        const rebased = updated.some((r) => chosen[r.checkout_id] === "rebase");
-        toast(
-          "success",
-          `Brought ${updated.length} repo${updated.length === 1 ? "" : "s"} up to date` +
-            (rebased ? " — Push all replaces the remote branches that were rebased" : ""),
-        );
-      }
+      // Each repo's row says how it went (NOTE-7).
       await Promise.all([refreshTasks().catch(() => {}), refreshRepos().catch(() => {})]);
     } catch (e) {
       fail(e);
@@ -161,8 +151,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
     setBusy(true);
     failure.clear();
     try {
-      const who = await at.send((paneId, scope) => api.sendMergeConflicts(task.id, paneId, scope));
-      toast("success", `Handed the conflicts to ${who}.`);
+      await at.send((paneId, scope) => api.sendMergeConflicts(task.id, paneId, scope));
       onClose();
     } catch (e) {
       fail(e);

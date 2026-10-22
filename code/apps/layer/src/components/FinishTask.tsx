@@ -85,14 +85,11 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
         setBusy(false);
         return;
       }
+      // The task leaving the sidebar says it finished (NOTE-7).
       if (selected === task.id) select(null);
-      const moved = done?.find((t) => t.id === transition);
-      toast(
-        "success",
-        `Finished ${task.name}` + (out.ticket_moved && moved ? ` · ${key} moved to ${moved.to_status}` : ""),
-      );
       if (out.ticket_error) fail(`Couldn't move ${key}: ${out.ticket_error}`);
       const kept = out.branches.filter((b) => !b.ok);
+      // The dialog closes, so a branch kept has nowhere else to be said.
       if (kept.length > 0) {
         toast("info", `Branch ${task.branch} was kept in ${kept.map((b) => `${b.repo} (${b.detail})`).join(", ")}`);
       }

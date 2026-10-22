@@ -28,7 +28,6 @@ export function StartWorkDialog({
   const select = useStore((s) => s.select);
   const setTab = useStore((s) => s.setTab);
   const setPendingSpec = useSpecs((s) => s.setPending);
-  const toast = useStore((s) => s.toast);
   // Starting fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
 
@@ -134,12 +133,8 @@ export function StartWorkDialog({
         setPendingSpec({ taskId: task.id, agentId: agentId || null });
         setTab("spec");
       }
+      // The task is selected and its ticket's card moved: nothing more to say (NOTE-7).
       onClose();
-      toast(
-        "success",
-        `${picked.length} worktree${picked.length === 1 ? "" : "s"} ready on ${task.branch}` +
-          (task.moved ? ` · ${issue.key} → ${task.moved}` : ""),
-      );
     } catch (e) {
       failure.fail(e);
     } finally {

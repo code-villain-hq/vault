@@ -12,7 +12,6 @@ import { Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
  */
 export function AddRepos({ onClose }: { onClose: () => void }) {
   const refreshAll = useStore((s) => s.refreshAll);
-  const toast = useStore((s) => s.toast);
   // Fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
   const fail = failure.fail;
@@ -61,7 +60,6 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
       // A folder of repos is usually already a group: ~/code/backend -> backend.
       const leaf = root.split(/[\\/]/).filter(Boolean).pop() ?? "";
       setGroup(leaf.toLowerCase());
-      if (repos.length === 0) toast("info", `No git repositories found under ${root}`);
     } catch (e) {
       fail(e);
     } finally {
@@ -75,9 +73,6 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
     try {
       const { added, skipped } = await api.addProjects(paths, into);
       await refreshAll();
-      if (added.length > 0) {
-        toast("success", `Added ${added.length} repositor${added.length === 1 ? "y" : "ies"}`);
-      }
       if (skipped.length === 0) {
         onClose();
         return;
@@ -148,7 +143,7 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
         <>
           <div className="row" style={{ marginBottom: 10 }}>
             <span className="muted">
-              {found.length} found under <code>{scanned}</code>
+              {found.length === 0 ? "No git repositories" : `${found.length} found`} under <code>{scanned}</code>
             </span>
             <div className="spacer" />
             <button

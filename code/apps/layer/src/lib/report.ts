@@ -1,31 +1,21 @@
 import type { RepoResult, Synced } from "./types";
 
-type Toast = (kind: "info" | "success", text: string) => void;
-
 /**
- * Say the outcome of a multi-repo operation: what worked as a toast, what
- * failed through `fail`, which is where the user acted (NOTE-6).
+ * Say what went wrong in a multi-repo operation, through `fail`, which is
+ * where the user acted (NOTE-6).
  *
  * Each repo answers on its own, so a failure in one must not swallow successes
- * in the others — and an empty reply is worth saying out loud rather than
- * leaving the click looking like it did nothing.
+ * in the others. What worked says nothing more (NOTE-7): its row, or the
+ * dialog closing, shows it. An empty reply is worth saying out loud rather
+ * than leaving the click looking like it did nothing.
  */
-export function reportRepoResults(
-  toast: Toast,
-  fail: (text: string) => void,
-  results: RepoResult[],
-  verb: string,
-) {
-  const ok = results.filter((r) => r.ok);
+export function reportRepoResults(fail: (text: string) => void, results: RepoResult[]) {
   const bad = results.filter((r) => !r.ok);
   if (bad.length) {
     fail(bad.map((r) => `${r.repo}: ${r.detail}`).join("\n"));
   }
-  if (ok.length) {
-    toast("success", `${verb} ${ok.map((r) => `${r.repo} (${r.detail})`).join(", ")}`);
-  }
-  if (!ok.length && !bad.length) {
-    toast("info", "Nothing to do — no repository had changes.");
+  if (results.length === 0) {
+    fail("Nothing to do. No repository had changes.");
   }
 }
 

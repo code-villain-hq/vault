@@ -13,6 +13,7 @@ import * as real from "../src/lib/api";
 let server: FakeServer;
 let backend: { outbox: Operation[]; snapshot: Record<string, { id: string }[]> | null };
 let written: () => void = () => {};
+let kept: string[] = [];
 
 mock.module("@code-villain/sync-client", () => ({
   ...kit,
@@ -36,6 +37,7 @@ mock.module("../src/lib/api", () => ({
     ...real.api,
     workspacePlace: async () => ({ origin: "http://127.0.0.1:7685", token: "t", user_id: "u", workspace_id: "w" }),
     takeSetupWrites: async () => backend.outbox.splice(0),
+    addMessage: async (_kind: string, _level: string, title: string) => void kept.push(title),
     applySetup: async (snapshot: Record<string, { id: string }[]>) => {
       if (backend.outbox.length) return { applied: false, setup: false };
       const setup = JSON.stringify(snapshot) !== JSON.stringify(backend.snapshot);
@@ -44,7 +46,7 @@ mock.module("../src/lib/api", () => ({
     },
   },
 }));
-const { startWorkspaceSync } = await import("../src/lib/workspace-sync");
+const { refusals, startWorkspaceSync } = await import("../src/lib/workspace-sync");
 
 // The fake server is Forge's: a create needs a title.
 const note = (id: string, text: string): Operation =>
@@ -55,6 +57,7 @@ const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
 beforeEach(() => {
   server = new FakeServer();
   backend = { outbox: [], snapshot: null };
+  kept = [];
 });
 
 describe("the shared setup between this Mac and its workspace", () => {
@@ -94,13 +97,17 @@ describe("the shared setup between this Mac and its workspace", () => {
     stop();
   });
 
-  test("a change the workspace refuses is said", async () => {
+  test("a change the workspace refuses is said by the sync status, and kept", async () => {
     const refused: string[] = [];
+    const said = (e: Event) => refused.push((e as CustomEvent<string>).detail);
+    refusals.addEventListener("refused", said);
     backend.outbox.push({ action: "create", model: "Note", id: "n3", data: { text: "No title." } } as Operation);
-    const stop = await startWorkspaceSync({ onSetup: () => {}, onRefused: (m) => refused.push(m) });
+    const stop = await startWorkspaceSync({ onSetup: () => {}, onRefused: (m) => refused.push(`here: ${m}`) });
     await settled();
+    refusals.removeEventListener("refused", said);
 
     expect(refused).toEqual(["title can't be empty"]);
+    expect(kept).toEqual(["The workspace did not take a change: title can't be empty"]);
     expect(server.records.get("Note")?.has("n3") ?? false).toBe(false);
     stop();
   });

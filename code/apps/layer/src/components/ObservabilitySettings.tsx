@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { GrafanaDatasource } from "../lib/types";
 import { useStore } from "../store";
-import { ErrorMessage, Field, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
 import { S3LogSources } from "./S3LogSources";
 import { heldText, Theirs, useHeld, Yours } from "./SharedSettings";
 
@@ -27,7 +27,6 @@ export function ObservabilitySettings() {
 function GrafanaSource() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const toast = useStore((s) => s.toast);
   // Disconnecting fails under its row, choosing under the list, connecting
   // under its button (NOTE-6).
   const unlink = useFailure();
@@ -71,13 +70,8 @@ function GrafanaSource() {
     setBusy(true);
     connecting.clear();
     try {
-      const loki = await api.grafanaConnect(url.trim(), token.trim());
+      await api.grafanaConnect(url.trim(), token.trim());
       setToken("");
-      if (loki === 0) {
-        toast("info", "Grafana connected, but the token can see no Loki datasource.");
-      } else {
-        toast("success", `Grafana connected: ${loki} Loki datasource${loki === 1 ? "" : "s"}.`);
-      }
       await refreshSettings();
     } catch (e) {
       connecting.fail(e);
@@ -91,7 +85,6 @@ function GrafanaSource() {
     try {
       await api.disconnect("grafana");
       await refreshSettings();
-      toast("info", "grafana disconnected");
     } catch (e) {
       unlink.fail(e);
     }
@@ -111,6 +104,13 @@ function GrafanaSource() {
         </div>
       )}
       <ErrorMessage>{unlink.error}</ErrorMessage>
+      {/* Said here rather than in a toast as it connects (NOTE-7): it stays
+          true, and worth seeing, until the token is given one. */}
+      {connected && sources?.length === 0 && (
+        <p className="ui-tint-warn error-message">
+          The token can see no Loki datasource. Give its service account access to one in Grafana.
+        </p>
+      )}
       <p className="muted" style={{ marginTop: 0 }}>
         Logs in Loki, read with LogQL or with a Grafana Explore link from a ticket.
       </p>
@@ -160,7 +160,8 @@ function GrafanaSource() {
         disabled={busy || !url.trim() || (!token.trim() && !connected)}
         onClick={() => void connect()}
       >
-        {busy ? "Verifying…" : connected ? "Save & reconnect" : "Connect"}
+        {/* One button, named by what it does (SET-12). */}
+        <BusyLabel busy={busy} idle={connected ? "Reconnect" : "Connect"} working="Connecting…" />
       </button>
       <ErrorMessage>{connecting.error}</ErrorMessage>
     </div>

@@ -222,7 +222,6 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
  * before the agent had read it.
  */
 export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: string; onClose: () => void }) {
-  const toast = useStore((s) => s.toast);
   // Reading fails where the list would be, sending above the buttons (NOTE-6).
   const reading = useFailure();
   const sending = useFailure();
@@ -275,8 +274,7 @@ export function PrFeedback({ task, first, onClose }: { task: TaskView; first?: s
     sending.clear();
     try {
       const items = chosen.map((e) => e.item);
-      const who = await at.send((paneId, scope) => api.sendPrFeedback(task.id, paneId, scope, items));
-      toast("success", `Sent ${chosen.length} item${chosen.length === 1 ? "" : "s"} of feedback to ${who}.`);
+      await at.send((paneId, scope) => api.sendPrFeedback(task.id, paneId, scope, items));
       const keep = [...new Set([...read<string[]>(sentKey(task.id), []), ...chosen.map((e) => e.key)])];
       write(sentKey(task.id), keep.slice(-SENT_LIMIT));
       onClose();

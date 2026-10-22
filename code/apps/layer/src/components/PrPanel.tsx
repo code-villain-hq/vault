@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../lib/api";
-import { copyAndSay } from "../lib/clipboard";
 import { reportRepoResults } from "../lib/report";
 import { useRunningAgentsOf } from "../lib/panes";
 import { useStore } from "../store";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
-import { ChevronIcon, CopyIcon, ExternalIcon, PlusIcon } from "./icons";
+import { ChevronIcon, ExternalIcon, PlusIcon } from "./icons";
+import { CopyButton } from "./CopyButton";
 import { BusyLabel, Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 import { PrFeedback } from "./PrFeedback";
 import { Outgoing } from "./Outgoing";
@@ -119,7 +119,6 @@ export function PrPanel({
   const settings = useStore((s) => s.settings);
   const agentPanes = useRunningAgentsOf(task.id);
   const toggleSettings = useStore((s) => s.toggleSettings);
-  const toast = useStore((s) => s.toast);
   // The panel's own actions fail under its buttons, the dialog's above its
   // footer (NOTE-6).
   const panel = useFailure();
@@ -166,6 +165,8 @@ export function PrPanel({
   /** Repos the user unticked in the dialog: no push, no PR. Everything starts picked. */
   const [leftOut, setLeftOut] = useState<string[]>([]);
   const [drafting, setDrafting] = useState(false);
+  /** The agent asked for the draft when the fast model could not write it. */
+  const [askedPane, setAskedPane] = useState<string | null>(null);
   /** What the review step before pushing asks a second look at (PR-11). */
   const [flags, setFlags] = useState(0);
   const pollRef = useRef<number | null>(null);
@@ -252,7 +253,8 @@ export function PrPanel({
 
   async function retarget(row: CheckoutPr) {
     try {
-      toast("success", await api.githubRetargetPr(row.checkout_id));
+      // The row shows the new base once it is read again (NOTE-7).
+      await api.githubRetargetPr(row.checkout_id);
       await load();
     } catch (e) {
       fail(e);
@@ -267,6 +269,7 @@ export function PrPanel({
   /// it knows what the diff cannot say.
   async function draftWithAgent() {
     setDrafting(true);
+    setAskedPane(null);
     dialog.clear();
     // Cleared so the streamed text is not appended to whatever was there.
     setBody("");
@@ -275,7 +278,6 @@ export function PrPanel({
       const drafted = await api.draftPrDescription(task.id);
       streaming.current = false;
       setBody(drafted.trim());
-      toast("success", "Description drafted — edit it before opening the PR.");
       setDrafting(false);
       return;
     } catch (e) {
@@ -288,7 +290,7 @@ export function PrPanel({
         dialog.fail(e);
         return;
       }
-      toast("info", `Asking ${pane.title} instead — this one takes longer.`);
+      setAskedPane(pane.title);
     }
 
     const pane = agentPanes[0];
@@ -304,7 +306,6 @@ export function PrPanel({
           setBody(text.trim());
           setDrafting(false);
           if (pollRef.current) window.clearInterval(pollRef.current);
-          toast("success", "Description drafted — edit it before opening the PR.");
         } else if (Date.now() - started > 5 * 60 * 1000) {
           setDrafting(false);
           if (pollRef.current) window.clearInterval(pollRef.current);
@@ -321,7 +322,7 @@ export function PrPanel({
     setBusy(true);
     panel.clear();
     try {
-      reportRepoResults(toast, fail, await api.pushTask(task.id), "Pushed");
+      reportRepoResults(fail, await api.pushTask(task.id));
       await load();
     } catch (e) {
       fail(e);
@@ -335,9 +336,9 @@ export function PrPanel({
     dialog.clear();
     try {
       const results = await api.githubOpenPrs(task.id, title.trim(), body, draft, leftOut);
-      reportRepoResults(toast, dialog.fail, results, "Opened");
+      reportRepoResults(dialog.fail, results);
       // A repository that refused keeps the dialog open, its reason in it.
-      if (results.every((r) => r.ok)) setCreating(false);
+      if (results.length > 0 && results.every((r) => r.ok)) setCreating(false);
       await load();
     } catch (e) {
       dialog.fail(e);
@@ -580,13 +581,7 @@ export function PrPanel({
               >
                 <ExternalIcon />
               </button>
-              <button
-                className="ui-button ui-icon-button"
-                title="Copy link"
-                onClick={(e) => { e.stopPropagation(); copyAndSay(pr.url, `the link to #${pr.number}`); }}
-              >
-                <CopyIcon />
-              </button>
+              <CopyButton text={pr.url} label="Copy link" />
             </div>
 
             {shown && (
@@ -691,13 +686,7 @@ export function PrPanel({
                 <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(pr.url)}>
                   <ExternalIcon />
                 </button>
-                <button
-                  className="ui-button ui-icon-button"
-                  title="Copy link"
-                  onClick={() => copyAndSay(pr.url, `the link to #${pr.number}`)}
-                >
-                  <CopyIcon />
-                </button>
+                <CopyButton text={pr.url} label="Copy link" />
               </div>
             ))}
         </div>
@@ -744,7 +733,9 @@ export function PrPanel({
                 label="Description"
                 hint={
                   drafting
-                    ? "Writing — it appears here as it goes."
+                    ? askedPane
+                      ? `Asking ${askedPane} instead. This one takes longer.`
+                      : "Writing — it appears here as it goes."
                     : "Written from the diff by a fast model, as a handoff for whoever reviews this."
                 }
               >

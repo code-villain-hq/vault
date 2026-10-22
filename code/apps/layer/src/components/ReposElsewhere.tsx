@@ -8,7 +8,7 @@ import { BusyLabel, ErrorMessage, useFailure } from "./ui";
  * The workspace's repositories with no clone on this Mac (REPO-9), each
  * with its one next action: Clone, or Locate a clone that is here already.
  */
-export function ReposElsewhere({ repos, onPlaced }: { repos: Elsewhere[]; onPlaced: (name: string, path: string) => void }) {
+export function ReposElsewhere({ repos, onPlaced }: { repos: Elsewhere[]; onPlaced: () => void }) {
   if (repos.length === 0) return null;
   return (
     <div className="card">
@@ -17,7 +17,7 @@ export function ReposElsewhere({ repos, onPlaced }: { repos: Elsewhere[]; onPlac
   );
 }
 
-function Row({ repo, onPlaced }: { repo: Elsewhere; onPlaced: (name: string, path: string) => void }) {
+function Row({ repo, onPlaced }: { repo: Elsewhere; onPlaced: () => void }) {
   const [busy, setBusy] = useState<"locate" | "clone" | null>(null);
   const failure = useFailure();
 
@@ -30,10 +30,8 @@ function Row({ repo, onPlaced }: { repo: Elsewhere; onPlaced: (name: string, pat
     setBusy(how);
     failure.clear();
     try {
-      const placed = how === "locate"
-        ? await api.locateElsewhere(repo.id, chosen)
-        : await api.cloneElsewhere(repo.id, chosen);
-      onPlaced(placed.name, placed.path);
+      await (how === "locate" ? api.locateElsewhere(repo.id, chosen) : api.cloneElsewhere(repo.id, chosen));
+      onPlaced();
     } catch (e) {
       failure.fail(e);
     } finally {
