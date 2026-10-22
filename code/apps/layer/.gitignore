@@ -35,3 +35,6 @@ dist-ssr
 
 # The web app, as the server serves it (bun run build:web).
 /dist-web/
+
+# A company's settings, with its secrets (layer.example.toml shows them).
+layer.toml

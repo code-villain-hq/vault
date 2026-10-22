@@ -35,31 +35,7 @@ fn note(repo: &str, text: &str) -> Value {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn setting_up_layer_makes_the_first_workspace(pool: PgPool) {
-    let app = App::new(pool);
-    let setup = app.call("GET", "/api/auth/providers", None, None).await;
-    assert_eq!(setup.body["setup"], true);
-
-    let (session, _) = app.signup("Ada", "Code Villain").await;
-    let me = app.get("/api/me", &session).await;
-    assert_eq!(me.body["workspaces"][0]["url_key"], "code-villain");
-    assert_eq!(me.body["workspaces"][0]["role"], "admin");
-
-    // Layer is set up once; everyone after comes with an invite.
-    let again = app
-        .post(
-            "/api/auth/signup",
-            None,
-            json!({ "name": "Eve", "email": "eve@example.com", "password": "correct horse", "workspace_name": "Mine" }),
-        )
-        .await;
-    assert_eq!(again.status, StatusCode::FORBIDDEN, "{}", again.body);
-    let setup = app.call("GET", "/api/auth/providers", None, None).await;
-    assert_eq!(setup.body["setup"], false);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn invite_links_let_people_join_and_share_the_repositories(pool: PgPool) {
+async fn members_share_the_repositories(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;
     let added = create(
@@ -104,7 +80,6 @@ async fn workspace_routes_need_membership(pool: PgPool) {
     for path in [
         format!("/api/w/{side}/sync/bootstrap"),
         format!("/api/w/{side}/members"),
-        format!("/api/w/{side}/invites"),
     ] {
         assert_eq!(
             app.get(&path, &grace).await.status,
@@ -508,30 +483,4 @@ async fn in_development_a_page_asked_of_the_server_opens_from_vite(pool: PgPool)
     // The API stays the server's.
     let api = app.oneshot(ask("/api/nothing")).await.unwrap();
     assert_eq!(api.status(), StatusCode::NOT_FOUND);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn the_server_makes_a_workspace_for_someone_with_an_account(pool: PgPool) {
-    let app = App::new(pool);
-    let (ada, _) = app.signup("Ada", "Acme").await;
-
-    let url_key = accounts::create_workspace_for(&app.pool, " Studio ", "ADA@example.com")
-        .await
-        .unwrap();
-
-    assert_eq!(url_key, "studio");
-    let me = app.get("/api/me", &ada).await.body;
-    let studio = me["workspaces"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|w| w["url_key"] == "studio")
-        .expect("Ada is in Studio");
-    assert_eq!(studio["name"], "Studio");
-    assert_eq!(studio["role"], "admin");
-    assert!(
-        accounts::create_workspace_for(&app.pool, "Studio", "nobody@example.com")
-            .await
-            .is_err()
-    );
 }

@@ -19,19 +19,20 @@ export interface ProfileView {
   server: string | null;
 }
 
-/** How a server signs people in (PROF-15). */
+/** How a server signs people in (PROF-15): with its company's account, or not at all. */
 export interface ServerWays {
   oidc: boolean;
-  password: boolean;
+  /** The company the server runs for. */
+  company: string | null;
 }
 
 /** Signed in to a server: the person's workspaces there (PROF-15). */
 export interface ServerSignedIn {
   host: string;
+  /** The company the server runs for, or its host when it doesn't say. */
+  company: string;
   email: string;
   workspaces: WorkspaceInfo[];
-  /** The workspace an invite link joined. */
-  joined: string | null;
 }
 
 /** Where the window's sync client finds this workspace (PROF-11). */

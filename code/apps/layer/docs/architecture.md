@@ -46,15 +46,17 @@ the app's own copy of each repository, not to the user's clone:
 
 A team shares its setup through Layer's server (`crates/server`), built like
 Forge's, Glyph's and Raven's: Rust on Postgres, Forge's workspaces with
-members, roles and invites, and the studio's sync engine (`code/kit/sync`).
-Each client keeps a copy of a workspace and works on it offline.
+members and roles, and the studio's sync engine (`code/kit/sync`). Each
+client keeps a copy of a workspace and works on it offline. A server runs
+for one company, in one workspace: its people sign in with the company's
+account and come from its groups (`layer.example.toml`).
 
 ```
  crates/domain   the synced records and their checks → ts-rs → packages/types
  crates/sync     the engine's rules for Layer: who writes what (rules.rs)
- crates/server   accounts, sign-in (passwords, or Code Villain over OIDC),
-                 workspaces, members, invites, the account's groups (SCIM),
-                 the sync routes; serves dist-web
+ crates/server   sign-in with the company's account (OIDC), the company's
+                 workspace and members, its groups (SCIM), the settings
+                 (layer.toml), the sync routes; serves dist-web
  migrations/     one schema: the kit's sync tables, accounts, the five models
  web/            the server's web app (React, TanStack Router, the kit client)
 ```
@@ -131,9 +133,8 @@ session goes from the server to the keychain without passing a page:
  server_open(id) ──▶ new profile: registry entry, config.json, keychain item ──▶ its own window
 ```
 
-A server with passwords signs in with `server_sign_in` instead. An invite
-link pasted for the address joins its workspace once signed in. When the
-server stops taking the session (401), the window says "signed out" and
+A server that signs nobody in (another Mac's own) is refused before the
+browser opens. When the server stops taking the session (401), the window says "signed out" and
 offers Sign in again (`server_resume`), and what changed waits in the
 outbox meanwhile.
 

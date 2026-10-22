@@ -1,0 +1,37 @@
+# Layer's server settings for one company. Copy to layer.toml (or pass
+# `layer-server --config <file>`, or set LAYER_CONFIG). Every setting can
+# also come from the environment, which wins: `[oidc] issuer` is
+# LAYER_OIDC_ISSUER, `public_url` is LAYER_PUBLIC_URL. A setting Layer
+# doesn't know stops it, naming the setting.
+
+# Required.
+
+company = "Acme Inc"                    # names the workspace and the sign-in button
+public_url = "https://layer.acme.org"   # where people reach Layer
+
+[database]
+url = "postgres://layer@localhost/layer"   # or DATABASE_URL
+
+# The company's account signs people in (OpenID Connect). Register Layer as a
+# confidential client with the callback <public_url>/api/auth/oidc/callback.
+[oidc]
+issuer = "https://id.acme.org"
+client_id = "layer"
+client_secret = "…"
+
+# The account sends its people and groups to <public_url>/api/scim/v2 with
+# this token (SCIM), and they're in Layer as its groups say.
+[scim]
+token = "…"
+
+# Optional.
+
+# The groups whose people are in Layer, and as what.
+[groups]
+users = "layer-users"
+admins = "layer-admins"
+guests = "layer-guests"
+
+# addr = "0.0.0.0:7680"           # where the server listens (LAYER_ADDR)
+# web_dir = "/srv/layer/web"      # the built web app, served beside the API
+# cookie_secure = true            # false only on plain http

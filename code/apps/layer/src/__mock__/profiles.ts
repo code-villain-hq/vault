@@ -3,8 +3,8 @@
  * profile is open in another window, a third is closed, and a fourth is on
  * layer.codevillain.eu. Opening one only marks it open; there is no second
  * window to show. Signing in to a server signs in at once, as Ada, with
- * Code Villain or a password, and an invite link joins Code Villain. With
- * `?place=server` this window is the server's workspace, signed out.
+ * Code Villain's account; localhost signs nobody in. With `?place=server`
+ * this window is the server's workspace, signed out.
  */
 import { emit } from "@tauri-apps/api/event";
 import type { ProfileView, ServerSignedIn } from "../lib/types-profiles";
@@ -35,9 +35,9 @@ export function profileAnswers() {
   ];
   const signedIn = (address: string): ServerSignedIn => ({
     host: address.replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
+    company: "Code Villain",
     email: "ada@codevillain.eu",
     workspaces,
-    joined: address.includes("/join/") ? workspaces[0].id : null,
   });
   return {
     list_profiles: () => structuredClone(profiles),
@@ -48,9 +48,9 @@ export function profileAnswers() {
     server_ways: (a: Record<string, unknown>) => {
       const address = String(a.address);
       if (!address.includes(".") && !address.startsWith("localhost")) throw new Error(`“${address}” is not a server address.`);
-      return { oidc: !address.startsWith("localhost"), password: address.startsWith("localhost") };
+      const oidc = !address.startsWith("localhost");
+      return { oidc, company: oidc ? "Code Villain" : null };
     },
-    server_sign_in: (a: Record<string, unknown>) => signedIn(String(a.address)),
     server_sign_in_browser: async (a: Record<string, unknown>) => {
       await new Promise((done) => setTimeout(done, 1500));
       return signedIn(String(a.address));

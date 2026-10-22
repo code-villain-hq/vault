@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { ServerSignedIn, ServerWays } from "../../lib/types-profiles";
+import type { ServerSignedIn } from "../../lib/types-profiles";
 import { signedInAgain } from "../../lib/workspace-sync";
 import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 
@@ -9,13 +9,12 @@ const STUDIO_SERVER = "https://layer.codevillain.eu";
 
 type Step =
   | { at: "where" }
-  | { at: "password"; ways: ServerWays }
-  | { at: "browser" }
+  | { at: "browser"; company: string }
   | { at: "choose"; signed: ServerSignedIn };
 
 /**
  * New workspace (§25): on this Mac, as a profile always was, or on a server
- * after signing in there (PROF-15). With `again`, the server this window's
+ * after signing in there with its company's account (PROF-15). With `again`, the server this window's
  * workspace is on, it signs in again instead (PROF-16).
  */
 export function NewWorkspace({
@@ -28,8 +27,6 @@ export function NewWorkspace({
   const [onServer, setOnServer] = useState(Boolean(again));
   const [name, setName] = useState("");
   const [address, setAddress] = useState(again ?? STUDIO_SERVER);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [step, setStep] = useState<Step>({ at: "where" });
   const [busy, setBusy] = useState(false);
   const failure = useFailure();
@@ -48,10 +45,10 @@ export function NewWorkspace({
     run(api.createProfile(name), (p) => onOpened(p.name));
   }
 
-  /** Signed in: on with this window's workspace, the one joined, or a choice. */
+  /** Signed in: on with this window's workspace, the company's, or a choice. */
   function signedIn(signed: ServerSignedIn) {
     if (again) return run(api.serverResume(), () => { signedInAgain(); onClose(); });
-    if (signed.joined) return open(signed, signed.joined);
+    if (signed.workspaces.length === 1) return open(signed, signed.workspaces[0].id);
     setStep({ at: "choose", signed });
   }
 
@@ -63,19 +60,14 @@ export function NewWorkspace({
   function signIn() {
     if (!address.trim() || busy) return;
     run(api.serverWays(address), (ways) => {
-      if (!ways.oidc) return setStep({ at: "password", ways });
-      setStep({ at: "browser" });
+      if (!ways.oidc) return failure.fail("That server signs nobody in. It's another Mac's own.");
+      setStep({ at: "browser", company: ways.company ?? "the server's company" });
       setBusy(true);
       api.serverSignInBrowser(address)
         .then(signedIn)
         .catch((e) => { setStep({ at: "where" }); failure.fail(e); })
         .finally(() => setBusy(false));
     });
-  }
-
-  function signInWithPassword() {
-    if (!email.trim() || !password || busy) return;
-    run(api.serverSignIn(address, email, password), signedIn);
   }
 
   function back() {
@@ -90,13 +82,6 @@ export function NewWorkspace({
       cancel
     ) : step.at === "browser" ? (
       <button className="ui-button" onClick={back}>Cancel</button>
-    ) : step.at === "password" ? (
-      <>
-        <button className="ui-button" onClick={back}>Back</button>
-        <button className="ui-button ui-button-primary" disabled={!email.trim() || !password || busy} onClick={signInWithPassword}>
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-      </>
     ) : onServer ? (
       <>
         {cancel}
@@ -150,11 +135,7 @@ export function NewWorkspace({
           hint={again
             ? "Layer stopped being signed in to this server. What changed here waits, and goes once you're back."
             : (
-              <>
-                Opens Code Villain sign-in in your browser. Your repositories and notes are shared with the
-                workspace; tasks and agents stay on this Mac.
-                <div className="new-workspace-invite">Have an invite? Paste its link here instead.</div>
-              </>
+              "Opens your company's sign-in in your browser. Your repositories and notes are shared with the workspace; tasks and agents stay on this Mac."
             )}
         >
           <input className="ui-field"
@@ -170,24 +151,8 @@ export function NewWorkspace({
 
       {step.at === "browser" && (
         <p className="hint">
-          Finish signing in in your browser. Layer waits for it here, for up to five minutes.
+          Finish signing in with {step.company} in your browser. Layer waits for it here, for up to five minutes.
         </p>
-      )}
-
-      {step.at === "password" && (
-        <>
-          <Field label="Email">
-            <input className="ui-field" type="email" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} />
-          </Field>
-          <Field label="Password">
-            <input className="ui-field"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && signInWithPassword()}
-            />
-          </Field>
-        </>
       )}
 
       {step.at === "choose" && <Choose signed={step.signed} busy={busy} onOpen={(id) => open(step.signed, id)} />}
@@ -202,8 +167,8 @@ function Choose({ signed, busy, onOpen }: { signed: ServerSignedIn; busy: boolea
   if (signed.workspaces.length === 0) {
     return (
       <p className="hint">
-        Signed in to {signed.host} as {signed.email}, and in no workspace there yet. Ask for an invite link, then paste
-        it in New workspace.
+        Signed in to {signed.host} as {signed.email}, and in no workspace there yet. Ask {signed.company}'s admin to
+        add you.
       </p>
     );
   }

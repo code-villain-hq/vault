@@ -202,8 +202,8 @@ bun run dev:app        # the app, as a dev build under its own identity
 bun run dev            # Vite alone; the mock harness is at /mock.html
 bun run release:mac    # release build, installed over /Applications
 bun run db             # Postgres for the server, in Docker on 5436
-bun run dev:server     # the server (7680) and its web app (5176) together
-bun run seed           # a test account, with a repository, a note, GitHub and a guest
+bun run dev:server     # the server (7680) and its web app (5176), for Acme Inc through dev-id
+bun run seed           # Acme's workspace gets a repository, a note, GitHub and a guest
 bun run gen:types      # packages/types from crates/domain, after changing a record
 ```
 
@@ -268,15 +268,28 @@ build does the same.
 | `crates/domain`, `crates/sync`, `crates/server`, `migrations/` | Layer's server: the synced records, who may write them, the HTTP and sync routes, the schema ([architecture](docs/architecture.md#layers-server)) |
 | `web/` | the server's web app; `packages/types` holds the records' types, generated |
 
-## Groups
+## One company
 
-With `LAYER_SCIM_TOKEN` set, the Code Villain account sends its people and
-groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `layer` (`PUT /api/w/{id}/group`) has `layer-users` as
-members, `layer-admins` as admins and `layer-guests` as guests, and Members
-won't change their roles. A guest's repositories are still set by hand. Tests: `crates/server/tests/scim.rs`.
-A server with Code Villain sign-in on makes its first workspace with
-`layer-server create-workspace "<name>" <email>` (PROF-22).
+A server runs for one company (`layer.example.toml`, or `--config`, or
+`LAYER_CONFIG`, with the environment over it): `company`, `public_url`, the
+database, its account's sign-in (`[oidc]`) and its SCIM token (`[scim]`) are
+required, and a missing or unknown setting stops the server, naming it. On
+its first start it makes the company's workspace, named after it
+(`company.rs`).
+
+Nobody signs up and there are no invites or passwords: the company's account
+sends its people and groups to `/api/scim/v2` (`code/kit/scim`;
+`crates/server/src/groups.rs`). `layer-users` are members, `layer-admins`
+admins and `layer-guests` guests (other names under `[groups]`), and Members
+won't change their roles. A guest's repositories are still set by hand.
+Someone who signs in and isn't in one is told to ask the company's admin
+(`oidc_no_access`). Once the account has sent groups, people in none of them
+leave the workspace. Tests: `crates/server/tests/scim.rs`.
+
+`bun run dev:server` runs it for Acme Inc, with dev-id (`code/kit/dev-id`)
+standing in for its account, on a database of its own (`layer_acme`), unless
+there is a `layer.toml` or `LAYER_OIDC_ISSUER`. The desktop app's own server
+(`src-tauri/src/workspace.rs`) has none of this: it signs nobody in.
 
 ## Adding a synced model
 

@@ -8,10 +8,12 @@ use axum::Router;
 use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::http::{Request, StatusCode, header};
-use layer_server::{AppState, router};
+use layer_domain::Role;
+use layer_server::{AppState, accounts, auth, router};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
+use uuid::Uuid;
 
 /// A server's state for tests: no secure cookies.
 pub fn state(pool: PgPool) -> AppState {
@@ -21,8 +23,7 @@ pub fn state(pool: PgPool) -> AppState {
 pub struct App {
     pub router: Router,
     pub pool: PgPool,
-    /// Requests come from a new address each, unless a test says otherwise,
-    /// so limits per client (on signing up) don't get in the way.
+    /// Requests come from a new address each, unless a test says otherwise.
     next_client: AtomicU32,
 }
 
@@ -136,46 +137,56 @@ impl App {
         self.call("POST", path, session, Some(body)).await
     }
 
-    /// Signs someone up with a new workspace; returns their session and workspace id.
+    /// Someone with a new workspace, as the company's account would bring
+    /// them in; returns their session and workspace id.
     pub async fn signup(&self, name: &str, workspace: &str) -> (String, String) {
-        let email = format!("{}@example.com", name.to_lowercase());
-        let response = self
-            .post(
-                "/api/auth/signup",
-                None,
-                json!({ "name": name, "email": email, "password": "correct horse", "workspace_name": workspace }),
-            )
-            .await;
-        assert_eq!(response.status, StatusCode::OK, "{}", response.body);
-        let workspace_id = response.body["workspaces"][0]["id"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        (response.session.expect("a session cookie"), workspace_id)
+        let user_id = self.person(name).await;
+        let mut db = self.pool.begin().await.unwrap();
+        let workspace_id = accounts::create_workspace(&mut db, workspace, user_id)
+            .await
+            .unwrap();
+        db.commit().await.unwrap();
+        let session = auth::start_session(&self.pool, user_id).await.unwrap();
+        (session, workspace_id.to_string())
     }
 
-    pub async fn invite(&self, admin: &str, workspace_id: &str, role: &str) -> String {
-        let response = self
-            .post(
-                &format!("/api/w/{workspace_id}/invites"),
-                Some(admin),
-                json!({ "role": role }),
-            )
-            .await;
-        assert_eq!(response.status, StatusCode::OK, "{}", response.body);
-        response.body["token"].as_str().unwrap().to_string()
+    /// Where someone joins as `role`: what [`App::join`] takes. People come
+    /// from the company's account, so there are no invite links; the admin
+    /// stays in the signature to keep tests reading as before.
+    pub async fn invite(&self, _admin: &str, workspace_id: &str, role: &str) -> String {
+        format!("{workspace_id}/{role}")
     }
 
-    pub async fn join(&self, name: &str, token: &str) -> String {
+    /// Someone joins the workspace [`App::invite`] named; returns their session.
+    pub async fn join(&self, name: &str, invite: &str) -> String {
+        let (workspace_id, role) = invite.split_once('/').unwrap();
+        let workspace_id: Uuid = workspace_id.parse().unwrap();
+        let role = match role {
+            "admin" => Role::Admin,
+            "guest" => Role::Guest,
+            _ => Role::Member,
+        };
+        let user_id = self.person(name).await;
+        let mut db = self.pool.begin().await.unwrap();
+        accounts::add_member(&mut db, workspace_id, user_id, role)
+            .await
+            .unwrap();
+        db.commit().await.unwrap();
+        auth::start_session(&self.pool, user_id).await.unwrap()
+    }
+
+    /// The person called `name`, at `<name>@example.com`.
+    pub async fn person(&self, name: &str) -> Uuid {
         let email = format!("{}@example.com", name.to_lowercase());
-        let response = self
-            .post(
-                "/api/auth/signup",
-                None,
-                json!({ "name": name, "email": email, "password": "correct horse", "invite_token": token }),
-            )
-            .await;
-        assert_eq!(response.status, StatusCode::OK, "{}", response.body);
-        response.session.unwrap()
+        sqlx::query_scalar(
+            "INSERT INTO users (id, email, name) VALUES ($1, $2, $3)
+             ON CONFLICT (email) DO UPDATE SET name = users.name RETURNING id",
+        )
+        .bind(Uuid::now_v7())
+        .bind(email)
+        .bind(name)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap()
     }
 }

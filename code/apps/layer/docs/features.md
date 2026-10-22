@@ -1223,9 +1223,20 @@ Known gaps:
   until it is connected, "Reconnect" after, and "Connecting…" while it
   tries (`studio/design/behaviour.md`, "Settings"). Connecting raises no
   toast: the connected row says it (NOTE-7).
+- **SET-13** Layer's server (§25), not the app, MUST read its settings
+  from `layer.toml` (`--config <file>`, else `LAYER_CONFIG`, else
+  `./layer.toml`), with the environment over it: `[oidc] issuer` is
+  `LAYER_OIDC_ISSUER`. `company`, `public_url`, the database (`[database]
+  url` or `DATABASE_URL`), the company's sign-in (`[oidc] issuer`,
+  `client_id`, `client_secret`) and its SCIM token (`[scim] token`) are
+  required; `[groups]`, `addr`, `web_dir` and `cookie_secure` are not. A
+  setting missing, or one the server doesn't know, stops it, naming the
+  setting. `layer.example.toml` has them all. The app's own server on
+  this Mac (PROF-11) reads none of them.
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `integrations/mod.rs` (`require_https`); the
+server's settings (SET-13) in `crates/server/src/config.rs`; the
 workspace's and yours (SET-7 to SET-10) in `SharedSettings.tsx` and
 `config/shared.rs` (`held`, `WorkspaceAt.admin`); the
 theme in `theme.css`, `lib/theme.ts`, `lib/terminal.ts` and `theme.rs`.
@@ -2662,9 +2673,11 @@ preferences, the phone, the browser, and what is one person's own: tokens,
 the Jira email, Slack's notify switches, the Slack bot, a log source's AWS
 profile.
 
-A workspace can live on a Layer server instead, shared with a team: the
-studio's is `layer.codevillain.eu`, signed in to with Code Villain. It is
-the same workspace in the browser and in each member's Layer, where their
+A workspace can live on a Layer server instead, shared with a team. A
+server runs for one company, in one workspace named after it: its people
+sign in with the company's account and come from the company's groups.
+The studio's is `layer.codevillain.eu`, for Code Villain. It is the same
+workspace in the browser and in each member's Layer, where their
 tasks and agents stay on their own Mac. Every member changes the
 repositories, their notes and the agents' models; only admins change the
 connections and the log sources. A guest works only in the repositories an
@@ -2768,27 +2781,27 @@ a new workspace, and renames or deletes one.
   email and switches; a log source's AWS profile.
 - **PROF-15** New workspace MUST ask where the workspace lives: this Mac,
   as before, or a server, by its address (`layer.codevillain.eu` unless
-  another is given). For a server, the app signs in first: with Code
-  Villain in the browser, where the server has it, or else with the email
-  and password of an account there. Then it lists the person's workspaces
-  on that server, and choosing one opens it in a window of its own, like
-  any workspace, named as the server names it. An invite link pasted
-  instead of choosing joins its workspace and opens it. A workspace on a
-  server runs no Postgres or server on this Mac (PROF-11); its last copy
-  is kept as PROF-13 says.
+  another is given). For a server, the app signs in first, with the
+  server's company's account in the browser; a server that signs nobody
+  in (another Mac's own) is refused before the browser opens. Then it
+  opens the person's workspace there in a window of its own, like any
+  workspace, named as the server names it; were there several, it would
+  list them to choose from. A workspace on a server runs no Postgres or
+  server on this Mac (PROF-11); its last copy is kept as PROF-13 says.
 - **PROF-16** A workspace's session on its server MUST be kept in the
   workspace's own keychain item (PROF-1), never in `config.json`, and sent
   only to that server. When the server no longer takes it, the window says
   so and offers Sign in again; until then the app works from its last copy
   and keeps what changes here, as PROF-13 says.
-- **PROF-17** Signing in with Code Villain MUST come back to the window
+- **PROF-17** Signing in to a server MUST come back to the window
   that started it, whichever copy of the app macOS hands the
   `layer://signed-in` link to: a copy that is not waiting for it passes it
   on through `signed-in.json` in the config folder. A sign-in not finished
   within five minutes, or cancelled, stops waiting and says so.
 - **PROF-18** A workspace on a server MUST offer Members… in the workspace
-  menu, which opens the workspace's members on the server in the browser:
-  inviting, roles and removing someone happen there.
+  menu, which opens the workspace's members on the server in the browser.
+  Who is in, and as what, comes from the company's groups (PROF-22); a
+  guest's repositories are set there.
 - **PROF-20** A guest on a server MUST sync only the repositories an admin
   adds them to in Members, and those repositories' notes; the connections
   and the agents' models, so their agents work there; no log source; and
@@ -2802,10 +2815,16 @@ a new workspace, and renames or deletes one.
   Mac's copy and what they may now see arrives without a restart. A
   repository leaving the snapshot stays in the app as this Mac's only, with
   its tasks.
-- **PROF-22** A server with Code Villain sign-in on has no sign-up, so it
-  MUST make a workspace from the server: `layer-server create-workspace
-  "<name>" <email>` makes it, with the person who has that email as its
-  admin. Someone who has never signed in has no account, and is refused.
+- **PROF-22** A server MUST run for one company, in one workspace: it makes
+  the company's workspace on its first start, named after `company`
+  (SET-13), and its people are the ones in the company's groups:
+  `layer-users` are members, `layer-admins` admins and `layer-guests`
+  guests, or the groups `[groups]` names. Nobody signs up, and there are
+  no invites or passwords. Someone who signs in and is in none of the
+  groups is told "You don't have access to Layer yet. Ask <company>'s
+  admin to add you." Once the account has sent groups, people in none of
+  them leave the workspace. The sign-in button says "Sign in with
+  <company> ↗".
 - **PROF-19** The foot of the sidebar MUST show the shared setup's sync
   status, in the words and dots of every app's (the kit's `SyncIndicator`):
   Synced; Syncing N, once changes have waited a second; Connecting… until
@@ -2823,7 +2842,8 @@ server, PROF-11), `workspace/moving.rs` (PROF-12), `config/shared.rs`
 sends, PROF-14), `lib/workspace-sync.ts` (the window's sync client),
 `sidebar/SyncStatus.tsx` (PROF-19);
 a workspace on a server: `workspace/server.rs` (signing in, PROF-15 to
-PROF-17), `sidebar/NewWorkspace.tsx`.
+PROF-17), `sidebar/NewWorkspace.tsx`; the server's one company
+(PROF-22): `crates/server/src/company.rs`, `groups.rs`, `oidc.rs`.
 
 Known gaps:
 - The agent CLIs keep their own sign-ins in the home folder (Claude Code's
@@ -2837,8 +2857,6 @@ Known gaps:
   of them quit. The next launch reopens them (PROF-7).
 - A repository removed from the workspace elsewhere stays here.
 - A workspace on this Mac cannot move to a server yet.
-- Signing up on a server whose accounts have passwords happens in the
-  browser, from the invite link.
 - Renaming a workspace renames it in the menu and the window; its server
   keeps the first name, which nothing shows yet.
 

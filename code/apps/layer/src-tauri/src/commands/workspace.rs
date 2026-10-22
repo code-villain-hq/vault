@@ -55,27 +55,17 @@ pub async fn apply_setup(app: AppHandle, snapshot: Snapshot) -> Result<Applied> 
     Ok(Applied { applied: true, setup })
 }
 
-/// How the server at `address` signs people in (PROF-15). An invite link
-/// is read as its server.
+/// How the server at `address` signs people in (PROF-15).
 #[tauri::command]
 pub async fn server_ways(address: String) -> Result<Ways> {
-    let (origin, _) = server::read_address(&address)?;
-    server::ways(&origin).await
+    server::ways(&server::read_address(&address)?).await
 }
 
-/// Sign in to the server at `address` with an email and password.
-#[tauri::command]
-pub async fn server_sign_in(address: String, email: String, password: String) -> Result<SignedIn> {
-    let (origin, invite) = server::read_address(&address)?;
-    server::sign_in(&origin, invite.as_deref(), &email, &password).await
-}
-
-/// Sign in to the server at `address` with Code Villain, in the browser
-/// (PROF-17).
+/// Sign in to the server at `address` with its company's account, in the
+/// browser (PROF-17).
 #[tauri::command]
 pub async fn server_sign_in_browser(app: AppHandle, address: String) -> Result<SignedIn> {
-    let (origin, invite) = server::read_address(&address)?;
-    server::sign_in_browser(&app, &origin, invite.as_deref()).await
+    server::sign_in_browser(&app, &server::read_address(&address)?).await
 }
 
 #[tauri::command]

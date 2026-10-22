@@ -1,6 +1,6 @@
 name: code-villain-layer
 
-# Layer's local database. `bun run db` starts it.
+# Layer's local database (`bun run db` starts it), and its server in an image.
 services:
   postgres:
     image: postgres:18
@@ -20,6 +20,36 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
+
+  # Layer's server, as a company runs it: `docker compose --profile app up
+  # --build`, then http://localhost:7690. The desktop app isn't in it.
+  layer:
+    profiles: ["app"]
+    # From code/, so the image can use the studio's kit (code/kit).
+    build:
+      context: ../..
+      dockerfile: apps/layer/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # This machine only by default. For others, put it behind https and
+      # set LAYER_LISTEN, e.g. 0.0.0.0:7690 (and drop LAYER_COOKIE_SECURE).
+      - "${LAYER_LISTEN:-127.0.0.1:7690}:7680"
+    environment:
+      DATABASE_URL: postgres://layer:layer@postgres:5432/layer
+      # Plain http on this machine; use https and drop this anywhere else.
+      LAYER_COOKIE_SECURE: "0"
+      # The company Layer runs for, its account (OpenID Connect and SCIM) and
+      # its address: required, from your shell or a `.env` file next to this
+      # one. See layer.example.toml.
+      LAYER_COMPANY: ${LAYER_COMPANY:-}
+      LAYER_OIDC_ISSUER: ${LAYER_OIDC_ISSUER:-}
+      LAYER_OIDC_CLIENT_ID: ${LAYER_OIDC_CLIENT_ID:-}
+      LAYER_OIDC_CLIENT_SECRET: ${LAYER_OIDC_CLIENT_SECRET:-}
+      LAYER_SCIM_TOKEN: ${LAYER_SCIM_TOKEN:-}
+      LAYER_PUBLIC_URL: ${LAYER_PUBLIC_URL:-http://localhost:7690}
 
 volumes:
   layer-db:

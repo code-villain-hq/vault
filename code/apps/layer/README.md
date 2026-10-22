@@ -165,6 +165,43 @@ Installs to `/Applications/Layer.app`. A self-built copy opens without the secur
 
 Complete list in [`docs/features.md`](docs/features.md#14-what-the-app-writes-on-your-machine).
 
+## Running the server for a company
+
+A team shares its repositories, notes and connections through Layer's
+server; tasks and agents stay on each Mac. A server runs for one company,
+from one settings file: copy `layer.example.toml` to `layer.toml` (or pass
+`layer-server --config <file>`), and fill in the company's name, the
+server's address, the database, the company's account and a SCIM token.
+Every setting can come from the environment too, which wins: `[oidc]
+issuer` is `LAYER_OIDC_ISSUER`. A missing or unknown setting stops the
+server, naming it.
+
+In the company's account (Pocket ID, or any OpenID Connect provider with
+SCIM):
+
+1. Register Layer as a confidential client with the callback
+   `<public_url>/api/auth/oidc/callback`.
+2. Make the groups `layer-users`, `layer-admins` and `layer-guests` (or
+   the names under `[groups]`), and put people in them.
+3. Turn on SCIM for Layer's client, with the endpoint
+   `<public_url>/api/scim/v2` and the settings' token.
+
+On its first start the server makes the company's workspace. The account
+sends its people within minutes, and they sign in with "Sign in with
+<company>", in the browser or from New workspace in the app. Nobody signs
+up, and there are no invites or passwords: someone in none of the groups is
+told to ask the company's admin.
+
+With Docker, build the image from `code/` and give it the settings file:
+
+```sh
+docker build -f apps/layer/Dockerfile -t layer .
+docker run -d --name layer -p 7680:7680 \
+  -v ./layer.toml:/etc/layer/layer.toml:ro -e LAYER_CONFIG=/etc/layer/layer.toml layer
+```
+
+Put it behind https at `public_url`; the image serves the web app too.
+
 ## Roadmap
 
 Possible future directions:

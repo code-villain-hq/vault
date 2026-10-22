@@ -1,5 +1,5 @@
-//! Signing in with Code Villain, against a stand-in for the studio's OpenID
-//! Connect provider.
+//! Signing in with the company's account, against a stand-in for its
+//! OpenID Connect provider.
 
 mod common;
 
@@ -82,30 +82,31 @@ async fn fake_provider() -> String {
 }
 
 struct Setup {
-    /// Layer with Code Villain sign-in on.
+    /// Layer for Acme Inc, signing in with its account.
     app: App,
-    /// The same database, with passwords: people from before.
-    before: App,
+    /// The same database, for putting people in as the company's account
+    /// would.
+    company: App,
 }
 
 async fn setup(pool: PgPool) -> Setup {
     let issuer = fake_provider().await;
     let login =
         OidcLogin::new(issuer, "layer".into(), "secret".into(), "http://layer.test").unwrap();
-    let state = common::state(pool.clone()).with_oidc_login(login);
+    let state = common::state(pool.clone())
+        .for_company("Acme Inc")
+        .with_oidc_login(login);
     Setup {
         app: App::with_state(state),
-        before: App::new(pool),
+        company: App::new(pool),
     }
 }
 
 struct Started {
-    /// The whole URL sent to the provider.
-    location: String,
     state: String,
     nonce: String,
     challenge: String,
-    /// The flow's cookie: nonce, verifier, and the invite if any.
+    /// The flow's cookie: nonce and verifier.
     cookie: String,
 }
 
@@ -153,7 +154,6 @@ async fn start(app: &App, query: &str) -> Started {
         state: param(&location, "state"),
         nonce: param(&location, "nonce"),
         challenge: param(&location, "code_challenge"),
-        location,
         cookie,
     }
 }
@@ -196,34 +196,29 @@ async fn sign_in(app: &App, who: &str, query: &str) -> (String, Option<String>) 
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn people_from_before_keep_their_account_and_passwords_close(pool: PgPool) {
-    let Setup { app, before } = setup(pool).await;
-    before.signup("Ada", "Acme").await;
+async fn the_companys_people_sign_in_with_its_account_only(pool: PgPool) {
+    let Setup { app, company } = setup(pool).await;
+    company.signup("Ada", "Acme").await;
 
     let providers = app
         .call("GET", "/api/auth/providers", None, None)
         .await
         .body;
-    assert_eq!(
-        providers,
-        json!({ "oidc": true, "password": false, "setup": false })
-    );
-    let login = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": "correct horse" }),
-        )
-        .await;
-    assert_eq!(login.status, StatusCode::NOT_FOUND);
-    let signup = app
-        .post(
-            "/api/auth/signup",
-            None,
-            json!({ "name": "Eve", "email": "eve@example.com", "password": "correct horse", "workspace_name": "Evil" }),
-        )
-        .await;
-    assert_eq!(signup.status, StatusCode::NOT_FOUND);
+    assert_eq!(providers, json!({ "oidc": true, "company": "Acme Inc" }));
+    for path in ["/api/auth/login", "/api/auth/signup"] {
+        let response = app
+            .post(
+                path,
+                None,
+                json!({ "email": "ada@example.com", "password": "correct horse" }),
+            )
+            .await;
+        assert!(
+            response.status.is_client_error(),
+            "{path}: {}",
+            response.status
+        );
+    }
 
     let (to, session) = sign_in(&app, "ada", "?redirect=/acme/settings").await;
     assert_eq!(to, "/acme/settings");
@@ -231,17 +226,7 @@ async fn people_from_before_keep_their_account_and_passwords_close(pool: PgPool)
     let me = app.get("/api/me", &session).await.body;
     assert_eq!(me["user"]["email"], "ada@example.com");
     assert_eq!(me["workspaces"][0]["name"], "Acme");
-    let change = app
-        .call(
-            "PUT",
-            "/api/me/password",
-            Some(&session),
-            Some(json!({ "current_password": "correct horse", "new_password": "battery staple" })),
-        )
-        .await;
-    assert_eq!(change.status, StatusCode::NOT_FOUND);
-
-    // Linked now: the studio account signs in to it whatever its email.
+    // Linked now: the company's account signs in to it whatever its email.
     let sub: Option<String> =
         sqlx::query_scalar("SELECT oidc_sub FROM users WHERE email = 'ada@example.com'")
             .fetch_one(&app.pool)
@@ -254,61 +239,51 @@ async fn people_from_before_keep_their_account_and_passwords_close(pool: PgPool)
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn new_people_come_through_invites_and_confirm_joining(pool: PgPool) {
-    let Setup { app, before } = setup(pool).await;
-    let (ada, acme) = before.signup("Ada", "Acme").await;
+async fn signing_in_makes_nobody(pool: PgPool) {
+    let Setup { app, company } = setup(pool).await;
+    company.signup("Ada", "Acme").await;
 
     let (to, session) = sign_in(&app, "newbie", "").await;
-    assert_eq!(to, "/login?error=oidc_no_account");
+    assert_eq!(to, "/login?error=oidc_no_access");
     assert!(session.is_none());
+    let people: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(people, 1, "only Ada");
 
-    let invite = before.invite(&ada, &acme, "member").await;
-    let started = start(&app, &format!("?invite={invite}")).await;
-    assert!(
-        !started.location.contains(&invite),
-        "the invite never goes to the provider"
-    );
-    let (to, session) = back(&app, "newbie", &started, &started.cookie).await;
-    assert_eq!(to, format!("/join/{invite}"), "they confirm joining there");
-    let session = session.unwrap();
-    let me = app.get("/api/me", &session).await.body;
-    assert_eq!(me["user"]["name"], "newbie");
-    assert_eq!(me["user"]["email"], "new@example.com");
-    assert!(me["workspaces"].as_array().unwrap().is_empty());
-
-    let joined = app
-        .post(
-            &format!("/api/invites/{invite}/accept"),
-            Some(&session),
-            json!({}),
-        )
-        .await;
-    assert_eq!(joined.status, StatusCode::OK, "{}", joined.body);
-    assert_eq!(joined.body["workspaces"][0]["role"], "member");
+    // Known, but in no workspace: the company took them out of its groups.
+    company.person("Newbie").await;
+    sqlx::query("UPDATE users SET email = 'new@example.com' WHERE name = 'Newbie'")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    let (to, session) = sign_in(&app, "newbie", "").await;
+    assert_eq!(to, "/login?error=oidc_no_access");
+    assert!(session.is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn only_a_verified_email_links_and_only_once(pool: PgPool) {
-    let Setup { app, before } = setup(pool).await;
-    let (bob, bobco) = before.signup("Bob", "Bobco").await;
+    let Setup { app, company } = setup(pool).await;
+    company.signup("Bob", "Bobco").await;
     let (to, _) = sign_in(&app, "unverified", "").await;
     assert_eq!(to, "/login?error=oidc_no_email");
 
-    let invite = before.invite(&bob, &bobco, "member").await;
-    before.join("Ada", &invite).await;
+    company.signup("Ada", "Acme").await;
     sign_in(&app, "ada", "").await;
     let (to, session) = sign_in(&app, "ada-again", "").await;
     assert_eq!(
         to, "/login?error=oidc_taken",
-        "Ada's account has its studio account"
+        "Ada's account has its company account"
     );
     assert!(session.is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn tokens_must_be_for_layer_current_and_from_this_sign_in(pool: PgPool) {
-    let Setup { app, before } = setup(pool).await;
-    before.signup("Ada", "Acme").await;
+    let Setup { app, company } = setup(pool).await;
+    company.signup("Ada", "Acme").await;
     for who in ["for-forge", "stale"] {
         let (to, session) = sign_in(&app, who, "").await;
         assert_eq!(to, "/login?error=oidc_refused", "{who}");
@@ -348,8 +323,8 @@ async fn sign_ins_must_finish_where_they_started(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_desktop_app_collects_its_session_once(pool: PgPool) {
-    let Setup { app, before } = setup(pool).await;
-    before.signup("Ada", "Acme").await;
+    let Setup { app, company } = setup(pool).await;
+    company.signup("Ada", "Acme").await;
     let secret = "the desktop app's secret";
     let challenge = hex::encode(Sha256::digest(secret.as_bytes()));
 
@@ -389,7 +364,7 @@ async fn a_failed_desktop_sign_in_goes_back_to_the_app(pool: PgPool) {
     let Setup { app, .. } = setup(pool).await;
     let challenge = hex::encode(Sha256::digest(b"the desktop app's secret"));
     let (to, session) = sign_in(&app, "newbie", &format!("?desktop={challenge}")).await;
-    assert_eq!(to, "/signed-in?error=oidc_no_account");
+    assert_eq!(to, "/signed-in?error=oidc_no_access");
     assert!(session.is_none());
 
     let started = start(&app, &format!("?desktop={challenge}")).await;

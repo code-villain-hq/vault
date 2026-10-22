@@ -1,22 +1,17 @@
-//! Signing in with Code Villain: one account for every studio app, kept by
-//! the studio's OpenID Connect provider (Pocket ID at id.codevillain.eu).
-//! Configured with `LAYER_OIDC_ISSUER`, `LAYER_OIDC_CLIENT_ID`,
-//! `LAYER_OIDC_CLIENT_SECRET` and `LAYER_PUBLIC_URL` (Layer's own address;
-//! the provider sends people back to `<it>/api/auth/oidc/callback`). Off
-//! without them. When it's on, it's the only way people sign in: email and
-//! password are closed.
+//! Signing in with the company's account, over OpenID Connect: the only way
+//! in to a server. Its settings are `[oidc] issuer`, `client_id` and
+//! `client_secret`, and `public_url` (Layer's own address; the provider
+//! sends people back to `<it>/api/auth/oidc/callback`).
 //!
-//! The provider says who someone is; Layer says what they may do here
-//! (workspaces, roles and invites stay in Layer). A studio account signs in
-//! to the Layer account it's linked to (`users.oidc_sub`). The first time, it
-//! links to the account with the provider's verified email: the studio keeps
-//! those emails, and with this on nobody can sign up here with an address of
-//! their choosing. Someone without an account gets one when they come from an
-//! invite link, and confirms joining on the invite page.
+//! The provider says who someone is; the company's account also sends its
+//! people and their groups (SCIM, `crate::groups`), which say who is in the
+//! workspace and with what role. Signing in makes nobody: it finds the Layer
+//! account the provider's account is linked to (`users.oidc_sub`), else the
+//! one with the provider's verified email, and lets them in only when
+//! they're in the workspace.
 //!
-//! The round trip carries a signed `state` and a cookie with the nonce, the
-//! PKCE verifier and any invite. A copy of Forge's `oidc.rs`; keep the two
-//! alike. Layer trades the code for tokens itself, with its
+//! The round trip carries a signed `state` and a cookie with the nonce and
+//! the PKCE verifier. A copy of Forge's `oidc.rs`; keep the two alike. Layer trades the code for tokens itself, with its
 //! client secret over TLS, so it checks the ID token's issuer, audience,
 //! expiry and nonce but not its signature (OpenID Connect Core 1.0,
 //! 3.1.3.7, step 6). The provider must therefore be https, except on this
@@ -46,7 +41,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::Utc;
 use hmac::{Hmac, KeyInit, Mac};
-use layer_domain::{clean_name, normalize_email};
+use layer_domain::normalize_email;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -57,7 +52,6 @@ use uuid::Uuid;
 use crate::accounts::signed_in;
 use crate::auth::{hash_token, new_token, session_cookie, start_session};
 use crate::error::AppError;
-use crate::invites;
 use crate::state::AppState;
 
 /// Ties a sign-in to the browser that started it, against login CSRF.
@@ -116,8 +110,6 @@ struct Claims {
     sub: String,
     email: Option<String>,
     email_verified: Option<bool>,
-    name: Option<String>,
-    preferred_username: Option<String>,
 }
 
 /// Why signing in didn't work; the sign-in page has a message for each.
@@ -128,9 +120,9 @@ enum Problem {
     OtherBrowser,
     Provider,
     NoEmail,
-    NoAccount,
-    InviteGone,
-    /// The Layer account with this email is linked to another studio account.
+    /// Not in the workspace: the company's admin adds them to its groups.
+    NoAccess,
+    /// The Layer account with this email is linked to another account.
     Taken,
     Failed,
 }
@@ -143,8 +135,7 @@ impl Problem {
             Problem::OtherBrowser => "oidc_other_browser",
             Problem::Provider => "oidc_refused",
             Problem::NoEmail => "oidc_no_email",
-            Problem::NoAccount => "oidc_no_account",
-            Problem::InviteGone => "invite_gone",
+            Problem::NoAccess => "oidc_no_access",
             Problem::Taken => "oidc_taken",
             Problem::Failed => "oidc_failed",
         }
@@ -153,7 +144,7 @@ impl Problem {
 
 impl From<sqlx::Error> for Problem {
     fn from(e: sqlx::Error) -> Self {
-        tracing::error!(error = %e, "Code Villain sign-in failed");
+        tracing::error!(error = %e, "signing in failed");
         Problem::Failed
     }
 }
@@ -175,29 +166,21 @@ fn trusted_url(url: &str) -> bool {
 }
 
 impl OidcLogin {
-    /// From `LAYER_OIDC_*` and `LAYER_PUBLIC_URL`; `None` without an issuer.
-    /// An issuer without the rest is a mistake, not a reason to leave
-    /// passwords open.
-    pub fn from_env() -> anyhow::Result<Option<Self>> {
-        let var = |name: &str| {
-            std::env::var(name)
-                .ok()
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-        };
-        let Some(issuer) = var("LAYER_OIDC_ISSUER") else {
-            return Ok(None);
-        };
-        let (Some(client_id), Some(client_secret), Some(public_url)) = (
-            var("LAYER_OIDC_CLIENT_ID"),
-            var("LAYER_OIDC_CLIENT_SECRET"),
-            var("LAYER_PUBLIC_URL"),
-        ) else {
-            bail!(
-                "LAYER_OIDC_ISSUER is set: also set LAYER_OIDC_CLIENT_ID, LAYER_OIDC_CLIENT_SECRET and LAYER_PUBLIC_URL"
-            );
-        };
-        Self::new(issuer, client_id, client_secret, &public_url).map(Some)
+    /// From `[oidc]` and `public_url`, which the server requires.
+    pub fn from_settings(settings: &crate::config::Settings) -> anyhow::Result<Self> {
+        settings.require(&[
+            "oidc.issuer",
+            "oidc.client_id",
+            "oidc.client_secret",
+            "public_url",
+        ])?;
+        let get = |key: &str| settings.get(key).unwrap_or_default();
+        Self::new(
+            get("oidc.issuer"),
+            get("oidc.client_id"),
+            get("oidc.client_secret"),
+            &get("public_url"),
+        )
     }
 
     /// `public_url` is Layer's own address, as people's browsers reach it.
@@ -209,7 +192,9 @@ impl OidcLogin {
     ) -> anyhow::Result<Self> {
         let issuer = issuer.trim_end_matches('/').to_string();
         if !trusted_url(&issuer) {
-            bail!("LAYER_OIDC_ISSUER must be an https address (or http on this machine)");
+            bail!(
+                "the setting oidc.issuer (LAYER_OIDC_ISSUER) is an https address (or http on this machine)"
+            );
         }
         let mut key = [0u8; 32];
         getrandom::fill(&mut key).expect("the OS random number generator works");
@@ -435,8 +420,7 @@ fn is_hex(text: &str, len: usize) -> bool {
     text.len() == len && text.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// `nonce.verifier` or `nonce.verifier.invite`, all hex, for this flow's
-/// paths only.
+/// `nonce.verifier`, both hex, for this flow's paths only.
 fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     let secure = if secure { "; Secure" } else { "" };
     HeaderValue::from_str(&format!(
@@ -455,7 +439,6 @@ fn failed(problem: Problem, desktop: bool, secure: bool) -> Response {
 
 #[derive(Deserialize)]
 pub struct StartParams {
-    invite: Option<String>,
     redirect: Option<String>,
     /// From the desktop app: the hex SHA-256 of its secret.
     desktop: Option<String>,
@@ -482,11 +465,7 @@ pub async fn start(State(state): State<AppState>, Query(params): Query<StartPara
             .filter(|d| is_hex(d, 64))
             .map(|d| d.to_ascii_lowercase()),
     });
-    // The invite rides in the cookie, never in the URL sent to the provider.
-    let cookie = match params.invite.filter(|i| is_hex(i, 64)) {
-        Some(invite) => format!("{nonce}.{verifier}.{invite}"),
-        None => format!("{nonce}.{verifier}"),
-    };
+    let cookie = format!("{nonce}.{verifier}");
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     let join = if endpoints.authorization.contains('?') {
         '&'
@@ -560,7 +539,6 @@ async fn finish(
     let mut parts = cookie.split('.');
     let nonce = parts.next().unwrap_or_default();
     let verifier = parts.next().unwrap_or_default();
-    let invite = parts.next();
     if nonce.is_empty() || nonce != trip.nonce {
         return Err(Problem::OtherBrowser);
     }
@@ -569,12 +547,8 @@ async fn finish(
     login.check(&claims, &trip.nonce)?;
 
     let mut db = state.pool.begin().await?;
-    let user = account(&mut db, &claims, invite).await?;
-    // People confirm joining a workspace themselves, on the invite page.
-    let to = match invite {
-        Some(invite) => format!("/join/{invite}"),
-        None => trip.redirect,
-    };
+    let user = account(&mut db, &claims).await?;
+    let to = trip.redirect;
     match trip.desktop {
         Some(challenge) => {
             db.commit().await?;
@@ -591,68 +565,51 @@ async fn finish(
     }
 }
 
-/// The Layer account behind the studio account: linked already, linked now
-/// by email, or new from an invite.
-async fn account(
-    db: &mut PgConnection,
-    claims: &Claims,
-    invite: Option<&str>,
-) -> Result<Uuid, Problem> {
+/// The Layer account behind the company's account: linked already, or
+/// linked now by its verified email. Only someone in the workspace gets in.
+async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem> {
     let linked: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE oidc_sub = $1")
         .bind(&claims.sub)
         .fetch_optional(&mut *db)
         .await?;
-    if let Some(user) = linked {
-        return Ok(user);
-    }
-    // An email the provider says it hasn't verified proves nothing.
-    let email = claims
-        .email
-        .as_deref()
-        .filter(|_| claims.email_verified != Some(false))
-        .and_then(|e| normalize_email(e).ok())
-        .ok_or(Problem::NoEmail)?;
-    let existing: Option<(Uuid, bool)> =
-        sqlx::query_as("SELECT id, oidc_sub IS NULL FROM users WHERE email = $1")
-            .bind(&email)
-            .fetch_optional(&mut *db)
-            .await?;
-    match existing {
-        Some((user, true)) => {
-            sqlx::query("UPDATE users SET oidc_sub = $1 WHERE id = $2")
-                .bind(&claims.sub)
-                .bind(user)
-                .execute(&mut *db)
-                .await?;
-            Ok(user)
-        }
-        Some((_, false)) => Err(Problem::Taken),
+    let user = match linked {
+        Some(user) => user,
         None => {
-            let invite = invite.ok_or(Problem::NoAccount)?;
-            if invites::find_valid(&mut *db, invite)
-                .await
-                .map_err(|_| Problem::Failed)?
-                .is_none()
-            {
-                return Err(Problem::InviteGone);
+            // An email the provider says it hasn't verified proves nothing.
+            let email = claims
+                .email
+                .as_deref()
+                .filter(|_| claims.email_verified != Some(false))
+                .and_then(|e| normalize_email(e).ok())
+                .ok_or(Problem::NoEmail)?;
+            let existing: Option<(Uuid, bool)> =
+                sqlx::query_as("SELECT id, oidc_sub IS NULL FROM users WHERE email = $1")
+                    .bind(&email)
+                    .fetch_optional(&mut *db)
+                    .await?;
+            match existing {
+                Some((user, true)) => {
+                    sqlx::query("UPDATE users SET oidc_sub = $1 WHERE id = $2")
+                        .bind(&claims.sub)
+                        .bind(user)
+                        .execute(&mut *db)
+                        .await?;
+                    user
+                }
+                Some((_, false)) => return Err(Problem::Taken),
+                None => return Err(Problem::NoAccess),
             }
-            let fallback = email.split('@').next().unwrap_or_default().to_string();
-            let name = [&claims.name, &claims.preferred_username]
-                .into_iter()
-                .flatten()
-                .chain([&fallback])
-                .find_map(|n| clean_name(n, "name").ok())
-                .unwrap_or_else(|| "New member".into());
-            let user = Uuid::now_v7();
-            sqlx::query("INSERT INTO users (id, email, name, oidc_sub) VALUES ($1, $2, $3, $4)")
-                .bind(user)
-                .bind(&email)
-                .bind(&name)
-                .bind(&claims.sub)
-                .execute(&mut *db)
-                .await?;
-            Ok(user)
         }
+    };
+    let member: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM workspace_members WHERE user_id = $1)")
+            .bind(user)
+            .fetch_one(&mut *db)
+            .await?;
+    if member {
+        Ok(user)
+    } else {
+        Err(Problem::NoAccess)
     }
 }
 
@@ -672,7 +629,7 @@ pub async fn desktop(
     let login = state
         .oidc_login
         .as_ref()
-        .ok_or_else(|| AppError::not_found("signing in with Code Villain is off"))?;
+        .ok_or_else(|| AppError::not_found("this server signs nobody in"))?;
     let user = login
         .take(&request.code, &request.secret)
         .ok_or_else(|| AppError::unauthorized("this sign-in has expired: start again"))?;

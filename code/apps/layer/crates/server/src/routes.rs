@@ -1,5 +1,5 @@
 use axum::extract::State;
-use axum::routing::{any, delete, get, patch, post, put};
+use axum::routing::{any, get, patch, post, put};
 use axum::{Json, Router};
 use layer_domain::{Bootstrap, Transaction, TransactionResult};
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, groups, invites, members, oidc, ws};
+use crate::{accounts, groups, members, oidc, ws};
 
 /// What the server answers outside `/api`.
 #[derive(Clone, Copy)]
@@ -60,10 +60,7 @@ pub fn router(state: AppState) -> Router {
             "/members/{user_id}",
             patch(members::update).delete(members::remove),
         )
-        .route("/members/{user_id}/access", put(members::update_access))
-        .route("/group", get(groups::get).put(groups::link))
-        .route("/invites", get(invites::list).post(invites::create))
-        .route("/invites/{invite_id}", delete(invites::revoke));
+        .route("/members/{user_id}/access", put(members::update_access));
 
     let mut api = Router::new();
     if let Some(token) = &state.scim_token {
@@ -77,17 +74,12 @@ pub fn router(state: AppState) -> Router {
     }
 
     api.route("/api/health", get(|| async { "ok" }))
-        .route("/api/auth/signup", post(accounts::signup))
-        .route("/api/auth/login", post(accounts::login))
         .route("/api/auth/logout", post(accounts::logout))
         .route("/api/auth/providers", get(providers))
         .route("/api/auth/oidc", get(oidc::start))
         .route("/api/auth/oidc/callback", get(oidc::callback))
         .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/me", get(accounts::me).put(accounts::update_profile))
-        .route("/api/me/password", put(accounts::change_password))
-        .route("/api/invites/{token}", get(invites::preview))
-        .route("/api/invites/{token}/accept", post(invites::accept))
         .nest("/api/w/{workspace_id}", workspace)
         .layer(desktop_cors(&state.extra_origins))
         .layer(
@@ -116,20 +108,15 @@ async fn transaction(
     Ok(Json(TransactionResult { sync_id }))
 }
 
-/// `GET /api/auth/providers`: the ways to sign in, and whether Layer still
-/// needs its first account. Signing in with Code Villain, when on, is the
-/// only way. On this Mac nobody signs in.
-async fn providers(State(state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
-    if state.on_this_mac {
-        return Ok(Json(
-            serde_json::json!({ "oidc": false, "password": false, "setup": false }),
-        ));
-    }
-    let oidc = state.oidc_login.is_some();
-    let setup = !oidc && !accounts::has_accounts(&state.pool).await?;
-    Ok(Json(
-        serde_json::json!({ "oidc": oidc, "password": !oidc, "setup": setup }),
-    ))
+/// `GET /api/auth/providers`: how to sign in. A server signs in with its
+/// company's account, named on the button; the desktop app's own server
+/// signs nobody in.
+async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let company = state
+        .company
+        .as_ref()
+        .filter(|_| state.oidc_login.is_some() && !state.on_this_mac);
+    Json(serde_json::json!({ "oidc": company.is_some(), "company": company }))
 }
 
 /// The packaged desktop app runs from its own origin (`tauri://localhost`,

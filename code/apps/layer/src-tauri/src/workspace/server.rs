@@ -1,5 +1,7 @@
-//! Workspaces on a Layer server (PROF-15 to PROF-18): signing in, joining
-//! by an invite link, and opening one in a window of its own. The calls are
+//! Workspaces on a Layer server (PROF-15 to PROF-18): signing in with the
+//! server's company, and opening a workspace in a window of its own. A
+//! server's people come from its company's account, so there is nothing to
+//! join here. The calls are
 //! made here rather than from the window, so the session goes from the
 //! server straight to the keychain (PROF-16) and never through a page.
 //!
@@ -38,21 +40,23 @@ const RELAY: &str = "signed-in.json";
 /// Why a server workspace has no session: the window offers Sign in again.
 pub const SIGNED_OUT: &str = "signed out";
 
-/// How a server signs people in.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+/// How a server signs people in: with its company's account, or not at
+/// all (another Mac's own server).
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ways {
     pub oidc: bool,
-    pub password: bool,
+    /// The company the server runs for, as the sign-in button names it.
+    #[serde(default)]
+    pub company: Option<String>,
 }
 
-/// What the window shows once signed in: the person's workspaces there,
-/// and the one an invite link joined.
+/// What the window shows once signed in: the person's workspaces there.
 #[derive(Debug, Clone, Serialize)]
 pub struct SignedIn {
     pub host: String,
+    pub company: String,
     pub email: String,
     pub workspaces: Vec<WorkspaceInfo>,
-    pub joined: Option<String>,
 }
 
 struct Signed {
@@ -63,16 +67,17 @@ struct Signed {
 
 static PENDING: Mutex<Option<Signed>> = Mutex::new(None);
 
-/// What `layer://signed-in` brought: a code to trade, or why there is none.
+/// What `layer://signed-in` brought: a code to trade, or the problem's
+/// code (`problem_words`) when there is none.
 type Back = std::result::Result<String, String>;
 
 /// The browser sign-in this copy waits for, by turn: a newer one replaces it.
 static WAITING: Mutex<Option<(u64, oneshot::Sender<Back>)>> = Mutex::new(None);
 static TURN: AtomicU64 = AtomicU64::new(0);
 
-/// A server address as the person types it, or an invite link, as the
-/// server's origin and the invite's token.
-pub fn read_address(address: &str) -> Result<(String, Option<String>)> {
+/// A server address as the person types it, as the server's origin. Any
+/// path is the server's, and dropped.
+pub fn read_address(address: &str) -> Result<String> {
     let address = address.trim().trim_end_matches('/');
     let local = ["localhost", "127.0.0.1", "[::1]"].iter().any(|h| address.starts_with(h));
     let full = match address {
@@ -86,15 +91,7 @@ pub fn read_address(address: &str) -> Result<(String, Option<String>)> {
     if url.scheme() != "https" && !(url.scheme() == "http" && loopback) {
         return Err(Error::Other("A server is reached over https.".into()));
     }
-    let mut path = url.path_segments().into_iter().flatten().filter(|s| !s.is_empty());
-    let invite = match (path.next(), path.next()) {
-        (Some("join"), Some(token)) if token.len() == 64 && token.bytes().all(|b| b.is_ascii_hexdigit()) => {
-            Some(token.to_string())
-        }
-        (Some("join"), _) => return Err(Error::Other("That invite link is not whole. Copy it again.".into())),
-        _ => None,
-    };
-    Ok((url.origin().ascii_serialization(), invite))
+    Ok(url.origin().ascii_serialization())
 }
 
 /// The server's name as people say it: its host, and its port if it is
@@ -138,8 +135,8 @@ pub async fn ways(origin: &str) -> Result<Ways> {
     response.json().await.map_err(|_| Error::Other(format!("{} is not a Layer server.", host(origin))))
 }
 
-/// The session a sign-in answered with, held here, and the invite joined.
-async fn hold(origin: &str, invite: Option<&str>, response: reqwest::Response) -> Result<SignedIn> {
+/// The session a sign-in answered with, held here.
+async fn hold(origin: &str, company: String, response: reqwest::Response) -> Result<SignedIn> {
     if !response.status().is_success() {
         return Err(refused(response).await);
     }
@@ -149,67 +146,24 @@ async fn hold(origin: &str, invite: Option<&str>, response: reqwest::Response) -
         .and_then(|v| v.to_str().ok())
         .map(str::to_string)
         .ok_or_else(|| Error::Other(format!("{} gave no session for Layer on a Mac.", host(origin))))?;
-    let mut me: Me = response.json().await?;
-    let mut joined = None;
-    if let Some(invite) = invite {
-        let (now, id) = join(origin, &token, invite, &me).await?;
-        me = now;
-        joined = Some(id);
-    }
+    let me: Me = response.json().await?;
     let shown =
-        SignedIn { host: host(origin), email: me.user.email.clone(), workspaces: me.workspaces.clone(), joined };
+        SignedIn { host: host(origin), company, email: me.user.email.clone(), workspaces: me.workspaces.clone() };
     *PENDING.lock() = Some(Signed { origin: origin.into(), token, me });
     Ok(shown)
 }
 
-/// Join the invite's workspace, unless the person is in it already.
-async fn join(origin: &str, token: &str, invite: &str, me: &Me) -> Result<(Me, String)> {
-    let client = crate::integrations::http_client();
-    let response =
-        client.get(format!("{origin}/api/invites/{invite}")).send().await.map_err(unreachable(origin))?;
-    if !response.status().is_success() {
-        return Err(refused(response).await);
-    }
-    let key = response.json::<Value>().await?["workspace_url_key"].as_str().unwrap_or_default().to_string();
-    if let Some(w) = me.workspaces.iter().find(|w| w.url_key == key) {
-        return Ok((me.clone(), w.id.to_string()));
-    }
-    let response = client
-        .post(format!("{origin}/api/invites/{invite}/accept"))
-        .bearer_auth(token)
-        .send()
-        .await
-        .map_err(unreachable(origin))?;
-    if !response.status().is_success() {
-        return Err(refused(response).await);
-    }
-    let me: Me = response.json().await?;
-    let id = me.workspaces.iter().find(|w| w.url_key == key).map(|w| w.id.to_string()).unwrap_or_default();
-    Ok((me, id))
-}
-
-/// Sign in with an email and password, where the server keeps them.
-pub async fn sign_in(origin: &str, invite: Option<&str>, email: &str, password: &str) -> Result<SignedIn> {
-    let response = crate::integrations::http_client()
-        .post(format!("{origin}/api/auth/login"))
-        .header(CLIENT_HEADER, "desktop")
-        .json(&json!({ "email": email, "password": password }))
-        .send()
-        .await
-        .map_err(unreachable(origin))?;
-    hold(origin, invite, response).await
-}
-
-/// Sign in with Code Villain in the browser (PROF-17), which comes back on
-/// `layer://signed-in` with a code only this copy's secret can trade.
-pub async fn sign_in_browser(app: &AppHandle, origin: &str, invite: Option<&str>) -> Result<SignedIn> {
+/// Sign in with the server's company in the browser (PROF-17), which comes
+/// back on `layer://signed-in` with a code only this copy's secret can trade.
+pub async fn sign_in_browser(app: &AppHandle, origin: &str) -> Result<SignedIn> {
+    let company = match ways(origin).await? {
+        Ways { oidc: true, company } => company.unwrap_or_else(|| host(origin)),
+        _ => return Err(Error::Other(format!("{} signs nobody in.", host(origin)))),
+    };
     let secret = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let challenge = hex::encode(Sha256::digest(secret.as_bytes()));
     let mut url = Url::parse(&format!("{origin}/api/auth/oidc")).map_err(|e| Error::Other(e.to_string()))?;
     url.query_pairs_mut().append_pair("desktop", &challenge);
-    if let Some(invite) = invite {
-        url.query_pairs_mut().append_pair("invite", invite);
-    }
 
     let turn = TURN.fetch_add(1, Ordering::Relaxed);
     let (sender, back) = oneshot::channel();
@@ -223,7 +177,7 @@ pub async fn sign_in_browser(app: &AppHandle, origin: &str, invite: Option<&str>
             *waiting = None;
         }
     }
-    let code = back.map_err(Error::Other)?;
+    let code = back.map_err(|problem| Error::Other(problem_words(&problem, &company)))?;
 
     profiles::bring_forward(std::process::id() as i32);
     let response = crate::integrations::http_client()
@@ -233,7 +187,7 @@ pub async fn sign_in_browser(app: &AppHandle, origin: &str, invite: Option<&str>
         .send()
         .await
         .map_err(unreachable(origin))?;
-    hold(origin, invite, response).await
+    hold(origin, company, response).await
 }
 
 /// Stop waiting for the browser.
@@ -247,7 +201,7 @@ async fn wait(mut back: oneshot::Receiver<Back>) -> Back {
     let until = tokio::time::Instant::now() + WAIT;
     loop {
         tokio::select! {
-            came = &mut back => return came.unwrap_or_else(|_| Err("Signing in was cancelled.".into())),
+            came = &mut back => return came.unwrap_or_else(|_| Err("cancelled".into())),
             () = tokio::time::sleep(Duration::from_millis(300)) => {}
         }
         let relay = relay.clone();
@@ -255,7 +209,7 @@ async fn wait(mut back: oneshot::Receiver<Back>) -> Back {
             return came;
         }
         if tokio::time::Instant::now() >= until {
-            return Err("Signing in took longer than five minutes, so Layer stopped waiting. Try again.".into());
+            return Err("too_slow".into());
         }
     }
 }
@@ -303,23 +257,24 @@ fn back_of(url: &Url) -> Back {
     let query = |name: &str| url.query_pairs().find(|(k, _)| k == name).map(|(_, v)| v.to_string());
     match (query("code"), query("error")) {
         (Some(code), _) => Ok(code),
-        (_, Some(problem)) => Err(problem_words(&problem).into()),
-        _ => Err(problem_words("").into()),
+        (_, Some(problem)) => Err(problem),
+        _ => Err(String::new()),
     }
 }
 
-/// What a failed Code Villain sign-in means, as the web app says it.
-fn problem_words(code: &str) -> &'static str {
-    match code {
-        "oidc_not_set_up" => "Signing in with Code Villain isn't set up on this server.",
-        "oidc_expired" => "That took too long. Try again.",
-        "oidc_other_browser" => "Start signing in from Layer, and finish in the browser it opened.",
-        "oidc_refused" => "Code Villain didn't sign you in. Try again.",
-        "oidc_no_email" => "Your Code Villain account has no email address Layer can use.",
-        "oidc_no_account" => "This Code Villain account has no Layer account yet. Ask your team for an invite link.",
-        "invite_gone" => "That invite link has expired or was revoked. Ask for a new one.",
-        "oidc_taken" => "The Layer account with your email is linked to another Code Villain account.",
-        _ => "Something went wrong. Try again.",
+/// What a failed sign-in with `company` means, as the web app says it.
+fn problem_words(problem: &str, company: &str) -> String {
+    match problem {
+        "cancelled" => "Signing in was cancelled.".into(),
+        "too_slow" => "Signing in took longer than five minutes, so Layer stopped waiting. Try again.".into(),
+        "oidc_not_set_up" => "Signing in isn't set up on this server.".into(),
+        "oidc_expired" => "That took too long. Try again.".into(),
+        "oidc_other_browser" => "Start signing in from Layer, and finish in the browser it opened.".into(),
+        "oidc_refused" => format!("{company} didn't sign you in. Try again."),
+        "oidc_no_email" => format!("Your {company} account has no email address Layer can use."),
+        "oidc_no_access" => format!("You don't have access to Layer yet. Ask {company}'s admin to add you."),
+        "oidc_taken" => format!("The Layer account with your email is linked to another {company} account."),
+        _ => "Something went wrong. Try again.".into(),
     }
 }
 
@@ -465,7 +420,7 @@ mod tests {
 
     #[test]
     fn an_address_is_read_as_its_origin_over_https_except_on_this_mac() {
-        let read = |a: &str| read_address(a).map(|(o, _)| o).ok();
+        let read = |a: &str| read_address(a).ok();
         assert_eq!(read("layer.codevillain.eu").as_deref(), Some("https://layer.codevillain.eu"));
         assert_eq!(read(" https://layer.codevillain.eu/ ").as_deref(), Some("https://layer.codevillain.eu"));
         assert_eq!(read("localhost:7680").as_deref(), Some("http://localhost:7680"));
@@ -477,20 +432,15 @@ mod tests {
     }
 
     #[test]
-    fn an_invite_link_is_its_server_and_token() {
-        let token = "ab".repeat(32);
-        let (origin, invite) = read_address(&format!("https://layer.codevillain.eu/join/{token}")).unwrap();
-        assert_eq!(origin, "https://layer.codevillain.eu");
-        assert_eq!(invite, Some(token));
-        assert!(read_address("https://layer.codevillain.eu/join/abc").is_err());
-    }
-
-    #[test]
-    fn a_sign_in_comes_back_as_a_code_or_in_words() {
+    fn a_sign_in_comes_back_as_a_code_or_a_problem() {
         let back = |u: &str| back_of(&Url::parse(u).unwrap());
         assert_eq!(back("layer://signed-in?code=c0de&next=%2F"), Ok("c0de".into()));
-        assert_eq!(back("layer://signed-in?error=invite_gone"), Err(problem_words("invite_gone").into()));
-        assert_eq!(back("layer://signed-in?error=new_problem"), Err(problem_words("oidc_failed").into()));
+        assert_eq!(back("layer://signed-in?error=oidc_no_access"), Err("oidc_no_access".into()));
+        assert_eq!(
+            problem_words("oidc_no_access", "Acme Inc"),
+            "You don't have access to Layer yet. Ask Acme Inc's admin to add you."
+        );
+        assert_eq!(problem_words("new_problem", "Acme Inc"), problem_words("", "Acme Inc"));
     }
 
     #[test]

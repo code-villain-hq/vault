@@ -424,7 +424,6 @@ pub fn run() {
             commands::take_setup_writes,
             commands::apply_setup,
             commands::server_ways,
-            commands::server_sign_in,
             commands::server_sign_in_browser,
             commands::server_sign_in_cancel,
             commands::server_open,

@@ -1,7 +1,7 @@
 import { Redirect } from "@code-villain/web";
-import type { InvitePreview, Me } from "@layer/types";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import type { Me } from "@layer/types";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
 import { isDesktop, onAppLink, openInBrowser } from "./platform";
 import {
@@ -14,26 +14,8 @@ import {
   serverUrl,
   setServerUrl,
 } from "./server";
-import { signedIn, signOut, useSession, workspaceKey } from "./session";
+import { signedIn, useSession, workspaceKey } from "./session";
 import { AuthScreen, Button, buttonClass, ErrorMessage, Splash, TextField } from "./ui";
-
-/** Runs a form submission, tracking whether it's busy and what went wrong. */
-function useSubmit(action: () => Promise<void>) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await action();
-    } catch (e) {
-      setError(messageOf(e));
-      setBusy(false);
-    }
-  };
-  return { busy, error, submit };
-}
 
 /** The server address someone typed, or "" when it doesn't look like one. */
 function serverOrNothing(input: string) {
@@ -78,11 +60,11 @@ function useServerChoice() {
   return { field, apply, checked };
 }
 
-/** The ways in this server offers, and whether it still needs its first account. */
-export type Providers = { oidc: boolean; password: boolean; setup: boolean };
+/** How this server signs people in: with its company's account, named on the button. */
+export type Providers = { oidc: boolean; company?: string | null };
 
-/** Before the server answers, or when it can't: email and password. */
-const PASSWORD_ONLY: Providers = { oidc: false, password: true, setup: false };
+/** Before the server answers, or when it can't: no way in. */
+const NO_SIGN_IN: Providers = { oidc: false };
 
 /**
  * How a server signs people in; null until it first says, so the page
@@ -93,13 +75,13 @@ export function useProviders(server = serverUrl()) {
   const [providers, setProviders] = useState<Providers | null>(null);
   useEffect(() => {
     if (bundled && !server) {
-      setProviders(PASSWORD_ONLY);
+      setProviders(NO_SIGN_IN);
       return;
     }
     let current = true;
     fetch(`${server}/api/auth/providers`)
-      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : PASSWORD_ONLY))
-      .catch(() => PASSWORD_ONLY)
+      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : NO_SIGN_IN))
+      .catch(() => NO_SIGN_IN)
       .then((p) => {
         if (current) setProviders(p);
       });
@@ -110,36 +92,43 @@ export function useProviders(server = serverUrl()) {
   return providers;
 }
 
-/** What went wrong signing in with Code Villain, by the code the server sends back. */
-const OIDC_PROBLEMS: Record<string, string> = {
-  oidc_not_set_up: "Signing in with Code Villain isn't set up on this server.",
-  oidc_expired: "That took too long. Try again.",
-  oidc_other_browser: "Start signing in from Layer, in this browser.",
-  oidc_refused: "Code Villain didn't sign you in. Try again.",
-  oidc_no_email: "Your Code Villain account has no email address Layer can use.",
-  oidc_no_account:
-    "This Code Villain account has no Layer account yet. Ask your team for an invite link.",
-  invite_gone: "That invite link has expired or was revoked. Ask for a new one.",
-  oidc_taken: "The Layer account with your email is linked to another Code Villain account.",
-  oidc_failed: "Something went wrong. Try again.",
-};
+/** What went wrong signing in, by the code the server sends back, for a company's account. */
+function oidcProblems(company: string): Record<string, string> {
+  return {
+    oidc_not_set_up: "Signing in isn't set up on this server.",
+    oidc_expired: "That took too long. Try again.",
+    oidc_other_browser: "Start signing in from Layer, in this browser.",
+    oidc_refused: `${company} didn't sign you in. Try again.`,
+    oidc_no_email: `Your ${company} account has no email address Layer can use.`,
+    oidc_no_access: `You don't have access to Layer yet. Ask ${company}'s admin to add you.`,
+    oidc_taken: `The Layer account with your email is linked to another ${company} account.`,
+    oidc_failed: "Something went wrong. Try again.",
+  };
+}
 
-/** A Code Villain sign-in problem we have words for; unknown codes are the general one. */
+/** A sign-in problem we have words for; unknown codes are the general one. */
 function oidcCode(code: string) {
-  return Object.hasOwn(OIDC_PROBLEMS, code) ? code : "oidc_failed";
+  return Object.hasOwn(oidcProblems(""), code) ? code : "oidc_failed";
+}
+
+/** Why signing in didn't work, for a code in the page's address. */
+function problemOf(code: string, company?: string | null) {
+  return oidcProblems(company || "Your company")[oidcCode(code)] ?? "Something went wrong.";
 }
 
 type SignInProps = {
   label: string;
-  /** An invite to join with, or where to go afterwards. */
+  company: string;
+  /** Where to go afterwards. */
   query: Record<string, string>;
   /** Runs first: the desktop app applies its choice of server. */
   before?: () => void;
 };
 
-/** Off to the studio's sign-in; the server brings people back signed in. */
-function CodeVillainButton({ label, query, before }: SignInProps) {
-  if (bundled) return <DesktopSignIn label={label} query={query} before={before} />;
+/** Off to the company's sign-in; the server brings people back signed in. */
+function CompanyButton({ label, company, query, before }: SignInProps) {
+  if (bundled)
+    return <DesktopSignIn label={label} company={company} query={query} before={before} />;
   const params = new URLSearchParams(query).toString();
   return (
     <a
@@ -156,12 +145,12 @@ function hex(bytes: ArrayBuffer | Uint8Array) {
 }
 
 /**
- * The packaged app signs in in the browser, where passkeys and the studio's
- * session are. The server sends back a one-time code through a
+ * The packaged app signs in in the browser, where passkeys and the
+ * company's session are. The server sends back a one-time code through a
  * `layer://signed-in` link, and only this app, which knows the secret behind
  * the challenge, can trade it for a session.
  */
-function DesktopSignIn({ label, query, before }: SignInProps) {
+function DesktopSignIn({ label, company, query, before }: SignInProps) {
   const afterSignIn = useAfterSignIn();
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +163,7 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
       const problem = url.searchParams.get("error");
       if (problem) {
         setSecret(null);
-        setError(OIDC_PROBLEMS[oidcCode(problem)] ?? null);
+        setError(problemOf(problem, company));
         return;
       }
       const code = url.searchParams.get("code");
@@ -189,7 +178,7 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
         setError(messageOf(e));
       }
     });
-  }, [secret, afterSignIn]);
+  }, [secret, afterSignIn, company]);
 
   const start = async () => {
     setError(null);
@@ -260,254 +249,47 @@ function BackLink() {
 
 export function LoginPage() {
   const session = useSession();
-  const { redirect, error: problemCode } = useSearch({ strict: false }) as {
+  const { redirect, error: code } = useSearch({ strict: false }) as {
     redirect?: string;
     error?: string;
   };
-  const afterSignIn = useAfterSignIn();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const server = useServerChoice();
   const providers = useProviders(server.checked);
-  const { busy, error, submit } = useSubmit(async () => {
-    server.apply();
-    const place = authPlace();
-    const me = await api<Me>("POST", "/api/auth/login", { email, password });
-    signedIn(me, place);
-    await afterSignIn(me, place, redirect);
-  });
 
   // The packaged app signs in to another server here, next to the ones it has.
-  if (session.status === "signed-in" && !busy && !bundled) {
-    return <Redirect to={safeRedirect(redirect)} />;
-  }
+  if (session.status === "signed-in" && !bundled) return <Redirect to={safeRedirect(redirect)} />;
   if (!providers) return <Splash />;
-  const problem = problemCode ? OIDC_PROBLEMS[oidcCode(problemCode)] : null;
-  if (providers.setup) return <SetupForm server={server} />;
+  const company = providers.oidc ? providers.company || "your company" : null;
+  const problem = code ? problemOf(code, company) : null;
   const query: Record<string, string> = redirect ? { redirect: safeRedirect(redirect) } : {};
 
-  if (providers.oidc) {
-    return (
-      <AuthScreen title="Sign in to Layer">
-        {problem && (
-          <div className="mb-4">
-            <ErrorMessage>{problem}</ErrorMessage>
-          </div>
-        )}
-        {server.field && <div className="mb-4">{server.field}</div>}
-        <CodeVillainButton
-          label="Sign in with Code Villain ↗"
-          query={query}
-          before={server.apply}
-        />
-        <p className="mt-6 text-center text-muted">
-          One account for every Code Villain app.
-          <br />
-          New here? Ask your team for an invite.
-        </p>
-        <BackLink />
-      </AuthScreen>
-    );
-  }
   return (
     <AuthScreen title="Sign in to Layer">
-      {problem && !error && (
+      {problem && (
         <div className="mb-4">
           <ErrorMessage>{problem}</ErrorMessage>
         </div>
       )}
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        {server.field}
-        <TextField
-          label="Email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <TextField
-          label="Password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <ErrorMessage>{error}</ErrorMessage>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-muted">New here? Ask your team for an invite.</p>
-      <BackLink />
-    </AuthScreen>
-  );
-}
-
-/**
- * A Layer server without accounts asks for its first one, with the
- * workspace that watches Layer itself. After that, people join by invite.
- */
-function SetupForm({ server }: { server: ReturnType<typeof useServerChoice> }) {
-  const afterSignIn = useAfterSignIn();
-  const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
-  const field = (key: keyof typeof form) => ({
-    value: form[key],
-    onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
-  });
-  const { busy, error, submit } = useSubmit(async () => {
-    server.apply();
-    const place = authPlace();
-    const me = await api<Me>("POST", "/api/auth/signup", form);
-    signedIn(me, place);
-    await afterSignIn(me, place);
-  });
-
-  return (
-    <AuthScreen title="Set up Layer">
-      <p className="-mt-3 mb-6 text-center text-muted">
-        This Layer has no accounts yet. Yours is the first; everyone after you joins by invite.
-      </p>
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        {server.field}
-        <TextField label="Your name" autoComplete="name" required {...field("name")} />
-        <TextField label="Email" type="email" autoComplete="email" required {...field("email")} />
-        <TextField
-          label="Password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          hint="At least 8 characters."
-          {...field("password")}
-        />
-        <TextField
-          label="Workspace name"
-          required
-          placeholder="Your team or company"
-          {...field("workspace_name")}
-        />
-        <ErrorMessage>{error}</ErrorMessage>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Setting up…" : "Set up Layer"}
-        </Button>
-      </form>
-      <BackLink />
-    </AuthScreen>
-  );
-}
-
-/** Where an invite link lands: join as the signed-in user, or sign in or up first. */
-export function JoinPage() {
-  const { token } = useParams({ strict: false }) as { token: string };
-  const session = useSession();
-  const navigate = useNavigate();
-  const [invite, setInvite] = useState<InvitePreview | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const providers = useProviders();
-  // Invite links open in the browser, on the inviting server: "here".
-  const here =
-    session.status === "signed-in"
-      ? session.places.find((s) => s.place.kind === "here")
-      : undefined;
-
-  useEffect(() => {
-    api<InvitePreview>("GET", `/api/invites/${encodeURIComponent(token)}`)
-      .then(setInvite)
-      .catch((e) => setProblem(messageOf(e)));
-  }, [token]);
-
-  const open = async (me: Me) => {
-    signedIn(me);
-    await navigate({ to: "/$workspace", params: { workspace: invite?.workspace_url_key ?? "" } });
-  };
-  const accept = useSubmit(async () => {
-    await open(await api<Me>("POST", `/api/invites/${encodeURIComponent(token)}/accept`));
-  });
-  const signup = useSubmit(async () => {
-    await open(await api<Me>("POST", "/api/auth/signup", { ...form, invite_token: token }));
-  });
-
-  if (problem) {
-    return (
-      <AuthScreen title="This invite link doesn't work">
+      {server.field && <div className="mb-4">{server.field}</div>}
+      {company ? (
+        <>
+          <CompanyButton
+            label={`Sign in with ${company} ↗`}
+            company={company}
+            query={query}
+            before={server.apply}
+          />
+          <p className="mt-6 text-center text-muted">New here? Ask {company}'s admin to add you.</p>
+        </>
+      ) : (
+        // A desktop app's own server, or one whose sign-in isn't set up.
         <p className="text-center text-muted">
-          {/\.$/.test(problem) ? problem : `${problem}.`} Ask for a new one.
+          {bundled && !server.checked
+            ? "Enter the server your team's Layer runs on."
+            : "This server doesn't sign anyone in."}
         </p>
-      </AuthScreen>
-    );
-  }
-  if (!invite || !providers || session.status === "loading") return <Splash />;
-
-  const title = `Join ${invite.workspace_name} on Layer`;
-  const as = { admin: "an admin", member: "a member", guest: "a guest" }[invite.role];
-  const subtitle = (
-    <p className="-mt-3 mb-6 text-center text-muted">
-      {invite.invited_by} invited you as {as}.
-    </p>
-  );
-
-  if (here) {
-    return (
-      <AuthScreen title={title}>
-        {subtitle}
-        <form onSubmit={accept.submit} className="flex flex-col gap-4">
-          <ErrorMessage>{accept.error}</ErrorMessage>
-          <Button type="submit" disabled={accept.busy}>
-            Join as {here.me.user.name}
-          </Button>
-          <Button variant="secondary" onClick={() => void signOut(here.place)}>
-            Not {here.me.user.name}? Sign out
-          </Button>
-        </form>
-      </AuthScreen>
-    );
-  }
-
-  if (providers.oidc) {
-    return (
-      <AuthScreen title={title}>
-        {subtitle}
-        <CodeVillainButton label="Sign in with Code Villain to join ↗" query={{ invite: token }} />
-        <p className="mt-6 text-center text-muted">
-          No Code Villain account yet? Ask {invite.invited_by} for one.
-        </p>
-      </AuthScreen>
-    );
-  }
-
-  const field = (key: keyof typeof form) => ({
-    value: form[key],
-    onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
-  });
-  return (
-    <AuthScreen title={title}>
-      {subtitle}
-      <form onSubmit={signup.submit} className="flex flex-col gap-4">
-        <TextField label="Your name" autoComplete="name" required {...field("name")} />
-        <TextField label="Email" type="email" autoComplete="email" required {...field("email")} />
-        <TextField
-          label="Password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          hint="At least 8 characters."
-          {...field("password")}
-        />
-        <ErrorMessage>{signup.error}</ErrorMessage>
-        <Button type="submit" disabled={signup.busy}>
-          Create account and join
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-muted">
-        Already have an account?{" "}
-        <Link to="/login" search={{ redirect: `/join/${token}` }} className="ui-link">
-          Sign in to join
-        </Link>
-      </p>
+      )}
+      <BackLink />
     </AuthScreen>
   );
 }
@@ -536,7 +318,7 @@ export function SignedInPage() {
     return (
       <AuthScreen title="Couldn't sign you in">
         <div className="mb-4">
-          <ErrorMessage>{OIDC_PROBLEMS[problem]}</ErrorMessage>
+          <ErrorMessage>{problemOf(problem)}</ErrorMessage>
         </div>
         <p className="mb-6 text-center text-muted">Layer shows this too. You can close this tab.</p>
         <a href={link} className={`${buttonClass("secondary")} flex w-full`}>
