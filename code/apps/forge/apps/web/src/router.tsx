@@ -1,5 +1,5 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
-import { JoinPage, LoginPage, SignedInPage, SignupPage, StartPage } from "./auth";
+import { LoginPage, SignedInPage, StartPage } from "./auth";
 import { DriftCheckPage, DriftChecksPage } from "./drift-checks";
 import { InboxPage } from "./inbox";
 import { IssuePage } from "./issue-page";
@@ -37,12 +37,8 @@ const login = createRoute({
   component: LoginPage,
 });
 
-const signup = createRoute({ getParentRoute: () => root, path: "/signup", component: SignupPage });
-
 /** The desktop app's first screen: this Mac, or a server. */
 const start = createRoute({ getParentRoute: () => root, path: "/start", component: StartPage });
-
-const join = createRoute({ getParentRoute: () => root, path: "/join/$token", component: JoinPage });
 
 /** Where a desktop sign-in ends in the browser, to hand back to the app. */
 const signedInRoute = createRoute({
@@ -201,10 +197,8 @@ const account = createRoute({
 const routeTree = root.addChildren([
   index,
   login,
-  signup,
   start,
   signedInRoute,
-  join,
   workspace.addChildren([
     home,
     inbox,

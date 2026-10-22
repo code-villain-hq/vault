@@ -1,0 +1,18 @@
+[package]
+name = "code-villain-settings"
+description = "An app server's settings: a TOML file, with the environment over it"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+toml = "1.1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

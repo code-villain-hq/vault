@@ -1,32 +1,25 @@
-// The Code Villain account's groups, where the server takes them
-// (code/kit/scim): which group a workspace follows, and the menu that
-// links it, or a Forge team, to one.
+// The company's groups, as its account sends them (code/kit/scim): the
+// menu that links a Forge team to one.
 import { Select } from "@base-ui/react/select";
 import { ChevronsUpDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { RequestError } from "./api";
 
-/** What `GET /api/w/{id}/group` says: the linked group, and the groups there are. */
-export interface WorkspaceGroups {
-  group: string | null;
-  /** The account's groups, without their `-users`, `-admins` and `-guests`. */
-  groups: string[];
-}
-
 /**
- * The workspace's groups, for admins. Null while loading, and where the
- * server doesn't take groups (404) or the viewer isn't an admin (403).
+ * The company's groups, without their `-users`, `-admins` and `-guests`, for
+ * admins. Null while loading, and where the server doesn't take groups (404)
+ * or the viewer isn't an admin (403).
  */
 export function useGroups(
   api: <T>(method: string, path: string, body?: unknown) => Promise<T>,
   workspaceId: string,
   enabled = true,
 ) {
-  const [groups, setGroups] = useState<WorkspaceGroups | null>(null);
+  const [groups, setGroups] = useState<string[] | null>(null);
   const reload = useCallback(async () => {
     if (!enabled) return;
     try {
-      setGroups(await api<WorkspaceGroups>("GET", `/api/w/${workspaceId}/group`));
+      setGroups(await api<string[]>("GET", `/api/w/${workspaceId}/groups`));
     } catch (e) {
       if (!(e instanceof RequestError) || (e.status !== 404 && e.status !== 403)) throw e;
       setGroups(null);
@@ -36,13 +29,6 @@ export function useGroups(
     reload().catch(() => setGroups(null));
   }, [reload]);
   return { groups, reload };
-}
-
-/** What a group link does, in the group's own names. */
-export function groupHint(group: string | null) {
-  return group
-    ? `Everyone in ${group}-users is a member, in ${group}-admins an admin, in ${group}-guests a guest. Changed in the Code Villain account.`
-    : "No group: people join with an invite link.";
 }
 
 /** Picks one of the account's groups, or none. */

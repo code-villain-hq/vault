@@ -65,15 +65,18 @@ export function GitHubSettingsPage() {
           {status && !status.configured && (
             <section className="flex flex-col gap-2 rounded-lg p-4">
               <h3 className="font-medium">This server isn't set up for GitHub yet</h3>
-              <p className="text-muted">Whoever runs the server creates a GitHub App and sets:</p>
+              <p className="text-muted">
+                Whoever runs the server creates a GitHub App and adds it to Forge's settings file:
+              </p>
               <pre className="overflow-x-auto rounded-md bg-hover p-3 font-mono text-xs">
                 {[
-                  "FORGE_GITHUB_APP_ID=…",
-                  "FORGE_GITHUB_APP_SLUG=…            # from github.com/apps/<slug>",
-                  "FORGE_GITHUB_PRIVATE_KEY_PATH=…    # the app's private key (.pem),",
-                  "                                   # or FORGE_GITHUB_PRIVATE_KEY=… with the key itself",
-                  "FORGE_GITHUB_WEBHOOK_SECRET=…",
-                  "FORGE_DATA_DIR=…                   # optional: where clones are kept (./data)",
+                  "[github]",
+                  "app_id = …",
+                  'app_slug = "…"              # from github.com/apps/<slug>',
+                  'private_key_path = "…"      # the app\'s private key (.pem)',
+                  'webhook_secret = "…"',
+                  'client_id = "…"             # its OAuth client, to confirm who installs it',
+                  'client_secret = "…"',
                 ].join("\n")}
               </pre>
               <p className="text-muted">
@@ -84,12 +87,10 @@ export function GitHubSettingsPage() {
                 <code>{publicUrl("/api/github/setup", place)}</code>.
               </p>
               <p className="text-muted">
-                To let people sign in with GitHub too, also set <code>FORGE_GITHUB_CLIENT_ID</code>{" "}
-                and <code>FORGE_GITHUB_CLIENT_SECRET</code> from the app, give it the "Email
-                addresses" account permission (read), and set its callback URL to{" "}
-                <code>{publicUrl("/api/auth/github/callback", place)}</code>. Then also turn on
-                "Request user authorization (OAuth) during installation", so Forge can confirm that
-                whoever connects an installation can access it on GitHub.
+                Set the app's callback URL to{" "}
+                <code>{publicUrl("/api/auth/github/callback", place)}</code> and turn on "Request
+                user authorization (OAuth) during installation", so Forge can confirm that whoever
+                connects an installation can access it on GitHub.
               </p>
             </section>
           )}

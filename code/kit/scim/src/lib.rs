@@ -3,11 +3,11 @@
 //! Pocket ID pushes the people and groups an app's sign-in client allows to
 //! `/api/scim/v2` (SCIM 2.0), after every change and at least once an hour.
 //! This crate keeps them (`schema.sql`) and turns them into workspace roles:
-//! a workspace linked to a tool's groups (`workspaces.group_name`, say
-//! `forge`) has `forge-users` as members, `forge-admins` as admins and
-//! `forge-guests` as guests. The
-//! app does the joining and leaving itself, through [`Directory`], so its
-//! sync records and its own rules (teams, grants) follow.
+//! a workspace that follows groups ([`follow_groups`]) has the people of its
+//! users group (`forge-users` unless the settings name another) as members,
+//! of its admins group as admins and of its guests group as guests. The app
+//! does the joining and leaving itself, through [`Directory`], so its sync
+//! records and its own rules (teams, grants) follow.
 //!
 //! What Pocket ID sends: it lists `/Users` and `/Groups` (`startIndex`,
 //! `count`), matches them to its own by `externalId`, then creates (POST),
@@ -33,7 +33,7 @@ use serde::de::DeserializeOwned;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-pub use reconcile::{link_workspace, linked_group, role_source};
+pub use reconcile::{Groups, follow_groups, role_source};
 pub use store::{group_key, group_names, in_group};
 
 use resources::{GroupIn, ListQuery, UserIn};
@@ -98,6 +98,21 @@ pub trait Directory: Send + Sync + 'static {
         _users: &[Uuid],
     ) -> impl Future<Output = anyhow::Result<()>> + Send {
         async { Ok(()) }
+    }
+
+    /// Whether someone stays in workspaces without a group: Forge's agents,
+    /// who are added in Forge.
+    fn stays(
+        _db: &mut PgConnection,
+        _user: Uuid,
+    ) -> impl Future<Output = anyhow::Result<bool>> + Send {
+        async { Ok(false) }
+    }
+
+    /// Why an email can't be a person's here, if it can't: Forge keeps its
+    /// agents' addresses for agents.
+    fn refuses_email(_email: &str) -> Option<&'static str> {
+        None
     }
 }
 
@@ -305,7 +320,7 @@ async fn create_user<D: Directory>(
     let user: UserIn = body(&bytes)?;
     let mut db = scim.pool.begin().await?;
     store::lock(&mut db).await?;
-    let id = store::create_user(&mut db, &user).await?;
+    let id = store::create_user(&mut db, &user, D::refuses_email).await?;
     reconcile::people::<D>(&mut db, &[id]).await?;
     let created = store::user(&mut db, id).await?.expect("just created");
     db.commit().await?;

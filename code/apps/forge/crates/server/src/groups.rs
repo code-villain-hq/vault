@@ -1,22 +1,17 @@
-//! The Code Villain account's groups (code/kit/scim). Pocket ID sends its
-//! people and groups to `/api/scim/v2` when `FORGE_SCIM_TOKEN` is set. A
-//! workspace linked to a tool's groups has `<tool>-users` as members, `<tool>-admins`
-//! as admins and `<tool>-guests` as guests; a team linked to a group
-//! (`Team.group_name`) has the group's people in the workspace.
+//! The company's people and groups (code/kit/scim), which its account sends
+//! to `/api/scim/v2` with the `scim.token` setting. The workspace has the
+//! groups the settings name (`forge-users`, `forge-admins` and
+//! `forge-guests` unless `[groups]` says otherwise) as members, admins and
+//! guests; a team linked to a group (`Team.group_name`) has the group's
+//! people in it. Forge's agents are added in Forge and stay.
 
 use anyhow::anyhow;
-use axum::Json;
-use axum::extract::State;
-use axum::http::StatusCode;
 use code_villain_scim::Directory;
-use forge_domain::{Actor, LinkGroupRequest, Role, WorkspaceGroup};
+use forge_domain::{Actor, Role, is_agent_email};
 use sqlx::PgConnection;
 use uuid::Uuid;
 
-use crate::auth::Member;
-use crate::error::AppError;
-use crate::state::AppState;
-use crate::{accounts, members};
+use crate::{accounts, company, members};
 
 pub struct ForgeDirectory;
 
@@ -29,7 +24,8 @@ impl Directory for ForgeDirectory {
     ) -> anyhow::Result<()> {
         accounts::add_member(db, workspace, user, role_of(role))
             .await
-            .map_err(|e| anyhow!("{e}"))
+            .map_err(|e| anyhow!("{e}"))?;
+        company::finish_setting_up(db, workspace, user).await
     }
 
     async fn change_role(
@@ -75,6 +71,20 @@ impl Directory for ForgeDirectory {
         }
         Ok(())
     }
+
+    async fn stays(db: &mut PgConnection, user: Uuid) -> anyhow::Result<bool> {
+        Ok(
+            sqlx::query_scalar("SELECT kind = 'agent' FROM users WHERE id = $1")
+                .bind(user)
+                .fetch_optional(&mut *db)
+                .await?
+                .unwrap_or(false),
+        )
+    }
+
+    fn refuses_email(email: &str) -> Option<&'static str> {
+        is_agent_email(email).then_some("that address is kept for Forge's agents")
+    }
 }
 
 fn role_of(role: code_villain_scim::Role) -> Role {
@@ -92,53 +102,17 @@ fn actor(workspace_id: Uuid, user_id: Uuid) -> Actor {
     }
 }
 
-/// `GET /api/w/{id}/group`: the group the workspace follows, and the groups
-/// it could. Not there when the account doesn't send its groups.
-pub async fn get(
-    State(state): State<AppState>,
-    member: Member,
-) -> Result<Json<WorkspaceGroup>, AppError> {
+/// `GET /api/w/{id}/groups`: the company's groups, without their `-users`,
+/// `-admins` and `-guests`, for a team to follow. Not there when the account
+/// doesn't send its groups.
+pub async fn list(
+    axum::extract::State(state): axum::extract::State<crate::AppState>,
+    member: crate::auth::Member,
+) -> Result<axum::Json<Vec<String>>, crate::error::AppError> {
     member.require_admin()?;
     if state.scim_token.is_none() {
-        return Err(AppError::not_found("groups are off"));
+        return Err(crate::error::AppError::not_found("groups are off"));
     }
     let mut db = state.pool.acquire().await?;
-    Ok(Json(WorkspaceGroup {
-        group: code_villain_scim::linked_group(&mut db, member.actor.workspace_id).await?,
-        groups: code_villain_scim::group_names(&mut db).await?,
-    }))
-}
-
-/// `PUT /api/w/{id}/group`: follows a group, or none. Its people join at
-/// once; unlinking keeps everyone as they are, as though invited.
-pub async fn link(
-    State(state): State<AppState>,
-    member: Member,
-    Json(request): Json<LinkGroupRequest>,
-) -> Result<StatusCode, AppError> {
-    member.require_admin()?;
-    if state.scim_token.is_none() {
-        return Err(AppError::not_found("groups are off"));
-    }
-    let mut db = state.pool.begin().await?;
-    let group = request
-        .group
-        .as_deref()
-        .map(str::trim)
-        .filter(|g| !g.is_empty());
-    if let Some(group) = group
-        && !code_villain_scim::group_names(&mut db)
-            .await?
-            .iter()
-            .any(|g| g == group)
-    {
-        return Err(AppError::invalid(format!(
-            "there's no group {group} in the Code Villain account"
-        )));
-    }
-    code_villain_scim::link_workspace::<ForgeDirectory>(&mut db, member.actor.workspace_id, group)
-        .await
-        .map_err(|e| AppError::invalid(e.to_string()))?;
-    db.commit().await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(axum::Json(code_villain_scim::group_names(&mut db).await?))
 }

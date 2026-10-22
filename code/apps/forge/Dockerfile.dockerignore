@@ -3,6 +3,10 @@
 *
 !apps/forge
 !kit/sync
+!kit/web
+!kit/desktop
+!kit/scim
+!kit/settings
 **/target
 **/node_modules
 apps/forge/apps/web/dist

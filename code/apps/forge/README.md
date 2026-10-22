@@ -35,9 +35,8 @@ is and why" and "Architecture overview".
 - **Forgejo** (Settings → Forgejo: a server, the repositories to watch and a
   token). Forge asks Forgejo about their pull requests about once a minute,
   links them to the issues they name and moves those issues, as with GitHub.
-- **Accounts.** Code Villain sign-in (the studio's account, see below), or
-  without it email and password or GitHub; invite links, admin and member
-  roles.
+- **People.** A server runs for one company: its account signs people in
+  and its groups say who's in, as admin, member or guest (see below).
 - **Apps.** The web app, and a desktop app with native notifications and the
   unread count on the dock icon.
 
@@ -48,14 +47,21 @@ Needs Rust, [bun](https://bun.sh) and Docker.
 ```sh
 bun install
 bun run db            # Postgres in Docker, on port 5433
-bun run dev           # server on :7380, web app on http://localhost:5173
+bun run dev           # Forge for Acme Inc on http://localhost:5173, see below
 bun run dev:desktop   # desktop app (with `bun run dev` running)
-bun run seed          # local test accounts, see scripts/seed-dev.ts
+bun run seed          # Gus Guest in Acme's first team alone
 bun run check         # everything that must pass before a change is done
 ```
 
-`bun run db:reset` deletes the local database and starts it fresh; open clients
-notice and download a new copy.
+`bun run dev` runs Forge for a made-up company, Acme Inc: dev-id
+(`code/kit/dev-id`) stands in for its account, so you sign in as anyone in
+its `people.toml` (Ada Admin, Max Member, Gus Guest, or Nell New, who isn't
+let in). Acme's data has a database of its own, `forge_acme`. With a
+`forge.toml`, or `FORGE_OIDC_ISSUER` in `.env`, it runs with those settings
+and the `forge` database instead.
+
+`bun run db:reset` deletes the local databases and starts them fresh; open
+clients notice and download a new copy.
 
 `bun run build:desktop` builds the desktop app (in
 `target/release/bundle`). It offers Start on this Mac, which runs Forge's
@@ -74,45 +80,36 @@ bun run app           # builds the image and runs it with Postgres
 ```
 
 Forge is then at http://localhost:7390, with the same database as
-development. Only this machine can reach it (and Postgres); to let
-teammates in, put it behind https and set `FORGE_LISTEN=0.0.0.0:7390`; if
-the proxy in front of it sets `X-Forwarded-For`, also set
-`FORGE_TRUST_FORWARDED_FOR=1`, so limits per client (such as on signing up)
-see each client's own address. `bun run app:logs` follows its logs. Put `ANTHROPIC_API_KEY` (for
-drift checks) and the `FORGE_GITHUB_*` settings (Settings → GitHub lists
-them) in a `.env` file next to
-`docker-compose.yml`, then run `bun run app` again.
-
-The server also reads `DATABASE_URL`, `FORGE_ADDR` (default
-`127.0.0.1:7380`), `FORGE_WEB_DIR`, `FORGE_DATA_DIR` (where files live, default
-`./data`), `FORGE_COOKIE_SECURE` (`0` for plain http) and
-`FORGE_MCP_ALLOWED_HOSTS`, and for drift checks `FORGE_LOCAL_REPOS_ROOT`,
-`FORGE_AI_CHECK_HOURS`, `FORGE_AI_MAX_TURNS`, `FORGE_AI_TRIAGE`,
-`FORGE_AI_MODEL` and `FORGE_AI_EFFORT` (`crates/server/src/config.rs`,
-`drift/mod.rs`, `mcp/mod.rs`, `crates/ai/src/provider.rs`).
+development. It needs a company's settings (below) in a `.env` file next to
+`docker-compose.yml`, which it reads as `FORGE_COMPANY`, `FORGE_OIDC_ISSUER`
+and so on. Only this machine can reach it (and Postgres); to let teammates
+in, put it behind https and set `FORGE_LISTEN=0.0.0.0:7390`. `bun run
+app:logs` follows its logs.
 
 `bun run backup` saves the database and the attachments outside the
 repository, to `FORGE_BACKUP_DIR` or else `backup/forge` next to the vault;
 `scripts/backup.ts` says how to restore them.
 
-## Signing in with Code Villain
+## Running it for a company
 
-Set `FORGE_OIDC_ISSUER` (`https://id.codevillain.eu`),
-`FORGE_OIDC_CLIENT_ID`, `FORGE_OIDC_CLIENT_SECRET` and `FORGE_PUBLIC_URL`
-(this Forge's address; Pocket ID sends people back to
-`<FORGE_PUBLIC_URL>/api/auth/oidc/callback`, which the client there must
-list). With them, Code Villain is the only way in: passwords and GitHub
-sign-in are off, and so are `bun run seed` and `bun run reset-password`.
-Without them, as in plain local development, passwords stay on. Bun and
-`docker compose` both read a `.env` next to `docker-compose.yml`, so one
-there turns it on for `bun run dev` and `bun run app` alike.
+A server runs for one company, from one settings file: copy
+`forge.example.toml` to `forge.toml` (or pass `forge-server --config
+<file>`), and fill in the company's name, Forge's address, the database,
+the company's account and a SCIM token. Every setting can come from the
+environment too, which wins: `[oidc] issuer` is `FORGE_OIDC_ISSUER`. A
+missing or unknown setting stops the server, naming it.
 
-With sign-up closed, the server's first workspace is made on the server, for
-someone who has signed in once: `forge-server create-workspace "<name>"
-<email>` makes it with them as its admin.
+In the company's account (Pocket ID, or any OpenID Connect provider with
+SCIM):
 
-With `FORGE_SCIM_TOKEN` set too, the account's groups say who is in a
-workspace. In Pocket ID, turn on SCIM for Forge's client, with the
-endpoint `<FORGE_PUBLIC_URL>/api/scim/v2` and the same token, and allow
-`forge-users`, `forge-admins` and `forge-guests` on it. Then link the
-workspace to `forge` in Settings → Members → Group. Without the token, invites are the only way in.
+1. Register Forge as a confidential client with the callback
+   `<public_url>/api/auth/oidc/callback`.
+2. Make the groups `forge-users`, `forge-admins` and `forge-guests` (or
+   the names under `[groups]`), and put people in them.
+3. Turn on SCIM for Forge's client, with the endpoint
+   `<public_url>/api/scim/v2` and the settings' token.
+
+On its first start Forge makes the company's workspace. The account sends
+its people within minutes, and they sign in with "Sign in with <company>".
+Nobody signs up, and there are no invites or passwords: someone in none of
+the groups is told to ask the company's admin.

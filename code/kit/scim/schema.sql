@@ -33,8 +33,11 @@ CREATE TABLE scim_group_members (
 );
 CREATE INDEX scim_group_members_user_idx ON scim_group_members (user_id);
 
--- The tool a workspace is linked to: "<name>-users" are members, "<name>-admins"
--- admins and "<name>-guests" guests.
-ALTER TABLE workspaces ADD COLUMN group_name text;
--- The group someone's role comes from; empty for an invite or a role set by hand.
+-- The groups a workspace follows, from the server's settings: its members,
+-- admins and guests. Empty on the desktop app's own server.
+ALTER TABLE workspaces ADD COLUMN users_group text;
+ALTER TABLE workspaces ADD COLUMN admins_group text;
+ALTER TABLE workspaces ADD COLUMN guests_group text;
+-- The group someone's role comes from; empty for an agent, or someone here
+-- before the account sent its groups.
 ALTER TABLE workspace_members ADD COLUMN from_group text;

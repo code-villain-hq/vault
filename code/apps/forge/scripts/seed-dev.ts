@@ -1,15 +1,14 @@
-// Creates local test accounts through the API: an admin with a "Forge"
-// workspace, a member who joined it by invite link, and a guest in its first
-// team. Safe to run again; the guest is put back in that team alone.
-// Needs `bun run dev` running. Local development only.
+// Readies Acme Inc's workspace for trying Forge: its people come from dev-id
+// (code/kit/dev-id/people.toml), and this puts Gus Guest in the first team
+// alone. Safe to run again. Needs `bun run dev` running, for Acme Inc.
+// Local development only.
+
+import { signInAs } from "../../../kit/dev-id/dev";
 
 export const BASE = process.env.FORGE_URL ?? "http://localhost:5173";
 
-/** Test-only password for the local seed accounts. */
-export const DEV_PASSWORD = "forge-dev-password";
-export const DEV_ADMIN = { name: "Ada Admin", email: "admin@forge.test" };
-export const DEV_MEMBER = { name: "Max Member", email: "member@forge.test" };
-export const DEV_GUEST = { name: "Gus Guest", email: "guest@forge.test" };
+/** dev-id's admin. */
+export const DEV_ADMIN = "ada";
 
 export async function call(path: string, body: unknown, cookie?: string, method = "POST") {
   const response = await fetch(`${BASE}${path}`, {
@@ -17,57 +16,47 @@ export async function call(path: string, body: unknown, cookie?: string, method 
     headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const session = response.headers.get("set-cookie")?.split(";")[0];
-  return { status: response.status, body: await response.json().catch(() => null), session };
+  return { status: response.status, body: await response.json().catch(() => null) };
 }
 
-/** Signs up, or signs in if the account exists. Returns the session cookie and workspaces. */
-export async function account(
-  person: { name: string; email: string },
-  extra: Record<string, string>,
-) {
-  const signup = await call("/api/auth/signup", { ...person, password: DEV_PASSWORD, ...extra });
-  if (signup.status === 200) return signup;
-  const login = await call("/api/auth/login", { email: person.email, password: DEV_PASSWORD });
-  if (login.status !== 200)
-    throw new Error(`couldn't sign in ${person.email}: ${JSON.stringify(login.body)}`);
-  return login;
+/** Signs someone in through dev-id: their session cookie, `/api/me` and workspace. */
+export async function account(who: string) {
+  const { session, me } = await signInAs(BASE, who);
+  const workspace = me.workspaces[0];
+  if (!workspace) throw new Error(`${who} isn't in Acme Inc's workspace yet: is dev-id running?`);
+  return { session, me, workspace };
+}
+
+/** Waits up to ten seconds, two of dev-id's rounds, for `check` to find something. */
+async function until<T>(what: string, check: () => Promise<T | undefined>) {
+  for (let i = 0; i < 20; i++) {
+    const found = await check();
+    if (found) return found;
+    await Bun.sleep(500);
+  }
+  throw new Error(`gave up waiting for ${what}`);
 }
 
 if (import.meta.main) {
-  const admin = await account(DEV_ADMIN, { workspace_name: "Forge" });
-  const workspace = admin.body.workspaces.find((w: { name: string }) => w.name === "Forge");
-  const invite = await call(`/api/w/${workspace.id}/invites`, { role: "member" }, admin.session);
-  await account(DEV_MEMBER, { invite_token: invite.body.token });
-
-  const guestInvite = await call(
-    `/api/w/${workspace.id}/invites`,
-    { role: "guest" },
+  const admin = await until("Ada", () => account(DEV_ADMIN).catch(() => undefined));
+  const { workspace } = admin;
+  const get = async (path: string) =>
+    (await call(`/api/w/${workspace.id}${path}`, undefined, admin.session, "GET")).body;
+  const team = await until(
+    "the first team",
+    async () => (await get("/sync/bootstrap")).records.Team?.[0],
+  );
+  const members: { user: { id: string; email: string } }[] = await get("/members");
+  const guest = members.find((m) => m.user.email === "gus@acme.test");
+  if (!guest) throw new Error("Gus isn't in the workspace: check people.toml");
+  const access = await call(
+    `/api/w/${workspace.id}/members/${guest.user.id}/access`,
+    { items: [team.id] },
     admin.session,
+    "PUT",
   );
-  const guest = await account(DEV_GUEST, { invite_token: guestInvite.body.token });
-  const snapshot = await call(
-    `/api/w/${workspace.id}/sync/bootstrap`,
-    undefined,
-    admin.session,
-    "GET",
-  );
-  const team = snapshot.body.records.Team?.[0];
-  if (team) {
-    const access = await call(
-      `/api/w/${workspace.id}/members/${guest.body.user.id}/access`,
-      { items: [team.id] },
-      admin.session,
-      "PUT",
-    );
-    if (access.status !== 204) throw new Error(`couldn't add the guest to ${team.name}`);
-  }
+  if (access.status !== 204) throw new Error(`couldn't add Gus to ${team.name}`);
 
-  console.log(
-    `Seeded ${DEV_ADMIN.email} (admin), ${DEV_MEMBER.email} (member) and ${DEV_GUEST.email} ` +
-      `(guest in ${team?.name ?? "no team"}) in "${workspace.name}".`,
-  );
-  console.log(
-    `Password for all three: see DEV_PASSWORD in scripts/seed-dev.ts. Open ${BASE}/${workspace.url_key}`,
-  );
+  console.log(`Gus Guest is in ${team.name} alone, in "${workspace.name}".`);
+  console.log(`Open ${BASE}/${workspace.url_key} and sign in as anyone in people.toml.`);
 }

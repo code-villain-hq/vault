@@ -1,12 +1,14 @@
-//! The Code Villain account's groups: Pocket ID sends people and groups over
-//! SCIM, a workspace linked to a group follows it, and so does a linked team.
+//! The company's account sends its people and groups over SCIM; the
+//! workspace follows forge-users, -admins and -guests (or the groups the
+//! settings name), and a linked team follows its own groups.
 
 mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
+use code_villain_scim::Groups;
 use common::App;
-use forge_server::AppState;
+use forge_server::{AppState, company};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
@@ -84,15 +86,13 @@ fn group(name: &str, members: &[&str]) -> Value {
     })
 }
 
-async fn link(app: &App, admin: &str, workspace: &str, group: Option<&str>) -> StatusCode {
-    app.call(
-        "PUT",
-        &format!("/api/w/{workspace}/group"),
-        Some(admin),
-        Some(json!({ "group": group })),
-    )
-    .await
-    .status
+/// The server starting for the company, following `forge-*` groups.
+async fn start(app: &App) {
+    start_with(app, &Groups::new("forge", None, None, None)).await;
+}
+
+async fn start_with(app: &App, groups: &Groups) {
+    company::start(&app.pool, "Studio", groups).await.unwrap();
 }
 
 /// Each member's name, role and the group it comes from.
@@ -133,36 +133,28 @@ async fn scim_needs_its_token_and_is_off_without_one(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
+async fn the_workspace_follows_the_companys_groups(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
-    let admins = push_group(&app, "Forge admins", &[&bob]).await;
+    let admins = push_group(&app, "Forge admins", &[&ada_id, &bob]).await;
     push_group(&app, "forge-users", &[]).await;
     push_group(&app, "forge-guests", &[]).await;
     // A group named for the tool alone gives no role.
     let dana = push_user(&app, "sub-dana", "Dana").await;
     push_group(&app, "forge", &[&dana]).await;
+    start(&app).await;
 
-    // Only an admin links, and only to a group there is.
-    let groups = app.get(&format!("/api/w/{studio}/group"), &ada).await.body;
-    assert_eq!(groups["groups"], json!(["forge"]));
-    assert_eq!(groups["group"], Value::Null);
-    assert_eq!(
-        link(&app, &ada, &studio, Some("forje")).await,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
-    assert_eq!(
-        link(&app, &ada, &studio, Some("forge")).await,
-        StatusCode::NO_CONTENT
-    );
     let people = members(&app, &ada, &studio).await;
     assert_eq!(
-        people[1],
-        ("Bob".into(), "admin".into(), json!("forge-admins"))
+        people,
+        vec![
+            ("Ada".into(), "admin".into(), json!("forge-admins")),
+            ("Bob".into(), "admin".into(), json!("forge-admins")),
+        ],
+        "Dana is only in forge"
     );
-    assert_eq!(people[0].2, Value::Null, "Ada came by signing up");
-    assert_eq!(people.len(), 2, "Dana is only in forge");
 
     // Their role is changed in the account, not here.
     let path = format!("/api/w/{studio}/members/{bob}");
@@ -191,7 +183,7 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         &app,
         "PUT",
         &format!("/Groups/{admins}"),
-        Some(group("forge-admins", &[])),
+        Some(group("forge-admins", &[&ada_id])),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -228,22 +220,48 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn invited_people_stay_until_a_group_takes_them(pool: PgPool) {
+async fn the_settings_can_name_other_groups(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
-    let token = app.invite(&ada, &studio, "member").await;
-    app.join("Cleo", &token).await;
-    push_group(&app, "forge-users", &[]).await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
+    let bob = push_user(&app, "sub-bob", "Bob").await;
+    push_group(&app, "Acme Leads", &[&ada_id]).await;
+    push_group(&app, "acme-engineers", &[&bob]).await;
+    start_with(
+        &app,
+        &Groups::new("forge", Some("Acme Engineers"), Some("acme-leads"), None),
+    )
+    .await;
     assert_eq!(
-        link(&app, &ada, &studio, Some("forge")).await,
-        StatusCode::NO_CONTENT
+        members(&app, &ada, &studio).await,
+        vec![
+            ("Ada".into(), "admin".into(), json!("acme-leads")),
+            ("Bob".into(), "member".into(), json!("acme-engineers")),
+        ]
     );
-    assert_eq!(
-        members(&app, &ada, &studio).await[1],
-        ("Cleo".into(), "member".into(), Value::Null)
-    );
+}
 
-    // The account sends Cleo by her email, in forge-guests.
+#[sqlx::test(migrations = "../../migrations")]
+async fn people_outside_the_groups_leave_once_the_account_sends_them(pool: PgPool) {
+    let app = app(pool.clone());
+    let (ada, studio) = app.signup("Ada", "Studio").await;
+    app.join("Cleo", &app.invite(&ada, &studio, "member").await)
+        .await;
+    let agent = app
+        .post(
+            &format!("/api/w/{studio}/agents"),
+            Some(&ada),
+            json!({ "name": "Claude Code" }),
+        )
+        .await;
+    assert_eq!(agent.status, StatusCode::OK, "{}", agent.body);
+
+    // Before the account has sent any groups, nobody leaves.
+    start(&app).await;
+    assert_eq!(members(&app, &ada, &studio).await.len(), 3);
+
+    // The account sends Ada and Cleo by their emails.
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let cleo = push_user(&app, "sub-cleo", "Cleo").await;
     let cleo_id: uuid::Uuid =
         sqlx::query_scalar("SELECT id FROM users WHERE email = 'cleo@example.com'")
@@ -251,36 +269,53 @@ async fn invited_people_stay_until_a_group_takes_them(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(cleo, cleo_id.to_string(), "the same account");
+    push_group(&app, "forge-admins", &[&ada_id]).await;
     push_group(&app, "forge-guests", &[&cleo]).await;
+    app.join("Dan", &app.invite(&ada, &studio, "member").await)
+        .await;
+
+    // Starting again, Dan leaves: he's in no group. The agent stays.
+    start(&app).await;
+    let people = members(&app, &ada, &studio).await;
+    let names: Vec<&str> = people.iter().map(|(name, _, _)| name.as_str()).collect();
+    assert_eq!(names, ["Ada", "Cleo", "Claude Code"]);
     assert_eq!(
-        members(&app, &ada, &studio).await[1],
+        people[1],
         ("Cleo".into(), "guest".into(), json!("forge-guests"))
     );
 
-    // Unlinked, everyone stays, as though invited.
-    assert_eq!(
-        link(&app, &ada, &studio, None).await,
-        StatusCode::NO_CONTENT
-    );
-    assert_eq!(
-        members(&app, &ada, &studio).await[1],
-        ("Cleo".into(), "guest".into(), Value::Null)
-    );
+    // Agents' addresses aren't for people.
+    let (status, _) = scim(
+        &app,
+        "POST",
+        "/Users",
+        Some(json!({
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            "externalId": "sub-mallory",
+            "userName": "mallory",
+            "active": true,
+            "emails": [{ "value": format!("forge-ai@{studio}.agents.forge.invalid"), "primary": true }],
+        })),
+    )
+    .await;
+    assert!(status.is_client_error(), "{status}");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn someone_turned_off_is_signed_out_and_leaves(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
+    push_group(&app, "forge-admins", &[&ada_id]).await;
     push_group(&app, "forge-users", &[&bob]).await;
-    link(&app, &ada, &studio, Some("forge")).await;
+    start(&app).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 2);
 
     let (status, _) = scim(&app, "DELETE", &format!("/Users/{bob}"), None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
-    // The account stays; they can't sign in to it but through Pocket ID.
+    // The account stays; they can't sign in to it but through the company's.
     let accounts: i64 =
         sqlx::query_scalar("SELECT count(*) FROM users WHERE email = 'bob@example.com'")
             .fetch_one(&pool)
@@ -293,11 +328,13 @@ async fn someone_turned_off_is_signed_out_and_leaves(pool: PgPool) {
 async fn a_linked_team_has_its_groups_people(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
     let cleo = push_user(&app, "sub-cleo", "Cleo").await;
+    push_group(&app, "forge-admins", &[&ada_id]).await;
     push_group(&app, "forge-users", &[&bob, &cleo]).await;
     let design = push_group(&app, "design-users", &[&bob]).await;
-    link(&app, &ada, &studio, Some("forge")).await;
+    start(&app).await;
 
     let bootstrap = format!("/api/w/{studio}/sync/bootstrap");
     let team = app.get(&bootstrap, &ada).await.body["records"]["Team"][0]["id"].clone();
@@ -357,4 +394,45 @@ async fn a_linked_team_has_its_groups_people(pool: PgPool) {
         in_team(&app.get(&bootstrap, &ada).await.body),
         vec![cleo.clone()]
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_new_server_makes_the_companys_workspace(pool: PgPool) {
+    let app = app(pool.clone());
+    let groups = Groups::new("forge", None, None, None);
+    let workspace = company::start(&pool, " Acme Inc ", &groups).await.unwrap();
+    assert_eq!(
+        company::start(&pool, "Acme Inc", &groups).await.unwrap(),
+        workspace,
+        "the same one on every start"
+    );
+    let (name, url_key): (String, String) =
+        sqlx::query_as("SELECT name, url_key FROM workspaces WHERE id = $1")
+            .bind(workspace)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((name.as_str(), url_key.as_str()), ("Acme Inc", "acme-inc"));
+    let teams = || async {
+        sqlx::query_scalar::<_, String>("SELECT name FROM teams")
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+    };
+    assert!(teams().await.is_empty(), "nobody to make it yet");
+
+    // Its first person brings its first team.
+    let ada = push_user(&app, "sub-ada", "Ada").await;
+    push_group(&app, "forge-admins", &[&ada]).await;
+    assert_eq!(teams().await, ["Acme Inc"]);
+    let bob = push_user(&app, "sub-bob", "Bob").await;
+    push_group(&app, "forge-users", &[&bob]).await;
+    assert_eq!(teams().await, ["Acme Inc"], "only once");
+
+    // A database with more than one company's is refused.
+    let (_, _) = app.signup("Eve", "Elsewhere").await;
+    let refused = company::start(&pool, "Acme Inc", &groups)
+        .await
+        .unwrap_err();
+    assert!(refused.to_string().contains("Elsewhere"), "{refused}");
 }

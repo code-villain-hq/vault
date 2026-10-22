@@ -1,10 +1,9 @@
-// Describes Forge's own code as services in the local "Forge" workspace, so
+// Describes Forge's own code as services in the local workspace, so
 // drift checks can run on the vault: each service names its folder
 // (relative to the folder containing the vault, so it works in development
 // and in Docker) and its paths, which start at the vault's root. Safe to run
 // again: existing services with the same name are updated. Needs `bun run
-// dev` (or `bun run app` with FORGE_URL=http://localhost:7390) and `bun run
-// seed`.
+// dev` (or `bun run app` with FORGE_URL=http://localhost:7390), for Acme Inc.
 import { account, BASE, call, DEV_ADMIN } from "./seed-dev";
 
 const REPOSITORY = "villain-vault";
@@ -71,8 +70,8 @@ const SERVICES: { name: string; description: string; paths: string[] }[] = [
   },
 ];
 
-const admin = await account(DEV_ADMIN, { workspace_name: "Forge" });
-const workspace = admin.body.workspaces.find((w: { name: string }) => w.name === "Forge");
+const admin = await account(DEV_ADMIN);
+const { workspace } = admin;
 const bootstrap = await fetch(`${BASE}/api/w/${workspace.id}/sync/bootstrap`, {
   headers: { cookie: admin.session ?? "" },
 }).then((r) => r.json());

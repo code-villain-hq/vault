@@ -1,5 +1,6 @@
 // Members and Account, the settings pages every app has: who is in the
-// workspace and how they join, and your own name, password and sign-out.
+// workspace, as the company's account sends them, and your own name and
+// sign-out.
 // Each app hands over its API, session and page header with `accountPages`.
 import { Menu } from "@base-ui/react/menu";
 import { Select } from "@base-ui/react/select";
@@ -7,7 +8,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { Check, ChevronsUpDown } from "lucide-react";
 import {
   type ComponentType,
-  type FormEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -16,8 +16,7 @@ import {
 } from "react";
 import { Button } from "./button";
 import { type Confirmation, ConfirmDialog } from "./confirm";
-import { Empty, ErrorMessage, Initial, TextField } from "./controls";
-import { GroupSelect, groupHint, useGroups } from "./groups";
+import { Empty, ErrorMessage, Initial } from "./controls";
 import { MoreMenu } from "./page-parts";
 import { messageOf } from "./problems";
 
@@ -34,25 +33,13 @@ interface MemberInfo {
   role: Role;
   /** The ids of what they're in: teams, languages, apps or repositories. */
   access: string[];
-  /** The group of the Code Villain account their role comes from, which only the account changes. */
+  /** The company's group their role comes from, which only its account changes. */
   from_group?: string | null;
 }
 
-interface Invite {
-  id: string;
-  role: Role;
-  created_by: string;
-  expires_at: string;
-}
-
-interface CreatedInvite {
-  token: string;
-}
-
-/** What the pages read of the signed-in person; `has_password` only where accounts can lack one. */
+/** What the pages read of the signed-in person. */
 export interface AccountMe {
   user: AccountUser;
-  has_password?: boolean;
 }
 
 /** A place workspaces live in: this Mac, or a server. */
@@ -71,9 +58,6 @@ export interface AccountApp<P extends AccountPlace, M extends AccountMe> {
     me: M;
     workspace: { id: string; name: string; role: Role };
   };
-  /** Whether the place signs people in with passwords; undefined until it says. */
-  usePasswords: (origin: string) => boolean | undefined;
-  publicUrl: (path: string, place: P) => string;
   loadSession: () => Promise<void>;
   signedIn: (me: M, place: P) => void;
   signOut: (place: P) => Promise<void>;
@@ -167,7 +151,6 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     const isAdmin = workspace.role === "admin";
     const base = `/api/w/${workspace.id}`;
     const [members, setMembers] = useState<MemberInfo[]>([]);
-    const [invites, setInvites] = useState<Invite[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const options = access.useOptions();
@@ -175,11 +158,10 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     const reload = useCallback(async () => {
       try {
         setMembers(await api<MemberInfo[]>("GET", `${base}/members`));
-        if (isAdmin) setInvites(await api<Invite[]>("GET", `${base}/invites`));
       } catch (e) {
         setError(messageOf(e));
       }
-    }, [base, isAdmin]);
+    }, [base]);
 
     useEffect(() => {
       void reload();
@@ -207,20 +189,13 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
         <div className="page-content min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-2xl flex-col gap-10 px-6 py-8">
             <ErrorMessage>{error}</ErrorMessage>
-            {isAdmin && <WorkspaceSection onGroupChange={reload} />}
+            {isAdmin && <WorkspaceSection />}
             {/* Only you are in a workspace on this Mac. */}
-            {isAdmin && place.kind !== "mac" && (
-              <InviteSection
-                roles={roleOptions}
-                invites={invites}
-                onCreate={(role) =>
-                  api<CreatedInvite>("POST", `${base}/invites`, { role }).then(async (created) => {
-                    await reload();
-                    return created;
-                  })
-                }
-                onRevoke={(id) => change(() => api("DELETE", `${base}/invites/${id}`))}
-              />
+            {place.kind !== "mac" && (
+              <p className="-mt-6 text-muted">
+                People come from your company's account: its groups for {app.name} say who's in, and
+                as what.
+              </p>
             )}
 
             {groups.map(
@@ -334,120 +309,11 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     );
   }
 
-  function InviteSection({
-    roles,
-    invites,
-    onCreate,
-    onRevoke,
-  }: {
-    roles: RoleOption[];
-    invites: Invite[];
-    onCreate: (role: Role) => Promise<CreatedInvite>;
-    onRevoke: (id: string) => Promise<void>;
-  }) {
-    const { place } = useWorkspace();
-    const [role, setRole] = useState<Role>("member");
-    const [link, setLink] = useState<string | null>(null);
-    const [creating, setCreating] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const create = async () => {
-      setError(null);
-      setCopied(false);
-      setCreating(true);
-      try {
-        const created = await onCreate(role);
-        setLink(app.publicUrl(`/join/${created.token}`, place));
-      } catch (e) {
-        setError(messageOf(e));
-      }
-      setCreating(false);
-    };
-
-    const copy = async () => {
-      if (!link) return;
-      try {
-        await navigator.clipboard.writeText(link);
-        setCopied(true);
-      } catch {
-        setError("Couldn't copy the link. Select it and copy it yourself.");
-      }
-    };
-
-    return (
-      <section>
-        <h2 className="mb-1 font-medium">Invite people</h2>
-        <p className="mb-4 text-muted">
-          Create a link and send it to the people you want to invite. Anyone with the link can join
-          for 7 days.
-        </p>
-        <div className="flex items-center gap-2">
-          <RoleSelect
-            roles={roles}
-            value={role}
-            label="Role for people who join"
-            onChange={setRole}
-          />
-          <Button disabled={creating} onClick={() => void create()}>
-            {creating ? "Creating link…" : "Create invite link"}
-          </Button>
-        </div>
-        {link && (
-          <div className="mt-3 flex items-center gap-2">
-            <input
-              readOnly
-              value={link}
-              aria-label="Invite link"
-              onFocus={(e) => e.target.select()}
-              className="h-8 min-w-0 flex-1 rounded-md ui-field px-2 font-mono text-xs text-muted outline-none"
-            />
-            <Button variant="secondary" onClick={() => void copy()}>
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          </div>
-        )}
-        <div className="mt-3">
-          <ErrorMessage>{error}</ErrorMessage>
-        </div>
-
-        {invites.length > 0 && (
-          <>
-            <h3 className="mt-6 mb-2 text-xs text-faint">Active links</h3>
-            <ul className="-mx-3 flex flex-col gap-0.5">
-              {invites.map((invite) => (
-                <li
-                  key={invite.id}
-                  className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-hover"
-                >
-                  <div className="flex-1">
-                    <span className="capitalize">{invite.role}</span>
-                    <span className="text-muted">
-                      {" "}
-                      link · by {invite.created_by} · {expiresIn(invite.expires_at)}
-                    </span>
-                  </div>
-                  <Button variant="secondary" onClick={() => void onRevoke(invite.id)}>
-                    Revoke
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-    );
-  }
-
-  /**
-   * The workspace's name, for admins, saved when they leave the field or
-   * press Enter; and the group it follows, where the server takes groups.
-   */
-  function WorkspaceSection({ onGroupChange }: { onGroupChange: () => Promise<void> }) {
+  /** The workspace's name, for admins, saved when they leave the field or press Enter. */
+  function WorkspaceSection() {
     const { place, workspace } = useWorkspace();
     const [value, setValue] = useState(workspace.name);
     const [error, setError] = useState<string | null>(null);
-    const { groups, reload } = useGroups(api, workspace.id);
     const save = async () => {
       const trimmed = value.trim();
       if (trimmed === workspace.name) return;
@@ -458,15 +324,6 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
         setError(messageOf(e));
         setValue(workspace.name);
       }
-    };
-    const link = async (group: string | null) => {
-      setError(null);
-      try {
-        await api("PUT", `/api/w/${workspace.id}/group`, { group });
-      } catch (e) {
-        setError(messageOf(e));
-      }
-      await Promise.all([reload(), onGroupChange(), app.loadSession()]);
     };
     return (
       <section>
@@ -482,20 +339,6 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
               className="-ml-2 h-8 w-full rounded-md px-2 ui-field"
             />
           </label>
-          {groups && (
-            <div className="flex items-start gap-3">
-              <span className="flex h-7 w-24 shrink-0 items-center text-muted">Group</span>
-              <div className="-ml-2 flex min-w-0 flex-col items-start gap-1">
-                <GroupSelect
-                  groups={groups.groups}
-                  value={groups.group}
-                  label="Group the workspace follows"
-                  onChange={(group) => void link(group)}
-                />
-                <p className="text-xs text-muted">{groupHint(groups.group)}</p>
-              </div>
-            </div>
-          )}
         </div>
         <ErrorMessage>{error}</ErrorMessage>
       </section>
@@ -533,42 +376,10 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     );
   }
 
-  /**
-   * Your account; `children` are the app's own sections, shown after
-   * Profile. `noPassword` says, to someone who joined without a password,
-   * why they might set one.
-   */
-  function AccountPage({ children, noPassword }: { children?: ReactNode; noPassword?: string }) {
+  /** Your account; `children` are the app's own sections, shown after Profile. */
+  function AccountPage({ children }: { children?: ReactNode }) {
     const { place, me } = useWorkspace();
-    // With Code Villain accounts, passwords live there, not here.
-    const passwords = app.usePasswords(place.origin);
-    // Someone who joined another way has none to give.
-    const hasPassword = me.has_password ?? true;
     const navigate = useNavigate();
-    const [current, setCurrent] = useState("");
-    const [next, setNext] = useState("");
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    // Rarely needed, so the form opens only when asked for.
-    const [changing, setChanging] = useState(false);
-    const action = hasPassword ? "Change password" : "Set a password";
-
-    const changePassword = async (event: FormEvent) => {
-      event.preventDefault();
-      setBusy(true);
-      setError(null);
-      try {
-        await api("PUT", "/api/me/password", { current_password: current, new_password: next });
-        setCurrent("");
-        setNext("");
-        setChanging(false);
-        await app.loadSession();
-      } catch (e) {
-        setError(messageOf(e));
-      }
-      setBusy(false);
-    };
-
     return (
       <>
         <PageHeader title="Account" />
@@ -587,58 +398,6 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
             </section>
 
             {children}
-
-            {passwords && (
-              <section>
-                <h2 className="mb-3 font-medium">Password</h2>
-                {!hasPassword && noPassword && (
-                  <p className="-mt-1 mb-3 text-muted">{noPassword}</p>
-                )}
-                {!changing ? (
-                  <Button variant="secondary" onClick={() => setChanging(true)}>
-                    {action}
-                  </Button>
-                ) : (
-                  <form onSubmit={changePassword} className="flex flex-col gap-4">
-                    {hasPassword && (
-                      <TextField
-                        label="Current password"
-                        type="password"
-                        autoComplete="current-password"
-                        required
-                        value={current}
-                        onChange={(e) => setCurrent(e.target.value)}
-                      />
-                    )}
-                    <TextField
-                      label="New password"
-                      type="password"
-                      autoComplete="new-password"
-                      required
-                      minLength={8}
-                      hint="At least 8 characters. Other devices will be signed out."
-                      value={next}
-                      onChange={(e) => setNext(e.target.value)}
-                    />
-                    <ErrorMessage>{error}</ErrorMessage>
-                    <div className="flex items-center gap-2">
-                      <Button type="submit" disabled={busy}>
-                        {busy ? "Saving…" : hasPassword ? "Change password" : "Set password"}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          setChanging(false);
-                          setError(null);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                )}
-              </section>
-            )}
 
             {place.kind !== "mac" && (
               <section>
@@ -664,11 +423,6 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
   }
 
   return { MembersPage, AccountPage };
-}
-
-function expiresIn(date: string) {
-  const days = Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000);
-  return days <= 1 ? "expires today" : `expires in ${days} days`;
 }
 
 type RoleOption = { value: Role; label: string; hint: string };

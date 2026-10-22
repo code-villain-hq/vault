@@ -3,10 +3,10 @@
 //! links pull requests and commits to issues, and moves issues along as
 //! pull requests open and merge.
 //!
-//! Configured with `FORGE_GITHUB_*` (see `app.rs`); off without them.
+//! Configured with the `[github]` settings (see `app.rs`); off without them.
 
 pub mod app;
-pub mod login;
+pub mod oauth;
 pub mod webhook;
 
 use std::collections::BTreeSet;
@@ -151,7 +151,7 @@ pub async fn status(
     Ok(Json(GitHubStatus {
         configured: true,
         install_url,
-        confirms_ownership: state.github_login.is_some(),
+        confirms_ownership: state.github_oauth.is_some(),
         installations: out,
     }))
 }
@@ -202,7 +202,7 @@ pub async fn setup(
             "only workspace admins can connect GitHub",
         ));
     }
-    if let Some(login) = state.github_login.as_ref() {
+    if let Some(oauth) = state.github_oauth.as_ref() {
         let code = params.code.as_deref().ok_or_else(|| {
             AppError::invalid(
                 "GitHub didn't say who installed the app, so it wasn't connected. Turn on \
@@ -210,7 +210,7 @@ pub async fn setup(
                  settings, then connect GitHub again from Forge's settings",
             )
         })?;
-        match login
+        match oauth
             .can_access_installation(code, params.installation_id)
             .await
         {

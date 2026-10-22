@@ -75,14 +75,9 @@ pub fn router(state: AppState) -> Router<AppState> {
     // Stateless: each request carries its token; nothing to keep between calls.
     config.legacy_session_mode = false;
     config.json_response = true;
-    if let Ok(hosts) = std::env::var("FORGE_MCP_ALLOWED_HOSTS") {
-        config.allowed_hosts.extend(
-            hosts
-                .split(',')
-                .map(|h| h.trim().to_string())
-                .filter(|h| !h.is_empty()),
-        );
-    }
+    config
+        .allowed_hosts
+        .extend(state.mcp_allowed_hosts.iter().cloned());
     let service = StreamableHttpService::new(
         move || Ok(Forge::new(pool.clone())),
         Arc::new(NeverSessionManager::default()),

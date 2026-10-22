@@ -65,7 +65,11 @@ pub async fn user(db: &mut PgConnection, id: Uuid) -> Result<Option<UserRow>, sq
 /// Finds or makes the account for someone new: the one signing in already
 /// uses (`oidc_sub`), else the one with their email that no studio account
 /// has yet, else a new one. Signing in later finds it by `oidc_sub`.
-pub async fn create_user(db: &mut PgConnection, user: &UserIn) -> Result<Uuid, ScimError> {
+pub async fn create_user(
+    db: &mut PgConnection,
+    user: &UserIn,
+    refuses: fn(&str) -> Option<&'static str>,
+) -> Result<Uuid, ScimError> {
     let external_id = user
         .external_id
         .as_deref()
@@ -77,6 +81,13 @@ pub async fn create_user(db: &mut PgConnection, user: &UserIn) -> Result<Uuid, S
                 "externalId is needed",
             )
         })?;
+    if let Some(reason) = user.email().as_deref().and_then(refuses) {
+        return Err(ScimError::typed(
+            StatusCode::BAD_REQUEST,
+            "invalidValue",
+            reason,
+        ));
+    }
     let known: Option<Uuid> =
         sqlx::query_scalar("SELECT user_id FROM scim_users WHERE external_id = $1")
             .bind(external_id)

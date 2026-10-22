@@ -173,7 +173,7 @@ export function placeFor(path: string): Place {
   const workspace = /^\/api\/w\/([^/?]+)/.exec(path)?.[1];
   const known = workspace ? byWorkspace.get(workspace) : undefined;
   if (known) return known;
-  if (path.startsWith("/api/auth/") || path.startsWith("/api/invites/")) return authPlace();
+  if (path.startsWith("/api/auth/")) return authPlace();
   return current ?? places[0] ?? authPlace();
 }
 

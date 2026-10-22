@@ -1,0 +1,33 @@
+# The stand-in company's people, for every app's local development. `id` is
+# their account id: what signing in calls `sub` and SCIM `externalId`. Each
+# app gets the people in one of its groups (`forge-users`, `forge-admins`,
+# `forge-guests`…), with all their groups. Edit this while dev-id runs: it
+# sends the change to the apps within a few seconds.
+
+company = "Acme Inc"
+
+[[person]]
+id = "ada"
+name = "Ada Admin"
+email = "ada@acme.test"
+groups = ["forge-admins", "glyph-admins", "raven-admins", "layer-admins"]
+
+[[person]]
+id = "max"
+name = "Max Member"
+email = "max@acme.test"
+groups = ["forge-users", "glyph-users", "raven-users", "layer-users"]
+
+[[person]]
+id = "gus"
+name = "Gus Guest"
+email = "gus@acme.test"
+groups = ["forge-guests", "glyph-guests", "raven-guests", "layer-guests"]
+
+# In the company, but in none of the apps' groups: signing in tells her to
+# ask Acme's admin.
+[[person]]
+id = "nell"
+name = "Nell New"
+email = "nell@acme.test"
+groups = []

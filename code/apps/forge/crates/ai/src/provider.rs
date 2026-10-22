@@ -53,16 +53,18 @@ impl ClaudeProvider {
         }
     }
 
-    /// From `ANTHROPIC_API_KEY`, `FORGE_AI_MODEL` and `FORGE_AI_EFFORT`;
-    /// `None` without an API key, which turns the AI off.
-    pub fn from_env() -> Option<Self> {
-        let api_key = std::env::var("ANTHROPIC_API_KEY")
-            .ok()
-            .filter(|k| !k.trim().is_empty())?;
-        let model = std::env::var("FORGE_AI_MODEL").unwrap_or_else(|_| "claude-opus-5-5".into());
-        let effort = std::env::var("FORGE_AI_EFFORT").unwrap_or_else(|_| "high".into());
+    /// From the server's settings, looked up by their names in the
+    /// environment: `FORGE_AI_API_KEY` (or `ANTHROPIC_API_KEY`),
+    /// `FORGE_AI_MODEL`, `FORGE_AI_EFFORT` and `FORGE_AI_BASE_URL` (or
+    /// `ANTHROPIC_BASE_URL`). `None` without an API key, which turns the AI
+    /// off.
+    pub fn from_settings(var: impl Fn(&str) -> Option<String>) -> Option<Self> {
+        let var = |name: &str| var(name).filter(|v| !v.trim().is_empty());
+        let api_key = var("FORGE_AI_API_KEY").or_else(|| var("ANTHROPIC_API_KEY"))?;
+        let model = var("FORGE_AI_MODEL").unwrap_or_else(|| "claude-opus-5-5".into());
+        let effort = var("FORGE_AI_EFFORT").unwrap_or_else(|| "high".into());
         let mut provider = ClaudeProvider::new(api_key, model, effort);
-        if let Ok(base_url) = std::env::var("ANTHROPIC_BASE_URL") {
+        if let Some(base_url) = var("FORGE_AI_BASE_URL").or_else(|| var("ANTHROPIC_BASE_URL")) {
             provider.base_url = base_url.trim_end_matches('/').to_string();
         }
         Some(provider)

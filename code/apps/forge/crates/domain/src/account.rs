@@ -1,5 +1,5 @@
-//! Accounts, workspaces, membership and invites: the request and response
-//! types of the account API, and the rules for names, emails and passwords.
+//! Accounts, workspaces and membership: the request and response types of
+//! the account API, and the rules for names and emails.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use crate::model::ValidationError;
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum Role {
-    /// Manages the workspace: members, invites and settings.
+    /// Manages the workspace: members and settings.
     Admin,
     Member,
     /// Sees only the teams they've been added to, and works there as a
@@ -64,32 +64,6 @@ pub struct WorkspaceInfo {
 pub struct Me {
     pub user: UserInfo,
     pub workspaces: Vec<WorkspaceInfo>,
-    /// Whether you can sign in with a password (people who joined with
-    /// GitHub start without one).
-    pub has_password: bool,
-    /// Whether a GitHub account is connected, to sign in with.
-    pub github_connected: bool,
-}
-
-/// Creates an account. With `workspace_name` it also creates a workspace;
-/// with `invite_token` it joins the invite's workspace instead.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(deny_unknown_fields)]
-#[ts(export, optional_fields)]
-pub struct SignupRequest {
-    pub name: String,
-    pub email: String,
-    pub password: String,
-    pub workspace_name: Option<String>,
-    pub invite_token: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(deny_unknown_fields)]
-#[ts(export)]
-pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
 }
 
 /// Renames a workspace. Its URL key stays, so links keep working.
@@ -109,14 +83,6 @@ pub struct UpdateProfileRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(deny_unknown_fields)]
-#[ts(export)]
-pub struct ChangePasswordRequest {
-    pub current_password: String,
-    pub new_password: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct MemberInfo {
     pub user: UserInfo,
@@ -124,27 +90,9 @@ pub struct MemberInfo {
     pub joined_at: DateTime<Utc>,
     /// The teams they're in.
     pub access: Vec<Uuid>,
-    /// The group of the Code Villain account their role comes from, such as
-    /// `forge-admins`: it's changed there, not in Members.
+    /// The company's group their role comes from, such as `forge-admins`:
+    /// it's changed in the company's account, not in Members.
     pub from_group: Option<String>,
-}
-
-/// The group of the Code Villain account a workspace follows, and the
-/// groups there are. Only when the account sends its groups (`FORGE_SCIM_TOKEN`).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct WorkspaceGroup {
-    pub group: Option<String>,
-    /// Each tool's groups once, by its name: `forge` for `forge-users`,
-    /// `forge-admins` and `forge-guests`.
-    pub groups: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(deny_unknown_fields)]
-#[ts(export)]
-pub struct LinkGroupRequest {
-    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -162,47 +110,6 @@ pub struct UpdateAccessRequest {
     pub items: Vec<Uuid>,
 }
 
-/// An active invite link, as admins see it. The token itself is shown once,
-/// when the link is created.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct Invite {
-    pub id: Uuid,
-    pub role: Role,
-    pub created_by: String,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(deny_unknown_fields)]
-#[ts(export)]
-pub struct CreateInviteRequest {
-    pub role: Role,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct CreatedInvite {
-    pub invite: Invite,
-    /// Goes in the link: `/join/<token>`.
-    pub token: String,
-}
-
-/// What anyone with an invite link may see before joining.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct InvitePreview {
-    pub workspace_name: String,
-    /// Where to go once joined.
-    pub workspace_url_key: String,
-    pub invited_by: String,
-    /// What the invite makes you there.
-    pub role: Role,
-}
-
-pub const MIN_PASSWORD: usize = 8;
-const MAX_PASSWORD: usize = 256;
 const MAX_NAME: usize = 100;
 
 /// Trims and lowercases an email address and checks it looks like one.
@@ -238,21 +145,6 @@ pub fn is_agent_email(email: &str) -> bool {
                 .strip_suffix(AGENT_EMAIL_DOMAIN)
                 .is_some_and(|rest| rest.ends_with('.'))
     })
-}
-
-pub fn check_password(password: &str) -> Result<(), ValidationError> {
-    let length = password.chars().count();
-    if length < MIN_PASSWORD {
-        return Err(ValidationError(format!(
-            "password must be at least {MIN_PASSWORD} characters"
-        )));
-    }
-    if length > MAX_PASSWORD {
-        return Err(ValidationError(format!(
-            "password must be at most {MAX_PASSWORD} characters"
-        )));
-    }
-    Ok(())
 }
 
 /// Trims a person's or workspace's name and checks its length.
@@ -346,13 +238,6 @@ mod tests {
         ] {
             assert!(!is_agent_email(person), "{person:?} is a person's");
         }
-    }
-
-    #[test]
-    fn passwords_need_a_minimum_length() {
-        assert!(check_password("1234567").is_err());
-        assert!(check_password("12345678").is_ok());
-        assert!(check_password(&"x".repeat(257)).is_err());
     }
 
     #[test]

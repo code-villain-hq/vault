@@ -1,0 +1,62 @@
+# Forge's settings for one company. Copy to forge.toml (or pass
+# `forge-server --config <file>`, or set FORGE_CONFIG). Every setting can
+# also come from the environment, which wins: `[oidc] issuer` is
+# FORGE_OIDC_ISSUER, `public_url` is FORGE_PUBLIC_URL. A setting Forge
+# doesn't know stops it, naming the setting.
+
+# Required.
+
+company = "Acme Inc"                    # names the workspace and the sign-in button
+public_url = "https://forge.acme.org"   # where people reach Forge
+
+[database]
+url = "postgres://forge@localhost/forge"   # or DATABASE_URL
+
+# The company's account signs people in (OpenID Connect). Register Forge as a
+# confidential client with the callback <public_url>/api/auth/oidc/callback.
+[oidc]
+issuer = "https://id.acme.org"
+client_id = "forge"
+client_secret = "…"
+
+# The account sends its people and groups to <public_url>/api/scim/v2 with
+# this token (SCIM), and they're in Forge as its groups say.
+[scim]
+token = "…"
+
+# Optional.
+
+# The groups whose people are in Forge, and as what.
+[groups]
+users = "forge-users"
+admins = "forge-admins"
+guests = "forge-guests"
+
+# addr = "0.0.0.0:7380"           # where the server listens (FORGE_ADDR)
+# web_dir = "/srv/forge/web"      # the built web app, served beside the API
+# data_dir = "/var/lib/forge"     # attachments and repository copies (./data)
+# local_repos_root = "/repos"     # services may point at repositories below it
+# cookie_secure = true            # false only on plain http
+
+# Drift checks and triage, with a Claude API key (or ANTHROPIC_API_KEY).
+# [ai]
+# api_key = "…"
+# model = "claude-opus-5-5"
+# effort = "high"
+# check_hours = 24                # 0 turns scheduled checks off
+# max_turns = 40
+# triage = false                  # true triages new issues on their own
+
+# A GitHub App, for repositories, pull requests and checks. Its callback URL
+# is <public_url>/api/auth/github/callback.
+# [github]
+# app_id = 123456
+# app_slug = "acme-forge"
+# private_key_path = "/etc/forge/github.pem"   # or private_key = "…"
+# webhook_secret = "…"
+# client_id = "…"
+# client_secret = "…"
+
+# Hosts the MCP endpoint answers for, besides public_url's.
+# [mcp]
+# allowed_hosts = ["forge.internal.acme.org"]

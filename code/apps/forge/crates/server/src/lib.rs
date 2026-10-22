@@ -1,4 +1,4 @@
-//! Forge's server: the HTTP API, the sync feed and accounts. Its specs live
+//! Forge's server: the HTTP API, the sync feed, sign-in and workspaces. Its specs live
 //! in Forge ("Architecture overview" and each service's). [`serve`] runs it, from `main.rs` or the desktop app; tests drive [`router`]
 //! directly.
 
@@ -6,14 +6,13 @@ pub mod accounts;
 pub mod agents;
 pub mod attachments;
 pub mod auth;
+pub mod company;
 pub mod config;
 pub mod drift;
 pub mod error;
 pub mod forgejo;
 pub mod github;
 pub mod groups;
-pub mod invites;
-pub mod limits;
 pub mod local;
 pub mod mcp;
 pub mod members;

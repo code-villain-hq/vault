@@ -1,6 +1,6 @@
 # Forge in one image: the Rust server, serving the built web app.
 # Built and run by `bun run app` (see docker-compose.yml), from code/ so it
-# can use the studio's kit (code/kit/sync).
+# can use the studio's kit (code/kit).
 
 FROM oven/bun:1.4 AS web
 WORKDIR /code/apps/forge
@@ -9,8 +9,10 @@ COPY apps/forge/apps/web/package.json apps/web/
 COPY apps/forge/apps/desktop/package.json apps/desktop/
 COPY apps/forge/packages/types/package.json packages/types/
 COPY kit/sync/client/package.json /code/kit/sync/client/
+COPY kit/web/package.json /code/kit/web/
 RUN bun install --frozen-lockfile
 COPY kit/sync/client /code/kit/sync/client
+COPY kit/web /code/kit/web
 COPY apps/forge/packages packages
 COPY apps/forge/apps/web apps/web
 RUN bun run --cwd apps/web build
@@ -24,6 +26,7 @@ COPY apps/forge/migrations migrations
 COPY kit/sync /code/kit/sync
 COPY kit/desktop /code/kit/desktop
 COPY kit/scim /code/kit/scim
+COPY kit/settings /code/kit/settings
 # Cargo needs every workspace member's manifest, even when not building it.
 COPY apps/forge/apps/desktop/src-tauri apps/desktop/src-tauri
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

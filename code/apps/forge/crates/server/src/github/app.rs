@@ -68,12 +68,11 @@ struct InstallationToken {
 }
 
 impl GitHubApp {
-    /// From `FORGE_GITHUB_APP_ID`, `FORGE_GITHUB_APP_SLUG`,
-    /// `FORGE_GITHUB_PRIVATE_KEY` (PEM) or `FORGE_GITHUB_PRIVATE_KEY_PATH`,
-    /// `FORGE_GITHUB_WEBHOOK_SECRET` and `FORGE_DATA_DIR`. `None` if any is
-    /// missing, which turns the connection off.
-    pub fn from_env() -> Option<GitHubApp> {
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
+    /// From `github.app_id`, `github.app_slug`, `github.private_key` (PEM)
+    /// or `github.private_key_path`, `github.webhook_secret` and `data_dir`.
+    /// `None` if any is missing, which turns the connection off.
+    pub fn from_settings(settings: &crate::config::Settings) -> Option<GitHubApp> {
+        let var = |name: &str| settings.var(name);
         let pem = var("FORGE_GITHUB_PRIVATE_KEY").or_else(|| {
             var("FORGE_GITHUB_PRIVATE_KEY_PATH").and_then(|p| std::fs::read_to_string(p).ok())
         })?;

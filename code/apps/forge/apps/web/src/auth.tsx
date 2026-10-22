@@ -1,6 +1,6 @@
 import { Redirect } from "@code-villain/web";
-import type { InvitePreview, Me } from "@forge/types";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import type { Me } from "@forge/types";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
 import { isDesktop, onAppLink, openInBrowser } from "./platform";
@@ -16,14 +16,7 @@ import {
   setServerUrl,
   startOnThisMac,
 } from "./server";
-import {
-  defaultWorkspace,
-  signedIn,
-  signOut,
-  useSession,
-  workspaceEntries,
-  workspaceKey,
-} from "./session";
+import { signedIn, useSession, workspaceKey } from "./session";
 import { AuthScreen, Button, buttonClass, ErrorMessage, Splash, TextField } from "./ui";
 
 /** Runs a form submission, tracking whether it's busy and what went wrong. */
@@ -87,30 +80,30 @@ function useServerChoice() {
   return { field, apply, checked };
 }
 
-/** The ways in this server offers. */
-export type Providers = { oidc: boolean; password: boolean; github: boolean };
+/** How this server signs people in: with its company's account, named on the button. */
+export type Providers = { oidc: boolean; company?: string | null };
 
-/** Before the server answers, or when it can't: email and password. */
-const PASSWORD_ONLY: Providers = { oidc: false, password: true, github: false };
+/** Before the server answers, or when it can't: no way in. */
+const NO_SIGN_IN: Providers = { oidc: false };
 
 /**
  * How a server signs people in; null until it first says, so the page
  * doesn't flash the wrong way in. The packaged desktop app asks the server
- * chosen at sign-in, and leaves GitHub to the browser.
+ * chosen at sign-in.
  */
 export function useProviders(server = serverUrl()) {
   const [providers, setProviders] = useState<Providers | null>(null);
   useEffect(() => {
     if (bundled && !server) {
-      setProviders(PASSWORD_ONLY);
+      setProviders(NO_SIGN_IN);
       return;
     }
     let current = true;
     fetch(`${server}/api/auth/providers`)
-      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : PASSWORD_ONLY))
-      .catch(() => PASSWORD_ONLY)
+      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : NO_SIGN_IN))
+      .catch(() => NO_SIGN_IN)
       .then((p) => {
-        if (current) setProviders({ ...p, github: p.github && !bundled });
+        if (current) setProviders(p);
       });
     return () => {
       current = false;
@@ -119,59 +112,43 @@ export function useProviders(server = serverUrl()) {
   return providers;
 }
 
-/** What went wrong signing in with GitHub, by the code the server sends back. */
-export const GITHUB_PROBLEMS: Record<string, string> = {
-  github_not_set_up: "Signing in with GitHub isn't set up on this server.",
-  github_expired: "That took too long. Try again.",
-  github_other_browser: "Start signing in with GitHub from Forge, in this browser.",
-  github_refused: "GitHub didn't sign you in. Try again.",
-  github_no_email: "Your GitHub account has no verified email address.",
-  github_use_password:
-    "There's already an account with your GitHub email. Sign in with its password, then connect GitHub under Account.",
-  github_no_account:
-    "No Forge account is connected to that GitHub account. Sign up with email, or use an invite link.",
-  invite_gone: "That invite link has expired or was revoked. Ask for a new one.",
-  github_taken: "That GitHub account is connected to another Forge account.",
-  github_failed: "Something went wrong. Try again.",
-};
+/** What went wrong signing in, by the code the server sends back, for a company's account. */
+function oidcProblems(company: string): Record<string, string> {
+  return {
+    oidc_not_set_up: "Signing in isn't set up on this server.",
+    oidc_expired: "That took too long. Try again.",
+    oidc_other_browser: "Start signing in from Forge, in this browser.",
+    oidc_refused: `${company} didn't sign you in. Try again.`,
+    oidc_no_email: `Your ${company} account has no email address Forge can use.`,
+    oidc_no_access: `You don't have access to Forge yet. Ask ${company}'s admin to add you.`,
+    oidc_taken: `The Forge account with your email is linked to another ${company} account.`,
+    oidc_failed: "Something went wrong. Try again.",
+  };
+}
 
-/** What went wrong signing in with Code Villain, by the code the server sends back. */
-const OIDC_PROBLEMS: Record<string, string> = {
-  oidc_not_set_up: "Signing in with Code Villain isn't set up on this server.",
-  oidc_expired: "That took too long. Try again.",
-  oidc_other_browser: "Start signing in from Forge, in this browser.",
-  oidc_refused: "Code Villain didn't sign you in. Try again.",
-  oidc_no_email: "Your Code Villain account has no email address Forge can use.",
-  oidc_no_account:
-    "This Code Villain account has no Forge account yet. Ask your team for an invite link.",
-  invite_gone: "That invite link has expired or was revoked. Ask for a new one.",
-  oidc_taken: "The Forge account with your email is linked to another Code Villain account.",
-  oidc_failed: "Something went wrong. Try again.",
-};
-
-/** A Code Villain sign-in problem we have words for; unknown codes are the general one. */
+/** A sign-in problem we have words for; unknown codes are the general one. */
 function oidcCode(code: string) {
-  return Object.hasOwn(OIDC_PROBLEMS, code) ? code : "oidc_failed";
+  return Object.hasOwn(oidcProblems(""), code) ? code : "oidc_failed";
 }
 
 /** Why signing in didn't work, for a code in the page's address. */
-function problemOf(code: string, providers: Providers) {
-  return providers.oidc
-    ? OIDC_PROBLEMS[oidcCode(code)]
-    : (GITHUB_PROBLEMS[code] ?? GITHUB_PROBLEMS.github_failed);
+function problemOf(code: string, company?: string | null) {
+  return oidcProblems(company || "Your company")[oidcCode(code)] ?? "Something went wrong.";
 }
 
 type SignInProps = {
   label: string;
-  /** An invite to join with, or where to go afterwards. */
+  company: string;
+  /** Where to go afterwards. */
   query: Record<string, string>;
   /** Runs first: the desktop app applies its choice of server. */
   before?: () => void;
 };
 
-/** Off to the studio's sign-in; the server brings people back signed in. */
-function CodeVillainButton({ label, query, before }: SignInProps) {
-  if (bundled) return <DesktopSignIn label={label} query={query} before={before} />;
+/** Off to the company's sign-in; the server brings people back signed in. */
+function CompanyButton({ label, company, query, before }: SignInProps) {
+  if (bundled)
+    return <DesktopSignIn label={label} company={company} query={query} before={before} />;
   const params = new URLSearchParams(query).toString();
   return (
     <a
@@ -193,7 +170,7 @@ function hex(bytes: ArrayBuffer | Uint8Array) {
  * `forge://signed-in` link, and only this app, which knows the secret behind
  * the challenge, can trade it for a session.
  */
-function DesktopSignIn({ label, query, before }: SignInProps) {
+function DesktopSignIn({ label, company, query, before }: SignInProps) {
   const afterSignIn = useAfterSignIn();
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -206,7 +183,7 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
       const problem = url.searchParams.get("error");
       if (problem) {
         setSecret(null);
-        setError(OIDC_PROBLEMS[oidcCode(problem)] ?? null);
+        setError(problemOf(problem, company));
         return;
       }
       const code = url.searchParams.get("code");
@@ -221,7 +198,7 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
         setError(messageOf(e));
       }
     });
-  }, [secret, afterSignIn]);
+  }, [secret, afterSignIn, company]);
 
   const start = async () => {
     setError(null);
@@ -249,22 +226,6 @@ function DesktopSignIn({ label, query, before }: SignInProps) {
       </Button>
       {secret && <p className="mt-3 text-center text-muted">Finish signing in in your browser.</p>}
     </>
-  );
-}
-
-/** Off to GitHub; the server brings people back signed in. */
-function GitHubButton({ label, query }: { label: string; query: Record<string, string> }) {
-  const params = new URLSearchParams(query).toString();
-  return (
-    <a
-      href={`/api/auth/github${params ? `?${params}` : ""}`}
-      className={`${buttonClass("secondary")} flex`}
-    >
-      <svg viewBox="0 0 16 16" className="size-4" aria-hidden="true" fill="currentColor">
-        <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-      </svg>
-      {label}
-    </a>
   );
 }
 
@@ -313,290 +274,47 @@ function BackLink() {
 
 export function LoginPage() {
   const session = useSession();
-  const { redirect, error: githubError } = useSearch({ strict: false }) as {
+  const { redirect, error: code } = useSearch({ strict: false }) as {
     redirect?: string;
     error?: string;
   };
-  const afterSignIn = useAfterSignIn();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const server = useServerChoice();
   const providers = useProviders(server.checked);
-  const { busy, error, submit } = useSubmit(async () => {
-    server.apply();
-    const place = authPlace();
-    const me = await api<Me>("POST", "/api/auth/login", { email, password });
-    signedIn(me, place);
-    await afterSignIn(me, place, redirect);
-  });
 
   // The packaged app signs in to another server here, next to the ones it has.
-  if (session.status === "signed-in" && !busy && !bundled) {
-    // Connecting GitHub from Account can come back here when its trip can't
-    // be read (expired, or the server restarted); say why on Account.
-    const workspace = githubError?.startsWith("github")
-      ? defaultWorkspace(workspaceEntries(session.places))
-      : undefined;
-    if (workspace) {
-      return (
-        <Redirect
-          to="/$workspace/settings/account"
-          params={{ workspace: workspace.key }}
-          search={{ github_error: githubError }}
-        />
-      );
-    }
-    return <Redirect to={safeRedirect(redirect)} />;
-  }
+  if (session.status === "signed-in" && !bundled) return <Redirect to={safeRedirect(redirect)} />;
   if (!providers) return <Splash />;
-  const problem = githubError ? problemOf(githubError, providers) : null;
+  const company = providers.oidc ? providers.company || "your company" : null;
+  const problem = code ? problemOf(code, company) : null;
   const query: Record<string, string> = redirect ? { redirect: safeRedirect(redirect) } : {};
 
-  if (providers.oidc) {
-    return (
-      <AuthScreen title="Sign in to Forge">
-        {problem && (
-          <div className="mb-4">
-            <ErrorMessage>{problem}</ErrorMessage>
-          </div>
-        )}
-        {server.field && <div className="mb-4">{server.field}</div>}
-        <CodeVillainButton
-          label="Sign in with Code Villain ↗"
-          query={query}
-          before={server.apply}
-        />
-        <p className="mt-6 text-center text-muted">
-          One account for every Code Villain app.
-          <br />
-          New here? Ask your team for an invite.
-        </p>
-        <BackLink />
-      </AuthScreen>
-    );
-  }
   return (
     <AuthScreen title="Sign in to Forge">
-      {providers.github && (
-        <>
-          <GitHubButton label="Continue with GitHub" query={query} />
-          <Or />
-        </>
-      )}
-      {problem && !error && (
+      {problem && (
         <div className="mb-4">
           <ErrorMessage>{problem}</ErrorMessage>
         </div>
       )}
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        {server.field}
-        <TextField
-          label="Email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <TextField
-          label="Password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <ErrorMessage>{error}</ErrorMessage>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-muted">
-        New to Forge?{" "}
-        <Link to="/signup" className="ui-link">
-          Create an account
-        </Link>
-      </p>
-      <BackLink />
-    </AuthScreen>
-  );
-}
-
-export function SignupPage() {
-  const session = useSession();
-  const afterSignIn = useAfterSignIn();
-  const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
-  const field = (key: keyof typeof form) => ({
-    value: form[key],
-    onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
-  });
-  const server = useServerChoice();
-  const providers = useProviders(server.checked);
-  const { busy, error, submit } = useSubmit(async () => {
-    server.apply();
-    const place = authPlace();
-    const me = await api<Me>("POST", "/api/auth/signup", form);
-    signedIn(me, place);
-    await afterSignIn(me, place);
-  });
-
-  if (session.status === "signed-in" && !busy && !bundled) return <Redirect to="/" />;
-  if (!providers) return <Splash />;
-  // With Code Villain accounts, people come in through invites only.
-  if (providers.oidc) return <Redirect to="/login" />;
-  return (
-    <AuthScreen title="Create your Forge account">
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        {server.field}
-        <TextField label="Your name" autoComplete="name" required {...field("name")} />
-        <TextField label="Email" type="email" autoComplete="email" required {...field("email")} />
-        <TextField
-          label="Password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          hint="At least 8 characters."
-          {...field("password")}
-        />
-        <TextField
-          label="Workspace name"
-          required
-          placeholder="Your team or company"
-          {...field("workspace_name")}
-        />
-        <ErrorMessage>{error}</ErrorMessage>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Creating…" : "Create account"}
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-muted">
-        Already have an account?{" "}
-        <Link to="/login" className="ui-link">
-          Sign in
-        </Link>
-      </p>
-      <BackLink />
-    </AuthScreen>
-  );
-}
-
-/** Where an invite link lands: join as the signed-in user, or sign in or up first. */
-export function JoinPage() {
-  const { token } = useParams({ strict: false }) as { token: string };
-  const session = useSession();
-  const navigate = useNavigate();
-  const [invite, setInvite] = useState<InvitePreview | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const providers = useProviders();
-  // Invite links open in the browser, on the inviting server: "here".
-  const here =
-    session.status === "signed-in"
-      ? session.places.find((s) => s.place.kind === "here")
-      : undefined;
-
-  useEffect(() => {
-    api<InvitePreview>("GET", `/api/invites/${encodeURIComponent(token)}`)
-      .then(setInvite)
-      .catch((e) => setProblem(messageOf(e)));
-  }, [token]);
-
-  const open = async (me: Me) => {
-    signedIn(me);
-    await navigate({ to: "/$workspace", params: { workspace: invite?.workspace_url_key ?? "" } });
-  };
-  const accept = useSubmit(async () => {
-    await open(await api<Me>("POST", `/api/invites/${encodeURIComponent(token)}/accept`));
-  });
-  const signup = useSubmit(async () => {
-    await open(await api<Me>("POST", "/api/auth/signup", { ...form, invite_token: token }));
-  });
-
-  if (problem) {
-    return (
-      <AuthScreen title="This invite link doesn't work">
-        <p className="text-center text-muted">
-          {/\.$/.test(problem) ? problem : `${problem}.`} Ask for a new one.
-        </p>
-      </AuthScreen>
-    );
-  }
-  if (!invite || !providers || session.status === "loading") return <Splash />;
-
-  const title = `Join ${invite.workspace_name} on Forge`;
-  const subtitle = (
-    <p className="-mt-3 mb-6 text-center text-muted">
-      {invite.invited_by} invited you as{" "}
-      {{ admin: "an admin", member: "a member", guest: "a guest" }[invite.role]}.
-    </p>
-  );
-
-  if (here) {
-    return (
-      <AuthScreen title={title}>
-        {subtitle}
-        <form onSubmit={accept.submit} className="flex flex-col gap-4">
-          <ErrorMessage>{accept.error}</ErrorMessage>
-          <Button type="submit" disabled={accept.busy}>
-            Join as {here.me.user.name}
-          </Button>
-          <Button variant="secondary" onClick={() => void signOut(here.place)}>
-            Not {here.me.user.name}? Sign out
-          </Button>
-        </form>
-      </AuthScreen>
-    );
-  }
-
-  if (providers.oidc) {
-    return (
-      <AuthScreen title={title}>
-        {subtitle}
-        <CodeVillainButton label="Sign in with Code Villain to join ↗" query={{ invite: token }} />
-        <p className="mt-6 text-center text-muted">
-          No Code Villain account yet? Ask {invite.invited_by} for one.
-        </p>
-      </AuthScreen>
-    );
-  }
-
-  const field = (key: keyof typeof form) => ({
-    value: form[key],
-    onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
-  });
-  return (
-    <AuthScreen title={title}>
-      {subtitle}
-      {providers.github && (
+      {server.field && <div className="mb-4">{server.field}</div>}
+      {company ? (
         <>
-          <GitHubButton label="Join with GitHub" query={{ invite: token }} />
-          <Or />
+          <CompanyButton
+            label={`Sign in with ${company} ↗`}
+            company={company}
+            query={query}
+            before={server.apply}
+          />
+          <p className="mt-6 text-center text-muted">New here? Ask {company}'s admin to add you.</p>
         </>
+      ) : (
+        // A desktop app's own server, or one whose sign-in isn't set up.
+        <p className="text-center text-muted">
+          {bundled && !server.checked
+            ? "Enter the server your team's Forge runs on."
+            : "This server doesn't sign anyone in."}
+        </p>
       )}
-      <form onSubmit={signup.submit} className="flex flex-col gap-4">
-        <TextField label="Your name" autoComplete="name" required {...field("name")} />
-        <TextField label="Email" type="email" autoComplete="email" required {...field("email")} />
-        <TextField
-          label="Password"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          hint="At least 8 characters."
-          {...field("password")}
-        />
-        <ErrorMessage>{signup.error}</ErrorMessage>
-        <Button type="submit" disabled={signup.busy}>
-          Create account and join
-        </Button>
-      </form>
-      <p className="mt-6 text-center text-muted">
-        Already have an account?{" "}
-        <Link to="/login" search={{ redirect: `/join/${token}` }} className="ui-link">
-          Sign in to join
-        </Link>
-      </p>
+      <BackLink />
     </AuthScreen>
   );
 }
@@ -625,7 +343,7 @@ export function SignedInPage() {
     return (
       <AuthScreen title="Couldn't sign you in">
         <div className="mb-4">
-          <ErrorMessage>{OIDC_PROBLEMS[problem]}</ErrorMessage>
+          <ErrorMessage>{problemOf(problem)}</ErrorMessage>
         </div>
         <p className="mb-6 text-center text-muted">Forge shows this too. You can close this tab.</p>
         <a href={link} className={`${buttonClass("secondary")} flex w-full`}>

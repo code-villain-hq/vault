@@ -85,7 +85,11 @@ issue is done.
 ## Commands
 
 - `bun run db`: start Postgres (Docker, port 5433). `bun run db:reset` wipes it.
-- `bun run dev`: Rust server (:7380) plus web app (:5173, proxies `/api`).
+- `bun run dev`: Rust server (:7380) plus web app (:5173, proxies `/api`),
+  for Acme Inc: dev-id (`code/kit/dev-id`) stands in for its account and
+  signs you in as anyone in its `people.toml`, on a database of its own
+  (`forge_acme`). With your own settings (`forge.toml`, or
+  `FORGE_OIDC_ISSUER` in `.env`) it uses those and your `forge` database.
 - `bun run dev:desktop`: Tauri app against the running dev server.
   `bun run build:desktop` packages it. The app runs Forge itself, on its own
   Postgres, for the workspaces on this Mac, and signs in to servers for the
@@ -93,17 +97,14 @@ issue is done.
   `~/Library/Application Support/com.villain.forge`.
 - `bun run app`: the whole app in Docker at http://localhost:7390 (one image:
   server plus built web app). `bun run app:logs` follows it.
-- `bun run seed`: local test accounts (admin, member, and a guest in the
-  first team of "Forge"); the
-  password is in `scripts/seed-dev.ts`. Needs `bun run dev` running, with
-  passwords on (`FORGE_OIDC_ISSUER` empty; README, "Signing in with Code Villain").
-  `bun run seed:dogfood` then describes Forge's code in the vault as
-  services, for drift checks on Forge itself.
+- `bun run seed`: puts Gus Guest in Acme's first team alone. Needs
+  `bun run dev` running for Acme Inc. `bun run seed:dogfood` then
+  describes Forge's code in the vault as services, for drift checks on
+  Forge itself.
 - `bun run dev:fake-ai`: `bun run dev` with the AI features on, against a
   stand-in model (no API key, no cost).
 - `bun run runner:install`: on the PO's Mac, install the launch agent that
   starts Claude Code when Forge wakes it (`scripts/agent-runner/README.md`).
-- `bun run reset-password <email>`: set a new password for someone.
 - `bun run backup`: dump the database and attachments to the backup folder,
   outside the repository: `FORGE_BACKUP_DIR`, or else `backup/forge` next to
   the vault's checkout (restoring: see the script).
@@ -124,11 +125,12 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 - `crates/domain`: models, validation, sync protocol types (no database).
 - `crates/sync`: Forge's rules for the studio's sync engine (`code/kit/sync`):
   who may write what, server-set fields, reviews, spec changes, work.
-- `crates/server`: axum server: HTTP API, WebSocket feed, accounts, invites,
-  MCP, the GitHub and Forgejo connections, Code Villain sign-in (`oidc.rs`),
-  drift checks. `serve.rs` runs it on a listener until told to stop, for the
-  server binary and the desktop app alike; `local.rs` is the one person of
-  the desktop app's own Forge, who has no password.
+- `crates/server`: axum server: HTTP API, WebSocket feed, accounts, MCP,
+  the GitHub and Forgejo connections, the company's sign-in (`oidc.rs`) and
+  people (`groups.rs`, `company.rs`), drift checks. Its settings:
+  `config.rs`, and `forge.example.toml`. `serve.rs` runs it on a listener
+  until told to stop, for the server binary and the desktop app alike; `local.rs` is the one person of
+  the desktop app's own Forge, who signs in to nothing.
 - `crates/ai`: model provider (Claude), agent loop, read-only repository
   access.
 - `packages/types`: generated from Rust. Never edit by hand.
@@ -170,16 +172,25 @@ initiatives, services, domains, specs, decisions or verdicts. A new member
 joins every team; a new guest joins none. `model.rs`'s `guest_view` holds
 the rules, and endpoints outside sync call `require_not_guest()`.
 
-## Groups
+## One company
 
-With `FORGE_SCIM_TOKEN` set, the Code Villain account sends its people and
-groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `forge` (`PUT /api/w/{id}/group`) has `forge-users` as
-members, `forge-admins` as admins and `forge-guests` as guests, and Members
-won't change their roles. A team linked to a group (`Team.group_name`, say
-`design`) has the people of `design-users`, `design-admins` and
-`design-guests` in the workspace, and nobody joins or leaves it by hand:
-`forge_sync::follow_groups` keeps it so. Tests: `crates/server/tests/scim.rs`.
+A server runs for one company (`forge.example.toml`): `company`,
+`public_url`, its account's sign-in (`[oidc]`) and its SCIM token
+(`[scim]`) are required, and a missing or unknown setting stops the server,
+naming it. On its first start it makes the company's workspace
+(`company.rs`); the first team comes with the first person.
+
+Nobody signs up and there are no invites or passwords: the company's account
+sends its people and groups to `/api/scim/v2` (`code/kit/scim`;
+`crates/server/src/groups.rs`). `forge-users` are members, `forge-admins`
+admins and `forge-guests` guests (other names under `[groups]`), and Members
+won't change their roles. Someone who signs in and isn't in one is told to
+ask the company's admin (`oidc_no_access`). Once the account has sent
+groups, people in none of them leave the workspace; agents stay. A team
+linked to a group (`Team.group_name`, say `design`) has the people of
+`design-users`, `design-admins` and `design-guests`, and nobody joins or
+leaves it by hand: `forge_sync::follow_groups` keeps it so. Tests:
+`crates/server/tests/scim.rs`.
 
 ## Adding a synced model
 

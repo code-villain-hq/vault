@@ -29,6 +29,7 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::auth::Member;
+use crate::config::{Error as SettingsError, Settings};
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -59,29 +60,30 @@ impl Default for DriftSettings {
 }
 
 impl DriftSettings {
-    /// `FORGE_LOCAL_REPOS_ROOT`, `FORGE_AI_CHECK_HOURS` (default 24; 0 turns
-    /// scheduled checks off), `FORGE_AI_MAX_TURNS` and `FORGE_AI_TRIAGE`
-    /// (0 turns triaging new issues off).
-    pub fn from_env() -> Self {
-        let repos_root = std::env::var("FORGE_LOCAL_REPOS_ROOT")
-            .ok()
-            .filter(|p| !p.trim().is_empty())
+    /// `local_repos_root`, `ai.check_hours` (default 24; 0 turns scheduled
+    /// checks off), `ai.max_turns` and `ai.triage` (false turns triaging new
+    /// issues off).
+    pub fn from_settings(settings: &Settings) -> Result<Self, SettingsError> {
+        let repos_root = settings
+            .get("local_repos_root")
             .and_then(|p| std::fs::canonicalize(p).ok());
-        let hours: i64 = std::env::var("FORGE_AI_CHECK_HOURS")
-            .ok()
-            .and_then(|h| h.parse().ok())
-            .unwrap_or(24);
-        let max_turns = std::env::var("FORGE_AI_MAX_TURNS")
-            .ok()
-            .and_then(|t| t.parse().ok())
-            .unwrap_or(40);
-        DriftSettings {
+        let number = |key: &str, default: i64| match settings.get(key) {
+            Some(value) => value
+                .parse::<i64>()
+                .ok()
+                .filter(|n| *n >= 0)
+                .ok_or_else(|| settings.invalid(key, "is a whole number")),
+            None => Ok(default),
+        };
+        let hours = number("ai.check_hours", 24)?;
+        let max_turns = number("ai.max_turns", 40)?;
+        Ok(DriftSettings {
             repos_root,
             check_every: (hours > 0).then(|| chrono::Duration::hours(hours)),
-            max_turns,
+            max_turns: max_turns as usize,
             github_clones: None,
-            triage_new_issues: std::env::var("FORGE_AI_TRIAGE").map_or(true, |v| v != "0"),
-        }
+            triage_new_issues: settings.flag("ai.triage", true)?,
+        })
     }
 
     /// Where a service's repository is on disk.

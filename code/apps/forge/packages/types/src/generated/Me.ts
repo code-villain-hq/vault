@@ -5,13 +5,4 @@ import type { WorkspaceInfo } from "./WorkspaceInfo";
 /**
  * The signed-in user and their workspaces.
  */
-export type Me = { user: UserInfo, workspaces: Array<WorkspaceInfo>, 
-/**
- * Whether you can sign in with a password (people who joined with
- * GitHub start without one).
- */
-has_password: boolean, 
-/**
- * Whether a GitHub account is connected, to sign in with.
- */
-github_connected: boolean, };
+export type Me = { user: UserInfo, workspaces: Array<WorkspaceInfo>, };

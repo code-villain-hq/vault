@@ -41,7 +41,7 @@ export function TeamsSettingsPage() {
               key={team.id}
               teamId={team.id}
               editable={isAdmin}
-              groups={isAdmin ? (groups?.groups ?? null) : null}
+              groups={isAdmin ? groups : null}
             />
           ))}
         </div>

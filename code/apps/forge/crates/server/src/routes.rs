@@ -12,8 +12,8 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::{
-    accounts, agents, attachments, drift, forgejo, github, groups, invites, mcp, members, oidc,
-    runners, teams, ws,
+    accounts, agents, attachments, drift, forgejo, github, groups, mcp, members, oidc, runners,
+    teams, ws,
 };
 
 /// The API, plus the built web app from `web_dir` when given (in production
@@ -53,9 +53,6 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/members/{user_id}/access", put(members::update_access))
-        .route("/group", get(groups::get).put(groups::link))
-        .route("/invites", get(invites::list).post(invites::create))
-        .route("/invites/{invite_id}", delete(invites::revoke))
         .route("/teams", post(teams::create))
         .route("/agents", get(agents::list).post(agents::create))
         .route("/agents/{agent_id}", patch(agents::rename))
@@ -78,6 +75,7 @@ pub fn router(state: AppState) -> Router {
                 .put(forgejo::connect)
                 .delete(forgejo::disconnect),
         )
+        .route("/groups", get(groups::list))
         .route("/github", get(github::status))
         .route("/github/refresh", post(github::refresh))
         .route(
@@ -101,21 +99,14 @@ pub fn router(state: AppState) -> Router {
     }
 
     api.route("/api/health", get(|| async { "ok" }))
-        .route("/api/auth/signup", post(accounts::signup))
-        .route("/api/auth/login", post(accounts::login))
         .route("/api/auth/logout", post(accounts::logout))
         .route("/api/me", get(accounts::me).put(accounts::update_profile))
-        .route("/api/me/password", put(accounts::change_password))
-        .route("/api/invites/{token}", get(invites::preview))
-        .route("/api/invites/{token}/accept", post(invites::accept))
         .route("/api/auth/providers", get(providers))
-        .route("/api/auth/github", get(github::login::start))
-        .route("/api/auth/github/connect", get(github::login::connect))
-        .route("/api/auth/github/callback", get(github::login::callback))
         .route("/api/auth/oidc", get(oidc::start))
         .route("/api/auth/oidc/callback", get(oidc::callback))
         .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/github/setup", get(github::setup))
+        .route("/api/auth/github/callback", get(github::oauth::callback))
         .route("/api/github/webhook", post(github::webhook::receive))
         .nest("/api/w/{workspace_id}", workspace)
         .merge(mcp::router(state.clone()))
@@ -200,16 +191,13 @@ fn desktop_cors(extra_origins: &[String]) -> CorsLayer {
         .expose_headers([HeaderName::from_static(crate::auth::SESSION_HEADER)])
 }
 
-/// `GET /api/auth/providers`: the ways to sign in. Signing in with Code
-/// Villain, when on, is the only one.
+/// `GET /api/auth/providers`: how to sign in. A server signs in with its
+/// company's account, named on the button; the desktop app's own server
+/// signs nobody in.
 async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
-    if state.on_this_mac {
-        return Json(serde_json::json!({ "oidc": false, "password": false, "github": false }));
-    }
-    let oidc = state.oidc_login.is_some();
-    Json(serde_json::json!({
-        "oidc": oidc,
-        "password": !oidc,
-        "github": !oidc && state.github_login.is_some(),
-    }))
+    let company = state
+        .company
+        .as_ref()
+        .filter(|_| state.oidc_login.is_some() && !state.on_this_mac);
+    Json(serde_json::json!({ "oidc": company.is_some(), "company": company }))
 }

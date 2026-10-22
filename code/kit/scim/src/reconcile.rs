@@ -1,12 +1,12 @@
-//! Turning groups into roles: who should be in each linked workspace, and
-//! as what, compared with who is.
+//! Turning groups into roles: who should be in each workspace that follows
+//! groups, and as what, compared with who is.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use sqlx::PgConnection;
 use uuid::Uuid;
 
-use crate::{Directory, Role, store};
+use crate::{Directory, Role, group_key, store};
 
 /// Brings each of these people's workspaces in line with their groups.
 pub(crate) async fn people<D: Directory>(
@@ -19,21 +19,23 @@ pub(crate) async fn people<D: Directory>(
     D::groups_changed(db, users).await
 }
 
-/// The role someone's groups give them in each linked workspace (or only in
-/// `only`), with the group it comes from, and what they have now; then the
-/// joins, changes and leaves that close the gap. Someone who came by invite
-/// and isn't in the groups stays as they are.
+/// The role someone's groups give them in each workspace that follows groups
+/// (or only in `only`), with the group it comes from, and what they have now;
+/// then the joins, changes and leaves that close the gap. Someone whose role
+/// didn't come from a group is left here: [`follow_groups`] takes them out.
+/// Pocket ID sends people before their groups, so a newcomer isn't in one yet.
 async fn person<D: Directory>(
     db: &mut PgConnection,
     user: Uuid,
     only: Option<Uuid>,
 ) -> anyhow::Result<()> {
     let from_groups: Vec<(Uuid, String, String)> = sqlx::query_as(
-        "SELECT w.id, w.group_name, g.name FROM workspaces w \
-         JOIN scim_groups g ON g.name IN (w.group_name || '-users', w.group_name || '-admins', w.group_name || '-guests') \
+        "SELECT w.id, g.name, CASE g.name WHEN w.admins_group THEN 'admin' \
+         WHEN w.users_group THEN 'member' ELSE 'guest' END FROM workspaces w \
+         JOIN scim_groups g ON g.name IN (w.users_group, w.admins_group, w.guests_group) \
          JOIN scim_group_members m ON m.group_id = g.id AND m.user_id = $1 \
          JOIN scim_users s ON s.user_id = m.user_id AND s.active \
-         WHERE w.group_name IS NOT NULL AND ($2::uuid IS NULL OR w.id = $2)",
+         WHERE w.users_group IS NOT NULL AND ($2::uuid IS NULL OR w.id = $2)",
     )
     .bind(user)
     .bind(only)
@@ -41,12 +43,8 @@ async fn person<D: Directory>(
     .await?;
     // Someone in more than one of a workspace's groups has the highest role.
     let mut wanted: BTreeMap<Uuid, (Role, String)> = BTreeMap::new();
-    for (workspace, base, name) in from_groups {
-        let role = match name.strip_prefix(base.as_str()) {
-            Some("-admins") => Role::Admin,
-            Some("-guests") => Role::Guest,
-            _ => Role::Member,
-        };
+    for (workspace, name, role) in from_groups {
+        let role = Role::parse(&role).unwrap_or(Role::Guest);
         if wanted.get(&workspace).is_none_or(|(best, _)| role > *best) {
             wanted.insert(workspace, (role, name));
         }
@@ -104,55 +102,89 @@ async fn set_source(
     .map(|_| ())
 }
 
-/// Links a workspace to a group, or unlinks it with `None`, and brings its
-/// people in line at once. Unlinking keeps everyone, with their roles, as
-/// though they'd been invited.
-pub async fn link_workspace<D: Directory>(
+/// The three groups that give a workspace's roles: its members, its admins
+/// and its guests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Groups {
+    pub users: String,
+    pub admins: String,
+    pub guests: String,
+}
+
+impl Groups {
+    /// `<app>-users`, `<app>-admins` and `<app>-guests`, or the names given,
+    /// read as names ([`group_key`]): "Forge admins" is forge-admins.
+    pub fn new(app: &str, users: Option<&str>, admins: Option<&str>, guests: Option<&str>) -> Self {
+        let name = |given: Option<&str>, ending: &str| {
+            given
+                .map(group_key)
+                .filter(|g| !g.is_empty())
+                .unwrap_or_else(|| format!("{app}-{ending}"))
+        };
+        Groups {
+            users: name(users, "users"),
+            admins: name(admins, "admins"),
+            guests: name(guests, "guests"),
+        }
+    }
+}
+
+/// Makes a workspace follow `groups` and brings its people in line: the
+/// groups' people join with their roles and, once the account has sent its
+/// groups, everyone else leaves, but for those [`Directory::stays`] keeps.
+/// The server does this as it starts, with the groups its settings name.
+pub async fn follow_groups<D: Directory>(
     db: &mut PgConnection,
     workspace: Uuid,
-    group: Option<&str>,
+    groups: &Groups,
 ) -> anyhow::Result<()> {
     store::lock(db).await?;
-    sqlx::query("UPDATE workspaces SET group_name = $2 WHERE id = $1")
-        .bind(workspace)
-        .bind(group)
-        .execute(&mut *db)
-        .await?;
-    if group.is_none() {
-        sqlx::query("UPDATE workspace_members SET from_group = NULL WHERE workspace_id = $1")
-            .bind(workspace)
-            .execute(&mut *db)
-            .await?;
-    }
-    let users: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT m.user_id FROM scim_group_members m JOIN scim_groups g ON g.id = m.group_id \
-         WHERE g.name IN ($2 || '-users', $2 || '-admins', $2 || '-guests') \
-         UNION SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND from_group IS NOT NULL",
+    sqlx::query(
+        "UPDATE workspaces SET users_group = $2, admins_group = $3, guests_group = $4 WHERE id = $1",
     )
     .bind(workspace)
-    .bind(group)
+    .bind(&groups.users)
+    .bind(&groups.admins)
+    .bind(&groups.guests)
+    .execute(&mut *db)
+    .await?;
+    let users: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT m.user_id FROM scim_group_members m JOIN scim_groups g ON g.id = m.group_id \
+         WHERE g.name IN ($2, $3, $4) \
+         UNION SELECT user_id FROM workspace_members WHERE workspace_id = $1",
+    )
+    .bind(workspace)
+    .bind(&groups.users)
+    .bind(&groups.admins)
+    .bind(&groups.guests)
     .fetch_all(&mut *db)
     .await?;
     for &user in &users {
         person::<D>(db, user, Some(workspace)).await?;
     }
+    // Until the account has sent its groups nobody is in one, and leaving
+    // would empty the workspace.
+    let sent: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM scim_groups)")
+        .fetch_one(&mut *db)
+        .await?;
+    if sent {
+        let strays: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND from_group IS NULL",
+        )
+        .bind(workspace)
+        .fetch_all(&mut *db)
+        .await?;
+        for user in strays {
+            if !D::stays(db, user).await? {
+                D::remove_member(db, workspace, user).await?;
+            }
+        }
+    }
     D::groups_changed(db, &users).await
 }
 
-/// The group a workspace is linked to.
-pub async fn linked_group(
-    db: &mut PgConnection,
-    workspace: Uuid,
-) -> Result<Option<String>, sqlx::Error> {
-    sqlx::query_scalar("SELECT group_name FROM workspaces WHERE id = $1")
-        .bind(workspace)
-        .fetch_optional(db)
-        .await
-        .map(Option::flatten)
-}
-
 /// The group someone's role in a workspace comes from, if it does: then the
-/// role is changed in the Code Villain account, not here.
+/// role is changed in the company's account, not here.
 pub async fn role_source(
     db: &mut PgConnection,
     workspace: Uuid,

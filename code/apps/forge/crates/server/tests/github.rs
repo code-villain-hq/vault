@@ -14,7 +14,7 @@ use axum::routing::{get, post};
 use common::App;
 use forge_server::AppState;
 use forge_server::github::GitHubApp;
-use forge_server::github::login::GitHubLogin;
+use forge_server::github::oauth::GitHubOAuth;
 use hmac::{Hmac, KeyInit, Mac};
 use jsonwebtoken::EncodingKey;
 use serde_json::{Value, json};
@@ -182,8 +182,8 @@ async fn setup(pool: PgPool) -> Setup {
     setup_with(pool, false).await
 }
 
-/// With `sign_in`, the server also has GitHub sign-in (OAuth) set up.
-async fn setup_with(pool: PgPool, sign_in: bool) -> Setup {
+/// With `oauth`, the server also has the App's OAuth client.
+async fn setup_with(pool: PgPool, oauth: bool) -> Setup {
     let data = tempfile::tempdir().unwrap();
     let pr = Arc::new(Mutex::new(PullRequest {
         mergeable: json!(true),
@@ -202,9 +202,9 @@ async fn setup_with(pool: PgPool, sign_in: bool) -> Setup {
     )
     .with_test_api(api.clone());
     let mut state = AppState::new(pool.clone(), false).with_github(github.clone());
-    if sign_in {
-        let login = GitHubLogin::new("client".into(), "client-secret".into(), api.clone(), api);
-        state = state.with_github_login(login);
+    if oauth {
+        let oauth = GitHubOAuth::new("client".into(), "client-secret".into(), api.clone(), api);
+        state = state.with_github_oauth(oauth);
     }
     let app = App::with_state(state);
     let (admin, workspace) = app.signup("Ada", "Forge").await;
@@ -940,7 +940,7 @@ async fn linked(s: &Setup) -> bool {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn with_github_sign_in_the_installer_must_be_able_to_access_the_installation(pool: PgPool) {
+async fn with_github_oauth_the_installer_must_be_able_to_access_the_installation(pool: PgPool) {
     let s = setup_with(pool, true).await;
     let status = s
         .app
@@ -975,7 +975,7 @@ async fn an_installation_the_installer_cannot_access_is_not_linked(pool: PgPool)
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn with_github_sign_in_an_installation_needs_github_to_say_who_installed_it(pool: PgPool) {
+async fn with_github_oauth_an_installation_needs_github_to_say_who_installed_it(pool: PgPool) {
     let s = setup_with(pool, true).await;
     let response = finish_installing(&s, "&setup_action=install").await;
     assert_eq!(
@@ -994,7 +994,7 @@ async fn with_github_sign_in_an_installation_needs_github_to_say_who_installed_i
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn without_github_sign_in_an_admin_links_installations_as_before(pool: PgPool) {
+async fn without_github_oauth_an_admin_links_installations_as_before(pool: PgPool) {
     let s = setup(pool).await;
     let status = s
         .app
@@ -1008,7 +1008,7 @@ async fn without_github_sign_in_an_admin_links_installations_as_before(pool: PgP
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn installs_that_github_sends_to_the_sign_in_callback_go_on_to_setup(pool: PgPool) {
+async fn installs_that_github_sends_to_the_oauth_callback_go_on_to_setup(pool: PgPool) {
     let s = setup_with(pool, true).await;
     sqlx::query("DELETE FROM github_installations")
         .execute(&s.app.pool)

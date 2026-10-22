@@ -16,7 +16,6 @@
     "seed:dogfood": "bun scripts/seed-dogfood.ts",
     "runner": "bun scripts/agent-runner/main.ts",
     "runner:install": "bun scripts/agent-runner/install.ts",
-    "reset-password": "cargo run -q -p forge-server -- reset-password",
     "backup": "bun scripts/backup.ts",
     "dev": "bun scripts/dev.ts",
     "dev:desktop": "bun run --cwd apps/desktop tauri dev",

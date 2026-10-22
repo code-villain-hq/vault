@@ -7,8 +7,7 @@ use uuid::Uuid;
 
 use crate::drift::DriftSettings;
 use crate::github::GitHubApp;
-use crate::github::login::GitHubLogin;
-use crate::limits::Attempts;
+use crate::github::oauth::GitHubOAuth;
 use crate::oidc::OidcLogin;
 
 #[derive(Clone)]
@@ -27,25 +26,21 @@ pub struct AppState {
     pub forgejo_wake: Arc<Notify>,
     /// The GitHub App; `None` turns the GitHub connection off.
     pub github: Option<Arc<GitHubApp>>,
-    /// Signing in with GitHub; `None` turns it off.
-    pub github_login: Option<Arc<GitHubLogin>>,
-    /// Signing in with Code Villain; when on, it's the only way in.
+    /// The GitHub App's OAuth client, which confirms who installs the App.
+    pub github_oauth: Option<Arc<GitHubOAuth>>,
+    /// The company the server runs for, as the sign-in button names it.
+    pub company: Option<String>,
+    /// Signing in with the company's account: the only way in.
     pub oidc_login: Option<Arc<OidcLogin>>,
-    /// The token Pocket ID sends the account's people and groups with
-    /// (`FORGE_SCIM_TOKEN`); `None` turns groups off.
+    /// The token the company's account sends its people and groups with
+    /// (`scim.token`).
     pub scim_token: Option<String>,
-    /// Wrong passwords per account, to slow down guessing.
-    pub password_attempts: Arc<Attempts>,
-    /// Sign-ups per client address, so nobody can make accounts (or find
-    /// out which emails have one) by the thousand.
-    pub signup_attempts: Arc<Attempts>,
-    /// Whether to take client addresses from `X-Forwarded-For`, which only
-    /// a proxy in front of Forge may set (`FORGE_TRUST_FORWARDED_FOR=1`).
-    pub trust_forwarded_for: bool,
+    /// Hosts besides this one that may call `/mcp` (`mcp.allowed_hosts`).
+    pub mcp_allowed_hosts: Vec<String>,
     /// Where files live: attachments, and the GitHub connection's clones.
     pub data_dir: std::path::PathBuf,
     /// The desktop app's own server, for the workspaces on this Mac: nobody
-    /// signs up or in; the app gets its session from [`crate::local`].
+    /// signs in; the app gets its session from [`crate::local`].
     pub on_this_mac: bool,
     /// Origins besides the desktop app's that may call the API across
     /// origins (the dev web app, for a desktop app in development).
@@ -66,12 +61,11 @@ impl AppState {
             drift_wake: Arc::new(Notify::new()),
             forgejo_wake: Arc::new(Notify::new()),
             github: None,
-            github_login: None,
+            github_oauth: None,
+            company: None,
             oidc_login: None,
             scim_token: None,
-            password_attempts: Arc::default(),
-            signup_attempts: Arc::new(Attempts::sign_ups()),
-            trust_forwarded_for: false,
+            mcp_allowed_hosts: Vec::new(),
             data_dir: "data".into(),
             on_this_mac: false,
             extra_origins: Vec::new(),
@@ -79,14 +73,7 @@ impl AppState {
         }
     }
 
-    /// Takes client addresses from `X-Forwarded-For`, for a server behind a
-    /// proxy that sets it.
-    pub fn trusting_forwarded_for(mut self, trust: bool) -> Self {
-        self.trust_forwarded_for = trust;
-        self
-    }
-
-    /// The desktop app's own server: no sign-ups and no sign-ins.
+    /// The desktop app's own server: no sign-ins.
     pub fn on_this_mac(mut self) -> Self {
         self.on_this_mac = true;
         self
@@ -104,22 +91,33 @@ impl AppState {
         self
     }
 
-    /// Turns on signing in with GitHub.
-    pub fn with_github_login(mut self, login: GitHubLogin) -> Self {
-        self.github_login = Some(Arc::new(login));
+    /// Confirms who installs the GitHub App with its OAuth client.
+    pub fn with_github_oauth(mut self, oauth: GitHubOAuth) -> Self {
+        self.github_oauth = Some(Arc::new(oauth));
         self
     }
 
-    /// Turns on signing in with Code Villain, and off passwords and GitHub
-    /// sign-in.
-    /// Takes the account's people and groups at `/api/scim/v2` (`crate::groups`).
+    /// The company the server runs for, named on the sign-in button.
+    pub fn for_company(mut self, company: impl Into<String>) -> Self {
+        self.company = Some(company.into());
+        self
+    }
+
+    /// Takes the company's people and groups at `/api/scim/v2` (`crate::groups`).
     pub fn with_scim(mut self, token: impl Into<String>) -> Self {
         self.scim_token = Some(token.into());
         self
     }
 
+    /// Signs people in with the company's account.
     pub fn with_oidc_login(mut self, login: OidcLogin) -> Self {
         self.oidc_login = Some(Arc::new(login));
+        self
+    }
+
+    /// Lets `/mcp` be called at these hosts too, as behind a proxy.
+    pub fn allowing_mcp_hosts(mut self, hosts: Vec<String>) -> Self {
+        self.mcp_allowed_hosts = hosts;
         self
     }
 

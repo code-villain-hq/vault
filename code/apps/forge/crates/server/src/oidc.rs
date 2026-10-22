@@ -1,22 +1,17 @@
-//! Signing in with Code Villain: one account for every studio app, kept by
-//! the studio's OpenID Connect provider (Pocket ID at id.codevillain.eu).
-//! Configured with `FORGE_OIDC_ISSUER`, `FORGE_OIDC_CLIENT_ID`,
-//! `FORGE_OIDC_CLIENT_SECRET` and `FORGE_PUBLIC_URL` (Forge's own address;
-//! the provider sends people back to `<it>/api/auth/oidc/callback`). Off
-//! without them. When it's on, it's the only way people sign in: email and
-//! password, and GitHub, are closed.
+//! Signing in with the company's account, over OpenID Connect: the only way
+//! in to a server. Its settings are `[oidc] issuer`, `client_id` and
+//! `client_secret`, and `public_url` (Forge's own address; the provider
+//! sends people back to `<it>/api/auth/oidc/callback`).
 //!
-//! The provider says who someone is; Forge says what they may do here
-//! (workspaces, roles and invites stay in Forge). A studio account signs in
-//! to the Forge account it's linked to (`users.oidc_sub`). The first time, it
-//! links to the account with the provider's verified email: the studio keeps
-//! those emails, and with this on nobody can sign up here with an address of
-//! their choosing. Someone without an account gets one when they come from an
-//! invite link, and confirms joining on the invite page.
+//! The provider says who someone is; the company's account also sends its
+//! people and their groups (SCIM, `crate::groups`), which say who is in the
+//! workspace and with what role. Signing in makes nobody: it finds the Forge
+//! account the provider's account is linked to (`users.oidc_sub`), else the
+//! one with the provider's verified email, and lets them in only when
+//! they're in the workspace.
 //!
-//! The round trip carries a signed `state` and a cookie with the nonce, the
-//! PKCE verifier and any invite, as signing in with GitHub does
-//! (`github::login`). Forge trades the code for tokens itself, with its
+//! The round trip carries a signed `state` and a cookie with the nonce and
+//! the PKCE verifier. Forge trades the code for tokens itself, with its
 //! client secret over TLS, so it checks the ID token's issuer, audience,
 //! expiry and nonce but not its signature (OpenID Connect Core 1.0,
 //! 3.1.3.7, step 6). The provider must therefore be https, except on this
@@ -37,12 +32,13 @@ use std::time::{Duration, Instant};
 use anyhow::bail;
 use axum::Json;
 use axum::extract::{Query, State};
-use axum::http::{HeaderMap, HeaderValue};
-use axum::response::Response;
+use axum::http::header::{COOKIE, LOCATION, SET_COOKIE};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::Utc;
-use forge_domain::{clean_name, is_agent_email, normalize_email};
+use forge_domain::{is_agent_email, normalize_email};
 use hmac::{Hmac, KeyInit, Mac};
 use serde::Deserialize;
 use serde_json::Value;
@@ -54,8 +50,6 @@ use uuid::Uuid;
 use crate::accounts::signed_in;
 use crate::auth::{hash_token, new_token, session_cookie, start_session};
 use crate::error::AppError;
-use crate::github::login::{cookie_value, redirect, safe_redirect, urlencode};
-use crate::invites;
 use crate::state::AppState;
 
 /// Ties a sign-in to the browser that started it, against login CSRF.
@@ -114,8 +108,6 @@ struct Claims {
     sub: String,
     email: Option<String>,
     email_verified: Option<bool>,
-    name: Option<String>,
-    preferred_username: Option<String>,
 }
 
 /// Why signing in didn't work; the sign-in page has a message for each.
@@ -126,9 +118,9 @@ enum Problem {
     OtherBrowser,
     Provider,
     NoEmail,
-    NoAccount,
-    InviteGone,
-    /// The Forge account with this email is linked to another studio account.
+    /// Not in the workspace: the company's admin adds them to its groups.
+    NoAccess,
+    /// The Forge account with this email is linked to another account.
     Taken,
     Failed,
 }
@@ -141,8 +133,7 @@ impl Problem {
             Problem::OtherBrowser => "oidc_other_browser",
             Problem::Provider => "oidc_refused",
             Problem::NoEmail => "oidc_no_email",
-            Problem::NoAccount => "oidc_no_account",
-            Problem::InviteGone => "invite_gone",
+            Problem::NoAccess => "oidc_no_access",
             Problem::Taken => "oidc_taken",
             Problem::Failed => "oidc_failed",
         }
@@ -151,7 +142,7 @@ impl Problem {
 
 impl From<sqlx::Error> for Problem {
     fn from(e: sqlx::Error) -> Self {
-        tracing::error!(error = %e, "Code Villain sign-in failed");
+        tracing::error!(error = %e, "signing in failed");
         Problem::Failed
     }
 }
@@ -173,45 +164,21 @@ fn trusted_url(url: &str) -> bool {
 }
 
 impl OidcLogin {
-    /// From `FORGE_OIDC_*` and `FORGE_PUBLIC_URL`; `None` without an issuer.
-    /// An issuer without the rest is a mistake, not a reason to leave
-    /// passwords open.
-    pub fn from_env() -> anyhow::Result<Option<Self>> {
-        Self::from_settings(|name| std::env::var(name).ok())
-    }
-
-    /// [`Self::from_env`], with the settings looked up by `setting`.
-    fn from_settings(setting: impl Fn(&str) -> Option<String>) -> anyhow::Result<Option<Self>> {
-        let var = |name: &str| {
-            setting(name)
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-        };
-        let Some(issuer) = var("FORGE_OIDC_ISSUER") else {
-            return Ok(None);
-        };
-        let (Some(client_id), Some(client_secret), Some(public_url)) = (
-            var("FORGE_OIDC_CLIENT_ID"),
-            var("FORGE_OIDC_CLIENT_SECRET"),
-            var("FORGE_PUBLIC_URL"),
-        ) else {
-            let missing: Vec<&str> = [
-                "FORGE_OIDC_CLIENT_ID",
-                "FORGE_OIDC_CLIENT_SECRET",
-                "FORGE_PUBLIC_URL",
-            ]
-            .into_iter()
-            .filter(|name| var(name).is_none())
-            .collect();
-            let missing = match missing.as_slice() {
-                [rest @ .., last] if !rest.is_empty() => {
-                    format!("{} and {last}", rest.join(", "))
-                }
-                _ => missing.join(""),
-            };
-            bail!("FORGE_OIDC_ISSUER is set: also set {missing}");
-        };
-        Self::new(issuer, client_id, client_secret, &public_url).map(Some)
+    /// From `[oidc]` and `public_url`, which the server requires.
+    pub fn from_settings(settings: &crate::config::Settings) -> anyhow::Result<Self> {
+        settings.require(&[
+            "oidc.issuer",
+            "oidc.client_id",
+            "oidc.client_secret",
+            "public_url",
+        ])?;
+        let get = |key: &str| settings.get(key).unwrap_or_default();
+        Self::new(
+            get("oidc.issuer"),
+            get("oidc.client_id"),
+            get("oidc.client_secret"),
+            &get("public_url"),
+        )
     }
 
     /// `public_url` is Forge's own address, as people's browsers reach it.
@@ -223,7 +190,9 @@ impl OidcLogin {
     ) -> anyhow::Result<Self> {
         let issuer = issuer.trim_end_matches('/').to_string();
         if !trusted_url(&issuer) {
-            bail!("FORGE_OIDC_ISSUER must be an https address (or http on this machine)");
+            bail!(
+                "the setting oidc.issuer (FORGE_OIDC_ISSUER) is an https address (or http on this machine)"
+            );
         }
         let mut key = [0u8; 32];
         getrandom::fill(&mut key).expect("the OS random number generator works");
@@ -406,8 +375,7 @@ fn is_hex(text: &str, len: usize) -> bool {
     text.len() == len && text.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// `nonce.verifier` or `nonce.verifier.invite`, all hex, for this flow's
-/// paths only.
+/// `nonce.verifier`, both hex, for this flow's paths only.
 fn nonce_cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
     let secure = if secure { "; Secure" } else { "" };
     HeaderValue::from_str(&format!(
@@ -426,7 +394,6 @@ fn failed(problem: Problem, desktop: bool, secure: bool) -> Response {
 
 #[derive(Deserialize)]
 pub struct StartParams {
-    invite: Option<String>,
     redirect: Option<String>,
     /// From the desktop app: the hex SHA-256 of its secret.
     desktop: Option<String>,
@@ -453,11 +420,7 @@ pub async fn start(State(state): State<AppState>, Query(params): Query<StartPara
             .filter(|d| is_hex(d, 64))
             .map(|d| d.to_ascii_lowercase()),
     });
-    // The invite rides in the cookie, never in the URL sent to the provider.
-    let cookie = match params.invite.filter(|i| is_hex(i, 64)) {
-        Some(invite) => format!("{nonce}.{verifier}.{invite}"),
-        None => format!("{nonce}.{verifier}"),
-    };
+    let cookie = format!("{nonce}.{verifier}");
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
     let join = if endpoints.authorization.contains('?') {
         '&'
@@ -531,7 +494,6 @@ async fn finish(
     let mut parts = cookie.split('.');
     let nonce = parts.next().unwrap_or_default();
     let verifier = parts.next().unwrap_or_default();
-    let invite = parts.next();
     if nonce.is_empty() || nonce != trip.nonce {
         return Err(Problem::OtherBrowser);
     }
@@ -540,12 +502,8 @@ async fn finish(
     login.check(&claims, &trip.nonce)?;
 
     let mut db = state.pool.begin().await?;
-    let user = account(&mut db, &claims, invite).await?;
-    // People confirm joining a workspace themselves, on the invite page.
-    let to = match invite {
-        Some(invite) => format!("/join/{invite}"),
-        None => trip.redirect,
-    };
+    let user = account(&mut db, &claims).await?;
+    let to = trip.redirect;
     match trip.desktop {
         Some(challenge) => {
             db.commit().await?;
@@ -562,71 +520,54 @@ async fn finish(
     }
 }
 
-/// The Forge account behind the studio account: linked already, linked now
-/// by email, or new from an invite.
-async fn account(
-    db: &mut PgConnection,
-    claims: &Claims,
-    invite: Option<&str>,
-) -> Result<Uuid, Problem> {
+/// The Forge account behind the company's account: linked already, or
+/// linked now by its verified email. Only someone in the workspace gets in.
+async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem> {
     let linked: Option<Uuid> =
         sqlx::query_scalar("SELECT id FROM users WHERE oidc_sub = $1 AND kind = 'person'")
             .bind(&claims.sub)
             .fetch_optional(&mut *db)
             .await?;
-    if let Some(user) = linked {
-        return Ok(user);
-    }
-    // An email the provider says it hasn't verified proves nothing.
-    let email = claims
-        .email
-        .as_deref()
-        .filter(|_| claims.email_verified != Some(false))
-        .and_then(|e| normalize_email(e).ok())
-        .filter(|e| !is_agent_email(e))
-        .ok_or(Problem::NoEmail)?;
-    let existing: Option<(Uuid, bool)> = sqlx::query_as(
-        "SELECT id, kind = 'person' AND oidc_sub IS NULL FROM users WHERE email = $1",
-    )
-    .bind(&email)
-    .fetch_optional(&mut *db)
-    .await?;
-    match existing {
-        Some((user, true)) => {
-            sqlx::query("UPDATE users SET oidc_sub = $1 WHERE id = $2")
-                .bind(&claims.sub)
-                .bind(user)
-                .execute(&mut *db)
-                .await?;
-            Ok(user)
-        }
-        Some((_, false)) => Err(Problem::Taken),
+    let user = match linked {
+        Some(user) => user,
         None => {
-            let invite = invite.ok_or(Problem::NoAccount)?;
-            if invites::find_valid(&mut *db, invite)
-                .await
-                .map_err(|_| Problem::Failed)?
-                .is_none()
-            {
-                return Err(Problem::InviteGone);
+            // An email the provider says it hasn't verified proves nothing.
+            let email = claims
+                .email
+                .as_deref()
+                .filter(|_| claims.email_verified != Some(false))
+                .and_then(|e| normalize_email(e).ok())
+                .filter(|e| !is_agent_email(e))
+                .ok_or(Problem::NoEmail)?;
+            let existing: Option<(Uuid, bool)> = sqlx::query_as(
+                "SELECT id, kind = 'person' AND oidc_sub IS NULL FROM users WHERE email = $1",
+            )
+            .bind(&email)
+            .fetch_optional(&mut *db)
+            .await?;
+            match existing {
+                Some((user, true)) => {
+                    sqlx::query("UPDATE users SET oidc_sub = $1 WHERE id = $2")
+                        .bind(&claims.sub)
+                        .bind(user)
+                        .execute(&mut *db)
+                        .await?;
+                    user
+                }
+                Some((_, false)) => return Err(Problem::Taken),
+                None => return Err(Problem::NoAccess),
             }
-            let fallback = email.split('@').next().unwrap_or_default().to_string();
-            let name = [&claims.name, &claims.preferred_username]
-                .into_iter()
-                .flatten()
-                .chain([&fallback])
-                .find_map(|n| clean_name(n, "name").ok())
-                .unwrap_or_else(|| "New member".into());
-            let user = Uuid::now_v7();
-            sqlx::query("INSERT INTO users (id, email, name, oidc_sub) VALUES ($1, $2, $3, $4)")
-                .bind(user)
-                .bind(&email)
-                .bind(&name)
-                .bind(&claims.sub)
-                .execute(&mut *db)
-                .await?;
-            Ok(user)
         }
+    };
+    let member: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM workspace_members WHERE user_id = $1)")
+            .bind(user)
+            .fetch_one(&mut *db)
+            .await?;
+    if member {
+        Ok(user)
+    } else {
+        Err(Problem::NoAccess)
     }
 }
 
@@ -646,12 +587,55 @@ pub async fn desktop(
     let login = state
         .oidc_login
         .as_ref()
-        .ok_or_else(|| AppError::not_found("signing in with Code Villain is off"))?;
+        .ok_or_else(|| AppError::not_found("this server signs nobody in"))?;
     let user = login
         .take(&request.code, &request.secret)
         .ok_or_else(|| AppError::unauthorized("this sign-in has expired: start again"))?;
     let token = start_session(&state.pool, user).await?;
     signed_in(&state, &headers, &token, user).await
+}
+
+/// A path on this site, nothing that a browser could read as another one:
+/// no control characters, spaces or backslashes, and not `//`.
+fn safe_redirect(path: Option<&str>) -> String {
+    path.filter(|p| {
+        p.starts_with('/')
+            && !p.starts_with("//")
+            && p.chars().all(|c| c.is_ascii_graphic() && c != '\\')
+    })
+    .unwrap_or("/")
+    .to_string()
+}
+
+fn redirect(to: &str, cookies: &[HeaderValue]) -> Response {
+    let mut response = (StatusCode::SEE_OTHER, [(LOCATION, to.to_string())]).into_response();
+    for cookie in cookies {
+        response.headers_mut().append(SET_COOKIE, cookie.clone());
+    }
+    response
+}
+
+fn urlencode(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .find_map(|pair| {
+            let (key, value) = pair.trim().split_once('=')?;
+            (key == name).then(|| value.to_string())
+        })
 }
 
 #[cfg(test)]
@@ -722,46 +706,23 @@ mod tests {
     }
 
     #[test]
-    fn half_set_up_names_only_the_missing_settings() {
-        let settings = |set: &'static [(&'static str, &'static str)]| {
-            move |name: &str| {
-                set.iter()
-                    .find(|(key, _)| *key == name)
-                    .map(|(_, value)| value.to_string())
-            }
-        };
-        let error = |set| {
-            OidcLogin::from_settings(settings(set))
-                .err()
-                .unwrap()
-                .to_string()
-        };
-
+    fn redirects_stay_on_this_site() {
+        assert_eq!(safe_redirect(Some("/forge")), "/forge");
         assert_eq!(
-            error(&[
-                ("FORGE_OIDC_ISSUER", "https://id.example"),
-                ("FORGE_OIDC_CLIENT_ID", "forge"),
-                ("FORGE_PUBLIC_URL", "https://forge.example"),
-            ]),
-            "FORGE_OIDC_ISSUER is set: also set FORGE_OIDC_CLIENT_SECRET"
+            safe_redirect(Some("/forge/issue/FOR-1?x=1")),
+            "/forge/issue/FOR-1?x=1"
         );
-        assert_eq!(
-            error(&[
-                ("FORGE_OIDC_ISSUER", "https://id.example"),
-                ("FORGE_OIDC_CLIENT_SECRET", " "),
-            ]),
-            "FORGE_OIDC_ISSUER is set: also set FORGE_OIDC_CLIENT_ID, FORGE_OIDC_CLIENT_SECRET and FORGE_PUBLIC_URL"
-        );
-        assert!(OidcLogin::from_settings(settings(&[])).unwrap().is_none());
-        assert!(
-            OidcLogin::from_settings(settings(&[
-                ("FORGE_OIDC_ISSUER", "https://id.example"),
-                ("FORGE_OIDC_CLIENT_ID", "forge"),
-                ("FORGE_OIDC_CLIENT_SECRET", "secret"),
-                ("FORGE_PUBLIC_URL", "https://forge.example"),
-            ]))
-            .unwrap()
-            .is_some()
-        );
+        for bad in [
+            "//evil.example",
+            "/\\evil.example",
+            "/\t/evil.example",
+            "/\n/evil.example",
+            "/ /evil.example",
+            "https://evil.example",
+            "",
+        ] {
+            assert_eq!(safe_redirect(Some(bad)), "/", "{bad:?}");
+        }
+        assert_eq!(safe_redirect(None), "/");
     }
 }

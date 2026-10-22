@@ -52,26 +52,6 @@ impl AppError {
         Self::new(StatusCode::CONFLICT, "conflict", message)
     }
 
-    /// Refused for now, after too many wrong passwords.
-    pub fn too_many(wait: std::time::Duration) -> Self {
-        Self::try_again_later("too many wrong passwords", wait)
-    }
-
-    /// Refused for now, after too many sign-ups from the same place.
-    pub fn too_many_signups(wait: std::time::Duration) -> Self {
-        Self::try_again_later("too many sign-ups from here", wait)
-    }
-
-    fn try_again_later(what: &str, wait: std::time::Duration) -> Self {
-        let minutes = wait.as_secs().div_ceil(60).max(1);
-        let unit = if minutes == 1 { "minute" } else { "minutes" };
-        Self::new(
-            StatusCode::TOO_MANY_REQUESTS,
-            "too_many_attempts",
-            format!("{what}; try again in {minutes} {unit}"),
-        )
-    }
-
     /// Logs the cause and tells the client only that something went wrong.
     pub fn internal(cause: impl Display) -> Self {
         tracing::error!(error = %cause, "internal error");
