@@ -38,7 +38,7 @@ One studio account signs people in to every app: Pocket ID at id.codevillain.eu,
 
 Pocket ID also says who belongs where, as a company's login provider does for Linear. It pushes its users and groups to each app's server over SCIM 2.0, at most five minutes after a change and at least once an hour. `studio/design/behaviour.md` ("Who gets in") says what people see.
 
-- The server takes them at `/api/scim/v2` (Users and Groups) with `code/kit/scim`, a Rust crate every app uses instead of a copy (its `AGENTS.md` says how). It keeps people and groups; the app keeps workspaces and roles. Forge has it.
+- The server takes them at `/api/scim/v2` (Users and Groups) with `code/kit/scim`, a Rust crate every app uses instead of a copy (its `AGENTS.md` says how). It keeps people and groups; the app keeps workspaces and roles. Forge, Glyph, Raven and Layer have it.
 - A user from Pocket ID gets an account straight away, keyed by the same `oidc_sub` that signing in uses. Taking them out of every linked group removes them from those workspaces and ends their sessions there. The account stays, for history and other invites.
 - A workspace links to one group, by name (`workspaces.group_name`): the studio's Forge workspace to `forge`, its Glyph workspace to `glyph`. That group makes members; the group with `-admins` after its name makes admins, and with `-guests`, guests. A role from a group can't be changed in the app (`workspace_members.from_group` says which).
 - Pocket ID sends a group's friendly name, not its name: give every group the same friendly name as its name, and don't rename a linked one, or its people leave.

@@ -16,6 +16,9 @@ pub struct AppState {
     pub cookie_secure: bool,
     /// Signing in with Code Villain; when on, it's the only way in.
     pub oidc_login: Option<Arc<OidcLogin>>,
+    /// The token Pocket ID sends the account's people and groups with
+    /// (`LAYER_SCIM_TOKEN`); `None` turns groups off.
+    pub scim_token: Option<String>,
     /// Wrong passwords per account, to slow down guessing.
     pub password_attempts: Arc<Attempts>,
     /// Sign-ups per client address, so nobody can make accounts (or find
@@ -40,6 +43,7 @@ impl AppState {
             wake,
             cookie_secure,
             oidc_login: None,
+            scim_token: None,
             password_attempts: Arc::default(),
             signup_attempts: Arc::new(Attempts::sign_ups()),
             trust_forwarded_for: false,
@@ -57,6 +61,12 @@ impl AppState {
     /// Lets `origin` call the API across origins, as the desktop app may.
     pub fn allowing_origin(mut self, origin: impl Into<String>) -> Self {
         self.extra_origins.push(origin.into());
+        self
+    }
+
+    /// Takes the account's people and groups at `/api/scim/v2` (`crate::groups`).
+    pub fn with_scim(mut self, token: impl Into<String>) -> Self {
+        self.scim_token = Some(token.into());
         self
     }
 

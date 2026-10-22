@@ -9,6 +9,7 @@ pub mod apps;
 pub mod auth;
 pub mod config;
 pub mod error;
+pub mod groups;
 pub mod health;
 pub mod invites;
 pub mod limits;

@@ -7,4 +7,9 @@ export type MemberInfo = { user: UserInfo, role: Role, joined_at: string,
  * The apps they've been added to. Only a guest's matter: admins and
  * members see them all.
  */
-access: Array<string>, };
+access: Array<string>, 
+/**
+ * The group of the Code Villain account their role comes from, such as
+ * `raven-admins`: it's changed there, not in Members.
+ */
+from_group: string | null, };

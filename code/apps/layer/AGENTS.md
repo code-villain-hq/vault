@@ -268,6 +268,14 @@ build does the same.
 | `crates/domain`, `crates/sync`, `crates/server`, `migrations/` | Layer's server: the synced records, who may write them, the HTTP and sync routes, the schema ([architecture](docs/architecture.md#layers-server)) |
 | `web/` | the server's web app; `packages/types` holds the records' types, generated |
 
+## Groups
+
+With `LAYER_SCIM_TOKEN` set, the Code Villain account sends its people and
+groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
+A workspace linked to `layer` (`PUT /api/w/{id}/group`) has `layer` as
+members, `layer-admins` as admins and `layer-guests` as guests, and Members
+won't change their roles. A guest's repositories are still set by hand. Tests: `crates/server/tests/scim.rs`.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and

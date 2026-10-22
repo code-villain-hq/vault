@@ -129,6 +129,14 @@ A guest sees only the apps an admin adds them to (`app_access`, set with
 `raven_sync::set_apps`): they sync those, and every page of any other app
 (`apps::find`) and `GET /apps` leave it out. They see no Members.
 
+## Groups
+
+With `RAVEN_SCIM_TOKEN` set, the Code Villain account sends its people and
+groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
+A workspace linked to `raven` (`PUT /api/w/{id}/group`) has `raven` as
+members, `raven-admins` as admins and `raven-guests` as guests, and Members
+won't change their roles. A guest's apps are still set by hand. Tests: `crates/server/tests/scim.rs`.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and

@@ -700,6 +700,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-villain-scim"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "code-villain-sync"
 version = "0.1.0"
 dependencies = [
@@ -3775,6 +3789,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
+ "code-villain-scim",
  "code-villain-sync",
  "futures",
  "getrandom 0.4.3",

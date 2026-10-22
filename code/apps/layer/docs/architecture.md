@@ -53,7 +53,8 @@ Each client keeps a copy of a workspace and works on it offline.
  crates/domain   the synced records and their checks → ts-rs → packages/types
  crates/sync     the engine's rules for Layer: who writes what (rules.rs)
  crates/server   accounts, sign-in (passwords, or Code Villain over OIDC),
-                 workspaces, members, invites, the sync routes; serves dist-web
+                 workspaces, members, invites, the account's groups (SCIM),
+                 the sync routes; serves dist-web
  migrations/     one schema: the kit's sync tables, accounts, the five models
  web/            the server's web app (React, TanStack Router, the kit client)
 ```

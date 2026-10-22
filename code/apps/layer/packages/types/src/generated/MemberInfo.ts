@@ -7,4 +7,9 @@ export type MemberInfo = { user: UserInfo, role: Role, joined_at: string,
  * The repositories they've been added to. Only a guest's matter:
  * admins and members have them all.
  */
-access: Array<string>, };
+access: Array<string>, 
+/**
+ * The group of the Code Villain account their role comes from, such as
+ * `layer-admins`: it's changed there, not in Members.
+ */
+from_group: string | null, };

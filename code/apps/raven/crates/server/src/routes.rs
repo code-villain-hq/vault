@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, apps, invites, members, metrics, oidc, otlp, telemetry, ws};
+use crate::{accounts, apps, groups, invites, members, metrics, oidc, otlp, telemetry, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -40,6 +40,7 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/members/{user_id}/access", put(members::update_access))
+        .route("/group", get(groups::get).put(groups::link))
         .route("/invites", get(invites::list).post(invites::create))
         .route("/invites/{invite_id}", delete(invites::revoke))
         .route("/apps", get(metrics::apps))
@@ -49,8 +50,18 @@ pub fn router(state: AppState) -> Router {
         .route("/apps/{app}/calls/{trace_id}", get(metrics::call_page))
         .route("/apps/{app}/key", post(apps::new_key));
 
-    Router::new()
-        .route("/api/health", get(|| async { "ok" }))
+    let mut api = Router::new();
+    if let Some(token) = &state.scim_token {
+        api = api.nest(
+            "/api/scim/v2",
+            code_villain_scim::router::<groups::RavenDirectory, AppState>(
+                state.pool.clone(),
+                token.clone(),
+            ),
+        );
+    }
+
+    api.route("/api/health", get(|| async { "ok" }))
         .route("/api/auth/signup", post(accounts::signup))
         .route("/api/auth/login", post(accounts::login))
         .route("/api/auth/logout", post(accounts::logout))

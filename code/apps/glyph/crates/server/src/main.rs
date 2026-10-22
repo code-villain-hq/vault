@@ -58,6 +58,18 @@ async fn main() -> anyhow::Result<()> {
                 }
                 None => state,
             };
+            let state = match std::env::var("GLYPH_SCIM_TOKEN") {
+                Ok(token) if !token.trim().is_empty() => {
+                    tracing::info!("groups from the Code Villain account are on");
+                    state.with_scim(token.trim())
+                }
+                _ => {
+                    tracing::info!(
+                        "groups are off: set GLYPH_SCIM_TOKEN to take them from the Code Villain account"
+                    );
+                    state
+                }
+            };
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
             glyph_server::serve(state, config.web_dir.as_deref(), listener, async {

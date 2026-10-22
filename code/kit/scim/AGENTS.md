@@ -3,7 +3,7 @@
 Pocket ID (id.codevillain.eu) signs people in to every app. With SCIM it
 also sends each app the people and groups its sign-in client allows. This
 crate, `code-villain-scim`, takes them at `/api/scim/v2` and turns them into
-workspace roles. Forge uses it; Glyph, Raven and Layer are next.
+workspace roles. Forge, Glyph, Raven and Layer use it.
 
 ## What it does
 

@@ -55,6 +55,13 @@ on. The server also reads `DATABASE_URL`, `GLYPH_ADDR` (default
 also takes `GLYPH_LISTEN`, the address Docker publishes it on (default
 `127.0.0.1:7490`).
 
+With `GLYPH_SCIM_TOKEN` set too, the account's groups say who is in a
+workspace. In Pocket ID, turn on SCIM for Glyph's client, with the
+endpoint `<GLYPH_PUBLIC_URL>/api/scim/v2` and the same token, and allow
+`glyph`, `glyph-admins` and `glyph-guests` on it (each with the same
+friendly name as its name). Then link the workspace to `glyph`
+(`PUT /api/w/{id}/group`). Without the token, invites are the only way in.
+
 See [AGENTS.md](AGENTS.md) for the commands, the layout and the rules.
 
 ## License

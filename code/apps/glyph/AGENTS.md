@@ -145,6 +145,14 @@ them, plus the admins and members. They change no source text, start no
 run for another language, and see no Members. `model.rs`'s `guest_view`
 holds what they see; `rules.rs` (`check_guest_language`) what they write.
 
+## Groups
+
+With `GLYPH_SCIM_TOKEN` set, the Code Villain account sends its people and
+groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
+A workspace linked to `glyph` (`PUT /api/w/{id}/group`) has `glyph` as
+members, `glyph-admins` as admins and `glyph-guests` as guests, and Members
+won't change their roles. A guest's languages are still set by hand. Tests: `crates/server/tests/scim.rs`.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and

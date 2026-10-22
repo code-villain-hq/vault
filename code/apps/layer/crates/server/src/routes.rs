@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, invites, members, oidc, ws};
+use crate::{accounts, groups, invites, members, oidc, ws};
 
 /// What the server answers outside `/api`.
 #[derive(Clone, Copy)]
@@ -61,11 +61,22 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/members/{user_id}/access", put(members::update_access))
+        .route("/group", get(groups::get).put(groups::link))
         .route("/invites", get(invites::list).post(invites::create))
         .route("/invites/{invite_id}", delete(invites::revoke));
 
-    Router::new()
-        .route("/api/health", get(|| async { "ok" }))
+    let mut api = Router::new();
+    if let Some(token) = &state.scim_token {
+        api = api.nest(
+            "/api/scim/v2",
+            code_villain_scim::router::<groups::LayerDirectory, AppState>(
+                state.pool.clone(),
+                token.clone(),
+            ),
+        );
+    }
+
+    api.route("/api/health", get(|| async { "ok" }))
         .route("/api/auth/signup", post(accounts::signup))
         .route("/api/auth/login", post(accounts::login))
         .route("/api/auth/logout", post(accounts::logout))

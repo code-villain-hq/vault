@@ -120,6 +120,27 @@ pub struct MemberInfo {
     /// The apps they've been added to. Only a guest's matter: admins and
     /// members see them all.
     pub access: Vec<Uuid>,
+    /// The group of the Code Villain account their role comes from, such as
+    /// `raven-admins`: it's changed there, not in Members.
+    pub from_group: Option<String>,
+}
+
+/// The group of the Code Villain account a workspace follows, and the
+/// groups there are. Only when the account sends its groups (`RAVEN_SCIM_TOKEN`).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WorkspaceGroup {
+    pub group: Option<String>,
+    /// Each group once by its base name: `raven` for `raven`, `raven-admins`
+    /// and `raven-guests`.
+    pub groups: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct LinkGroupRequest {
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

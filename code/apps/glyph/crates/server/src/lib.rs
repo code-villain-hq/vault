@@ -6,6 +6,7 @@ pub mod accounts;
 pub mod auth;
 pub mod config;
 pub mod error;
+pub mod groups;
 pub mod invites;
 pub mod limits;
 pub mod local;

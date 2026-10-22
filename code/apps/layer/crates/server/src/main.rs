@@ -48,6 +48,18 @@ async fn main() -> anyhow::Result<()> {
                 }
                 None => state,
             };
+            let state = match std::env::var("LAYER_SCIM_TOKEN") {
+                Ok(token) if !token.trim().is_empty() => {
+                    tracing::info!("groups from the Code Villain account are on");
+                    state.with_scim(token.trim())
+                }
+                _ => {
+                    tracing::info!(
+                        "groups are off: set LAYER_SCIM_TOKEN to take them from the Code Villain account"
+                    );
+                    state
+                }
+            };
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
             layer_server::serve(state, config.web(), listener, async {
