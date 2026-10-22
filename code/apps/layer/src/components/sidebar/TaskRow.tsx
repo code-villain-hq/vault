@@ -9,7 +9,8 @@ import { Spinner } from "../ui";
 const REVIEW_WORD: Partial<Record<TaskReview, { text: string; color: string }>> = {
   changes_requested: { text: "changes", color: "var(--status-danger-ink)" },
   approved: { text: "approved", color: "var(--status-ok-ink)" },
-  merged: { text: "merged", color: "var(--status-ok-ink)" },
+  // Done is calm; approved keeps ok, since it means you can merge.
+  merged: { text: "merged", color: "var(--muted)" },
   commented: { text: "comments", color: "var(--status-info-ink)" },
 };
 

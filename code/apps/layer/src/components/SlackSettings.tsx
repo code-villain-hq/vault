@@ -8,7 +8,7 @@ import { BusyLabel, ErrorMessage, Field, Switch, useFailure } from "./ui";
 import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
-  connected: ["connected", "ui-status ui-status-ok"],
+  connected: ["connected", "ui-status"],
   connecting: ["connecting…", "ui-status ui-status-warn"],
   failing: ["not connected", "ui-status ui-status-danger"],
   off: ["off", "ui-chip"],

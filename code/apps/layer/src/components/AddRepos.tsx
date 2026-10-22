@@ -188,7 +188,7 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
                 />
                 <span style={{ flex: 1 }}>{r.name}</span>
                 {r.branch && <span className="ui-chip">{r.branch}</span>}
-                {r.registered && <span className="ui-status ui-status-ok">added</span>}
+                {r.registered && <span className="ui-status">added</span>}
                 <span className="path" style={{ maxWidth: 240 }}>{r.path}</span>
               </label>
             ))}

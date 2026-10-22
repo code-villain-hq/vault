@@ -66,7 +66,7 @@ const TASK_REVIEW: Record<TaskReview, { word: string; color: string; hint: strin
     hint: "A reviewer asked for changes on at least one pull request",
   },
   approved: { word: "Approved", color: "var(--status-ok-ink)", hint: "Every pull request is approved" },
-  merged: { word: "Merged", color: "var(--status-ok-ink)", hint: "Every pull request has merged" },
+  merged: { word: "Merged", color: "var(--muted)", hint: "Every pull request has merged" },
 };
 
 /**
@@ -671,7 +671,7 @@ export function PrPanel({
               <div key={`${row.checkout_id}:${pr.number}`} className="check">
                 <span
                   className="dot"
-                  style={{ background: pr.merged ? "var(--status-ok-ink)" : "var(--muted)" }}
+                  style={{ background: "var(--muted)" }}
                 />
                 <span className="name">
                   {row.repo} #{pr.number}

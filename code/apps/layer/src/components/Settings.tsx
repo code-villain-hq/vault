@@ -196,7 +196,7 @@ export function Settings() {
           </p>
           {settings?.jira_connected && (
             <div className="row" style={{ marginBottom: 14 }}>
-              <span className="ui-status ui-status-ok">connected</span>
+              <span className="ui-status">connected</span>
               <span className="muted">{settings.jira?.email}</span>
               <div className="spacer" />
               <button className="ui-button ui-button-danger" onClick={() => void disconnect("jira")}>
@@ -296,7 +296,7 @@ export function Settings() {
             <div className="row" style={{ marginBottom: 14 }}>
               {ghRejected
                 ? <span className="ui-status ui-status-danger">token rejected</span>
-                : <span className="ui-status ui-status-ok">connected</span>}
+                : <span className="ui-status">connected</span>}
               <span className="muted">{settings.github?.api_url}</span>
               <div className="spacer" />
               <button className="ui-button ui-button-danger" onClick={() => void disconnect("github")}>

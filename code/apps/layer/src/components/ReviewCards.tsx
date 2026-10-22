@@ -77,7 +77,7 @@ export function ReviewCard({
         {pr.cross_repo && <span className="ui-chip" title="Its branch is on a fork">fork</span>}
         {pr.checks === "failing" && <span className="ui-status ui-status-danger">checks failing</span>}
         {pr.checks === "pending" && <span className="ui-status ui-status-warn">checks running</span>}
-        {pr.checks === "passing" && <span className="ui-status ui-status-ok">checks pass</span>}
+        {pr.checks === "passing" && <span className="ui-status">checks pass</span>}
         <MyReview pr={pr} />
       </div>
     </div>
@@ -177,7 +177,7 @@ export function AuthoredCard({
       <div className="chips standing">
         {pr.checks === "failing" && <span className="ui-status ui-status-danger">checks failing</span>}
         {pr.checks === "pending" && <span className="ui-status ui-status-warn">checks running</span>}
-        {pr.checks === "passing" && <span className="ui-status ui-status-ok">checks pass</span>}
+        {pr.checks === "passing" && <span className="ui-status">checks pass</span>}
         {pr.review === "changes_requested" && <span className="ui-status ui-status-danger">changes requested{who(pr.changes_by)}</span>}
         {pr.review === "approved" && <span className="ui-status ui-status-ok">approved{who(pr.approved_by)}</span>}
         {pr.review === "review_required" && pr.waiting_on.length === 0 && <span className="ui-status ui-status-warn">needs a review</span>}

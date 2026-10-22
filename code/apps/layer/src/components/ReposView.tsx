@@ -315,7 +315,7 @@ export function ReposView() {
                   <span className="rname">{p.name}</span>
                   <span className="ui-chip" title="Default branch">{p.default_branch}</span>
                   <Standing h={h} branch={p.default_branch} />
-                  {inUse > 0 && <span className="ui-status ui-status-ok">{inUse} task{inUse === 1 ? "" : "s"}</span>}
+                  {inUse > 0 && <span className="ui-status">{inUse} task{inUse === 1 ? "" : "s"}</span>}
                   <CopyState h={h} now={now} />
                   <div className="spacer" />
                   <UpdateByPicker p={p} h={h} onChange={(by) => void setUpdateBy(p, by)} />

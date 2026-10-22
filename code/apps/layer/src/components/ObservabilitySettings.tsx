@@ -95,7 +95,7 @@ function GrafanaSource() {
       <h3>Grafana</h3>
       {connected && (
         <div className="row" style={{ marginBottom: 14 }}>
-          <span className="ui-status ui-status-ok">connected</span>
+          <span className="ui-status">connected</span>
           <span className="muted">{settings?.grafana?.base_url}</span>
           <div className="spacer" />
           <button className="ui-button ui-button-danger" onClick={() => void disconnect()}>

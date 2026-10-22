@@ -83,7 +83,7 @@ export function S3LogSources() {
                   <span className="ui-chip">{s.profile}{s.region ? ` · ${s.region}` : ""}</span>
                   {s.athena ? (
                     <>
-                      <span className="ui-status ui-status-ok" title={`Workgroup ${s.athena.workgroup}`}>Athena: {s.athena.database}.{s.athena.table}</span>
+                      <span className="ui-status" title={`Workgroup ${s.athena.workgroup}`}>Athena: {s.athena.database}.{s.athena.table}</span>
                       <span className="ui-chip" title="What agents' queries scanned today, of the source's daily limit. Athena charges $5 a TB.">
                         today {size(scanned?.[s.id] ?? 0)} of {s.athena.daily_limit_gb ?? DEFAULT_DAILY_GB} GB
                       </span>
