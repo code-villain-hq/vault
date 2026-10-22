@@ -7,12 +7,11 @@
 pub mod accounts;
 pub mod apps;
 pub mod auth;
+pub mod company;
 pub mod config;
 pub mod error;
 pub mod groups;
 pub mod health;
-pub mod invites;
-pub mod limits;
 pub mod local;
 pub mod members;
 pub mod metrics;

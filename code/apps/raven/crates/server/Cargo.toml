@@ -1,17 +1,17 @@
 [package]
 name = "raven-server"
-description = "Raven's server: health checks, OpenTelemetry ingest, accounts, and the API its web app reads"
+description = "Raven's server: health checks, OpenTelemetry ingest, sign-in, and the API its web app reads"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-argon2.workspace = true
 axum.workspace = true
 base64.workspace = true
 chrono.workspace = true
 code-villain-scim.workspace = true
+code-villain-settings.workspace = true
 code-villain-sync.workspace = true
 futures.workspace = true
 getrandom.workspace = true

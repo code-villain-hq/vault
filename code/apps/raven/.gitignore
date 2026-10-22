@@ -3,3 +3,6 @@ node_modules
 dist
 .env
 apps/desktop/src-tauri/gen/
+
+# A company's settings, with its secrets (raven.example.toml shows them).
+raven.toml

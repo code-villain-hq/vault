@@ -1,6 +1,4 @@
-//! Signing up, signing in and out, the signed-in user, and passwords.
-//! The first person to come sets Raven up, with its first workspace; after
-//! that, people join with an invite.
+//! Signing out, the signed-in user, and making workspaces and their members.
 
 use axum::Json;
 use axum::extract::State;
@@ -9,164 +7,19 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use raven_domain::{Actor, SyncAction};
 use raven_domain::{
-    ChangePasswordRequest, LoginRequest, Me, Role, SignupRequest, UpdateProfileRequest,
-    UpdateWorkspaceRequest, UserInfo, WorkspaceInfo, check_password, clean_name, normalize_email,
+    Me, Role, UpdateProfileRequest, UpdateWorkspaceRequest, UserInfo, WorkspaceInfo, clean_name,
     url_key_from,
 };
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::auth::{
-    CLIENT_HEADER, CurrentUser, SESSION_HEADER, clear_session_cookie, hash_password, hash_token,
-    session_cookie, session_token, start_session, verify_password,
+    CLIENT_HEADER, CurrentUser, SESSION_HEADER, clear_session_cookie, hash_token, session_cookie,
+    session_token,
 };
 use crate::error::AppError;
-use crate::limits::ClientAddress;
 use crate::state::AppState;
-use crate::{apps, invites, members};
-
-/// What a sign-up refused because of the email says: it has an account
-/// already, but not in so many words, so nobody can find out which emails
-/// have accounts.
-pub const SIGNUP_REFUSED: &str =
-    "Couldn't sign up with these details. If you already have an account, sign in instead.";
-
-/// A sign-up refused because of the email, with the same status (422) as a
-/// sign-up refused for anything else.
-pub fn signup_refused() -> AppError {
-    AppError::invalid(SIGNUP_REFUSED)
-}
-
-/// With Code Villain sign-in on, it's the only way in: no passwords.
-fn passwords_open(state: &AppState) -> Result<(), AppError> {
-    if state.on_this_mac {
-        return Err(AppError::not_found("this Raven is the desktop app's own"));
-    }
-    match state.oidc_login {
-        Some(_) => Err(AppError::not_found("sign in with Code Villain instead")),
-        None => Ok(()),
-    }
-}
-
-/// Whether anyone has an account yet. Until someone has, the sign-in page
-/// offers to set Raven up.
-pub async fn has_accounts(pool: &PgPool) -> Result<bool, AppError> {
-    Ok(sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users)")
-        .fetch_one(pool)
-        .await?)
-}
-
-/// Signs someone up, at most five times an hour from one client address
-/// (every try counts). The first person sets Raven up with a workspace;
-/// everyone after them comes with an invite.
-pub async fn signup(
-    State(state): State<AppState>,
-    client: ClientAddress,
-    headers: HeaderMap,
-    Json(request): Json<SignupRequest>,
-) -> Result<Response, AppError> {
-    passwords_open(&state)?;
-    state
-        .signup_attempts
-        .count(&client.key())
-        .map_err(AppError::too_many_signups)?;
-    let name = clean_name(&request.name, "name")?;
-    let email = normalize_email(&request.email)?;
-    check_password(&request.password)?;
-    let workspace_name = match (&request.workspace_name, &request.invite_token) {
-        (Some(workspace), None) => Some(clean_name(workspace, "workspace name")?),
-        (None, Some(_)) => None,
-        _ => {
-            return Err(AppError::invalid(
-                "give either a workspace name or an invite",
-            ));
-        }
-    };
-    let password_hash = hash_password(request.password).await?;
-
-    let mut db = state.pool.begin().await?;
-    if workspace_name.is_some() {
-        // One sign-up at a time, so two people can't both be first.
-        sqlx::query("LOCK TABLE users IN EXCLUSIVE MODE")
-            .execute(&mut *db)
-            .await?;
-        let taken: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users)")
-            .fetch_one(&mut *db)
-            .await?;
-        if taken {
-            return Err(AppError::forbidden(
-                "Raven is set up already: sign in, or ask an admin for an invite",
-            ));
-        }
-    }
-    // The invite first, so whether it still works can't depend on the email.
-    let invite = match &request.invite_token {
-        Some(token) => Some(
-            invites::find_valid(&mut *db, token)
-                .await?
-                .ok_or_else(invites::gone)?,
-        ),
-        None => None,
-    };
-    let user_id = Uuid::now_v7();
-    let created = sqlx::query(
-        "INSERT INTO users (id, email, name, password_hash) VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING",
-    )
-    .bind(user_id)
-    .bind(&email)
-    .bind(&name)
-    .bind(&password_hash)
-    .execute(&mut *db)
-    .await?
-    .rows_affected();
-    if created == 0 {
-        return Err(signup_refused());
-    }
-
-    match (workspace_name, invite) {
-        (Some(workspace), _) => {
-            create_workspace(&mut db, &workspace, user_id).await?;
-        }
-        (None, Some(invite)) => {
-            add_member(&mut db, invite.workspace_id, user_id, invite.role).await?;
-        }
-        (None, None) => unreachable!("checked above"),
-    }
-
-    let token = start_session(&mut *db, user_id).await?;
-    db.commit().await?;
-    signed_in(&state, &headers, &token, user_id).await
-}
-
-pub async fn login(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(request): Json<LoginRequest>,
-) -> Result<Response, AppError> {
-    passwords_open(&state)?;
-    let email = normalize_email(&request.email).unwrap_or_default();
-    let attempt = state
-        .password_attempts
-        .begin(&email)
-        .map_err(AppError::too_many)?;
-    let account: Option<(Uuid, Option<String>)> =
-        sqlx::query_as("SELECT id, password_hash FROM users WHERE email = $1")
-            .bind(&email)
-            .fetch_optional(&state.pool)
-            .await?;
-    let (user_id, hash) = account.map_or((None, None), |(id, hash)| (Some(id), hash));
-
-    // Check a password even when there's no account, so both take as long.
-    let matches = verify_password(request.password, hash).await;
-    let Some(user_id) = user_id.filter(|_| matches) else {
-        attempt.failed();
-        return Err(AppError::unauthorized("wrong email or password"));
-    };
-    attempt.succeeded();
-
-    let token = start_session(&state.pool, user_id).await?;
-    signed_in(&state, &headers, &token, user_id).await
-}
+use crate::{apps, members};
 
 /// Ends the current session, if there is one, and clears the cookie.
 pub async fn logout(
@@ -237,124 +90,6 @@ pub async fn update_profile(
     }
     db.commit().await?;
     Ok(Json(load_me(&state.pool, user.id).await?))
-}
-
-/// Changes the password and signs out every other session.
-pub async fn change_password(
-    State(state): State<AppState>,
-    user: CurrentUser,
-    Json(request): Json<ChangePasswordRequest>,
-) -> Result<StatusCode, AppError> {
-    passwords_open(&state)?;
-    check_password(&request.new_password)?;
-    let (email, hash): (String, Option<String>) =
-        sqlx::query_as("SELECT email, password_hash FROM users WHERE id = $1")
-            .bind(user.id)
-            .fetch_one(&state.pool)
-            .await?;
-    // An account without a password (made by an admin) sets one.
-    if hash.is_some() {
-        // The same count as signing in to the account.
-        let attempt = state
-            .password_attempts
-            .begin(&email)
-            .map_err(AppError::too_many)?;
-        // Not 401: that would tell the app the session has ended.
-        if !verify_password(request.current_password, hash).await {
-            attempt.failed();
-            return Err(AppError::invalid("current password is wrong"));
-        }
-        attempt.succeeded();
-    }
-
-    let new_hash = hash_password(request.new_password).await?;
-    let mut db = state.pool.begin().await?;
-    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
-        .bind(new_hash)
-        .bind(user.id)
-        .execute(&mut *db)
-        .await?;
-    sqlx::query("DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2")
-        .bind(user.id)
-        .bind(&user.token_hash)
-        .execute(&mut *db)
-        .await?;
-    db.commit().await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// Sets a new random password and ends every session; for the
-/// `reset-password` command, until Raven can send reset emails.
-pub async fn reset_password(pool: &PgPool, email: &str) -> anyhow::Result<String> {
-    let email = normalize_email(email)?;
-    let password = readable_password();
-    let hash = hash_password(password.clone())
-        .await
-        .map_err(|_| anyhow::anyhow!("couldn't hash the password"))?;
-
-    let mut db = pool.begin().await?;
-    let user_id: Option<Uuid> =
-        sqlx::query_scalar("UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id")
-            .bind(hash)
-            .bind(&email)
-            .fetch_optional(&mut *db)
-            .await?;
-    let user_id =
-        user_id.ok_or_else(|| anyhow::anyhow!("nobody has an account with the email {email}"))?;
-    sqlx::query("DELETE FROM sessions WHERE user_id = $1")
-        .bind(user_id)
-        .execute(&mut *db)
-        .await?;
-    db.commit().await?;
-    Ok(password)
-}
-
-/// Makes a workspace with someone who has an account as its admin, from the
-/// server (`raven-server create-workspace`): with Code Villain sign-in on,
-/// sign-up is closed, so this is how a server gets its first workspace.
-/// Returns the workspace's URL key.
-pub async fn create_workspace_for(
-    pool: &PgPool,
-    name: &str,
-    email: &str,
-) -> anyhow::Result<String> {
-    let name = clean_name(name, "workspace name")?;
-    let email = normalize_email(email)?;
-    let mut db = pool.begin().await?;
-    let user_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
-        .bind(&email)
-        .fetch_optional(&mut *db)
-        .await?
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "no person has an account with the email {email}: they sign in to Raven first"
-            )
-        })?;
-    let workspace_id = create_workspace(&mut db, &name, user_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    let url_key = sqlx::query_scalar("SELECT url_key FROM workspaces WHERE id = $1")
-        .bind(workspace_id)
-        .fetch_one(&mut *db)
-        .await?;
-    db.commit().await?;
-    Ok(url_key)
-}
-
-/// 20 random letters and digits in groups of four, avoiding look-alikes.
-fn readable_password() -> String {
-    const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
-    let mut bytes = [0u8; 20];
-    getrandom::fill(&mut bytes).expect("the OS random number generator works");
-    let chars: Vec<char> = bytes
-        .iter()
-        .map(|b| ALPHABET[*b as usize % ALPHABET.len()] as char)
-        .collect();
-    chars
-        .chunks(4)
-        .map(|group| group.iter().collect::<String>())
-        .collect::<Vec<_>>()
-        .join("-")
 }
 
 /// The response to signing in: who you are, and the session as a cookie,

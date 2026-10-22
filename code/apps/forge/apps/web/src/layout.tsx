@@ -76,7 +76,7 @@ export function Home() {
       void Promise.all(session.places.map(({ place }) => signOut(place)));
     return (
       <AuthScreen title="You're not in any workspace">
-        <p className="mb-6 text-center text-muted">Ask a workspace admin for an invite link.</p>
+        <p className="mb-6 text-center text-muted">Ask your company's admin to add you.</p>
         <Button variant="secondary" className="w-full" onClick={signOutEverywhere}>
           Sign out
         </Button>
@@ -611,20 +611,6 @@ function WorkspaceMenu() {
             >
               Settings
             </Menu.Item>
-            {/* Only you are in a workspace on this Mac. */}
-            {place.kind !== "mac" && !guest && (
-              <Menu.Item
-                className={item}
-                onClick={() =>
-                  void navigate({
-                    to: "/$workspace/settings/members",
-                    params: { workspace: workspace.url_key },
-                  })
-                }
-              >
-                Invite people
-              </Menu.Item>
-            )}
             {isDesktop && (
               <Menu.Item className={item} onClick={() => void navigate({ to: "/start" })}>
                 New workspace on this Mac…

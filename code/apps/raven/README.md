@@ -20,33 +20,57 @@ You start at Health and only go deeper when something catches your eye.
 ```bash
 bun install
 bun run db      # Postgres in Docker, on 127.0.0.1:5435
-bun run dev     # server on :7580, web app on http://localhost:5175
-bun run seed    # a local account, a workspace and some calls; password in scripts/seed.ts
+bun run dev     # Raven for Acme Inc: server on :7580, web app on http://localhost:5175
+bun run seed    # some calls, and Gus Guest let in to Raven itself
 ```
+
+`bun run dev` runs Raven for a made-up company, Acme Inc: dev-id
+(`code/kit/dev-id`) stands in for its account, so you sign in as anyone in
+its `people.toml` (Ada Admin, Max Member, Gus Guest, or Nell New, who isn't
+let in). Acme's data has a database of its own, `raven_acme`. With a
+`raven.toml`, or `RAVEN_OIDC_ISSUER` in `.env`, it runs with those settings
+and the `raven` database instead.
 
 `bun run dev:desktop` opens the desktop app on the dev server, and
 `bun run build:desktop` packages it. The packaged app runs Raven on this
-Mac, or signs in to a server with Code Villain through the browser.
+Mac, or signs in to a server through the browser.
 
-The first person to open a Raven server sets it up, with a password and a
-workspace; everyone after joins by invite. With `RAVEN_OIDC_ISSUER`,
-`RAVEN_OIDC_CLIENT_ID`, `RAVEN_OIDC_CLIENT_SECRET` and `RAVEN_PUBLIC_URL`
-set, people sign in with Code Villain and passwords are off; a new
-account still needs an invite. The server also reads `DATABASE_URL`,
-`RAVEN_ADDR` (default `127.0.0.1:7580`), `RAVEN_WEB_DIR` (the built web
-app, served when set), `RAVEN_COOKIE_SECURE` (`0` for plain http) and
-`RAVEN_TRUST_FORWARDED_FOR` (`1` behind a proxy that sets
-`X-Forwarded-For`), in `crates/server/src/config.rs`.
+## Running it for a company
 
-With sign-up closed, the server's first workspace is made on the server, for
-someone who has signed in once: `raven-server create-workspace "<name>"
-<email>` makes it with them as its admin.
+A server runs for one company, from one settings file: copy
+`raven.example.toml` to `raven.toml` (or pass `raven-server --config
+<file>`), and fill in the company's name, Raven's address, the database,
+the company's account and a SCIM token. Every setting can come from the
+environment too, which wins: `[oidc] issuer` is `RAVEN_OIDC_ISSUER`. A
+missing or unknown setting stops the server, naming it.
 
-With `RAVEN_SCIM_TOKEN` set too, the account's groups say who is in a
-workspace. In Pocket ID, turn on SCIM for Raven's client, with the
-endpoint `<RAVEN_PUBLIC_URL>/api/scim/v2` and the same token, and allow
-`raven-users`, `raven-admins` and `raven-guests` on it. Then link the
-workspace to `raven` in Settings → Members → Group. Without the token, invites are the only way in.
+In the company's account (Pocket ID, or any OpenID Connect provider with
+SCIM):
+
+1. Register Raven as a confidential client with the callback
+   `<public_url>/api/auth/oidc/callback`.
+2. Make the groups `raven-users`, `raven-admins` and `raven-guests` (or
+   the names under `[groups]`), and put people in them.
+3. Turn on SCIM for Raven's client, with the endpoint
+   `<public_url>/api/scim/v2` and the settings' token.
+
+On its first start Raven makes the company's workspace, and Raven itself
+comes with the first person. The account sends its people within minutes,
+and they sign in with "Sign in with <company>". Nobody signs up, and there
+are no invites or passwords: someone in none of the groups is told to ask
+the company's admin.
+
+`bun run app` runs the whole app in Docker at http://localhost:7590, with
+the settings in `.env`. Elsewhere, build the image from `code/` and give it
+the settings file:
+
+```sh
+docker build -f apps/raven/Dockerfile -t raven .
+docker run -d --name raven -p 7580:7580 \
+  -v ./raven.toml:/etc/raven/raven.toml:ro -e RAVEN_CONFIG=/etc/raven/raven.toml raven
+```
+
+Put it behind https at `public_url`; the image serves the web app too.
 
 A workspace is a team's apps. Its admins add the apps it watches in
 Settings → Apps, with each one's health address, and make the key the app
@@ -68,8 +92,8 @@ isn't running shows as down, which is the truth.
   bars with the failed part marked, and its slowest calls.
 - **A call:** where its time went, step by step, down to each database
   query, with the logs it wrote and the app's logs just before.
-- **Workspaces:** each watches its team's apps, with members, roles and
-  invites as in Forge. The apps and members sync, so Settings works
+- **Workspaces:** each watches its team's apps, with members and roles
+  as in Forge. The apps and members sync, so Settings works
   offline; calls, logs and checks are read live, and say so when the
   server can't be reached.
 - **Data in:** Raven records its own calls the same way. Other apps send
@@ -78,8 +102,8 @@ isn't running shows as down, which is the truth.
 - **Desktop app:** Raven in its own window on macOS, like Glyph. It runs
   Raven on this Mac, watching the apps on this Mac: itself, the installed
   Forge and Glyph and their dev servers. For a server it keeps its session
-  in the keychain and signs in with Code Villain through the browser and a
-  `raven://` link.
+  in the keychain and signs in with the company's account through the
+  browser and a `raven://` link.
 - **Kept:** 30 days of calls, logs and checks, in Postgres.
 
 ## What's decided, not built

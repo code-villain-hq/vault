@@ -1,19 +1,40 @@
-// Runs the server and the web app together, with prefixed output.
-// Stops both when either exits or on Ctrl-C.
+// Runs the server and the web app together, with prefixed output, for Acme
+// Inc as dev-id stands in for its account (code/kit/dev-id), or with your
+// own settings (raven.toml, or RAVEN_OIDC_ISSUER in .env).
+// Stops them all when one exits or on Ctrl-C.
+
+import { devCompany } from "../../../kit/dev-id/dev";
 
 const root = new URL("..", import.meta.url).pathname;
+
+// In development people reach Raven through Vite, so that's where signing in
+// sends them back.
+process.env.RAVEN_PUBLIC_URL ||= "http://localhost:5175";
+
+// The developer's own Raven data stays in `raven`; Acme's is in `raven_acme`.
+const dev = await devCompany(
+  "raven",
+  root,
+  process.env.DATABASE_URL ?? "postgres://raven:raven@localhost:5435/raven",
+);
+console.log(
+  dev
+    ? "Raven for Acme Inc: sign in as anyone in kit/dev-id/people.toml."
+    : "Raven with your own settings.",
+);
 
 // Raven marks its own calls with the commit it runs, so a change that made
 // something slower shows where it started.
 const commit = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: root });
 const version = commit.success ? commit.stdout.toString().trim() : "";
-const env = { ...process.env, RAVEN_VERSION: process.env.RAVEN_VERSION || version };
+process.env.RAVEN_VERSION ||= version;
 
 const processes = [
+  ...(dev?.devId ? [{ name: "dev-id", color: 33, cmd: dev.devId }] : []),
   { name: "server", color: 35, cmd: ["cargo", "run", "-p", "raven-server"] },
   { name: "web", color: 36, cmd: ["bun", "run", "--cwd", "apps/web", "dev"] },
 ].map(({ name, color, cmd }) => {
-  const child = Bun.spawn(cmd, { cwd: root, stdout: "pipe", stderr: "pipe", env });
+  const child = Bun.spawn(cmd, { cwd: root, stdout: "pipe", stderr: "pipe", env: process.env });
   const prefix = `\x1b[${color}m${name.padEnd(6)}\x1b[0m │ `;
   pipe(child.stdout, prefix);
   pipe(child.stderr, prefix);

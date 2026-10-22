@@ -1,6 +1,6 @@
 name: code-villain-raven
 
-# Raven's local database. `bun run db` starts it.
+# Raven's local database (`bun run db`), and the whole app (`bun run app`).
 services:
   postgres:
     image: postgres:18
@@ -20,6 +20,35 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
+
+  # The whole app, as a company uses it: `bun run app`, then http://localhost:7590.
+  raven:
+    profiles: ["app"]
+    # From code/, so the image can use the studio's kit (code/kit).
+    build:
+      context: ../..
+      dockerfile: apps/raven/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # This machine only by default. For others, put it behind https and
+      # set RAVEN_LISTEN, e.g. 0.0.0.0:7590 (and drop RAVEN_COOKIE_SECURE).
+      - "${RAVEN_LISTEN:-127.0.0.1:7590}:7580"
+    environment:
+      DATABASE_URL: postgres://raven:raven@postgres:5432/raven
+      # Plain http on this machine; use https and drop this anywhere else.
+      RAVEN_COOKIE_SECURE: "0"
+      # The company Raven runs for, its account (OpenID Connect and SCIM) and
+      # its address: required. They come from your shell or a `.env` file
+      # next to this one. See raven.example.toml.
+      RAVEN_COMPANY: ${RAVEN_COMPANY:-}
+      RAVEN_OIDC_ISSUER: ${RAVEN_OIDC_ISSUER:-}
+      RAVEN_OIDC_CLIENT_ID: ${RAVEN_OIDC_CLIENT_ID:-}
+      RAVEN_OIDC_CLIENT_SECRET: ${RAVEN_OIDC_CLIENT_SECRET:-}
+      RAVEN_SCIM_TOKEN: ${RAVEN_SCIM_TOKEN:-}
+      RAVEN_PUBLIC_URL: ${RAVEN_PUBLIC_URL:-http://localhost:7590}
 
 volumes:
   raven-db:

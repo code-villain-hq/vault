@@ -1,0 +1,13 @@
+# The build context is code/ (docker-compose.yml), so the image can use the
+# studio's kit. Only Raven and the kit go in.
+*
+!apps/raven
+!kit/sync
+!kit/web
+!kit/desktop
+!kit/scim
+!kit/settings
+**/target
+**/node_modules
+apps/raven/apps/web/dist
+apps/raven/apps/desktop/src-tauri/gen

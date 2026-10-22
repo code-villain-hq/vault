@@ -1,24 +1,45 @@
+//! `raven-server [--config <file>]`: Raven for one company. Its settings
+//! are in `raven.toml` (see `raven.example.toml`), with the environment
+//! over them.
+
+use std::path::PathBuf;
 use std::time::Duration;
 
-use raven_server::config::Config;
+use code_villain_scim::Groups;
+use raven_server::config::{Config, KNOWN, Settings};
 use raven_server::oidc::OidcLogin;
 use raven_server::telemetry::{Capture, Recorder};
-use raven_server::{AppState, accounts};
+use raven_server::{AppState, company};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer};
 
-const USAGE: &str =
-    "usage: raven-server [serve | reset-password <email> | create-workspace <name> <admin email>]";
+const USAGE: &str = "usage: raven-server [--config <file>]";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let file = match args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        // `serve` is how it used to start.
+        [] | ["serve"] => None,
+        ["--config", file] | ["serve", "--config", file] => Some(PathBuf::from(file)),
+        _ => {
+            eprintln!("{USAGE}");
+            std::process::exit(2);
+        }
+    };
+    let settings = Settings::load("raven", KNOWN, file.as_deref())?;
+
     // Raven's own spans carry the commit it runs (dev.ts sets it) or its version.
-    let version = std::env::var("RAVEN_VERSION")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
+    let version = settings
+        .get("version")
         .unwrap_or_else(|| env!("CARGO_PKG_VERSION").into());
     let (recorder, records) = Recorder::new(&version);
     tracing_subscriber::registry()
@@ -31,63 +52,40 @@ async fn main() -> anyhow::Result<()> {
         .with(Capture::new(recorder.clone()))
         .init();
 
-    let config = Config::from_env()?;
+    let config = Config::from_settings(&settings)?;
+    let login = OidcLogin::from_settings(&settings)?;
+    let scim_token = settings.get("scim.token").unwrap_or_default();
+    let groups = Groups::new(
+        "raven",
+        settings.get("groups.users").as_deref(),
+        settings.get("groups.admins").as_deref(),
+        settings.get("groups.guests").as_deref(),
+    );
+
     let pool = PgPoolOptions::new()
         .max_connections(20)
         .acquire_timeout(Duration::from_secs(5))
         .connect(&config.database_url)
         .await?;
     raven_sync::MIGRATOR.run(&pool).await?;
+    company::start(&pool, &config.company, &groups).await?;
+    tracing::info!(
+        users = groups.users,
+        admins = groups.admins,
+        guests = groups.guests,
+        "Raven for {}: people sign in with its account and come from its groups",
+        config.company
+    );
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match args
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .as_slice()
-    {
-        [] | ["serve"] => {
-            let state = AppState::new(pool.clone(), config.cookie_secure, recorder)
-                .trusting_forwarded_for(config.trust_forwarded_for);
-            let state = match OidcLogin::from_env()? {
-                Some(login) => {
-                    tracing::info!("signing in with Code Villain is on: passwords are off");
-                    state.with_oidc_login(login)
-                }
-                None => state,
-            };
-            let state = match std::env::var("RAVEN_SCIM_TOKEN") {
-                Ok(token) if !token.trim().is_empty() => {
-                    tracing::info!("groups from the Code Villain account are on");
-                    state.with_scim(token.trim())
-                }
-                _ => {
-                    tracing::info!(
-                        "groups are off: set RAVEN_SCIM_TOKEN to take them from the Code Villain account"
-                    );
-                    state
-                }
-            };
-            let listener = TcpListener::bind(config.addr).await?;
-            tracing::info!(version, "listening on http://{}", config.addr);
-            raven_server::serve(state, config.web_dir.as_deref(), listener, records, async {
-                let _ = tokio::signal::ctrl_c().await;
-            })
-            .await?;
-        }
-        ["reset-password", email] => {
-            let password = accounts::reset_password(&pool, email).await?;
-            println!("New password for {email}: {password}");
-            println!("They're signed out everywhere and should change it after signing in.");
-        }
-        ["create-workspace", name, email] => {
-            let url_key = accounts::create_workspace_for(&pool, name, email).await?;
-            println!("Made {name} with {email} as its admin: /{url_key}");
-        }
-        _ => {
-            eprintln!("{USAGE}");
-            std::process::exit(2);
-        }
-    }
+    let state = AppState::new(pool, config.cookie_secure, recorder)
+        .for_company(&config.company)
+        .with_oidc_login(login)
+        .with_scim(scim_token);
+    let listener = TcpListener::bind(config.addr).await?;
+    tracing::info!(version, "listening on http://{}", config.addr);
+    raven_server::serve(state, config.web_dir.as_deref(), listener, records, async {
+        let _ = tokio::signal::ctrl_c().await;
+    })
+    .await?;
     Ok(())
 }

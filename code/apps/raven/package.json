@@ -14,6 +14,8 @@
     "db:reset": "docker compose down -v && docker compose up -d --wait",
     "seed": "bun scripts/seed.ts",
     "dev": "bun scripts/dev.ts",
+    "app": "docker compose --profile app up -d --build --wait",
+    "app:logs": "docker compose --profile app logs -f raven",
     "dev:desktop": "bun run --cwd apps/desktop tauri dev",
     "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
     "gen:types": "bun scripts/gen-types.ts",

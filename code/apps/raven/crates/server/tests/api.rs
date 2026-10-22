@@ -38,11 +38,8 @@ fn span(trace_id: &str) -> Value {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn setting_up_raven_makes_a_workspace_that_watches_raven(pool: PgPool) {
+async fn a_workspace_watches_raven_itself(pool: PgPool) {
     let app = App::new(pool);
-    let setup = app.call("GET", "/api/auth/providers", None, None).await;
-    assert_eq!(setup.body["setup"], true);
-
     let (session, workspace) = app.signup("Ada", "Code Villain").await;
     let me = app.get("/api/me", &session).await;
     assert_eq!(me.body["workspaces"][0]["url_key"], "code-villain");
@@ -53,22 +50,10 @@ async fn setting_up_raven_makes_a_workspace_that_watches_raven(pool: PgPool) {
     assert_eq!(apps[0]["key"], "raven");
     assert_eq!(apps[0]["is_self"], true);
     assert_eq!(apps[0]["health_url"], Value::Null);
-
-    // Raven is set up once; everyone after comes with an invite.
-    let again = app
-        .post(
-            "/api/auth/signup",
-            None,
-            json!({ "name": "Eve", "email": "eve@example.com", "password": "correct horse", "workspace_name": "Mine" }),
-        )
-        .await;
-    assert_eq!(again.status, StatusCode::FORBIDDEN, "{}", again.body);
-    let setup = app.call("GET", "/api/auth/providers", None, None).await;
-    assert_eq!(setup.body["setup"], false);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn invite_links_let_people_join(pool: PgPool) {
+async fn members_see_what_the_workspace_watches(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;
     let token = app.invite(&ada, &workspace, "member").await;
@@ -433,30 +418,4 @@ async fn a_guest_sees_only_the_apps_an_admin_adds_them_to(pool: PgPool) {
     let token = app.invite(&ada, &workspace, "member").await;
     let grace = app.join("Grace", &token).await;
     assert_eq!(app.synced_apps(&grace, &workspace).await.len(), 3);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn the_server_makes_a_workspace_for_someone_with_an_account(pool: PgPool) {
-    let app = App::new(pool);
-    let (ada, _) = app.signup("Ada", "Acme").await;
-
-    let url_key = accounts::create_workspace_for(&app.pool, " Studio ", "ADA@example.com")
-        .await
-        .unwrap();
-
-    assert_eq!(url_key, "studio");
-    let me = app.get("/api/me", &ada).await.body;
-    let studio = me["workspaces"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|w| w["url_key"] == "studio")
-        .expect("Ada is in Studio");
-    assert_eq!(studio["name"], "Studio");
-    assert_eq!(studio["role"], "admin");
-    assert!(
-        accounts::create_workspace_for(&app.pool, "Studio", "nobody@example.com")
-            .await
-            .is_err()
-    );
 }

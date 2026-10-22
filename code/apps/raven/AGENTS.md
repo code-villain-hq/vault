@@ -27,22 +27,28 @@ Run `bun run design:sync` after changing them in the vault.
 ## Commands
 
 - `bun run db`: start Postgres (Docker, port 5435). `bun run db:reset` wipes it.
-- `bun run dev`: Rust server (:7580) plus web app (:5175, proxies `/api`).
+- `bun run dev`: Rust server (:7580) plus web app (:5175, proxies `/api`),
+  for Acme Inc: dev-id (`code/kit/dev-id`) stands in for its account and
+  signs you in as anyone in its `people.toml`, on a database of its own
+  (`raven_acme`). With your own settings (`raven.toml`, or
+  `RAVEN_OIDC_ISSUER` in `.env`) it uses those and your `raven` database.
   It sets `RAVEN_VERSION` to the commit, so calls carry their version.
 - `bun run dev:desktop`: the Tauri app against the running dev server.
   `bun run build:desktop` packages it. The app runs Raven itself, on its
   own Postgres (7586) and server (7585), for the workspaces on this Mac,
   and signs in to servers (the Rust port, 7580, not Vite's) for the
   others. Its data is in `~/Library/Application Support/eu.codevillain.raven`.
-- `bun run seed`: the local account, its "Code Villain" workspace, a
-  few dozen calls, and Gus Guest, a guest in Raven itself; needs `bun run dev`. The password is in `scripts/seed.ts`.
+- `bun run app`: the whole app in Docker at http://localhost:7590 (one image:
+  server plus built web app), with the settings in `.env`. `bun run app:logs`
+  follows it.
+- `bun run seed`: a few dozen calls in Acme's workspace, and Gus Guest let
+  in to Raven itself. Needs `bun run dev` running for Acme Inc.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, generated types and design
   copies up to date, Biome, typecheck, the bun tests (the sync kit's too),
   web build. It must pass before you finish. CI runs it on every push that
   touches Raven (`.forgejo/workflows/raven.yml`).
   `RAVEN_CHECK_SKIP_DESKTOP=1` leaves the desktop app out.
-- `cargo run -p raven-server -- reset-password <email>` sets a new password.
 
 Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 `.cargo/config.toml`.
@@ -62,7 +68,8 @@ change; "settings" is taken by the settings pages. "New key"
 one before. Keys live in `app_keys`, never in a synced record.
 
 One app per Raven is Raven itself (`is_self`, set by the server): the
-first workspace's. Its health address is the server's own listener.
+first workspace's, which on a server comes with its first person. Its
+health address is the server's own listener.
 
 ## How data comes in
 
@@ -83,9 +90,9 @@ installed Forge and Glyph (7385, 7485) and their dev servers (7380, 7480).
 For a server, it keeps its session
 token in the system keychain and sends it as a bearer token with
 `x-raven-client: desktop`; the server allows the `tauri://localhost`
-origin. Signing in with Code Villain happens in the browser, and comes
-back through a `raven://signed-in` link with a one-time code only this
-app can trade (`oidc.rs` says how). Deep links only reach an app macOS
+origin. Signing in with the company's account happens in the browser, and
+comes back through a `raven://signed-in` link with a one-time code only
+this app can trade (`oidc.rs` says how). Deep links only reach an app macOS
 has registered from a real folder: try a test build, with its own
 identifier, from `~/Applications`.
 
@@ -94,10 +101,13 @@ identifier, from `~/Applications`.
 - `crates/domain`: models, validation, sync protocol types (no database).
 - `crates/sync`: Raven's rules for the sync engine: only admins write an
   `App`, and nobody sets `is_self` or removes Raven itself.
-- `crates/server`: axum server: HTTP API, WebSocket feed, accounts,
-  invites, OTLP intake, health checks, the pages. `serve.rs` runs it on a
+- `crates/server`: axum server: HTTP API, WebSocket feed, accounts, the
+  company's sign-in (`oidc.rs`) and people (`groups.rs`, `company.rs`), OTLP
+  intake, health checks, the pages. Its settings: `config.rs`, and
+  `raven.example.toml`. `serve.rs` runs it on a
   listener until told to stop, for the server binary and the desktop app
-  alike; `local.rs` is the one person of the desktop app's own Raven.
+  alike; `local.rs` is the one person of the desktop app's own Raven, who
+  signs in to nothing.
 - `packages/types`: generated from Rust. Never edit by hand. The pages'
   shapes stay hand-written in `apps/web/src/types.ts`.
 - `apps/web`: React + Base UI + Tailwind. Its workspaces come from places
@@ -129,13 +139,22 @@ A guest sees only the apps an admin adds them to (`app_access`, set with
 `raven_sync::set_apps`): they sync those, and every page of any other app
 (`apps::find`) and `GET /apps` leave it out. They see no Members.
 
-## Groups
+## One company
 
-With `RAVEN_SCIM_TOKEN` set, the Code Villain account sends its people and
-groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `raven` (`PUT /api/w/{id}/group`) has `raven-users` as
-members, `raven-admins` as admins and `raven-guests` as guests, and Members
-won't change their roles. A guest's apps are still set by hand. Tests: `crates/server/tests/scim.rs`.
+A server runs for one company (`raven.example.toml`): `company`,
+`public_url`, its account's sign-in (`[oidc]`) and its SCIM token
+(`[scim]`) are required, and a missing or unknown setting stops the server,
+naming it. On its first start it makes the company's workspace
+(`company.rs`); Raven itself comes with the first person.
+
+Nobody signs up and there are no invites or passwords: the company's account
+sends its people and groups to `/api/scim/v2` (`code/kit/scim`;
+`crates/server/src/groups.rs`). `raven-users` are members, `raven-admins`
+admins and `raven-guests` guests (other names under `[groups]`), and Members
+won't change their roles. A guest's apps are still set by hand. Someone who
+signs in and isn't in one is told to ask the company's admin
+(`oidc_no_access`). Once the account has sent groups, people in none of
+them leave the workspace. Tests: `crates/server/tests/scim.rs`.
 
 ## Adding a synced model
 

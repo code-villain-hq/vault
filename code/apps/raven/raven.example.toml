@@ -1,0 +1,38 @@
+# Raven's settings for one company. Copy to raven.toml (or pass
+# `raven-server --config <file>`, or set RAVEN_CONFIG). Every setting can
+# also come from the environment, which wins: `[oidc] issuer` is
+# RAVEN_OIDC_ISSUER, `public_url` is RAVEN_PUBLIC_URL. A setting Raven
+# doesn't know stops it, naming the setting.
+
+# Required.
+
+company = "Acme Inc"                    # names the workspace and the sign-in button
+public_url = "https://raven.acme.org"   # where people reach Raven
+
+[database]
+url = "postgres://raven@localhost/raven"   # or DATABASE_URL
+
+# The company's account signs people in (OpenID Connect). Register Raven as a
+# confidential client with the callback <public_url>/api/auth/oidc/callback.
+[oidc]
+issuer = "https://id.acme.org"
+client_id = "raven"
+client_secret = "…"
+
+# The account sends its people and groups to <public_url>/api/scim/v2 with
+# this token (SCIM), and they're in Raven as its groups say.
+[scim]
+token = "…"
+
+# Optional.
+
+# The groups whose people are in Raven, and as what.
+[groups]
+users = "raven-users"
+admins = "raven-admins"
+guests = "raven-guests"
+
+# addr = "0.0.0.0:7580"           # where the server listens (RAVEN_ADDR)
+# web_dir = "/srv/raven/web"      # the built web app, served beside the API
+# cookie_secure = true            # false only on plain http
+# version = "1.2.0"               # what Raven's own calls say it runs
