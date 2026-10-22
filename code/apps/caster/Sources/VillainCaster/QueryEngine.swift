@@ -184,7 +184,9 @@ final class QueryEngine {
         }
 
         if Weather.matches(text) {
-            deliver(.list([ResultItem(icon: nil, title: "Fetching weather…", subtitle: nil, action: nil)]))
+            // No loading words: the rows appear when the weather does
+            // (studio/design/behaviour.md, "Empty and loading").
+            deliver(.empty)
             debounced(gen) { finish in
                 Weather.fetch { finish(.list($0)) }
             } deliver: { deliver($0) }

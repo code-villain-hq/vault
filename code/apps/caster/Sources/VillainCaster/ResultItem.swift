@@ -6,7 +6,7 @@ struct ResultItem {
     var subtitle: String?
     /// Stable id for usage tracking ("app:<path>" / "command:<title>" /
     /// "snippet:<defaultsKey>");
-    /// nil for untracked rows like weather or loading placeholders.
+    /// nil for untracked rows like weather or a problem.
     var usageKey: String? = nil
     var action: (() -> Void)?
 }

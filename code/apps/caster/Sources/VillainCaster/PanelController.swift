@@ -16,6 +16,9 @@ private let inputSidePadding: CGFloat = listInset + rowContentInset - 2
 private let inputFont = Nightshade.font(TypeTokens.query)
 private let rowFont = Nightshade.font(TypeTokens.body)
 private let screenshotPadding: CGFloat = 48
+/// The screenshot message's share of the input row, and its gap to the query.
+private let messageWidth: CGFloat = (panelWidth * 0.6).rounded()
+private let messageGap: CGFloat = 12
 
 /// The panel itself: a solid `dialog` tone with `radius-lg` corners. No
 /// border and no shadow: the tone alone sets it off.
@@ -85,7 +88,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private let field = NSTextField()
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
-    /// Screenshot feedback, at the right of the input.
+    /// Screenshot feedback, at the right of the input. It wraps to a
+    /// second line rather than cut a message off; the input row grows.
     private let inlineResultField = NSTextField(labelWithString: "")
     private let answerCard = AnswerCard()
     private let engine = QueryEngine()
@@ -230,7 +234,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         inlineResultField.font = inputFont
         inlineResultField.textColor = Nightshade.muted
         inlineResultField.alignment = .right
-        inlineResultField.lineBreakMode = .byTruncatingHead
+        inlineResultField.lineBreakMode = .byWordWrapping
+        inlineResultField.maximumNumberOfLines = 2
+        inlineResultField.preferredMaxLayoutWidth = messageWidth
         inlineResultField.isHidden = true
         chrome.addSubview(inlineResultField)
 
@@ -329,14 +335,26 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         hide()
     }
 
+    /// The screenshot message measured at most `messageWidth` wide: one
+    /// line, or two when it needs them.
+    private func messageSize() -> NSSize {
+        guard !inlineResultField.isHidden, let cell = inlineResultField.cell else { return .zero }
+        let size = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: messageWidth, height: .greatestFiniteMagnitude))
+        return NSSize(width: min(ceil(size.width), messageWidth), height: ceil(size.height))
+    }
+
     /// Resizes the panel downward from a fixed top edge as results change.
     private func relayout() {
+        let message = messageSize()
+        // A two-line message adds its second line to the input row, keeping
+        // the row's padding above and below.
+        let inputRowHeight = max(inputHeight, message.height + inputHeight - fieldHeight)
         let rows = min(results.count, maxVisibleRows)
         let visibleListHeight = CGFloat(rows) * rowHeight
         // Space, not a line, separates the query from the list or the answer.
         let listAreaHeight: CGFloat = answer != nil ? AnswerCard.height + listInset
             : rows > 0 ? visibleListHeight + listInset : 0
-        let totalHeight = inputHeight + listAreaHeight
+        let totalHeight = inputRowHeight + listAreaHeight
 
         var frame = panel.frame
         let top = frame.maxY
@@ -347,20 +365,20 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         }
         chrome.frame = NSRect(origin: .zero, size: frame.size)
 
-        let fieldY = totalHeight - inputHeight + (inputHeight - fieldHeight) / 2
+        let inputRowY = totalHeight - inputRowHeight
+        let fieldY = inputRowY + (inputRowHeight - fieldHeight) / 2
         if inlineResultField.isHidden {
             field.frame = NSRect(x: inputSidePadding, y: fieldY,
                                  width: panelWidth - inputSidePadding * 2, height: fieldHeight)
         } else {
             // Split the input row: query on the left, the screenshot message
-            // on the right, wide enough for "Couldn't save the screenshot.
-            // Try again." whole.
-            inlineResultField.sizeToFit()
-            let labelWidth = min(inlineResultField.frame.width, panelWidth * 0.6)
-            inlineResultField.frame = NSRect(x: panelWidth - inputSidePadding - labelWidth, y: fieldY,
-                                             width: labelWidth, height: fieldHeight)
+            // on the right, both centred in the row.
+            inlineResultField.frame = NSRect(x: panelWidth - inputSidePadding - message.width,
+                                             y: inputRowY + (inputRowHeight - message.height) / 2,
+                                             width: message.width, height: message.height)
             field.frame = NSRect(x: inputSidePadding, y: fieldY,
-                                 width: panelWidth - inputSidePadding * 2 - labelWidth - 12, height: fieldHeight)
+                                 width: panelWidth - inputSidePadding * 2 - message.width - messageGap,
+                                 height: fieldHeight)
         }
         answerCard.frame = NSRect(x: listInset, y: listInset,
                                   width: panelWidth - listInset * 2, height: AnswerCard.height)
