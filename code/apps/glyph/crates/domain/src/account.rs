@@ -16,6 +16,9 @@ pub enum Role {
     /// Manages the workspace: members, invites, languages and models.
     Admin,
     Member,
+    /// Sees the source language and the languages they've been added to,
+    /// and translates there as a member does.
+    Guest,
 }
 
 impl Role {
@@ -23,6 +26,7 @@ impl Role {
         match self {
             Role::Admin => "admin",
             Role::Member => "member",
+            Role::Guest => "guest",
         }
     }
 
@@ -30,6 +34,7 @@ impl Role {
         match value {
             "admin" => Some(Role::Admin),
             "member" => Some(Role::Member),
+            "guest" => Some(Role::Guest),
             _ => None,
         }
     }
@@ -113,6 +118,9 @@ pub struct MemberInfo {
     pub user: UserInfo,
     pub role: Role,
     pub joined_at: DateTime<Utc>,
+    /// The languages they've been added to. Only a guest's matter: admins
+    /// and members have them all.
+    pub access: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -120,6 +128,14 @@ pub struct MemberInfo {
 #[ts(export)]
 pub struct UpdateMemberRequest {
     pub role: Role,
+}
+
+/// Puts a guest in exactly these languages.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct UpdateAccessRequest {
+    pub items: Vec<Uuid>,
 }
 
 /// An active invite link, as admins see it. The token itself is shown once,

@@ -171,7 +171,44 @@ impl Member {
     pub fn require_admin(&self) -> Result<(), AppError> {
         match self.role {
             Role::Admin => Ok(()),
-            Role::Member => Err(AppError::forbidden("only workspace admins can do that")),
+            Role::Member | Role::Guest => {
+                Err(AppError::forbidden("only workspace admins can do that"))
+            }
+        }
+    }
+
+    /// For what spans the whole workspace, which a guest doesn't see.
+    pub fn require_not_guest(&self) -> Result<(), AppError> {
+        match self.role {
+            Role::Guest => Err(AppError::forbidden("guests can't do that")),
+            Role::Admin | Role::Member => Ok(()),
+        }
+    }
+
+    /// For a guest, translating into a language they haven't been added to
+    /// is refused, as their copy has no such language.
+    pub async fn require_translates(
+        &self,
+        pool: &sqlx::PgPool,
+        language: &str,
+    ) -> Result<(), AppError> {
+        if self.role != Role::Guest {
+            return Ok(());
+        }
+        let theirs: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM languages l JOIN language_access a \
+             ON a.language_id = l.id AND a.user_id = $3 \
+             WHERE l.workspace_id = $1 AND l.code = $2)",
+        )
+        .bind(self.actor.workspace_id)
+        .bind(language)
+        .bind(self.actor.user_id)
+        .fetch_one(pool)
+        .await?;
+        if theirs {
+            Ok(())
+        } else {
+            Err(AppError::not_found("language not found"))
         }
     }
 }

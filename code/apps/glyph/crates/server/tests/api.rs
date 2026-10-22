@@ -8,6 +8,7 @@ use common::App;
 use glyph_server::accounts;
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use uuid::Uuid;
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn signing_up_creates_a_workspace_you_administer(pool: PgPool) {
@@ -867,4 +868,84 @@ async fn many_wrong_passwords_at_once_still_hit_the_limit(pool: PgPool) {
         .count();
     assert!(checked <= 10, "{checked} passwords were checked");
     assert!(statuses.contains(&StatusCode::TOO_MANY_REQUESTS));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_works_only_in_the_languages_an_admin_adds_them_to(pool: PgPool) {
+    let app = App::new(pool.clone());
+    let (ada, acme) = app.signup("Ada", "Acme").await;
+    let created = app
+        .post(
+            &format!("/api/w/{acme}/sync/transactions"),
+            Some(&ada),
+            json!({ "id": Uuid::now_v7(), "operations": [
+                { "action": "create", "model": "Language", "id": Uuid::now_v7(), "data": { "code": "sv" } },
+                { "action": "create", "model": "Language", "id": Uuid::now_v7(), "data": { "code": "de" } },
+            ] }),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::OK);
+    let gus = app
+        .join("Gus", &app.invite(&ada, &acme, "guest").await)
+        .await;
+    let gus_id = app.get("/api/me", &gus).await.body["user"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let swedish: Uuid = sqlx::query_scalar("SELECT id FROM languages WHERE code = 'sv'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let access = format!("/api/w/{acme}/members/{gus_id}/access");
+
+    let by_guest = app
+        .call(
+            "PUT",
+            &access,
+            Some(&gus),
+            Some(json!({ "items": [swedish] })),
+        )
+        .await;
+    assert_eq!(by_guest.status, StatusCode::FORBIDDEN);
+    let by_admin = app
+        .call(
+            "PUT",
+            &access,
+            Some(&ada),
+            Some(json!({ "items": [swedish] })),
+        )
+        .await;
+    assert_eq!(by_admin.status, StatusCode::NO_CONTENT);
+    let members = app.get(&format!("/api/w/{acme}/members"), &ada).await.body;
+    let row = members
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["user"]["id"] == gus_id.as_str())
+        .unwrap();
+    assert_eq!(row["role"], "guest");
+    assert_eq!(row["access"], json!([swedish]));
+    // A guest's Settings are their account's alone.
+    assert_eq!(
+        app.get(&format!("/api/w/{acme}/members"), &gus)
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
+
+    let run = |target: &'static str| {
+        let (app, gus, acme) = (&app, &gus, &acme);
+        async move {
+            app.post(
+                &format!("/api/w/{acme}/runs"),
+                Some(gus),
+                json!({ "kind": "suggest", "source_lang": "en", "target_lang": target }),
+            )
+            .await
+            .status
+        }
+    };
+    assert_eq!(run("de").await, StatusCode::NOT_FOUND);
+    // Swedish is theirs: what stops it is only that there's nothing to do.
+    assert_ne!(run("sv").await, StatusCode::NOT_FOUND);
 }

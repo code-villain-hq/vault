@@ -3,6 +3,7 @@
 use glyph_domain::{Actor, ModelKind, Operation, SyncAction, Transaction};
 use glyph_sync::{
     Origin, SyncError, apply_in, apply_transaction, bootstrap, entries_after, record_change,
+    set_languages,
 };
 use serde_json::{Map, Value, json};
 use sqlx::PgPool;
@@ -595,4 +596,217 @@ async fn bootstrap_and_log_agree(pool: PgPool) {
         .await
         .unwrap();
     assert!(later.is_empty());
+}
+
+/// German too, a guest added to Swedish, and one added to German.
+async fn with_guests(pool: &PgPool) -> (Actor, Actor, Actor) {
+    let admin = seed(pool).await;
+    apply(
+        pool,
+        admin,
+        vec![create(ModelKind::Language, json!({ "code": "de" }))],
+    )
+    .await
+    .unwrap();
+    let gus = add_person(pool, admin, "guest").await;
+    put_in_languages(pool, admin, gus, &["sv"]).await;
+    let dee = add_person(pool, admin, "guest").await;
+    put_in_languages(pool, admin, dee, &["de"]).await;
+    (admin, gus, dee)
+}
+
+async fn put_in_languages(pool: &PgPool, admin: Actor, guest: Actor, codes: &[&str]) {
+    let mut ids = Vec::new();
+    for code in codes {
+        ids.push(language_id(pool, admin, code).await);
+    }
+    let mut db = pool.begin().await.unwrap();
+    set_languages(&mut db, admin, guest.user_id, &ids)
+        .await
+        .unwrap();
+    db.commit().await.unwrap();
+}
+
+async fn codes(pool: &PgPool, viewer: Actor, model: ModelKind, field: &str) -> Vec<String> {
+    let mut codes: Vec<String> = records(pool, viewer, model)
+        .await
+        .iter()
+        .map(|r| r[field].as_str().unwrap().to_string())
+        .collect();
+    codes.sort();
+    codes
+}
+
+fn glossary(source: &str, target: &str, term: &str) -> Operation {
+    create(
+        ModelKind::GlossaryEntry,
+        json!({
+            "source_lang": source,
+            "target_lang": target,
+            "source_term": term,
+            "target_term": term,
+        }),
+    )
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_syncs_the_source_and_their_languages(pool: PgPool) {
+    let (admin, gus, dee) = with_guests(&pool).await;
+    let bob = add_person(&pool, admin, "member").await;
+    for lang in ["en", "sv", "de"] {
+        new_translation(&pool, admin, lang, "hello", json!({})).await;
+    }
+    apply(
+        &pool,
+        admin,
+        vec![glossary("en", "sv", "email"), glossary("en", "de", "email")],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        codes(&pool, gus, ModelKind::Language, "code").await,
+        ["en", "sv"]
+    );
+    assert_eq!(
+        codes(&pool, gus, ModelKind::Translation, "lang").await,
+        ["en", "sv"]
+    );
+    assert_eq!(
+        codes(&pool, gus, ModelKind::GlossaryEntry, "target_lang").await,
+        ["sv"]
+    );
+    // The admin and the members, but not a guest in another language.
+    let mut people = ids(&pool, gus, ModelKind::User).await;
+    people.sort();
+    let mut expected = vec![admin.user_id, gus.user_id, bob.user_id];
+    expected.sort();
+    assert_eq!(people, expected);
+    assert!(!people.contains(&dee.user_id));
+    // Members still sync everything.
+    assert_eq!(
+        codes(&pool, bob, ModelKind::Translation, "lang").await,
+        ["de", "en", "sv"]
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn guests_translate_only_their_languages(pool: PgPool) {
+    let (admin, gus, _) = with_guests(&pool).await;
+    let english = new_translation(&pool, admin, "en", "hello", json!({})).await;
+    let german = new_translation(&pool, admin, "de", "hello", json!({})).await;
+
+    new_translation(&pool, gus, "sv", "hello", json!({ "value": "Hej" })).await;
+    apply(&pool, gus, vec![glossary("en", "sv", "email")])
+        .await
+        .unwrap();
+
+    let source = apply(
+        &pool,
+        gus,
+        vec![update(
+            ModelKind::Translation,
+            english,
+            json!({ "value": "Hi" }),
+        )],
+    )
+    .await;
+    assert!(matches!(source, Err(SyncError::Forbidden(_))), "{source:?}");
+    let new_key = apply(
+        &pool,
+        gus,
+        vec![create(
+            ModelKind::Translation,
+            json!({ "lang": "en", "namespace": "common", "key": "bye", "value": "Bye" }),
+        )],
+    )
+    .await;
+    assert!(
+        matches!(new_key, Err(SyncError::Forbidden(_))),
+        "{new_key:?}"
+    );
+    // German isn't there for them at all.
+    let other = apply(&pool, gus, vec![delete(ModelKind::Translation, german)]).await;
+    assert!(matches!(other, Err(SyncError::NotFound(_))), "{other:?}");
+    let language = apply(
+        &pool,
+        gus,
+        vec![create(ModelKind::Language, json!({ "code": "fi" }))],
+    )
+    .await;
+    assert!(
+        matches!(language, Err(SyncError::Forbidden(_))),
+        "{language:?}"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guests_log_hides_other_languages_but_confirms_their_writes(pool: PgPool) {
+    let (admin, gus, _) = with_guests(&pool).await;
+    let (_, start) = entries_after(&pool, gus, 0, 1000).await.unwrap();
+    let german = new_translation(&pool, admin, "de", "hello", json!({})).await;
+    let swedish = Uuid::now_v7();
+    let confirmed = apply(
+        &pool,
+        gus,
+        vec![create_with(
+            ModelKind::Translation,
+            swedish,
+            json!({ "lang": "sv", "namespace": "common", "key": "hello", "value": "Hej" }),
+        )],
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
+    let (entries, upto) = entries_after(&pool, gus, start, 1000).await.unwrap();
+    let seen: Vec<Uuid> = entries.iter().map(|e| e.model_id).collect();
+    assert_eq!(seen, vec![swedish]);
+    assert!(!seen.contains(&german));
+    assert_eq!(upto, confirmed);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guests_copy_starts_over_when_their_languages_or_the_source_change(pool: PgPool) {
+    let (admin, gus, _) = with_guests(&pool).await;
+    let bob = add_person(&pool, admin, "member").await;
+    let epoch = |viewer| {
+        let pool = pool.clone();
+        async move { bootstrap(&pool, viewer).await.unwrap().epoch }
+    };
+    let (shared, first) = (epoch(admin).await, epoch(gus).await);
+    assert_eq!(epoch(bob).await, shared);
+    assert_ne!(first, shared);
+
+    put_in_languages(&pool, admin, gus, &["sv", "de"]).await;
+    let second = epoch(gus).await;
+    assert_ne!(second, first);
+    assert_eq!(
+        codes(&pool, gus, ModelKind::Language, "code").await,
+        ["de", "en", "sv"]
+    );
+
+    put_in_languages(&pool, admin, gus, &["sv"]).await;
+    let (en, de) = (
+        language_id(&pool, admin, "en").await,
+        language_id(&pool, admin, "de").await,
+    );
+    apply(
+        &pool,
+        admin,
+        vec![
+            update(ModelKind::Language, en, json!({ "is_source": false })),
+            update(ModelKind::Language, de, json!({ "is_source": true })),
+        ],
+    )
+    .await
+    .unwrap();
+    assert_ne!(epoch(gus).await, second);
+    assert_eq!(
+        codes(&pool, gus, ModelKind::Language, "code").await,
+        ["de", "sv"]
+    );
+    // Nothing changes for everyone else.
+    assert_eq!(epoch(admin).await, shared);
+    assert_eq!(epoch(bob).await, shared);
 }

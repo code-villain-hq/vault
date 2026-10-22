@@ -12,6 +12,16 @@ use crate::run::{TranslationRunCreate, TranslationRunPatch};
 use crate::suggestion::{SuggestionCreate, SuggestionPatch};
 use crate::translation::{TranslationCreate, TranslationPatch};
 
+/// The languages a guest sees, as a condition on a language code: the
+/// source, and the ones they've been added to.
+macro_rules! their_languages {
+    () => {
+        " IN (SELECT l.code FROM languages l WHERE l.workspace_id = t.workspace_id \
+         AND (l.is_source OR l.id IN \
+         (SELECT language_id FROM language_access WHERE user_id = $viewer)))"
+    };
+}
+
 /// Every kind of record that clients sync.
 ///
 /// To add one: add a variant, a migration for its table, and its record,
@@ -88,6 +98,34 @@ impl ModelKind {
         false
     }
 
+    /// What a guest syncs: the source language and their languages, with
+    /// their texts, suggestions, glossaries, pair settings and runs; and the
+    /// admins, the members, and the guests who share a language with them.
+    pub fn guest_view(self) -> GuestView {
+        match self {
+            ModelKind::Language => GuestView::Where(
+                "t.is_source OR t.id IN \
+                 (SELECT language_id FROM language_access WHERE user_id = $viewer)",
+            ),
+            ModelKind::Translation | ModelKind::Suggestion => {
+                GuestView::Where(concat!("t.lang", their_languages!()))
+            }
+            ModelKind::GlossaryEntry | ModelKind::LanguagePair | ModelKind::TranslationRun => {
+                GuestView::Where(concat!(
+                    "t.source_lang",
+                    their_languages!(),
+                    " AND t.target_lang",
+                    their_languages!()
+                ))
+            }
+            ModelKind::User => GuestView::Where(
+                "t.id = $viewer OR t.role <> 'guest' OR t.id IN (SELECT o.user_id \
+                 FROM language_access o JOIN language_access mine \
+                 ON mine.language_id = o.language_id WHERE mine.user_id = $viewer)",
+            ),
+        }
+    }
+
     /// Checks the fields sent to create a record.
     pub fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         match self {
@@ -143,9 +181,8 @@ impl code_villain_sync::Model for ModelKind {
         ModelKind::validate_patch(self, data)
     }
 
-    // No guests yet: everyone syncs the whole workspace.
     fn guest_view(self) -> GuestView {
-        GuestView::All
+        ModelKind::guest_view(self)
     }
 }
 

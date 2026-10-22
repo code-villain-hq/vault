@@ -36,6 +36,7 @@ export type * from "./generated/TranslationPatch";
 export type * from "./generated/TranslationRun";
 export type * from "./generated/TranslationRunCreate";
 export type * from "./generated/TranslationRunPatch";
+export type * from "./generated/UpdateAccessRequest";
 export type * from "./generated/UpdateMemberRequest";
 export type * from "./generated/UpdateProfileRequest";
 export type * from "./generated/UpdateWorkspaceRequest";

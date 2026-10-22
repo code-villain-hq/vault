@@ -52,6 +52,9 @@ pub async fn start(
     Json(request): Json<StartRunRequest>,
 ) -> Result<(StatusCode, Json<TranslationRun>), AppError> {
     request.validate()?;
+    member
+        .require_translates(&state.pool, &request.target_lang)
+        .await?;
     let actor = member.actor;
     let settings = settings(&state, actor, &request.source_lang, &request.target_lang).await?;
     let items = plan(&state.pool, actor, &request).await?;
@@ -101,6 +104,10 @@ pub async fn cancel(
     let run = load_run(&mut db, actor, run_id)
         .await?
         .ok_or_else(|| AppError::not_found("run not found"))?;
+    member
+        .require_translates(&state.pool, &run.target_lang)
+        .await
+        .map_err(|_| AppError::not_found("run not found"))?;
     if run.status.finished() {
         return Ok(Json(run));
     }
@@ -125,6 +132,9 @@ pub async fn variants(
     Json(request): Json<VariantsRequest>,
 ) -> Result<Json<Variants>, AppError> {
     request.validate()?;
+    member
+        .require_translates(&state.pool, &request.target_lang)
+        .await?;
     let settings = settings(
         &state,
         member.actor,

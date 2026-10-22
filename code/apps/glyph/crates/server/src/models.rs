@@ -35,9 +35,10 @@ pub async fn list(State(state): State<AppState>, _user: CurrentUser) -> Json<Vec
 /// `POST /api/models/{name}/start`.
 pub async fn start(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    user: CurrentUser,
     Path(name): Path<String>,
 ) -> Result<Json<ModelInfo>, AppError> {
+    require_not_only_guest(&state, &user).await?;
     let models = state.models();
     let model = find(&models, &name)?;
     let args = model.start_args().map_err(AppError::invalid)?;
@@ -65,9 +66,10 @@ pub async fn start(
 /// `POST /api/models/{name}/stop`: stops a server this one started.
 pub async fn stop(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    user: CurrentUser,
     Path(name): Path<String>,
 ) -> Result<Json<ModelInfo>, AppError> {
+    require_not_only_guest(&state, &user).await?;
     let models = state.models();
     let model = find(&models, &name)?;
     state
@@ -144,6 +146,23 @@ pub async fn remove(
     }
     tracing::info!(model = name, "removed a model");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// The server's models are shared by its workspaces, so starting and
+/// stopping them is for the people who work in one, not for someone who is
+/// only ever a guest.
+async fn require_not_only_guest(state: &AppState, user: &CurrentUser) -> Result<(), AppError> {
+    let works_here: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM workspace_members WHERE user_id = $1 AND role <> 'guest')",
+    )
+    .bind(user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    if works_here {
+        Ok(())
+    } else {
+        Err(AppError::forbidden("guests can't do that"))
+    }
 }
 
 /// The file models are added to, if this server lets Settings change them.

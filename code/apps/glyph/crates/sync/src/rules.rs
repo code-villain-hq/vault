@@ -17,6 +17,18 @@ impl Rules for Glyph {
     type Model = ModelKind;
     const NOTIFY_CHANNEL: &'static str = NOTIFY_CHANNEL;
 
+    async fn guest_access(db: &mut PgConnection, actor: Actor) -> Result<Option<i64>, SyncError> {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT role, access_version FROM workspace_members \
+             WHERE workspace_id = $1 AND user_id = $2",
+        )
+        .bind(actor.workspace_id)
+        .bind(actor.user_id)
+        .fetch_optional(&mut *db)
+        .await?;
+        Ok(row.and_then(|(role, version)| (role == "guest").then_some(version)))
+    }
+
     async fn check_allowed(
         db: &mut PgConnection,
         actor: Actor,
@@ -25,7 +37,11 @@ impl Rules for Glyph {
         let (Operation::Create { model, .. }
         | Operation::Update { model, .. }
         | Operation::Delete { model, .. }) = operation;
-        check_allowed(db, actor, *model).await
+        check_allowed(db, actor, *model).await?;
+        if Self::guest_access(db, actor).await?.is_some() {
+            check_guest_language(db, actor, operation).await?;
+        }
+        Ok(())
     }
 
     async fn prepare_update(
@@ -40,6 +56,24 @@ impl Rules for Glyph {
             written_by_hand(data);
         }
         Ok(())
+    }
+
+    async fn after_write(
+        db: &mut PgConnection,
+        actor: Actor,
+        _transaction_id: Uuid,
+        model: ModelKind,
+        before: Option<&Value>,
+        after: &Value,
+    ) -> Result<Option<i64>, SyncError> {
+        // Guests see the source language, so a new one changes what they see.
+        if model == ModelKind::Language
+            && let Some(before) = before
+            && before.get("is_source") != after.get("is_source")
+        {
+            crate::access::every_guest_starts_over(db, actor.workspace_id).await?;
+        }
+        Ok(None)
     }
 
     async fn cascade(
@@ -84,6 +118,65 @@ async fn check_allowed(
         }
         _ => Ok(()),
     }
+}
+
+/// A guest translates only the languages they've been added to: they read
+/// the source, but don't change it.
+async fn check_guest_language(
+    db: &mut PgConnection,
+    actor: Actor,
+    operation: &Operation,
+) -> Result<(), SyncError> {
+    let (model, id, data) = match operation {
+        Operation::Create { model, id, data } | Operation::Update { model, id, data } => {
+            (*model, *id, Some(data))
+        }
+        Operation::Delete { model, id } => (*model, *id, None),
+    };
+    let column = match model {
+        ModelKind::Translation | ModelKind::Suggestion => "lang",
+        ModelKind::GlossaryEntry => "target_lang",
+        // Languages and pairs are for admins; users and runs aren't written
+        // from clients.
+        _ => return Ok(()),
+    };
+    let mut languages: Vec<String> = data
+        .and_then(|d| d.get(column))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .into_iter()
+        .collect();
+    if !matches!(operation, Operation::Create { .. }) {
+        let sql = format!(
+            "SELECT {column} FROM {} WHERE id = $1 AND workspace_id = $2",
+            model.table()
+        );
+        // Safe: the column and the table are constants.
+        let current: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+            .bind(id)
+            .bind(actor.workspace_id)
+            .fetch_optional(&mut *db)
+            .await?;
+        languages.extend(current);
+    }
+    languages.sort();
+    languages.dedup();
+    let theirs: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM languages l \
+         JOIN language_access a ON a.language_id = l.id AND a.user_id = $3 \
+         WHERE l.workspace_id = $1 AND l.code = ANY($2)",
+    )
+    .bind(actor.workspace_id)
+    .bind(&languages)
+    .bind(actor.user_id)
+    .fetch_one(&mut *db)
+    .await?;
+    if theirs != languages.len() as i64 {
+        return Err(SyncError::Forbidden(
+            "Guests translate only the languages they've been added to.".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Whether the actor is an admin of the workspace.
