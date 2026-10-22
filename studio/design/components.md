@@ -62,6 +62,8 @@ Ink, bold, underlined. The underline is `fg` at 45% and firms to `fg` on hover. 
 
 Round, in the `control` role at 700. Composite the status colour (`ok`, `warn`, `danger`, `info`, or a user-chosen hue) at `status-tint` (13%) over the actual surface. Keep this fill translucent; do not bake it against one background.
 
+A calm state stays quiet: up, healthy, done and complete take `status-neutral`, and a progress bar fills `muted`. `warn` and `danger` mark what needs a look (unsure, degraded, down), and `ok` is kept for the rare state worth a glance.
+
 Text and the leading dot use `status-<name>-ink`; `status-neutral-ink` covers quiet states, whose tint source is `muted`. The ink is checked at 4.5:1 or better against the composite on frame, panel, surface, hover, selection, dialog, and field tones in both modes. Do not use the adjusted ink as the tint source: that would change the fill's hue and strength. Hover and open states keep the same tint and ink.
 
 For user-chosen colours, keep the chosen hue as the tint source and adjust its ink toward black by day or white by night until it meets the same contrast requirement on all supported hosts. This changes presentation, never the stored colour.
@@ -71,6 +73,10 @@ For user-chosen colours, keep the chosen hue as the tint source and adjust its i
 Round. Text `muted` in the `control` role, on a translucent `fg` tint at `chip-tint` (7%). A label is detail, not a signal.
 
 Tints are recipes, not precomputed solid colours. Chips and status pills blend with their host; the base surface provides the ground. When a tint carries text, check the resulting composite in each supported context and adjust the ink rather than removing the tint.
+
+## Disclosure
+
+Folds a part of a view open and shut: sub-issues, a finding's detail, a group in a list. A 12px chevron before a `faint` label in the `control` role; on hover the label and chevron turn `muted`. Open, the chevron points down. No underline, no pill, no bare arrow. A count stays in the label ("4 sub-issues"). The control is a button with `aria-expanded`. `ui-disclosure` draws it.
 
 ## Tabs
 
@@ -82,13 +88,13 @@ Pick one value of a few: merge or rebase, an interface scale. One track of `fg` 
 
 ## Row
 
-No dividers. 6px corners inside a list inset from the panel edge. Hover fills `hover`; selection fills `selected`.
+No dividers. 6px corners inside a list inset from the panel edge. Hover fills `hover`; selection fills `selected`. One row is selected: the place you're on. A row that holds it, like the open app above its views, is `fg` at 700 with no fill.
 
 The active option in a menu or command list (the one the arrow keys move) uses a translucent `fg` tint at `highlight-tint` (8%), like a chip. A solid `hover` can match its host: in night, `dialog` and `hover` are the same tone. The tint stands apart on every host, and `fg`, `muted` and `faint` are checked on its composites.
 
 ## Icon
 
-Interface icons are line icons from one set per toolkit: Lucide on the web, SF Symbols in AppKit. A curated picker set may come from Tabler's outline icons, like Forge's service icons. Don't mix sets on one screen, and don't draw one-off icons when the set has one.
+Interface icons are line icons from one set per toolkit: Lucide on the web, SF Symbols in AppKit. Pickers draw from the same set: Forge's service icons are Lucide too. Don't mix sets on one screen, and don't draw one-off icons when the set has one.
 
 - **Size**: 15px beside text in rows, buttons, and nav, and inside the 28px icon button; 12px inside chips and pills. In AppKit, a symbol takes the point size of the text beside it.
 - **Stroke**: 1.75 on the web. SF Symbols use the weight of the text beside them.

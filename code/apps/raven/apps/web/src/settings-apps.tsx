@@ -85,9 +85,7 @@ export function AppsPage() {
                     <span className="ui-status px-2 py-0.5 text-xs">Raven itself</span>
                   ) : (
                     <>
-                      <span
-                        className={`ui-status px-2 py-0.5 text-xs ${sending ? "ui-status-ok" : ""}`}
-                      >
+                      <span className="ui-status px-2 py-0.5 text-xs">
                         {sending ? "Sends data" : "No key yet"}
                       </span>
                       {isAdmin && (

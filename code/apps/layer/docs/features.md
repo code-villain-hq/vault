@@ -959,7 +959,7 @@ Code: `commands/github.rs` (`review_queue`, `github_review_queue`),
 | Dock count | agents that need you (STATE table) | `attention.rs`, every 5s |
 | Banner: agent | an agent starts needing you, or exits on its own, while the window is not focused | `attention.rs` |
 | Banner: review, ticket | a new review request or assigned ticket, while the window is not focused | `news.rs`, every 3 min while away |
-| Toast | PR approved, changes requested, new comments, merged; a pane that exited | `Watchers.tsx` |
+| Toast | news from out of view (NOTE-7): PR approved, changes requested, new comments, merged; a ticket the PR sweep moved; a pane that exited, asks to be trusted or hit a usage limit; a notice from the app | `Watchers.tsx`, `store.ts` |
 | Status, in the top bar | a failure in the background, or of a tool with no place of its own; polls that keep failing (WIN-2) | `FrameStatus.tsx` |
 | Message center | all of the above but Slack and the dock, kept | `messages.rs`, `MessageCenter.tsx` |
 | Slack | an agent finished, PRs opened, an agent's own post, posted by the Slack bot to its channel (BOT-15) | `commands/slack.rs` |
@@ -990,6 +990,15 @@ Code: `commands/github.rs` (`review_queue`, `github_review_queue`),
   background, or of a tool that has no place of its own (an icon in the top
   bar, a menu item), shows in the top bar's status (WIN-2). Both say what
   happened in a sentence (`studio/design/behaviour.md`).
+- **NOTE-7** A success MUST NOT be a toast when it shows where it was
+  done: a saved setting, a connection's row, a renamed, added or removed
+  row, a dialog that closes on its work, a draft that fills its field. A
+  copy button reads "Copied" for a moment instead (`CopyButton`). A toast
+  is news from out of view (`studio/design/behaviour.md`, "When something
+  worked"): the table above, and the few a click starts that end out of
+  view: a workspace's window opening beside this one, running agents told
+  of a new worktree in their terminals, a branch Finish kept as the
+  dialog closes, and a copy from a menu, which closes as it is chosen.
 
 ### Message center
 
@@ -1208,6 +1217,12 @@ Known gaps:
   0.1.0"), faint and small, under whichever page is open
   (`studio/design/behaviour.md`, "Settings"). Its title says where a crash
   is written.
+- **SET-12** A connection's form (Jira, GitHub, the Slack bot, Grafana)
+  MUST keep one button, since its address and token only work together
+  and the app has to try them. It is named by what it does: "Connect"
+  until it is connected, "Reconnect" after, and "Connecting…" while it
+  tries (`studio/design/behaviour.md`, "Settings"). Connecting raises no
+  toast: the connected row says it (NOTE-7).
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `integrations/mod.rs` (`require_https`); the
@@ -2377,7 +2392,8 @@ changed.
   read when they name none, checked against the site before it is saved
   and kept when reconnecting to the same site while it still exists.
   With several and none chosen, a call that names none says which there
-  are, and where to choose one.
+  are, and where to choose one. A token that can see none is said on the
+  tab, in the warn tint, for as long as it lasts.
 - **OBS-6** Anything that goes into a URL path (a datasource uid, a label
   name) MUST be checked first, and a token the site refuses MUST fail with
   an error that says to enter a new one. A datasource the token may not
@@ -2771,6 +2787,13 @@ a new workspace, and renames or deletes one.
 - **PROF-18** A workspace on a server MUST offer Members… in the workspace
   menu, which opens the workspace's members on the server in the browser:
   inviting, roles and removing someone happen there.
+- **PROF-19** The foot of the sidebar MUST show the shared setup's sync
+  status, in the words and dots of every app's (the kit's `SyncIndicator`):
+  Synced; Syncing N, once changes have waited a second; Connecting… until
+  the workspace answers; Offline, with "· N waiting" when changes wait, also
+  when the workspace's server did not start or it is signed out; and
+  "Change refused: <why>" for six seconds when the workspace turns a change
+  down, which the message center keeps.
 
 Code: `profiles.rs` (the registry `profiles.json`, the lock, choosing what
 to open at launch, launching a copy), `profiles/mac.rs` (bringing another
@@ -2778,7 +2801,8 @@ copy forward, the Dock icon), `commands/profiles.rs`,
 `sidebar/ProfileMenu.tsx`; the workspace: `workspace.rs` (Postgres and the
 server, PROF-11), `workspace/moving.rs` (PROF-12), `config/shared.rs`
 (what a change sends, PROF-13), `workspace/mirror.rs` (what the workspace
-sends, PROF-14), `lib/workspace-sync.ts` (the window's sync client);
+sends, PROF-14), `lib/workspace-sync.ts` (the window's sync client),
+`sidebar/SyncStatus.tsx` (PROF-19);
 a workspace on a server: `workspace/server.rs` (signing in, PROF-15 to
 PROF-17), `sidebar/NewWorkspace.tsx`.
 

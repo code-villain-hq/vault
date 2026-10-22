@@ -836,6 +836,8 @@ body.dragging * { pointer-events: none; }
 /* A toast that opens what it is about says so, so a click is not a surprise. */
 .toast.linked:hover { background: var(--hover); }
 .toast.linked::after { content: " →"; color: var(--muted); }
+/* A copy button reads "Copied" for a moment instead of raising a toast (NOTE-7). */
+.ui-icon-button.copied { width: auto; padding: 0 8px; color: var(--fg); }
 
 /* A failure where the user acted (NOTE-6): Forge's ErrorMessage. */
 .error-message {

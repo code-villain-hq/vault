@@ -15,6 +15,7 @@ import { FinishTask } from "../FinishTask";
 import { DeleteTask } from "./DeleteTask";
 import { TaskRow } from "./TaskRow";
 import { ProfileMenu } from "./ProfileMenu";
+import { SyncStatus } from "./SyncStatus";
 
 /** What the task list is grouped by (TASK-17). Stage is the three lists it always had. */
 const GROUPINGS = ["stage", "epic", "repo"] as const;
@@ -141,15 +142,13 @@ export function Sidebar() {
       setAdding([]);
     }
 
+    // The new worktrees show under the task (NOTE-7). Agents already running
+    // cannot see a new sibling folder, so they are told, in terminals that
+    // may be out of view. Say so rather than reaching into their session
+    // invisibly.
     const added = adding.length - failed.length;
-    if (added > 0) {
-      toast(
-        "success",
-        `${added} worktree${added === 1 ? "" : "s"} on ${task.branch}` +
-          // Agents already running cannot see a new sibling folder, so they are
-          // told. Say so rather than reaching into their session invisibly.
-          (told > 0 ? ` · told ${told} running agent${told === 1 ? "" : "s"}` : ""),
-      );
+    if (added > 0 && told > 0) {
+      toast("info", `Told ${told} running agent${told === 1 ? "" : "s"} about the new worktree${added === 1 ? "" : "s"}.`);
     }
   }
 
@@ -165,20 +164,18 @@ export function Sidebar() {
       await Promise.all([refreshTasks(), refreshPanes()]);
 
       if (stuck.length === 0) {
+        // The task leaving the list says it went (NOTE-7).
         if (selected === task.id) select(null);
         // Only once the task is gone: a ticket closed for a task that was
         // then kept would be the board saying something untrue.
-        let moved = "";
         if (ticket && task.issue_key) {
           try {
             await api.jiraTransition(task.issue_key, ticket.id);
-            moved = ` · ${task.issue_key} moved to ${ticket.to_status}`;
             void refreshIssues({ quiet: true });
           } catch (e) {
             fail(`Couldn't move ${task.issue_key}: ${errMessage(e)}`);
           }
         }
-        toast("success", `Deleted ${task.name}${moved}`);
         return;
       }
       setConfirming({
@@ -446,6 +443,10 @@ export function Sidebar() {
 
       </div>
       <ProfileMenu />
+      {/* Where every app has it (PROF-19): Forge keeps a help button beside it. */}
+      <div className="sidebar-foot">
+        <SyncStatus />
+      </div>
 
       {menu && (
         <ContextMenu

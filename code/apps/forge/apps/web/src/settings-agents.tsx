@@ -310,8 +310,8 @@ function AgentRow({
             <span className="w-24 text-faint">older key</span>
           )}
           {inUse(token) ? (
-            <span className="flex items-center gap-1.5 text-ok-ink">
-              <span className="size-1.5 rounded-full bg-ok-ink" aria-hidden="true" />
+            <span className="flex items-center gap-1.5 text-muted">
+              <span className="size-1.5 rounded-full bg-muted" aria-hidden="true" />
               In use · {timeAgo(token.last_used_at ?? "")}
             </span>
           ) : (

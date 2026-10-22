@@ -128,7 +128,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
                           {i.kind === "records" ? <span>{i.title}</span> : <code>{i.title}</code>}
                           {i.repo && <span className="ui-chip">{i.repo}</span>}
                           {result && (result.ok
-                            ? <span className="ui-status ui-status-ok">removed</span>
+                            ? <span className="ui-status">removed</span>
                             : <span className="ui-status ui-status-danger">not removed</span>)}
                         </div>
                         <div className="cleanup-detail">{result && !result.ok ? result.detail : i.detail}</div>

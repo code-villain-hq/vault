@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useApi } from "./api";
-import { ago, clock, ms, percent } from "./format";
+import { ago, clock, lasted, ms, percent } from "./format";
 import {
   levelWords,
   NotAvailableOffline,
@@ -16,7 +16,7 @@ import { buttonClass, ErrorMessage, Section, Stat } from "./ui";
 import { useIsAdmin } from "./workspace";
 
 const STATUS_CLASS: Record<Level, string> = {
-  up: "ui-status ui-status-ok",
+  up: "ui-status",
   warn: "ui-status ui-status-warn",
   down: "ui-status ui-status-danger",
   unknown: "ui-status",
@@ -52,7 +52,11 @@ function HealthBody({ health }: { health: Health }) {
         </span>
         <p className="text-title font-semibold">{status.reason}</p>
         <p className="text-muted">
-          {status.down_since && `Down since ${clock(status.down_since)}. `}
+          {status.down_since && (
+            <span title={`Since ${clock(status.down_since)}`}>
+              Down for {lasted(status.down_since)}.{" "}
+            </span>
+          )}
           {status.last_check
             ? `Checked ${ago(status.last_check)}. Raven checks every half minute.`
             : health.health_url

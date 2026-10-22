@@ -1,5 +1,4 @@
 import { partView, slotKey, useSpecs, type SpecFile } from "../../lib/specs";
-import { useStore } from "../../store";
 import type { TaskSpec, TaskView } from "../../lib/types";
 import { ErrorMessage, useFailure } from "../ui";
 
@@ -23,7 +22,6 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
   const turnDown = useSpecs((s) => s.turnDown);
   // What fails in a banner shows under the banners (NOTE-6).
   const failure = useFailure();
-  const toast = useStore((s) => s.toast);
   const view = partView(spec, file.part, file.checkoutId);
   const word = file.part === "tasks" ? "tasks" : file.part === "design" ? "design" : spec.kind === "bugfix" ? "bug analysis" : "requirements";
 
@@ -55,12 +53,12 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
                 onClick={() => {
                   const target: SpecFile = { part: file.part, checkoutId: file.part === "tasks" ? o.checkout_id : null };
                   // Tasks go to their one repository; the rest to every one.
+                  // The banner going says it worked (NOTE-7).
                   const reached = target.checkoutId ? 1 : spec.repos.length;
                   failure.clear();
                   void approve(task.id, [target], null, { [slotKey(target.part, target.checkoutId)]: o.text })
                     .then((failed) => {
-                      if (failed.length === 0) toast("success", `Approved the ${word} from ${o.folder}.`);
-                      else failure.fail(`Couldn't write it in ${failed.map((f) => f.folder).join(", ")}. ${reached > failed.length ? "The others have it." : "Try again."}`);
+                      if (failed.length > 0) failure.fail(`Couldn't write it in ${failed.map((f) => f.folder).join(", ")}. ${reached > failed.length ? "The others have it." : "Try again."}`);
                     })
                     .catch(failure.fail);
                 }}
@@ -75,7 +73,7 @@ export function SpecBanners({ task, spec, file, busy, onApprove, onShow }: {
             title="Write what was approved back over it, and commit that"
             onClick={() => {
               failure.clear();
-              void putBack(task.id, file.part, o.checkout_id).then(() => toast("success", `Put back the approved ${word} in ${o.folder}.`)).catch(failure.fail);
+              void putBack(task.id, file.part, o.checkout_id).catch(failure.fail);
             }}
           >
             Put back

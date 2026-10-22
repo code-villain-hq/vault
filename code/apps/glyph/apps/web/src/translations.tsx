@@ -446,7 +446,7 @@ function StateDot({
       title={label}
       className={`size-2 shrink-0 rounded-full ${
         state === "done"
-          ? "bg-ok"
+          ? "bg-muted"
           : state === "unsure"
             ? "bg-warn"
             : "shadow-[inset_0_0_0_1.5px_var(--faint)]"

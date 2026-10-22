@@ -422,7 +422,9 @@ function AppNav() {
               key={watched.id}
               to="/$workspace/$app"
               params={{ workspace: workspace.url_key, app: watched.key }}
-              className={`${navLink} ${watched.key === key ? "bg-selected font-bold" : ""}`}
+              // The open app holds the selected view below it: bold, never filled.
+              activeProps={{}}
+              className={`${navLink} ${watched.key === key ? "font-bold" : ""}`}
               title={status?.reason}
             >
               <Initial name={watched.name} square />

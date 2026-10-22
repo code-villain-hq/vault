@@ -17,7 +17,7 @@ pub struct Service {
     pub id: Uuid,
     pub workspace_id: Uuid,
     pub name: String,
-    /// The name of its icon (one of Tabler's), shown in its `color`, so it's
+    /// The name of its icon (one of Lucide's), shown in its `color`, so it's
     /// recognisable wherever it appears.
     pub icon: String,
     /// `#rrggbb`.
@@ -129,9 +129,10 @@ impl Validate for DomainPatch {
     }
 }
 
-/// A service's icon is the name of one in the web app's icon set (Tabler's
-/// outline icons), such as `key` or `git-branch`; the app shows unknown names as
-/// `server`, so the server only checks it looks like a name.
+/// A service's icon is the name of one in the web app's icon set (Lucide's
+/// icons), such as `key` or `git-branch`; the app also reads the Tabler names
+/// stored before, and shows unknown names as `server`, so the server only
+/// checks it looks like a name.
 fn check_icon(icon: &str) -> Result<(), ValidationError> {
     let valid = !icon.is_empty()
         && icon.len() <= 40

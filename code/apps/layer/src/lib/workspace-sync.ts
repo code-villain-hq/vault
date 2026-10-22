@@ -42,9 +42,38 @@ function signedOut() {
 }
 
 /**
+ * What the sidebar's sync status shows (PROF-19), in the kit's own terms
+ * (`SyncIndicator`): connecting until the client starts, offline when there
+ * is no workspace to reach (its server did not start, or it is signed out).
+ */
+export interface SyncState {
+  connection: "online" | "offline" | "connecting";
+  pending: number;
+  ready: boolean;
+}
+const CONNECTING: SyncState = { connection: "connecting", pending: 0, ready: false };
+const UNREACHABLE: SyncState = { connection: "offline", pending: 0, ready: false };
+let sync = CONNECTING;
+const watchingSync = new Set<() => void>();
+function setSync(next: SyncState) {
+  if (next.connection === sync.connection && next.pending === sync.pending && next.ready === sync.ready) return;
+  sync = next;
+  for (const tell of watchingSync) tell();
+}
+export function useSyncState() {
+  return useSyncExternalStore((tell) => {
+    watchingSync.add(tell);
+    return () => void watchingSync.delete(tell);
+  }, () => sync);
+}
+/** Raises "refused", with the workspace's reason, when it turns a change down. */
+export const refusals = new EventTarget();
+
+/**
  * Starts once the workspace's server has (it may never: then nothing does).
  * `onSetup` reads the repositories and settings again; `onRefused` says why
- * a change was not taken. Returns what stops it.
+ * a change from the workspace could not be kept here (one the workspace
+ * refuses goes to `refusals`). Returns what stops it.
  */
 export async function startWorkspaceSync(hooks: {
   onSetup: () => void;
@@ -55,8 +84,13 @@ export async function startWorkspaceSync(hooks: {
     // A server workspace with no session: the menu offers Sign in again.
     const me = (await api.listProfiles()).find((p) => p.current);
     if (me?.server) signedOut();
-    return () => {};
+    setSync(UNREACHABLE);
+    return () => setSync(CONNECTING);
   }
+  // Stopped for good once the server stops taking the session: offline from
+  // then on, with what waits still counted.
+  let shut = false;
+  const tellSync = () => setSync(shut ? { ...client.status(), connection: "offline" } : client.status());
   const client = new SyncClient<Schema>({
     store: new IndexedDbStore(`layer-${place.user_id}-${place.workspace_id}`),
     transport: new HttpTransport({
@@ -68,9 +102,17 @@ export async function startWorkspaceSync(hooks: {
       onUnauthorized: () => {
         signedOut();
         client.stop();
+        shut = true;
+        tellSync();
       },
     }),
-    onReject: (_transaction, error) => hooks.onRefused(error.message),
+    // Said where the sync status is (PROF-19), and kept in the message center.
+    onReject: (_transaction, error) => {
+      refusals.dispatchEvent(new CustomEvent("refused", { detail: error.message }));
+      void api
+        .addMessage("error", "error", `The workspace did not take a change: ${error.message}`)
+        .catch(() => {});
+    },
   });
 
   const take = async () => {
@@ -120,12 +162,17 @@ export async function startWorkspaceSync(hooks: {
 
   await client.start();
   await take();
-  const unsubscribe = client.subscribe(() => void push());
+  tellSync();
+  const unsubscribe = client.subscribe(() => {
+    tellSync();
+    void push();
+  });
   const unlisten = listen("setup:write", () => void take());
   void push();
   return () => {
     unsubscribe();
     void unlisten.then((un) => un());
     client.stop();
+    setSync(CONNECTING);
   };
 }

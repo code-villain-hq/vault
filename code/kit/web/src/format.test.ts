@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ago } from "./format";
+import { ago, lasted } from "./format";
 
 const now = new Date(2026, 9, 21, 15, 0).getTime();
 const before = (ms: number) => new Date(now - ms).toISOString();
@@ -31,4 +31,12 @@ test("no time reads never", () => {
 
 test("a time that isn't one reads nothing", () => {
   expect(ago("soon", now)).toBe("");
+});
+
+test("a state says how long it has lasted", () => {
+  expect(lasted(before(10_000), now)).toBe("a minute");
+  expect(lasted(before(12 * minute), now)).toBe("12 minutes");
+  expect(lasted(before(60 * minute), now)).toBe("an hour");
+  expect(lasted(before(5 * 60 * minute), now)).toBe("5 hours");
+  expect(lasted(before(3 * 24 * 60 * minute), now)).toBe("3 days");
 });

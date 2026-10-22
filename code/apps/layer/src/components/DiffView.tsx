@@ -45,7 +45,6 @@ export function DiffView({ task }: { task: TaskView }) {
   const fail = useStore((s) => s.fail);
   const tray = useFailure();
   const dialog = useFailure();
-  const toast = useStore((s) => s.toast);
   const refreshTasks = useStore((s) => s.refreshTasks);
   const refreshPanes = useStore((s) => s.refreshPanes);
   const setTab = useStore((s) => s.setTab);
@@ -402,11 +401,10 @@ export function DiffView({ task }: { task: TaskView }) {
     tray.clear();
     if (pane) {
       try {
-        const n = queued.length;
         const sent = queued.map((d) => d.id);
         await api.sendReview(pane.id, commentsFor(pane.checkout_id));
+        // They leave the tray; that is the news (NOTE-7).
         dropNotes(task.id, sent);
-        toast("success", `Sent ${n} note${n === 1 ? "" : "s"} to ${pane.title}.`);
       } catch (e) {
         tray.fail(e);
       }
@@ -427,9 +425,8 @@ export function DiffView({ task }: { task: TaskView }) {
     setStartingBusy(true);
     dialog.clear();
     try {
-      const n = queued.length;
       const sent = queued.map((d) => d.id);
-      const pane = await api.spawnAgent(
+      await api.spawnAgent(
         task.id,
         startAgentId,
         startScope,
@@ -439,7 +436,6 @@ export function DiffView({ task }: { task: TaskView }) {
       setStarting(false);
       await refreshPanes();
       setTab("terminals");
-      toast("success", `Started ${pane.title} with ${n} note${n === 1 ? "" : "s"}.`);
     } catch (e) {
       dialog.fail(e);
     } finally {
@@ -456,10 +452,10 @@ export function DiffView({ task }: { task: TaskView }) {
     dialog.clear();
     try {
       const results = await api.commitTask(task.id, message.trim());
-      reportRepoResults(toast, dialog.fail, results, "Committed");
+      reportRepoResults(dialog.fail, results);
       // A hook that fails comes back as a result, not an error. Closing the
       // dialog then threw the message away with the repo still uncommitted.
-      if (results.every((r) => r.ok)) {
+      if (results.length > 0 && results.every((r) => r.ok)) {
         setCommitting(false);
         setMessage("");
       }

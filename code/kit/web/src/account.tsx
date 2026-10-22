@@ -412,7 +412,6 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     const [next, setNext] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [done, setDone] = useState(false);
     // Rarely needed, so the form opens only when asked for.
     const [changing, setChanging] = useState(false);
     const action = hasPassword ? "Change password" : "Set a password";
@@ -421,12 +420,10 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
       event.preventDefault();
       setBusy(true);
       setError(null);
-      setDone(false);
       try {
         await api("PUT", "/api/me/password", { current_password: current, new_password: next });
         setCurrent("");
         setNext("");
-        setDone(true);
         setChanging(false);
         await app.loadSession();
       } catch (e) {
@@ -460,15 +457,8 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
                 {!hasPassword && noPassword && (
                   <p className="-mt-1 mb-3 text-muted">{noPassword}</p>
                 )}
-                {done && <p className="mb-3 text-ok-ink">Password saved.</p>}
                 {!changing ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setChanging(true);
-                      setDone(false);
-                    }}
-                  >
+                  <Button variant="secondary" onClick={() => setChanging(true)}>
                     {action}
                   </Button>
                 ) : (

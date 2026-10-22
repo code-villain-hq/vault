@@ -296,7 +296,11 @@ export function LoginPage() {
           </div>
         )}
         {server.field && <div className="mb-4">{server.field}</div>}
-        <CodeVillainButton label="Sign in with Code Villain" query={query} before={server.apply} />
+        <CodeVillainButton
+          label="Sign in with Code Villain ↗"
+          query={query}
+          before={server.apply}
+        />
         <p className="mt-6 text-center text-muted">
           One account for every Code Villain app.
           <br />
@@ -477,7 +481,7 @@ export function JoinPage() {
     return (
       <AuthScreen title={title}>
         {subtitle}
-        <CodeVillainButton label="Sign in with Code Villain to join" query={{ invite: token }} />
+        <CodeVillainButton label="Sign in with Code Villain to join ↗" query={{ invite: token }} />
         <p className="mt-6 text-center text-muted">
           No Code Villain account yet? Ask {invite.invited_by} for one.
         </p>

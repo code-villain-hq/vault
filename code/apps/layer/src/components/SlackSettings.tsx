@@ -4,11 +4,11 @@ import { api } from "../lib/api";
 import { BOT_NAME_MAX, botManifest, newAppUrl, useSlackBot } from "../lib/slackBot";
 import { useStore } from "../store";
 import type { AgentStatus, SlackBotConfig, SlackBotStatus, SlackConfig } from "../lib/types";
-import { ErrorMessage, Field, Switch, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Field, Switch, useFailure } from "./ui";
 import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
-  connected: ["connected", "ui-status ui-status-ok"],
+  connected: ["connected", "ui-status"],
   connecting: ["connecting…", "ui-status ui-status-warn"],
   failing: ["not connected", "ui-status ui-status-danger"],
   off: ["off", "ui-chip"],
@@ -24,7 +24,6 @@ export function SlackSettings() {
   const settings = useStore((s) => s.settings);
   const agents = useStore((s) => s.agents);
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const toast = useStore((s) => s.toast);
   // Each card's actions fail in that card, the connect under its button
   // (NOTE-6).
   const card = useFailure();
@@ -51,7 +50,6 @@ export function SlackSettings() {
       await api.slackBotConnect(botToken.trim(), appToken.trim(), owner.trim(), bot?.agent_id || agentId);
       setBotToken("");
       setAppToken("");
-      toast("success", "Slack bot connected. Mention it in a thread to try it.");
       await refreshSettings();
     } catch (e) {
       connecting.fail(e);
@@ -95,7 +93,6 @@ export function SlackSettings() {
     try {
       await api.setSlackBotPersonality(personality);
       await refreshSettings();
-      toast("success", "Saved. Threads handed over from now on get the new voice.");
     } catch (e) {
       voice.fail(e);
     }
@@ -106,7 +103,6 @@ export function SlackSettings() {
     try {
       await api.disconnect("slack");
       await refreshSettings();
-      toast("info", "Slack disconnected");
     } catch (e) {
       card.fail(e);
     }
@@ -273,7 +269,8 @@ export function SlackSettings() {
         disabled={busy || !owner.trim() || !(bot?.agent_id || agentId) || (!bot && (!botToken.trim() || !appToken.trim()))}
         onClick={() => void connect()}
       >
-        {busy ? "Checking with Slack…" : bot ? "Save & reconnect" : "Connect"}
+        {/* One button, named by what it does (SET-12). */}
+        <BusyLabel busy={busy} idle={bot ? "Reconnect" : "Connect"} working="Connecting…" />
       </button>
       <ErrorMessage>{connecting.error}</ErrorMessage>
     </>
@@ -331,7 +328,6 @@ function AgentAndModel({ bot, conversational, onChange }: {
 function Notifications({ botName }: { botName: string }) {
   const slack = useStore((s) => s.settings?.slack ?? null);
   const refreshSettings = useStore((s) => s.refreshSettings);
-  const toast = useStore((s) => s.toast);
   const failure = useFailure();
   const workspace = useWorkspace();
   // The channel is the workspace's (SET-7): a member posts their test there.
@@ -345,8 +341,8 @@ function Notifications({ botName }: { botName: string }) {
     setBusy(true);
     failure.clear();
     try {
+      // No toast (NOTE-7): the test is there to see in the channel.
       await api.setSlackChannel(channel.trim());
-      toast("success", "Posted a test message: check the channel.");
       await refreshSettings();
     } catch (e) {
       failure.fail(e);

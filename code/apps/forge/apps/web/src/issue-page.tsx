@@ -10,7 +10,7 @@ import type {
   RelationType,
 } from "@forge/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ChevronRight, Ellipsis, Plus, X } from "lucide-react";
+import { Ellipsis, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentWorkLine } from "./agent-work";
 import {
@@ -48,7 +48,7 @@ import { chip, NewButton } from "./page-parts";
 import { Picker } from "./picker";
 import { describeDelta } from "./spec-change";
 import { DescriptionProposals } from "./suggestions";
-import { Button } from "./ui";
+import { Button, Disclosure } from "./ui";
 import { useIsAdmin, useMayDeleteIssue, useRecords, useWorkspace } from "./workspace";
 
 export function IssuePage() {
@@ -501,20 +501,9 @@ function Knowledge({ issue }: { issue: Issue }) {
     .join(" and ");
   return (
     <section className="flex flex-col gap-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="-mx-2 flex items-center gap-2 self-start rounded-md px-2 py-1 text-xs text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
-      >
-        <ChevronRight
-          size={15}
-          strokeWidth={1.75}
-          className={`transition-transform ${open ? "rotate-90" : ""}`}
-          aria-hidden="true"
-        />
+      <Disclosure open={open} onToggle={() => setOpen(!open)} className="self-start">
         Follows {counts}
-      </button>
+      </Disclosure>
       {open && (
         <div className="flex flex-col gap-4">
           {specs.length > 0 && (
@@ -1101,8 +1090,8 @@ function ParentPicker({ issue, onClose }: { issue: Issue; onClose: () => void })
 }
 
 const LINK_STATES: Record<string, { label: string; className: string }> = {
-  open: { label: "Open", className: "text-ok-ink" },
-  merged: { label: "Merged", className: "text-ok-ink" },
+  open: { label: "Open", className: "text-muted" },
+  merged: { label: "Merged", className: "text-muted" },
   closed: { label: "Closed", className: "text-faint" },
   pushed: { label: "Commit", className: "text-muted" },
 };

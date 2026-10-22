@@ -61,6 +61,8 @@ export function ProfileMenu() {
     setMenu(null);
     if (p.current) return;
     api.openProfile(p.id)
+      // The window takes seconds to start its workspace's server, and comes
+      // up beside this one: said here, or the click looks like nothing.
       .then(() => { if (!p.open) toast("info", `Opening ${p.name} in a window of its own…`); })
       .catch(fail);
   }
@@ -127,7 +129,8 @@ export function ProfileMenu() {
           onOpened={(name) => {
             setMaking(false);
             load();
-            toast("success", `${name} is opening in a window of its own.`);
+            // As above: the new window is out of this one's view for a while.
+            toast("info", `${name} is opening in a window of its own.`);
           }}
         />
       )}
@@ -180,7 +183,6 @@ function ManageProfiles({
   reload: () => void;
   onClose: () => void;
 }) {
-  const toast = useStore((s) => s.toast);
   // Renaming and recolouring fail above the dialog's button, deleting in
   // its own dialog (NOTE-6).
   const failure = useFailure();
@@ -308,7 +310,7 @@ function ManageProfiles({
           onConfirm={() =>
             api.deleteProfile(deleting.id)
               .then(() => {
-                toast("success", `Deleted ${deleting.name}.`);
+                // Its row leaving the list says it went (NOTE-7).
                 setDeleting(null);
                 reload();
               })

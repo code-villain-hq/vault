@@ -18,6 +18,7 @@ import {
   statement,
 } from "./spec-change";
 import { TextDiff } from "./suggestions";
+import { Fold } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
 /** The spec changes of open issues (not done or canceled) that haven't taken effect. */
@@ -163,8 +164,7 @@ function ChangedAfterStart({ change }: { change: SpecChange }) {
           : "It says something else now than when work on this issue started. The comments should say why."}
       </p>
       {!nothingThen && (
-        <details>
-          <summary className="ui-link cursor-pointer text-xs">See what it said then</summary>
+        <Fold label="See what it said then">
           <div className="mt-2 flex flex-col gap-3">
             {[...(then.replaces_decision_ids ?? [])].sort().join() !==
               [...change.replaces_decision_ids].sort().join() && (
@@ -206,7 +206,7 @@ function ChangedAfterStart({ change }: { change: SpecChange }) {
               );
             })}
           </div>
-        </details>
+        </Fold>
       )}
     </div>
   );
@@ -316,12 +316,11 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
         <h3 className="text-sm font-medium">
           {verb} also adds a new spec, “{part.title}”.
         </h3>
-        <details className="text-sm">
-          <summary className="ui-link cursor-pointer text-xs">Read the new spec</summary>
+        <Fold label="Read the new spec" className="text-sm">
           <div className="mt-2">
             <Markdown text={part.text} />
           </div>
-        </details>
+        </Fold>
       </div>
     );
   }
@@ -339,12 +338,11 @@ function SpecPart({ part, verb }: { part: SpecChangePart; verb: string }) {
           {changed.length > 0 && <NameList change="Changes" names={changed} />}
           {removed.length > 0 && <NameList change="Removes" names={removed} />}
         </ul>
-        <details className="text-sm">
-          <summary className="ui-link cursor-pointer text-xs">See the full change</summary>
+        <Fold label="See the full change" className="text-sm">
           <div className="mt-2">
             <TextDiff label={`What changes in ${title}`} before={part.before} after={part.after} />
           </div>
-        </details>
+        </Fold>
       </div>
     );
   }

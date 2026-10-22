@@ -19,7 +19,6 @@ import {
   Bot,
   Box,
   Check,
-  ChevronDown,
   ChevronsUpDown,
   CircleUserRound,
   Folders,
@@ -54,7 +53,7 @@ import {
   workspaceEntries,
 } from "./session";
 import { ForgeShortcuts } from "./shortcuts";
-import { AuthScreen, Button, Splash } from "./ui";
+import { AuthScreen, Button, Disclosure, Splash } from "./ui";
 import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /**
@@ -376,20 +375,12 @@ function DomainsNav() {
           Domains
         </Link>
         {domains.length > 0 && (
-          <button
-            type="button"
-            aria-label={open ? "Fold domains" : "Show domains"}
-            aria-expanded={open}
-            onClick={toggle}
-            className="ui-button ui-icon-button absolute top-1/2 right-0 -translate-y-1/2 text-faint hover:text-fg"
-          >
-            <ChevronDown
-              size={15}
-              strokeWidth={1.75}
-              aria-hidden="true"
-              className={`transition-transform ${open ? "" : "-rotate-90"}`}
-            />
-          </button>
+          <Disclosure
+            open={open}
+            onToggle={toggle}
+            aria-label="Show domains"
+            className="absolute top-1/2 right-0 size-7 -translate-y-1/2 justify-center"
+          />
         )}
       </div>
       {open &&
@@ -486,20 +477,9 @@ function Section({ id, title, children }: { id: string; title: string; children:
   };
   return (
     <nav aria-label={title} className="sidebar-section flex flex-col gap-0.5">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={toggle}
-        className="sidebar-group-label group flex h-7 items-center gap-1 self-start rounded-md px-2 text-xs text-faint outline-none hover:text-muted focus-visible:ring-2 focus-visible:ring-accent"
-      >
+      <Disclosure open={open} onToggle={toggle} className="sidebar-group-label h-7 self-start px-2">
         {title}
-        <ChevronDown
-          size={15}
-          strokeWidth={1.75}
-          aria-hidden="true"
-          className={`transition-transform ${open ? "" : "-rotate-90"}`}
-        />
-      </button>
+      </Disclosure>
       <div className={`sidebar-section-items flex-col gap-0.5 ${open ? "flex" : "hidden"}`}>
         {children}
       </div>

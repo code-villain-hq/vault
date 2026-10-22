@@ -26,7 +26,6 @@ export function FileIssueDialog({
   const settings = useStore((s) => s.settings);
   const issues = useStore((s) => s.issues);
   const refreshIssues = useStore((s) => s.refreshIssues);
-  const toast = useStore((s) => s.toast);
   // Filing fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
 
@@ -89,7 +88,6 @@ export function FileIssueDialog({
         parent_key: epic?.key ?? null,
         fields: rf.fields(),
       });
-      toast("success", epic ? `Filed ${issue.key} under ${epic.key}` : `Filed ${issue.key}`);
       onClose();
       await refreshIssues();
       // Straight into the start-work dialog: filing it is usually the first
