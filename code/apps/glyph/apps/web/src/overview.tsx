@@ -1,3 +1,4 @@
+import { NotAddedYet } from "@code-villain/web";
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
@@ -12,13 +13,16 @@ import {
 } from "./data";
 import { PageHeader } from "./layout";
 import { Empty } from "./page-parts";
+import { LANGUAGE_ACCESS } from "./settings";
 import { buttonClass } from "./ui";
-import { useIsAdmin, useRecords, useWorkspace } from "./workspace";
+import { useIsAdmin, useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** `/$workspace`: how far each language has come, overall and per namespace. */
 export function OverviewPage() {
   const { workspace } = useWorkspace();
   const isAdmin = useIsAdmin();
+  const guest = useIsGuest();
+  const people = useRecords("User");
   const languages = useLanguages();
   const source = useSource();
   const catalog = useCatalog();
@@ -44,6 +48,14 @@ export function OverviewPage() {
     return byLang;
   }, [suggestions]);
 
+  if (guest && languages.every((l) => l.is_source)) {
+    return (
+      <>
+        <PageHeader title="Overview" />
+        <NotAddedYet access={LANGUAGE_ACCESS} people={people} />
+      </>
+    );
+  }
   if (languages.length === 0) {
     return (
       <>

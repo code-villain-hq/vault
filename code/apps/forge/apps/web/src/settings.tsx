@@ -1,12 +1,21 @@
-import { accountPages } from "@code-villain/web";
+import { type AccessConfig, accountPages } from "@code-villain/web";
 import { useState } from "react";
 import { api } from "./api";
 import { GITHUB_PROBLEMS, useProviders } from "./auth";
+import { useTeams } from "./data";
 import { PageHeader } from "./layout";
 import { publicUrl } from "./server";
 import { loadSession, signedIn, signOut } from "./session";
 import { buttonClass, ErrorMessage } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
+
+/** A guest is added to teams, and admins and members are in some of them too. */
+export const TEAM_ACCESS: AccessConfig = {
+  noun: "team",
+  plural: "teams",
+  useOptions: useTeams,
+  everyone: true,
+};
 
 const pages = accountPages({
   name: "Forge",
@@ -18,6 +27,7 @@ const pages = accountPages({
   signedIn,
   signOut,
   PageHeader,
+  access: TEAM_ACCESS,
 });
 
 export function MembersPage() {

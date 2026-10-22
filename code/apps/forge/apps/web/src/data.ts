@@ -13,7 +13,7 @@ import type {
   WorkflowState,
 } from "@forge/types";
 import { useEffect, useMemo, useState } from "react";
-import { useRecords } from "./workspace";
+import { useRecords, useWorkspace } from "./workspace";
 
 export function byId<T extends { id: string }>(records: T[]): Map<string, T> {
   return new Map(records.map((record) => [record.id, record]));
@@ -22,6 +22,17 @@ export function byId<T extends { id: string }>(records: T[]): Map<string, T> {
 export function useTeams(): Team[] {
   const teams = useRecords("Team");
   return useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
+}
+
+/** The teams you're in, by name: the sidebar's. A guest sees no others. */
+export function useMyTeams(): Team[] {
+  const { me } = useWorkspace();
+  const teams = useTeams();
+  const memberships = useRecords("TeamMember");
+  return useMemo(() => {
+    const mine = new Set(memberships.filter((m) => m.user_id === me.user.id).map((m) => m.team_id));
+    return teams.filter((team) => mine.has(team.id));
+  }, [teams, memberships, me.user.id]);
 }
 
 /** Every workflow state, by id. */

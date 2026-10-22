@@ -1,20 +1,22 @@
 // Members and Account, the settings pages every app has: who is in the
 // workspace and how they join, and your own name, password and sign-out.
 // Each app hands over its API, session and page header with `accountPages`.
+import { Menu } from "@base-ui/react/menu";
 import { Select } from "@base-ui/react/select";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import {
   type ComponentType,
   type FormEvent,
   type ReactNode,
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { Button } from "./button";
 import { type Confirmation, ConfirmDialog } from "./confirm";
-import { ErrorMessage, Initial, TextField } from "./controls";
+import { Empty, ErrorMessage, Initial, TextField } from "./controls";
 import { MoreMenu } from "./page-parts";
 import { messageOf } from "./problems";
 
@@ -29,6 +31,8 @@ interface AccountUser {
 interface MemberInfo {
   user: AccountUser;
   role: Role;
+  /** The ids of what they're in: teams, languages, apps or repositories. */
+  access: string[];
 }
 
 interface Invite {
@@ -71,16 +75,74 @@ export interface AccountApp<P extends AccountPlace, M extends AccountMe> {
   signedIn: (me: M, place: P) => void;
   signOut: (place: P) => Promise<void>;
   PageHeader: ComponentType<{ title: string }>;
+  /** What a guest is added to. */
+  access: AccessConfig;
 }
 
-const ROLES: { value: Role; label: string }[] = [
-  { value: "member", label: "Member" },
-  { value: "admin", label: "Admin" },
-];
+/** What a guest is added to, and works in: a team, a language, an app, a repository. */
+export interface AccessConfig {
+  /** One of them, as people read it: "team". */
+  noun: string;
+  /** More than one: "teams". */
+  plural: string;
+  /** Everything there is to add someone to, by name. */
+  useOptions: () => { id: string; name: string }[];
+  /**
+   * Whether admins and members are in some and not others, as Forge's teams
+   * are. Otherwise they reach everything, and only a guest's row says what
+   * they're in.
+   */
+  everyone?: boolean;
+}
+
+/** Whether a role sees only what they've been added to. */
+export const isGuest = (role: Role) => role === "guest";
+
+function roles(access: AccessConfig): { value: Role; label: string; hint: string }[] {
+  return [
+    { value: "admin", label: "Admin", hint: "Changes settings and who's in" },
+    { value: "member", label: "Member", hint: `Works in every ${access.noun}` },
+    { value: "guest", label: "Guest", hint: `Sees only the ${access.plural} they're added to` },
+  ];
+}
+
+/** "Teams". */
+const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** "a team", "an app". */
+function withArticle(noun: string) {
+  return `${/^[aeiou]/i.test(noun) ? "an" : "a"} ${noun}`;
+}
+
+/**
+ * What a guest added to nothing sees in place of the workspace: what
+ * they're waiting for, and whom to ask.
+ */
+export function NotAddedYet({
+  access,
+  people,
+}: {
+  access: AccessConfig;
+  /** The workspace's people, as clients sync them; the admins among them are named. */
+  people: { name: string; role: Role; kind?: string }[];
+}) {
+  const admins = people
+    .filter((p) => p.role === "admin" && p.kind !== "agent")
+    .map((p) => p.name)
+    .sort((a, b) => a.localeCompare(b));
+  const names = new Intl.ListFormat("en", { type: "conjunction" }).format(admins);
+  return (
+    <Empty title={`No ${access.plural} yet`}>
+      Ask an admin to add you to {withArticle(access.noun)}.
+      {admins.length > 0 && ` ${admins.length === 1 ? "Admin" : "Admins"} here: ${names}.`}
+    </Empty>
+  );
+}
 
 /** Call once, at module level, and export the pages it returns. */
 export function accountPages<P extends AccountPlace, M extends AccountMe>(app: AccountApp<P, M>) {
-  const { api, useWorkspace, PageHeader } = app;
+  const { api, useWorkspace, PageHeader, access } = app;
+  const roleOptions = roles(access);
 
   function MembersPage({
     agents,
@@ -98,6 +160,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     const [invites, setInvites] = useState<Invite[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const options = access.useOptions();
 
     const reload = useCallback(async () => {
       try {
@@ -138,6 +201,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
             {/* Only you are in a workspace on this Mac. */}
             {isAdmin && place.kind !== "mac" && (
               <InviteSection
+                roles={roleOptions}
                 invites={invites}
                 onCreate={(role) =>
                   api<CreatedInvite>("POST", `${base}/invites`, { role }).then(async (created) => {
@@ -182,9 +246,26 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
                                 </div>
                               )}
                             </div>
+                            {!agent && (access.everyone || isGuest(member.role)) && (
+                              <AccessPicker
+                                access={access}
+                                options={options}
+                                name={member.user.name}
+                                value={member.access}
+                                editable={isAdmin}
+                                onChange={(items) =>
+                                  change(() =>
+                                    api("PUT", `${base}/members/${member.user.id}/access`, {
+                                      items,
+                                    }),
+                                  )
+                                }
+                              />
+                            )}
                             {/* Agents can't be admins, so their role isn't a choice. */}
                             {isAdmin && !agent ? (
                               <RoleSelect
+                                roles={roleOptions}
                                 value={member.role}
                                 label={`Role of ${member.user.name}`}
                                 onChange={(role) =>
@@ -234,10 +315,12 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
   }
 
   function InviteSection({
+    roles,
     invites,
     onCreate,
     onRevoke,
   }: {
+    roles: RoleOption[];
     invites: Invite[];
     onCreate: (role: Role) => Promise<CreatedInvite>;
     onRevoke: (id: string) => Promise<void>;
@@ -280,7 +363,12 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
           for 7 days.
         </p>
         <div className="flex items-center gap-2">
-          <RoleSelect value={role} label="Role for people who join" onChange={setRole} />
+          <RoleSelect
+            roles={roles}
+            value={role}
+            label="Role for people who join"
+            onChange={setRole}
+          />
           <Button disabled={creating} onClick={() => void create()}>
             {creating ? "Creating link…" : "Create invite link"}
           </Button>
@@ -534,18 +622,108 @@ function expiresIn(date: string) {
   return days <= 1 ? "expires today" : `expires in ${days} days`;
 }
 
+type RoleOption = { value: Role; label: string; hint: string };
+
+/** What someone is in, as their row says it: "All teams", "API, Design", "3 teams". */
+function accessSummary(
+  access: AccessConfig,
+  options: { id: string; name: string }[],
+  ids: string[],
+) {
+  const names = options.filter((o) => ids.includes(o.id)).map((o) => o.name);
+  if (names.length === 0) return `No ${access.plural} yet`;
+  if (options.length > 1 && names.length === options.length) return `All ${access.plural}`;
+  if (names.length <= 2) return names.join(", ");
+  return `${names.length} ${access.plural}`;
+}
+
+/** What someone is in; for admins, the button that changes it. */
+function AccessPicker({
+  access,
+  options,
+  name,
+  value,
+  editable,
+  onChange,
+}: {
+  access: AccessConfig;
+  options: { id: string; name: string }[];
+  name: string;
+  value: string[];
+  editable: boolean;
+  onChange: (items: string[]) => void;
+}) {
+  const sorted = useMemo(
+    () => [...options].sort((a, b) => a.name.localeCompare(b.name)),
+    [options],
+  );
+  const summary = accessSummary(access, sorted, value);
+  if (!editable) return <span className="truncate text-xs text-muted">{summary}</span>;
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        aria-label={`${capitalized(access.plural)} ${name} is in`}
+        className="flex h-7 min-w-0 items-center rounded-md px-2 text-xs text-muted outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-hover data-popup-open:text-fg"
+      >
+        <span className="truncate">{summary}</span>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
+          <Menu.Popup className="ui-menu max-h-80 min-w-56 overflow-y-auto p-1 outline-none">
+            <Menu.Group>
+              <Menu.GroupLabel className="px-2 pt-1 pb-0.5 text-xs text-faint">
+                {capitalized(access.plural)} {name} is in
+              </Menu.GroupLabel>
+              {sorted.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted">No {access.plural} yet</p>
+              )}
+              {sorted.map((option) => {
+                const checked = value.includes(option.id);
+                return (
+                  <Menu.CheckboxItem
+                    key={option.id}
+                    checked={checked}
+                    closeOnClick={false}
+                    onCheckedChange={(next) =>
+                      onChange(
+                        next ? [...value, option.id] : value.filter((id) => id !== option.id),
+                      )
+                    }
+                    className="ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none"
+                  >
+                    <span
+                      className={`grid size-3.5 shrink-0 place-items-center rounded-sm ${checked ? "bg-fg text-bg" : "ring-1 ring-muted ring-inset"}`}
+                    >
+                      <Menu.CheckboxItemIndicator>
+                        <Check size={10} strokeWidth={3} aria-hidden="true" />
+                      </Menu.CheckboxItemIndicator>
+                    </span>
+                    {option.name}
+                  </Menu.CheckboxItem>
+                );
+              })}
+            </Menu.Group>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
 function RoleSelect({
+  roles,
   value,
   label,
   onChange,
 }: {
+  roles: RoleOption[];
   value: Role;
   label: string;
   onChange: (role: Role) => void;
 }) {
   return (
     <Select.Root
-      items={ROLES}
+      items={roles}
       value={value}
       onValueChange={(next) => {
         if (next && next !== value) onChange(next as Role);
@@ -566,15 +744,16 @@ function RoleSelect({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <Select.Popup className="ui-menu min-w-(--anchor-width) p-1 outline-none">
+          <Select.Popup className="ui-menu min-w-64 p-1 outline-none">
             <Select.List>
-              {ROLES.map((role) => (
+              {roles.map((role) => (
                 <Select.Item
                   key={role.value}
                   value={role.value}
-                  className="ui-option flex cursor-default items-center px-2 py-1.5 outline-none select-none"
+                  className="ui-option flex cursor-default flex-col items-start px-2 py-1.5 outline-none select-none"
                 >
                   <Select.ItemText>{role.label}</Select.ItemText>
+                  <span className="text-xs text-muted">{role.hint}</span>
                 </Select.Item>
               ))}
             </Select.List>

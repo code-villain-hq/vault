@@ -8,7 +8,7 @@ import { NavIcon } from "./icons";
 import { isDesktop } from "./platform";
 import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
-import { useWorkspace } from "./workspace";
+import { useIsGuest, useWorkspace } from "./workspace";
 
 /** The pages, each with its "G" key, in the sidebar's order. */
 const PAGES = [
@@ -24,6 +24,7 @@ const SETTINGS = [
 /** The command menu and the shortcuts list, for the workspace frame. */
 export function LayerMenus() {
   const { workspace } = useWorkspace();
+  const guest = useIsGuest();
   const navigate = useNavigate();
   const params = { workspace: workspace.url_key };
   const goTo: GoTo[] = PAGES.map(({ key, name, to }) => ({
@@ -38,7 +39,11 @@ export function LayerMenus() {
         goTo={goTo}
         onSettings={
           isDesktop
-            ? () => void navigate({ to: "/$workspace/settings/members", params })
+            ? () =>
+                void navigate({
+                  to: guest ? "/$workspace/settings/account" : "/$workspace/settings/members",
+                  params,
+                })
             : undefined
         }
       />
@@ -48,6 +53,7 @@ export function LayerMenus() {
 
 function useLayerCommands(query: string): Command[] {
   const { workspace, place } = useWorkspace();
+  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
 
@@ -62,7 +68,8 @@ function useLayerCommands(query: string): Command[] {
         icon: <NavIcon icon={icon} />,
         run: () => void navigate({ to, params }),
       })),
-      ...SETTINGS.map(({ id, name, icon, to }) => ({
+      // A guest has only their account to set.
+      ...SETTINGS.filter((s) => !guest || s.id === "account").map(({ id, name, icon, to }) => ({
         id: `settings-${id}`,
         group: "Settings",
         label: name,
@@ -88,7 +95,7 @@ function useLayerCommands(query: string): Command[] {
       });
     }
     return list;
-  }, [workspace, place, session, navigate]);
+  }, [workspace, place, session, navigate, guest]);
 
   return matching(commands, query);
 }

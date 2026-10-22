@@ -1,4 +1,5 @@
 import type { SyncClient } from "@code-villain/sync-client";
+import { isGuest } from "@code-villain/web";
 import type { Me, ModelKind, WorkspaceInfo } from "@forge/types";
 import {
   createContext,
@@ -93,6 +94,14 @@ export function useWorkspace(): WorkspaceContext {
  */
 export function useIsAdmin(): boolean {
   return useWorkspace().workspace.role === "admin";
+}
+
+/**
+ * Whether you're a guest: you see only the teams you're in, and none of the
+ * workspace's projects, knowledge or settings.
+ */
+export function useIsGuest(): boolean {
+  return isGuest(useWorkspace().workspace.role);
 }
 
 /** Whether you may delete an issue: admins any, others the ones they created. */

@@ -18,7 +18,7 @@ import { NavIcon } from "./icons";
 import { isDesktop } from "./platform";
 import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
-import { useWorkspace } from "./workspace";
+import { useIsGuest, useWorkspace } from "./workspace";
 
 /** The views, each with its "G" key, in the sidebar's order. */
 const VIEWS = [
@@ -39,6 +39,7 @@ const SETTINGS = [
 /** The command menu and the shortcuts list, for the workspace frame. */
 export function GlyphMenus() {
   const { workspace } = useWorkspace();
+  const guest = useIsGuest();
   const navigate = useNavigate();
   const params = { workspace: workspace.url_key };
   const goTo: GoTo[] = VIEWS.map(({ key, name, to }) => ({
@@ -53,7 +54,11 @@ export function GlyphMenus() {
         goTo={goTo}
         onSettings={
           isDesktop
-            ? () => void navigate({ to: "/$workspace/settings/languages", params })
+            ? () =>
+                void navigate({
+                  to: guest ? "/$workspace/settings/account" : "/$workspace/settings/languages",
+                  params,
+                })
             : undefined
         }
       />
@@ -63,6 +68,7 @@ export function GlyphMenus() {
 
 function useGlyphCommands(query: string): Command[] {
   const { workspace, place } = useWorkspace();
+  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
 
@@ -77,7 +83,8 @@ function useGlyphCommands(query: string): Command[] {
         icon: <NavIcon icon={icon} />,
         run: () => void navigate({ to, params }),
       })),
-      ...SETTINGS.map(({ id, name, icon, to }) => ({
+      // A guest has only their account to set.
+      ...SETTINGS.filter((s) => !guest || s.id === "account").map(({ id, name, icon, to }) => ({
         id: `settings-${id}`,
         group: "Settings",
         label: name,
@@ -103,7 +110,7 @@ function useGlyphCommands(query: string): Command[] {
       });
     }
     return list;
-  }, [workspace, place, session, navigate]);
+  }, [workspace, place, session, navigate, guest]);
 
   return matching(commands, query);
 }

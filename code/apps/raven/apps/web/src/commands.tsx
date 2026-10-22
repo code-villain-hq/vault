@@ -9,11 +9,12 @@ import { useAppKey, useApps } from "./layout";
 import { isDesktop } from "./platform";
 import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
-import { useWorkspace } from "./workspace";
+import { useIsGuest, useWorkspace } from "./workspace";
 
 /** The command menu and the shortcuts list, for the workspace frame. */
 export function RavenMenus() {
   const { workspace } = useWorkspace();
+  const guest = useIsGuest();
   const navigate = useNavigate();
   const app = useAppKey();
   // "G" then a letter goes to a view of the open app.
@@ -36,7 +37,7 @@ export function RavenMenus() {
           isDesktop
             ? () =>
                 void navigate({
-                  to: "/$workspace/settings/apps",
+                  to: guest ? "/$workspace/settings/account" : "/$workspace/settings/apps",
                   params: { workspace: workspace.url_key },
                 })
             : undefined
@@ -48,6 +49,7 @@ export function RavenMenus() {
 
 function useRavenCommands(query: string): Command[] {
   const { workspace, place } = useWorkspace();
+  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
   const apps = useApps();
@@ -96,13 +98,16 @@ function useRavenCommands(query: string): Command[] {
           ["members", "Members", UsersRound, "/$workspace/settings/members"],
           ["account", "Account", UserRound, "/$workspace/settings/account"],
         ] as const
-      ).map(([id, label, icon, to]) => ({
-        id: `settings-${id}`,
-        group: "Settings",
-        label,
-        icon: <NavIcon icon={icon} />,
-        run: () => void navigate({ to, params: { workspace: ws } }),
-      })),
+      )
+        // A guest has only their account to set.
+        .filter(([id]) => !guest || id === "account")
+        .map(([id, label, icon, to]) => ({
+          id: `settings-${id}`,
+          group: "Settings",
+          label,
+          icon: <NavIcon icon={icon} />,
+          run: () => void navigate({ to, params: { workspace: ws } }),
+        })),
       ...(session.status === "signed-in" ? workspaceEntries(session.places) : [])
         .filter((e) => e.key !== ws)
         .map((e) => ({
@@ -122,7 +127,7 @@ function useRavenCommands(query: string): Command[] {
       });
     }
     return list;
-  }, [workspace, place, session, navigate, apps, open]);
+  }, [workspace, place, session, navigate, apps, open, guest]);
 
   return matching(commands, query);
 }

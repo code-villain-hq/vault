@@ -1,8 +1,11 @@
 export {
+  type AccessConfig,
   type AccountApp,
   type AccountMe,
   type AccountPlace,
   accountPages,
+  isGuest,
+  NotAddedYet,
   type Role,
 } from "./account";
 export { api, RequestError, setSessionEndedHandler, useApi } from "./api";

@@ -42,7 +42,13 @@ import {
   workspaceEntries,
 } from "./session";
 import { AuthScreen, Button, Splash } from "./ui";
-import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
+import {
+  useIsGuest,
+  useRecords,
+  useSyncStatus,
+  useWorkspace,
+  WorkspaceProvider,
+} from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in; the desktop app
@@ -270,6 +276,7 @@ function AppNav() {
 /** Settings take the sidebar's place, with a way back. */
 function SettingsNav() {
   const { workspace } = useWorkspace();
+  const guest = useIsGuest();
   const router = useRouter();
   const params = { workspace: workspace.url_key };
   const back = lastAppPath ?? `/${workspace.url_key}`;
@@ -286,21 +293,23 @@ function SettingsNav() {
         <NavIcon icon={ArrowLeft} />
         Back to app
       </a>
-      <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
-        <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
-        <Link to="/$workspace/settings/languages" params={params} className={navLink}>
-          <NavIcon icon={Globe} />
-          Languages
-        </Link>
-        <Link to="/$workspace/settings/models" params={params} className={navLink}>
-          <NavIcon icon={Cpu} />
-          Models
-        </Link>
-        <Link to="/$workspace/settings/members" params={params} className={navLink}>
-          <NavIcon icon={UsersRound} />
-          Members
-        </Link>
-      </nav>
+      {!guest && (
+        <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
+          <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
+          <Link to="/$workspace/settings/languages" params={params} className={navLink}>
+            <NavIcon icon={Globe} />
+            Languages
+          </Link>
+          <Link to="/$workspace/settings/models" params={params} className={navLink}>
+            <NavIcon icon={Cpu} />
+            Models
+          </Link>
+          <Link to="/$workspace/settings/members" params={params} className={navLink}>
+            <NavIcon icon={UsersRound} />
+            Members
+          </Link>
+        </nav>
+      )}
       <nav aria-label="Personal settings" className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-xs text-faint">You</span>
         <Link to="/$workspace/settings/account" params={params} className={navLink}>
@@ -326,12 +335,13 @@ function byPlace(entries: WorkspaceEntry[]) {
 
 function WorkspaceMenu() {
   const { place, workspace } = useWorkspace();
+  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
   const groups = byPlace(session.status === "signed-in" ? workspaceEntries(session.places) : []);
   const item =
     "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
-  const settings = (page: "languages" | "members") =>
+  const settings = (page: "languages" | "members" | "account") =>
     void navigate({
       to: `/$workspace/settings/${page}`,
       params: { workspace: workspace.url_key },
@@ -386,11 +396,11 @@ function WorkspaceMenu() {
               </Menu.Group>
             ))}
             <Menu.Separator className="my-1 h-px bg-line" />
-            <Menu.Item className={item} onClick={() => settings("languages")}>
+            <Menu.Item className={item} onClick={() => settings(guest ? "account" : "languages")}>
               Settings
             </Menu.Item>
             {/* Only you are in a workspace on this Mac. */}
-            {place.kind !== "mac" && (
+            {place.kind !== "mac" && !guest && (
               <Menu.Item className={item} onClick={() => settings("members")}>
                 Invite people
               </Menu.Item>

@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { type Confirmation, ConfirmDialog } from "@code-villain/web";
+import { type Confirmation, ConfirmDialog, NotAddedYet } from "@code-villain/web";
 import type { Note, Repository, UpdateBy } from "@layer/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { type FormEvent, useMemo, useState } from "react";
@@ -7,15 +7,16 @@ import { ago } from "./format";
 import { PageBody, PageHeader } from "./layout";
 import { CreateDialog, MoreMenu } from "./page-parts";
 import { remoteKey } from "./remote";
+import { REPOSITORY_ACCESS } from "./settings";
 import { Button, buttonClass, ErrorMessage, Section, TextField } from "./ui";
-import { useRecords, useSyncStatus, useWorkspace } from "./workspace";
+import { useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /** As many notes as a repository keeps, and as long as each may be (`notes.rs`). */
 const NOTES_PER_REPO = 50;
 const NOTE_MAX = 500;
 
 /** The workspace's repositories, by name. */
-function useRepositories(): Repository[] {
+export function useRepositories(): Repository[] {
   const repositories = useRecords("Repository");
   return useMemo(
     () => [...repositories].sort((a, b) => a.name.localeCompare(b.name)),
@@ -60,16 +61,20 @@ export function RepositoriesPage() {
   const repositories = useRepositories();
   const notes = useNotesByRepo();
   const { ready } = useSyncStatus();
+  const guest = useIsGuest();
+  const people = useRecords("User");
   const [adding, setAdding] = useState(false);
   const groups = byGroup(repositories);
 
   return (
     <>
       <PageHeader title="Repositories">
-        <Button onClick={() => setAdding(true)}>Add repository</Button>
+        {!guest && <Button onClick={() => setAdding(true)}>Add repository</Button>}
       </PageHeader>
       <PageBody>
-        {ready && repositories.length === 0 ? (
+        {ready && repositories.length === 0 && guest ? (
+          <NotAddedYet access={REPOSITORY_ACCESS} people={people} />
+        ) : ready && repositories.length === 0 ? (
           <div className="mx-auto flex max-w-sm flex-col items-center gap-3 py-16 text-center">
             <h2 className="font-medium">No repositories yet</h2>
             <p className="text-muted">

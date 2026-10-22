@@ -1,4 +1,5 @@
 import type { SyncClient } from "@code-villain/sync-client";
+import { isGuest } from "@code-villain/web";
 import type { Me, ModelKind, WorkspaceInfo } from "@glyph/types";
 import {
   createContext,
@@ -92,6 +93,14 @@ export function useWorkspace(): WorkspaceContext {
  */
 export function useIsAdmin(): boolean {
   return useWorkspace().workspace.role === "admin";
+}
+
+/**
+ * Whether you're a guest: you translate only the languages you're added to,
+ * and of the settings see only your account.
+ */
+export function useIsGuest(): boolean {
+  return isGuest(useWorkspace().workspace.role);
 }
 
 function useSyncStore<T>(read: (sync: SyncClient<Schema>) => T): T {

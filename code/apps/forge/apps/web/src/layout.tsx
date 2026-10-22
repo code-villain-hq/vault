@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { ForgeCommandMenu } from "./command-menu";
-import { useStates, useTeams } from "./data";
+import { useMyTeams, useStates, useTeams } from "./data";
 import { Initial, NavIcon, ServiceIcon } from "./icons";
 import { useDesktopNotifications, useUnreadCount } from "./inbox";
 import { type NewIssueDefaults, NewIssueProvider, useNewIssue } from "./new-issue";
@@ -54,7 +54,13 @@ import {
 } from "./session";
 import { ForgeShortcuts } from "./shortcuts";
 import { AuthScreen, Button, Disclosure, Splash } from "./ui";
-import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
+import {
+  useIsGuest,
+  useRecords,
+  useSyncStatus,
+  useWorkspace,
+  WorkspaceProvider,
+} from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in; the desktop app
@@ -264,11 +270,16 @@ function SidebarActions() {
   );
 }
 
-/** Where people work: their inbox and issues, the workspace, its knowledge and teams. */
+/**
+ * Where people work: their inbox and issues, the workspace, its knowledge
+ * and their teams. The other teams are a search away. A guest has only
+ * their teams' work.
+ */
 function AppNav() {
   const { workspace } = useWorkspace();
   const params = { workspace: workspace.url_key };
-  const teams = useTeams();
+  const teams = useMyTeams();
+  const guest = useIsGuest();
   const triage = useTriageCount();
   const unread = useUnreadCount();
   return (
@@ -288,14 +299,42 @@ function AppNav() {
           <NavIcon icon={CircleUserRound} />
           My issues
         </Link>
-        <Link to="/$workspace/triage" params={params} className={navLink}>
-          <NavIcon icon={Funnel} />
-          Triage
-          {triage > 0 && (
-            <span className="nav-count ml-auto text-xs font-normal text-faint">{triage}</span>
-          )}
-        </Link>
+        {!(guest && teams.length === 0) && (
+          <Link to="/$workspace/triage" params={params} className={navLink}>
+            <NavIcon icon={Funnel} />
+            Triage
+            {triage > 0 && (
+              <span className="nav-count ml-auto text-xs font-normal text-faint">{triage}</span>
+            )}
+          </Link>
+        )}
       </nav>
+      {!guest && <WorkspaceNav />}
+      {teams.length > 0 && (
+        <Section id="teams" title="Your teams">
+          {teams.map((team) => (
+            <Link
+              key={team.id}
+              to="/$workspace/team/$team"
+              params={{ ...params, team: team.key }}
+              className={navLink}
+            >
+              <NavIcon icon={Layers} />
+              {team.name}
+            </Link>
+          ))}
+        </Section>
+      )}
+    </>
+  );
+}
+
+/** The workspace's plans and knowledge, which guests don't see. */
+function WorkspaceNav() {
+  const { workspace } = useWorkspace();
+  const params = { workspace: workspace.url_key };
+  return (
+    <>
       <Section id="workspace" title="Workspace">
         <Link to="/$workspace/projects" params={params} className={navLink}>
           <NavIcon icon={Box} />
@@ -320,19 +359,6 @@ function AppNav() {
           <NavIcon icon={Radar} />
           Drift checks
         </Link>
-      </Section>
-      <Section id="teams" title="Teams">
-        {teams.map((team) => (
-          <Link
-            key={team.id}
-            to="/$workspace/team/$team"
-            params={{ ...params, team: team.key }}
-            className={navLink}
-          >
-            <NavIcon icon={Layers} />
-            {team.name}
-          </Link>
-        ))}
       </Section>
     </>
   );
@@ -405,6 +431,8 @@ function SettingsNav() {
   const router = useRouter();
   const params = { workspace: workspace.url_key };
   const back = lastAppPath ?? `/${workspace.url_key}`;
+  // A guest has no workspace settings, only their own.
+  const guest = useIsGuest();
   return (
     <>
       <a
@@ -418,33 +446,35 @@ function SettingsNav() {
         <NavIcon icon={ArrowLeft} />
         Back to app
       </a>
-      <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
-        <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
-        <Link to="/$workspace/settings/members" params={params} className={navLink}>
-          <NavIcon icon={UsersRound} />
-          Members
-        </Link>
-        <Link to="/$workspace/settings/teams" params={params} className={navLink}>
-          <NavIcon icon={Layers} />
-          Teams
-        </Link>
-        <Link to="/$workspace/settings/labels" params={params} className={navLink}>
-          <NavIcon icon={Tag} />
-          Labels
-        </Link>
-        <Link to="/$workspace/settings/agents" params={params} className={navLink}>
-          <NavIcon icon={Bot} />
-          Agents
-        </Link>
-        <Link to="/$workspace/settings/github" params={params} className={navLink}>
-          <NavIcon icon={GitPullRequest} />
-          GitHub
-        </Link>
-        <Link to="/$workspace/settings/forgejo" params={params} className={navLink}>
-          <NavIcon icon={GitMerge} />
-          Forgejo
-        </Link>
-      </nav>
+      {!guest && (
+        <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
+          <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
+          <Link to="/$workspace/settings/members" params={params} className={navLink}>
+            <NavIcon icon={UsersRound} />
+            Members
+          </Link>
+          <Link to="/$workspace/settings/teams" params={params} className={navLink}>
+            <NavIcon icon={Layers} />
+            Teams
+          </Link>
+          <Link to="/$workspace/settings/labels" params={params} className={navLink}>
+            <NavIcon icon={Tag} />
+            Labels
+          </Link>
+          <Link to="/$workspace/settings/agents" params={params} className={navLink}>
+            <NavIcon icon={Bot} />
+            Agents
+          </Link>
+          <Link to="/$workspace/settings/github" params={params} className={navLink}>
+            <NavIcon icon={GitPullRequest} />
+            GitHub
+          </Link>
+          <Link to="/$workspace/settings/forgejo" params={params} className={navLink}>
+            <NavIcon icon={GitMerge} />
+            Forgejo
+          </Link>
+        </nav>
+      )}
       <nav aria-label="Personal settings" className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-xs text-faint">You</span>
         <Link to="/$workspace/settings/account" params={params} className={navLink}>
@@ -513,6 +543,7 @@ function byPlace(entries: WorkspaceEntry[]) {
 
 function WorkspaceMenu() {
   const { place, workspace } = useWorkspace();
+  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
   const groups = byPlace(session.status === "signed-in" ? workspaceEntries(session.places) : []);
@@ -572,7 +603,8 @@ function WorkspaceMenu() {
               className={item}
               onClick={() =>
                 void navigate({
-                  to: "/$workspace/settings/members",
+                  // A guest's settings are only their own.
+                  to: guest ? "/$workspace/settings/account" : "/$workspace/settings/members",
                   params: { workspace: workspace.url_key },
                 })
               }
@@ -580,7 +612,7 @@ function WorkspaceMenu() {
               Settings
             </Menu.Item>
             {/* Only you are in a workspace on this Mac. */}
-            {place.kind !== "mac" && (
+            {place.kind !== "mac" && !guest && (
               <Menu.Item
                 className={item}
                 onClick={() =>

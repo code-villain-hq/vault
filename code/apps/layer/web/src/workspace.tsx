@@ -1,4 +1,5 @@
 import type { SyncClient } from "@code-villain/sync-client";
+import { isGuest } from "@code-villain/web";
 import type { Me, ModelKind, Schema, WorkspaceInfo } from "@layer/types";
 import {
   createContext,
@@ -91,6 +92,14 @@ export function useWorkspace(): WorkspaceContext {
  */
 export function useIsAdmin(): boolean {
   return useWorkspace().workspace.role === "admin";
+}
+
+/**
+ * Whether you're a guest: you work only in the repositories you're added
+ * to, add none, and of the settings see only your account.
+ */
+export function useIsGuest(): boolean {
+  return isGuest(useWorkspace().workspace.role);
 }
 
 function useSyncStore<T>(read: (sync: SyncClient<Schema>) => T): T {

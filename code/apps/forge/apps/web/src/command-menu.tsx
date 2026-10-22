@@ -32,7 +32,7 @@ import { NavIcon, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { useNewIssue } from "./new-issue";
 import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
-import { useRecords, useWorkspace } from "./workspace";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** ⌘K in Forge: act on the open issue, create, go to, settings, workspaces, and search. */
 export function ForgeCommandMenu() {
@@ -54,6 +54,7 @@ function useForgeCommands(q: string): Command[] {
   const navigate = useNavigate();
   const newIssue = useNewIssue();
   const teams = useTeams();
+  const guest = useIsGuest();
   const teamsById = useMemo(() => byId(teams), [teams]);
   const issues = useRecords("Issue");
   const projects = useRecords("Project");
@@ -122,11 +123,16 @@ function useForgeCommands(q: string): Command[] {
           ["inbox", "Inbox", Inbox, "G I", "/$workspace/inbox"],
           ["my", "My issues", CircleUserRound, "G M", "/$workspace/my-issues"],
           ["triage", "Triage", Funnel, "G T", "/$workspace/triage"],
-          ["projects", "Projects", Box, "G P", "/$workspace/projects"],
-          ["initiatives", "Initiatives", Mountain, "G N", "/$workspace/initiatives"],
-          ["services", "Services", Server, "G S", "/$workspace/services"],
-          ["domains", "Domains", Folders, "G E", "/$workspace/domains"],
-          ["decisions", "Decisions", Scale, "G D", "/$workspace/decisions"],
+          // A guest has none of the workspace's plans and knowledge.
+          ...(guest
+            ? []
+            : ([
+                ["projects", "Projects", Box, "G P", "/$workspace/projects"],
+                ["initiatives", "Initiatives", Mountain, "G N", "/$workspace/initiatives"],
+                ["services", "Services", Server, "G S", "/$workspace/services"],
+                ["domains", "Domains", Folders, "G E", "/$workspace/domains"],
+                ["decisions", "Decisions", Scale, "G D", "/$workspace/decisions"],
+              ] as const)),
         ] as const
       ).map(([id, label, icon, hint, to]) => ({
         id,
@@ -152,12 +158,16 @@ function useForgeCommands(q: string): Command[] {
       })),
       ...(
         [
-          ["members", "Members", UsersRound, "/$workspace/settings/members"],
-          ["teams", "Teams", Layers, "/$workspace/settings/teams"],
-          ["labels", "Labels", Tag, "/$workspace/settings/labels"],
-          ["agents", "Agents", Bot, "/$workspace/settings/agents"],
-          ["github", "GitHub", GitPullRequest, "/$workspace/settings/github"],
-          ["forgejo", "Forgejo", GitMerge, "/$workspace/settings/forgejo"],
+          ...(guest
+            ? []
+            : ([
+                ["members", "Members", UsersRound, "/$workspace/settings/members"],
+                ["teams", "Teams", Layers, "/$workspace/settings/teams"],
+                ["labels", "Labels", Tag, "/$workspace/settings/labels"],
+                ["agents", "Agents", Bot, "/$workspace/settings/agents"],
+                ["github", "GitHub", GitPullRequest, "/$workspace/settings/github"],
+                ["forgejo", "Forgejo", GitMerge, "/$workspace/settings/forgejo"],
+              ] as const)),
           ["account", "Account", UserRound, "/$workspace/settings/account"],
         ] as const
       ).map(([id, label, icon, to]) => ({
@@ -189,6 +199,7 @@ function useForgeCommands(q: string): Command[] {
   }, [
     current,
     currentStates,
+    guest,
     teams,
     teamsById,
     projects,

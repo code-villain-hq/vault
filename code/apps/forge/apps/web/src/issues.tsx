@@ -1,8 +1,8 @@
-import { Redirect } from "@code-villain/web";
+import { NotAddedYet, Redirect } from "@code-villain/web";
 import type { StateType } from "@forge/types";
 import { Link, useParams } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { byId, identifier, useStates, useTeamStates, useTeams } from "./data";
+import { byId, identifier, useMyTeams, useStates, useTeamStates, useTeams } from "./data";
 import { FilterBar, FilterButton } from "./filters";
 import { StateIcon } from "./icons";
 import { IssueBoard } from "./issue-board";
@@ -11,14 +11,22 @@ import { EmptyState, type GroupBy, IssueList, SharedFields } from "./issue-list"
 import { PageHeader } from "./layout";
 import { useNewIssue } from "./new-issue";
 import { NewButton } from "./page-parts";
+import { TEAM_ACCESS } from "./settings";
 import { SuggestionCard, TriageSuggestion, useOpenSuggestions } from "./suggestions";
-import { useRecords, useWorkspace } from "./workspace";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
-/** `/$workspace`: opens the first team's issues. */
+/**
+ * `/$workspace`: opens the first of your teams' issues. A guest in no team
+ * is told whom to ask.
+ */
 export function WorkspaceHome() {
   const { workspace } = useWorkspace();
+  const mine = useMyTeams();
   const teams = useTeams();
-  const first = teams[0];
+  const guest = useIsGuest();
+  const people = useRecords("User");
+  const first = mine[0] ?? teams[0];
+  if (!first && guest) return <NotAddedYet access={TEAM_ACCESS} people={people} />;
   if (!first) return <PageHeader title="Issues" />;
   return (
     <Redirect

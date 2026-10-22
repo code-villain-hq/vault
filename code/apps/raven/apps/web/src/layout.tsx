@@ -1,6 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import {
   AppVersion,
+  NotAddedYet,
   Redirect,
   SearchButton,
   ShortcutsButton,
@@ -39,10 +40,12 @@ import {
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";
+import { APP_ACCESS } from "./settings";
 import type { AppSummary, Level } from "./types";
 import { AuthScreen, Button, buttonClass, Splash } from "./ui";
 import {
   useIsAdmin,
+  useIsGuest,
   useRecords,
   useSyncStatus,
   useWorkspace,
@@ -143,6 +146,18 @@ export function WorkspaceHome() {
 function NoApps() {
   const { workspace } = useWorkspace();
   const isAdmin = useIsAdmin();
+  const guest = useIsGuest();
+  const people = useRecords("User");
+  if (guest) {
+    return (
+      <>
+        <PageHeader title="Apps" />
+        <PageBody>
+          <NotAddedYet access={APP_ACCESS} people={people} />
+        </PageBody>
+      </>
+    );
+  }
   return (
     <>
       <PageHeader title="Apps" />
@@ -471,6 +486,7 @@ function AppNav() {
 /** Settings take the sidebar's place, with a way back. */
 function SettingsNav() {
   const { workspace } = useWorkspace();
+  const guest = useIsGuest();
   const apps = useApps();
   const router = useRouter();
   const params = { workspace: workspace.url_key };
@@ -489,17 +505,19 @@ function SettingsNav() {
         <NavIcon icon={ArrowLeft} />
         {backTo ? `Back to ${backTo}` : "Back"}
       </a>
-      <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
-        <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
-        <Link to="/$workspace/settings/apps" params={params} className={navLink}>
-          <NavIcon icon={LayoutGrid} />
-          Apps
-        </Link>
-        <Link to="/$workspace/settings/members" params={params} className={navLink}>
-          <NavIcon icon={UsersRound} />
-          Members
-        </Link>
-      </nav>
+      {!guest && (
+        <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
+          <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
+          <Link to="/$workspace/settings/apps" params={params} className={navLink}>
+            <NavIcon icon={LayoutGrid} />
+            Apps
+          </Link>
+          <Link to="/$workspace/settings/members" params={params} className={navLink}>
+            <NavIcon icon={UsersRound} />
+            Members
+          </Link>
+        </nav>
+      )}
       <nav aria-label="Personal settings" className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-xs text-faint">You</span>
         <Link to="/$workspace/settings/account" params={params} className={navLink}>
@@ -525,12 +543,13 @@ function byPlace(entries: WorkspaceEntry[]) {
 
 function WorkspaceMenu() {
   const { place, workspace } = useWorkspace();
+  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
   const groups = byPlace(session.status === "signed-in" ? workspaceEntries(session.places) : []);
   const item =
     "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
-  const settings = (page: "apps" | "members") =>
+  const settings = (page: "apps" | "members" | "account") =>
     void navigate({
       to: `/$workspace/settings/${page}`,
       params: { workspace: workspace.url_key },
@@ -585,11 +604,11 @@ function WorkspaceMenu() {
               </Menu.Group>
             ))}
             <Menu.Separator className="my-1 h-px bg-line" />
-            <Menu.Item className={item} onClick={() => settings("apps")}>
+            <Menu.Item className={item} onClick={() => settings(guest ? "account" : "apps")}>
               Settings
             </Menu.Item>
             {/* Only you are in a workspace on this Mac. */}
-            {place.kind !== "mac" && (
+            {place.kind !== "mac" && !guest && (
               <Menu.Item className={item} onClick={() => settings("members")}>
                 Invite people
               </Menu.Item>

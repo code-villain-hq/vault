@@ -2,7 +2,7 @@
 import { type GoTo, type ShortcutSection, Shortcuts } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
 import { isDesktop } from "./platform";
-import { useWorkspace } from "./workspace";
+import { useIsGuest, useWorkspace } from "./workspace";
 
 const GO_TO: Record<string, { to: string; name: string }> = {
   i: { to: "/$workspace/inbox", name: "Inbox" },
@@ -14,6 +14,9 @@ const GO_TO: Record<string, { to: string; name: string }> = {
   e: { to: "/$workspace/domains", name: "Domains" },
   d: { to: "/$workspace/decisions", name: "Decisions" },
 };
+
+/** The workspace's plans and knowledge, which guests don't see. */
+const NOT_FOR_GUESTS = new Set(["p", "n", "s", "e", "d"]);
 
 /** Forge's own shortcuts; the kit's list adds "Anywhere" and "Menus". */
 const SECTIONS: ShortcutSection[] = [
@@ -46,19 +49,28 @@ export function ForgeShortcuts() {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const params = { workspace: workspace.url_key };
+  const guest = useIsGuest();
   // `to` varies here, so the router can't check it; every path is a real route.
-  const goTo: GoTo[] = Object.entries(GO_TO).map(([key, { to, name }]) => ({
-    key,
-    name,
-    go: () => void navigate({ to, params } as never),
-  }));
+  const goTo: GoTo[] = Object.entries(GO_TO)
+    .filter(([key]) => !(guest && NOT_FOR_GUESTS.has(key)))
+    .map(([key, { to, name }]) => ({
+      key,
+      name,
+      go: () => void navigate({ to, params } as never),
+    }));
   return (
     <Shortcuts
       goTo={goTo}
       anywhere={[["C", "New issue"]]}
       sections={SECTIONS}
       onSettings={
-        isDesktop ? () => void navigate({ to: "/$workspace/settings/members", params }) : undefined
+        isDesktop
+          ? () =>
+              void navigate({
+                to: guest ? "/$workspace/settings/account" : "/$workspace/settings/members",
+                params,
+              })
+          : undefined
       }
     />
   );
