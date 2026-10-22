@@ -172,7 +172,17 @@ impl Member {
     pub fn require_admin(&self) -> Result<(), AppError> {
         match self.role {
             Role::Admin => Ok(()),
-            Role::Member => Err(AppError::forbidden("only workspace admins can do that")),
+            Role::Member | Role::Guest => {
+                Err(AppError::forbidden("only workspace admins can do that"))
+            }
+        }
+    }
+
+    /// For what spans the whole workspace, which a guest doesn't see.
+    pub fn require_not_guest(&self) -> Result<(), AppError> {
+        match self.role {
+            Role::Guest => Err(AppError::forbidden("guests can't do that")),
+            Role::Admin | Role::Member => Ok(()),
         }
     }
 }

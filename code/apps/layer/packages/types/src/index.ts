@@ -36,6 +36,7 @@ export type * from "./generated/SignupRequest";
 export type * from "./generated/SlackSettings";
 export type * from "./generated/StartTo";
 export type * from "./generated/TicketFlow";
+export type * from "./generated/UpdateAccessRequest";
 export type * from "./generated/UpdateBy";
 export type * from "./generated/UpdateMemberRequest";
 export type * from "./generated/UpdateProfileRequest";

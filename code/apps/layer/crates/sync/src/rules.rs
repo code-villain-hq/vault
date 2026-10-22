@@ -17,6 +17,18 @@ impl Rules for Layer {
     type Model = ModelKind;
     const NOTIFY_CHANNEL: &'static str = NOTIFY_CHANNEL;
 
+    async fn guest_access(db: &mut PgConnection, actor: Actor) -> Result<Option<i64>, SyncError> {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT role, access_version FROM workspace_members \
+             WHERE workspace_id = $1 AND user_id = $2",
+        )
+        .bind(actor.workspace_id)
+        .bind(actor.user_id)
+        .fetch_optional(&mut *db)
+        .await?;
+        Ok(row.and_then(|(role, version)| (role == "guest").then_some(version)))
+    }
+
     async fn check_allowed(
         db: &mut PgConnection,
         actor: Actor,
@@ -87,16 +99,19 @@ impl Rules for Layer {
     }
 
     async fn cascade(
-        _db: &mut PgConnection,
-        _actor: Actor,
+        db: &mut PgConnection,
+        actor: Actor,
         model: ModelKind,
-        _id: Uuid,
+        id: Uuid,
     ) -> Result<Vec<Operation>, SyncError> {
         match model {
             // A repository's notes stay: they are kept by its remote, for
             // when it is added again.
-            ModelKind::Repository
-            | ModelKind::Connection
+            ModelKind::Repository => {
+                crate::access::repository_going(db, actor, id).await?;
+                Ok(Vec::new())
+            }
+            ModelKind::Connection
             | ModelKind::LogSource
             | ModelKind::AgentModel
             | ModelKind::Note => Ok(Vec::new()),

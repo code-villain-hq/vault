@@ -183,6 +183,126 @@ async fn members_write_repositories_and_notes_and_admins_the_connections(pool: P
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_works_only_in_the_repositories_an_admin_adds_them_to(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    for remote in ["github.com/code-villain/api", "github.com/code-villain/web"] {
+        let added = create(&app, &ada, &workspace, "Repository", repository(remote)).await;
+        assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+        let noted = create(
+            &app,
+            &ada,
+            &workspace,
+            "Note",
+            note(remote, "Read the README."),
+        )
+        .await;
+        assert_eq!(noted.status, StatusCode::OK, "{}", noted.body);
+    }
+    let logs = json!({ "name": "Requests", "bucket": "acme-logs", "prefix": "requests/" });
+    let sourced = create(&app, &ada, &workspace, "LogSource", logs).await;
+    assert_eq!(sourced.status, StatusCode::OK, "{}", sourced.body);
+    let jira = json!({ "kind": "jira", "settings": { "base_url": "https://acme.atlassian.net", "flow": {} } });
+    let connected = create(&app, &ada, &workspace, "Connection", jira).await;
+    assert_eq!(connected.status, StatusCode::OK, "{}", connected.body);
+    let api = app
+        .records(&ada, &workspace, "Repository")
+        .await
+        .into_iter()
+        .find(|r| r["remote_key"] == "github.com/code-villain/api")
+        .unwrap()["id"]
+        .clone();
+
+    let token = app.invite(&ada, &workspace, "guest").await;
+    let gus = app.join("Gus", &token).await;
+    let gus_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE email = 'gus@example.com'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+
+    // Added to nothing, a guest has the connections and nothing else.
+    for model in ["Repository", "Note", "LogSource"] {
+        assert!(
+            app.records(&gus, &workspace, model).await.is_empty(),
+            "{model}"
+        );
+    }
+    assert_eq!(app.records(&gus, &workspace, "Connection").await.len(), 1);
+    let bootstrap = format!("/api/w/{workspace}/sync/bootstrap");
+    let epoch_before = app.get(&bootstrap, &gus).await.body["epoch"].clone();
+
+    let access = format!("/api/w/{workspace}/members/{gus_id}/access");
+    let refused = app
+        .call("PUT", &access, Some(&gus), Some(json!({ "items": [api] })))
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+    let added = app
+        .call("PUT", &access, Some(&ada), Some(json!({ "items": [api] })))
+        .await;
+    assert_eq!(added.status, StatusCode::NO_CONTENT, "{}", added.body);
+
+    // Now the API and its notes, and the guest's copy starts over.
+    assert_ne!(app.get(&bootstrap, &gus).await.body["epoch"], epoch_before);
+    let repositories = app.records(&gus, &workspace, "Repository").await;
+    assert_eq!(repositories.len(), 1);
+    assert_eq!(repositories[0]["id"], api);
+    let notes = app.records(&gus, &workspace, "Note").await;
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0]["repo"], "github.com/code-villain/api");
+    assert!(app.records(&gus, &workspace, "LogSource").await.is_empty());
+
+    // They remember things there as a member does, and nowhere else.
+    let remembered = create(
+        &app,
+        &gus,
+        &workspace,
+        "Note",
+        note("github.com/code-villain/api", "Seed before the tests."),
+    )
+    .await;
+    assert_eq!(remembered.status, StatusCode::OK, "{}", remembered.body);
+    let elsewhere = create(
+        &app,
+        &gus,
+        &workspace,
+        "Note",
+        note("github.com/code-villain/web", "Mine now."),
+    )
+    .await;
+    assert_eq!(
+        elsewhere.status,
+        StatusCode::FORBIDDEN,
+        "{}",
+        elsewhere.body
+    );
+    let added = create(
+        &app,
+        &gus,
+        &workspace,
+        "Repository",
+        repository("github.com/code-villain/docs"),
+    )
+    .await;
+    assert_eq!(added.status, StatusCode::FORBIDDEN, "{}", added.body);
+    let members = app.get(&format!("/api/w/{workspace}/members"), &gus).await;
+    assert_eq!(members.status, StatusCode::FORBIDDEN, "{}", members.body);
+
+    // When the repository goes, its notes leave the guest's copy with it.
+    let epoch_before = app.get(&bootstrap, &gus).await.body["epoch"].clone();
+    let removed = app
+        .sync(
+            &ada,
+            &workspace,
+            json!([{ "action": "delete", "model": "Repository", "id": api }]),
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::OK, "{}", removed.body);
+    assert_ne!(app.get(&bootstrap, &gus).await.body["epoch"], epoch_before);
+    assert!(app.records(&gus, &workspace, "Note").await.is_empty());
+    assert_eq!(app.records(&ada, &workspace, "Note").await.len(), 3);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn no_token_or_email_reaches_a_shared_connection(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;

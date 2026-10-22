@@ -2667,7 +2667,9 @@ studio's is `layer.codevillain.eu`, signed in to with Code Villain. It is
 the same workspace in the browser and in each member's Layer, where their
 tasks and agents stay on their own Mac. Every member changes the
 repositories, their notes and the agents' models; only admins change the
-connections and the log sources.
+connections and the log sources. A guest works only in the repositories an
+admin adds them to, as `studio/design/behaviour.md` ("Who gets in") says
+of every app.
 
 The workspace button at the foot of the task list names the window's
 workspace. Its menu lists every workspace, those on this Mac first, then
@@ -2787,6 +2789,19 @@ a new workspace, and renames or deletes one.
 - **PROF-18** A workspace on a server MUST offer Members… in the workspace
   menu, which opens the workspace's members on the server in the browser:
   inviting, roles and removing someone happen there.
+- **PROF-20** A guest on a server MUST sync only the repositories an admin
+  adds them to in Members, and those repositories' notes; the connections
+  and the agents' models, so their agents work there; no log source; and
+  of the people, the admins, the members and the guests who share a
+  repository with them. In their repositories they remember and forget
+  notes as a member does; they add no repository and change none they
+  aren't in. Members shows them only their account.
+- **PROF-21** Adding a guest to a repository, taking one away, changing
+  their role or removing the repository MUST make the guest's copy start
+  over from a fresh snapshot, so what they may no longer see leaves their
+  Mac's copy and what they may now see arrives without a restart. A
+  repository leaving the snapshot stays in the app as this Mac's only, with
+  its tasks.
 - **PROF-19** The foot of the sidebar MUST show the shared setup's sync
   status, in the words and dots of every app's (the kit's `SyncIndicator`):
   Synced; Syncing N, once changes have waited a second; Connecting… until

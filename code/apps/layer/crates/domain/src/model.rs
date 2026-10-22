@@ -77,6 +77,30 @@ impl ModelKind {
         false
     }
 
+    /// What a guest syncs: the repositories they've been added to and their
+    /// notes; the connections and the agents' models, so their agents work
+    /// there; no log sources; and the admins, the members, and the guests
+    /// who share a repository with them.
+    pub fn guest_view(self) -> GuestView {
+        match self {
+            ModelKind::Repository => GuestView::Where(
+                "t.id IN (SELECT repository_id FROM repository_access WHERE user_id = $viewer)",
+            ),
+            ModelKind::Note => GuestView::Where(
+                "t.repo IN (SELECT r.remote_key FROM repositories r \
+                 JOIN repository_access a ON a.repository_id = r.id \
+                 WHERE r.workspace_id = t.workspace_id AND a.user_id = $viewer)",
+            ),
+            ModelKind::Connection | ModelKind::AgentModel => GuestView::All,
+            ModelKind::LogSource => GuestView::Hidden,
+            ModelKind::User => GuestView::Where(
+                "t.id = $viewer OR t.role <> 'guest' OR t.id IN (SELECT o.user_id \
+                 FROM repository_access o JOIN repository_access mine \
+                 ON mine.repository_id = o.repository_id WHERE mine.user_id = $viewer)",
+            ),
+        }
+    }
+
     /// Checks the fields sent to create a record.
     pub fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         match self {
@@ -130,9 +154,8 @@ impl code_villain_sync::Model for ModelKind {
         ModelKind::validate_patch(self, data)
     }
 
-    // No guests yet: everyone syncs the whole workspace.
     fn guest_view(self) -> GuestView {
-        GuestView::All
+        ModelKind::guest_view(self)
     }
 }
 

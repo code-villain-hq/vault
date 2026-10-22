@@ -12,6 +12,7 @@
 //! [`bootstrap`] snapshot once and then follow the log with
 //! [`entries_after`].
 
+mod access;
 mod rules;
 
 use layer_domain::{Actor, Bootstrap, ModelKind, SyncAction, SyncEntry, Transaction};
@@ -19,6 +20,7 @@ use serde_json::Value;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
+pub use access::{role_changed, set_repositories};
 pub use code_villain_sync::{Origin, SyncError, current_sync_id, lock_workspace, workspace_epoch};
 pub use rules::Layer;
 
