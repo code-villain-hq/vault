@@ -30,7 +30,7 @@ async fn person<D: Directory>(
 ) -> anyhow::Result<()> {
     let from_groups: Vec<(Uuid, String, String)> = sqlx::query_as(
         "SELECT w.id, w.group_name, g.name FROM workspaces w \
-         JOIN scim_groups g ON g.name IN (w.group_name, w.group_name || '-admins', w.group_name || '-guests') \
+         JOIN scim_groups g ON g.name IN (w.group_name || '-users', w.group_name || '-admins', w.group_name || '-guests') \
          JOIN scim_group_members m ON m.group_id = g.id AND m.user_id = $1 \
          JOIN scim_users s ON s.user_id = m.user_id AND s.active \
          WHERE w.group_name IS NOT NULL AND ($2::uuid IS NULL OR w.id = $2)",
@@ -42,12 +42,10 @@ async fn person<D: Directory>(
     // Someone in more than one of a workspace's groups has the highest role.
     let mut wanted: BTreeMap<Uuid, (Role, String)> = BTreeMap::new();
     for (workspace, base, name) in from_groups {
-        let role = if name == base {
-            Role::Member
-        } else if name.ends_with("-admins") {
-            Role::Admin
-        } else {
-            Role::Guest
+        let role = match name.strip_prefix(base.as_str()) {
+            Some("-admins") => Role::Admin,
+            Some("-guests") => Role::Guest,
+            _ => Role::Member,
         };
         if wanted.get(&workspace).is_none_or(|(best, _)| role > *best) {
             wanted.insert(workspace, (role, name));
@@ -128,7 +126,7 @@ pub async fn link_workspace<D: Directory>(
     }
     let users: Vec<Uuid> = sqlx::query_scalar(
         "SELECT m.user_id FROM scim_group_members m JOIN scim_groups g ON g.id = m.group_id \
-         WHERE g.name IN ($2, $2 || '-admins', $2 || '-guests') \
+         WHERE g.name IN ($2 || '-users', $2 || '-admins', $2 || '-guests') \
          UNION SELECT user_id FROM workspace_members WHERE workspace_id = $1 AND from_group IS NOT NULL",
     )
     .bind(workspace)

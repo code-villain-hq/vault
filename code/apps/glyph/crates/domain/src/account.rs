@@ -132,8 +132,8 @@ pub struct MemberInfo {
 #[ts(export)]
 pub struct WorkspaceGroup {
     pub group: Option<String>,
-    /// Each group once by its base name: `glyph` for `glyph`, `glyph-admins`
-    /// and `glyph-guests`.
+    /// Each tool's groups once, by its name: `glyph` for `glyph-users`,
+    /// `glyph-admins` and `glyph-guests`.
     pub groups: Vec<String>,
 }
 

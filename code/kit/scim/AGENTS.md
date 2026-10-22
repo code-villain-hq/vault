@@ -7,9 +7,10 @@ workspace roles. Forge, Glyph, Raven and Layer use it.
 
 ## What it does
 
-- A workspace linked to a group (`workspaces.group_name`, say `forge`) has
-  the group's people as members, `forge-admins` as admins and
+- A workspace linked to a tool's groups (`workspaces.group_name`, say
+  `forge`) has `forge-users` as members, `forge-admins` as admins and
   `forge-guests` as guests. Someone in more than one has the highest role.
+  A group without one of those endings links nowhere.
 - The role's group is kept in `workspace_members.from_group`. Members shows
   it ("from forge-admins") and refuses to change the role or remove the
   person: that's done in the account.
@@ -51,8 +52,10 @@ ahead of its releases:
   bodies are read as bytes.
 - Users first, then groups; a group's members are the ids this server gave
   its users.
-- A group's `displayName` is its friendly name in Pocket ID, not its name.
-  Give every group the same friendly name as its name (`forge-admins`).
+- A group's `displayName` is its friendly name in Pocket ID; its name isn't
+  sent at all. `group_key` reads the friendly name as a name: lowercase,
+  anything but letters and digits as one `-`, so "Forge admins",
+  `forge_admins` and `forge-admins` are the same group.
 - Renaming a linked group unlinks it in effect: its people leave. Link the
   workspace again after a rename.
 - It syncs five minutes after a change, every hour, and on "Sync now".

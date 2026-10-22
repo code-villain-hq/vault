@@ -6,7 +6,7 @@
  */
 export type WorkspaceGroup = { group: string | null, 
 /**
- * Each group once by its base name: `forge` for `forge`, `forge-admins`
- * and `forge-guests`.
+ * Each tool's groups once, by its name: `forge` for `forge-users`,
+ * `forge-admins` and `forge-guests`.
  */
 groups: Array<string>, };

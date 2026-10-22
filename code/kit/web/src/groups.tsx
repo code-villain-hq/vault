@@ -9,7 +9,7 @@ import { RequestError } from "./api";
 /** What `GET /api/w/{id}/group` says: the linked group, and the groups there are. */
 export interface WorkspaceGroups {
   group: string | null;
-  /** The account's groups, without their `-admins` and `-guests`. */
+  /** The account's groups, without their `-users`, `-admins` and `-guests`. */
   groups: string[];
 }
 
@@ -41,7 +41,7 @@ export function useGroups(
 /** What a group link does, in the group's own names. */
 export function groupHint(group: string | null) {
   return group
-    ? `Everyone in ${group} is a member, in ${group}-admins an admin, in ${group}-guests a guest. Changed in the Code Villain account.`
+    ? `Everyone in ${group}-users is a member, in ${group}-admins an admin, in ${group}-guests a guest. Changed in the Code Villain account.`
     : "No group: people join with an invite link.";
 }
 

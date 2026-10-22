@@ -131,8 +131,8 @@ pub struct MemberInfo {
 #[ts(export)]
 pub struct WorkspaceGroup {
     pub group: Option<String>,
-    /// Each group once by its base name: `layer` for `layer`, `layer-admins`
-    /// and `layer-guests`.
+    /// Each tool's groups once, by its name: `layer` for `layer-users`,
+    /// `layer-admins` and `layer-guests`.
     pub groups: Vec<String>,
 }
 

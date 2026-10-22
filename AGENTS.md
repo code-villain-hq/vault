@@ -31,7 +31,7 @@ The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled
 One studio account signs people in to every app: Pocket ID at id.codevillain.eu, over OpenID Connect. The provider says who someone is, and its groups say who belongs to a linked workspace (below); each app keeps its own workspaces, roles and invites. Forge, Glyph, Raven and Layer have it. For the next app:
 
 - Copy Forge's `crates/server/src/oidc.rs` and `crates/server/tests/oidc_login.rs`, the `users.oidc_sub` migration, the `passwords_open` guard and `/api/auth/providers`. On the web side copy `useProviders`, `CodeVillainButton`, `DesktopSignIn` and `OIDC_PROBLEMS` from `auth.tsx`. For the desktop app copy the `<app>://` deep link (tauri-plugin-deep-link 2.6.1) and `openInBrowser`/`onAppLink` in `platform.ts`. Glyph shows the changes a copy needs.
-- In Pocket ID, register a confidential client with the callback `<public url>/api/auth/oidc/callback`, and allow only the app's own groups on it (`<app>`, `<app>-admins`, `<app>-guests`).
+- In Pocket ID, register a confidential client with the callback `<public url>/api/auth/oidc/callback`, and allow only the app's own groups on it (`<app>-users`, `<app>-admins`, `<app>-guests`).
 - Set `<APP>_OIDC_ISSUER`, `<APP>_OIDC_CLIENT_ID`, `<APP>_OIDC_CLIENT_SECRET` and `<APP>_PUBLIC_URL`. With them set, passwords are off. Without them the app keeps its passwords, as local development does.
 
 ### Groups and roles
@@ -40,8 +40,8 @@ Pocket ID also says who belongs where, as a company's login provider does for Li
 
 - The server takes them at `/api/scim/v2` (Users and Groups) with `code/kit/scim`, a Rust crate every app uses instead of a copy (its `AGENTS.md` says how). It keeps people and groups; the app keeps workspaces and roles. Forge, Glyph, Raven and Layer have it.
 - A user from Pocket ID gets an account straight away, keyed by the same `oidc_sub` that signing in uses. Taking them out of every linked group removes them from those workspaces and ends their sessions there. The account stays, for history and other invites.
-- A workspace links to one group, by name (`workspaces.group_name`): the studio's Forge workspace to `forge`, its Glyph workspace to `glyph`. That group makes members; the group with `-admins` after its name makes admins, and with `-guests`, guests. A role from a group can't be changed in the app (`workspace_members.from_group` says which).
-- Pocket ID sends a group's friendly name, not its name: give every group the same friendly name as its name, and don't rename a linked one, or its people leave.
+- A workspace links to one tool's groups, by the tool's name (`workspaces.group_name`): the studio's Forge workspace to `forge`, its Glyph workspace to `glyph`. `forge-users` makes members, `forge-admins` admins and `forge-guests` guests; there is no bare `forge` group. A role from a group can't be changed in the app (`workspace_members.from_group` says which).
+- Pocket ID's SCIM sends a group's friendly name, not its name, so the kit reads the friendly name as a name: lowercase, with spaces and other marks as `-` ("Forge admins" is `forge-admins`). Don't rename a linked group to something else, or its people leave.
 - Every app has three roles: admin, member, guest. A guest sees only the records they've been added to, and the app's sync rules and `/api/w/{id}` endpoints check it, not just the pages. What a guest is added to: Forge teams, Glyph languages, Raven apps, Layer repositories. Each app's `AGENTS.md` names it.
 - A Forge team can link to a group (`teams.group_name`), which sets the team's members. Forge gains team members for this: "Your teams" in the sidebar, and a guest's view.
 - In Pocket ID, turn on SCIM provisioning for the app's client: the endpoint `<public url>/api/scim/v2` and a token, set on the server as `<APP>_SCIM_TOKEN`. Allow the groups on the client: Pocket ID pushes only the groups a client allows, with their people.

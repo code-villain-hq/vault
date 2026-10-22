@@ -272,7 +272,7 @@ build does the same.
 
 With `LAYER_SCIM_TOKEN` set, the Code Villain account sends its people and
 groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `layer` (`PUT /api/w/{id}/group`) has `layer` as
+A workspace linked to `layer` (`PUT /api/w/{id}/group`) has `layer-users` as
 members, `layer-admins` as admins and `layer-guests` as guests, and Members
 won't change their roles. A guest's repositories are still set by hand. Tests: `crates/server/tests/scim.rs`.
 

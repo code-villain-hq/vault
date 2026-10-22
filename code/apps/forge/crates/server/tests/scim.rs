@@ -137,9 +137,12 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
-    let admins = push_group(&app, "forge-admins", &[&bob]).await;
-    push_group(&app, "forge", &[]).await;
+    let admins = push_group(&app, "Forge admins", &[&bob]).await;
+    push_group(&app, "forge-users", &[]).await;
     push_group(&app, "forge-guests", &[]).await;
+    // A group named for the tool alone gives no role.
+    let dana = push_user(&app, "sub-dana", "Dana").await;
+    push_group(&app, "forge", &[&dana]).await;
 
     // Only an admin links, and only to a group there is.
     let groups = app.get(&format!("/api/w/{studio}/group"), &ada).await.body;
@@ -159,6 +162,7 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         ("Bob".into(), "admin".into(), json!("forge-admins"))
     );
     assert_eq!(people[0].2, Value::Null, "Ada came by signing up");
+    assert_eq!(people.len(), 2, "Dana is only in forge");
 
     // Their role is changed in the account, not here.
     let path = format!("/api/w/{studio}/members/{bob}");
@@ -182,7 +186,7 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         StatusCode::CONFLICT
     );
 
-    // Moved to forge: a member.
+    // Moved to forge-users: a member.
     let (status, _) = scim(
         &app,
         "PUT",
@@ -195,7 +199,7 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["displayName"] == "forge")
+        .find(|g| g["displayName"] == "forge-users")
         .unwrap()["id"]
         .as_str()
         .unwrap()
@@ -204,12 +208,12 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         &app,
         "PUT",
         &format!("/Groups/{forge}"),
-        Some(group("forge", &[&bob])),
+        Some(group("forge-users", &[&bob])),
     )
     .await;
     assert_eq!(
         members(&app, &ada, &studio).await[1],
-        ("Bob".into(), "member".into(), json!("forge"))
+        ("Bob".into(), "member".into(), json!("forge-users"))
     );
 
     // Out of the groups: out of the workspace.
@@ -217,7 +221,7 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         &app,
         "PUT",
         &format!("/Groups/{forge}"),
-        Some(group("forge", &[])),
+        Some(group("forge-users", &[])),
     )
     .await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
@@ -229,7 +233,7 @@ async fn invited_people_stay_until_a_group_takes_them(pool: PgPool) {
     let (ada, studio) = app.signup("Ada", "Studio").await;
     let token = app.invite(&ada, &studio, "member").await;
     app.join("Cleo", &token).await;
-    push_group(&app, "forge", &[]).await;
+    push_group(&app, "forge-users", &[]).await;
     assert_eq!(
         link(&app, &ada, &studio, Some("forge")).await,
         StatusCode::NO_CONTENT
@@ -269,7 +273,7 @@ async fn someone_turned_off_is_signed_out_and_leaves(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
-    push_group(&app, "forge", &[&bob]).await;
+    push_group(&app, "forge-users", &[&bob]).await;
     link(&app, &ada, &studio, Some("forge")).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 2);
 
@@ -291,8 +295,8 @@ async fn a_linked_team_has_its_groups_people(pool: PgPool) {
     let (ada, studio) = app.signup("Ada", "Studio").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
     let cleo = push_user(&app, "sub-cleo", "Cleo").await;
-    push_group(&app, "forge", &[&bob, &cleo]).await;
-    let design = push_group(&app, "design", &[&bob]).await;
+    push_group(&app, "forge-users", &[&bob, &cleo]).await;
+    let design = push_group(&app, "design-users", &[&bob]).await;
     link(&app, &ada, &studio, Some("forge")).await;
 
     let bootstrap = format!("/api/w/{studio}/sync/bootstrap");
@@ -346,7 +350,7 @@ async fn a_linked_team_has_its_groups_people(pool: PgPool) {
         &app,
         "PUT",
         &format!("/Groups/{design}"),
-        Some(group("design", &[&cleo])),
+        Some(group("design-users", &[&cleo])),
     )
     .await;
     assert_eq!(

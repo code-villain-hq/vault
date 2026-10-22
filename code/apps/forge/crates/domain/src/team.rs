@@ -85,7 +85,8 @@ impl Validate for TeamPatch {
     }
 }
 
-/// A group's name as the Code Villain account has it: `design`, `forge-admins`.
+/// The groups a team follows, by their name before `-users`, `-admins` and
+/// `-guests`: `design`, `forge`.
 fn check_group(name: &str) -> Result<(), ValidationError> {
     let valid = !name.is_empty()
         && name.len() <= 100

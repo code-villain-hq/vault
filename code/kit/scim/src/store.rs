@@ -245,8 +245,24 @@ pub async fn group_member_ids(db: &mut PgConnection, id: Uuid) -> Result<Vec<Uui
         .await
 }
 
-fn group_name(group: &GroupIn) -> Result<&str, ScimError> {
-    let name = group.display_name.trim();
+/// A group's name, from the friendly name Pocket ID sends as `displayName`
+/// (it doesn't send the group's own name): lowercase, with anything that
+/// isn't a letter or digit as one `-`. "Forge admins", `forge_admins` and
+/// `forge-admins` are all `forge-admins`.
+pub fn group_key(display_name: &str) -> String {
+    let mut key = String::new();
+    for c in display_name.trim().chars().flat_map(char::to_lowercase) {
+        if c.is_alphanumeric() {
+            key.push(c);
+        } else if !key.is_empty() && !key.ends_with('-') {
+            key.push('-');
+        }
+    }
+    key.trim_end_matches('-').to_string()
+}
+
+fn group_name(group: &GroupIn) -> Result<String, ScimError> {
+    let name = group_key(&group.display_name);
     if name.is_empty() {
         return Err(ScimError::typed(
             StatusCode::BAD_REQUEST,
@@ -276,7 +292,7 @@ pub async fn create_group(db: &mut PgConnection, group: &GroupIn) -> Result<Uuid
             sqlx::query("INSERT INTO scim_groups (id, external_id, name) VALUES ($1, $2, $3)")
                 .bind(id)
                 .bind(external_id)
-                .bind(name)
+                .bind(&name)
                 .execute(&mut *db)
                 .await?;
             id
@@ -299,7 +315,7 @@ pub async fn replace_group(
          updated_at = now() WHERE id = $1",
     )
     .bind(id)
-    .bind(name)
+    .bind(&name)
     .bind(group.external_id.as_deref().filter(|e| !e.is_empty()))
     .execute(&mut *db)
     .await?
@@ -337,11 +353,12 @@ pub async fn delete_group(db: &mut PgConnection, id: Uuid) -> Result<bool, sqlx:
 }
 
 /// The groups a workspace or a team can link to: each base name once, so
-/// `forge` stands for `forge`, `forge-admins` and `forge-guests`.
+/// `forge` stands for `forge-users`, `forge-admins` and `forge-guests`. A
+/// group without one of those endings links nowhere.
 pub async fn group_names(db: &mut PgConnection) -> Result<Vec<String>, sqlx::Error> {
     sqlx::query_scalar(
-        "SELECT DISTINCT regexp_replace(name, '-(admins|guests)$', '') AS base \
-         FROM scim_groups ORDER BY base",
+        "SELECT DISTINCT regexp_replace(name, '-(users|admins|guests)$', '') AS base \
+         FROM scim_groups WHERE name ~ '.-(users|admins|guests)$' ORDER BY base",
     )
     .fetch_all(db)
     .await
@@ -359,4 +376,18 @@ pub async fn in_group(db: &mut PgConnection, user: Uuid, name: &str) -> Result<b
     .bind(name)
     .fetch_one(db)
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::group_key;
+
+    #[test]
+    fn a_friendly_name_is_matched_as_a_name() {
+        assert_eq!(group_key("Forge admins"), "forge-admins");
+        assert_eq!(group_key("forge_admins"), "forge-admins");
+        assert_eq!(group_key(" Forge -- Users "), "forge-users");
+        assert_eq!(group_key("forge-guests"), "forge-guests");
+        assert_eq!(group_key("  "), "");
+    }
 }

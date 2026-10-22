@@ -1,7 +1,7 @@
 //! The Code Villain account's groups (code/kit/scim). Pocket ID sends its
 //! people and groups to `/api/scim/v2` when `FORGE_SCIM_TOKEN` is set. A
-//! workspace linked to a group has its people as members, `<group>-admins`
-//! as admins and `<group>-guests` as guests; a team linked to a group
+//! workspace linked to a tool's groups has `<tool>-users` as members, `<tool>-admins`
+//! as admins and `<tool>-guests` as guests; a team linked to a group
 //! (`Team.group_name`) has the group's people in the workspace.
 
 use anyhow::anyhow;

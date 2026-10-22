@@ -131,8 +131,8 @@ pub struct MemberInfo {
 #[ts(export)]
 pub struct WorkspaceGroup {
     pub group: Option<String>,
-    /// Each group once by its base name: `raven` for `raven`, `raven-admins`
-    /// and `raven-guests`.
+    /// Each tool's groups once, by its name: `raven` for `raven-users`,
+    /// `raven-admins` and `raven-guests`.
     pub groups: Vec<String>,
 }
 

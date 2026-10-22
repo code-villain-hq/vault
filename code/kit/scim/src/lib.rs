@@ -3,15 +3,18 @@
 //! Pocket ID pushes the people and groups an app's sign-in client allows to
 //! `/api/scim/v2` (SCIM 2.0), after every change and at least once an hour.
 //! This crate keeps them (`schema.sql`) and turns them into workspace roles:
-//! a workspace linked to a group (`workspaces.group_name`) has its people as
-//! members, `<group>-admins` as admins and `<group>-guests` as guests. The
+//! a workspace linked to a tool's groups (`workspaces.group_name`, say
+//! `forge`) has `forge-users` as members, `forge-admins` as admins and
+//! `forge-guests` as guests. The
 //! app does the joining and leaving itself, through [`Directory`], so its
 //! sync records and its own rules (teams, grants) follow.
 //!
 //! What Pocket ID sends: it lists `/Users` and `/Groups` (`startIndex`,
 //! `count`), matches them to its own by `externalId`, then creates (POST),
 //! replaces (PUT) or deletes (DELETE) each one. A group's members are the
-//! ids this server gave its users. It never uses PATCH or filters.
+//! ids this server gave its users. It never uses PATCH or filters, and it
+//! sends a group's friendly name, not its name: [`group_key`] makes a name
+//! of it.
 
 mod reconcile;
 mod resources;
@@ -31,7 +34,7 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 pub use reconcile::{link_workspace, linked_group, role_source};
-pub use store::{group_names, in_group};
+pub use store::{group_key, group_names, in_group};
 
 use resources::{GroupIn, ListQuery, UserIn};
 

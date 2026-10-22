@@ -6,7 +6,7 @@
  */
 export type WorkspaceGroup = { group: string | null, 
 /**
- * Each group once by its base name: `glyph` for `glyph`, `glyph-admins`
- * and `glyph-guests`.
+ * Each tool's groups once, by its name: `glyph` for `glyph-users`,
+ * `glyph-admins` and `glyph-guests`.
  */
 groups: Array<string>, };

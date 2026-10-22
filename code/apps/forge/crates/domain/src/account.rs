@@ -135,8 +135,8 @@ pub struct MemberInfo {
 #[ts(export)]
 pub struct WorkspaceGroup {
     pub group: Option<String>,
-    /// Each group once by its base name: `forge` for `forge`, `forge-admins`
-    /// and `forge-guests`.
+    /// Each tool's groups once, by its name: `forge` for `forge-users`,
+    /// `forge-admins` and `forge-guests`.
     pub groups: Vec<String>,
 }
 

@@ -135,7 +135,7 @@ pub async fn leave_every_team(
 }
 
 /// Brings the teams linked to a group in line with it: everyone in the
-/// workspace who is in the group (or its `-admins` or `-guests`), and nobody
+/// workspace who is in its groups (`-users`, `-admins` or `-guests`), and nobody
 /// else. Only `teams`, and only
 /// for `people`, when given. A team that's no longer linked keeps its people.
 /// Returns the last change it logged.
@@ -154,7 +154,7 @@ pub async fn follow_groups(
          AND EXISTS (SELECT 1 FROM scim_group_members m JOIN scim_groups g ON g.id = m.group_id \
                      JOIN scim_users s ON s.user_id = m.user_id AND s.active \
                      WHERE m.user_id = w.user_id \
-                     AND g.name IN (t.group_name, t.group_name || '-admins', t.group_name || '-guests'))",
+                     AND g.name IN (t.group_name || '-users', t.group_name || '-admins', t.group_name || '-guests'))",
     )
     .bind(actor.workspace_id)
     .bind(teams)

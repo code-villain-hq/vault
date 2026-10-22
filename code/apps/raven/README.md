@@ -41,9 +41,8 @@ app, served when set), `RAVEN_COOKIE_SECURE` (`0` for plain http) and
 With `RAVEN_SCIM_TOKEN` set too, the account's groups say who is in a
 workspace. In Pocket ID, turn on SCIM for Raven's client, with the
 endpoint `<RAVEN_PUBLIC_URL>/api/scim/v2` and the same token, and allow
-`raven`, `raven-admins` and `raven-guests` on it (each with the same
-friendly name as its name). Then link the workspace to `raven`
-(`PUT /api/w/{id}/group`). Without the token, invites are the only way in.
+`raven-users`, `raven-admins` and `raven-guests` on it. Then link the
+workspace to `raven` in Settings → Members → Group. Without the token, invites are the only way in.
 
 A workspace is a team's apps. Its admins add the apps it watches in
 Settings → Apps, with each one's health address, and make the key the app

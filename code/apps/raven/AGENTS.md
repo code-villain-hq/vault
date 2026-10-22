@@ -133,7 +133,7 @@ A guest sees only the apps an admin adds them to (`app_access`, set with
 
 With `RAVEN_SCIM_TOKEN` set, the Code Villain account sends its people and
 groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `raven` (`PUT /api/w/{id}/group`) has `raven` as
+A workspace linked to `raven` (`PUT /api/w/{id}/group`) has `raven-users` as
 members, `raven-admins` as admins and `raven-guests` as guests, and Members
 won't change their roles. A guest's apps are still set by hand. Tests: `crates/server/tests/scim.rs`.
 

@@ -174,10 +174,11 @@ the rules, and endpoints outside sync call `require_not_guest()`.
 
 With `FORGE_SCIM_TOKEN` set, the Code Villain account sends its people and
 groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `forge` (`PUT /api/w/{id}/group`) has `forge` as
+A workspace linked to `forge` (`PUT /api/w/{id}/group`) has `forge-users` as
 members, `forge-admins` as admins and `forge-guests` as guests, and Members
-won't change their roles. A team linked to a group (`Team.group_name`) has
-the group's people in the workspace, and nobody joins or leaves it by hand:
+won't change their roles. A team linked to a group (`Team.group_name`, say
+`design`) has the people of `design-users`, `design-admins` and
+`design-guests` in the workspace, and nobody joins or leaves it by hand:
 `forge_sync::follow_groups` keeps it so. Tests: `crates/server/tests/scim.rs`.
 
 ## Adding a synced model

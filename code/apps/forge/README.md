@@ -110,6 +110,5 @@ there turns it on for `bun run dev` and `bun run app` alike.
 With `FORGE_SCIM_TOKEN` set too, the account's groups say who is in a
 workspace. In Pocket ID, turn on SCIM for Forge's client, with the
 endpoint `<FORGE_PUBLIC_URL>/api/scim/v2` and the same token, and allow
-`forge`, `forge-admins` and `forge-guests` on it (each with the same
-friendly name as its name). Then link the workspace to `forge`
-(`PUT /api/w/{id}/group`). Without the token, invites are the only way in.
+`forge-users`, `forge-admins` and `forge-guests` on it. Then link the
+workspace to `forge` in Settings → Members → Group. Without the token, invites are the only way in.
