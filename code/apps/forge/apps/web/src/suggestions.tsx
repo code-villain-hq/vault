@@ -5,7 +5,7 @@ import { api, messageOf } from "./api";
 import { byId, decisionProposal, identifier, timeAgo, useStates } from "./data";
 import { foldDiff, lineDiff, wordPairs } from "./diff";
 import { Markdown } from "./markdown";
-import { Button, ErrorMessage } from "./ui";
+import { Button, Disclosure, ErrorMessage } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
 /** Open drift suggestions, newest first, optionally for one service. */
@@ -134,9 +134,9 @@ function TriageCard({ suggestion }: { suggestion: Suggestion }) {
           <span key={change}>{change}</span>
         ))}
         <span className="ml-auto flex gap-2">
-          <Button variant="secondary" onClick={() => setWhy(!why)}>
+          <Disclosure open={why} onToggle={() => setWhy(!why)}>
             {why ? "Hide why" : "Why?"}
-          </Button>
+          </Disclosure>
           {!nothing && (
             // Secondary: the triage bar's Accept is the action this state needs.
             <Button variant="secondary" disabled={busy} onClick={() => void resolve("accept")}>

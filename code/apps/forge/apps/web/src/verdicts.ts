@@ -92,7 +92,7 @@ export function requirementStatuses(
 }
 
 export const VERDICTS: Record<Verdict, { label: string; color: string }> = {
-  met: { label: "Met", color: "var(--ok)" },
+  met: { label: "Met", color: "var(--muted)" },
   not_met: { label: "Not met", color: "var(--danger)" },
   unclear: { label: "Unclear", color: "var(--warn)" },
 };

@@ -15,21 +15,13 @@ import type {
   SpecVersion,
 } from "@forge/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import {
-  ChevronRight,
-  FolderCode,
-  Folders,
-  GitBranch,
-  Globe,
-  Replace,
-  UsersRound,
-} from "lucide-react";
+import { FolderCode, Folders, GitBranch, Globe, Replace, UsersRound } from "lucide-react";
 import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { conventionWarnings } from "./convention";
 import { byId, formatDate, identifier, servicesOf, timeAgo, useStates, useTeams } from "./data";
 import { ServiceDriftChecks, useServiceChecks } from "./drift-checks";
-import { ICON_NAMES } from "./icon-set";
+import { ICON_NAMES, iconName } from "./icon-set";
 import { Avatar, ProjectIcon, ServiceIcon, StateIcon } from "./icons";
 import { IssueList, SharedFields } from "./issue-list";
 import { useOpenSpecChanges } from "./issue-spec-change";
@@ -50,7 +42,7 @@ import {
   specConflicts,
 } from "./spec-change";
 import { SuggestionCard, TextDiff, useAiConfigured, useOpenSuggestions } from "./suggestions";
-import { Button } from "./ui";
+import { Button, Disclosure, Fold } from "./ui";
 import {
   aroundRequirements,
   requirementBody,
@@ -62,13 +54,13 @@ import { useIsAdmin, useRecords, useSyncStatus, useWorkspace } from "./workspace
 
 const SPEC_STATUSES: { value: SpecStatus; label: string; color: string }[] = [
   { value: "draft", label: "Draft", color: "var(--faint)" },
-  { value: "active", label: "Active", color: "var(--ok)" },
+  { value: "active", label: "Active", color: "var(--muted)" },
   { value: "deprecated", label: "Deprecated", color: "var(--muted)" },
 ];
 
 const DECISION_STATUSES: { value: DecisionStatus; label: string; color: string }[] = [
   { value: "proposed", label: "Proposed", color: "var(--warn)" },
-  { value: "accepted", label: "Accepted", color: "var(--ok)" },
+  { value: "accepted", label: "Accepted", color: "var(--muted)" },
   { value: "superseded", label: "Superseded", color: "var(--muted)" },
   { value: "overridden", label: "Overridden", color: "var(--danger)" },
 ];
@@ -431,6 +423,7 @@ function IconPicker({
   const [query, setQuery] = useState("");
   const words = query.trim().toLowerCase();
   const shown = ICON_NAMES.filter((name) => name.replace(/-/g, " ").includes(words));
+  const current = iconName(icon);
   const custom = !COLORS.includes(color);
   const [mixing, setMixing] = useState(false);
   return (
@@ -488,9 +481,9 @@ function IconPicker({
                   type="button"
                   title={name.replace(/-/g, " ")}
                   aria-label={`Icon ${name}`}
-                  aria-pressed={name === icon}
+                  aria-pressed={name === current}
                   onClick={() => onChange({ icon: name })}
-                  className={`flex size-8 items-center justify-center rounded-md outline-none hover:bg-highlight focus-visible:ring-2 focus-visible:ring-accent ${name === icon ? "bg-highlight" : ""}`}
+                  className={`flex size-8 items-center justify-center rounded-md outline-none hover:bg-highlight focus-visible:ring-2 focus-visible:ring-accent ${name === current ? "bg-highlight" : ""}`}
                 >
                   <ServiceIcon service={{ icon: name, color }} className="size-5" />
                 </button>
@@ -1800,36 +1793,42 @@ function Requirements({
           const changed = changedIn.get(requirement.name);
           return (
             <li key={requirement.name}>
-              <details>
-                <summary className="flex cursor-pointer list-none items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-hover [&::-webkit-details-marker]:hidden">
-                  {/* Colour only once a check has said something; until then an empty ring, like an unchecked status. */}
-                  {shown ? (
-                    <Dot color={shown.color} />
-                  ) : (
-                    <span
-                      className="size-2 shrink-0 rounded-full border border-faint"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{requirement.name}</span>
-                  {coming.map(({ key, issue, touch }) => (
-                    <span
-                      key={key}
-                      className={`shrink-0 text-xs ${clash ? "text-danger-ink" : "text-warn-ink"}`}
-                    >
-                      {identifier(issue, teams)} will {UPCOMING[touch.upcoming]} this
+              <Fold
+                buttonClassName="flex w-full gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-hover"
+                label={
+                  <>
+                    {/* Colour only once a check has said something; until then an empty ring, like an unchecked status. */}
+                    {shown ? (
+                      <Dot color={shown.color} />
+                    ) : (
+                      <span
+                        className="size-2 shrink-0 rounded-full border border-faint"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-fg">{requirement.name}</span>
+                    {coming.map(({ key, issue, touch }) => (
+                      <span
+                        key={key}
+                        className={`shrink-0 text-xs ${clash ? "text-danger-ink" : "text-warn-ink"}`}
+                      >
+                        {identifier(issue, teams)} will {UPCOMING[touch.upcoming]} this
+                      </span>
+                    ))}
+                    {stale && (
+                      <span className="text-xs text-faint">
+                        {stale === "requirement"
+                          ? "requirement changed since"
+                          : "code changed since"}
+                      </span>
+                    )}
+                    <span className={`text-xs ${stale ? "text-faint" : "text-muted"}`}>
+                      {shown?.label}
                     </span>
-                  ))}
-                  {stale && (
-                    <span className="text-xs text-faint">
-                      {stale === "requirement" ? "requirement changed since" : "code changed since"}
-                    </span>
-                  )}
-                  <span className={`text-xs ${stale ? "text-faint" : "text-muted"}`}>
-                    {shown?.label}
-                  </span>
-                </summary>
-                <div className="flex flex-col gap-2 px-3 pb-3 pl-7 text-sm">
+                  </>
+                }
+              >
+                <div className="flex flex-col gap-2 px-3 pb-3 pl-12 text-sm">
                   <Markdown text={requirementBody(requirement)} />
                   {clash && (
                     <p className="text-xs text-danger-ink">
@@ -1879,25 +1878,29 @@ function Requirements({
                     </p>
                   )}
                 </div>
-              </details>
+              </Fold>
             </li>
           );
         })}
         {added.map(({ key, issue, requirement }) => (
           <li key={key}>
-            <details>
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-hover [&::-webkit-details-marker]:hidden">
-                <span aria-hidden="true" className="w-2 shrink-0 text-center text-warn-ink">
-                  +
-                </span>
-                <span className="min-w-0 flex-1 truncate">{requirement.name}</span>
-                <span
-                  className={`shrink-0 text-xs ${conflicted.has(requirement.name) ? "text-danger-ink" : "text-warn-ink"}`}
-                >
-                  {identifier(issue, teams)} will add this
-                </span>
-              </summary>
-              <div className="flex flex-col gap-2 px-3 pb-3 pl-7 text-sm">
+            <Fold
+              buttonClassName="flex w-full gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-hover"
+              label={
+                <>
+                  <span aria-hidden="true" className="w-2 shrink-0 text-center text-warn-ink">
+                    +
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-muted">{requirement.name}</span>
+                  <span
+                    className={`shrink-0 text-xs ${conflicted.has(requirement.name) ? "text-danger-ink" : "text-warn-ink"}`}
+                  >
+                    {identifier(issue, teams)} will add this
+                  </span>
+                </>
+              }
+            >
+              <div className="flex flex-col gap-2 px-3 pb-3 pl-12 text-sm">
                 <p className="text-xs text-warn-ink">
                   <IssueName issue={issue} /> will add it, once it's done.
                 </p>
@@ -1910,7 +1913,7 @@ function Requirements({
                 )}
                 <Markdown text={requirementBody(requirement)} />
               </div>
-            </details>
+            </Fold>
           </li>
         ))}
       </ul>
@@ -1990,21 +1993,13 @@ export function DecisionsPage() {
       {past.length > 0 && (
         <li key="past" className={DECISION_GROUP}>
           <h2 className={DECISION_BAND}>
-            <button
-              type="button"
-              aria-expanded={showPast}
-              onClick={() => setShowPast(!showPast)}
-              className="flex h-full flex-1 items-center gap-2 px-3 hover:underline"
+            <Disclosure
+              open={showPast}
+              onToggle={() => setShowPast(!showPast)}
+              className="h-full flex-1 px-3"
             >
-              <ChevronRight
-                size={12}
-                strokeWidth={1.75}
-                aria-hidden="true"
-                className={`shrink-0 text-muted transition-transform ${showPast ? "rotate-90" : ""}`}
-              />
-              No longer in force
-              <span className="text-faint">{past.length}</span>
-            </button>
+              No longer in force {past.length}
+            </Disclosure>
           </h2>
           {showPast && (
             <ul className="flex flex-col gap-0.5">

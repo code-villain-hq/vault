@@ -1,6 +1,5 @@
 import { Initial } from "@code-villain/web";
 import type { StateType, WorkflowState } from "@forge/types";
-import { IconServer } from "@tabler/icons-react";
 import {
   Box,
   Check,
@@ -19,7 +18,7 @@ import {
 } from "lucide-react";
 import { readable } from "./contrast";
 import { useReviewStateIds } from "./data";
-import { ICONS } from "./icon-set";
+import { iconFor } from "./icon-set";
 
 export { Initial, NavIcon } from "@code-villain/web";
 
@@ -169,14 +168,14 @@ export function ServiceIcon({
   service?: { icon: string; color: string } | null;
   className?: string;
 }) {
-  const Glyph = ICONS[service?.icon ?? "server"] ?? IconServer;
+  const Glyph = iconFor(service?.icon ?? "server");
   return (
     <Glyph
       aria-hidden="true"
       className={`${className} shrink-0`}
       // Its own colour, shaded where needed to stand out in this theme.
       color={service ? readable(service.color) : "var(--muted)"}
-      stroke={1.75}
+      strokeWidth={STROKE}
     />
   );
 }

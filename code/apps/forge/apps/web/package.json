@@ -12,7 +12,6 @@
     "@code-villain/sync-client": "workspace:*",
     "@code-villain/web": "workspace:*",
     "@forge/types": "workspace:*",
-    "@tabler/icons-react": "3.48.0",
     "@tanstack/react-router": "1.170.44",
     "@tauri-apps/api": "2.12.3",
     "@tauri-apps/plugin-deep-link": "2.6.1",

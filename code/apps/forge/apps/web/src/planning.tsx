@@ -35,14 +35,14 @@ const PROJECT_STATUSES: { value: ProjectStatus; label: string; color: string }[]
   { value: "planned", label: "Planned", color: "var(--faint)" },
   { value: "started", label: "In progress", color: "var(--info)" },
   { value: "paused", label: "Paused", color: "var(--muted)" },
-  { value: "completed", label: "Completed", color: "var(--ok)" },
+  { value: "completed", label: "Completed", color: "var(--muted)" },
   { value: "canceled", label: "Canceled", color: "var(--faint)" },
 ];
 
 const INITIATIVE_STATUSES: { value: InitiativeStatus; label: string; color: string }[] = [
   { value: "planned", label: "Planned", color: "var(--faint)" },
   { value: "active", label: "Active", color: "var(--info)" },
-  { value: "completed", label: "Completed", color: "var(--ok)" },
+  { value: "completed", label: "Completed", color: "var(--muted)" },
 ];
 
 /** Share of a project's issues that are closed (completed or canceled). */
@@ -55,11 +55,8 @@ function ProgressBar({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-2 text-xs text-muted">
       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-line">
-        {/* Progress is detail, not a signal: grey until the work is all done. */}
-        <span
-          className={`block h-full rounded-full ${value === 1 ? "bg-ok" : "bg-muted"}`}
-          style={{ width: `${value * 100}%` }}
-        />
+        {/* Progress is detail, not a signal: grey, done or not. */}
+        <span className="block h-full rounded-full bg-muted" style={{ width: `${value * 100}%` }} />
       </span>
       {Math.round(value * 100)}%
     </span>

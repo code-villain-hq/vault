@@ -1,7 +1,6 @@
 import { shortcutFree } from "@code-villain/web";
 import type { Issue, Service, WorkflowState } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { BulkBar } from "./bulk";
 import {
@@ -23,7 +22,7 @@ import {
   StatusPicker,
 } from "./issue-fields";
 import { useNewIssue } from "./new-issue";
-import { buttonClass } from "./ui";
+import { buttonClass, Disclosure } from "./ui";
 import { useIsPending, useRecords, useWorkspace } from "./workspace";
 
 /** What a list's sections are: a status each, or a service each. */
@@ -342,18 +341,6 @@ function ServiceHeading({ service }: { service: Service | undefined }) {
   );
 }
 
-/** A small arrow inside the sub-issue chip: right when closed, down when open. */
-function Disclosure({ open }: { open: boolean }) {
-  return (
-    <ChevronRight
-      size={12}
-      strokeWidth={1.75}
-      aria-hidden="true"
-      className={`shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
-    />
-  );
-}
-
 function IssueRow({
   issue,
   index,
@@ -436,20 +423,15 @@ function IssueRow({
         </a>
       </span>
       {fold ? (
-        <button
-          type="button"
-          aria-expanded={fold.open}
+        <Disclosure
+          open={fold.open}
+          onToggle={fold.toggle}
           title={fold.open ? "Hide sub-issues (←)" : "Show sub-issues (→)"}
-          onClick={(e) => {
-            e.stopPropagation();
-            fold.toggle();
-          }}
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-faint outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent"
+          className="h-7 shrink-0"
         >
-          <Disclosure open={fold.open} />
           <span className="sr-only">Sub-issues done:</span>
           {progress}
-        </button>
+        </Disclosure>
       ) : (
         progress && (
           <span className="shrink-0 text-xs text-faint" title="Sub-issues done">

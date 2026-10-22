@@ -5,7 +5,7 @@
  */
 export type Service = { id: string, workspace_id: string, name: string, 
 /**
- * The name of its icon (one of Tabler's), shown in its `color`, so it's
+ * The name of its icon (one of Lucide's), shown in its `color`, so it's
  * recognisable wherever it appears.
  */
 icon: string, 

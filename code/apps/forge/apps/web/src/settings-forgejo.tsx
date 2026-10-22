@@ -211,7 +211,7 @@ function ConnectForm({
       />
       <div className="flex gap-2">
         <Button type="submit" disabled={saving}>
-          {saving ? "Checking…" : status.connected ? "Save" : "Connect Forgejo"}
+          {saving ? "Connecting…" : status.connected ? "Reconnect" : "Connect"}
         </Button>
         {onCancel && (
           <Button variant="secondary" onClick={onCancel}>

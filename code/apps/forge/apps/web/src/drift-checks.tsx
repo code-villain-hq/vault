@@ -15,7 +15,7 @@ import { api, messageOf } from "./api";
 import { byId, identifier, timeAgo, useNow, useTeams } from "./data";
 import { PageHeader } from "./layout";
 import { Markdown } from "./markdown";
-import { Button, ErrorMessage } from "./ui";
+import { Button, Disclosure, ErrorMessage } from "./ui";
 import { useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /** An agent's running check unheard from for this long has lost contact. */
@@ -314,13 +314,14 @@ function useDetails(run: AiRun | undefined): DriftCheckDetails | null | undefine
 }
 
 /** Verdict groups in the order a person should read them; folded ones need no attention. */
-const GROUPS: { verdict: CheckVerdict | null; label: string; tone: Tone; folded: boolean }[] = [
-  { verdict: "not_met", label: "Unmet", tone: "danger", folded: false },
-  { verdict: "unclear", label: "Unclear", tone: "warn", folded: false },
-  { verdict: null, label: "Not judged", tone: "warn", folded: false },
-  { verdict: "covered", label: "Covered by open work", tone: "neutral", folded: true },
-  { verdict: "skipped", label: "Skipped", tone: "neutral", folded: true },
-  { verdict: "met", label: "Met", tone: "neutral", folded: true },
+// What needs a look keeps its colour on the count; the rest stays quiet.
+const GROUPS: { verdict: CheckVerdict | null; label: string; ink?: string; folded: boolean }[] = [
+  { verdict: "not_met", label: "Unmet", ink: "text-danger-ink", folded: false },
+  { verdict: "unclear", label: "Unclear", ink: "text-warn-ink", folded: false },
+  { verdict: null, label: "Not judged", ink: "text-warn-ink", folded: false },
+  { verdict: "covered", label: "Covered by open work", folded: true },
+  { verdict: "skipped", label: "Skipped", folded: true },
+  { verdict: "met", label: "Met", folded: true },
 ];
 
 /** One check: how it went, its requirements by verdict, the issues Forge saw, its usage. */
@@ -453,7 +454,7 @@ function Requirements({
     ...g,
     // A requirement without a verdict is still planned while the check runs.
     label: g.verdict === null && run.status === "running" ? "Planned" : g.label,
-    tone: g.verdict === null && run.status === "running" ? ("neutral" as Tone) : g.tone,
+    ink: g.verdict === null && run.status === "running" ? undefined : g.ink,
     results: results.filter((r) => r.verdict === g.verdict),
   })).filter((g) => g.results.length > 0);
   const toggle = (label: string) =>
@@ -478,14 +479,9 @@ function Requirements({
         const open = g.folded ? unfolded.has(g.label) : !unfolded.has(g.label);
         return (
           <div key={g.label} className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              aria-expanded={open}
-              onClick={() => toggle(g.label)}
-              className="flex items-center gap-2 self-start rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <Pill label={`${g.label} ${g.results.length}`} tone={g.tone} />
-            </button>
+            <Disclosure open={open} onToggle={() => toggle(g.label)} className="self-start">
+              {g.label} <span className={g.ink}>{g.results.length}</span>
+            </Disclosure>
             {open && (
               <ul className="-mx-3 flex flex-col gap-0.5">
                 {g.results.map((r) => (
@@ -508,16 +504,17 @@ function ResultRow({ result }: { result: CheckResult }) {
   return (
     <li>
       <div className="flex min-h-9 items-center gap-3 rounded-md px-3 hover:bg-hover">
-        <button
-          type="button"
-          aria-expanded={open}
+        <Disclosure
+          open={open}
           disabled={!result.why}
-          onClick={() => setOpen(!open)}
-          className="min-w-0 flex-1 truncate py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          onToggle={() => setOpen(!open)}
+          className="min-w-0 flex-1 py-2 text-left"
         >
-          {result.requirement}
-          <span className="text-muted"> · {result.spec_title}</span>
-        </button>
+          <span className="min-w-0 truncate">
+            <span className="text-fg">{result.requirement}</span>
+            <span className="text-muted"> · {result.spec_title}</span>
+          </span>
+        </Disclosure>
         {issue && (
           <Link
             to="/$workspace/issue/$identifier"
@@ -529,7 +526,7 @@ function ResultRow({ result }: { result: CheckResult }) {
         )}
       </div>
       {open && result.why && (
-        <div className="px-3 pb-3 text-muted">
+        <div className="px-3 pb-3 pl-7 text-muted">
           <Markdown text={result.why} />
         </div>
       )}

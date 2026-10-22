@@ -46,7 +46,6 @@
         "@code-villain/sync-client": "workspace:*",
         "@code-villain/web": "workspace:*",
         "@forge/types": "workspace:*",
-        "@tabler/icons-react": "3.48.0",
         "@tanstack/react-router": "1.170.44",
         "@tauri-apps/api": "2.12.3",
         "@tauri-apps/plugin-deep-link": "2.6.1",
@@ -161,10 +160,6 @@
     "@rolldown/binding-win32-x64-msvc": ["@rolldown/binding-win32-x64-msvc@1.2.13", "", { "os": "win32", "cpu": "x64" }, "sha512-UKhFaZTeTcbKrb3iU82m17jVcPEAoqDkCN5MBqgPyZSwp/cQmib21crTS0DdH7T1B7wZRWEI89YQAOJMet5yhg=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
-
-    "@tabler/icons": ["@tabler/icons@3.48.0", "", {}, "sha512-lQk06gVHNVBnJp0UOgtth54mcZBJM7rdYKsAxKOProj1bbSAx+/xiuOWfHlyvgdL3M+Y+I0HINrjHa3ygp8eXQ=="],
-
-    "@tabler/icons-react": ["@tabler/icons-react@3.48.0", "", { "dependencies": { "@tabler/icons": "3.48.0" }, "peerDependencies": { "react": ">= 16" } }, "sha512-OCeAlpaWHEMV+EsgdVeGQ3YuKfmfnThZhc++CaZ/ujYzi5+/DONDQlX4OGvH1ikYhIfmc0grI4otJgHy7QAvng=="],
 
     "@tailwindcss/node": ["@tailwindcss/node@4.3.3", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "enhanced-resolve": "^5.24.1", "jiti": "^2.7.0", "lightningcss": "1.32.0", "magic-string": "^0.30.21", "source-map-js": "^1.2.1", "tailwindcss": "4.3.3" } }, "sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg=="],
 

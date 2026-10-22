@@ -24,7 +24,7 @@ import { useIssueHistory } from "./issue-activity";
 import { Markdown } from "./markdown";
 import { Picker } from "./picker";
 import { DescriptionDiff, proposedDescription, TriageSuggestion } from "./suggestions";
-import { Button, buttonClass, ErrorMessage } from "./ui";
+import { Button, buttonClass, Disclosure, ErrorMessage } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
 const DUPLICATE_TRIGGER = "triage-duplicate";
@@ -284,14 +284,13 @@ function DecisionBar({
       )}
       {proposal && (
         <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            aria-expanded={fullChange}
-            className="self-start text-xs text-muted hover:text-fg"
-            onClick={() => setFullChange(!fullChange)}
+          <Disclosure
+            open={fullChange}
+            onToggle={() => setFullChange(!fullChange)}
+            className="self-start"
           >
             {fullChange ? "Hide the full change" : "See the full change"}
-          </button>
+          </Disclosure>
           {fullChange && <DescriptionDiff issue={issue} suggestion={proposal} />}
         </div>
       )}
