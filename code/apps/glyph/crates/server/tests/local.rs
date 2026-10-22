@@ -41,7 +41,7 @@ async fn starting_on_this_mac_makes_you_admin_of_a_workspace(pool: PgPool) {
 async fn the_apps_own_server_takes_no_sign_ups_or_sign_ins(pool: PgPool) {
     let app = App::with_state(AppState::new(pool.clone(), false).on_this_mac());
     let providers = app.call("GET", "/api/auth/providers", None, None).await;
-    assert_eq!(providers.body, json!({ "oidc": false, "password": false }));
+    assert_eq!(providers.body, json!({ "oidc": false, "company": null }));
 
     let signup = app
         .post(
@@ -50,7 +50,7 @@ async fn the_apps_own_server_takes_no_sign_ups_or_sign_ins(pool: PgPool) {
             json!({ "name": "Eve", "email": "eve@example.com", "password": "correct horse", "workspace_name": "Mine" }),
         )
         .await;
-    assert_eq!(signup.status, StatusCode::NOT_FOUND);
+    assert!(signup.status.is_client_error(), "{}", signup.status);
 
     local::start(&pool, "Ada", "Docs").await.unwrap();
     let login = app
@@ -60,7 +60,7 @@ async fn the_apps_own_server_takes_no_sign_ups_or_sign_ins(pool: PgPool) {
             json!({ "email": local::EMAIL, "password": "" }),
         )
         .await;
-    assert_eq!(login.status, StatusCode::NOT_FOUND);
+    assert!(login.status.is_client_error(), "{}", login.status);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

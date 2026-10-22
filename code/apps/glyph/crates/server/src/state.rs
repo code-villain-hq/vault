@@ -6,7 +6,6 @@ use sqlx::PgPool;
 use tokio::sync::{Semaphore, broadcast};
 use uuid::Uuid;
 
-use crate::limits::Attempts;
 use crate::oidc::OidcLogin;
 
 #[derive(Clone)]
@@ -16,19 +15,13 @@ pub struct AppState {
     /// wake every connection (after missed notifications).
     pub wake: broadcast::Sender<Uuid>,
     pub cookie_secure: bool,
-    /// Signing in with Code Villain; when on, it's the only way in.
+    /// The company the server runs for, as the sign-in button names it.
+    pub company: Option<String>,
+    /// Signing in with the company's account: the only way in.
     pub oidc_login: Option<Arc<OidcLogin>>,
-    /// The token Pocket ID sends the account's people and groups with
-    /// (`GLYPH_SCIM_TOKEN`); `None` turns groups off.
+    /// The token the company's account sends its people and groups with
+    /// (`scim.token`).
     pub scim_token: Option<String>,
-    /// Wrong passwords per account, to slow down guessing.
-    pub password_attempts: Arc<Attempts>,
-    /// Sign-ups per client address, so nobody can make accounts (or find
-    /// out which emails have one) by the thousand.
-    pub signup_attempts: Arc<Attempts>,
-    /// Whether to take client addresses from `X-Forwarded-For`, which only
-    /// a proxy in front of Glyph may set (`GLYPH_TRUST_FORWARDED_FOR=1`).
-    pub trust_forwarded_for: bool,
     /// The translation models, from the models file. Read them with
     /// [`AppState::models`].
     pub models: Arc<RwLock<Models>>,
@@ -41,7 +34,7 @@ pub struct AppState {
     /// Translation runs take turns: one model serves them all.
     pub llm_turn: Arc<Semaphore>,
     /// The desktop app's own server, for the workspaces on this Mac: nobody
-    /// signs up or in; the app gets its session from [`crate::local`].
+    /// signs in; the app gets its session from [`crate::local`].
     pub on_this_mac: bool,
     /// Origins besides the desktop app's that may call the API across
     /// origins (the dev web app, for a desktop app in development).
@@ -55,11 +48,9 @@ impl AppState {
             pool,
             wake,
             cookie_secure,
+            company: None,
             oidc_login: None,
             scim_token: None,
-            password_attempts: Arc::default(),
-            signup_attempts: Arc::new(Attempts::sign_ups()),
-            trust_forwarded_for: false,
             models: Arc::default(),
             models_file: None,
             processes: Processes::new(),
@@ -85,7 +76,7 @@ impl AppState {
         self
     }
 
-    /// The desktop app's own server: no sign-ups and no sign-ins.
+    /// The desktop app's own server: nobody signs in.
     pub fn on_this_mac(mut self) -> Self {
         self.on_this_mac = true;
         self
@@ -97,22 +88,21 @@ impl AppState {
         self
     }
 
-    /// Takes the account's people and groups at `/api/scim/v2` (`crate::groups`).
+    /// The company the server runs for, named on the sign-in button.
+    pub fn for_company(mut self, company: impl Into<String>) -> Self {
+        self.company = Some(company.into());
+        self
+    }
+
+    /// Takes the company's people and groups at `/api/scim/v2` (`crate::groups`).
     pub fn with_scim(mut self, token: impl Into<String>) -> Self {
         self.scim_token = Some(token.into());
         self
     }
 
-    /// Turns on signing in with Code Villain, and off passwords.
+    /// Signs people in with the company's account.
     pub fn with_oidc_login(mut self, login: OidcLogin) -> Self {
         self.oidc_login = Some(Arc::new(login));
-        self
-    }
-
-    /// Takes client addresses from `X-Forwarded-For`, for a server behind a
-    /// proxy that sets it.
-    pub fn trusting_forwarded_for(mut self, trust: bool) -> Self {
-        self.trust_forwarded_for = trust;
         self
     }
 }

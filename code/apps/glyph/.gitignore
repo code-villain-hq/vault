@@ -8,6 +8,8 @@ apps/desktop/src-tauri/gen/
 /models.toml
 .env
 .env.local
+# A company's settings, with its secrets (glyph.example.toml shows them).
+glyph.toml
 
 # Real translation files and the old Go app's database: never in this
 # public repository. The made-up demo data in demo/ is.

@@ -1,12 +1,14 @@
-//! The Code Villain account's groups: Pocket ID sends people and groups over
-//! SCIM, and a workspace linked to a group follows it.
+//! The company's account sends its people and groups over SCIM; the
+//! workspace follows glyph-users, -admins and -guests (or the groups the
+//! settings name).
 
 mod common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
+use code_villain_scim::Groups;
 use common::App;
-use glyph_server::AppState;
+use glyph_server::{AppState, company};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
@@ -84,15 +86,13 @@ fn group(name: &str, members: &[&str]) -> Value {
     })
 }
 
-async fn link(app: &App, admin: &str, workspace: &str, group: Option<&str>) -> StatusCode {
-    app.call(
-        "PUT",
-        &format!("/api/w/{workspace}/group"),
-        Some(admin),
-        Some(json!({ "group": group })),
-    )
-    .await
-    .status
+/// The server starting for the company, following `glyph-*` groups.
+async fn start(app: &App) {
+    start_with(app, &Groups::new("glyph", None, None, None)).await;
+}
+
+async fn start_with(app: &App, groups: &Groups) {
+    company::start(&app.pool, "Studio", groups).await.unwrap();
 }
 
 /// Each member's name, role and the group it comes from.
@@ -133,32 +133,28 @@ async fn scim_needs_its_token_and_is_off_without_one(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
+async fn the_workspace_follows_the_companys_groups(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
-    let admins = push_group(&app, "Glyph admins", &[&bob]).await;
+    let admins = push_group(&app, "Glyph admins", &[&ada_id, &bob]).await;
     push_group(&app, "glyph-users", &[]).await;
     push_group(&app, "glyph-guests", &[]).await;
+    // A group named for the tool alone gives no role.
+    let dana = push_user(&app, "sub-dana", "Dana").await;
+    push_group(&app, "glyph", &[&dana]).await;
+    start(&app).await;
 
-    // Only an admin links, and only to a group there is.
-    let groups = app.get(&format!("/api/w/{studio}/group"), &ada).await.body;
-    assert_eq!(groups["groups"], json!(["glyph"]));
-    assert_eq!(groups["group"], Value::Null);
-    assert_eq!(
-        link(&app, &ada, &studio, Some("forje")).await,
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
-    assert_eq!(
-        link(&app, &ada, &studio, Some("glyph")).await,
-        StatusCode::NO_CONTENT
-    );
     let people = members(&app, &ada, &studio).await;
     assert_eq!(
-        people[1],
-        ("Bob".into(), "admin".into(), json!("glyph-admins"))
+        people,
+        vec![
+            ("Ada".into(), "admin".into(), json!("glyph-admins")),
+            ("Bob".into(), "admin".into(), json!("glyph-admins")),
+        ],
+        "Dana is only in glyph"
     );
-    assert_eq!(people[0].2, Value::Null, "Ada came by signing up");
 
     // Their role is changed in the account, not here.
     let path = format!("/api/w/{studio}/members/{bob}");
@@ -187,7 +183,7 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
         &app,
         "PUT",
         &format!("/Groups/{admins}"),
-        Some(group("glyph-admins", &[])),
+        Some(group("glyph-admins", &[&ada_id])),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -224,22 +220,39 @@ async fn a_linked_workspace_follows_its_groups(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn invited_people_stay_until_a_group_takes_them(pool: PgPool) {
+async fn the_settings_can_name_other_groups(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
-    let token = app.invite(&ada, &studio, "member").await;
-    app.join("Cleo", &token).await;
-    push_group(&app, "glyph-users", &[]).await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
+    let bob = push_user(&app, "sub-bob", "Bob").await;
+    push_group(&app, "Acme Leads", &[&ada_id]).await;
+    push_group(&app, "acme-engineers", &[&bob]).await;
+    start_with(
+        &app,
+        &Groups::new("glyph", Some("Acme Engineers"), Some("acme-leads"), None),
+    )
+    .await;
     assert_eq!(
-        link(&app, &ada, &studio, Some("glyph")).await,
-        StatusCode::NO_CONTENT
+        members(&app, &ada, &studio).await,
+        vec![
+            ("Ada".into(), "admin".into(), json!("acme-leads")),
+            ("Bob".into(), "member".into(), json!("acme-engineers")),
+        ]
     );
-    assert_eq!(
-        members(&app, &ada, &studio).await[1],
-        ("Cleo".into(), "member".into(), Value::Null)
-    );
+}
 
-    // The account sends Cleo by her email, in glyph-guests.
+#[sqlx::test(migrations = "../../migrations")]
+async fn people_outside_the_groups_leave_once_the_account_sends_them(pool: PgPool) {
+    let app = app(pool.clone());
+    let (ada, studio) = app.signup("Ada", "Studio").await;
+    app.join("Cleo", &app.invite(&ada, &studio, "member").await)
+        .await;
+    // Before the account has sent any groups, nobody leaves.
+    start(&app).await;
+    assert_eq!(members(&app, &ada, &studio).await.len(), 2);
+
+    // The account sends Ada and Cleo by their emails.
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let cleo = push_user(&app, "sub-cleo", "Cleo").await;
     let cleo_id: uuid::Uuid =
         sqlx::query_scalar("SELECT id FROM users WHERE email = 'cleo@example.com'")
@@ -247,20 +260,19 @@ async fn invited_people_stay_until_a_group_takes_them(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(cleo, cleo_id.to_string(), "the same account");
+    push_group(&app, "glyph-admins", &[&ada_id]).await;
     push_group(&app, "glyph-guests", &[&cleo]).await;
-    assert_eq!(
-        members(&app, &ada, &studio).await[1],
-        ("Cleo".into(), "guest".into(), json!("glyph-guests"))
-    );
+    app.join("Dan", &app.invite(&ada, &studio, "member").await)
+        .await;
 
-    // Unlinked, everyone stays, as though invited.
+    // Starting again, Dan leaves: he's in no group.
+    start(&app).await;
+    let people = members(&app, &ada, &studio).await;
+    let names: Vec<&str> = people.iter().map(|(name, _, _)| name.as_str()).collect();
+    assert_eq!(names, ["Ada", "Cleo"]);
     assert_eq!(
-        link(&app, &ada, &studio, None).await,
-        StatusCode::NO_CONTENT
-    );
-    assert_eq!(
-        members(&app, &ada, &studio).await[1],
-        ("Cleo".into(), "guest".into(), Value::Null)
+        people[1],
+        ("Cleo".into(), "guest".into(), json!("glyph-guests"))
     );
 }
 
@@ -268,19 +280,62 @@ async fn invited_people_stay_until_a_group_takes_them(pool: PgPool) {
 async fn someone_turned_off_is_signed_out_and_leaves(pool: PgPool) {
     let app = app(pool.clone());
     let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
     let bob = push_user(&app, "sub-bob", "Bob").await;
+    push_group(&app, "glyph-admins", &[&ada_id]).await;
     push_group(&app, "glyph-users", &[&bob]).await;
-    link(&app, &ada, &studio, Some("glyph")).await;
+    start(&app).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 2);
 
     let (status, _) = scim(&app, "DELETE", &format!("/Users/{bob}"), None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
-    // The account stays; they can't sign in to it but through Pocket ID.
+    // The account stays; they can't sign in to it but through the company's.
     let accounts: i64 =
         sqlx::query_scalar("SELECT count(*) FROM users WHERE email = 'bob@example.com'")
             .fetch_one(&pool)
             .await
             .unwrap();
     assert_eq!(accounts, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_new_server_makes_the_companys_workspace(pool: PgPool) {
+    let app = app(pool.clone());
+    let groups = Groups::new("glyph", None, None, None);
+    let workspace = company::start(&pool, " Acme Inc ", &groups).await.unwrap();
+    assert_eq!(
+        company::start(&pool, "Acme Inc", &groups).await.unwrap(),
+        workspace,
+        "the same one on every start"
+    );
+    let (name, url_key): (String, String) =
+        sqlx::query_as("SELECT name, url_key FROM workspaces WHERE id = $1")
+            .bind(workspace)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((name.as_str(), url_key.as_str()), ("Acme Inc", "acme-inc"));
+    let languages = || async {
+        sqlx::query_scalar::<_, String>("SELECT code FROM languages WHERE is_source")
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+    };
+    assert!(languages().await.is_empty(), "nobody to make it yet");
+
+    // Its first person brings its source language.
+    let ada = push_user(&app, "sub-ada", "Ada").await;
+    push_group(&app, "glyph-admins", &[&ada]).await;
+    assert_eq!(languages().await, ["en"]);
+    let bob = push_user(&app, "sub-bob", "Bob").await;
+    push_group(&app, "glyph-users", &[&bob]).await;
+    assert_eq!(languages().await, ["en"], "only once");
+
+    // A database with more than one company's is refused.
+    let (_, _) = app.signup("Eve", "Elsewhere").await;
+    let refused = company::start(&pool, "Acme Inc", &groups)
+        .await
+        .unwrap_err();
+    assert!(refused.to_string().contains("Elsewhere"), "{refused}");
 }

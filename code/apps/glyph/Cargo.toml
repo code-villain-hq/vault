@@ -9,7 +9,6 @@ publish = false
 
 [workspace.dependencies]
 anyhow = "1"
-argon2 = "0.6"
 axum = { version = "0.8.9", features = ["ws"] }
 base64 = "0.22"
 chrono = { version = "0.4.45", features = ["serde"] }
@@ -38,15 +37,12 @@ uuid = { version = "1.28", features = ["v7", "serde"] }
 
 code-villain-desktop = { path = "../../kit/desktop" }
 code-villain-scim = { path = "../../kit/scim" }
+code-villain-settings = { path = "../../kit/settings" }
 code-villain-sync = { path = "../../kit/sync" }
 glyph-domain = { path = "crates/domain" }
 glyph-llm = { path = "crates/llm" }
 glyph-server = { path = "crates/server" }
 glyph-sync = { path = "crates/sync" }
-
-# Password hashing is deliberately slow; unoptimised it makes tests crawl.
-[profile.dev.package.argon2]
-opt-level = 3
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

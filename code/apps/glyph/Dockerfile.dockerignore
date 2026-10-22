@@ -3,6 +3,10 @@
 *
 !apps/glyph
 !kit/sync
+!kit/web
+!kit/desktop
+!kit/scim
+!kit/settings
 **/target
 **/node_modules
 apps/glyph/apps/web/dist

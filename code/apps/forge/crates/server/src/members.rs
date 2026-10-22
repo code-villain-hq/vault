@@ -156,7 +156,7 @@ pub async fn take_out(db: &mut PgConnection, actor: Actor, user_id: Uuid) -> Res
 }
 
 /// Refuses to change a role that comes from a group: it's changed in the
-/// Code Villain account.
+/// company's account.
 async fn not_from_group(
     db: &mut PgConnection,
     workspace_id: Uuid,
@@ -164,7 +164,7 @@ async fn not_from_group(
 ) -> Result<(), AppError> {
     match code_villain_scim::role_source(db, workspace_id, user_id).await? {
         Some(group) => Err(AppError::conflict(format!(
-            "their role comes from {group}: it's changed in the Code Villain account"
+            "their role comes from {group}: it's changed in the company's account"
         ))),
         None => Ok(()),
     }

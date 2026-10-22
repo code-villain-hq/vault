@@ -1,18 +1,15 @@
-// Creates local test accounts through the API and fills their workspace with
-// the made-up villain strings in demo/: an admin with a "Villain Corp"
-// workspace, a member who joined it by invite link, and a guest who
-// translates its first language after the source. Safe to run again:
-// keys that are there already are left alone. Needs the server running
-// (`bun run dev`). Local development only.
+// Fills Acme Inc's workspace with the made-up villain strings in demo/, and
+// puts Gus Guest in its first language after the source. Its people come
+// from dev-id (code/kit/dev-id/people.toml). Safe to run again: keys that
+// are there already are left alone. Needs `bun run dev` running, for Acme
+// Inc. Local development only.
 import { readdir } from "node:fs/promises";
+import { signInAs } from "../../../kit/dev-id/dev";
 
-export const BASE = process.env.GLYPH_URL ?? "http://localhost:7480";
+export const BASE = process.env.GLYPH_URL ?? "http://localhost:5174";
 
-/** Test-only password for the local seed accounts. */
-export const DEV_PASSWORD = "glyph-dev-password";
-export const DEV_ADMIN = { name: "Ada Admin", email: "admin@glyph.test" };
-export const DEV_MEMBER = { name: "Max Member", email: "member@glyph.test" };
-export const DEV_GUEST = { name: "Gus Guest", email: "guest@glyph.test" };
+/** dev-id's admin. */
+export const DEV_ADMIN = "ada";
 
 const demo = new URL("../demo/", import.meta.url).pathname;
 /** Well under the server's request size limit. */
@@ -28,21 +25,25 @@ export async function call(path: string, body: unknown, cookie?: string, method 
     headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const session = response.headers.get("set-cookie")?.split(";")[0];
-  return { status: response.status, body: await response.json().catch(() => null), session };
+  return { status: response.status, body: await response.json().catch(() => null) };
 }
 
-/** Signs up, or signs in if the account exists. Returns the session cookie and workspaces. */
-export async function account(
-  person: { name: string; email: string },
-  extra: Record<string, string>,
-) {
-  const signup = await call("/api/auth/signup", { ...person, password: DEV_PASSWORD, ...extra });
-  if (signup.status === 200) return signup;
-  const login = await call("/api/auth/login", { email: person.email, password: DEV_PASSWORD });
-  if (login.status !== 200)
-    throw new Error(`couldn't sign in ${person.email}: ${JSON.stringify(login.body)}`);
-  return login;
+/** Signs someone in through dev-id: their session cookie, `/api/me` and workspace. */
+export async function account(who: string) {
+  const { session, me } = await signInAs(BASE, who);
+  const workspace = me.workspaces[0];
+  if (!workspace) throw new Error(`${who} isn't in Acme Inc's workspace yet: is dev-id running?`);
+  return { session, me, workspace };
+}
+
+/** Waits up to ten seconds, two of dev-id's rounds, for `check` to find something. */
+async function until<T>(what: string, check: () => Promise<T | undefined>) {
+  for (let i = 0; i < 20; i++) {
+    const found = await check();
+    if (found) return found;
+    await Bun.sleep(500);
+  }
+  throw new Error(`gave up waiting for ${what}`);
 }
 
 type Meta = { confidence?: number; translated_by?: string; context?: string };
@@ -99,11 +100,16 @@ const create = (model: string, data: Record<string, unknown>): Operation => ({
 });
 
 if (import.meta.main) {
-  const admin = await account(DEV_ADMIN, { workspace_name: "Villain Corp" });
-  const workspace = admin.body.workspaces.find((w: { name: string }) => w.name === "Villain Corp");
-  const cookie = admin.session as string;
-  const current = (await call(`/api/w/${workspace.id}/sync/bootstrap`, undefined, cookie, "GET"))
-    .body.records;
+  const admin = await until("Ada", () => account(DEV_ADMIN).catch(() => undefined));
+  const { workspace } = admin;
+  const cookie = admin.session;
+  const bootstrap = async () =>
+    (await call(`/api/w/${workspace.id}/sync/bootstrap`, undefined, cookie, "GET")).body.records;
+  // The source language comes with the workspace's first person.
+  const current = await until("the source language", async () => {
+    const records = await bootstrap();
+    return records.Language?.length ? records : undefined;
+  });
   const have = (model: string, key: (row: Record<string, unknown>) => string) =>
     new Set<string>((current[model] ?? []).map(key));
 
@@ -133,30 +139,26 @@ if (import.meta.main) {
   ];
   await send(workspace.id, cookie, operations);
 
-  const invite = await call(`/api/w/${workspace.id}/invites`, { role: "member" }, cookie);
-  await account(DEV_MEMBER, { invite_token: invite.body.token });
-
-  const guestInvite = await call(`/api/w/${workspace.id}/invites`, { role: "guest" }, cookie);
-  const guest = await account(DEV_GUEST, { invite_token: guestInvite.body.token });
-  const after = (await call(`/api/w/${workspace.id}/sync/bootstrap`, undefined, cookie, "GET")).body
-    .records;
+  const members: { user: { id: string; email: string } }[] = (
+    await call(`/api/w/${workspace.id}/members`, undefined, cookie, "GET")
+  ).body;
+  const guest = members.find((m) => m.user.email === "gus@acme.test");
+  if (!guest) throw new Error("Gus isn't in the workspace: check people.toml");
+  const after = await bootstrap();
   const language = (after.Language ?? []).find((l: { is_source: boolean }) => !l.is_source);
   if (language) {
     const access = await call(
-      `/api/w/${workspace.id}/members/${guest.body.user.id}/access`,
+      `/api/w/${workspace.id}/members/${guest.user.id}/access`,
       { items: [language.id] },
       cookie,
       "PUT",
     );
-    if (access.status !== 204) throw new Error(`couldn't add the guest to ${language.code}`);
+    if (access.status !== 204) throw new Error(`couldn't add Gus to ${language.code}`);
   }
 
   console.log(
-    `Seeded ${DEV_ADMIN.email} (admin), ${DEV_MEMBER.email} (member) and ${DEV_GUEST.email} ` +
-      `(guest in ${language?.code ?? "no language"}) in "${workspace.name}": ` +
-      `${operations.length} new records.`,
+    `Seeded "${workspace.name}": ${operations.length} new records, ` +
+      `and Gus Guest in ${language?.code ?? "no language"}.`,
   );
-  console.log(
-    `Password for all three: see DEV_PASSWORD in scripts/seed-demo.ts. Open http://localhost:5174/${workspace.url_key}`,
-  );
+  console.log(`Open ${BASE}/${workspace.url_key} and sign in as anyone in people.toml.`);
 }

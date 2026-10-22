@@ -1,0 +1,38 @@
+# Glyph's settings for one company. Copy to glyph.toml (or pass
+# `glyph-server --config <file>`, or set GLYPH_CONFIG). Every setting can
+# also come from the environment, which wins: `[oidc] issuer` is
+# GLYPH_OIDC_ISSUER, `public_url` is GLYPH_PUBLIC_URL. A setting Glyph
+# doesn't know stops it, naming the setting.
+
+# Required.
+
+company = "Acme Inc"                    # names the workspace and the sign-in button
+public_url = "https://glyph.acme.org"   # where people reach Glyph
+
+[database]
+url = "postgres://glyph@localhost/glyph"   # or DATABASE_URL
+
+# The company's account signs people in (OpenID Connect). Register Glyph as a
+# confidential client with the callback <public_url>/api/auth/oidc/callback.
+[oidc]
+issuer = "https://id.acme.org"
+client_id = "glyph"
+client_secret = "…"
+
+# The account sends its people and groups to <public_url>/api/scim/v2 with
+# this token (SCIM), and they're in Glyph as its groups say.
+[scim]
+token = "…"
+
+# Optional.
+
+# The groups whose people are in Glyph, and as what.
+[groups]
+users = "glyph-users"
+admins = "glyph-admins"
+guests = "glyph-guests"
+
+# models = "/etc/glyph/models.toml"   # the translation models (./models.toml; see models.example.toml)
+# addr = "0.0.0.0:7480"               # where the server listens (GLYPH_ADDR)
+# web_dir = "/srv/glyph/web"          # the built web app, served beside the API
+# cookie_secure = true                # false only on plain http

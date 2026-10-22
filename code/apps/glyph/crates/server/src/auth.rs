@@ -1,11 +1,8 @@
-//! Who is making a request: sessions, password hashing, and the extractors
+//! Who is making a request: sessions, and the extractors
 //! handlers use to require a signed-in user or a workspace member.
 
 use std::collections::HashMap;
 
-use argon2::Argon2;
-use argon2::password_hash::phc::PasswordHash;
-use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use axum::extract::{FromRequestParts, Path};
 use axum::http::header::{AUTHORIZATION, COOKIE, SEC_WEBSOCKET_PROTOCOL};
 use axum::http::request::Parts;
@@ -31,7 +28,7 @@ pub const BEARER_PROTOCOL_PREFIX: &str = "bearer.";
 pub const SYNC_PROTOCOL: &str = "glyph";
 const SESSION_DAYS: i64 = 60;
 
-/// A random 256-bit token, hex-encoded, for sessions and invite links.
+/// A random 256-bit token, hex-encoded, for sessions.
 pub fn new_token() -> String {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes).expect("the OS random number generator works");
@@ -41,36 +38,6 @@ pub fn new_token() -> String {
 /// Tokens are stored only as hashes, so a leaked database can't be used to sign in.
 pub fn hash_token(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()
-}
-
-pub async fn hash_password(password: String) -> Result<String, AppError> {
-    tokio::task::spawn_blocking(move || {
-        Argon2::default()
-            .hash_password(password.as_bytes())
-            .map(|h| h.to_string())
-    })
-    .await
-    .map_err(AppError::internal)?
-    .map_err(AppError::internal)
-}
-
-/// A real hash of a throwaway password, checked when an account has no
-/// password, so response times don't reveal which emails have accounts.
-const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$KCbv1GHXuPgJBJiiwePHxA$NL6gvMeQB6J1KbyTIKFTYyGswt6zjU4UHX2+wfWh8B4";
-
-pub async fn verify_password(password: String, hash: Option<String>) -> bool {
-    tokio::task::spawn_blocking(move || {
-        let has_hash = hash.is_some();
-        let hash = hash.unwrap_or_else(|| DUMMY_HASH.into());
-        let matches = PasswordHash::new(&hash).is_ok_and(|parsed| {
-            Argon2::default()
-                .verify_password(password.as_bytes(), &parsed)
-                .is_ok()
-        });
-        has_hash && matches
-    })
-    .await
-    .unwrap_or(false)
 }
 
 /// Starts a session and returns its token, for the cookie.

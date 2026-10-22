@@ -30,40 +30,52 @@ Needs Rust, Bun and Docker.
 ```bash
 bun install
 bun run db               # Postgres in Docker, port 5434
-bun run dev:fake-model   # server :7480, web :5174, a stand-in model
-bun run seed             # in another terminal: test accounts and demo strings
+bun run dev:fake-model   # Glyph for Acme Inc on :5174, with a stand-in model
+bun run seed             # in another terminal: demo strings, Gus in a language
 ```
 
 Then open http://localhost:5174. For a real model, copy
 `models.example.toml` to `models.toml` and run `bun run dev` instead.
 
+`bun run dev` runs Glyph for a made-up company, Acme Inc: dev-id
+(`code/kit/dev-id`) stands in for its account, so you sign in as anyone in
+its `people.toml` (Ada Admin, Max Member, Gus Guest, or Nell New, who isn't
+let in). Acme's data has a database of its own, `glyph_acme`. With a
+`glyph.toml`, or `GLYPH_OIDC_ISSUER` in `.env`, it runs with those settings
+and the `glyph` database instead.
+
 `bun run app` runs the whole thing in Docker at http://localhost:7490.
-Copy `models.example.toml` to `models.toml` first: Docker mounts it.
+Copy `models.example.toml` to `models.toml` first: Docker mounts it. It
+needs a company's settings (below) in a `.env` file next to
+`docker-compose.yml`, which it reads as `GLYPH_COMPANY`,
+`GLYPH_OIDC_ISSUER` and so on. It also takes `GLYPH_LISTEN`, the address
+Docker publishes it on (default `127.0.0.1:7490`).
 
-## Signing in with Code Villain
+## Running it for a company
 
-Set `GLYPH_OIDC_ISSUER` (`https://id.codevillain.eu`),
-`GLYPH_OIDC_CLIENT_ID`, `GLYPH_OIDC_CLIENT_SECRET` and `GLYPH_PUBLIC_URL`
-(Glyph's address; Pocket ID sends people back to
-`<GLYPH_PUBLIC_URL>/api/auth/oidc/callback`), in your shell or a `.env`
-next to `docker-compose.yml`. With them, Code Villain is the only way in
-and `bun run seed` can't sign up its accounts. Without them, passwords stay
-on. The server also reads `DATABASE_URL`, `GLYPH_ADDR` (default
-`127.0.0.1:7480`), `GLYPH_WEB_DIR`, `GLYPH_MODELS` (default
-`./models.toml`), `GLYPH_COOKIE_SECURE` (`0` for plain http) and
-`GLYPH_TRUST_FORWARDED_FOR` (`crates/server/src/config.rs`). `bun run app`
-also takes `GLYPH_LISTEN`, the address Docker publishes it on (default
-`127.0.0.1:7490`).
+A server runs for one company, from one settings file: copy
+`glyph.example.toml` to `glyph.toml` (or pass `glyph-server --config
+<file>`), and fill in the company's name, Glyph's address, the database,
+the company's account and a SCIM token. Every setting can come from the
+environment too, which wins: `[oidc] issuer` is `GLYPH_OIDC_ISSUER`. A
+missing or unknown setting stops the server, naming it.
 
-With sign-up closed, the server's first workspace is made on the server, for
-someone who has signed in once: `glyph-server create-workspace "<name>"
-<email>` makes it with them as its admin.
+In the company's account (Pocket ID, or any OpenID Connect provider with
+SCIM):
 
-With `GLYPH_SCIM_TOKEN` set too, the account's groups say who is in a
-workspace. In Pocket ID, turn on SCIM for Glyph's client, with the
-endpoint `<GLYPH_PUBLIC_URL>/api/scim/v2` and the same token, and allow
-`glyph-users`, `glyph-admins` and `glyph-guests` on it. Then link the
-workspace to `glyph` in Settings → Members → Group. Without the token, invites are the only way in.
+1. Register Glyph as a confidential client with the callback
+   `<public_url>/api/auth/oidc/callback`.
+2. Make the groups `glyph-users`, `glyph-admins` and `glyph-guests` (or
+   the names under `[groups]`), and put people in them.
+3. Turn on SCIM for Glyph's client, with the endpoint
+   `<public_url>/api/scim/v2` and the settings' token.
+
+On its first start Glyph makes the company's workspace, with English as
+its source language once its first person is in. The account sends its
+people within minutes, and they sign in with "Sign in with <company>".
+Nobody signs up, and there are no invites or passwords: someone in none of
+the groups is told to ask the company's admin. A guest's languages are
+still added in Members.
 
 See [AGENTS.md](AGENTS.md) for the commands, the layout and the rules.
 

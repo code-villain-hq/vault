@@ -1,17 +1,17 @@
 [package]
 name = "glyph-server"
-description = "Glyph's server: HTTP API, sync over WebSocket, accounts, and translating with local models"
+description = "Glyph's server: HTTP API, sync over WebSocket, sign-in, and translating with local models"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-argon2.workspace = true
 axum.workspace = true
 base64.workspace = true
 chrono.workspace = true
 code-villain-scim.workspace = true
+code-villain-settings.workspace = true
 code-villain-sync.workspace = true
 futures.workspace = true
 getrandom.workspace = true

@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, groups, invites, members, models, oidc, translate, ws};
+use crate::{accounts, groups, members, models, oidc, translate, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -40,9 +40,6 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/members/{user_id}/access", put(members::update_access))
-        .route("/group", get(groups::get).put(groups::link))
-        .route("/invites", get(invites::list).post(invites::create))
-        .route("/invites/{invite_id}", delete(invites::revoke))
         .route("/runs", post(translate::start))
         .route("/runs/{run_id}/cancel", post(translate::cancel))
         .route("/glossary/variants", post(translate::variants));
@@ -59,17 +56,12 @@ pub fn router(state: AppState) -> Router {
     }
 
     api.route("/api/health", get(|| async { "ok" }))
-        .route("/api/auth/signup", post(accounts::signup))
-        .route("/api/auth/login", post(accounts::login))
         .route("/api/auth/logout", post(accounts::logout))
         .route("/api/auth/providers", get(providers))
         .route("/api/auth/oidc", get(oidc::start))
         .route("/api/auth/oidc/callback", get(oidc::callback))
         .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/me", get(accounts::me).put(accounts::update_profile))
-        .route("/api/me/password", put(accounts::change_password))
-        .route("/api/invites/{token}", get(invites::preview))
-        .route("/api/invites/{token}/accept", post(invites::accept))
         .route("/api/models", get(models::list).post(models::add))
         .route("/api/models/{name}", delete(models::remove))
         .route("/api/models/{name}/start", post(models::start))
@@ -102,14 +94,14 @@ async fn transaction(
     Ok(Json(TransactionResult { sync_id }))
 }
 
-/// `GET /api/auth/providers`: the ways to sign in. Signing in with Code
-/// Villain, when on, is the only one.
+/// `GET /api/auth/providers`: whether people sign in here, and with whose
+/// account. The desktop app's own server has nobody sign in.
 async fn providers(State(state): State<AppState>) -> Json<serde_json::Value> {
-    if state.on_this_mac {
-        return Json(serde_json::json!({ "oidc": false, "password": false }));
-    }
-    let oidc = state.oidc_login.is_some();
-    Json(serde_json::json!({ "oidc": oidc, "password": !oidc }))
+    let company = state
+        .company
+        .as_ref()
+        .filter(|_| state.oidc_login.is_some() && !state.on_this_mac);
+    Json(serde_json::json!({ "oidc": company.is_some(), "company": company }))
 }
 
 /// The packaged desktop app runs from its own origin (`tauri://localhost`,

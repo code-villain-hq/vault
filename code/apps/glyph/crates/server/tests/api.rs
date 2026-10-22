@@ -5,8 +5,7 @@ mod common;
 
 use axum::http::StatusCode;
 use common::App;
-use glyph_server::accounts;
-use serde_json::{Value, json};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -37,229 +36,6 @@ async fn workspace_url_keys_are_unique(pool: PgPool) {
         app.get("/api/me", &second).await.body["workspaces"][0]["url_key"],
         "acme-2"
     );
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn signup_rejects_bad_input_and_taken_emails(pool: PgPool) {
-    let app = App::new(pool);
-    app.signup("Ada", "Acme").await;
-
-    let cases = [
-        (
-            json!({ "name": "Ada", "email": "ADA@example.com", "password": "correct horse", "workspace_name": "X" }),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ),
-        (
-            json!({ "name": "Bo", "email": "bo@example.com", "password": "short", "workspace_name": "X" }),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ),
-        (
-            json!({ "name": "Bo", "email": "not-an-email", "password": "correct horse", "workspace_name": "X" }),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ),
-        (
-            json!({ "name": " ", "email": "bo@example.com", "password": "correct horse", "workspace_name": "X" }),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ),
-        (
-            json!({ "name": "Bo", "email": "bo@example.com", "password": "correct horse" }),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ),
-        (
-            json!({ "name": "Bo", "email": "bo@example.com", "password": "correct horse", "workspace_name": "X", "invite_token": "t" }),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ),
-    ];
-    for (body, expected) in cases {
-        let response = app.post("/api/auth/signup", None, body.clone()).await;
-        assert_eq!(response.status, expected, "{body} gave {}", response.body);
-        assert!(response.session.is_none());
-    }
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn signing_up_doesnt_reveal_who_has_an_account(pool: PgPool) {
-    let app = App::new(pool);
-    let (ada, acme) = app.signup("Ada", "Acme").await;
-    let signup = async |email: &str, extra: Value| {
-        let mut body = json!({ "name": "Someone", "email": email, "password": "correct horse" });
-        body.as_object_mut()
-            .unwrap()
-            .extend(extra.as_object().unwrap().clone());
-        app.post("/api/auth/signup", None, body).await
-    };
-
-    let taken = signup(" Ada@Example.com", json!({ "workspace_name": "X" })).await;
-    assert_eq!(taken.status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(taken.body["message"], accounts::SIGNUP_REFUSED);
-    assert!(taken.session.is_none());
-    // With an invite too.
-    let invite = app.invite(&ada, &acme, "member").await;
-    let joining = signup("ada@example.com", json!({ "invite_token": invite })).await;
-    assert_eq!(
-        (joining.status, &joining.body),
-        (taken.status, &taken.body),
-        "the same answer"
-    );
-    // The same status as any other refusal.
-    let short = signup(
-        "bo@example.com",
-        json!({ "workspace_name": "X", "password": "short" }),
-    )
-    .await;
-    assert_eq!(short.status, taken.status);
-    assert!(
-        !taken
-            .body
-            .to_string()
-            .to_lowercase()
-            .contains("already an account"),
-        "{}",
-        taken.body
-    );
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn sign_ups_are_limited_per_client(pool: PgPool) {
-    let app = App::new(pool);
-    let here: std::net::SocketAddr = "203.0.113.7:50000".parse().unwrap();
-    let signup = async |client: std::net::SocketAddr, name: &str, password: &str| {
-        let email = format!("{}@example.com", name.to_lowercase());
-        app.call_from(
-            client,
-            "POST",
-            "/api/auth/signup",
-            None,
-            Some(json!({ "name": name, "email": email, "password": password, "workspace_name": name })),
-        )
-        .await
-    };
-
-    // Five tries an hour, whether they work or not.
-    for (name, password) in [
-        ("Ada", "correct horse"),
-        ("Bo", "short"),
-        ("Ada", "correct horse"),
-        ("Cy", "correct horse"),
-        ("Di", "short"),
-    ] {
-        let response = signup(here, name, password).await;
-        assert_ne!(response.status, StatusCode::TOO_MANY_REQUESTS, "{name}");
-    }
-    let sixth = signup(here, "Eve", "correct horse").await;
-    assert_eq!(
-        sixth.status,
-        StatusCode::TOO_MANY_REQUESTS,
-        "{}",
-        sixth.body
-    );
-    assert_eq!(
-        sixth.body["message"],
-        "too many sign-ups from here; try again in 60 minutes"
-    );
-    assert!(sixth.session.is_none());
-    let eve: i64 = sqlx::query_scalar("SELECT count(*) FROM users WHERE email = 'eve@example.com'")
-        .fetch_one(&app.pool)
-        .await
-        .unwrap();
-    assert_eq!(eve, 0);
-
-    // Other clients aren't affected, and signing in isn't either.
-    let elsewhere = signup(
-        "198.51.100.2:50000".parse().unwrap(),
-        "Eve",
-        "correct horse",
-    )
-    .await;
-    assert_eq!(elsewhere.status, StatusCode::OK, "{}", elsewhere.body);
-    let login = app
-        .call_from(
-            here,
-            "POST",
-            "/api/auth/login",
-            None,
-            Some(json!({ "email": "ada@example.com", "password": "correct horse" })),
-        )
-        .await;
-    assert_eq!(login.status, StatusCode::OK);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn login_checks_the_password(pool: PgPool) {
-    let app = App::new(pool);
-    app.signup("Ada", "Acme").await;
-
-    let wrong = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": "wrong horse" }),
-        )
-        .await;
-    let unknown = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "bob@example.com", "password": "correct horse" }),
-        )
-        .await;
-    assert_eq!(wrong.status, StatusCode::UNAUTHORIZED);
-    assert_eq!(unknown.status, StatusCode::UNAUTHORIZED);
-    assert_eq!(
-        wrong.body["message"], unknown.body["message"],
-        "don't reveal which emails have accounts"
-    );
-
-    let right = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": " Ada@Example.com", "password": "correct horse" }),
-        )
-        .await;
-    assert_eq!(right.status, StatusCode::OK);
-    assert_eq!(
-        app.get("/api/me", &right.session.unwrap()).await.status,
-        StatusCode::OK
-    );
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn too_many_wrong_passwords_lock_the_account_for_a_while(pool: PgPool) {
-    let app = App::new(pool);
-    app.signup("Ada", "Acme").await;
-    let login = async |password: &str| {
-        app.post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": password }),
-        )
-        .await
-    };
-    for _ in 0..10 {
-        assert_eq!(login("wrong horse").await.status, StatusCode::UNAUTHORIZED);
-    }
-    let locked = login("correct horse").await;
-    assert_eq!(locked.status, StatusCode::TOO_MANY_REQUESTS);
-    assert!(
-        locked.body["message"]
-            .as_str()
-            .unwrap()
-            .contains("try again in 15 minutes"),
-        "{}",
-        locked.body
-    );
-
-    // Other accounts are unaffected.
-    app.signup("Bob", "Bobco").await;
-    let bob = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "bob@example.com", "password": "correct horse" }),
-        )
-        .await;
-    assert_eq!(bob.status, StatusCode::OK);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -326,94 +102,6 @@ async fn workspace_routes_need_membership(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn invite_links_let_people_join(pool: PgPool) {
-    let app = App::new(pool);
-    let (ada, acme) = app.signup("Ada", "Acme").await;
-    let token = app.invite(&ada, &acme, "member").await;
-
-    let preview = app
-        .call("GET", &format!("/api/invites/{token}"), None, None)
-        .await;
-    assert_eq!(preview.status, StatusCode::OK);
-    assert_eq!(
-        preview.body,
-        json!({ "workspace_name": "Acme", "workspace_url_key": "acme", "invited_by": "Ada", "role": "member" })
-    );
-
-    // A new account joins through the link instead of creating a workspace.
-    let bob = app.join("Bob", &token).await;
-    let me = app.get("/api/me", &bob).await.body;
-    assert_eq!(me["workspaces"].as_array().unwrap().len(), 1);
-    assert_eq!(me["workspaces"][0]["id"], acme.as_str());
-    assert_eq!(me["workspaces"][0]["role"], "member");
-
-    // An existing account accepts the same link while signed in.
-    let (grace, _) = app.signup("Grace", "Navy").await;
-    let accepted = app
-        .call(
-            "POST",
-            &format!("/api/invites/{token}/accept"),
-            Some(&grace),
-            None,
-        )
-        .await;
-    assert_eq!(accepted.status, StatusCode::OK);
-    assert_eq!(accepted.body["workspaces"].as_array().unwrap().len(), 2);
-
-    let members = app.get(&format!("/api/w/{acme}/members"), &bob).await.body;
-    let names: Vec<&str> = members
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|m| m["user"]["name"].as_str().unwrap())
-        .collect();
-    assert_eq!(names, ["Ada", "Bob", "Grace"]);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn revoked_invite_links_stop_working(pool: PgPool) {
-    let app = App::new(pool);
-    let (ada, acme) = app.signup("Ada", "Acme").await;
-    let token = app.invite(&ada, &acme, "member").await;
-
-    let invites = app.get(&format!("/api/w/{acme}/invites"), &ada).await.body;
-    assert_eq!(invites.as_array().unwrap().len(), 1);
-    let invite_id = invites[0]["id"].as_str().unwrap();
-    let revoked = app
-        .call(
-            "DELETE",
-            &format!("/api/w/{acme}/invites/{invite_id}"),
-            Some(&ada),
-            None,
-        )
-        .await;
-    assert_eq!(revoked.status, StatusCode::NO_CONTENT);
-
-    assert_eq!(
-        app.call("GET", &format!("/api/invites/{token}"), None, None)
-            .await
-            .status,
-        StatusCode::NOT_FOUND
-    );
-    let signup = app
-        .post(
-            "/api/auth/signup",
-            None,
-            json!({ "name": "Bob", "email": "bob@example.com", "password": "correct horse", "invite_token": token }),
-        )
-        .await;
-    assert_eq!(signup.status, StatusCode::NOT_FOUND);
-    assert!(
-        app.get(&format!("/api/w/{acme}/invites"), &ada)
-            .await
-            .body
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
-}
-
-#[sqlx::test(migrations = "../../migrations")]
 async fn only_admins_manage_people(pool: PgPool) {
     let app = App::new(pool);
     let (ada, acme) = app.signup("Ada", "Acme").await;
@@ -425,14 +113,6 @@ async fn only_admins_manage_people(pool: PgPool) {
         .unwrap()
         .to_string();
 
-    let invite = app
-        .post(
-            &format!("/api/w/{acme}/invites"),
-            Some(&bob),
-            json!({ "role": "member" }),
-        )
-        .await;
-    assert_eq!(invite.status, StatusCode::FORBIDDEN);
     let demote = app
         .call(
             "PATCH",
@@ -513,83 +193,6 @@ async fn a_workspace_always_keeps_an_admin(pool: PgPool) {
             .await
             .status,
         StatusCode::NOT_FOUND
-    );
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn changing_the_password_signs_out_other_sessions(pool: PgPool) {
-    let app = App::new(pool);
-    let (here, _) = app.signup("Ada", "Acme").await;
-    let elsewhere = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": "correct horse" }),
-        )
-        .await
-        .session
-        .unwrap();
-
-    let wrong = app
-        .call(
-            "PUT",
-            "/api/me/password",
-            Some(&here),
-            Some(json!({ "current_password": "nope nope", "new_password": "battery staple" })),
-        )
-        .await;
-    assert_eq!(wrong.status, StatusCode::UNPROCESSABLE_ENTITY);
-
-    let changed = app
-        .call(
-            "PUT",
-            "/api/me/password",
-            Some(&here),
-            Some(json!({ "current_password": "correct horse", "new_password": "battery staple" })),
-        )
-        .await;
-    assert_eq!(changed.status, StatusCode::NO_CONTENT);
-    assert_eq!(app.get("/api/me", &here).await.status, StatusCode::OK);
-    assert_eq!(
-        app.get("/api/me", &elsewhere).await.status,
-        StatusCode::UNAUTHORIZED
-    );
-
-    let login = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": "battery staple" }),
-        )
-        .await;
-    assert_eq!(login.status, StatusCode::OK);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn reset_password_sets_a_new_one_and_signs_out_everywhere(pool: PgPool) {
-    let app = App::new(pool);
-    let (session, _) = app.signup("Ada", "Acme").await;
-
-    let password = accounts::reset_password(&app.pool, "ADA@example.com")
-        .await
-        .unwrap();
-
-    assert_eq!(
-        app.get("/api/me", &session).await.status,
-        StatusCode::UNAUTHORIZED
-    );
-    let login = app
-        .post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": password }),
-        )
-        .await;
-    assert_eq!(login.status, StatusCode::OK);
-    assert!(
-        accounts::reset_password(&app.pool, "nobody@example.com")
-            .await
-            .is_err()
     );
 }
 
@@ -698,31 +301,9 @@ async fn the_desktop_app_signs_in_with_a_token_from_its_own_origin(pool: PgPool)
     use tower::ServiceExt;
 
     let app = App::new(pool);
-    app.signup("Ada", "Acme").await;
+    // The token the desktop app gets from signing in (`oidc.rs`).
+    let (token, _) = app.signup("Ada", "Acme").await;
     let send = async |request: Request<Body>| app.router.clone().oneshot(request).await.unwrap();
-
-    let login = send(
-        Request::post("/api/auth/login")
-            .header(header::ORIGIN, "tauri://localhost")
-            .header(header::CONTENT_TYPE, "application/json")
-            .header("x-glyph-client", "desktop")
-            .body(Body::from(
-                json!({ "email": "ada@example.com", "password": "correct horse" }).to_string(),
-            ))
-            .unwrap(),
-    )
-    .await;
-    assert_eq!(login.status(), StatusCode::OK);
-    let headers = login.headers();
-    assert!(headers.get(header::SET_COOKIE).is_none(), "no cookie");
-    assert_eq!(headers["access-control-allow-origin"], "tauri://localhost");
-    assert!(
-        headers["access-control-expose-headers"]
-            .to_str()
-            .unwrap()
-            .contains("x-glyph-session")
-    );
-    let token = headers["x-glyph-session"].to_str().unwrap().to_string();
 
     let me = send(
         Request::get("/api/me")
@@ -847,30 +428,6 @@ async fn admins_rename_the_workspace_and_its_url_stays(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn many_wrong_passwords_at_once_still_hit_the_limit(pool: PgPool) {
-    let app = App::new(pool);
-    app.signup("Ada", "Acme").await;
-    let tries = (0..30).map(|_| {
-        app.post(
-            "/api/auth/login",
-            None,
-            json!({ "email": "ada@example.com", "password": "wrong horse" }),
-        )
-    });
-    let statuses: Vec<StatusCode> = futures::future::join_all(tries)
-        .await
-        .into_iter()
-        .map(|r| r.status)
-        .collect();
-    let checked = statuses
-        .iter()
-        .filter(|s| **s == StatusCode::UNAUTHORIZED)
-        .count();
-    assert!(checked <= 10, "{checked} passwords were checked");
-    assert!(statuses.contains(&StatusCode::TOO_MANY_REQUESTS));
-}
-
-#[sqlx::test(migrations = "../../migrations")]
 async fn a_guest_works_only_in_the_languages_an_admin_adds_them_to(pool: PgPool) {
     let app = App::new(pool.clone());
     let (ada, acme) = app.signup("Ada", "Acme").await;
@@ -948,30 +505,4 @@ async fn a_guest_works_only_in_the_languages_an_admin_adds_them_to(pool: PgPool)
     assert_eq!(run("de").await, StatusCode::NOT_FOUND);
     // Swedish is theirs: what stops it is only that there's nothing to do.
     assert_ne!(run("sv").await, StatusCode::NOT_FOUND);
-}
-
-#[sqlx::test(migrations = "../../migrations")]
-async fn the_server_makes_a_workspace_for_someone_with_an_account(pool: PgPool) {
-    let app = App::new(pool);
-    let (ada, _) = app.signup("Ada", "Acme").await;
-
-    let url_key = accounts::create_workspace_for(&app.pool, " Studio ", "ADA@example.com")
-        .await
-        .unwrap();
-
-    assert_eq!(url_key, "studio");
-    let me = app.get("/api/me", &ada).await.body;
-    let studio = me["workspaces"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|w| w["url_key"] == "studio")
-        .expect("Ada is in Studio");
-    assert_eq!(studio["name"], "Studio");
-    assert_eq!(studio["role"], "admin");
-    assert!(
-        accounts::create_workspace_for(&app.pool, "Studio", "nobody@example.com")
-            .await
-            .is_err()
-    );
 }

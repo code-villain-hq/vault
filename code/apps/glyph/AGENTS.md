@@ -28,7 +28,11 @@ snapshots by hand. `bun run check` fails when they've drifted.
 ## Commands
 
 - `bun run db`: start Postgres (Docker, port 5434). `bun run db:reset` wipes it.
-- `bun run dev`: Rust server (:7480) plus web app (:5174, proxies `/api`).
+- `bun run dev`: Rust server (:7480) plus web app (:5174, proxies `/api`),
+  for Acme Inc: dev-id (`code/kit/dev-id`) stands in for its account, so
+  you sign in as anyone in its `people.toml`, on a database of its own
+  (`glyph_acme`). A `glyph.toml`, or `GLYPH_OIDC_ISSUER` in `.env`, runs
+  it with those settings instead.
 - `bun run dev:fake-model`: `bun run dev` with a stand-in model on :7483
   (no download, no GPU). It answers in a moment with the source text, the
   target language and the glossary terms it was told to use.
@@ -40,10 +44,9 @@ snapshots by hand. `bun run check` fails when they've drifted.
   `~/Library/Application Support/eu.codevillain.glyph`.
 - `bun run app`: the whole app in Docker at http://localhost:7490 (one
   image: server plus built web app). `bun run app:logs` follows it.
-- `bun run seed`: local test accounts (an admin, a member and a guest of
-  "Villain Corp", the guest in its first language) and the made-up strings in `demo/`; the password is in
-  `scripts/seed-demo.ts`. Needs `bun run dev` running, with passwords on
-  (`GLYPH_OIDC_ISSUER` empty; README, "Signing in with Code Villain").
+- `bun run seed`: the made-up strings in `demo/` in Acme Inc's workspace,
+  and Gus Guest in its first language after the source. It signs in as Ada
+  through dev-id. Needs `bun run dev` running, for Acme Inc.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, types and design copies up to
   date, Biome, typecheck, bun tests, web build. It must pass before you
@@ -56,8 +59,8 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 
 ## Models
 
-The server reads its models from a TOML file (`GLYPH_MODELS`, default
-`./models.toml`; start from `models.example.toml`). Each entry names an
+The server reads its models from a TOML file (the `models` setting or
+`GLYPH_MODELS`, default `./models.toml`; start from `models.example.toml`). Each entry names an
 OpenAI-compatible server by `endpoint`. With `model_path`, or `hf_repo` and
 `hf_file`, a signed-in user can start and stop it from Settings, which runs
 `llm_binary` (llama-server) on the endpoint's port. A language pair picks a
@@ -101,8 +104,8 @@ text's confidence and origin.
   admins' models, texts written by hand, what a language takes with it.
 - `crates/llm`: model client, prompts, reading the models file, starting
   llama-server.
-- `crates/server`: axum server: HTTP API, WebSocket feed, accounts,
-  invites, runs, models. `serve.rs` runs it on a listener until told to
+- `crates/server`: axum server: HTTP API, WebSocket feed, sign-in, the
+  company's workspace, runs, models. `serve.rs` runs it on a listener until told to
   stop, and stops the models it started, for the server binary and the
   desktop app alike; `local.rs` is the one person of the desktop app's own
   Glyph, who has no password.
@@ -145,13 +148,21 @@ them, plus the admins and members. They change no source text, start no
 run for another language, and see no Members. `model.rs`'s `guest_view`
 holds what they see; `rules.rs` (`check_guest_language`) what they write.
 
-## Groups
+## One company
 
-With `GLYPH_SCIM_TOKEN` set, the Code Villain account sends its people and
-groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
-A workspace linked to `glyph` (`PUT /api/w/{id}/group`) has `glyph-users` as
-members, `glyph-admins` as admins and `glyph-guests` as guests, and Members
-won't change their roles. A guest's languages are still set by hand. Tests: `crates/server/tests/scim.rs`.
+A server runs for one company, from `glyph.toml` (`glyph.example.toml`;
+`crates/server/src/config.rs`), with the environment over it. Its only way
+in is the company's account (`oidc.rs`): no passwords, sign-ups or
+invites. On the first start it makes the company's workspace, named after
+`company` (`company.rs`); English comes as its source language with the
+first person. The account sends its people and groups to `/api/scim/v2`
+(`code/kit/scim`; `groups.rs`): `glyph-users` are members, `glyph-admins`
+admins and `glyph-guests` guests, unless `[groups]` names others, and
+Members won't change their roles. Once the account has sent groups, people
+in none of them leave. A guest's languages are still set by hand. Someone
+who signs in but is in no group gets `oidc_no_access`. The desktop app's
+own server has none of this. Tests: `crates/server/tests/scim.rs` and
+`oidc_login.rs`.
 
 ## Adding a synced model
 
