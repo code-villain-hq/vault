@@ -15,5 +15,6 @@ Caster is AppKit. Forge, Layer, Glyph, Raven, and the site are web. The Code Vil
 | [`layouts/`](layouts) | Reference layouts: the app window and the blog; a social card to come |
 | [`pets/`](pets) | Animated studio companions, source artwork, and previews |
 | [`pocket-id/`](pocket-id/README.md) | The settings and images that dress the studio sign-in page |
+| [`vaultwarden/`](vaultwarden/README.md) | The stylesheet that dresses the studio password vault |
 
 A [spacing proposal](spacing.draft.md) is available as a draft, with [interactive examples](../brand/index.html#spacing). No space tokens are published yet.
