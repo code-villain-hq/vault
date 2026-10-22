@@ -15,6 +15,8 @@ COPY kit/sync/client /code/kit/sync/client
 COPY kit/web /code/kit/web
 COPY apps/forge/packages packages
 COPY apps/forge/apps/web apps/web
+# The web app shows the version Cargo.toml keeps.
+COPY apps/forge/Cargo.toml Cargo.toml
 RUN bun run --cwd apps/web build
 
 FROM rust:1-slim-trixie AS server
