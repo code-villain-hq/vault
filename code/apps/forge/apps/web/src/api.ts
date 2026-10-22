@@ -1,4 +1,4 @@
-import { RequestError } from "@code-villain/web";
+import { api, RequestError } from "@code-villain/web";
 import type { ApiError } from "@forge/types";
 import { apiUrl, authHeaders, credentialsFor, placeFor } from "./server";
 
@@ -40,4 +40,15 @@ export async function uploadAttachment(workspaceId: string, file: File): Promise
   // Characters that would end or escape the link text.
   const label = uploaded.name.replace(/[[\]\\]/g, "");
   return uploaded.inline ? `![${label}](${uploaded.url})` : `[${label}](${uploaded.url})`;
+}
+
+/**
+ * A link to an attachment that works once, within a minute, in a browser
+ * without a session: for the desktop app to open, since its own session is
+ * a token the browser doesn't have.
+ */
+export async function attachmentLink(path: string): Promise<string> {
+  const place = placeFor(path);
+  const link = await api<{ url: string }>("POST", `${path}/link`, undefined, place);
+  return apiUrl(link.url, place);
 }

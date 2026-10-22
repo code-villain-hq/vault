@@ -1,8 +1,10 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { attachmentLink, messageOf } from "./api";
 import { useDraft } from "./draft";
 import { highlightMentions, useMentionNames } from "./mentions";
+import { openInBrowser } from "./platform";
 import { apiUrl, authHeaders, placeFor } from "./server";
 
 /** Renders Markdown, sanitised: the text comes from people and agents. */
@@ -48,19 +50,46 @@ function prepareMarkdown(root: HTMLElement) {
   }
 }
 
+/** An attachment's address, as uploads give it. */
+const ATTACHMENT = /^\/api\/w\/[^/]+\/attachments\/[^/?#]+$/;
+
 /**
  * A workspace on this Mac or on a server the packaged app signed in to
  * isn't on the page's origin, and signs requests with a token, which images
  * can't send: fetch attached images with it and show them from memory, and
- * point attachment links at its place. Returns a cleanup. Nothing to do
- * when the page comes from the workspace's server.
+ * point links at its place. A browser opening an attachment link wouldn't
+ * have the token either, so a click opens a download link instead. Returns a
+ * cleanup. Nothing to do when the page comes from the workspace's server.
  */
 function showAttachments(root: HTMLElement): (() => void) | undefined {
   const urls: string[] = [];
   let cancelled = false;
+  const clicks = new AbortController();
   for (const link of root.querySelectorAll<HTMLAnchorElement>('a[href^="/api/"]')) {
     const href = link.getAttribute("href") ?? "";
-    if (placeFor(href).kind !== "here") link.href = apiUrl(href);
+    if (placeFor(href).kind === "here") continue;
+    link.href = apiUrl(href);
+    if (!ATTACHMENT.test(href)) continue;
+    link.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        const shown = link.nextElementSibling;
+        if (shown?.matches("[data-link-problem]")) shown.remove();
+        void attachmentLink(href)
+          .then(openInBrowser)
+          .catch((e: unknown) => {
+            // Where it was clicked, as a failure of something just done.
+            const problem = document.createElement("span");
+            problem.dataset.linkProblem = "";
+            problem.role = "alert";
+            problem.className = "ml-1 text-danger-ink";
+            problem.textContent = messageOf(e);
+            link.after(problem);
+          });
+      },
+      { signal: clicks.signal },
+    );
   }
   for (const image of root.querySelectorAll<HTMLImageElement>('img[src^="/api/"]')) {
     const src = image.getAttribute("src") ?? "";
@@ -79,6 +108,7 @@ function showAttachments(root: HTMLElement): (() => void) | undefined {
   }
   return () => {
     cancelled = true;
+    clicks.abort();
     for (const url of urls) URL.revokeObjectURL(url);
   };
 }
