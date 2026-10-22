@@ -93,7 +93,8 @@ issue is done.
   `~/Library/Application Support/com.villain.forge`.
 - `bun run app`: the whole app in Docker at http://localhost:7390 (one image:
   server plus built web app). `bun run app:logs` follows it.
-- `bun run seed`: local test accounts (admin and member of "Forge"); the
+- `bun run seed`: local test accounts (admin, member, and a guest in the
+  first team of "Forge"); the
   password is in `scripts/seed-dev.ts`. Needs `bun run dev` running, with
   passwords on (`FORGE_OIDC_ISSUER` empty; README, "Signing in with Code Villain").
   `bun run seed:dogfood` then describes Forge's code in the vault as

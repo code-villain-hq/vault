@@ -1,5 +1,6 @@
 // Creates local test accounts through the API: an admin with a "Forge"
-// workspace, and a member who joined it by invite link. Safe to run again.
+// workspace, a member who joined it by invite link, and a guest in its first
+// team. Safe to run again; the guest is put back in that team alone.
 // Needs `bun run dev` running. Local development only.
 
 export const BASE = process.env.FORGE_URL ?? "http://localhost:5173";
@@ -8,6 +9,7 @@ export const BASE = process.env.FORGE_URL ?? "http://localhost:5173";
 export const DEV_PASSWORD = "forge-dev-password";
 export const DEV_ADMIN = { name: "Ada Admin", email: "admin@forge.test" };
 export const DEV_MEMBER = { name: "Max Member", email: "member@forge.test" };
+export const DEV_GUEST = { name: "Gus Guest", email: "guest@forge.test" };
 
 export async function call(path: string, body: unknown, cookie?: string, method = "POST") {
   const response = await fetch(`${BASE}${path}`, {
@@ -38,10 +40,34 @@ if (import.meta.main) {
   const invite = await call(`/api/w/${workspace.id}/invites`, { role: "member" }, admin.session);
   await account(DEV_MEMBER, { invite_token: invite.body.token });
 
+  const guestInvite = await call(
+    `/api/w/${workspace.id}/invites`,
+    { role: "guest" },
+    admin.session,
+  );
+  const guest = await account(DEV_GUEST, { invite_token: guestInvite.body.token });
+  const snapshot = await call(
+    `/api/w/${workspace.id}/sync/bootstrap`,
+    undefined,
+    admin.session,
+    "GET",
+  );
+  const team = snapshot.body.records.Team?.[0];
+  if (team) {
+    const access = await call(
+      `/api/w/${workspace.id}/members/${guest.body.user.id}/access`,
+      { items: [team.id] },
+      admin.session,
+      "PUT",
+    );
+    if (access.status !== 204) throw new Error(`couldn't add the guest to ${team.name}`);
+  }
+
   console.log(
-    `Seeded ${DEV_ADMIN.email} (admin) and ${DEV_MEMBER.email} (member) in "${workspace.name}".`,
+    `Seeded ${DEV_ADMIN.email} (admin), ${DEV_MEMBER.email} (member) and ${DEV_GUEST.email} ` +
+      `(guest in ${team?.name ?? "no team"}) in "${workspace.name}".`,
   );
   console.log(
-    `Password for both: see DEV_PASSWORD in scripts/seed-dev.ts. Open ${BASE}/${workspace.url_key}`,
+    `Password for all three: see DEV_PASSWORD in scripts/seed-dev.ts. Open ${BASE}/${workspace.url_key}`,
   );
 }

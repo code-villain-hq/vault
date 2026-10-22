@@ -40,8 +40,8 @@ snapshots by hand. `bun run check` fails when they've drifted.
   `~/Library/Application Support/eu.codevillain.glyph`.
 - `bun run app`: the whole app in Docker at http://localhost:7490 (one
   image: server plus built web app). `bun run app:logs` follows it.
-- `bun run seed`: local test accounts (an admin and a member of "Villain
-  Corp") and the made-up strings in `demo/`; the password is in
+- `bun run seed`: local test accounts (an admin, a member and a guest of
+  "Villain Corp", the guest in its first language) and the made-up strings in `demo/`; the password is in
   `scripts/seed-demo.ts`. Needs `bun run dev` running, with passwords on
   (`GLYPH_OIDC_ISSUER` empty; README, "Signing in with Code Villain").
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.

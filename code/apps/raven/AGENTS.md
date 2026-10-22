@@ -34,8 +34,8 @@ Run `bun run design:sync` after changing them in the vault.
   own Postgres (7586) and server (7585), for the workspaces on this Mac,
   and signs in to servers (the Rust port, 7580, not Vite's) for the
   others. Its data is in `~/Library/Application Support/eu.codevillain.raven`.
-- `bun run seed`: the local account, its "Code Villain" workspace and a
-  few dozen calls; needs `bun run dev`. The password is in `scripts/seed.ts`.
+- `bun run seed`: the local account, its "Code Villain" workspace, a
+  few dozen calls, and Gus Guest, a guest in Raven itself; needs `bun run dev`. The password is in `scripts/seed.ts`.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, generated types and design
   copies up to date, Biome, typecheck, the bun tests (the sync kit's too),

@@ -203,7 +203,7 @@ bun run dev            # Vite alone; the mock harness is at /mock.html
 bun run release:mac    # release build, installed over /Applications
 bun run db             # Postgres for the server, in Docker on 5436
 bun run dev:server     # the server (7680) and its web app (5176) together
-bun run seed           # a test account, with a repository, a note and GitHub
+bun run seed           # a test account, with a repository, a note, GitHub and a guest
 bun run gen:types      # packages/types from crates/domain, after changing a record
 ```
 

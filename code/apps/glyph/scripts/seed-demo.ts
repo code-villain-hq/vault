@@ -1,6 +1,7 @@
 // Creates local test accounts through the API and fills their workspace with
 // the made-up villain strings in demo/: an admin with a "Villain Corp"
-// workspace, and a member who joined it by invite link. Safe to run again:
+// workspace, a member who joined it by invite link, and a guest who
+// translates its first language after the source. Safe to run again:
 // keys that are there already are left alone. Needs the server running
 // (`bun run dev`). Local development only.
 import { readdir } from "node:fs/promises";
@@ -11,6 +12,7 @@ export const BASE = process.env.GLYPH_URL ?? "http://localhost:7480";
 export const DEV_PASSWORD = "glyph-dev-password";
 export const DEV_ADMIN = { name: "Ada Admin", email: "admin@glyph.test" };
 export const DEV_MEMBER = { name: "Max Member", email: "member@glyph.test" };
+export const DEV_GUEST = { name: "Gus Guest", email: "guest@glyph.test" };
 
 const demo = new URL("../demo/", import.meta.url).pathname;
 /** Well under the server's request size limit. */
@@ -134,11 +136,27 @@ if (import.meta.main) {
   const invite = await call(`/api/w/${workspace.id}/invites`, { role: "member" }, cookie);
   await account(DEV_MEMBER, { invite_token: invite.body.token });
 
+  const guestInvite = await call(`/api/w/${workspace.id}/invites`, { role: "guest" }, cookie);
+  const guest = await account(DEV_GUEST, { invite_token: guestInvite.body.token });
+  const after = (await call(`/api/w/${workspace.id}/sync/bootstrap`, undefined, cookie, "GET")).body
+    .records;
+  const language = (after.Language ?? []).find((l: { is_source: boolean }) => !l.is_source);
+  if (language) {
+    const access = await call(
+      `/api/w/${workspace.id}/members/${guest.body.user.id}/access`,
+      { items: [language.id] },
+      cookie,
+      "PUT",
+    );
+    if (access.status !== 204) throw new Error(`couldn't add the guest to ${language.code}`);
+  }
+
   console.log(
-    `Seeded ${DEV_ADMIN.email} (admin) and ${DEV_MEMBER.email} (member) in "${workspace.name}": ` +
+    `Seeded ${DEV_ADMIN.email} (admin), ${DEV_MEMBER.email} (member) and ${DEV_GUEST.email} ` +
+      `(guest in ${language?.code ?? "no language"}) in "${workspace.name}": ` +
       `${operations.length} new records.`,
   );
   console.log(
-    `Password for both: see DEV_PASSWORD in scripts/seed-demo.ts. Open http://localhost:5174/${workspace.url_key}`,
+    `Password for all three: see DEV_PASSWORD in scripts/seed-demo.ts. Open http://localhost:5174/${workspace.url_key}`,
   );
 }
