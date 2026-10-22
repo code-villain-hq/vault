@@ -54,17 +54,21 @@ pub struct Watched {
     pub sending: bool,
 }
 
-/// The workspace's app with that service name, or 404.
-pub async fn find(pool: &PgPool, workspace_id: Uuid, key: &str) -> Result<Watched, AppError> {
+/// The workspace's app with that service name, or 404, as it is for a
+/// guest who hasn't been added to it.
+pub async fn find(pool: &PgPool, member: &Member, key: &str) -> Result<Watched, AppError> {
     const SQL: &str = "SELECT a.id, a.name, a.health_url, a.is_self, k.app_id IS NOT NULL \
         FROM apps a LEFT JOIN app_keys k ON k.app_id = a.id \
-        WHERE a.workspace_id = $1 AND a.key = $2";
+        WHERE a.workspace_id = $1 AND a.key = $2 \
+        AND ($3 OR a.id IN (SELECT app_id FROM app_access WHERE user_id = $4))";
     let row: Option<(Uuid, String, Option<String>, bool, bool)> = timed(
         "find app",
         SQL,
         sqlx::query_as(SQL)
-            .bind(workspace_id)
+            .bind(member.actor.workspace_id)
             .bind(key)
+            .bind(member.sees_every_app())
+            .bind(member.actor.user_id)
             .fetch_optional(pool),
     )
     .await?;
@@ -87,7 +91,7 @@ pub async fn new_key(
     Path((_, app)): Path<(Uuid, String)>,
 ) -> Result<Json<AppKey>, AppError> {
     member.require_admin()?;
-    let app = find(&state.pool, member.actor.workspace_id, &app).await?;
+    let app = find(&state.pool, &member, &app).await?;
     if app.is_self {
         return Err(AppError::invalid(
             "Raven records its own calls: it needs no key",

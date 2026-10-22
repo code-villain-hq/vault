@@ -52,13 +52,18 @@ pub async fn apps(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<Vec<AppSummary>>, AppError> {
+    // A guest sees the apps they've been added to.
     const SQL: &str = "SELECT a.id, a.key, k.app_id IS NOT NULL FROM apps a \
-        LEFT JOIN app_keys k ON k.app_id = a.id WHERE a.workspace_id = $1 ORDER BY a.position";
+        LEFT JOIN app_keys k ON k.app_id = a.id WHERE a.workspace_id = $1 \
+        AND ($2 OR a.id IN (SELECT app_id FROM app_access WHERE user_id = $3)) \
+        ORDER BY a.position";
     let rows: Vec<(Uuid, String, bool)> = timed(
         "list apps",
         SQL,
         sqlx::query_as(SQL)
             .bind(member.actor.workspace_id)
+            .bind(member.sees_every_app())
+            .bind(member.actor.user_id)
             .fetch_all(&state.pool),
     )
     .await?;
@@ -127,7 +132,7 @@ pub async fn health_page(
     Path((_, app)): Path<(Uuid, String)>,
 ) -> Result<Json<HealthPage>, AppError> {
     let pool = &state.pool;
-    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
+    let app = apps::find(pool, &member, &app).await?;
     let status = timed("app status", "health::status", health::status(pool, app.id)).await?;
 
     const CHECKS: &str = "SELECT floor(extract(epoch FROM checked_at) / $2)::bigint, count(*), \
@@ -341,7 +346,7 @@ pub async fn technical_page(
     Query(query): Query<WindowQuery>,
 ) -> Result<Json<TechnicalPage>, AppError> {
     let pool = &state.pool;
-    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
+    let app = apps::find(pool, &member, &app).await?;
     let secs = query.secs();
     let mut actions: Vec<ActionRow> = action_stats(pool, app.id, secs)
         .await?
@@ -443,7 +448,7 @@ pub async fn action_page(
     Query(query): Query<ActionQuery>,
 ) -> Result<Json<ActionPage>, AppError> {
     let pool = &state.pool;
-    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
+    let app = apps::find(pool, &member, &app).await?;
     let secs = WindowQuery {
         window: query.window,
     }
@@ -548,7 +553,7 @@ pub async fn call_page(
     Path((_, app, trace_id)): Path<(Uuid, String, String)>,
 ) -> Result<Json<CallPage>, AppError> {
     let pool = &state.pool;
-    let app = apps::find(pool, member.actor.workspace_id, &app).await?;
+    let app = apps::find(pool, &member, &app).await?;
     const SPANS: &str = "SELECT span_id, parent_span_id, name, kind, started_at, duration_ms, is_error, \
         error_message, http_status, version, attributes FROM spans \
         WHERE app_id = $1 AND trace_id = $2 ORDER BY started_at, (parent_span_id IS NOT NULL)";

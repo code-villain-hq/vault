@@ -2,4 +2,9 @@
 import type { Role } from "./Role";
 import type { UserInfo } from "./UserInfo";
 
-export type MemberInfo = { user: UserInfo, role: Role, joined_at: string, };
+export type MemberInfo = { user: UserInfo, role: Role, joined_at: string, 
+/**
+ * The apps they've been added to. Only a guest's matter: admins and
+ * members see them all.
+ */
+access: Array<string>, };

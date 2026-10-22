@@ -12,6 +12,7 @@
 //! [`bootstrap`] snapshot once and then follow the log with
 //! [`entries_after`].
 
+mod access;
 mod rules;
 
 use raven_domain::{Actor, Bootstrap, ModelKind, SyncAction, SyncEntry, Transaction};
@@ -19,6 +20,7 @@ use serde_json::Value;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
+pub use access::{role_changed, set_apps};
 pub use code_villain_sync::{Origin, SyncError, current_sync_id, lock_workspace, workspace_epoch};
 pub use rules::Raven;
 
@@ -61,6 +63,12 @@ pub async fn record_change(
     data: Option<Value>,
 ) -> Result<i64, SyncError> {
     code_villain_sync::record_change::<Raven>(db, actor, model, model_id, action, data).await
+}
+
+/// Whether the viewer sees only some of the workspace: for a guest, the
+/// version of what they may see; `None` for admins and members.
+pub async fn guest_access(db: &mut PgConnection, viewer: Actor) -> Result<Option<i64>, SyncError> {
+    <Raven as code_villain_sync::Rules>::guest_access(db, viewer).await
 }
 
 /// A consistent snapshot of every record the viewer syncs in the workspace.

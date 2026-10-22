@@ -14,6 +14,7 @@ export type * from "./generated/MemberInfo";
 export type * from "./generated/ModelKind";
 export type * from "./generated/Role";
 export type * from "./generated/SignupRequest";
+export type * from "./generated/UpdateAccessRequest";
 export type * from "./generated/UpdateMemberRequest";
 export type * from "./generated/UpdateProfileRequest";
 export type * from "./generated/UpdateWorkspaceRequest";

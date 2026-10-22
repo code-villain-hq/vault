@@ -58,6 +58,21 @@ impl ModelKind {
         false
     }
 
+    /// What a guest syncs: the apps they've been added to, and the admins,
+    /// the members, and the guests who share an app with them.
+    pub fn guest_view(self) -> GuestView {
+        match self {
+            ModelKind::App => {
+                GuestView::Where("t.id IN (SELECT app_id FROM app_access WHERE user_id = $viewer)")
+            }
+            ModelKind::User => GuestView::Where(
+                "t.id = $viewer OR t.role <> 'guest' OR t.id IN (SELECT o.user_id \
+                 FROM app_access o JOIN app_access mine ON mine.app_id = o.app_id \
+                 WHERE mine.user_id = $viewer)",
+            ),
+        }
+    }
+
     /// Checks the fields sent to create a record.
     pub fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         match self {
@@ -103,9 +118,8 @@ impl code_villain_sync::Model for ModelKind {
         ModelKind::validate_patch(self, data)
     }
 
-    // No guests yet: everyone syncs the whole workspace.
     fn guest_view(self) -> GuestView {
-        GuestView::All
+        ModelKind::guest_view(self)
     }
 }
 

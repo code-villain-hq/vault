@@ -39,6 +39,7 @@ pub fn router(state: AppState) -> Router {
             "/members/{user_id}",
             patch(members::update).delete(members::remove),
         )
+        .route("/members/{user_id}/access", put(members::update_access))
         .route("/invites", get(invites::list).post(invites::create))
         .route("/invites/{invite_id}", delete(invites::revoke))
         .route("/apps", get(metrics::apps))

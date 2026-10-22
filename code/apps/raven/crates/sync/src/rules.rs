@@ -16,6 +16,18 @@ impl Rules for Raven {
     type Model = ModelKind;
     const NOTIFY_CHANNEL: &'static str = NOTIFY_CHANNEL;
 
+    async fn guest_access(db: &mut PgConnection, actor: Actor) -> Result<Option<i64>, SyncError> {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT role, access_version FROM workspace_members \
+             WHERE workspace_id = $1 AND user_id = $2",
+        )
+        .bind(actor.workspace_id)
+        .bind(actor.user_id)
+        .fetch_optional(&mut *db)
+        .await?;
+        Ok(row.and_then(|(role, version)| (role == "guest").then_some(version)))
+    }
+
     async fn check_allowed(
         db: &mut PgConnection,
         actor: Actor,

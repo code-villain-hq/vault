@@ -331,3 +331,106 @@ async fn a_new_key_is_shown_once_and_says_which_app_sends(pool: PgPool) {
         .unwrap();
     assert_eq!(left, 0);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_sees_only_the_apps_an_admin_adds_them_to(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    let forge = add_app(&app, &ada, &workspace, "forge", Value::Null).await;
+    add_app(&app, &ada, &workspace, "glyph", Value::Null).await;
+    let token = app.invite(&ada, &workspace, "guest").await;
+    let gus = app.join("Gus", &token).await;
+    let gus_id: Uuid = sqlx::query_scalar("SELECT id FROM users WHERE email = 'gus@example.com'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+
+    // Added to nothing, a guest sees no app.
+    let me = app.get("/api/me", &gus).await;
+    assert_eq!(me.body["workspaces"][0]["role"], "guest");
+    assert!(app.synced_apps(&gus, &workspace).await.is_empty());
+    let health = app
+        .get(&format!("/api/w/{workspace}/apps/forge/health"), &gus)
+        .await;
+    assert_eq!(health.status, StatusCode::NOT_FOUND, "{}", health.body);
+    let epoch_before = app
+        .get(&format!("/api/w/{workspace}/sync/bootstrap"), &gus)
+        .await
+        .body["epoch"]
+        .clone();
+
+    // Only admins add guests to apps.
+    let access = format!("/api/w/{workspace}/members/{gus_id}/access");
+    let refused = app
+        .call(
+            "PUT",
+            &access,
+            Some(&gus),
+            Some(json!({ "items": [forge] })),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+    let added = app
+        .call(
+            "PUT",
+            &access,
+            Some(&ada),
+            Some(json!({ "items": [forge] })),
+        )
+        .await;
+    assert_eq!(added.status, StatusCode::NO_CONTENT, "{}", added.body);
+
+    // Now Forge, and only Forge, on every page; the guest's copy starts over.
+    let bootstrap = app
+        .get(&format!("/api/w/{workspace}/sync/bootstrap"), &gus)
+        .await;
+    assert_ne!(bootstrap.body["epoch"], epoch_before);
+    let apps = app.synced_apps(&gus, &workspace).await;
+    let keys: Vec<&str> = apps.iter().filter_map(|a| a["key"].as_str()).collect();
+    assert_eq!(keys, ["forge"]);
+    let statuses = app.get(&format!("/api/w/{workspace}/apps"), &gus).await;
+    assert_eq!(statuses.status, StatusCode::OK, "{}", statuses.body);
+    assert_eq!(statuses.body.as_array().unwrap().len(), 1);
+    assert_eq!(statuses.body[0]["key"], "forge");
+    for (key, status) in [("forge", StatusCode::OK), ("glyph", StatusCode::NOT_FOUND)] {
+        let health = app
+            .get(&format!("/api/w/{workspace}/apps/{key}/health"), &gus)
+            .await;
+        assert_eq!(health.status, status, "{key}: {}", health.body);
+    }
+
+    // A guest's Settings are their account's alone, and they change no app.
+    let members = app.get(&format!("/api/w/{workspace}/members"), &gus).await;
+    assert_eq!(members.status, StatusCode::FORBIDDEN, "{}", members.body);
+    let rename = app
+        .sync(
+            &gus,
+            &workspace,
+            json!([{ "action": "update", "model": "App", "id": forge, "data": { "name": "Mine" } }]),
+        )
+        .await;
+    assert_ne!(rename.status, StatusCode::OK, "{}", rename.body);
+
+    // Admins see whom they added where; taking it away hides Forge again.
+    let members = app.get(&format!("/api/w/{workspace}/members"), &ada).await;
+    let row = members
+        .body
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["user"]["name"] == "Gus")
+        .unwrap()
+        .clone();
+    assert_eq!(row["role"], "guest");
+    assert_eq!(row["access"], json!([forge]));
+    let removed = app
+        .call("PUT", &access, Some(&ada), Some(json!({ "items": [] })))
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{}", removed.body);
+    assert!(app.synced_apps(&gus, &workspace).await.is_empty());
+
+    // A member sees every app, whatever their access says.
+    let token = app.invite(&ada, &workspace, "member").await;
+    let grace = app.join("Grace", &token).await;
+    assert_eq!(app.synced_apps(&grace, &workspace).await.len(), 3);
+}
