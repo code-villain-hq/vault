@@ -65,6 +65,106 @@ async fn the_apps_own_server_takes_no_sign_ups_or_sign_ins(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn attachments_on_this_mac_open_with_the_apps_token_or_a_download_link(pool: PgPool) {
+    use axum::body::Body;
+    use axum::http::{Request, header};
+    use serde_json::Value;
+    use tower::ServiceExt;
+
+    let data = tempfile::tempdir().unwrap();
+    let app = App::with_state(
+        AppState::new(pool.clone(), false)
+            .on_this_mac()
+            .with_data_dir(data.path()),
+    );
+    let person = local::start(&pool, "Ada", "Notes").await.unwrap();
+    let token = local::session(&pool, person).await.unwrap();
+    let me = app.get("/api/me", &token).await;
+    let notes = me.body["workspaces"][0]["id"].as_str().unwrap().to_string();
+
+    let send = async |request: Request<Body>| app.router.clone().oneshot(request).await.unwrap();
+    let bearer = format!("Bearer {token}");
+    let json = async |response: axum::response::Response| -> Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    };
+    let upload = async |name: &str| {
+        let uploaded = send(
+            Request::post(format!("/api/w/{notes}/attachments?name={name}"))
+                .header(header::AUTHORIZATION, &bearer)
+                .header(header::CONTENT_TYPE, "application/pdf")
+                .body(Body::from(b"%PDF fake".to_vec()))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(uploaded.status(), StatusCode::OK);
+        json(uploaded).await["url"].as_str().unwrap().to_string()
+    };
+    let get = async |url: &str, authorization: Option<&str>| {
+        let mut request = Request::get(url);
+        if let Some(value) = authorization {
+            request = request.header(header::AUTHORIZATION, value);
+        }
+        send(request.body(Body::empty()).unwrap()).await
+    };
+
+    // The app sends its session as a bearer token, as it does everywhere.
+    let report = upload("report.pdf").await;
+    let fetched = get(&report, Some(&bearer)).await;
+    assert_eq!(fetched.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(fetched.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(&bytes[..], b"%PDF fake");
+    assert_eq!(get(&report, None).await.status(), StatusCode::UNAUTHORIZED);
+
+    // The browser it opens a link in has no session: a download link works
+    // there once.
+    let ask = async |url: &str, authorization: Option<&str>| {
+        let mut request = Request::post(format!("{url}/link"));
+        if let Some(value) = authorization {
+            request = request.header(header::AUTHORIZATION, value);
+        }
+        send(request.body(Body::empty()).unwrap()).await
+    };
+    assert_eq!(ask(&report, None).await.status(), StatusCode::UNAUTHORIZED);
+    let link = json(ask(&report, Some(&bearer)).await).await["url"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(link.starts_with(&format!("{report}?ticket=")));
+    let opened = get(&link, None).await;
+    assert_eq!(opened.status(), StatusCode::OK);
+    assert!(
+        opened.headers()[header::CONTENT_DISPOSITION]
+            .to_str()
+            .unwrap()
+            .starts_with("attachment")
+    );
+    assert_eq!(get(&link, None).await.status(), StatusCode::UNAUTHORIZED);
+
+    // A ticket opens only the attachment it was made for.
+    let other = upload("other.pdf").await;
+    let link = json(ask(&report, Some(&bearer)).await).await["url"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let ticket = link.split_once("?ticket=").unwrap().1;
+    let elsewhere = get(&format!("{other}?ticket={ticket}"), None).await;
+    assert_eq!(elsewhere.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(get(&link, None).await.status(), StatusCode::OK);
+
+    // No links to attachments that aren't there.
+    let missing = format!("/api/w/{notes}/attachments/{}", uuid::Uuid::now_v7());
+    assert_eq!(
+        ask(&missing, Some(&bearer)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn serve_stops_when_asked(pool: PgPool) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();

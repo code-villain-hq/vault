@@ -45,6 +45,7 @@ pub fn router(state: AppState) -> Router {
             post(attachments::upload).layer(DefaultBodyLimit::max(attachments::MAX_SIZE)),
         )
         .route("/attachments/{attachment_id}", get(attachments::download))
+        .route("/attachments/{attachment_id}/link", post(attachments::link))
         .route("/issues/{issue_id}/triage", post(drift::triage::request))
         .route("/members", get(members::list))
         .route(

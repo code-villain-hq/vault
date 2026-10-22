@@ -47,6 +47,8 @@ pub struct AppState {
     /// Origins besides the desktop app's that may call the API across
     /// origins (the dev web app, for a desktop app in development).
     pub extra_origins: Vec<String>,
+    /// Download links to attachments, not yet used.
+    pub tickets: Arc<crate::attachments::Tickets>,
 }
 
 impl AppState {
@@ -69,6 +71,7 @@ impl AppState {
             data_dir: "data".into(),
             on_this_mac: false,
             extra_origins: Vec::new(),
+            tickets: Arc::default(),
         }
     }
 
