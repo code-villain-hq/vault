@@ -113,3 +113,13 @@ On its first start Forge makes the company's workspace. The account sends
 its people within minutes, and they sign in with "Sign in with <company>".
 Nobody signs up, and there are no invites or passwords: someone in none of
 the groups is told to ask the company's admin.
+
+With Docker, build the image from `code/` and give it the settings file:
+
+```sh
+docker build -f apps/forge/Dockerfile -t forge .
+docker run -d --name forge -p 7380:7380 -v forge-data:/var/lib/forge \
+  -v ./forge.toml:/etc/forge/forge.toml:ro -e FORGE_CONFIG=/etc/forge/forge.toml forge
+```
+
+Put it behind https at `public_url`; the image serves the web app too.
