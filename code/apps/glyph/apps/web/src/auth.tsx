@@ -456,7 +456,8 @@ export function JoinPage() {
   const title = `Join ${invite.workspace_name} on Glyph`;
   const subtitle = (
     <p className="-mt-3 mb-6 text-center text-muted">
-      {invite.invited_by} invited you as {invite.role === "admin" ? "an admin" : "a member"}.
+      {invite.invited_by} invited you as{" "}
+      {{ admin: "an admin", member: "a member", guest: "a guest" }[invite.role]}.
     </p>
   );
 
