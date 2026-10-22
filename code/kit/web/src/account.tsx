@@ -17,6 +17,7 @@ import {
 import { Button } from "./button";
 import { type Confirmation, ConfirmDialog } from "./confirm";
 import { Empty, ErrorMessage, Initial, TextField } from "./controls";
+import { GroupSelect, groupHint, useGroups } from "./groups";
 import { MoreMenu } from "./page-parts";
 import { messageOf } from "./problems";
 
@@ -33,6 +34,8 @@ interface MemberInfo {
   role: Role;
   /** The ids of what they're in: teams, languages, apps or repositories. */
   access: string[];
+  /** The group of the Code Villain account their role comes from, which only the account changes. */
+  from_group?: string | null;
 }
 
 interface Invite {
@@ -85,14 +88,21 @@ export interface AccessConfig {
   noun: string;
   /** More than one: "teams". */
   plural: string;
-  /** Everything there is to add someone to, by name. */
-  useOptions: () => { id: string; name: string }[];
+  /** Everything there is to add someone to, by name; one linked to a group has its people. */
+  useOptions: () => AccessOption[];
   /**
    * Whether admins and members are in some and not others, as Forge's teams
    * are. Otherwise they reach everything, and only a guest's row says what
    * they're in.
    */
   everyone?: boolean;
+}
+
+/** Something to add someone to; one linked to a group (`group_name`) can't be picked by hand. */
+export interface AccessOption {
+  id: string;
+  name: string;
+  group_name?: string | null;
 }
 
 /** Whether a role sees only what they've been added to. */
@@ -197,7 +207,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
         <div className="page-content min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-2xl flex-col gap-10 px-6 py-8">
             <ErrorMessage>{error}</ErrorMessage>
-            {isAdmin && <WorkspaceName />}
+            {isAdmin && <WorkspaceSection onGroupChange={reload} />}
             {/* Only you are in a workspace on this Mac. */}
             {isAdmin && place.kind !== "mac" && (
               <InviteSection
@@ -263,21 +273,31 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
                               />
                             )}
                             {/* Agents can't be admins, so their role isn't a choice. */}
-                            {isAdmin && !agent ? (
-                              <RoleSelect
-                                roles={roleOptions}
-                                value={member.role}
-                                label={`Role of ${member.user.name}`}
-                                onChange={(role) =>
-                                  change(() =>
-                                    api("PATCH", `${base}/members/${member.user.id}`, { role }),
-                                  )
-                                }
-                              />
-                            ) : (
-                              <span className="text-xs text-muted capitalize">{member.role}</span>
-                            )}
-                            {isAdmin && !isMe ? (
+                            <div className="flex w-32 shrink-0 justify-end">
+                              {member.from_group ? (
+                                <span className="flex flex-col items-end px-2 text-xs whitespace-nowrap">
+                                  <span className="text-muted capitalize">{member.role}</span>
+                                  <span className="text-faint">from {member.from_group}</span>
+                                </span>
+                              ) : isAdmin && !agent ? (
+                                <RoleSelect
+                                  roles={roleOptions}
+                                  value={member.role}
+                                  label={`Role of ${member.user.name}`}
+                                  onChange={(role) =>
+                                    change(() =>
+                                      api("PATCH", `${base}/members/${member.user.id}`, { role }),
+                                    )
+                                  }
+                                />
+                              ) : (
+                                <span className="px-2 text-xs text-muted capitalize">
+                                  {member.role}
+                                </span>
+                              )}
+                            </div>
+                            {/* A role from a group is changed in the account, and so is leaving. */}
+                            {isAdmin && !isMe && !member.from_group ? (
                               <MoreMenu
                                 label={`Actions for ${member.user.name}`}
                                 items={[
@@ -419,11 +439,15 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
     );
   }
 
-  /** The workspace's name, for admins; saved when they leave the field or press Enter. */
-  function WorkspaceName() {
+  /**
+   * The workspace's name, for admins, saved when they leave the field or
+   * press Enter; and the group it follows, where the server takes groups.
+   */
+  function WorkspaceSection({ onGroupChange }: { onGroupChange: () => Promise<void> }) {
     const { place, workspace } = useWorkspace();
     const [value, setValue] = useState(workspace.name);
     const [error, setError] = useState<string | null>(null);
+    const { groups, reload } = useGroups(api, workspace.id);
     const save = async () => {
       const trimmed = value.trim();
       if (trimmed === workspace.name) return;
@@ -435,19 +459,44 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
         setValue(workspace.name);
       }
     };
+    const link = async (group: string | null) => {
+      setError(null);
+      try {
+        await api("PUT", `/api/w/${workspace.id}/group`, { group });
+      } catch (e) {
+        setError(messageOf(e));
+      }
+      await Promise.all([reload(), onGroupChange(), app.loadSession()]);
+    };
     return (
       <section>
         <h2 className="mb-3 font-medium">Workspace</h2>
-        <label className="flex items-center gap-3">
-          <span className="w-24 shrink-0 text-muted">Name</span>
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onBlur={() => void save()}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-            className="-ml-2 h-8 w-full rounded-md px-2 ui-field"
-          />
-        </label>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-3">
+            <span className="w-24 shrink-0 text-muted">Name</span>
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onBlur={() => void save()}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              className="-ml-2 h-8 w-full rounded-md px-2 ui-field"
+            />
+          </label>
+          {groups && (
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-24 shrink-0 items-center text-muted">Group</span>
+              <div className="-ml-2 flex min-w-0 flex-col items-start gap-1">
+                <GroupSelect
+                  groups={groups.groups}
+                  value={groups.group}
+                  label="Group the workspace follows"
+                  onChange={(group) => void link(group)}
+                />
+                <p className="text-xs text-muted">{groupHint(groups.group)}</p>
+              </div>
+            </div>
+          )}
+        </div>
         <ErrorMessage>{error}</ErrorMessage>
       </section>
     );
@@ -625,11 +674,7 @@ function expiresIn(date: string) {
 type RoleOption = { value: Role; label: string; hint: string };
 
 /** What someone is in, as their row says it: "All teams", "API, Design", "3 teams". */
-function accessSummary(
-  access: AccessConfig,
-  options: { id: string; name: string }[],
-  ids: string[],
-) {
+function accessSummary(access: AccessConfig, options: AccessOption[], ids: string[]) {
   const names = options.filter((o) => ids.includes(o.id)).map((o) => o.name);
   if (names.length === 0) return `No ${access.plural} yet`;
   if (options.length > 1 && names.length === options.length) return `All ${access.plural}`;
@@ -647,7 +692,7 @@ function AccessPicker({
   onChange,
 }: {
   access: AccessConfig;
-  options: { id: string; name: string }[];
+  options: AccessOption[];
   name: string;
   value: string[];
   editable: boolean;
@@ -679,26 +724,32 @@ function AccessPicker({
               )}
               {sorted.map((option) => {
                 const checked = value.includes(option.id);
+                // Its people come from the group, not from here.
+                const fromGroup = option.group_name;
                 return (
                   <Menu.CheckboxItem
                     key={option.id}
                     checked={checked}
+                    disabled={!!fromGroup}
                     closeOnClick={false}
                     onCheckedChange={(next) =>
                       onChange(
                         next ? [...value, option.id] : value.filter((id) => id !== option.id),
                       )
                     }
-                    className="ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none"
+                    className="ui-option flex cursor-default items-start gap-2 px-2 py-1.5 outline-none select-none data-disabled:opacity-60"
                   >
                     <span
-                      className={`grid size-3.5 shrink-0 place-items-center rounded-sm ${checked ? "bg-fg text-bg" : "ring-1 ring-muted ring-inset"}`}
+                      className={`mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-sm ${checked ? "bg-fg text-bg" : "ring-1 ring-muted ring-inset"}`}
                     >
                       <Menu.CheckboxItemIndicator>
                         <Check size={10} strokeWidth={3} aria-hidden="true" />
                       </Menu.CheckboxItemIndicator>
                     </span>
-                    {option.name}
+                    <span className="flex flex-col">
+                      {option.name}
+                      {fromGroup && <span className="text-xs text-muted">from {fromGroup}</span>}
+                    </span>
                   </Menu.CheckboxItem>
                 );
               })}

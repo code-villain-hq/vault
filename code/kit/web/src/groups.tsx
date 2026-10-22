@@ -1,0 +1,107 @@
+// The Code Villain account's groups, where the server takes them
+// (code/kit/scim): which group a workspace follows, and the menu that
+// links it, or a Forge team, to one.
+import { Select } from "@base-ui/react/select";
+import { ChevronsUpDown } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { RequestError } from "./api";
+
+/** What `GET /api/w/{id}/group` says: the linked group, and the groups there are. */
+export interface WorkspaceGroups {
+  group: string | null;
+  /** The account's groups, without their `-admins` and `-guests`. */
+  groups: string[];
+}
+
+/**
+ * The workspace's groups, for admins. Null while loading, and where the
+ * server doesn't take groups (404) or the viewer isn't an admin (403).
+ */
+export function useGroups(
+  api: <T>(method: string, path: string, body?: unknown) => Promise<T>,
+  workspaceId: string,
+  enabled = true,
+) {
+  const [groups, setGroups] = useState<WorkspaceGroups | null>(null);
+  const reload = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      setGroups(await api<WorkspaceGroups>("GET", `/api/w/${workspaceId}/group`));
+    } catch (e) {
+      if (!(e instanceof RequestError) || (e.status !== 404 && e.status !== 403)) throw e;
+      setGroups(null);
+    }
+  }, [api, workspaceId, enabled]);
+  useEffect(() => {
+    reload().catch(() => setGroups(null));
+  }, [reload]);
+  return { groups, reload };
+}
+
+/** What a group link does, in the group's own names. */
+export function groupHint(group: string | null) {
+  return group
+    ? `Everyone in ${group} is a member, in ${group}-admins an admin, in ${group}-guests a guest. Changed in the Code Villain account.`
+    : "No group: people join with an invite link.";
+}
+
+/** Picks one of the account's groups, or none. */
+export function GroupSelect({
+  groups,
+  value,
+  label,
+  onChange,
+}: {
+  groups: string[];
+  value: string | null;
+  label: string;
+  onChange: (group: string | null) => void;
+}) {
+  // A linked group the account no longer sends still shows what's linked.
+  const names = value && !groups.includes(value) ? [value, ...groups] : groups;
+  const items = [
+    { value: null, label: "None" },
+    ...names.map((name) => ({ value: name as string | null, label: name })),
+  ];
+  return (
+    <Select.Root
+      items={items}
+      value={value}
+      onValueChange={(next) => {
+        if (next !== value) onChange(next);
+      }}
+    >
+      <Select.Trigger
+        aria-label={label}
+        className="ui-field flex h-7 min-w-32 items-center justify-between gap-1.5 rounded-md px-2 text-xs"
+      >
+        <Select.Value />
+        <Select.Icon className="text-faint">
+          <ChevronsUpDown size={15} strokeWidth={1.75} aria-hidden="true" />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Positioner
+          className="z-50 outline-none"
+          sideOffset={4}
+          align="start"
+          alignItemWithTrigger={false}
+        >
+          <Select.Popup className="ui-menu max-h-80 min-w-44 overflow-y-auto p-1 outline-none">
+            <Select.List>
+              {items.map((item) => (
+                <Select.Item
+                  key={item.value ?? ""}
+                  value={item.value}
+                  className="ui-option flex cursor-default px-2 py-1.5 text-xs outline-none select-none"
+                >
+                  <Select.ItemText>{item.label}</Select.ItemText>
+                </Select.Item>
+              ))}
+            </Select.List>
+          </Select.Popup>
+        </Select.Positioner>
+      </Select.Portal>
+    </Select.Root>
+  );
+}

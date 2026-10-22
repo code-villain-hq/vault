@@ -1,6 +1,6 @@
 // Settings for teams, their workflows, and labels.
 import { Dialog } from "@base-ui/react/dialog";
-import { type Confirmation, ConfirmDialog } from "@code-villain/web";
+import { type Confirmation, ConfirmDialog, GroupSelect, useGroups } from "@code-villain/web";
 import { type FormEvent, useState } from "react";
 import { api, messageOf } from "./api";
 import { useLabels, useTeamStates, useTeams } from "./data";
@@ -13,8 +13,11 @@ import { useIsAdmin, useWorkspace } from "./workspace";
 
 export function TeamsSettingsPage() {
   const isAdmin = useIsAdmin();
+  const { workspace } = useWorkspace();
   const teams = useTeams();
   const [creating, setCreating] = useState(false);
+  // The account's groups, where the server takes them: a team can follow one.
+  const { groups } = useGroups(api, workspace.id, isAdmin);
 
   return (
     <>
@@ -34,7 +37,12 @@ export function TeamsSettingsPage() {
             <p className="text-muted">Teams and their workflows are set up by workspace admins.</p>
           )}
           {teams.map((team) => (
-            <TeamSettings key={team.id} teamId={team.id} editable={isAdmin} />
+            <TeamSettings
+              key={team.id}
+              teamId={team.id}
+              editable={isAdmin}
+              groups={isAdmin ? (groups?.groups ?? null) : null}
+            />
           ))}
         </div>
       </div>
@@ -112,7 +120,16 @@ function suggestKey(name: string) {
   return /^[A-Z]/.test(key) ? key : "";
 }
 
-function TeamSettings({ teamId, editable }: { teamId: string; editable: boolean }) {
+function TeamSettings({
+  teamId,
+  editable,
+  groups,
+}: {
+  teamId: string;
+  editable: boolean;
+  /** The groups it could follow; null where there are none to follow. */
+  groups: string[] | null;
+}) {
   const { sync } = useWorkspace();
   const team = useTeams().find((t) => t.id === teamId);
   const states = useTeamStates(teamId);
@@ -132,6 +149,17 @@ function TeamSettings({ teamId, editable }: { teamId: string; editable: boolean 
           }}
           className="flex-1 bg-transparent text-title font-bold outline-none"
         />
+        {groups && (
+          <span className="flex items-center gap-2 text-xs text-muted">
+            Group
+            <GroupSelect
+              groups={groups}
+              value={team.group_name}
+              label={`Group ${team.name} follows`}
+              onChange={(group_name) => sync.update("Team", team.id, { group_name })}
+            />
+          </span>
+        )}
         <label className="flex items-center gap-2 text-xs text-muted">
           Key
           <input

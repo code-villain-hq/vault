@@ -1,5 +1,6 @@
 export {
   type AccessConfig,
+  type AccessOption,
   type AccountApp,
   type AccountMe,
   type AccountPlace,
@@ -25,6 +26,7 @@ export {
 } from "./controls";
 export { useDialogFocus } from "./dialog-focus";
 export { ago, lasted } from "./format";
+export { GroupSelect, groupHint, useGroups, type WorkspaceGroups } from "./groups";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";
 export { CreateDialog, chip, MoreMenu, NewButton, RowAction } from "./page-parts";
 export {
