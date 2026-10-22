@@ -90,7 +90,8 @@ export function SpecView({ task }: { task: TaskView }) {
     if (!started && !drafting) void draft(task.id, "requirements", null).catch(fail);
   }, [pending, task.id, loaded, started, drafting, setPending, draft, fail]);
 
-  if (!loaded || !spec) return <div className="empty"><Spinner /></div>;
+  // Nothing until the spec is read: content appears when it is ready.
+  if (!loaded || !spec) return null;
   if (!repo) {
     return (
       <div className="empty">

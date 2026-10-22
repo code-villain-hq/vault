@@ -29,8 +29,10 @@ it does, feature by feature, is in
    what exists over adding a parallel version of it: one helper, one store
    action, one way to run blocking work.
 4. **Prove it.** `bun run check` must pass. It runs the guard, the
-   frontend's tests, tsc, the frontend build, clippy and the Rust tests,
-   the server's included (`scripts/check.ts`; `bun run db` first).
+   design copies' check, the frontend's tests, tsc, the frontend build,
+   rustfmt on the server, clippy, the app's and the server's Rust tests,
+   the generated types' check, then the web app's Biome, tsc, tests and
+   build (`scripts/check.ts`; `bun run db` first).
    A UI change is looked at and
    clicked through in the mock harness ([`docs/testing.md`](docs/testing.md)).
    A bug fix comes with a test that fails without it.
@@ -235,7 +237,7 @@ build does the same.
 | Path | What |
 |---|---|
 | `src-tauri/src/lib.rs` | startup, `generate_handler!` (every command's registration) |
-| `src-tauri/src/commands/` | every Tauri command, by area: `projects`, `repos` (health, Sync, Locate), `cleanup`, `tasks`, `panes`, `diff`, `jira`, `github`, `slack`, `settings`; `mod.rs` has `AppState`, `blocking`, `off_runtime` |
+| `src-tauri/src/commands/` | every Tauri command, by area: `projects`, `repos` (health, Sync, Locate), `cleanup`, `tasks`, `panes`, `diff`, `jira`, `github`, `slack`, `settings`, `workspace`, `profiles`, and more; `mod.rs` has `AppState`, `blocking`, `off_runtime` |
 | `src-tauri/src/config.rs` | `AppConfig` (what `config.json` holds), `ConfigStore`, migration |
 | `src-tauri/src/pty.rs` | panes: spawning, output buffer and throttling, stop/kill, activity state |
 | `src-tauri/src/agents.rs` | the agent CLI catalogue and how each reports its state |
@@ -244,9 +246,9 @@ build does the same.
 | `src-tauri/src/attention.rs` | agents that need you: dock count, banners; and `awake.rs`, keeping the Mac awake while one works |
 | `src-tauri/src/news.rs` | new review requests and tickets, for banners |
 | `src-tauri/src/messages.rs` | the message center's log, kept in `messages.json` |
-| `src-tauri/src/notes.rs` | repo notes, kept in `notes.json`; `commands/notes.rs` measures them against git |
+| `src-tauri/src/notes.rs` | repo notes, kept in `notes.json`, and each change queued for the workspace; `commands/notes.rs` measures them against git |
 | `src-tauri/src/runs.rs` | the run log: each agent's run, start to exit, kept in `runs.json` |
-| `src-tauri/src/integrations/` | Jira, GitHub and Slack HTTP clients |
+| `src-tauri/src/integrations/` | Jira, GitHub, Slack, the Slack bot (`slack_bot.rs`) and Grafana HTTP clients, and AWS through the `aws` CLI |
 | `src-tauri/src/secrets.rs` | tokens in the keychain |
 | `src-tauri/src/profiles.rs`, `profiles/` | profiles (§25): which one this process is, its lock, the registry `profiles.json`, launching another copy |
 | `src-tauri/src/workspace.rs`, `workspace/`, `config/shared.rs` | each profile's workspace (§25): its Postgres and server, the one-time move, what a change queues for it and what it sends back; `src/lib/workspace-sync.ts` is the window's sync client |
@@ -276,8 +278,11 @@ build does the same.
    clear is `Option<Option<T>>`.
 3. In `crates/sync/src/rules.rs`: who may write it, and any fields only the
    server may set. A test in `crates/server/tests/api.rs`.
-4. `bun run gen:types`, then add it to `Schema` and its defaults in
-   `web/src/sync.ts`.
+4. `bun run gen:types`, then add it to `Schema` in
+   `packages/types/src/sync.ts` and to its defaults in `web/src/sync.ts`.
+5. If the desktop app keeps it: add it to the window's snapshot in
+   `src/lib/workspace-sync.ts`, and to `Snapshot` and what it changes here
+   in `src-tauri/src/workspace/mirror.rs`.
 
 ## Limits
 

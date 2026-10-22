@@ -58,8 +58,9 @@ bun run check         # everything that must pass before a change is done
 notice and download a new copy.
 
 `bun run build:desktop` builds the desktop app (in
-`target/release/bundle`). It asks which server to sign in to, by default the
-Docker setup below.
+`target/release/bundle`). It offers Start on this Mac, which runs Forge's
+own Postgres (7386) and server (7385) for the workspaces on this Mac, or
+signing in to a server, by default the Docker setup below.
 
 To try drift checks, start the server with `ANTHROPIC_API_KEY` set, give a
 service a repository in the folder containing the vault (for example
@@ -81,6 +82,14 @@ see each client's own address. `bun run app:logs` follows its logs. Put `ANTHROP
 drift checks) and the `FORGE_GITHUB_*` settings (Settings → GitHub lists
 them) in a `.env` file next to
 `docker-compose.yml`, then run `bun run app` again.
+
+The server also reads `DATABASE_URL`, `FORGE_ADDR` (default
+`127.0.0.1:7380`), `FORGE_WEB_DIR`, `FORGE_DATA_DIR` (where files live, default
+`./data`), `FORGE_COOKIE_SECURE` (`0` for plain http) and
+`FORGE_MCP_ALLOWED_HOSTS`, and for drift checks `FORGE_LOCAL_REPOS_ROOT`,
+`FORGE_AI_CHECK_HOURS`, `FORGE_AI_MAX_TURNS`, `FORGE_AI_TRIAGE`,
+`FORGE_AI_MODEL` and `FORGE_AI_EFFORT` (`crates/server/src/config.rs`,
+`drift/mod.rs`, `mcp/mod.rs`, `crates/ai/src/provider.rs`).
 
 `bun run backup` saves the database and the attachments outside the
 repository, to `FORGE_BACKUP_DIR` or else `backup/forge` next to the vault;

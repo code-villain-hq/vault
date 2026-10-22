@@ -144,6 +144,11 @@ interface State {
    */
   fail: (e: unknown, opts?: ToastOpts) => void;
 
+  /**
+   * The first `refreshAll` has come back, or failed. Until then the window
+   * is Layer's mark and nothing else (WIN-4), not views of empty lists.
+   */
+  booted: boolean;
   refreshAll: () => Promise<void>;
   refreshRepos: () => Promise<void>;
   refreshRepoHealth: () => Promise<void>;
@@ -263,6 +268,9 @@ function sameMessages(a: Message[], b: Message[]): boolean {
  * rows — the PR just opened — it put back the world from before, and the
  * panel offered to open the PR again.
  */
+/** How long the splash waits for the first lists before the window opens anyway. */
+const BOOT_WAIT = 1500;
+
 const prsFetchedAt = new Map<string, number>();
 /** "ACME:review": a project and stage already told to choose a status, this run. */
 const askedFlow = new Set<string>();
@@ -370,6 +378,7 @@ export const useStore = create<State>((set, get) => {
   watchFailing: false,
   cursorIde: false,
   appActive: true,
+  booted: false,
 
   // Selecting a task is always a request to look at it.
   select: (id) => set({ selectedTask: id, tab: "terminals", view: "work" }),
@@ -443,7 +452,19 @@ export const useStore = create<State>((set, get) => {
       });
       watchOk();
     });
-    await Promise.all([settingsP, coreP]);
+    // The splash waits for both, but no longer than BOOT_WAIT: a slow git
+    // status then fills the lists in an open window rather than holding it.
+    const opened = setTimeout(() => {
+      if (!get().booted) set({ booted: true });
+    }, BOOT_WAIT);
+    try {
+      await Promise.all([settingsP, coreP]);
+    } finally {
+      clearTimeout(opened);
+      // A failed first read still opens the window: the failure is in the
+      // top bar's status, and a splash that never ends would hide it.
+      if (!get().booted) set({ booted: true });
+    }
   },
 
   refreshRepos: async () => {

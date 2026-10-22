@@ -474,8 +474,8 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
               starts the next time it is needed.
             </p>
             <div className="row">
-              <button className="ui-button" onClick={() => void openUrl("https://www.google.com/chrome/")}>
-                Get Chrome <ExternalIcon />
+              <button className="ui-button ui-button-primary" onClick={() => void openUrl("https://www.google.com/chrome/")}>
+                Get Chrome ↗
               </button>
             </div>
           </div>

@@ -19,8 +19,9 @@ reviews what the models propose before it ships.
 
 ## Stack
 
-The same as Forge and Layer: a Rust server (axum) on Postgres, with
-Forge's sync engine; a React app (Vite, Bun); and a Tauri desktop shell.
+The same as Forge and Layer: a Rust server (axum) on Postgres, with the
+studio's sync engine (`code/kit/sync`); a React app (Vite, Bun); and a
+Tauri desktop shell.
 
 ## Running it
 
@@ -47,8 +48,12 @@ Set `GLYPH_OIDC_ISSUER` (`https://id.codevillain.eu`),
 `<GLYPH_PUBLIC_URL>/api/auth/oidc/callback`), in your shell or a `.env`
 next to `docker-compose.yml`. With them, Code Villain is the only way in
 and `bun run seed` can't sign up its accounts. Without them, passwords stay
-on. The server also reads `GLYPH_ADDR`, `GLYPH_WEB_DIR` and
-`GLYPH_TRUST_FORWARDED_FOR` (`crates/server/src/config.rs`).
+on. The server also reads `DATABASE_URL`, `GLYPH_ADDR` (default
+`127.0.0.1:7480`), `GLYPH_WEB_DIR`, `GLYPH_MODELS` (default
+`./models.toml`), `GLYPH_COOKIE_SECURE` (`0` for plain http) and
+`GLYPH_TRUST_FORWARDED_FOR` (`crates/server/src/config.rs`). `bun run app`
+also takes `GLYPH_LISTEN`, the address Docker publishes it on (default
+`127.0.0.1:7490`).
 
 See [AGENTS.md](AGENTS.md) for the commands, the layout and the rules.
 

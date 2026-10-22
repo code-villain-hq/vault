@@ -1,3 +1,4 @@
+import { shortcutFree } from "@code-villain/web";
 import type { Issue, Service, WorkflowState } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
@@ -21,7 +22,7 @@ import {
   ServicePicker,
   StatusPicker,
 } from "./issue-fields";
-import { isTyping, useNewIssue } from "./new-issue";
+import { useNewIssue } from "./new-issue";
 import { buttonClass } from "./ui";
 import { useIsPending, useRecords, useWorkspace } from "./workspace";
 
@@ -225,8 +226,7 @@ export function IssueList({
   // Keyboard navigation, while no field or menu has focus.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
+      if (!shortcutFree(event)) return;
       // Letters whatever the case (Caps Lock, Shift).
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       if (key === "j" || event.key === "ArrowDown") {

@@ -1,5 +1,6 @@
 // Projects and initiatives: lists and detail pages.
 import { Dialog } from "@base-ui/react/dialog";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type {
   InitiativePatch,
   InitiativeStatus,
@@ -10,7 +11,6 @@ import type {
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Mountain } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { formatDate, useUsers } from "./data";
 import { FilterBar, FilterButton } from "./filters";
 import { Avatar, ProjectIcon } from "./icons";

@@ -1204,6 +1204,10 @@ Known gaps:
 - **SET-10** A member connecting a service the workspace has no
   connection for MUST keep it on this Mac, and send nothing: the page
   says so above the settings.
+- **SET-11** Settings MUST end with the app's name and version ("Layer
+  0.1.0"), faint and small, under whichever page is open
+  (`studio/design/behaviour.md`, "Settings"). Its title says where a crash
+  is written.
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `integrations/mod.rs` (`require_https`); the
@@ -1220,7 +1224,7 @@ Known gaps:
 | Where | What |
 |---|---|
 | `~/Library/Application Support/eu.codevillain.villain-layer/` | `config.json`: repos, tasks, settings, saved panes, the Slack threads handed to chats (BOT-4). `messages.json`: the message center (MSG-4). `notes.json`: this Mac's copy of the repo notes (MEM-7). `runs.json`: the run log (RUN-5). `postgres/`: the workspace's Postgres, its data, password and binaries (PROF-11). At agent launch also `.mcp.json` (0600), `claude-hooks.json`, `copilot-plugin/`, `opencode-plugin.js` |
-| Keychain, service `eu.codevillain.villain-layer` | one item holding every token, paired phones' included (PHONE-3), and the passwords of the browser's saved sign-ins (BRW-18) |
+| Keychain, service `eu.codevillain.villain-layer` | one item holding every token, paired phones' included (PHONE-3), the workspace's session on its server (`layer-session`, PROF-16), and the passwords of the browser's saved sign-ins (BRW-18) |
 | `~/.villain-worktrees/` (settable) | task folders, `_chat/` rooms, and `.repos/`: the app's own copy of each repo (REPO-4) |
 | a task folder | the worktrees, `AGENTS.md` and `CLAUDE.md` (task context), `TICKET.md` (PANE-13), `.spec-drafts/`: spec drafts, what was approved, and checks (SPEC-2, SPEC-6, SPEC-15), `.mcp.json`, and `.gemini/settings.json`, `PR_DESCRIPTION.md`, `PR_FEEDBACK.md`, and hand-offs too long to type (`CONFLICTS.md`, `REVIEW_COMMENTS.md`, `PR_DRAFT_REQUEST.md`, `FIRST_PROMPT.md`, `CHECKS.md` (LOOP-6), PANE-11) as they come up |
 | `~/.claude.json` | trust entries for the app's own folders only (PANE-10) |
@@ -1235,8 +1239,9 @@ the same files in `profiles/<id>/` under the config folder, a keychain item
 under `eu.codevillain.villain-layer.profile.<id>`, and its task folders in
 `~/.villain-worktrees-<id>`, each settable. Beside them, the config folder
 holds `profiles.json`, the profiles' names and when each last opened and
-quit, and a profile's folder holds `running.lock`, held by the copy that
-has it open.
+quit, and, while a sign-in is passed from one copy to another,
+`signed-in.json` (PROF-17). A profile's folder holds `running.lock`, held
+by the copy that has it open.
 
 - **DISK-1** Nothing generated MUST ever be written inside a worktree,
   where it would end up in a commit. The one exception is a spec the user
@@ -1292,15 +1297,23 @@ to fix on Repos. A running agent or chat is a live dot.
 - **WIN-3** A confirmation MUST open with Cancel focused, so Enter never
   confirms a delete by accident (`studio/design/behaviour.md`, "Confirming").
 
-Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Confirm`), `src-tauri/capabilities/default.json`.
+- **WIN-4** Starting up MUST show Layer's mark, breathing, and nothing
+  else, until the first read of repositories, tasks, panes and settings has
+  come back or failed; then the window. A view never shows a spinner or a
+  skeleton while it waits: it shows its content once it has it
+  (`studio/design/behaviour.md`, "Empty and loading").
+
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Confirm`), `Splash.tsx`, `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 
 What agents learned about a repository that holds beyond one task, kept by
-the app and given to the next task on that repository. Notes are personal:
-they stay on this machine and never go into the repository, whose own
-`AGENTS.md`/`CLAUDE.md` is where a team's knowledge belongs. Each repo in
-the Repos view has a Notes list, to read, edit, check and delete them.
+the app and given to the next task on that repository. Notes belong to the
+workspace (MEM-7), so everyone in it reads the same ones; a repository with
+no `origin` keeps its notes on this Mac only (PROF-12). They never go into
+the repository, whose own `AGENTS.md`/`CLAUDE.md` is where what holds for
+everyone who clones it belongs. Each repo in the Repos view has a Notes
+list, to read, edit, check and delete them.
 
 - **MEM-1** A note MUST be about the repository, not a task: how to build
   or test it, a trap in its setup, where something lives, a convention its
@@ -2635,9 +2648,10 @@ profile.
 
 A workspace can live on a Layer server instead, shared with a team: the
 studio's is `layer.codevillain.eu`, signed in to with Code Villain. It is
-the same workspace in the browser, where its members change the shared
-setup, and in each member's Layer, where their tasks and agents stay on
-their own Mac.
+the same workspace in the browser and in each member's Layer, where their
+tasks and agents stay on their own Mac. Every member changes the
+repositories, their notes and the agents' models; only admins change the
+connections and the log sources.
 
 The workspace button at the foot of the task list names the window's
 workspace. Its menu lists every workspace, those on this Mac first, then
@@ -2779,8 +2793,6 @@ Known gaps:
 - Installing an update replaces the app under every open profile, and all
   of them quit. The next launch reopens them (PROF-7).
 - A repository removed from the workspace elsewhere stays here.
-- Settings shows a server workspace's shared connection settings as fields
-  anyone may change; the server refuses what a member may not.
 - A workspace on this Mac cannot move to a server yet.
 - Signing up on a server whose accounts have passwords happens in the
   browser, from the invite link.

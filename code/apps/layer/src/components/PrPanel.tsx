@@ -9,7 +9,7 @@ import { useStore } from "../store";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
 import { ChevronIcon, CopyIcon, ExternalIcon, PlusIcon } from "./icons";
-import { Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
+import { BusyLabel, Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 import { PrFeedback } from "./PrFeedback";
 import { Outgoing } from "./Outgoing";
 import { PrReadErrors } from "./PrReadErrors";
@@ -351,7 +351,7 @@ export function PrPanel({
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub or GitHub Enterprise to open pull requests and read CI from here.</p>
-        <button className="ui-button" onClick={() => toggleSettings(true)}>Open settings</button>
+        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect GitHub</button>
       </div>
     );
   }
@@ -463,8 +463,7 @@ export function PrPanel({
           <b>Pull requests</b>
         )}
         <div className="spacer" />
-        {loading && <Spinner />}
-        <button className="ui-button" onClick={() => void load()}>Refresh</button>
+        <button className="ui-button" onClick={() => void load()}><BusyLabel busy={loading} idle="Refresh" working="Refreshing…" /></button>
         <button className="ui-button" disabled={busy} onClick={() => void push()}>
           Push all
         </button>

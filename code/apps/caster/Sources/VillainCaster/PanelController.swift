@@ -28,6 +28,7 @@ private final class PanelBackground: NSView {
 
 final class LauncherPanel: NSPanel {
     var onScreenshot: (() -> Void)?
+    var onSettings: (() -> Void)?
     var onCancel: (() -> Void)?
 
     override var canBecomeKey: Bool { true }
@@ -57,6 +58,9 @@ final class LauncherPanel: NSPanel {
                 return NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: self)
             case "a":
                 return NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self)
+            case ",":
+                onSettings?()
+                return true
             default:
                 break
             }
@@ -113,6 +117,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         configureField()
         configureTable()
         panel.onScreenshot = { [weak self] in self?.captureScreenshot() }
+        // ⌘, opens settings, as in every desktop app (studio/design/behaviour.md).
+        panel.onSettings = { [weak self] in
+            self?.hide()
+            SettingsWindowController.shared.show()
+        }
         panel.onCancel = { [weak self] in self?.hide() }
         engine.refreshApps()
     }
@@ -145,7 +154,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             DispatchQueue.main.async {
                 guard let self else { return }
                 if captured {
-                    self.showScreenshotFeedback("📸 saved to Desktop")
+                    self.showScreenshotFeedback("Saved to Desktop.")
                 } else {
                     self.captureViewRender(to: url)
                 }
@@ -156,9 +165,10 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private func captureViewRender(to url: URL) {
         do {
             try renderPNG(to: url)
-            showScreenshotFeedback("📸 saved (panel only — grant Screen Recording)")
+            showScreenshotFeedback("Saved the panel only. Allow Screen Recording to include the desktop.")
         } catch {
             NSLog("Caster screenshot failed: \(error)")
+            showScreenshotFeedback("Couldn't save the screenshot. Try again.", isProblem: true)
         }
     }
 
@@ -171,8 +181,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         try data.write(to: url)
     }
 
-    private func showScreenshotFeedback(_ message: String) {
+    /// A problem reads in the danger ink, where it happened
+    /// (studio/design/behaviour.md, "Errors").
+    private func showScreenshotFeedback(_ message: String, isProblem: Bool = false) {
         inlineResultField.stringValue = message
+        inlineResultField.textColor = isProblem ? Nightshade.dangerInk : Nightshade.muted
         inlineResultField.isHidden = false
         relayout()
     }
@@ -339,9 +352,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             field.frame = NSRect(x: inputSidePadding, y: fieldY,
                                  width: panelWidth - inputSidePadding * 2, height: fieldHeight)
         } else {
-            // Split the input row: query on the left, "= result" on the right.
+            // Split the input row: query on the left, the screenshot message
+            // on the right, wide enough for "Couldn't save the screenshot.
+            // Try again." whole.
             inlineResultField.sizeToFit()
-            let labelWidth = min(inlineResultField.frame.width, panelWidth * 0.5)
+            let labelWidth = min(inlineResultField.frame.width, panelWidth * 0.6)
             inlineResultField.frame = NSRect(x: panelWidth - inputSidePadding - labelWidth, y: fieldY,
                                              width: labelWidth, height: fieldHeight)
             field.frame = NSRect(x: inputSidePadding, y: fieldY,

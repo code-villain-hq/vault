@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { markStopping, useStore } from "../store";
 import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
 import { Ago } from "./Ago";
-import { ErrorMessage, SidebarToggle, Spinner, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, SidebarToggle, useFailure } from "./ui";
 
 /**
  * Every agent, one card each.
@@ -169,11 +169,7 @@ const AgentCard = memo(function AgentCard({
           disabled={stopping}
           onClick={() => void onStop(pane.id)}
         >
-          {stopping ? (
-            <span className="btn-busy"><Spinner />Stopping…</span>
-          ) : (
-            "Stop"
-          )}
+          <BusyLabel busy={stopping} idle="Stop" working="Stopping…" />
         </button>
       )}
     </div>

@@ -1,7 +1,7 @@
 # The studio's sync engine: notes for coding agents
 
-Every app with a server keeps its workspaces in sync with this engine. Forge
-and Glyph use it; the next app does too. The engine knows the protocol, the
+Every app with a server keeps its workspaces in sync with this engine.
+Forge, Glyph, Raven and Layer use it; the next app does too. The engine knows the protocol, the
 tables and the feed; each app brings its models and its rules.
 
 ## Layout
@@ -11,8 +11,9 @@ tables and the feed; each app brings its models and its rules.
   it over the WebSocket (`follow`) and wakes the feed on Postgres NOTIFY
   (`listen`).
 - `client`: the TypeScript package `@code-villain/sync-client`: the local
-  store in IndexedDB, the outbox, the feed and a `FakeServer` for tests. It
-  also holds the protocol's types (`Sync`).
+  store in IndexedDB, the outbox and the feed. It also holds the
+  protocol's types (`Sync`). `FakeServer` is for the client's own tests,
+  and isn't exported.
 - `schema.sql`: the tables the engine needs, for reference. Each app keeps
   them in its own migrations, which sqlx has already applied in its
   databases, so they aren't moved here.
@@ -34,5 +35,5 @@ tables and the feed; each app brings its models and its rules.
 
 A change here changes every app. Keep the protocol as it is unless every app
 moves with it, and keep app rules out: they go behind `Rules`. Check with
-`bun run check` in Forge and in Glyph; both run the client's tests and build
-the crate (CI runs them when `code/kit/sync` changes).
+`bun run check` in Forge, Glyph, Raven and Layer; each runs the client's
+tests and builds the crate (CI runs all four when `code/kit` changes).

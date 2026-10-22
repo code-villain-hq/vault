@@ -221,6 +221,7 @@ const RESERVED_URL_KEYS: &[&str] = &[
     "settings",
     "signed-in",
     "signup",
+    "start",
 ];
 
 /// A URL key based on a workspace name: lowercase letters, digits and dashes.
@@ -282,6 +283,7 @@ mod tests {
         assert_eq!(url_key_from("???"), "workspace");
         assert_eq!(url_key_from("Login"), "login-team");
         assert_eq!(url_key_from("Signed in"), "signed-in-team");
+        assert_eq!(url_key_from("Start"), "start-team");
         assert!(url_key_from(&"a".repeat(80)).len() <= 32);
     }
 }

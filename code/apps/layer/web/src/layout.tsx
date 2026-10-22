@@ -1,5 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
 import {
+  AppVersion,
+  Redirect,
+  SearchButton,
+  ShortcutsButton,
+  SyncIndicator,
+} from "@code-villain/web";
+import {
   Link,
   Outlet,
   useLocation,
@@ -17,9 +24,9 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { LayerMenus } from "./commands";
 import { Initial, NavIcon } from "./icons";
 import { isDesktop } from "./platform";
-import { Redirect } from "./redirect";
 import { bundled, type Place, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
@@ -29,9 +36,8 @@ import {
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";
-import { SyncIndicator } from "./sync-indicator";
 import { AuthScreen, Button, Splash } from "./ui";
-import { useWorkspace, WorkspaceProvider } from "./workspace";
+import { useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in.
@@ -167,6 +173,7 @@ function Shell() {
       <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
         <Outlet />
       </main>
+      <LayerMenus />
     </div>
   );
 }
@@ -176,7 +183,7 @@ const navLinkBase =
   "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-muted";
 const navLink = `${navLinkBase} text-fg`;
 
-/** The last page outside settings, where "Back" returns. */
+/** The last page outside settings, where "Back to app" returns. */
 let lastPagePath: string | null = null;
 
 function Sidebar() {
@@ -202,6 +209,7 @@ function Sidebar() {
               <span className="font-display text-wordmark font-bold">Layer</span>
             </div>
           )}
+          <SearchButton />
         </div>
         <div className="workspace-switcher">
           <WorkspaceMenu />
@@ -209,23 +217,34 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <WorkspaceNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator />
+        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
+        <ShortcutsButton />
       </div>
     </aside>
   );
 }
 
-/** What the workspace shares. */
+/** What the workspace shares; each title names its "G" key. */
 function WorkspaceNav() {
   const { workspace } = useWorkspace();
   const params = { workspace: workspace.url_key };
   return (
     <nav aria-label="Workspace" className="flex flex-col gap-0.5">
-      <Link to="/$workspace/repositories" params={params} className={navLink}>
+      <Link
+        to="/$workspace/repositories"
+        params={params}
+        className={navLink}
+        title="Repositories (G then R)"
+      >
         <NavIcon icon={FolderGit2} />
         Repositories
       </Link>
-      <Link to="/$workspace/connections" params={params} className={navLink}>
+      <Link
+        to="/$workspace/connections"
+        params={params}
+        className={navLink}
+        title="Connections (G then C)"
+      >
         <NavIcon icon={Plug} />
         Connections
       </Link>
@@ -250,7 +269,7 @@ function SettingsNav() {
         className={`${navLinkBase} text-muted`}
       >
         <NavIcon icon={ArrowLeft} />
-        Back
+        Back to app
       </a>
       <nav aria-label="Workspace settings" className="flex flex-col gap-0.5">
         <span className="px-2 pb-1 text-xs text-faint">Workspace</span>
@@ -266,6 +285,7 @@ function SettingsNav() {
           Account
         </Link>
       </nav>
+      <AppVersion name="Layer" />
     </>
   );
 }
@@ -333,7 +353,7 @@ function WorkspaceMenu() {
                     {entry.place === place && entry.workspace.id === workspace.id && (
                       <Check
                         size={15}
-                        strokeWidth={2}
+                        strokeWidth={1.75}
                         aria-label="Open"
                         className="ml-auto shrink-0 text-muted"
                       />

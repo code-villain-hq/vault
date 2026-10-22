@@ -637,6 +637,8 @@ const SIMILAR_TITLES: f64 = 0.5;
 /// Open issues whose titles are like `title`, most alike first (at most 5).
 fn similar_open_issues<'a>(s: &'a Snapshot, title: &str) -> Vec<&'a Issue> {
     let words = title_words(title);
+    // The same title is always alike, even one made only of common words.
+    let same = |other: &str| other.trim().to_lowercase() == title.trim().to_lowercase();
     let mut found: Vec<(f64, &Issue)> = s
         .issues
         .iter()
@@ -648,7 +650,14 @@ fn similar_open_issues<'a>(s: &'a Snapshot, title: &str) -> Vec<&'a Issue> {
                 )
             })
         })
-        .map(|i| (title_similarity(&words, &title_words(&i.title)), i))
+        .map(|i| {
+            let score = if same(&i.title) {
+                1.0
+            } else {
+                title_similarity(&words, &title_words(&i.title))
+            };
+            (score, i)
+        })
         .filter(|(score, _)| *score >= SIMILAR_TITLES)
         .collect();
     found.sort_by(|a, b| {
@@ -674,7 +683,15 @@ pub async fn create_issue(pool: &PgPool, actor: Actor, input: CreateIssue) -> To
                     let assignee = s
                         .user_name(i.assignee_id)
                         .unwrap_or_else(|| "unassigned".into());
-                    format!("- {}: {} ({status}, {assignee})", s.identifier(i), i.title)
+                    // Only issues waiting for an agent have a place in its queue.
+                    let queue = s.queue.get(&i.id).map_or(String::new(), |position| {
+                        format!(", queue_position {position}")
+                    });
+                    format!(
+                        "- {}: {} ({status}, {assignee}{queue})",
+                        s.identifier(i),
+                        i.title
+                    )
                 })
                 .collect();
             return Err(format!(

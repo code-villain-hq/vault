@@ -4,7 +4,7 @@ Caster is the AppKit launcher: a menu bar app with one panel on ⌘Space. Run co
 
 ## Look
 
-Caster wears Nightshade in night and day, following the system's appearance. Read `../../../studio/design/principles.md` and `../../../studio/design/components.md` before any UI change.
+Caster wears Nightshade in night and day, following the system's appearance. Read `../../../studio/design/principles.md` and `../../../studio/design/components.md` before any UI change, and `../../../studio/design/behaviour.md` before changing what Caster does: errors, empty states, keys, settings.
 
 - `Sources/VillainCaster/Design/` holds copies of the generated Swift tokens. Never edit them. Change `studio/design/tokens/*.json`, run `python3 build.py` there, then `make design` here.
 - `Nightshade.swift` turns the tokens into dynamic `NSColor`s and Atkinson fonts. Take colours, type, and radii from it. Don't use system label colours, system fonts, or hand-typed hex values.

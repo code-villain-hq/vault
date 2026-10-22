@@ -1,4 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type {
   AgentInfo,
   ApiTokenInfo,
@@ -11,7 +12,6 @@ import type {
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { AgentWorkStatus } from "./agent-work";
 import { api, messageOf } from "./api";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { timeAgo } from "./data";
 import { Avatar } from "./icons";
 import { PageHeader } from "./layout";

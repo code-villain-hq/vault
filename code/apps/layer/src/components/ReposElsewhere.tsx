@@ -2,7 +2,7 @@ import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "../lib/api";
 import type { Elsewhere } from "../lib/types-profiles";
-import { ErrorMessage, Spinner, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, useFailure } from "./ui";
 
 /**
  * The workspace's repositories with no clone on this Mac (REPO-9), each
@@ -52,7 +52,7 @@ function Row({ repo, onPlaced }: { repo: Elsewhere; onPlaced: (name: string, pat
           Locate…
         </button>
         <button className="ui-button ui-button-primary" disabled={busy !== null} onClick={() => void place("clone")}>
-          {busy === "clone" ? <span className="btn-busy"><Spinner />Cloning…</span> : "Clone"}
+          <BusyLabel busy={busy === "clone"} idle="Clone" working="Cloning…" />
         </button>
       </div>
       <div className="repo-sub">

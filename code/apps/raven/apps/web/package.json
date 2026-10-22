@@ -10,6 +10,7 @@
   "dependencies": {
     "@base-ui/react": "1.9.0",
     "@code-villain/sync-client": "workspace:*",
+    "@code-villain/web": "workspace:*",
     "@raven/types": "workspace:*",
     "@tanstack/react-router": "1.170.44",
     "@tauri-apps/api": "2.12.3",

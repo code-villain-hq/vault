@@ -1,6 +1,6 @@
 # Behaviour
 
-How every Code Villain app acts, so that Forge, Glyph, Layer and Caster feel like one studio's work. [`components.md`](components.md) covers how controls look. This page covers what the apps do: how you sign in, what a failure says, what an empty list offers, which keys work, and where settings live.
+How every Code Villain app acts, so that Forge, Glyph, Raven, Layer and Caster feel like one studio's work. [`components.md`](components.md) covers how controls look. This page covers what the apps do: how you sign in, what a failure says, what an empty list offers, which keys work, and where settings live.
 
 Forge is the reference. Where another app has the same thing, it does it the same way, in its own toolkit. An app that doesn't have the thing (Caster has no sign-in) skips the section. The site isn't an app and follows [`studio/brand/`](../brand/).
 

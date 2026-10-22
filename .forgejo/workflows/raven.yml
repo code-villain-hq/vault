@@ -1,6 +1,7 @@
 # `bun run check` for Raven on every push that touches it: fmt, clippy and
-# the Rust tests (the desktop shell too), design copies up to date, Biome, tsc and the web build.
-# It runs on the MacBook's runner (label `macos`).
+# the Rust tests (the desktop shell too), generated types and design copies
+# up to date, Biome, tsc, the bun tests (the sync kit's too) and the web
+# build. It runs on the MacBook's runner (label `macos`).
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a
 # pull request from someone else's fork would run their code there.
@@ -11,6 +12,7 @@ on:
   push:
     paths:
       - "code/apps/raven/**"
+      - "code/kit/**"
       - "studio/design/tokens/**"
       - "studio/design/components.css"
       - "studio/brand/mark/raven.svg"
@@ -29,6 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bun install --frozen-lockfile
+      # The tests need Postgres: the same container as local development
+      # (port 5435), started if it isn't running. Each test gets a database
+      # of its own and drops it, so the dev data is never touched.
+      - run: bun run db
       # The Rust build is kept between jobs, so a push recompiles what
-      # changed, not the whole app. The tests don't need Postgres yet.
+      # changed, not the whole app.
       - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/raven-target" bun run check

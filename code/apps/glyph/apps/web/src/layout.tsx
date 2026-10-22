@@ -1,5 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
 import {
+  AppVersion,
+  Redirect,
+  SearchButton,
+  ShortcutsButton,
+  SyncIndicator,
+} from "@code-villain/web";
+import {
   Link,
   Outlet,
   useLocation,
@@ -21,10 +28,10 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
+import { GlyphMenus } from "./commands";
 import { Initial, NavIcon } from "./icons";
 import { isDesktop } from "./platform";
-import { Redirect } from "./redirect";
 import { bundled, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
@@ -34,9 +41,8 @@ import {
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";
-import { SyncIndicator } from "./sync-indicator";
 import { AuthScreen, Button, Splash } from "./ui";
-import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
+import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in; the desktop app
@@ -147,53 +153,15 @@ export function PageHeader({
   );
 }
 
-/** "G" then a letter goes to a page, as in Forge. */
-const GO_TO: Record<string, string> = {
-  o: "/$workspace",
-  t: "/$workspace/translations",
-  r: "/$workspace/review",
-  l: "/$workspace/glossary",
-  i: "/$workspace/import",
-};
-
-/** True while the key goes to a field, so letters are typed rather than shortcuts. */
-function isTyping(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-  );
-}
-
 /** The workspace frame: sidebar and page. */
 function Shell() {
-  const { workspace } = useWorkspace();
-  const navigate = useNavigate();
-  useEffect(() => {
-    let pendingG = 0;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
-      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
-      const key = event.key.toLowerCase();
-      if (key === "g") {
-        pendingG = event.timeStamp;
-        return;
-      }
-      const page = GO_TO[key];
-      if (page && event.timeStamp - pendingG < 1500) {
-        event.preventDefault();
-        pendingG = 0;
-        void navigate({ to: page, params: { workspace: workspace.url_key } });
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [navigate, workspace.url_key]);
   return (
     <div className="app-shell flex h-full bg-bg">
       <Sidebar />
       <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
         <Outlet />
       </main>
+      <GlyphMenus />
     </div>
   );
 }
@@ -229,6 +197,7 @@ function Sidebar() {
               <span className="font-display text-wordmark font-bold">Glyph</span>
             </div>
           )}
+          <SearchButton />
         </div>
         <div className="workspace-switcher">
           <WorkspaceMenu />
@@ -236,7 +205,8 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <AppNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator />
+        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
+        <ShortcutsButton />
       </div>
     </aside>
   );
@@ -338,6 +308,7 @@ function SettingsNav() {
           Account
         </Link>
       </nav>
+      <AppVersion name="Glyph" />
     </>
   );
 }
@@ -405,7 +376,7 @@ function WorkspaceMenu() {
                     {entry.place === place && entry.workspace.id === workspace.id && (
                       <Check
                         size={15}
-                        strokeWidth={2}
+                        strokeWidth={1.75}
                         aria-label="Open"
                         className="ml-auto shrink-0 text-muted"
                       />

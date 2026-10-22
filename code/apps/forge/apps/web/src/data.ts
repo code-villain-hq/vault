@@ -1,4 +1,5 @@
 // Derived views of the synced records: lookups, identifiers, ordering.
+import { ago } from "@code-villain/web";
 import type {
   Decision,
   Issue,
@@ -139,20 +140,8 @@ export function formatDate(date: string | null) {
   });
 }
 
-const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-
-/** "just now", "5 minutes ago", "yesterday", then a date. */
-export function timeAgo(iso: string, now = Date.now()) {
-  const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
-  if (Math.abs(seconds) < 60) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (Math.abs(minutes) < 60) return RELATIVE.format(minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return RELATIVE.format(hours, "hour");
-  const days = Math.round(hours / 24);
-  if (Math.abs(days) < 7) return RELATIVE.format(days, "day");
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+/** "just now", "5 minutes ago", "yesterday", then a date: the kit's words. */
+export const timeAgo = ago;
 
 /** "12 min", "2 h 5 min": how long something has been going. */
 export function duration(iso: string, now = Date.now()) {

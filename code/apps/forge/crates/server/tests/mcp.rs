@@ -1535,6 +1535,18 @@ async fn agents_see_similar_open_issues_before_filing(pool: PgPool) {
     create_issue(pool, s.agent, new_issue(duplicate, "Todo", None))
         .await
         .unwrap();
+
+    // The same title is always alike, even one made only of common words.
+    create_issue(pool, s.agent, new_issue("What is this?", "Todo", None))
+        .await
+        .unwrap();
+    let error = create_issue(pool, s.agent, new_issue(" what is THIS? ", "Todo", None))
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains(": What is this? (Todo, unassigned)"),
+        "{error}"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -2407,6 +2419,17 @@ async fn agents_take_their_issues_in_queue_order(pool: PgPool) {
     let issue = parse(get_issue(pool, s.agent, issue_ref("FOR-4")).await.unwrap());
     assert_eq!(issue["title"], "Started");
     assert_eq!(issue["queue_position"], 2);
+
+    // So do the similar issues create_issue shows before filing.
+    let similar = create_issue(pool, s.agent, new_issue("Urgent", "Todo", None))
+        .await
+        .unwrap_err();
+    assert!(similar.contains("FOR-2: Urgent (Todo, "), "{similar}");
+    assert!(similar.contains(", queue_position 1)"), "{similar}");
+    let waiting = create_issue(pool, s.agent, new_issue("Waiting for review", "Todo", None))
+        .await
+        .unwrap_err();
+    assert!(!waiting.contains("queue_position"), "{waiting}");
 
     // People have no queue: their issues have no place in one.
     move_issue(pool, s.agent, "FOR-1", None, Some("Ada")).await;

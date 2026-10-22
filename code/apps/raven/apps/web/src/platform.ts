@@ -1,8 +1,9 @@
 // What differs between the browser and the desktop app. Desktop features
 // load only inside the desktop app, so the web bundle doesn't need them.
 
-/** True inside the Tauri desktop app. */
-export const isDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+import { isDesktop } from "@code-villain/web";
+
+export { isDesktop };
 
 /**
  * In the desktop app, links to other sites open in the browser instead of

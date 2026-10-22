@@ -47,7 +47,7 @@ describe("parseFile", () => {
   });
 
   test("a value keeps its quotes and colons", () => {
-    expect(parseFile('{"hint":"Say \\"hi\\": HH:mm"}', "t")[0].value).toBe('Say "hi": HH:mm');
+    expect(parseFile('{"hint":"Say \\"hi\\": HH:mm"}', "t")[0]?.value).toBe('Say "hi": HH:mm');
   });
 
   test("files that aren't keys and texts are refused", () => {

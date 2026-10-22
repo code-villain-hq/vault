@@ -1,11 +1,11 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { Translation } from "@glyph/types";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { ChevronDown, Copy, Search, Sparkles, Trash2, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { messageOf } from "./api";
 import { deleteKey, deleteNamespace, renameNamespace, transactInBatches } from "./bulk";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import {
   DEFAULT_NAMESPACE,
   type Entry,

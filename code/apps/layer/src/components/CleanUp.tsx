@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, errMessage, failureText } from "../lib/api";
 import type { Cleaned, CleanupItem } from "../lib/types";
-import { ErrorMessage, Modal, Spinner, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Modal, useFailure } from "./ui";
 
 const SECTIONS: { kind: CleanupItem["kind"]; title: string }[] = [
   { kind: "folder", title: "Task folders no task uses" },
@@ -81,7 +81,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
     <>
       <button className="ui-button" disabled={running} onClick={onClose}>Cancel</button>
       <button className="ui-button ui-button-danger" disabled={running || picked.size === 0} onClick={() => void run()}>
-        {running ? <span className="btn-busy"><Spinner />Removing…</span> : `Remove ${picked.size}`}
+        <BusyLabel busy={running} idle={`Remove ${picked.size}`} working="Removing…" />
       </button>
     </>
   );
@@ -97,9 +97,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
     >
       {broken ? (
         <ErrorMessage>{broken}</ErrorMessage>
-      ) : items === null ? (
-        <div className="muted"><span className="btn-busy"><Spinner />Looking through task folders and copies…</span></div>
-      ) : items.length === 0 ? (
+      ) : items === null ? null : items.length === 0 ? (
         <div className="muted">Nothing to clean up: every folder, branch and copy is in use.</div>
       ) : (
         <>

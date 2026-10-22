@@ -26,7 +26,7 @@ enum Help {
         ("macwindow", "maximize", "Monitor size minus the menu bar"),
         ("rectangle.on.rectangle", "move window", "Send focused window to the next display"),
         ("moon.zzz", "sleep / lock / trash / dark", "Sleep Mac, lock screen, empty trash, toggle dark mode"),
-        ("keyboard", "Esc close · ⌘S / ⌘⇧S screenshot", "Empty input shows your most-used items"),
+        ("keyboard", "Esc close · ⌘S / ⌘⇧S screenshot · ⌘, settings", "Empty input shows your most-used items"),
     ].map { symbol, title, subtitle in
         ResultItem(icon: symbolIcon(symbol, title), title: title, subtitle: subtitle, action: nil)
     }

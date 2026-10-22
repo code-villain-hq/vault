@@ -1,4 +1,11 @@
 import { Menu } from "@base-ui/react/menu";
+import {
+  AppVersion,
+  Redirect,
+  SearchButton,
+  ShortcutsButton,
+  SyncIndicator,
+} from "@code-villain/web";
 import type { App } from "@raven/types";
 import {
   Link,
@@ -18,11 +25,11 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { createContext, type ReactNode, useContext, useEffect, useMemo } from "react";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { useApi } from "./api";
+import { RavenMenus } from "./commands";
 import { Initial, NavIcon } from "./icons";
 import { isDesktop } from "./platform";
-import { Redirect } from "./redirect";
 import { bundled, type Place, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
@@ -32,7 +39,6 @@ import {
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";
-import { SyncIndicator } from "./sync-indicator";
 import type { AppSummary, Level } from "./types";
 import { AuthScreen, Button, buttonClass, Splash } from "./ui";
 import {
@@ -296,25 +302,9 @@ export function NotAvailableOffline({
   );
 }
 
-/** "G" then a letter goes to a page of the open app, as in Forge. */
-const GO_TO: Record<string, string> = {
-  h: "/$workspace/$app",
-  t: "/$workspace/$app/technical",
-};
-
-/** True while the key goes to a field, so letters are typed rather than shortcuts. */
-function isTyping(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-  );
-}
-
 /** The workspace frame: sidebar and page, with the apps' statuses for both. */
 function Shell() {
   const { workspace } = useWorkspace();
-  const app = useAppKey();
-  const navigate = useNavigate();
   const { data, error } = useApi<AppSummary[]>(`/api/w/${workspace.id}/apps`);
   const statuses = useMemo(
     () => ({
@@ -323,26 +313,6 @@ function Shell() {
     }),
     [data, error],
   );
-  useEffect(() => {
-    let pendingG = 0;
-    const onKey = (event: KeyboardEvent) => {
-      if (!app || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
-      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
-      const key = event.key.toLowerCase();
-      if (key === "g") {
-        pendingG = event.timeStamp;
-        return;
-      }
-      const page = GO_TO[key];
-      if (page && event.timeStamp - pendingG < 1500) {
-        event.preventDefault();
-        pendingG = 0;
-        void navigate({ to: page, params: { workspace: workspace.url_key, app } });
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [navigate, workspace.url_key, app]);
   return (
     <Statuses.Provider value={statuses}>
       <div className="app-shell flex h-full bg-bg">
@@ -351,6 +321,7 @@ function Shell() {
           <Outlet />
         </main>
       </div>
+      <RavenMenus />
     </Statuses.Provider>
   );
 }
@@ -418,6 +389,7 @@ function Sidebar() {
               <span className="font-display text-wordmark font-bold">Raven</span>
             </div>
           )}
+          <SearchButton />
         </div>
         <div className="workspace-switcher">
           <WorkspaceMenu />
@@ -425,7 +397,8 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <AppNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator />
+        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
+        <ShortcutsButton />
       </div>
     </aside>
   );
@@ -532,6 +505,7 @@ function SettingsNav() {
           Account
         </Link>
       </nav>
+      <AppVersion name="Raven" />
     </>
   );
 }
@@ -599,7 +573,7 @@ function WorkspaceMenu() {
                     {entry.place === place && entry.workspace.id === workspace.id && (
                       <Check
                         size={15}
-                        strokeWidth={2}
+                        strokeWidth={1.75}
                         aria-label="Open"
                         className="ml-auto shrink-0 text-muted"
                       />

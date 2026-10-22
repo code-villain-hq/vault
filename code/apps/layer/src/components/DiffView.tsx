@@ -11,7 +11,7 @@ import { lineOf, parseDiff, toTree, type DiffLine, type Node } from "../lib/diff
 import { NoteCard, NoteEditor } from "./DiffNote";
 import { DiffCode, useDiffColours } from "./DiffCode";
 import { ChevronIcon } from "./icons";
-import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
 import { dragGrip } from "../lib/drag";
 import { read, write } from "../lib/persist";
 
@@ -946,11 +946,7 @@ export function DiffView({ task }: { task: TaskView }) {
                 disabled={commitBusy || !message.trim()}
                 onClick={() => void commit()}
               >
-                {commitBusy ? (
-                  <span className="btn-busy"><Spinner />Committing…</span>
-                ) : (
-                  "Commit"
-                )}
+                <BusyLabel busy={commitBusy} idle="Commit" working="Committing…" />
               </button>
             </>
           }

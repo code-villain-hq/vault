@@ -429,6 +429,16 @@ async fn updating_a_missing_record_fails_but_deleting_one_does_nothing(pool: PgP
     )
     .await;
     assert!(matches!(result, Err(SyncError::NotFound(_))), "{result:?}");
+    let nothing = apply(
+        &pool,
+        f.actor,
+        vec![update(ModelKind::Issue, missing, json!({}))],
+    )
+    .await;
+    assert!(
+        matches!(nothing, Err(SyncError::NotFound(_))),
+        "{nothing:?}"
+    );
     assert_eq!(
         apply(&pool, f.actor, vec![delete(ModelKind::Issue, missing)])
             .await

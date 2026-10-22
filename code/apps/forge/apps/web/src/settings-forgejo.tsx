@@ -1,6 +1,6 @@
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import { useCallback, useEffect, useState } from "react";
 import { api, messageOf } from "./api";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { timeAgo } from "./data";
 import { PageHeader } from "./layout";
 import { Button, ErrorMessage, TextField } from "./ui";

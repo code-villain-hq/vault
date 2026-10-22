@@ -196,9 +196,14 @@ function ManageProfiles({
 
   function rename() {
     if (!renaming) return;
+    const was = profiles.find((p) => p.id === renaming.id)?.name;
+    // Left empty or as it was: nothing to send, the field just closes.
+    if (!renaming.name.trim() || renaming.name === was) { setRenaming(null); return; }
     failure.clear();
-    api.renameProfile(renaming.id, renaming.name)
-      .then(() => { setRenaming(null); reload(); })
+    const { id } = renaming;
+    api.renameProfile(id, renaming.name)
+      // Only this field closes: Rename on another profile may have opened its own.
+      .then(() => { setRenaming((r) => (r?.id === id ? null : r)); reload(); })
       .catch(failure.fail);
   }
 
@@ -236,9 +241,17 @@ function ManageProfiles({
                 // Typing replaces the name, as renaming in Finder does.
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setRenaming({ id: p.id, name: e.target.value })}
+                // Saves when you leave it or press Enter, with no Save button
+                // (studio/design/behaviour.md); Esc keeps the old name.
+                onBlur={(e) => { if (!e.currentTarget.dataset.cancelled) rename(); }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") rename();
-                  if (e.key === "Escape") { e.stopPropagation(); setRenaming(null); }
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    // The field goes; a blur on its way out must not rename.
+                    e.currentTarget.dataset.cancelled = "1";
+                    setRenaming(null);
+                  }
                 }}
               />
             ) : (
@@ -247,12 +260,7 @@ function ManageProfiles({
                 <span className="profile-state">{p.current ? "this window" : p.open ? "open" : ""}</span>
               </span>
             )}
-            {renaming?.id === p.id ? (
-              <>
-                <button className="ui-button ui-button-primary" disabled={!renaming.name.trim()} onClick={rename}>Save</button>
-                <button className="ui-button" onClick={() => setRenaming(null)}>Cancel</button>
-              </>
-            ) : (
+            {renaming?.id === p.id ? null : (
               <>
                 <button className="ui-button" onClick={() => setRenaming({ id: p.id, name: p.name })}>Rename</button>
                 <button
@@ -288,11 +296,12 @@ function ManageProfiles({
           body={
             <>
               Its repositories, tasks, settings, connections and tokens, its notes, its messages and its
-              run log are deleted. This cannot be undone.
+              run log are deleted.
               <div className="confirm-detail">
                 Its task folders stay where they are, since they can hold work not yet committed:
                 <div><b>{deleting.worktree_root}</b></div>
               </div>
+              <div style={{ marginTop: 8 }}>This can't be undone.</div>
             </>
           }
           onCancel={() => setDeleting(null)}

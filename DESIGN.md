@@ -193,7 +193,7 @@ The gothic is the costume; Atkinson is the person inside it. Source: `studio/bra
 
 ## Layout
 
-Apps share one frame: sidebar and top bar on `bg`; content rises one step onto a rounded `panel` inset 0.5rem (`studio/design/layouts/app-window.md`). Prose keeps a 66ch measure. A spacing scale is still a draft (`studio/design/spacing.draft.md`); use rem rhythm consistently.
+Apps share one frame: sidebar and top bar on `bg` (Layer keeps a full-width top bar with its views as tabs); content rises one step onto a rounded `panel` inset 0.5rem (`studio/design/layouts/app-window.md`). Prose keeps a 66ch measure. A spacing scale is still a draft (`studio/design/spacing.draft.md`); use rem rhythm consistently.
 
 ## Elevation & Depth
 

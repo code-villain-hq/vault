@@ -10,12 +10,20 @@ Run before every commit. It stops at the first failure.
 
 | Step | What it proves |
 |---|---|
-| `bun scripts/guard.ts` | the rules in `AGENTS.md` that tools cannot check: command and event sync, nothing blocking the main thread or runtime, no panics, file sizes, docs listing every tool, CLI and event |
-| `bun test scripts` | the frontend's pure logic that has tests: the Markdown parser (`scripts/markdown.test.ts`). Kept outside `src/` because tsc has no bun types |
-| `tsc` | the frontend type-checks, including the mock harness against `types.ts` |
-| `vite build` | the frontend bundles; `tauri::generate_context!` needs `dist/` for the Rust steps |
-| `cargo clippy --all-targets -- -D warnings` | the backend, tests included, compiles clean. A warning is a failure |
-| `cargo test --lib` | the Rust tests |
+| guard (`scripts/guard.ts`) | the rules in `AGENTS.md` that tools cannot check: command and event sync, nothing blocking the main thread or runtime, no panics, file sizes, docs listing every tool, CLI and event |
+| design copies are current | `src/design/` matches the vault's `studio/design` (`bun scripts/sync-design.ts --check`) |
+| `bun test scripts` | the app's pure logic, in `scripts/*.test.ts`: the Markdown parser, the window's sync client, grouping, sorting, time and the rest. Kept outside `src/` because tsc has no bun types |
+| `tsc` (app) | the app's frontend type-checks, including the mock harness against `types.ts` |
+| `vite build` (app) | the frontend bundles; `tauri::generate_context!` needs `dist/` for the Rust steps |
+| `cargo fmt` (server) | `crates/domain`, `crates/sync` and `crates/server` are formatted |
+| `cargo clippy --workspace --all-targets -- -D warnings` | the app and the server, tests included, compile clean. A warning is a failure |
+| `cargo test` (app) | the app's Rust tests (`-p villain-layer --lib`) |
+| `cargo test` (server) | the server's, against Postgres (`bun run db`) |
+| generated types are current | `packages/types` matches `crates/domain` (`bun scripts/gen-types.ts`) |
+| Biome (web, sync kit) | the web app and the studio's sync client are linted and formatted |
+| `tsc` (web) | the web app type-checks, and its tests (`web/tsconfig.test.json`) |
+| `bun test` (web, sync kit) | the web app's tests, and the sync client's |
+| web build | the web app bundles, as the server serves it |
 
 `cargo check` alone does not compile the tests, so it passes while a test
 still calls a signature you changed.
@@ -76,6 +84,8 @@ harness is already served. Don't start a second server.
 | `task` | a task id from `src/__mock__/world.ts` (`t-login`, `t-audit`) | none, which is the All agents overview |
 | `tab` | `spec`, `terminals`, `diff`, `pr` | `terminals` |
 | `loop` | `checking`, `held`, `passed`, `gave_up`: the selected task's agents on a loop (§21) | none |
+| `spec` | `split`: ACME-123 with a spec per repository from before (SPEC-25) | none |
+| `role` | `member`: a member of the workspace, not an admin, who sees its connections read-only (SET-7) | admin |
 | `theme` | a saved theme (SET-5): `night`, `day`, `tokyo-night`, `system`, … | the app's default |
 
 For example: `/mock.html?task=t-login&tab=pr` is the PR panel with a failing

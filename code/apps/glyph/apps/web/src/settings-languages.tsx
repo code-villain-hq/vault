@@ -1,7 +1,7 @@
 import { uuidv7 } from "@code-villain/sync-client";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { Language, Operation } from "@glyph/types";
 import { type FormEvent, useState } from "react";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { DEFAULT_THRESHOLD, languageName, useLanguages, useSource } from "./data";
 import { PageHeader } from "./layout";
 import { MoreMenu } from "./page-parts";

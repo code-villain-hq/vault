@@ -12,7 +12,7 @@ on:
   push:
     paths:
       - "code/apps/forge/**"
-      - "code/kit/sync/**"
+      - "code/kit/**"
       - "studio/design/tokens/**"
       - "studio/design/components.css"
       - "studio/brand/mark/forge.svg"

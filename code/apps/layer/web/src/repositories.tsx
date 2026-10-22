@@ -1,8 +1,8 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { Note, Repository, UpdateBy } from "@layer/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { type FormEvent, useMemo, useState } from "react";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { ago } from "./format";
 import { PageBody, PageHeader } from "./layout";
 import { CreateDialog, MoreMenu } from "./page-parts";

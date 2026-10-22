@@ -78,7 +78,7 @@ export function DeleteTask({ task, onCancel, onDelete }: {
         </div>
         {dirty > 0 && (
           <div className="confirm-detail">
-            {dirty} uncommitted change{dirty === 1 ? "" : "s"} will be lost. This cannot be undone.
+            {dirty} uncommitted change{dirty === 1 ? "" : "s"} will be lost. This can't be undone.
           </div>
         )}
         {key && (

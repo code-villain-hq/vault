@@ -172,7 +172,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               ))}
             </div>
           )}
-          <div className="acp-box">
+          <div className="ui-field acp-box">
             {images.length > 0 && (
               <div className="acp-images">
                 {images.map((img, i) => (

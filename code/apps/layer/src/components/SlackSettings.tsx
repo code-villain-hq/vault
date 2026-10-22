@@ -186,12 +186,13 @@ export function SlackSettings() {
               maxLength={2000}
               value={personality}
               onChange={(e) => setPersonality(e.target.value)}
+              // Saves when you leave it, or on ⌘Enter, with no Save button
+              // (studio/design/behaviour.md).
+              onBlur={() => { if (personalityChanged) void savePersonality(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) { e.preventDefault(); e.currentTarget.blur(); } }}
               placeholder="You are Doctor Doom, monarch of Latveria. Answer as Doom: grand, imperious, speaking of yourself as Doom. Keep every fact exact."
             />
           </Field>
-          <button className="ui-button" disabled={!personalityChanged} onClick={() => void savePersonality()}>
-            Save personality
-          </button>
           <ErrorMessage>{voice.error}</ErrorMessage>
         </div>
       )}

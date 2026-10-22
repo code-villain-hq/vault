@@ -32,7 +32,11 @@ The first person to open a Raven server sets it up, with a password and a
 workspace; everyone after joins by invite. With `RAVEN_OIDC_ISSUER`,
 `RAVEN_OIDC_CLIENT_ID`, `RAVEN_OIDC_CLIENT_SECRET` and `RAVEN_PUBLIC_URL`
 set, people sign in with Code Villain and passwords are off; a new
-account still needs an invite.
+account still needs an invite. The server also reads `DATABASE_URL`,
+`RAVEN_ADDR` (default `127.0.0.1:7580`), `RAVEN_WEB_DIR` (the built web
+app, served when set), `RAVEN_COOKIE_SECURE` (`0` for plain http) and
+`RAVEN_TRUST_FORWARDED_FOR` (`1` behind a proxy that sets
+`X-Forwarded-For`), in `crates/server/src/config.rs`.
 
 A workspace is a team's apps. Its admins add the apps it watches in
 Settings → Apps, with each one's health address, and make the key the app

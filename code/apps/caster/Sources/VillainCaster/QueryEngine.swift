@@ -122,6 +122,11 @@ final class QueryEngine {
                 symbol: "circle.lefthalf.filled",
                 isAvailable: { true },
                 run: { SystemActions.toggleDarkMode() }),
+        Command(title: "Settings",
+                subtitle: "Edit your snippets",
+                symbol: "gearshape",
+                isAvailable: { true },
+                run: { SettingsWindowController.shared.show() }),
         Command(title: "Quit Caster",
                 subtitle: "Close this launcher",
                 symbol: "power",
@@ -158,7 +163,7 @@ final class QueryEngine {
             deliver(.answer(Answer(.currency, value: "…", copyValue: nil)))
             debounced(gen) { finish in
                 Currency.convert(currencyQuery) { display, copyValue in
-                    finish(.answer(Answer(.currency, value: copyValue == nil ? "No rate" : display,
+                    finish(.answer(Answer(.currency, value: copyValue == nil ? "Couldn't get a rate. Check your connection." : display,
                                           copyValue: copyValue)))
                 }
             } deliver: { deliver($0) }

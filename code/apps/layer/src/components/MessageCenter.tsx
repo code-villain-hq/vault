@@ -48,7 +48,7 @@ export function MessageCenter() {
       {clearing && (
         <Confirm
           title="Clear every message?"
-          body="The list empties for good. What comes next still lands here."
+          body="The list empties. What comes next still lands here. This can't be undone."
           confirmLabel="Clear"
           onConfirm={() => api.clearMessages()}
           onCancel={() => setClearing(false)}

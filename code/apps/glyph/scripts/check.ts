@@ -5,8 +5,10 @@ import { $ } from "bun";
 const root = new URL("..", import.meta.url).pathname;
 // The studio's sync client, which Glyph builds on (`code/kit/sync`).
 const kitClient = `${root}../../kit/sync/client`;
-// CI checks the desktop app in a job of its own, so the main check doesn't
-// wait for Tauri to build.
+// The parts every studio web app shares (`code/kit/web`).
+const kitWeb = `${root}../../kit/web`;
+// GLYPH_CHECK_SKIP_DESKTOP leaves the desktop app out, for a quicker check
+// that doesn't wait for Tauri to build. CI checks it too, in the same run.
 const crates = process.env.GLYPH_CHECK_SKIP_DESKTOP
   ? ["--workspace", "--exclude", "glyph-desktop"]
   : ["--workspace"];
@@ -38,12 +40,14 @@ const steps: [string, () => Promise<unknown>][] = [
   ["biome", () => $`bunx biome check .`.cwd(root)],
   // The kit's client, with its own settings: Biome checks only under its root.
   ["biome (sync kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitClient)],
+  ["biome (web kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitWeb)],
   ["typecheck", () => $`bun run typecheck`.cwd(root)],
   [
     "bun test",
     async () => {
       await $`bun test`.cwd(root);
       await $`bun test`.cwd(kitClient);
+      await $`bun test`.cwd(kitWeb);
     },
   ],
   ["web build", () => $`bun run --cwd apps/web build`.cwd(root).quiet()],

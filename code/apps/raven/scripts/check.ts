@@ -5,6 +5,8 @@ import { $ } from "bun";
 const root = new URL("..", import.meta.url).pathname;
 // The studio's sync client, which Raven builds on (`code/kit/sync`).
 const kitClient = `${root}../../kit/sync/client`;
+// The parts every studio web app shares (`code/kit/web`).
+const kitWeb = `${root}../../kit/web`;
 // Leaves the desktop shell out, for a quick check of the server and web app.
 const crates = process.env.RAVEN_CHECK_SKIP_DESKTOP
   ? ["--workspace", "--exclude", "raven-desktop"]
@@ -37,12 +39,14 @@ const steps: [string, () => Promise<unknown>][] = [
   ["biome", () => $`bunx biome check .`.cwd(root)],
   // The kit's client, with its own settings: Biome checks only under its root.
   ["biome (sync kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitClient)],
+  ["biome (web kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitWeb)],
   ["typecheck", () => $`bun run typecheck`.cwd(root)],
   [
     "bun test",
     async () => {
       await $`bun test`.cwd(root);
       await $`bun test`.cwd(kitClient);
+      await $`bun test`.cwd(kitWeb);
     },
   ],
   ["web build", () => $`bun run --cwd apps/web build`.cwd(root).quiet()],

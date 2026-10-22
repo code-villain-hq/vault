@@ -1,9 +1,9 @@
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { GlossaryEntry } from "@glyph/types";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Trash2, X } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { messageOf } from "./api";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { languageName, plural, useLanguages, useSource } from "./data";
 import { PageHeader } from "./layout";
 import { Empty, RowAction } from "./page-parts";

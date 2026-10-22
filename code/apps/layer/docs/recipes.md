@@ -92,6 +92,15 @@ To remove a command, undo every step, in the same commit.
 7. A field that holds data (not a preference) and is later removed drops
    that key from users' configs on the next write. Removing one is a
    decision, not a cleanup.
+8. **A field of the shared setup** (§25: a repository's, a connection's
+   shared settings, a log source's, an agent's models) goes to the
+   workspace too. Add it to the record in `crates/domain`, with a migration
+   for its column (a connection's settings are one JSON column, checked in
+   `connection.rs`), then `bun run gen:types`. Add it to what a change
+   sends, `records` (`connection_settings` for a connection) and
+   `patch_keys` in `config/shared.rs`, and to what the
+   workspace sends back, `merge` in `workspace/mirror.rs`. What is one
+   person's own (a token, the Jira email) stays out of all of them.
 
 Never add a setting for `MAX_PANES` or `RESTORE_LIMIT`.
 
@@ -180,7 +189,7 @@ Don't make the UI ask on a timer.
 5. **Files it needs** go in the app's config folder. Anything written into
    a task folder goes in `GENERATED_FILES` (`commands/panes.rs`), so
    deleting the task removes it.
-6. **Check `TRUST_MARKERS` and `LIMIT_MARKERS`** in `pty.rs` against its
+6. **Check `TRUST_MARKERS` and `LIMIT_MARKERS`** in `pty/screen.rs` against its
    wording.
 7. **Tests**: copy `each_cli_is_handed_its_hooks_and_the_server_its_own_way`
    (`agents.rs`) and `a_hook_post_moves_its_pane_by_what_that_pane_runs`

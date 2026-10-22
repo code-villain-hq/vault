@@ -15,6 +15,7 @@
         "@xterm/addon-fit": "^0.11.0",
         "@xterm/addon-webgl": "^0.19.0",
         "@xterm/xterm": "^6.0.0",
+        "lucide-react": "1.49.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
         "shiki": "4.5.0",
@@ -39,6 +40,19 @@
         "fake-indexeddb": "6.2.5",
       },
     },
+    "../../kit/web": {
+      "name": "@code-villain/web",
+      "devDependencies": {
+        "@types/bun": "1.4.3",
+        "@types/react": "19.3.0",
+      },
+      "peerDependencies": {
+        "@base-ui/react": "1.9.0",
+        "@tanstack/react-router": "1.170.44",
+        "lucide-react": "1.49.0",
+        "react": "19.3.0",
+      },
+    },
     "packages/types": {
       "name": "@layer/types",
       "dependencies": {
@@ -50,6 +64,7 @@
       "dependencies": {
         "@base-ui/react": "1.9.0",
         "@code-villain/sync-client": "workspace:*",
+        "@code-villain/web": "workspace:*",
         "@layer/types": "workspace:*",
         "@tanstack/react-router": "1.170.44",
         "@tauri-apps/api": "2.12.3",
@@ -62,6 +77,7 @@
       "devDependencies": {
         "@biomejs/biome": "2.5.15",
         "@tailwindcss/vite": "4.3.3",
+        "@types/bun": "1.4.3",
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
         "@vitejs/plugin-react": "6.1.2",
@@ -96,6 +112,8 @@
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.15", "", { "os": "win32", "cpu": "x64" }, "sha512-yAzh4UqEImV6Hcy0zjUqNfJAsUhoD64FBQCdTG8Md/Z2wQeVP/ZmJ3XRYAs1g8J9fjTFyl2fCtc5FB5til47+g=="],
 
     "@code-villain/sync-client": ["@code-villain/sync-client@workspace:../../kit/sync/client"],
+
+    "@code-villain/web": ["@code-villain/web@workspace:../../kit/web"],
 
     "@floating-ui/core": ["@floating-ui/core@1.8.0", "", { "dependencies": { "@floating-ui/utils": "^0.2.12" } }, "sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ=="],
 

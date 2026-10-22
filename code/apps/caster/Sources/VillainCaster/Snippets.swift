@@ -29,9 +29,10 @@ enum Snippets {
     }
 }
 
-/// One field per snippet on the `panel` tone, opened from the status item's
-/// right-click menu. Save is the window's one primary action.
-final class SettingsWindowController: NSWindowController {
+/// One field per snippet on the `panel` tone, opened with ⌘, in the panel or
+/// from the status item's right-click menu. A field saves when you leave it or press Enter
+/// (studio/design/behaviour.md), and the window ends with Caster's version.
+final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
     private var inputs: [String: NSTextField] = [:]
@@ -47,6 +48,7 @@ final class SettingsWindowController: NSWindowController {
         window.titlebarAppearsTransparent = true
         window.backgroundColor = Nightshade.panel
         super.init(window: window)
+        window.delegate = self
 
         let grid = NSGridView()
         grid.rowSpacing = 8
@@ -59,6 +61,7 @@ final class SettingsWindowController: NSWindowController {
             label.alignment = .right
             let box = FieldBox()
             box.widthAnchor.constraint(greaterThanOrEqualToConstant: 300).isActive = true
+            box.input.delegate = self
             inputs[field.defaultsKey] = box.input
             grid.addRow(with: [label, box])
         }
@@ -66,10 +69,10 @@ final class SettingsWindowController: NSWindowController {
         grid.rowAlignment = .none
         for row in 0..<grid.numberOfRows { grid.row(at: row).yPlacement = .center }
 
-        let saveButton = PrimaryButton(title: "Save", target: self, action: #selector(save))
-        saveButton.keyEquivalent = "\r"
-        grid.addRow(with: [NSGridCell.emptyContentView, saveButton])
-        grid.cell(for: saveButton)?.xPlacement = .trailing
+        let version = NSTextField(labelWithString: Self.nameAndVersion)
+        version.font = Nightshade.font(TypeTokens.uiSmall)
+        version.textColor = Nightshade.faint
+        grid.addRow(with: [NSGridCell.emptyContentView, version])
         grid.row(at: grid.numberOfRows - 1).topPadding = 8
 
         let content = NSView()
@@ -116,11 +119,24 @@ final class SettingsWindowController: NSWindowController {
         try data.write(to: url)
     }
 
-    @objc private func save() {
-        for (key, input) in inputs {
-            Snippets.set(input.stringValue, for: key)
-        }
-        window?.close()
+    /// "Caster 0.2.0"; just "Caster" from a bare `swift build`, which has
+    /// no Info.plist.
+    private static var nameAndVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return ["Caster", version].compactMap { $0 }.joined(separator: " ")
+    }
+
+    // Leaving a field (Tab, a click elsewhere) and Enter both end editing.
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let input = obj.object as? NSTextField,
+              let key = inputs.first(where: { $0.value === input })?.key
+        else { return }
+        Snippets.set(input.stringValue, for: key)
+    }
+
+    // Closing the window is leaving the field too: end its editing so it saves.
+    func windowWillClose(_ notification: Notification) {
+        window?.makeFirstResponder(nil)
     }
 }
 

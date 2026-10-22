@@ -1,4 +1,5 @@
 import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-client";
+import { databaseName } from "@code-villain/web";
 import type {
   AiRun,
   Comment,
@@ -68,11 +69,6 @@ export type Schema = {
   RequirementVerdict: { record: RequirementVerdict; create: never; patch: never };
   SpecChange: { record: SpecChange; create: never; patch: never };
 };
-
-/** Each person's copy of each workspace lives in its own database. */
-export function databaseName(userId: string, workspaceId: string) {
-  return `forge-${userId}-${workspaceId}`;
-}
 
 const timestamps = () => {
   const now = new Date().toISOString();

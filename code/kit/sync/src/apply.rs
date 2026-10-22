@@ -285,10 +285,15 @@ pub fn apply_operation<'a, R: Rules>(
             }
             Operation::Update { model, id, data } => {
                 model.validate_patch(data)?;
-                if data.is_empty() {
-                    return Ok(None);
-                }
                 let before = current(db, actor, *model, *id).await?;
+                if data.is_empty() {
+                    // Nothing to change, but a record that isn't there is
+                    // still refused.
+                    return match before {
+                        Some(_) => Ok(None),
+                        None => Err(SyncError::NotFound(model.name().into())),
+                    };
+                }
                 let mut data = data.clone();
                 R::prepare_update(db, actor, *model, *id, before.as_ref(), &mut data).await?;
                 let record = update::<R>(db, actor, *model, *id, &data)

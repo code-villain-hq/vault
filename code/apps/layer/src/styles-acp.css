@@ -60,9 +60,10 @@ details.acp-tool > summary::-webkit-details-marker { display: none; }
 .acp-working { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: calc(var(--acp-text) * 0.89); }
 .acp-compose { padding: 4px 18px 14px; }
 .acp-compose .acp-col { gap: 6px; }
-.acp-box { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px 6px; border: 1px solid transparent; border-radius: var(--radius-lg); background: var(--field); }
-.acp-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+/* A ui-field, for its tone and focus ring, with a larger corner. */
+.acp-box { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px 6px; border-radius: var(--radius-lg); }
 .acp-box textarea { resize: none; border: 0; background: transparent; padding: 2px; font-family: var(--font-reading); font-size: var(--acp-text); line-height: 1.45; }
+.acp-box textarea:focus { box-shadow: none; }
 .acp-images { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px; }
 .acp-image { position: relative; }
 .acp-image img { display: block; height: 64px; max-width: 160px; object-fit: cover; border-radius: var(--radius-md); }

@@ -1,5 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
 import {
+  AppVersion,
+  Redirect,
+  SearchButton,
+  ShortcutsButton,
+  SyncIndicator,
+} from "@code-villain/web";
+import {
   Link,
   Outlet,
   useLocation,
@@ -14,7 +21,6 @@ import {
   Check,
   ChevronDown,
   ChevronsUpDown,
-  CircleHelp,
   CircleUserRound,
   Folders,
   Funnel,
@@ -25,7 +31,6 @@ import {
   Mountain,
   Radar,
   Scale,
-  Search,
   Server,
   SquarePen,
   Tag,
@@ -33,13 +38,12 @@ import {
   UsersRound,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import { CommandMenu, openCommandMenu } from "./command-menu";
+import { ForgeCommandMenu } from "./command-menu";
 import { useStates, useTeams } from "./data";
 import { Initial, NavIcon, ServiceIcon } from "./icons";
 import { useDesktopNotifications, useUnreadCount } from "./inbox";
 import { type NewIssueDefaults, NewIssueProvider, useNewIssue } from "./new-issue";
 import { isDesktop } from "./platform";
-import { Redirect } from "./redirect";
 import { bundled, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
@@ -49,10 +53,9 @@ import {
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";
-import { openShortcuts, Shortcuts } from "./shortcuts";
-import { SyncIndicator } from "./sync-indicator";
+import { ForgeShortcuts } from "./shortcuts";
 import { AuthScreen, Button, Splash } from "./ui";
-import { useRecords, useWorkspace, WorkspaceProvider } from "./workspace";
+import { useRecords, useSyncStatus, useWorkspace, WorkspaceProvider } from "./workspace";
 
 /**
  * `/`: opens the workspace used last, or asks to sign in; the desktop app
@@ -187,8 +190,8 @@ function Shell() {
           <Outlet />
         </main>
       </div>
-      <CommandMenu />
-      <Shortcuts />
+      <ForgeCommandMenu />
+      <ForgeShortcuts />
     </NewIssueProvider>
   );
 }
@@ -236,16 +239,8 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <AppNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator />
-        <button
-          type="button"
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
-          onClick={openShortcuts}
-          className={`${iconButton} ml-auto`}
-        >
-          <CircleHelp size={15} strokeWidth={1.75} aria-hidden="true" />
-        </button>
+        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
+        <ShortcutsButton />
       </div>
     </aside>
   );
@@ -256,15 +251,7 @@ function SidebarActions() {
   const newIssue = useNewIssue();
   return (
     <div className="sidebar-actions flex items-center gap-1">
-      <button
-        type="button"
-        aria-label="Search and commands"
-        title="Search and commands (⌘K)"
-        onClick={openCommandMenu}
-        className={iconButton}
-      >
-        <Search size={15} strokeWidth={1.75} aria-hidden="true" />
-      </button>
+      <SearchButton />
       <button
         type="button"
         aria-label="New issue"
@@ -474,6 +461,7 @@ function SettingsNav() {
           Account
         </Link>
       </nav>
+      <AppVersion name="Forge" />
     </>
   );
 }

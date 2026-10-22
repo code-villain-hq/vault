@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
-import { useSyncStatus, useWorkspace } from "./workspace";
+
+/** What the sync client says about a workspace's copy. */
+export interface SyncState {
+  connection: "online" | "offline" | "connecting";
+  pending: number;
+  ready: boolean;
+}
 
 /** Shows whether changes are saved, waiting, or refused. */
-export function SyncIndicator() {
-  const status = useSyncStatus();
-  const refused = useLatestRefusal();
+export function SyncIndicator({
+  status,
+  refusals,
+}: {
+  status: SyncState;
+  /** Raises "refused", with the server's reason, when a change is turned down. */
+  refusals: EventTarget;
+}) {
+  const refused = useLatestRefusal(refusals);
   // Changes usually reach the server in a blink; saying "Syncing" for that
   // only makes the header flicker.
   const slow = useLasting(status.pending > 0, 1000);
@@ -44,8 +56,7 @@ function Pill({ tone, label }: { tone: "ok" | "warn" | "danger" | "muted"; label
   );
 }
 
-function useLatestRefusal(): string | null {
-  const { refusals } = useWorkspace();
+function useLatestRefusal(refusals: EventTarget): string | null {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;

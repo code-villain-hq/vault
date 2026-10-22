@@ -2,7 +2,9 @@
 // accept it into the team's workflow, close it as a duplicate, or decline it.
 // When the agent it's assigned to sent it here to ask for a decision, the
 // bar asks for that decision instead.
+
 import { Menu } from "@base-ui/react/menu";
+import { shortcutFree } from "@code-villain/web";
 import type { Issue, StateType, Suggestion, User, WorkflowState } from "@forge/types";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -20,7 +22,6 @@ import {
 import { StateIcon } from "./icons";
 import { useIssueHistory } from "./issue-activity";
 import { Markdown } from "./markdown";
-import { isTyping } from "./new-issue";
 import { Picker } from "./picker";
 import { DescriptionDiff, proposedDescription, TriageSuggestion } from "./suggestions";
 import { Button, buttonClass, ErrorMessage } from "./ui";
@@ -103,8 +104,7 @@ function PlainTriageBar({ issue }: { issue: Issue }) {
   // 1 accepts, 2 marks as a duplicate, 3 declines, as in Linear.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
-      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
+      if (!shortcutFree(event)) return;
       if (event.key === "1") moveTo(accept?.id);
       else if (event.key === "2") document.getElementById(DUPLICATE_TRIGGER)?.click();
       else if (event.key === "3") moveTo(decline?.id);
@@ -256,8 +256,7 @@ function DecisionBar({
   // 1 accepts and continues, 2 edits first, 3 declines.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
-      if (document.querySelector("[role=dialog],[role=alertdialog],[role=menu]")) return;
+      if (!shortcutFree(event)) return;
       if (event.key === "1") void acceptAndContinue();
       else if (event.key === "2" && proposal) void editFirst();
       else if (event.key === "3") void declineIssue();

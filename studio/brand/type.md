@@ -12,7 +12,7 @@ button, and nav item.
 All three are free under the SIL Open Font License. The site serves
 them from [`code/apps/site/assets/fonts/`](../../code/apps/site/assets/fonts/), with
 the licenses alongside them. The brand page reuses the same local
-font stylesheet. Forge, Layer and Glyph bundle all three; Caster bundles
+font stylesheet. Forge, Layer, Glyph and Raven bundle all three; Caster bundles
 Atkinson Hyperlegible Next, the only face it sets.
 
 ## Faces

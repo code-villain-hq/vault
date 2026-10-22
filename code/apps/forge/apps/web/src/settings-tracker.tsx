@@ -1,8 +1,8 @@
 // Settings for teams, their workflows, and labels.
 import { Dialog } from "@base-ui/react/dialog";
+import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import { type FormEvent, useState } from "react";
 import { api, messageOf } from "./api";
-import { type Confirmation, ConfirmDialog } from "./confirm";
 import { useLabels, useTeamStates, useTeams } from "./data";
 import { StateIcon } from "./icons";
 import { PageHeader } from "./layout";
