@@ -10,13 +10,13 @@ Forge is the reference. Where another app has the same thing, it does it the sam
 - A problem says what happened, then what to do. With no better fix, the second sentence is "Try again." Unknown problems read "Something went wrong. Try again."
 - Losing the server reads "Can't reach Forge. Check your connection.", with the app's own name.
 - A busy button keeps its place and changes its label: "Sign in" becomes "Signing in…". A copy button reads "Copied" for a moment.
-- Times are relative: "just now", "5 minutes ago", "yesterday", then a date ("Oct 3").
+- Times are relative: "just now", "5 minutes ago", "yesterday", then a date ("Oct 3"). A state says how long it has lasted ("Down for 12 minutes"), with the clock on hover. Where the exact moment is the point, in a log line or a call's timeline, the time is a clock.
 
 ## Signing in
 
 One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../AGENTS.md#signing-in-with-code-villain) says how to wire it.
 
-- The sign-in page is titled "Sign in to <App>". With the Code Villain account set up, it holds one primary button, "Sign in with Code Villain", and the line "One account for every Code Villain app. New here? Ask your team for an invite." Passwords are off then.
+- The sign-in page is titled "Sign in to <App>". With the Code Villain account set up, it holds one primary button, "Sign in with Code Villain ↗" (it opens another site), and the line "One account for every Code Villain app. New here? Ask your team for an invite." Passwords are off then.
 - The desktop app signs in through the browser. It says "Finish signing in in your browser." while it waits.
 - The browser then lands on a page that hands the sign-in back to the app. It says "You're signed in. <App> is opening. You can close this tab.", with a button to open the app. When sign-in fails, the page says "Couldn't sign you in", gives the reason, and tells the app too, so the app stops waiting and shows the same reason.
 - Signing out sits in the workspace menu, the command menu and Account. It removes the app's copy of your workspaces from the device, and Account says so.
@@ -27,6 +27,11 @@ One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../
 - A failure of something you just did shows where you did it: inline, in the danger tint, as an alert. Not a toast.
 - Something that fails in the background shows in the frame's status, where the sync status sits: "Change refused: …" for a few seconds.
 - The app retries on its own when it can, and says it is waiting. There's no "Retry" button for a connection.
+
+## When something worked
+
+- A change you can see where you made it says nothing more: a saved field shows its new value, a new row appears. No toast, no "Saved." message.
+- A toast is for news from out of view: an agent finishing in another task, a sign-in finishing in the browser.
 
 ## Empty and loading
 
@@ -52,6 +57,7 @@ One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../
 
 - One place, in the app, split into the workspace's settings and yours (Account).
 - A field saves when you leave it or press Enter. No Save button.
+- The exception is a form that only works as a whole, such as a connection's address and token: the app has to try them together. It keeps one button, named by what it does: "Connect" the first time, "Reconnect" after.
 - Night or day follows the system, and night is the default. An app with a theme picker opens on Nightshade, following the system.
 - Settings ends with the app's name and version ("Forge 0.1.0").
 
