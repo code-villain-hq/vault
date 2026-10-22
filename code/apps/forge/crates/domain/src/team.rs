@@ -17,6 +17,9 @@ pub struct Team {
     pub key: String,
     /// The last issue number given out. Maintained by the server.
     pub issue_counter: i32,
+    /// The Code Villain account's group whose people are this team's: set,
+    /// nobody joins or leaves the team by hand.
+    pub group_name: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -51,6 +54,8 @@ pub struct TeamCreate {
 pub struct TeamPatch {
     pub name: Option<String>,
     pub key: Option<String>,
+    /// null unlinks the team; its people stay.
+    pub group_name: Option<Option<String>>,
 }
 
 fn check_key(key: &str) -> Result<(), ValidationError> {
@@ -75,7 +80,22 @@ impl Validate for TeamCreate {
 impl Validate for TeamPatch {
     fn validate(&self) -> Result<(), ValidationError> {
         optional(&self.name, |n| rules::text(n, "team name", rules::NAME))?;
-        optional(&self.key, |k| check_key(k))
+        optional(&self.key, |k| check_key(k))?;
+        optional(&self.group_name.clone().flatten(), |g| check_group(g))
+    }
+}
+
+/// A group's name as the Code Villain account has it: `design`, `forge-admins`.
+fn check_group(name: &str) -> Result<(), ValidationError> {
+    let valid = !name.is_empty()
+        && name.len() <= 100
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+    if valid {
+        Ok(())
+    } else {
+        invalid("a group's name is lower-case letters, digits, - and _")
     }
 }
 

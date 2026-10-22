@@ -25,7 +25,9 @@ pub use code_villain_sync::{Origin, SyncError, current_sync_id, lock_workspace, 
 pub use history::{issue_events, spec_versions};
 pub use rules::{Forge, sees_issue};
 pub use spec_change::{Standing, spec_change_standing};
-pub use team_members::{add_everyone, join_every_team, leave_every_team, role_changed, set_teams};
+pub use team_members::{
+    add_everyone, follow_groups, join_every_team, leave_every_team, role_changed, set_teams,
+};
 pub use work::{WORK_LEASE_MINUTES, finish_work, renew_work, start_work};
 
 /// The Postgres channel notified, with the workspace id as payload, whenever

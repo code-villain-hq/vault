@@ -11,4 +11,9 @@ key: string,
 /**
  * The last issue number given out. Maintained by the server.
  */
-issue_counter: number, created_at: string, updated_at: string, };
+issue_counter: number, 
+/**
+ * The Code Villain account's group whose people are this team's: set,
+ * nobody joins or leaves the team by hand.
+ */
+group_name: string | null, created_at: string, updated_at: string, };

@@ -11,6 +11,7 @@ pub mod drift;
 pub mod error;
 pub mod forgejo;
 pub mod github;
+pub mod groups;
 pub mod invites;
 pub mod limits;
 pub mod local;

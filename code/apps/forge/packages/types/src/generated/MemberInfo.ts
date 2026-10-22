@@ -6,4 +6,9 @@ export type MemberInfo = { user: UserInfo, role: Role, joined_at: string,
 /**
  * The teams they're in.
  */
-access: Array<string>, };
+access: Array<string>, 
+/**
+ * The group of the Code Villain account their role comes from, such as
+ * `forge-admins`: it's changed there, not in Members.
+ */
+from_group: string | null, };

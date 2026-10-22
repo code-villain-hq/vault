@@ -106,3 +106,10 @@ sign-in are off, and so are `bun run seed` and `bun run reset-password`.
 Without them, as in plain local development, passwords stay on. Bun and
 `docker compose` both read a `.env` next to `docker-compose.yml`, so one
 there turns it on for `bun run dev` and `bun run app` alike.
+
+With `FORGE_SCIM_TOKEN` set too, the account's groups say who is in a
+workspace. In Pocket ID, turn on SCIM for Forge's client, with the
+endpoint `<FORGE_PUBLIC_URL>/api/scim/v2` and the same token, and allow
+`forge`, `forge-admins` and `forge-guests` on it (each with the same
+friendly name as its name). Then link the workspace to `forge`
+(`PUT /api/w/{id}/group`). Without the token, invites are the only way in.

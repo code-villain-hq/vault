@@ -55,6 +55,7 @@ services:
       FORGE_OIDC_ISSUER: ${FORGE_OIDC_ISSUER:-}
       FORGE_OIDC_CLIENT_ID: ${FORGE_OIDC_CLIENT_ID:-}
       FORGE_OIDC_CLIENT_SECRET: ${FORGE_OIDC_CLIENT_SECRET:-}
+      FORGE_SCIM_TOKEN: ${FORGE_SCIM_TOKEN:-}
       FORGE_PUBLIC_URL: ${FORGE_PUBLIC_URL:-http://localhost:7390}
       # 1 behind a proxy that sets X-Forwarded-For (limits per client use it).
       FORGE_TRUST_FORWARDED_FOR: ${FORGE_TRUST_FORWARDED_FOR:-}

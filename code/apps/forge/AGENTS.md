@@ -170,6 +170,16 @@ initiatives, services, domains, specs, decisions or verdicts. A new member
 joins every team; a new guest joins none. `model.rs`'s `guest_view` holds
 the rules, and endpoints outside sync call `require_not_guest()`.
 
+## Groups
+
+With `FORGE_SCIM_TOKEN` set, the Code Villain account sends its people and
+groups to `/api/scim/v2` (`code/kit/scim`; `crates/server/src/groups.rs`).
+A workspace linked to `forge` (`PUT /api/w/{id}/group`) has `forge` as
+members, `forge-admins` as admins and `forge-guests` as guests, and Members
+won't change their roles. A team linked to a group (`Team.group_name`) has
+the group's people in the workspace, and nobody joins or leaves it by hand:
+`forge_sync::follow_groups` keeps it so. Tests: `crates/server/tests/scim.rs`.
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and

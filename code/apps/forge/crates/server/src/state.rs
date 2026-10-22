@@ -31,6 +31,9 @@ pub struct AppState {
     pub github_login: Option<Arc<GitHubLogin>>,
     /// Signing in with Code Villain; when on, it's the only way in.
     pub oidc_login: Option<Arc<OidcLogin>>,
+    /// The token Pocket ID sends the account's people and groups with
+    /// (`FORGE_SCIM_TOKEN`); `None` turns groups off.
+    pub scim_token: Option<String>,
     /// Wrong passwords per account, to slow down guessing.
     pub password_attempts: Arc<Attempts>,
     /// Sign-ups per client address, so nobody can make accounts (or find
@@ -65,6 +68,7 @@ impl AppState {
             github: None,
             github_login: None,
             oidc_login: None,
+            scim_token: None,
             password_attempts: Arc::default(),
             signup_attempts: Arc::new(Attempts::sign_ups()),
             trust_forwarded_for: false,
@@ -108,6 +112,12 @@ impl AppState {
 
     /// Turns on signing in with Code Villain, and off passwords and GitHub
     /// sign-in.
+    /// Takes the account's people and groups at `/api/scim/v2` (`crate::groups`).
+    pub fn with_scim(mut self, token: impl Into<String>) -> Self {
+        self.scim_token = Some(token.into());
+        self
+    }
+
     pub fn with_oidc_login(mut self, login: OidcLogin) -> Self {
         self.oidc_login = Some(Arc::new(login));
         self

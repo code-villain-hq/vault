@@ -69,6 +69,15 @@ async fn main() -> anyhow::Result<()> {
                 );
                 state = state.with_oidc_login(login);
             }
+            match std::env::var("FORGE_SCIM_TOKEN") {
+                Ok(token) if !token.trim().is_empty() => {
+                    tracing::info!("groups from the Code Villain account are on");
+                    state = state.with_scim(token.trim());
+                }
+                _ => tracing::info!(
+                    "groups are off: set FORGE_SCIM_TOKEN to take them from the Code Villain account"
+                ),
+            }
             let listener = TcpListener::bind(config.addr).await?;
             tracing::info!("listening on http://{}", config.addr);
             forge_server::serve(state, config.web_dir.as_deref(), listener, async {

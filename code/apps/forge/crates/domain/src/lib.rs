@@ -26,11 +26,12 @@ mod verdict;
 
 pub use account::{
     AGENT_EMAIL_DOMAIN, AgentInfo, ApiTokenInfo, ChangePasswordRequest, CreateAgentRequest,
-    CreateInviteRequest, CreatedInvite, CreatedToken, Invite, InvitePreview, LoginRequest,
-    MIN_PASSWORD, Me, MemberInfo, Role, RunnerInfo, RunnerSecret, SetRunnerRequest, SignupRequest,
-    UpdateAccessRequest, UpdateAgentRequest, UpdateMemberRequest, UpdateProfileRequest,
-    UpdateWorkspaceRequest, UserInfo, WakeupEvent, WakeupInfo, WakeupStatus, WorkspaceInfo,
-    check_password, clean_name, is_agent_email, normalize_email, url_key_from,
+    CreateInviteRequest, CreatedInvite, CreatedToken, Invite, InvitePreview, LinkGroupRequest,
+    LoginRequest, MIN_PASSWORD, Me, MemberInfo, Role, RunnerInfo, RunnerSecret, SetRunnerRequest,
+    SignupRequest, UpdateAccessRequest, UpdateAgentRequest, UpdateMemberRequest,
+    UpdateProfileRequest, UpdateWorkspaceRequest, UserInfo, WakeupEvent, WakeupInfo, WakeupStatus,
+    WorkspaceGroup, WorkspaceInfo, check_password, clean_name, is_agent_email, normalize_email,
+    url_key_from,
 };
 pub use convention::{convention_warnings, requirement_warnings};
 pub use drift::{

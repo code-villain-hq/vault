@@ -8,7 +8,7 @@ use serde_json::{Map, Value, json};
 use sqlx::{AssertSqlSafe, PgConnection};
 use uuid::Uuid;
 
-use crate::{NOTIFY_CHANNEL, SyncError, review, spec_change, work};
+use crate::{NOTIFY_CHANNEL, SyncError, review, spec_change, team_members, work};
 
 /// Forge, as the sync engine sees it.
 ///
@@ -88,6 +88,16 @@ impl Rules for Forge {
         after: &Value,
     ) -> Result<Option<i64>, SyncError> {
         let mut last = notify_people(db, actor, transaction_id, model, before, after).await?;
+        // Linked to a group, or to another: its people are the group's now.
+        if model == ModelKind::Team
+            && before.and_then(|b| b.get("group_name")) != after.get("group_name")
+            && let Some(team) = after.get("id").and_then(Value::as_str)
+            && let Ok(team) = team.parse::<Uuid>()
+            && let Some(sync_id) =
+                team_members::follow_groups(db, actor, Some(&[team]), None).await?
+        {
+            last = Some(sync_id);
+        }
         let (ModelKind::Issue, Some(before)) = (model, before) else {
             return Ok(last);
         };

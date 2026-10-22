@@ -41,6 +41,7 @@ uuid = { version = "1.28", features = ["v7", "serde"] }
 
 forge-ai = { path = "crates/ai" }
 code-villain-desktop = { path = "../../kit/desktop" }
+code-villain-scim = { path = "../../kit/scim" }
 code-villain-sync = { path = "../../kit/sync" }
 forge-domain = { path = "crates/domain" }
 forge-server = { path = "crates/server" }

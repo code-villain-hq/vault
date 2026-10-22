@@ -26,12 +26,13 @@ One Code Villain account opens every app that has accounts. [`AGENTS.md`](../../
 
 Who belongs where is set once, in the Code Villain account's groups, not app by app. It covers workspaces on a server; workspaces on this Mac have no accounts and stay as they are.
 
-- A workspace on a server can be linked to a group, in its settings under Members. Everyone in `code-villain` is then a member of it, in every app whose workspace is linked to `code-villain`. Everyone in `code-villain-admins` is an admin there, and everyone in `code-villain-guests` a guest. Someone in more than one has the highest role.
+- Each tool has its groups: `forge`, `glyph`, `raven` and `layer`, each with `-admins` and `-guests`. Being in one of a tool's groups is what lets someone sign in to it; everyone in the studio is also in `code-villain`.
+- A workspace on a server can be linked to a group, in its settings under Members. Everyone in `forge` is then a member of the Forge workspace linked to `forge`, everyone in `forge-admins` an admin there, and everyone in `forge-guests` a guest. Someone in more than one has the highest role.
 - Roles are admin, member and guest. A guest sees only what they've been added to, and works there as a member does: teams in Forge, languages in Glyph, apps in Raven, repositories in Layer. A guest added to nothing sees an empty workspace that says "Ask an admin to add you to a team" (or language, app, repository).
 - In Forge a team can be linked to a group too, in the team's settings. Its people are the team's members: it's in their sidebar under "Your teams", and a guest in it sees that team.
 - People arrive before they sign in. Members lists them as soon as they're in the group, so they can be assigned or mentioned on day one. Their first sign-in just opens the workspace.
-- A role that comes from a group is changed in the Code Villain account. Members says where it comes from ("from code-villain-admins") and has no role menu for it.
-- Leaving the group takes the person out of the workspace within minutes, and signs them out of it.
+- A role that comes from a group is changed in the Code Villain account. Members says where it comes from ("from forge-admins") and has no role menu for it.
+- Leaving the group takes the person out of the workspace within minutes, and signs them out of it. Unlinking the workspace keeps everyone, with their roles, as though they'd been invited.
 - Invites keep working, for people outside the group. Their role is changed in Members, as now.
 - The sign-in page's line stays "New here? Ask your team for an invite.": being added to the group counts as one.
 

@@ -23,6 +23,7 @@ COPY apps/forge/crates crates
 COPY apps/forge/migrations migrations
 COPY kit/sync /code/kit/sync
 COPY kit/desktop /code/kit/desktop
+COPY kit/scim /code/kit/scim
 # Cargo needs every workspace member's manifest, even when not building it.
 COPY apps/forge/apps/desktop/src-tauri apps/desktop/src-tauri
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
