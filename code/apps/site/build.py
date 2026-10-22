@@ -27,6 +27,7 @@ REPLACEMENTS = {
     '../layer/src-tauri/icons/icon.svg': '/assets/products/layer.svg',
     '../caster/Resources/AppIcon.svg': '/assets/products/caster.svg',
     '../glyph/apps/web/public/icon.svg': '/assets/products/glyph.svg',
+    '../raven/apps/web/public/icon.svg': '/assets/products/raven.svg',
     '../../../../studio/content/blog/images/': '/assets/blog/',
 }
 
@@ -107,6 +108,7 @@ def main() -> None:
         'layer': 'code/apps/layer/src-tauri/icons/icon.svg',
         'caster': 'code/apps/caster/Resources/AppIcon.svg',
         'glyph': 'code/apps/glyph/apps/web/public/icon.svg',
+        'raven': 'code/apps/raven/apps/web/public/icon.svg',
     }.items():
         copy(VAULT / path, f'assets/products/{product}.svg')
     copy(SITE / 'uberspace.htaccess', '.htaccess')

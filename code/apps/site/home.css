@@ -52,7 +52,7 @@
   .product-name img { width: 36px; height: 36px; }
   .product-name p { max-width: 29ch; }
 }
-/* Under 800px the links would reach the logo, so they take their own row above it. */
-@media (max-width: 800px) {
+/* Under 1120px the seven links would reach the logo, so they take their own row above it. */
+@media (max-width: 1120px) {
   .home-nav { position: static; justify-content: flex-start; gap: 0.5rem 1.5rem; padding: 1rem var(--gutter) 0; }
 }
