@@ -294,6 +294,39 @@ pub async fn reset_password(pool: &PgPool, email: &str) -> anyhow::Result<String
     Ok(password)
 }
 
+/// Makes a workspace with someone who has an account as its admin, from the
+/// server (`forge-server create-workspace`): with Code Villain sign-in on,
+/// sign-up is closed, so this is how a server gets its first workspace.
+/// Returns the workspace's URL key.
+pub async fn create_workspace_for(
+    pool: &PgPool,
+    name: &str,
+    email: &str,
+) -> anyhow::Result<String> {
+    let name = clean_name(name, "workspace name")?;
+    let email = normalize_email(email)?;
+    let mut db = pool.begin().await?;
+    let user_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM users WHERE email = $1 AND kind = 'person'")
+            .bind(&email)
+            .fetch_optional(&mut *db)
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "no person has an account with the email {email}: they sign in to Forge first"
+                )
+            })?;
+    let workspace_id = create_workspace(&mut db, &name, user_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let url_key = sqlx::query_scalar("SELECT url_key FROM workspaces WHERE id = $1")
+        .bind(workspace_id)
+        .fetch_one(&mut *db)
+        .await?;
+    db.commit().await?;
+    Ok(url_key)
+}
+
 /// 20 random letters and digits in groups of four, avoiding look-alikes.
 fn readable_password() -> String {
     const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";

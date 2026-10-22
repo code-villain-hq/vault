@@ -38,6 +38,10 @@ app, served when set), `RAVEN_COOKIE_SECURE` (`0` for plain http) and
 `RAVEN_TRUST_FORWARDED_FOR` (`1` behind a proxy that sets
 `X-Forwarded-For`), in `crates/server/src/config.rs`.
 
+With sign-up closed, the server's first workspace is made on the server, for
+someone who has signed in once: `raven-server create-workspace "<name>"
+<email>` makes it with them as its admin.
+
 With `RAVEN_SCIM_TOKEN` set too, the account's groups say who is in a
 workspace. In Pocket ID, turn on SCIM for Raven's client, with the
 endpoint `<RAVEN_PUBLIC_URL>/api/scim/v2` and the same token, and allow

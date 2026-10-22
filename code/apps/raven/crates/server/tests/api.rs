@@ -434,3 +434,29 @@ async fn a_guest_sees_only_the_apps_an_admin_adds_them_to(pool: PgPool) {
     let grace = app.join("Grace", &token).await;
     assert_eq!(app.synced_apps(&grace, &workspace).await.len(), 3);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_server_makes_a_workspace_for_someone_with_an_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, _) = app.signup("Ada", "Acme").await;
+
+    let url_key = accounts::create_workspace_for(&app.pool, " Studio ", "ADA@example.com")
+        .await
+        .unwrap();
+
+    assert_eq!(url_key, "studio");
+    let me = app.get("/api/me", &ada).await.body;
+    let studio = me["workspaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["url_key"] == "studio")
+        .expect("Ada is in Studio");
+    assert_eq!(studio["name"], "Studio");
+    assert_eq!(studio["role"], "admin");
+    assert!(
+        accounts::create_workspace_for(&app.pool, "Studio", "nobody@example.com")
+            .await
+            .is_err()
+    );
+}

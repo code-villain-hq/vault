@@ -10,7 +10,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer};
 
-const USAGE: &str = "usage: raven-server [serve | reset-password <email>]";
+const USAGE: &str =
+    "usage: raven-server [serve | reset-password <email> | create-workspace <name> <admin email>]";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -78,6 +79,10 @@ async fn main() -> anyhow::Result<()> {
             let password = accounts::reset_password(&pool, email).await?;
             println!("New password for {email}: {password}");
             println!("They're signed out everywhere and should change it after signing in.");
+        }
+        ["create-workspace", name, email] => {
+            let url_key = accounts::create_workspace_for(&pool, name, email).await?;
+            println!("Made {name} with {email} as its admin: /{url_key}");
         }
         _ => {
             eprintln!("{USAGE}");

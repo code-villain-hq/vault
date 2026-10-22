@@ -55,6 +55,10 @@ on. The server also reads `DATABASE_URL`, `GLYPH_ADDR` (default
 also takes `GLYPH_LISTEN`, the address Docker publishes it on (default
 `127.0.0.1:7490`).
 
+With sign-up closed, the server's first workspace is made on the server, for
+someone who has signed in once: `glyph-server create-workspace "<name>"
+<email>` makes it with them as its admin.
+
 With `GLYPH_SCIM_TOKEN` set too, the account's groups say who is in a
 workspace. In Pocket ID, turn on SCIM for Glyph's client, with the
 endpoint `<GLYPH_PUBLIC_URL>/api/scim/v2` and the same token, and allow

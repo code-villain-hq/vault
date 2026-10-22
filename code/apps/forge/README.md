@@ -107,6 +107,10 @@ Without them, as in plain local development, passwords stay on. Bun and
 `docker compose` both read a `.env` next to `docker-compose.yml`, so one
 there turns it on for `bun run dev` and `bun run app` alike.
 
+With sign-up closed, the server's first workspace is made on the server, for
+someone who has signed in once: `forge-server create-workspace "<name>"
+<email>` makes it with them as its admin.
+
 With `FORGE_SCIM_TOKEN` set too, the account's groups say who is in a
 workspace. In Pocket ID, turn on SCIM for Forge's client, with the
 endpoint `<FORGE_PUBLIC_URL>/api/scim/v2` and the same token, and allow

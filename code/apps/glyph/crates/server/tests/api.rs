@@ -949,3 +949,29 @@ async fn a_guest_works_only_in_the_languages_an_admin_adds_them_to(pool: PgPool)
     // Swedish is theirs: what stops it is only that there's nothing to do.
     assert_ne!(run("sv").await, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_server_makes_a_workspace_for_someone_with_an_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, _) = app.signup("Ada", "Acme").await;
+
+    let url_key = accounts::create_workspace_for(&app.pool, " Studio ", "ADA@example.com")
+        .await
+        .unwrap();
+
+    assert_eq!(url_key, "studio");
+    let me = app.get("/api/me", &ada).await.body;
+    let studio = me["workspaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["url_key"] == "studio")
+        .expect("Ada is in Studio");
+    assert_eq!(studio["name"], "Studio");
+    assert_eq!(studio["role"], "admin");
+    assert!(
+        accounts::create_workspace_for(&app.pool, "Studio", "nobody@example.com")
+            .await
+            .is_err()
+    );
+}

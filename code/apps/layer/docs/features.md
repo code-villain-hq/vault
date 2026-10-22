@@ -2802,6 +2802,10 @@ a new workspace, and renames or deletes one.
   Mac's copy and what they may now see arrives without a restart. A
   repository leaving the snapshot stays in the app as this Mac's only, with
   its tasks.
+- **PROF-22** A server with Code Villain sign-in on has no sign-up, so it
+  MUST make a workspace from the server: `layer-server create-workspace
+  "<name>" <email>` makes it, with the person who has that email as its
+  admin. Someone who has never signed in has no account, and is refused.
 - **PROF-19** The foot of the sidebar MUST show the shared setup's sync
   status, in the words and dots of every app's (the kit's `SyncIndicator`):
   Synced; Syncing N, once changes have waited a second; Connecting… until
