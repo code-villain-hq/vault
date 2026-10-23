@@ -53,6 +53,9 @@ pub async fn start(
 ) -> Result<(StatusCode, Json<TranslationRun>), AppError> {
     request.validate()?;
     member
+        .require_reads(&state.pool, &request.source_lang)
+        .await?;
+    member
         .require_translates(&state.pool, &request.target_lang)
         .await?;
     let actor = member.actor;
@@ -132,6 +135,9 @@ pub async fn variants(
     Json(request): Json<VariantsRequest>,
 ) -> Result<Json<Variants>, AppError> {
     request.validate()?;
+    member
+        .require_reads(&state.pool, &request.source_lang)
+        .await?;
     member
         .require_translates(&state.pool, &request.target_lang)
         .await?;
@@ -562,6 +568,15 @@ async fn update_run(
     fields: Value,
 ) -> Result<bool, AppError> {
     let mut db = pool.begin().await?;
+    glyph_sync::lock_workspace(&mut db, actor.workspace_id).await?;
+    // Cancellation and a worker starting/finishing must use the same lock.
+    // A status checked before waiting for it may already be terminal now.
+    if load_run(&mut db, actor, id)
+        .await?
+        .is_none_or(|run| run.status.finished())
+    {
+        return Ok(false);
+    }
     match apply(&mut db, actor, vec![patch_run(id, fields)]).await {
         Ok(()) => {}
         Err(e) if e.is_not_found() => return Ok(false),

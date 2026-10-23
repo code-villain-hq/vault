@@ -506,3 +506,44 @@ async fn a_guest_works_only_in_the_languages_an_admin_adds_them_to(pool: PgPool)
     // Swedish is theirs: what stops it is only that there's nothing to do.
     assert_ne!(run("sv").await, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_cannot_use_a_hidden_source_language(pool: PgPool) {
+    let app = App::new(pool.clone());
+    let (ada, acme) = app.signup("Ada", "Acme").await;
+    let swedish = Uuid::now_v7();
+    let added = app.post(&format!("/api/w/{acme}/sync/transactions"), Some(&ada),
+        json!({ "id": Uuid::now_v7(), "operations": [
+          { "action": "create", "model": "Language", "id": swedish, "data": { "code": "sv" } },
+          { "action": "create", "model": "Language", "id": Uuid::now_v7(), "data": { "code": "de" } }
+        ] })).await;
+    assert_eq!(added.status, StatusCode::OK);
+    let gus = app
+        .join("Gus", &app.invite(&ada, &acme, "guest").await)
+        .await;
+    let user = app.get("/api/me", &gus).await.body["user"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    app.call(
+        "PUT",
+        &format!("/api/w/{acme}/members/{user}/access"),
+        Some(&ada),
+        Some(json!({ "items": [swedish] })),
+    )
+    .await;
+    for source in ["de", "en"] {
+        let response = app
+            .post(
+                &format!("/api/w/{acme}/runs"),
+                Some(&gus),
+                json!({ "kind": "suggest", "source_lang": source, "target_lang": "sv" }),
+            )
+            .await;
+        if source == "de" {
+            assert_eq!(response.status, StatusCode::NOT_FOUND);
+        } else {
+            assert_ne!(response.status, StatusCode::NOT_FOUND);
+        }
+    }
+}

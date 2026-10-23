@@ -448,6 +448,7 @@ function DescriptionField({
   }
   return (
     <MentionTextarea
+      issueId={issue.id}
       ref={field}
       aria-label="Description"
       placeholder="Add a description… (Markdown, @ to mention)"
@@ -913,6 +914,7 @@ function Activity({
         )}
         <div className="rounded-md ui-field">
           <MentionTextarea
+            issueId={issue.id}
             aria-label="Write a comment"
             placeholder="Leave a comment… (@ to mention, ⌘↵ to send)"
             value={body}
@@ -1015,6 +1017,7 @@ function CommentView({
         {editing ? (
           <div className="mt-1 flex flex-col gap-2">
             <MentionTextarea
+              issueId={comment.issue_id}
               aria-label="Edit comment"
               value={draft}
               onChange={setDraft}

@@ -87,6 +87,17 @@ impl Rules for Forge {
         before: Option<&Value>,
         after: &Value,
     ) -> Result<Option<i64>, SyncError> {
+        if model == ModelKind::Issue {
+            // Claim only this author's unbound draft files, using the issue's final team.
+            // URLs copied from another issue never broaden a file's scope.
+            sqlx::query("UPDATE attachments SET issue_id = $2, team_id = NULL \
+                WHERE workspace_id = $1 AND issue_id IS NULL AND created_by = $3 \
+                AND team_id IS NOT NULL AND strpos($4, '/api/w/' || workspace_id || '/attachments/' || id) > 0")
+                .bind(actor.workspace_id).bind(after.get("id").and_then(Value::as_str).and_then(|v| v.parse::<Uuid>().ok()))
+                .bind(actor.user_id)
+                .bind(after.get("description").and_then(Value::as_str).unwrap_or_default())
+                .execute(&mut *db).await?;
+        }
         let mut last = notify_people(db, actor, transaction_id, model, before, after).await?;
         // Linked to a group, or to another: its people are the group's now.
         if model == ModelKind::Team

@@ -50,13 +50,14 @@ export interface SyncState {
   connection: "online" | "offline" | "connecting";
   pending: number;
   ready: boolean;
+  storageError?: string;
 }
 const CONNECTING: SyncState = { connection: "connecting", pending: 0, ready: false };
 const UNREACHABLE: SyncState = { connection: "offline", pending: 0, ready: false };
 let sync = CONNECTING;
 const watchingSync = new Set<() => void>();
 function setSync(next: SyncState) {
-  if (next.connection === sync.connection && next.pending === sync.pending && next.ready === sync.ready) return;
+  if (next.connection === sync.connection && next.pending === sync.pending && next.ready === sync.ready && next.storageError === sync.storageError) return;
   sync = next;
   for (const tell of watchingSync) tell();
 }

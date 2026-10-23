@@ -1581,7 +1581,9 @@ ring marks where it clicked.
   switches tab, the panel follows. Agents list, open, switch and close
   tabs with `browser_tabs`, `browser_new_tab`, `browser_switch_tab` and
   `browser_close_tab`, and every outline lists the tabs. Closing the last
-  tab leaves an empty one: a task's browser never has none.
+  tab leaves an empty one: a task's browser never has none. The tab strip
+  MUST be keyboard-operable: arrows move and select, Home/End select its
+  first/last tab, and the current tab is named as selected to assistive tools.
 - **BRW-17** A tab MUST be named by its page's title, and by its site
   while it has none (loading, or a page without one); "New tab" when it
   has neither. Nobody names a tab.
@@ -2835,7 +2837,9 @@ a new workspace, and renames or deletes one.
   no invites or passwords. Someone who signs in and is in none of the
   groups is told "You don't have access to Layer yet. Ask <company>'s
   admin to add you." Once the account has sent groups, people in none of
-  them leave the workspace. The sign-in button says "Sign in with
+  them leave the workspace and their sessions end. A 30-second settling
+  period lets consecutive group updates complete a role transfer without
+  clearing assignments or signing the person out. The sign-in button says "Sign in with
   <company> ↗".
 - **PROF-19** The foot of the sidebar MUST show the shared setup's sync
   status, in the words and dots of every app's (the kit's `SyncIndicator`):
@@ -2843,7 +2847,9 @@ a new workspace, and renames or deletes one.
   the workspace answers; Offline, with "· N waiting" when changes wait, also
   when the workspace's server did not start or it is signed out; and
   "Change refused: <why>" for six seconds when the workspace turns a change
-  down, which the message center keeps.
+  down, which the message center keeps. A local storage failure MUST stay
+  visible in the status until the queued writes can be saved; writes retry
+  in order and MUST NOT be reported as durably saved after a storage failure.
 
 Code: `profiles.rs` (the registry `profiles.json`, the lock, choosing what
 to open at launch, launching a copy), `profiles/mac.rs` (bringing another

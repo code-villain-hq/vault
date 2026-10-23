@@ -8,7 +8,7 @@ struct ResultItem {
     /// "snippet:<defaultsKey>");
     /// nil for untracked rows like weather or a problem.
     var usageKey: String? = nil
-    var action: (() -> Void)?
+    var action: (() throws -> Void)?
 }
 
 /// Frecency store: every execution adds 1 to a score that decays

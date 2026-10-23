@@ -216,6 +216,7 @@ async fn the_workspace_follows_the_companys_groups(pool: PgPool) {
         Some(group("forge-users", &[])),
     )
     .await;
+    settle(&app).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
 }
 
@@ -314,6 +315,7 @@ async fn someone_turned_off_is_signed_out_and_leaves(pool: PgPool) {
 
     let (status, _) = scim(&app, "DELETE", &format!("/Users/{bob}"), None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
+    settle(&app).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
     // The account stays; they can't sign in to it but through the company's.
     let accounts: i64 =
@@ -435,4 +437,76 @@ async fn a_new_server_makes_the_companys_workspace(pool: PgPool) {
         .await
         .unwrap_err();
     assert!(refused.to_string().contains("Elsewhere"), "{refused}");
+}
+
+async fn settle(app: &App) {
+    sqlx::query("UPDATE scim_departures SET remove_after = now() - interval '1 second'")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    code_villain_scim::settle_departures::<forge_server::groups::ForgeDirectory>(&app.pool)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_role_transfer_keeps_the_session_but_a_departure_ends_it(pool: PgPool) {
+    let app = app(pool.clone());
+    let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
+    let bob = push_user(&app, "sub-bob", "Bob").await;
+    let admins = push_group(&app, "forge-admins", &[&ada_id, &bob]).await;
+    let users = push_group(&app, "forge-users", &[]).await;
+    start(&app).await;
+    let bob_id: uuid::Uuid = bob.parse().unwrap();
+    let token = forge_server::auth::start_session(&pool, bob_id)
+        .await
+        .unwrap();
+    let issue = uuid::Uuid::now_v7();
+    let team: uuid::Uuid = sqlx::query_scalar("SELECT id FROM teams WHERE workspace_id = $1")
+        .bind(studio.parse::<uuid::Uuid>().unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let created = app.post(&format!("/api/w/{studio}/sync/transactions"), Some(&ada),
+      json!({ "id": uuid::Uuid::now_v7(), "operations": [{ "action": "create", "model": "Issue", "id": issue,
+        "data": { "team_id": team, "title": "Keep my assignment", "assignee_id": bob_id } }] })).await;
+    assert_eq!(created.status, StatusCode::OK);
+    scim(
+        &app,
+        "PUT",
+        &format!("/Groups/{admins}"),
+        Some(group("forge-admins", &[&ada_id])),
+    )
+    .await;
+    assert_eq!(app.get("/api/me", &token).await.status, StatusCode::OK);
+    scim(
+        &app,
+        "PUT",
+        &format!("/Groups/{users}"),
+        Some(group("forge-users", &[&bob])),
+    )
+    .await;
+    settle(&app).await;
+    assert_eq!(app.get("/api/me", &token).await.status, StatusCode::OK);
+    let assignee: Option<uuid::Uuid> =
+        sqlx::query_scalar("SELECT assignee_id FROM issues WHERE id = $1")
+            .bind(issue)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(assignee, Some(bob_id));
+    scim(
+        &app,
+        "PUT",
+        &format!("/Groups/{users}"),
+        Some(group("forge-users", &[])),
+    )
+    .await;
+    settle(&app).await;
+    assert_eq!(
+        app.get("/api/me", &token).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(members(&app, &ada, &studio).await.len(), 1);
 }

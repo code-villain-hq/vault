@@ -24,7 +24,7 @@ pub(crate) async fn people<D: Directory>(
 /// then the joins, changes and leaves that close the gap. Someone whose role
 /// didn't come from a group is left here: [`follow_groups`] takes them out.
 /// Pocket ID sends people before their groups, so a newcomer isn't in one yet.
-async fn person<D: Directory>(
+pub(crate) async fn person<D: Directory>(
     db: &mut PgConnection,
     user: Uuid,
     only: Option<Uuid>,
@@ -65,6 +65,13 @@ async fn person<D: Directory>(
 
     let workspaces: BTreeSet<Uuid> = wanted.keys().chain(current.keys()).copied().collect();
     for workspace in workspaces {
+        if wanted.contains_key(&workspace) {
+            sqlx::query("DELETE FROM scim_departures WHERE workspace_id = $1 AND user_id = $2")
+                .bind(workspace)
+                .bind(user)
+                .execute(&mut *db)
+                .await?;
+        }
         match (wanted.get(&workspace), current.get(&workspace)) {
             (Some((role, from)), None) => {
                 D::add_member(db, workspace, user, *role).await?;
@@ -78,7 +85,9 @@ async fn person<D: Directory>(
                     set_source(db, workspace, user, Some(from)).await?;
                 }
             }
-            (None, Some((_, Some(_)))) => D::remove_member(db, workspace, user).await?,
+            (None, Some((_, Some(_)))) => {
+                crate::departures::depart::<D>(db, workspace, user).await?
+            }
             (None, _) => {}
         }
     }
@@ -177,6 +186,7 @@ pub async fn follow_groups<D: Directory>(
         for user in strays {
             if !D::stays(db, user).await? {
                 D::remove_member(db, workspace, user).await?;
+                store::end_sessions(db, user).await?;
             }
         }
     }

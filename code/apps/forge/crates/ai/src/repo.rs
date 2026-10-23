@@ -1,9 +1,9 @@
 //! Read-only access to a git repository's tracked files, for the AI.
 //!
-//! Only files git tracks can be listed or read: that keeps ignored files
+//! Only regular blobs in git’s index can be listed or read: that keeps ignored files
 //! such as `.env` out of reach. A service's path globs narrow it further.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -16,8 +16,8 @@ pub struct RepoError(pub String);
 
 pub struct Repo {
     root: PathBuf,
-    /// Tracked files in scope, sorted.
-    files: BTreeSet<String>,
+    /// Tracked regular files and their indexed blob ids, sorted by path.
+    files: BTreeMap<String, String>,
     /// The scope's globs, for git commands.
     globs: Vec<String>,
 }
@@ -33,13 +33,22 @@ impl Repo {
     /// Opens the repository at `root`, limited to the files matching
     /// `globs` (all tracked files when there are none).
     pub async fn open(root: &Path, globs: &[String]) -> Result<Repo, RepoError> {
-        let output = git(root, &["ls-files", "-z"]).await?;
+        let output = git(root, &["ls-files", "--stage", "-z"]).await?;
         let scope = glob_set(globs)?;
         let files = output
             .split('\0')
-            .filter(|f| !f.is_empty())
-            .filter(|f| scope.as_ref().is_none_or(|s| s.is_match(f)))
-            .map(str::to_string)
+            .filter_map(|entry| {
+                let (header, path) = entry.split_once('\t')?;
+                let mut fields = header.split_whitespace();
+                let mode = fields.next()?;
+                let blob = fields.next()?;
+                let stage = fields.next()?;
+                // Read regular tracked blobs, never symlinks or submodules.
+                (matches!(mode, "100644" | "100755")
+                    && stage == "0"
+                    && scope.as_ref().is_none_or(|s| s.is_match(path)))
+                .then(|| (path.to_string(), blob.to_string()))
+            })
             .collect();
         Ok(Repo {
             root: root.to_path_buf(),
@@ -60,7 +69,7 @@ impl Repo {
             .flatten();
         let matching: Vec<&String> = self
             .files
-            .iter()
+            .keys()
             .filter(|f| filter.as_ref().is_none_or(|g| g.is_match(f)))
             .collect();
         let mut out: Vec<String> = matching
@@ -88,9 +97,7 @@ impl Repo {
         end: Option<usize>,
     ) -> Result<String, RepoError> {
         let path = self.in_scope(path)?;
-        let text = tokio::fs::read_to_string(self.root.join(&path))
-            .await
-            .map_err(|e| RepoError(format!("can't read {path}: {e}")))?;
+        let text = self.contents(&path).await?;
         let lines: Vec<&str> = text.lines().collect();
         let start = start.unwrap_or(1).max(1);
         let end = end
@@ -131,18 +138,10 @@ impl Repo {
         let mut matches = Vec::new();
         for file in self
             .files
-            .iter()
+            .keys()
             .filter(|f| filter.as_ref().is_none_or(|g| g.is_match(f)))
         {
-            let full = self.root.join(file);
-            let Ok(meta) = tokio::fs::metadata(&full).await else {
-                continue;
-            };
-            if meta.len() > MAX_FILE_BYTES {
-                continue;
-            }
-            // Binary or unreadable files are skipped.
-            let Ok(text) = tokio::fs::read_to_string(&full).await else {
+            let Ok(text) = self.contents(file).await else {
                 continue;
             };
             for (number, line) in text.lines().enumerate() {
@@ -214,10 +213,26 @@ impl Repo {
         Ok(cut(output, MAX_GIT_OUTPUT))
     }
 
+    /// Read the indexed blob, not the working-tree path. Even a regular file
+    /// replaced with a symlink after opening cannot escape the repository.
+    async fn contents(&self, path: &str) -> Result<String, RepoError> {
+        let blob = self
+            .files
+            .get(path)
+            .ok_or_else(|| RepoError("file is out of scope".into()))?;
+        let size = git(&self.root, &["cat-file", "-s", blob]).await?;
+        if size.trim().parse::<u64>().unwrap_or(u64::MAX) > MAX_FILE_BYTES {
+            return Err(RepoError(
+                "file is too large; read a smaller tracked file".into(),
+            ));
+        }
+        git(&self.root, &["cat-file", "blob", blob]).await
+    }
+
     /// A tracked file in scope, by relative path.
     fn in_scope(&self, path: &str) -> Result<String, RepoError> {
         let path = path.trim().trim_start_matches("./").to_string();
-        if self.files.contains(&path) {
+        if self.files.contains_key(&path) {
             Ok(path)
         } else {
             Err(RepoError(format!(
@@ -383,5 +398,36 @@ mod tests {
         assert!(first.contains("this shows 1-400"));
         let range = repo.read("big.txt", Some(998), Some(1200)).await.unwrap();
         assert!(range.contains(" 1000  line 1000"), "{range}");
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn links_and_working_tree_replacements_cannot_expose_untracked_files() {
+        use std::os::unix::fs::symlink;
+        let dir = repo_with(&[("safe.txt", "tracked text\n")]);
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(outside.path(), "EXTERNAL_SECRET").unwrap();
+        symlink(outside.path(), dir.path().join("outside.txt")).unwrap();
+        symlink(".env", dir.path().join("ignored.txt")).unwrap();
+        assert!(
+            StdCommand::new("git")
+                .arg("-C")
+                .arg(dir.path())
+                .args(["add", "outside.txt", "ignored.txt"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        let repo = Repo::open(dir.path(), &[]).await.unwrap();
+        assert!(repo.read("outside.txt", None, None).await.is_err());
+        assert!(repo.read("ignored.txt", None, None).await.is_err());
+        std::fs::remove_file(dir.path().join("safe.txt")).unwrap();
+        symlink(outside.path(), dir.path().join("safe.txt")).unwrap();
+        assert!(
+            repo.read("safe.txt", None, None)
+                .await
+                .unwrap()
+                .contains("tracked text")
+        );
+        assert_eq!(repo.search("SECRET", None).await.unwrap(), "No matches.");
     }
 }

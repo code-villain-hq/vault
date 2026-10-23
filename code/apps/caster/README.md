@@ -24,7 +24,7 @@ Type `help` (or `?`) in the launcher for this list in-app.
 | `work email` | Snippets — copy your emails/phone/address; set values via menu bar icon → Settings… |
 | `maximize` | Resize the focused window to the monitor minus the menu bar¹ |
 | `move window` | Send focused window to next display (only with 2+ monitors)¹ |
-| `sleep` / `lock` / `trash` / `dark` | Sleep Mac, lock screen, empty trash², toggle dark mode² |
+| `sleep` / `lock` / `trash` / `dark` | Sleep Mac, lock screen¹, empty trash², toggle dark mode² |
 | `quit` | Quit Caster |
 | *(empty)* | Your 5 most-used items (frecency: usage count with 7-day half-life) |
 
@@ -102,7 +102,7 @@ Settings… and Quit.
 
 | Permission | Used for |
 |------------|----------|
-| Accessibility | `maximize`, `move window` |
+| Accessibility | `maximize`, `move window`, `lock` |
 | Automation → Finder | `trash`, reopening Finder windows |
 | Automation → System Events | `dark` |
 | Screen Recording (optional) | ⌘S screenshots with the desktop behind |

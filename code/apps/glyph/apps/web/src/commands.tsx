@@ -106,7 +106,15 @@ function useGlyphCommands(query: string): Command[] {
         id: "sign-out",
         group: "Account",
         label: place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out",
-        run: () => void signOut(place).then(() => navigate({ to: "/" })),
+        run: () =>
+          void signOut(place).then((ok) =>
+            ok
+              ? navigate({ to: "/" })
+              : navigate({
+                  to: "/$workspace/settings/account",
+                  params: { workspace: workspace.url_key },
+                }),
+          ),
       });
     }
     return list;

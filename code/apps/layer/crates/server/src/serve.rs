@@ -22,6 +22,11 @@ pub async fn serve(
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
     let mut workers = JoinSet::new();
+    if state.scim_token.is_some() {
+        workers.spawn(code_villain_scim::watch_departures::<
+            crate::groups::LayerDirectory,
+        >(state.pool.clone()));
+    }
     workers.spawn(code_villain_sync::listen(
         state.pool.clone(),
         layer_sync::NOTIFY_CHANNEL,

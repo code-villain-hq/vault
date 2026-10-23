@@ -158,7 +158,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             DispatchQueue.main.async {
                 guard let self else { return }
                 if captured {
-                    self.showScreenshotFeedback("Saved to Desktop.")
+                    self.showFeedback("Saved to Desktop.")
                 } else {
                     self.captureViewRender(to: url)
                 }
@@ -169,10 +169,10 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private func captureViewRender(to url: URL) {
         do {
             try renderPNG(to: url)
-            showScreenshotFeedback("Saved the panel only. Allow Screen Recording to include the desktop.")
+            showFeedback("Saved the panel only. Allow Screen Recording to include the desktop.")
         } catch {
             NSLog("Caster screenshot failed: \(error)")
-            showScreenshotFeedback("Couldn't save the screenshot. Try again.", isProblem: true)
+            showFeedback("Couldn't save the screenshot. Try again.", isProblem: true)
         }
     }
 
@@ -187,7 +187,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
 
     /// A problem reads in the danger ink, where it happened
     /// (studio/design/behaviour.md, "Errors").
-    private func showScreenshotFeedback(_ message: String, isProblem: Bool = false) {
+    private func showFeedback(_ message: String, isProblem: Bool = false) {
         inlineResultField.stringValue = message
         inlineResultField.textColor = isProblem ? Nightshade.dangerInk : Nightshade.muted
         inlineResultField.isHidden = false
@@ -486,7 +486,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         if let key = item.usageKey {
             UsageStore.record(key)
         }
-        item.action?()
+        do { try item.action?() }
+        catch {
+            show(query: field.stringValue)
+            showFeedback(error.localizedDescription, isProblem: true)
+        }
         WindowManager.targetPID = nil
     }
 

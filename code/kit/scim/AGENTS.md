@@ -16,8 +16,10 @@ in the company's workspace. Forge, Glyph, Raven and Layer use it.
 - The role's group is kept in `workspace_members.from_group`. Members shows
   it ("from forge-admins") and refuses to change the role or remove the
   person: that's done in the account.
-- Out of every group, someone leaves the workspace. Deleted or turned off in
-  the account, they also lose their sessions; their account here stays.
+- Out of every group, someone leaves the workspace after a 30-second settling
+  period, and loses their sessions. Separate group updates in a role transfer
+  can finish first, preserving assignments and sessions. Deleted or turned off
+  in the account, they leave immediately; their account here stays.
 - Once the account has sent its groups, anyone in the workspace without one
   leaves, as the server starts, unless the app keeps them (`stays`: Forge's
   agents). Before, nobody is in a group, and nobody leaves.
@@ -36,6 +38,8 @@ has. Someone without an email is refused, and so is the sync of their groups.
   `stays` and `refuses_email` for people the app has of its own.
 - On start, `follow_groups::<D>(db, workspace, &Groups::new(app, …))` with
   the names from the settings' `[groups]`.
+- Run `watch_departures::<D>(pool)` with the server’s workers, so pending
+  removals finish after restart too.
 - Mount `code_villain_scim::router::<D, S>(pool, token)` at `/api/scim/v2`
   with the settings' `[scim] token`.
 - Members: `role_source` before a role change or a removal; `from_group`

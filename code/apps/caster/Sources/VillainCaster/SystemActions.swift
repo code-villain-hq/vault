@@ -1,4 +1,5 @@
 import Foundation
+import ApplicationServices
 
 /// System-level commands invoked from the launcher.
 /// Empty trash and dark mode use AppleScript — macOS shows a one-time
@@ -8,10 +9,30 @@ enum SystemActions {
         run("/usr/bin/pmset", ["sleepnow"])
     }
 
-    /// Sleeps the displays; the session locks if "require password after
-    /// sleep" is enabled (the default).
-    static func lockScreen() {
-        run("/usr/bin/pmset", ["displaysleepnow"])
+    enum LockError: LocalizedError {
+        case permission, unavailable
+        var errorDescription: String? {
+            switch self {
+            case .permission: "Couldn't lock the screen. Allow Caster in System Settings → Privacy & Security → Accessibility, then try again."
+            case .unavailable: "Couldn't lock the screen. Try again."
+            }
+        }
+    }
+
+    /// Send macOS's Lock Screen shortcut, independent of sleep/password delay.
+    /// Injection is separated so tests never post keys to the user's session.
+    static func lockScreen(
+        isTrusted: () -> Bool = { AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) },
+        post: (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
+    ) throws {
+        guard isTrusted() else { throw LockError.permission }
+        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: true),
+              let up = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: false)
+        else { throw LockError.unavailable }
+        for event in [down, up] {
+            event.flags = [.maskControl, .maskCommand]
+            post(event)
+        }
     }
 
     static func emptyTrash() {

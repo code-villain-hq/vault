@@ -152,6 +152,23 @@ impl Member {
         }
     }
 
+    /// A guest may read the source language and languages they are assigned.
+    pub async fn require_reads(&self, pool: &sqlx::PgPool, language: &str) -> Result<(), AppError> {
+        if self.role != Role::Guest {
+            return Ok(());
+        }
+        let visible: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM languages l WHERE l.workspace_id = $1 AND l.code = $2 \
+             AND (l.is_source OR l.id IN (SELECT language_id FROM language_access WHERE user_id = $3)))"
+        ).bind(self.actor.workspace_id).bind(language).bind(self.actor.user_id)
+         .fetch_one(pool).await?;
+        if visible {
+            Ok(())
+        } else {
+            Err(AppError::not_found("language not found"))
+        }
+    }
+
     /// For a guest, translating into a language they haven't been added to
     /// is refused, as their copy has no such language.
     pub async fn require_translates(

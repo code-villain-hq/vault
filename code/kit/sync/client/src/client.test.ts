@@ -233,3 +233,31 @@ describe("SyncClient across a server restart", () => {
     expect(client.status().connection).toBe("online");
   });
 });
+
+test("failed local writes remain queued, report failure, and survive restart after storage recovers", async () => {
+  class FullStore extends MemoryStore {
+    full = true;
+    async addToOutbox(transaction: Transaction) {
+      if (this.full) throw new Error("quota exceeded");
+      return super.addToOutbox(transaction);
+    }
+  }
+  const server = new FakeServer();
+  const store = new FullStore();
+  const client = makeClient(server, store);
+  await client.start();
+  server.online = false;
+  const id = client.create("Task", { title: "Offline work" });
+  await expect(client.saved()).rejects.toThrow("Can't save on this device");
+  expect(client.status().storageError).toBeDefined();
+  expect((await store.load()).outbox).toHaveLength(0);
+  store.full = false;
+  client.retryNow();
+  await until(() => !client.status().storageError, "storage recovery");
+  await client.saved();
+  expect((await store.load()).outbox).toHaveLength(1);
+  client.stop();
+  const reopened = makeClient(server, store);
+  await reopened.start();
+  expect(reopened.get("Task", id)?.title).toBe("Offline work");
+});

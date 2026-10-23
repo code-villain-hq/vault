@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import type { Me } from "@forge/types";
 import { api } from "./api";
 import { authPlace, type Place, placeFor } from "./server";
-import { getSession, loadSession, signedIn, workspaceEntries } from "./session";
+import { getSession, loadSession, signedIn, signOut, workspaceEntries } from "./session";
 
 // Bun has no localStorage; the session keeps its last answers there.
 const stored = new Map<string, string>();
@@ -74,4 +74,15 @@ test("a place that can't be reached opens with its last answer", async () => {
 
   const now = getSession();
   expect(now.status === "signed-in" && now.places.map((s) => s.me.user.id)).toEqual(["grace"]);
+});
+
+test("failed logout keeps the session and cached workspaces until the server ends it", async () => {
+  const here = authPlace();
+  signedIn(me("ada", ["studio"]), here);
+  globalThis.fetch = (async () => {
+    throw new TypeError("offline");
+  }) as unknown as typeof fetch;
+  expect(await signOut(here)).toBe(false);
+  expect(getSession().status).toBe("signed-in");
+  expect(stored.get("forge:me")).toContain("ada");
 });

@@ -11,8 +11,15 @@ export {
 } from "@code-villain/web";
 
 /** An uploaded file, and the Markdown that shows or links to it. */
-export async function uploadAttachment(workspaceId: string, file: File): Promise<string> {
-  const path = `/api/w/${workspaceId}/attachments?name=${encodeURIComponent(file.name || "file")}`;
+export async function uploadAttachment(
+  workspaceId: string,
+  file: File,
+  scope: { issueId?: string; teamId?: string } = {},
+): Promise<string> {
+  const params = new URLSearchParams({ name: file.name || "file" });
+  if (scope.issueId) params.set("issue_id", scope.issueId);
+  else if (scope.teamId) params.set("team_id", scope.teamId);
+  const path = `/api/w/${workspaceId}/attachments?${params}`;
   const place = placeFor(path);
   let response: Response;
   try {

@@ -19,6 +19,7 @@ import { type Confirmation, ConfirmDialog } from "./confirm";
 import { Empty, ErrorMessage, Initial } from "./controls";
 import { MoreMenu } from "./page-parts";
 import { messageOf } from "./problems";
+import { useSignOutError } from "./session";
 
 export type Role = "admin" | "member" | "guest";
 
@@ -60,7 +61,7 @@ export interface AccountApp<P extends AccountPlace, M extends AccountMe> {
   };
   loadSession: () => Promise<void>;
   signedIn: (me: M, place: P) => void;
-  signOut: (place: P) => Promise<void>;
+  signOut: (place: P) => Promise<boolean>;
   PageHeader: ComponentType<{ title: string }>;
   /** What a guest is added to. */
   access: AccessConfig;
@@ -378,6 +379,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
 
   /** Your account; `children` are the app's own sections, shown after Profile. */
   function AccountPage({ children }: { children?: ReactNode }) {
+    const signOutError = useSignOutError();
     const { place, me } = useWorkspace();
     const navigate = useNavigate();
     return (
@@ -408,12 +410,12 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
                 <Button
                   variant="secondary"
                   onClick={async () => {
-                    await app.signOut(place);
-                    await navigate({ to: "/" });
+                    if (await app.signOut(place)) await navigate({ to: "/" });
                   }}
                 >
                   Sign out
                 </Button>
+                <ErrorMessage>{signOutError}</ErrorMessage>
               </section>
             )}
           </div>

@@ -216,6 +216,7 @@ async fn the_workspace_follows_the_companys_groups(pool: PgPool) {
         Some(group("glyph-users", &[])),
     )
     .await;
+    settle(&app).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
 }
 
@@ -289,6 +290,7 @@ async fn someone_turned_off_is_signed_out_and_leaves(pool: PgPool) {
 
     let (status, _) = scim(&app, "DELETE", &format!("/Users/{bob}"), None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
+    settle(&app).await;
     assert_eq!(members(&app, &ada, &studio).await.len(), 1);
     // The account stays; they can't sign in to it but through the company's.
     let accounts: i64 =
@@ -338,4 +340,61 @@ async fn a_new_server_makes_the_companys_workspace(pool: PgPool) {
         .await
         .unwrap_err();
     assert!(refused.to_string().contains("Elsewhere"), "{refused}");
+}
+
+async fn settle(app: &App) {
+    sqlx::query("UPDATE scim_departures SET remove_after = now() - interval '1 second'")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    code_villain_scim::settle_departures::<glyph_server::groups::GlyphDirectory>(&app.pool)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_role_transfer_keeps_the_session_but_a_departure_ends_it(pool: PgPool) {
+    let app = app(pool.clone());
+    let (ada, studio) = app.signup("Ada", "Studio").await;
+    let ada_id = push_user(&app, "sub-ada", "Ada").await;
+    let bob = push_user(&app, "sub-bob", "Bob").await;
+    let admins = push_group(&app, "glyph-admins", &[&ada_id, &bob]).await;
+    let users = push_group(&app, "glyph-users", &[]).await;
+    start(&app).await;
+    let bob_id: uuid::Uuid = bob.parse().unwrap();
+    let token = glyph_server::auth::start_session(&pool, bob_id)
+        .await
+        .unwrap();
+
+    scim(
+        &app,
+        "PUT",
+        &format!("/Groups/{admins}"),
+        Some(group("glyph-admins", &[&ada_id])),
+    )
+    .await;
+    assert_eq!(app.get("/api/me", &token).await.status, StatusCode::OK);
+    scim(
+        &app,
+        "PUT",
+        &format!("/Groups/{users}"),
+        Some(group("glyph-users", &[&bob])),
+    )
+    .await;
+    settle(&app).await;
+    assert_eq!(app.get("/api/me", &token).await.status, StatusCode::OK);
+
+    scim(
+        &app,
+        "PUT",
+        &format!("/Groups/{users}"),
+        Some(group("glyph-users", &[])),
+    )
+    .await;
+    settle(&app).await;
+    assert_eq!(
+        app.get("/api/me", &token).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(members(&app, &ada, &studio).await.len(), 1);
 }

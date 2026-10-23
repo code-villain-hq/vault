@@ -58,12 +58,14 @@ export {
   startOnThisMac,
 } from "./places";
 export { messageOf, UNKNOWN_PROBLEM } from "./problems";
+export { type SignInProviders, useSignInProviders } from "./providers";
 export { Redirect } from "./redirect";
 export {
   createSession,
   type Session,
   type SessionMe,
   type SignedIn,
+  useSignOutError,
   type WorkspaceEntry,
   workspaceEntries,
 } from "./session";

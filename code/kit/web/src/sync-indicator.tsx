@@ -5,6 +5,7 @@ export interface SyncState {
   connection: "online" | "offline" | "connecting";
   pending: number;
   ready: boolean;
+  storageError?: string;
 }
 
 /** Shows whether changes are saved, waiting, or refused. */
@@ -21,6 +22,7 @@ export function SyncIndicator({
   // only makes the header flicker.
   const slow = useLasting(status.pending > 0, 1000);
 
+  if (status.storageError) return <Pill tone="danger" label={status.storageError} />;
   if (refused) {
     return <Pill tone="danger" label={`Change refused: ${refused}`} />;
   }

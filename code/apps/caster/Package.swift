@@ -9,6 +9,7 @@ let package = Package(
             name: "VillainCaster",
             path: "Sources/VillainCaster",
             swiftSettings: [.swiftLanguageMode(.v5)]
-        )
+        ),
+        .testTarget(name: "VillainCasterTests", dependencies: ["VillainCaster"], path: "Tests")
     ]
 )

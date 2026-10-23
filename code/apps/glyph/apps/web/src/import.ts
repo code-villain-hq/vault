@@ -138,7 +138,7 @@ export function exportFile(
 
 /** Who wrote each text and how sure a model was, as `translations.meta.json` has it. */
 export function exportMeta(translations: readonly Translation[]): string {
-  const meta: Record<string, Record<string, Record<string, unknown>>> = {};
+  const meta: Record<string, Record<string, Record<string, unknown>>> = Object.create(null);
   const sorted = [...translations].sort(
     (a, b) =>
       a.lang.localeCompare(b.lang) ||
@@ -147,9 +147,9 @@ export function exportMeta(translations: readonly Translation[]): string {
   );
   for (const t of sorted) {
     if (!t.value) continue;
-    const language = meta[t.lang] ?? {};
+    const language = meta[t.lang] ?? Object.create(null);
     meta[t.lang] = language;
-    const keys = language[t.namespace] ?? {};
+    const keys = language[t.namespace] ?? Object.create(null);
     language[t.namespace] = keys;
     keys[t.key] = {
       confidence: t.confidence,

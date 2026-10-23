@@ -59,9 +59,8 @@ body {
   line-height: var(--type-label-leading);
 }
 
-.site-nav a { color: var(--muted); padding-block: 0.25rem; }
-.site-nav a:hover { color: var(--fg); }
-.site-nav a[aria-current] { color: var(--fg); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.35em; }
+.site-nav a { padding-block: 0.25rem; }
+.site-nav a[aria-current] { text-decoration-thickness: 2px; }
 
 .site-foot {
   display: flex;

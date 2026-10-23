@@ -1,4 +1,4 @@
-import { Redirect } from "@code-villain/web";
+import { Redirect, useSignInProviders } from "@code-villain/web";
 import type { Me } from "@glyph/types";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
@@ -81,35 +81,8 @@ function useServerChoice() {
 }
 
 /** How this server signs people in: with its company's account, named on the button. */
-export type Providers = { oidc: boolean; company?: string | null };
-
-/** Before the server answers, or when it can't: no way in. */
-const NO_SIGN_IN: Providers = { oidc: false };
-
-/**
- * How a server signs people in; null until it first says, so the page
- * doesn't flash the wrong way in. The packaged desktop app asks the server
- * chosen at sign-in.
- */
 export function useProviders(server = serverUrl()) {
-  const [providers, setProviders] = useState<Providers | null>(null);
-  useEffect(() => {
-    if (bundled && !server) {
-      setProviders(NO_SIGN_IN);
-      return;
-    }
-    let current = true;
-    fetch(`${server}/api/auth/providers`)
-      .then((r) => (r.ok ? (r.json() as Promise<Providers>) : NO_SIGN_IN))
-      .catch(() => NO_SIGN_IN)
-      .then((p) => {
-        if (current) setProviders(p);
-      });
-    return () => {
-      current = false;
-    };
-  }, [server]);
-  return providers;
+  return useSignInProviders(server);
 }
 
 /** What went wrong signing in, by the code the server sends back, for a company's account. */
@@ -296,7 +269,12 @@ export function LoginPage() {
         </div>
       )}
       {server.field && <div className="mb-4">{server.field}</div>}
-      {company ? (
+      {providers.error ? (
+        <>
+          <ErrorMessage>{providers.error}</ErrorMessage>
+          <p className="mt-3 text-center text-muted">Waiting to reconnect…</p>
+        </>
+      ) : company ? (
         <>
           <CompanyButton
             label={`Sign in with ${company} ↗`}

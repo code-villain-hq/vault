@@ -161,6 +161,7 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
           className="bg-transparent text-title font-bold outline-none placeholder:text-faint"
         />
         <MentionTextarea
+          teamId={teamId}
           value={description}
           onChange={setDescription}
           onMentioning={setMentioning}

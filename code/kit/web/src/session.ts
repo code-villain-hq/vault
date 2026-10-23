@@ -11,6 +11,25 @@ import {
   type Place,
   placeWorkspaces,
 } from "./places";
+import { messageOf } from "./problems";
+
+let signOutError: string | null = null;
+const errorListeners = new Set<() => void>();
+function setSignOutError(message: string | null) {
+  signOutError = message;
+  for (const notify of errorListeners) notify();
+}
+export function useSignOutError() {
+  return useSyncExternalStore(
+    (notify) => {
+      errorListeners.add(notify);
+      return () => {
+        errorListeners.delete(notify);
+      };
+    },
+    () => signOutError,
+  );
+}
 
 /** What every app's `/api/me` says, at the least. */
 export type SessionMe = {
@@ -128,14 +147,21 @@ export function createSession<M extends SessionMe>() {
   setSessionEndedHandler(ended);
 
   /** Signs out of a place and deletes this device's copies of its workspaces. */
-  async function signOut(place: Place): Promise<void> {
+  async function signOut(place: Place): Promise<boolean> {
     const me = signedInPlaces().find((s) => s.place.id === place.id)?.me ?? readCache(place);
-    await api("POST", "/api/auth/logout", undefined, place).catch(() => {});
+    setSignOutError(null);
+    try {
+      await api("POST", "/api/auth/logout", undefined, place);
+    } catch (error) {
+      setSignOutError(`Couldn't sign out. ${messageOf(error)}`);
+      return false;
+    }
     // Signing out first closes the open sync clients, so their databases can go.
     ended(place);
     for (const workspace of me?.workspaces ?? []) {
       indexedDB.deleteDatabase(databaseName(me?.user.id ?? "", workspace.id));
     }
+    return true;
   }
 
   /** The last known answer for each place, so the app opens offline too. */

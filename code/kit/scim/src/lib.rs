@@ -16,6 +16,7 @@
 //! sends a group's friendly name, not its name: [`group_key`] makes a name
 //! of it.
 
+mod departures;
 mod reconcile;
 mod resources;
 mod store;
@@ -33,6 +34,7 @@ use serde::de::DeserializeOwned;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
+pub use departures::{settle_departures, watch_departures};
 pub use reconcile::{Groups, follow_groups, role_source};
 pub use store::{group_key, group_names, in_group};
 

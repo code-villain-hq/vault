@@ -1,10 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
 import {
   AppVersion,
+  ErrorMessage,
   Redirect,
   SearchButton,
   ShortcutsButton,
   SyncIndicator,
+  useSignOutError,
 } from "@code-villain/web";
 import {
   Link,
@@ -43,6 +45,7 @@ import { useIsGuest, useSyncStatus, useWorkspace, WorkspaceProvider } from "./wo
  * `/`: opens the workspace used last, or asks to sign in.
  */
 export function Home() {
+  const signOutError = useSignOutError();
   const session = useSession();
   if (session.status === "loading") return <Splash />;
   if (session.status === "signed-out") return <Redirect to="/login" />;
@@ -53,6 +56,7 @@ export function Home() {
     return (
       <AuthScreen title="You're not in any workspace">
         <p className="mb-6 text-center text-muted">Ask your company's admin to add you.</p>
+        <ErrorMessage>{signOutError}</ErrorMessage>
         <Button variant="secondary" className="w-full" onClick={signOutEverywhere}>
           Sign out
         </Button>
@@ -382,8 +386,12 @@ function WorkspaceMenu() {
               <Menu.Item
                 className={item}
                 onClick={async () => {
-                  await signOut(place);
-                  await navigate({ to: "/" });
+                  if (await signOut(place)) await navigate({ to: "/" });
+                  else
+                    await navigate({
+                      to: "/$workspace/settings/account",
+                      params: { workspace: workspace.url_key },
+                    });
                 }}
               >
                 {place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out"}

@@ -105,3 +105,21 @@ describe("export", () => {
     expect(meta.sv.common.e).toBeUndefined();
   });
 });
+
+test("metadata preserves special namespaces and keys without changing prototypes", () => {
+  const before = Object.getOwnPropertyNames(Object.prototype);
+  const rows = [
+    t("sv", "__proto__", "vaultProbe", "Hej"),
+    t("sv", "constructor", "__proto__", "Ja"),
+    t("sv", "common", "__proto__", "Nej"),
+  ];
+  const meta = JSON.parse(exportMeta(rows));
+  expect(
+    Object.getOwnPropertyDescriptor(meta.sv, "__proto__")?.value.vaultProbe.translated_by,
+  ).toBe("human");
+  expect(
+    Object.getOwnPropertyDescriptor(meta.sv.constructor, "__proto__")?.value.confidence,
+  ).toBeNull();
+  expect(Object.hasOwn(meta.sv.common, "__proto__")).toBe(true);
+  expect(Object.getOwnPropertyNames(Object.prototype)).toEqual(before);
+});

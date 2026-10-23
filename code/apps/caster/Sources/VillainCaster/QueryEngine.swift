@@ -58,10 +58,10 @@ private struct Command {
     /// is preselected and a stray ⌘Space ⏎ would run it.
     let isDestructive: Bool
     let isAvailable: () -> Bool
-    let run: () -> Void
+    let run: () throws -> Void
 
     init(id: String? = nil, title: String, subtitle: String, symbol: String, isDestructive: Bool = false,
-         isAvailable: @escaping () -> Bool, run: @escaping () -> Void) {
+         isAvailable: @escaping () -> Bool, run: @escaping () throws -> Void) {
         self.id = id ?? title
         self.title = title
         self.subtitle = subtitle
@@ -107,10 +107,10 @@ final class QueryEngine {
                 isAvailable: { true },
                 run: { SystemActions.sleep() }),
         Command(id: "Lock Screen", title: "Lock screen",
-                subtitle: "Sleep displays and lock the session",
+                subtitle: "Lock the session immediately",
                 symbol: "lock",
                 isAvailable: { true },
-                run: { SystemActions.lockScreen() }),
+                run: { try SystemActions.lockScreen() }),
         Command(id: "Empty Trash", title: "Empty trash",
                 subtitle: "Ask Finder to empty the trash",
                 symbol: "trash",

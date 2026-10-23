@@ -28,6 +28,8 @@ function mentionAt(text: string, caret: number): { start: number; query: string 
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> & {
   value: string;
+  issueId?: string;
+  teamId?: string;
   onChange: (value: string) => void;
   /** Told when someone starts or stops choosing whom to mention. */
   onMentioning?: (active: boolean) => void;
@@ -50,6 +52,8 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
   function MentionTextarea(
     {
       value,
+      issueId,
+      teamId,
       onChange,
       onMentioning,
       onUploading,
@@ -102,7 +106,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement | null, Props>(
       const added: string[] = [];
       for (const file of files) {
         try {
-          added.push(await uploadAttachment(workspace.id, file));
+          added.push(await uploadAttachment(workspace.id, file, { issueId, teamId }));
         } catch (e) {
           setProblem(messageOf(e));
         } finally {

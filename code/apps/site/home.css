@@ -1,3 +1,4 @@
+/* One frame for every app: navigation uses the shared ink-and-underline links. */
 /* Product-led homepage: real captures of each product, on the shared Nightshade tokens. */
 .hero { --logo-width: clamp(20.5rem, 42vw, 36rem); --splash-pad: clamp(1.5rem, 3vw, 2.25rem); position: relative; overflow: hidden; }
 .splash { margin: 0; padding: var(--splash-pad) var(--gutter); }
@@ -12,8 +13,8 @@
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.5rem 1.75rem;
   font-size: var(--type-title-size); font-weight: var(--type-title-weight); line-height: var(--type-title-leading);
 }
-.home-nav a { padding-block: 0.4rem; color: var(--muted); }
-.home-nav a:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 0.22em; }
+.home-nav a { padding-block: 0.4rem; }
+
 .page-width { width: min(80rem, calc(100% - var(--gutter) * 2)); margin-inline: auto; }
 .skip { position: absolute; top: -5rem; left: 1rem; z-index: 5; padding: 0.75rem 1rem; background: var(--panel); border-radius: var(--radius-md); }
 .skip:focus { top: 1rem; }

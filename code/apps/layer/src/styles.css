@@ -312,16 +312,15 @@ body.dragging * { pointer-events: none; }
    draws, so the screen is plain: the canvas is the page's own size. */
 .browser-side { flex: none; min-width: 320px; display: flex; overflow: hidden; }
 .browser { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; }
-.browser-tabs { display: flex; align-items: center; gap: 2px; padding: 5px 6px 0; overflow-x: auto; }
+.browser-tabs { display: flex; align-items: center; padding: 5px 6px 0; overflow-x: auto; }
 .browser-tabs.locked { opacity: 0.55; }
 .browser-tabs.locked .browser-tab { cursor: not-allowed; }
 .browser-tab {
   display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 200px; flex: 0 1 auto;
-  padding: 4px 4px 4px 10px; border-radius: var(--radius-md) var(--radius-md) 0 0;
+  padding: 0;
   font-size: var(--type-ui-small-size); color: var(--muted); cursor: pointer; white-space: nowrap;
 }
-.browser-tab:hover { background: var(--hover); }
-.browser-tab.active { color: var(--fg); background: var(--panel); }
+.browser-tab-name { min-width: 0; max-width: 180px; }
 .browser-tab .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .browser-tab .x { display: inline-flex; padding: 2px; border-radius: var(--radius-sm); color: var(--faint); opacity: 0; }
 .browser-tab:hover .x, .browser-tab.active .x { opacity: 1; }

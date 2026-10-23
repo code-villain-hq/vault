@@ -17,6 +17,8 @@ export interface SyncStatus {
   pending: number;
   /** True once there is a local copy to show, from disk or downloaded. */
   ready: boolean;
+  /** Local writes are waiting for storage to recover. */
+  storageError?: string;
 }
 
 export interface SyncClientOptions<S extends SchemaShape> {
@@ -78,6 +80,9 @@ export class SyncClient<S extends SchemaShape> {
   #stopped = false;
   /** Store writes run one after another, in the order they were made. */
   #storeQueue: Promise<void> = Promise.resolve();
+  #writes: ((store: LocalStore) => Promise<void>)[] = [];
+  #saving = false;
+  #storageTimer?: ReturnType<typeof setTimeout>;
 
   constructor(options: SyncClientOptions<S>) {
     this.#options = options;
@@ -107,11 +112,13 @@ export class SyncClient<S extends SchemaShape> {
     this.#closeFeed = undefined;
     clearTimeout(this.#flushTimer);
     clearTimeout(this.#reconnectTimer);
+    clearTimeout(this.#storageTimer);
   }
 
   /** Try to reconnect and send now, for example when the browser comes back online. */
   retryNow(): void {
     if (this.#stopped) return;
+    this.#saveWrites();
     if (!this.#closeFeed) {
       clearTimeout(this.#reconnectTimer);
       this.#reconnectDelay = this.#backoff.min;
@@ -412,13 +419,40 @@ export class SyncClient<S extends SchemaShape> {
   }
 
   #persist(write: (store: LocalStore) => Promise<void>): void {
-    this.#storeQueue = this.#storeQueue
-      .then(() => write(this.#store))
-      .catch((error) => console.error("sync: saving locally failed", error));
+    this.#writes.push(write);
+    this.#saveWrites();
   }
 
-  /** Resolves when everything queued so far has been saved locally. */
-  saved(): Promise<void> {
-    return this.#storeQueue;
+  #saveWrites(): void {
+    if (this.#saving || this.#stopped) return;
+    clearTimeout(this.#storageTimer);
+    this.#saving = true;
+    this.#storeQueue = (async () => {
+      try {
+        while (this.#writes.length) {
+          await this.#writes[0]?.(this.#store);
+          this.#writes.shift();
+        }
+        this.#setStatus({ storageError: undefined });
+      } catch {
+        // Keep the failed write and everything behind it in order. In
+        // particular, never remove an outbox entry before its add is saved.
+        this.#setStatus({
+          storageError:
+            "Can't save on this device. Free up storage. Your changes are still open here.",
+        });
+        if (!this.#stopped)
+          this.#storageTimer = setTimeout(() => this.#saveWrites(), this.#backoff.max);
+      } finally {
+        this.#saving = false;
+      }
+    })();
+  }
+
+  /** Resolves only when the queued writes are durable; rejects on storage failure. */
+  async saved(): Promise<void> {
+    await this.#storeQueue;
+    if (this.#writes.length)
+      throw new Error(this.#status.storageError ?? "Local changes haven't been saved.");
   }
 }
