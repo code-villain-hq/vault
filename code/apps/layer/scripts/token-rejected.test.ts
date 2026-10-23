@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { api } from "../src/lib/api";
-import { githubRejected, TOKEN_REJECTED } from "../src/lib/derive";
+import { githubRefusal, TOKEN_NEEDS_SSO, TOKEN_REJECTED } from "../src/lib/derive";
 import type { CheckoutPr, Settings } from "../src/lib/types";
 import { useStore } from "../src/store";
 
@@ -9,9 +9,16 @@ const row = (error: string | null) => ({ checkout_id: "c", repo: "web", error })
 
 describe("a token GitHub refused (PR-12)", () => {
   test("is seen in any task's rows, and only for that refusal", () => {
-    expect(githubRejected({ a: [row(null)], b: [row(null), row(TOKEN_REJECTED)] })).toBe(true);
-    expect(githubRejected({ a: [row("GitHub 404 Not Found: {}")] })).toBe(false);
-    expect(githubRejected({})).toBe(false);
+    expect(githubRefusal({ a: [row(null)], b: [row(null), row(TOKEN_REJECTED)] })).toBe("rejected");
+    expect(githubRefusal({ a: [row("GitHub 404 Not Found: {}")] })).toBe(null);
+    expect(githubRefusal({})).toBe(null);
+  });
+
+  test("a token not authorized for single sign-on is told apart from a rejected one", () => {
+    expect(githubRefusal({ a: [row(TOKEN_NEEDS_SSO)], b: [row(null)] })).toBe("sso");
+    // A new token is the first thing needed; authorizing comes after.
+    expect(githubRefusal({ a: [row(TOKEN_NEEDS_SSO)], b: [row(TOKEN_REJECTED)] })).toBe("rejected");
+    expect(githubRefusal({ a: [row("GitHub 403 Forbidden: {\"message\":\"API rate limit exceeded\"}")] })).toBe(null);
   });
 
   test("a sweep asked for during one runs again after it, with the new token's answer", async () => {
@@ -35,6 +42,6 @@ describe("a token GitHub refused (PR-12)", () => {
     release();
     await Promise.all([first, second]);
     expect(calls).toBe(2);
-    expect(githubRejected(useStore.getState().prs)).toBe(false);
+    expect(githubRefusal(useStore.getState().prs)).toBe(null);
   });
 });
