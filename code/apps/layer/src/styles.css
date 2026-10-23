@@ -108,8 +108,9 @@ textarea { font-family: var(--font-mono); }
   flex-direction: column;
   height: 100%;
   width: 100%;
-  /* Chrome scales as one; the terminal has its own font size, because xterm
-     measures its cell grid and a page zoom would fight it. */
+  /* Chrome scales as one. A terminal undoes this and scales its text
+     instead (lib/outsideZoom.ts): xterm measures its cell grid unzoomed,
+     and under a zoom its clicks landed rows below the pointer. */
   zoom: var(--ui-scale, 1);
 }
 

@@ -423,7 +423,8 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   click, a key or a scroll, which go to the agent as before. Before this,
   nothing could select there, and a selection made anyway was gone with
   the next movement of the mouse, which xterm reports to the agent as
-  input.
+  input. A click or a selection MUST land on the cell under the pointer at
+  any interface scale; at 115% it landed three or four rows below it.
 
 Code: `pty.rs`, `agents.rs`, `commands/panes.rs` (`restart_pane`),
 `Terminals.tsx`, `Terminal.tsx`, `AgentsView.tsx`, `PaneNotice.tsx`.

@@ -8,6 +8,7 @@ import { useStore } from "../store";
 import type { PaneInfo } from "../lib/types";
 import { decode, TERMINAL_FONT, terminalTheme } from "../lib/terminal";
 import { whenBehind } from "../lib/catchUp";
+import { outsideZoom } from "../lib/outsideZoom";
 import { currentTheme, type Theme } from "../lib/theme";
 import { afterDrag, isDragging } from "../lib/drag";
 
@@ -30,7 +31,10 @@ const GPU_TERMINALS = 6;
  */
 const REPAINT_GAP_MS = 100;
 
-const fontSize = () => useStore.getState().settings?.ui.terminal_font_size ?? 13;
+const sizing = () => {
+  const ui = useStore.getState().settings?.ui;
+  return outsideZoom(ui?.terminal_font_size ?? 13, ui?.scale ?? 1);
+};
 
 /** Where a terminal waits while no view is showing it. */
 let parking: HTMLDivElement | null = null;
@@ -107,9 +111,11 @@ class PaneTerminal {
 
   constructor(private readonly id: string) {
     this.el.className = "term-host";
+    const { zoom, fontSize } = sizing();
+    this.el.style.zoom = String(zoom);
     this.term = new Terminal({
       fontFamily: TERMINAL_FONT,
-      fontSize: fontSize(),
+      fontSize,
       lineHeight: 1.25,
       ...terminalTheme(currentTheme()),
       cursorBlink: true,
@@ -182,9 +188,12 @@ class PaneTerminal {
     });
   }
 
-  setFontSize(size: number) {
+  /** Follow the terminal text size and the interface scale (`outsideZoom`). */
+  resizeText() {
     if (this.disposed) return;
-    this.term.options.fontSize = size;
+    const { zoom, fontSize } = sizing();
+    this.el.style.zoom = String(zoom);
+    this.term.options.fontSize = fontSize;
     if (this.el.offsetParent !== null) this.fitAndTell();
   }
 
@@ -375,7 +384,8 @@ function terminalFor(id: string): PaneTerminal {
 }
 
 // A pane that has left the list has been closed, and its terminal goes with
-// it. Font size applies to every terminal kept, not only the one on screen.
+// it. Text size and the interface scale apply to every terminal kept, not
+// only the one on screen.
 useStore.subscribe((s, prev) => {
   if (s.panes !== prev.panes) {
     const live = new Set(s.panes.map((p) => p.id));
@@ -386,9 +396,10 @@ useStore.subscribe((s, prev) => {
       }
     }
   }
-  const size = s.settings?.ui.terminal_font_size;
-  if (size !== undefined && size !== prev.settings?.ui.terminal_font_size) {
-    for (const t of pool.values()) t.setFontSize(size);
+  const ui = s.settings?.ui;
+  const was = prev.settings?.ui;
+  if (ui && (ui.terminal_font_size !== was?.terminal_font_size || ui.scale !== was?.scale)) {
+    for (const t of pool.values()) t.resizeText();
   }
 });
 
