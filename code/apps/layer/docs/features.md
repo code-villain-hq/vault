@@ -354,7 +354,10 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   Code's one-shot runs (`claude -p`, the app's own PR description drafts)
   do not. Counted, a draft in the task folder had an agent restarted there,
   where Claude found "No conversation found to continue", while its real
-  conversation was in the repo's folder.
+  conversation was in the repo's folder. A waiting agent that did not
+  record its conversation's id (one not over ACP) resumes the newest
+  conversation in its folder, so it stops waiting once an agent of the
+  same CLI is open there: that agent already continues it.
 - **PANE-8** A terminal MUST keep 256KB of scrollback. One coming back on
   screen gets exactly what it missed, by byte position. One that missed
   more than its scrollback holds is replayed from what it still holds,

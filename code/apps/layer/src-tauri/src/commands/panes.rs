@@ -160,7 +160,7 @@ pub(crate) fn open_shell(
             title_topic: None,
         },
     )?;
-    remember_pane(state, &pane);
+    remember_pane(app, state, &pane);
     Ok(pane)
 }
 
@@ -302,7 +302,7 @@ pub(crate) fn start_agent(
         }
         let start = super::acp_panes::Start { task_id, checkout_id, cwd, title, prompt, resume };
         let pane = super::acp_panes::start(app, state, def, start)?;
-        remember_pane(state, &pane);
+        remember_pane(app, state, &pane);
         return Ok(pane);
     }
     let program = shellenv::which(def.program)
@@ -350,7 +350,7 @@ pub(crate) fn start_agent(
             title_topic: agents::topic_reader(def.integration),
         },
     )?;
-    remember_pane(state, &pane);
+    remember_pane(app, state, &pane);
     Ok(pane)
 }
 
@@ -660,7 +660,7 @@ pub(crate) fn open_chat(
         let cwd = dir.to_string_lossy().to_string();
         let start = super::acp_panes::Start { task_id: CHAT_TASK_ID.to_string(), checkout_id: None, cwd, title, prompt, resume };
         let pane = super::acp_panes::start(app, state, def, start)?;
-        remember_pane(state, &pane);
+        remember_pane(app, state, &pane);
         return Ok(pane);
     }
     let program = shellenv::which(def.program)
@@ -698,7 +698,7 @@ pub(crate) fn open_chat(
             title_topic: agents::topic_reader(def.integration),
         },
     )?;
-    remember_pane(state, &pane);
+    remember_pane(app, state, &pane);
     Ok(pane)
 }
 

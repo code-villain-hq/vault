@@ -20,7 +20,7 @@ use super::AppState;
 /// Called where the pane is actually created rather than by each caller: an
 /// agent started from a ticket went through `start_agent` directly and so was
 /// never recorded, and vanished for good at the next restart.
-pub(crate) fn remember_pane(state: &AppState, pane: &PaneInfo) {
+pub(crate) fn remember_pane(app: &AppHandle, state: &AppState, pane: &PaneInfo) {
     let saved = SavedPane {
         id: pane.id.clone(),
         task_id: pane.task_id.clone(),
@@ -38,7 +38,11 @@ pub(crate) fn remember_pane(state: &AppState, pane: &PaneInfo) {
         on_loop: None,
     };
     let live: HashSet<String> = state.ptys.list(None).into_iter().map(|p| p.id).collect();
-    let _ = state.config.update(|c| {
+    let mut open = open_agents(state);
+    if let Some(agent) = &pane.agent_id {
+        open.insert((agent.clone(), pane.cwd.clone()));
+    }
+    let picked_up = state.config.update(|c| {
         let mut saved = saved;
         // Read under the config's lock, which the ACP connection takes to
         // record the conversation too: one of the two is sure to see it,
@@ -57,11 +61,35 @@ pub(crate) fn remember_pane(state: &AppState, pane: &PaneInfo) {
         // purpose does that — so without a bound this grows for as long as the
         // app is used.
         trim(&mut c.saved_panes, &live);
+        let before = c.saved_panes.len();
+        c.saved_panes.retain(|p| !continued_by_an_open_agent(p, &open));
+        c.saved_panes.len() < before
     });
+    if picked_up.unwrap_or(false) {
+        let _ = app.emit("panes:waiting", ());
+    }
     // A chat with a Slack thread, put back, restarted or reopened, goes on
     // posting to it (BOT-4).
     if pane.acp && pane.task_id == super::CHAT_TASK_ID {
         state.slack_bot.adopt(pane, &state.config.read().slack_threads);
+    }
+}
+
+/// Each open agent, as the CLI and the folder it runs in.
+fn open_agents(state: &AppState) -> HashSet<(String, String)> {
+    state.ptys.list(None).into_iter().filter_map(|p| Some((p.agent_id?, p.cwd))).collect()
+}
+
+/// Whether a waiting pane is already back. An agent saved without its
+/// conversation's id (not over ACP) can only resume the newest conversation
+/// in its folder, and an open agent of the same CLI there already continues
+/// that one. Kept, it waited for good: Reopen will not resume over an open
+/// agent, so it started an empty one, and its title, read from the newest
+/// transcript, named the conversation already open below it.
+fn continued_by_an_open_agent(p: &SavedPane, open: &HashSet<(String, String)>) -> bool {
+    match (&p.agent_id, &p.cwd) {
+        (Some(agent), Some(cwd)) if p.waiting && !p.acp && p.kind != "shell" => open.contains(&(agent.clone(), cwd.clone())),
+        _ => false,
     }
 }
 
@@ -334,12 +362,15 @@ pub async fn waiting_panes(app: AppHandle) -> Result<Vec<WaitingPane>> {
 }
 
 pub(crate) fn waiting_panes_inner(state: &AppState) -> Vec<WaitingPane> {
+    // Also left out here, not only when an agent starts: a list saved
+    // before that rule still holds such panes.
+    let open = open_agents(state);
     state
         .config
         .read()
         .saved_panes
         .into_iter()
-        .filter(|p| p.waiting)
+        .filter(|p| p.waiting && !continued_by_an_open_agent(p, &open))
         .map(|p| WaitingPane {
             title: match (&p.agent_id, &p.cwd) {
                 (Some(agent), Some(cwd)) => conversation_title(agent, cwd),
@@ -393,8 +424,7 @@ pub(crate) fn reopen_waiting_pane_inner(app: &AppHandle, state: &AppState, id: &
         })?
         .ok_or_else(|| Error::NotFound("That pane is no longer waiting to be reopened.".into()))?;
     // Not over a conversation an open agent already continues.
-    let mut resumed: HashSet<(String, String)> =
-        state.ptys.list(None).into_iter().filter_map(|p| Some((p.agent_id?, p.cwd))).collect();
+    let mut resumed = open_agents(state);
     let out = match put_back(app, state, &pane, &mut resumed) {
         Back::Opened(p) => {
             if let Some(kept) = &pane.on_loop {
@@ -499,6 +529,24 @@ mod tests {
         assert_eq!(saved.len(), SAVED_PANE_LIMIT);
         let kept: Vec<&str> = saved.iter().take(5).map(|p| p.id.as_str()).collect();
         assert_eq!(kept, ["0", "1", "2", "3", "4"], "the oldest exited panes went, not the waiting or open ones");
+    }
+
+    /// DT-21480: a pane over the limit waited, then an agent was started in
+    /// its folder and continued its conversation. The banner went on
+    /// offering to reopen it, under the open conversation's own title.
+    #[test]
+    fn a_waiting_agent_goes_once_an_open_agent_continues_its_folder() {
+        let open: HashSet<(String, String)> = [("claude".to_string(), "/w/a".to_string())].into();
+        let waiting = |id: &str, cwd: &str| SavedPane { waiting: true, cwd: Some(cwd.into()), ..pane(id, "t", "agent") };
+
+        assert!(continued_by_an_open_agent(&waiting("w", "/w/a"), &open));
+        assert!(!continued_by_an_open_agent(&waiting("elsewhere", "/w/b"), &open), "another folder still waits");
+        let other_cli = SavedPane { agent_id: Some("codex".into()), ..waiting("codex", "/w/a") };
+        assert!(!continued_by_an_open_agent(&other_cli, &open), "another CLI has its own conversation");
+        let acp = SavedPane { acp: true, session: Some("s".into()), ..waiting("acp", "/w/a") };
+        assert!(!continued_by_an_open_agent(&acp, &open), "over ACP it names its own conversation");
+        let open_pane = SavedPane { waiting: false, ..waiting("open", "/w/a") };
+        assert!(!continued_by_an_open_agent(&open_pane, &open), "only waiting panes go");
     }
 
     #[test]
