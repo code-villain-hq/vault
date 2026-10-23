@@ -75,22 +75,33 @@ function useActions(taskId: string) {
   return { busy, reopen, ask: setForgetting, confirm, problem };
 }
 
+interface WaitingChatsProps {
+  /** Which of them this list holds: the Slack bot's go under its heading (CHAT-5). */
+  keep: (w: WaitingPane) => boolean;
+  heading?: boolean;
+  /** What to call one its CLI has not named. */
+  label?: (w: WaitingPane) => string | undefined;
+  sub?: string;
+}
+
 /** Chats the last launch did not put back, under the open ones in the Chat view. */
-export function WaitingChats() {
-  const waiting = useWaiting(CHAT_TASK_ID);
+export function WaitingChats({ keep, heading = true, label, sub = "not reopened at launch · click to reopen" }: WaitingChatsProps) {
+  const waiting = useWaiting(CHAT_TASK_ID).filter(keep);
   const { busy, reopen, ask, confirm, problem } = useActions(CHAT_TASK_ID);
   if (waiting.length === 0) return null;
   return (
     <>
-      <div className="chat-list-waiting" title="At most 12 panes come back at launch. These wait for you.">
-        Not reopened
-      </div>
+      {heading && (
+        <div className="chat-list-waiting" title="At most 12 panes come back at launch. These wait for you.">
+          Not reopened
+        </div>
+      )}
       {waiting.map((w) => (
         <div key={w.id} className="chat-item waiting" onClick={() => void reopen(w)} title="Reopen this chat where it left off">
           <span className="dot" />
           <span className="chat-item-text">
-            <span className="chat-item-title">{w.title ?? "Chat"}</span>
-            <span className="chat-item-sub">{busy === w.id ? "Reopening…" : "not reopened at launch · click to reopen"}</span>
+            <span className="chat-item-title">{w.title ?? label?.(w) ?? "Chat"}</span>
+            <span className="chat-item-sub">{busy === w.id ? "Reopening…" : sub}</span>
           </span>
           <span className="x" title="Forget this chat" onClick={(e) => { e.stopPropagation(); ask(w); }}>✕</span>
         </div>

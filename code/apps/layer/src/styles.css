@@ -1295,6 +1295,26 @@ body.dragging * { pointer-events: none; }
 .chat-list-waiting { padding: 12px 8px 4px; color: var(--faint); font-size: var(--type-ui-small-size); }
 .chat-item.waiting .chat-item-title { color: var(--muted); }
 .chat-item.waiting .dot { background: var(--faint); }
+/* The Slack bot's chats (CHAT-5), under their own heading below yours. */
+.chat-list-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 8px 4px 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--faint);
+  font: inherit;
+  font-size: var(--type-ui-small-size);
+  text-align: left;
+  cursor: pointer;
+}
+.chat-list-section:hover { color: var(--muted); }
+.chat-list-section .spacer { flex: 1; }
+.chat-list-asking { color: var(--status-warn-ink); }
 .waiting-banner { flex-wrap: wrap; row-gap: 6px; }
 .waiting-pane { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
 

@@ -181,6 +181,9 @@ const cleanup: CleanupItem[] = [
 const clean = { ahead: 0, behind: 0, staged: 0, unstaged: 0, untracked: 0, conflicted: 0, dirty_files: 0 };
 
 const CHAT_ROOM = "/Users/you/.villain-worktrees/_chat/1a2b3c4d";
+// More Slack threads' chats (CHAT-5): one asking, one stopped (BOT-14).
+const SLACK_ROOM = "/Users/you/.villain-worktrees/_chat/5e6f7a8b";
+const SLACK_STOPPED = "/Users/you/.villain-worktrees/_chat/9c0d1e2f";
 
 const tasks: TaskView[] = [
   {
@@ -261,7 +264,9 @@ const panes: PaneInfo[] = [
   // An agent over ACP (§20), mid-conversation and asking (`acp.ts`).
   pane("pane-acp", "t-login", "agent", "Claude Code · api", "claude", "asking", 25, { topic: "Rate-limit POST /login", acp: true }),
   pane("pane-copilot", "t-audit", "agent", "GitHub Copilot CLI", "copilot", "done", 300),
+  pane("pane-mine", "chat", "agent", "Claude Code", "claude", "done", 900, { topic: "Draft the billing export ticket", cwd: "/Users/you/.villain-worktrees/_chat/77aa88bb" }),
   pane("pane-chat", "chat", "agent", "Claude Code (resumed)", "claude", "working", 12, { topic: "Which tickets block the release", cwd: CHAT_ROOM }),
+  pane("pane-slack-done", "chat", "agent", "Claude Code", "claude", "asking", 60, { topic: "Why is staging slow", cwd: SLACK_ROOM }),
 ];
 
 const pr = (number: number, repo: string, merged: boolean) => ({
@@ -406,6 +411,7 @@ function busy(): World {
     // shell of the login task's.
     waiting: [
       { id: "saved-chat", task_id: "chat", kind: "agent", agent_id: "claude", cwd: "/Users/you/.villain-worktrees/_chat/18c735bb", title: "Backend architecture and domain structure review" },
+      { id: "saved-slack", task_id: "chat", kind: "agent", agent_id: "claude", cwd: SLACK_STOPPED, title: "Flaky checkout test" },
       { id: "saved-shell", task_id: "t-login", kind: "shell", agent_id: null, cwd: "/Users/you/.villain-worktrees/ACME-123", title: null },
     ],
     agents,
@@ -516,7 +522,11 @@ function busy(): World {
     messages: messages(),
     slackBot: {
       status: { state: "connected", error: null },
-      threads: [{ room: CHAT_ROOM, label: "#ops", link: "https://acme.slack.com/archives/C01/p1760270400000100", pane_id: "pane-chat" }],
+      threads: [
+        { room: CHAT_ROOM, label: "#ops", link: "https://acme.slack.com/archives/C01/p1760270400000100", pane_id: "pane-chat" },
+        { room: SLACK_ROOM, label: "#web", link: "https://acme.slack.com/archives/C02/p1760270400000200", pane_id: "pane-slack-done" },
+        { room: SLACK_STOPPED, label: "#qa", link: "https://acme.slack.com/archives/C03/p1760270400000300", pane_id: null },
+      ],
     },
     notes: notes(),
     notHere: [{ id: "r-billing", remote_key: "github.com/acme/billing", name: "billing", default_branch: "main", group: null, added_by: "Ada" }],

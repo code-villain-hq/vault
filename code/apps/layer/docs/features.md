@@ -504,8 +504,16 @@ integrations, the app's tools, the repos and the tasks in flight.
   its right edge, as the task list is (TASK-16): the same bounds and keys,
   its own remembered width, and 230px on a double-click. Chat names were
   cut short at a width nobody could change.
+- **CHAT-5** The chats the Slack bot opened (§24) MUST be listed apart
+  from yours, under a Slack heading below them that says how many there
+  are and how many are asking. The heading is folded until you open it,
+  and remembers whether it is open. Folded, it still shows the ones
+  working or asking, and the one on screen. A thread's chat stopped for
+  being idle (BOT-14) waits under the heading, not under Not reopened.
+  Each thread keeps a chat, so mixed in with yours they buried the chats
+  you started.
 
-Code: `ChatView.tsx`, `ChatLink.tsx`, `sidebar/SidebarGrip.tsx` (CHAT-4),
+Code: `ChatView.tsx`, `ChatList.tsx` (CHAT-5), `ChatLink.tsx`, `sidebar/SidebarGrip.tsx` (CHAT-4),
 `commands/panes.rs` (`open_chat`, `write_chat_context`), `mcp.rs` (`caller_chat`).
 
 Known gaps:
@@ -2575,7 +2583,8 @@ mention sent while the app is closed is never seen.
   in the keychain (§14). SET-2 applies.
 - **BOT-11** A chat the bot opened MUST be recorded in the message center
   (MSG-1), and clicking it opens that chat (NOTE-4). The chat view MUST
-  link the chat to its Slack thread.
+  link the chat to its Slack thread, named by its channel, and list it under its
+  Slack heading (CHAT-5).
 - **BOT-12** A chat for a Slack thread MUST start in the agent's `auto`
   mode, set before its first prompt, while Settings' *Work without asking*
   is on (the default): the person who asked is in Slack, not at the Mac,

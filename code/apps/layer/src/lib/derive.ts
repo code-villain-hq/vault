@@ -44,6 +44,15 @@ export function paneState(pane: PaneInfo): { label: string; dot: string } {
 }
 
 /**
+ * Whether the Chat view's folded Slack heading still shows this chat
+ * (CHAT-5): one at work or asking is what you would open the heading for,
+ * and the one on screen stays where you can see it is.
+ */
+export function showsFolded(p: PaneInfo, active: string | null): boolean {
+  return p.id === active || (p.running && (p.activity === "working" || p.activity === "asking"));
+}
+
+/**
  * An agent that needs you — what the dock icon counts.
  *
  * The same rule as the backend's: asking, or finished and not yet seen. A
