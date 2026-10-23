@@ -90,9 +90,10 @@ impl GitHub {
     async fn json(&self, rb: reqwest::RequestBuilder) -> Result<Value> {
         let res = rb.send().await?;
         let status = res.status();
+        let sso = res.headers().get("x-github-sso").and_then(|v| v.to_str().ok()).map(str::to_owned);
         let body = res.text().await?;
         if !status.is_success() {
-            return Err(failure(status, &body));
+            return Err(failure(status, sso.as_deref(), &body));
         }
         if body.trim().is_empty() {
             return Ok(Value::Null);
@@ -743,9 +744,20 @@ pub(crate) fn graphql_url(api_url: &str) -> String {
 /// What a refused request reports. A 401 is the saved token, whatever was
 /// asked: an expired one used to put GitHub's "Bad credentials" JSON beside
 /// every repo, and nothing said to reconnect (PR-12).
-fn failure(status: reqwest::StatusCode, body: &str) -> Error {
+///
+/// A 403 that GitHub marks as single sign-on (`X-GitHub-SSO: required`, or
+/// its "SAML enforcement" message) is the token too: good, but not yet
+/// authorized for an organization that requires SSO. Every repo there put
+/// that JSON beside it, no task ever showed as in review, and Settings said
+/// "connected".
+fn failure(status: reqwest::StatusCode, sso: Option<&str>, body: &str) -> Error {
     if status == reqwest::StatusCode::UNAUTHORIZED {
         return Error::TokenRejected("GitHub");
+    }
+    if status == reqwest::StatusCode::FORBIDDEN
+        && (sso.is_some_and(|s| s.starts_with("required")) || body.contains("SAML enforcement"))
+    {
+        return Error::TokenNeedsSso("GitHub");
     }
     Error::Other(format!("GitHub {status}: {}", body.chars().take(400).collect::<String>()))
 }
@@ -913,10 +925,24 @@ mod tests {
     #[test]
     fn a_rejected_token_says_so_instead_of_echoing_github() {
         let body = r#"{"message":"Bad credentials","status":"401"}"#;
-        let said = failure(reqwest::StatusCode::UNAUTHORIZED, body).to_string();
+        let said = failure(reqwest::StatusCode::UNAUTHORIZED, None, body).to_string();
         assert_eq!(said, "GitHub no longer accepts the saved token");
-        let other = failure(reqwest::StatusCode::NOT_FOUND, r#"{"message":"Not Found"}"#).to_string();
+        let other = failure(reqwest::StatusCode::NOT_FOUND, None, r#"{"message":"Not Found"}"#).to_string();
         assert!(other.starts_with("GitHub 404 Not Found: "), "{other}");
+    }
+
+    #[test]
+    fn a_token_not_authorized_for_single_sign_on_says_so_instead_of_echoing_github() {
+        let needs = "GitHub needs the saved token authorized for single sign-on";
+        let saml = r#"{"message":"Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization.","status":"403"}"#;
+        let header = "required; url=https://github.com/orgs/acme/sso?authorization_request=x";
+        assert_eq!(failure(reqwest::StatusCode::FORBIDDEN, Some(header), saml).to_string(), needs);
+        // The message alone is enough, should a proxy drop the header.
+        assert_eq!(failure(reqwest::StatusCode::FORBIDDEN, None, saml).to_string(), needs);
+        // Any other 403 (a rate limit, a missing permission) is still GitHub's own words.
+        let limit = r#"{"message":"API rate limit exceeded"}"#;
+        let other = failure(reqwest::StatusCode::FORBIDDEN, None, limit).to_string();
+        assert!(other.starts_with("GitHub 403 Forbidden: "), "{other}");
     }
 
     fn review(author: &str, state: &str) -> Review {

@@ -304,13 +304,20 @@ export function taskReview(rows: CheckoutPr[]): TaskReview {
 /** What the backend says on a 401 (`Error::TokenRejected` in `error.rs`). */
 export const TOKEN_REJECTED = "GitHub no longer accepts the saved token";
 
+/** What the backend says on a 403 for single sign-on (`Error::TokenNeedsSso`). */
+export const TOKEN_NEEDS_SSO = "GitHub needs the saved token authorized for single sign-on";
+
 /**
- * Whether GitHub refused the saved token on the last read of any task's PRs.
- * Settings said "connected" beside a tab saying the token was refused, since
- * all it knew was that one was saved (PR-12).
+ * Whether GitHub refused the saved token on the last read of any task's PRs,
+ * and how. Settings said "connected" beside a tab saying the token was
+ * refused, since all it knew was that one was saved (PR-12). Rejected wins:
+ * a token that needs a new one also needs nothing authorized.
  */
-export function githubRejected(prs: Record<string, CheckoutPr[]>): boolean {
-  return Object.values(prs).some((rows) => rows.some((r) => r.error === TOKEN_REJECTED));
+export function githubRefusal(prs: Record<string, CheckoutPr[]>): "rejected" | "sso" | null {
+  const errors = Object.values(prs).flatMap((rows) => rows.map((r) => r.error));
+  if (errors.includes(TOKEN_REJECTED)) return "rejected";
+  if (errors.includes(TOKEN_NEEDS_SSO)) return "sso";
+  return null;
 }
 
 /** How many comments a task's PRs are carrying, conversation and inline both. */

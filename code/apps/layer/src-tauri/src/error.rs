@@ -34,6 +34,13 @@ pub enum Error {
     #[error("{0} no longer accepts the saved token")]
     TokenRejected(&'static str),
 
+    /// The service answered 403 because the organization requires single
+    /// sign-on and the saved token is not authorized for it. The token is
+    /// otherwise good, so it is not "rejected"; the frontend knows this text
+    /// (`TOKEN_NEEDS_SSO`) and says once what to do (PR-12).
+    #[error("{0} needs the saved token authorized for single sign-on")]
+    TokenNeedsSso(&'static str),
+
     #[error("{0}")]
     Other(String),
 }

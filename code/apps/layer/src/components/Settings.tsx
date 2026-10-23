@@ -3,7 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../lib/api";
-import { githubRejected } from "../lib/derive";
+import { githubRefusal } from "../lib/derive";
 import { useStore } from "../store";
 import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
 import { TicketFlowSettings } from "./TicketFlow";
@@ -25,7 +25,7 @@ export function Settings() {
   const refreshSettings = useStore((s) => s.refreshSettings);
   const refreshIssues = useStore((s) => s.refreshIssues);
   const refreshPrs = useStore((s) => s.refreshPrs);
-  const ghRejected = useStore((s) => githubRejected(s.prs));
+  const ghRefusal = useStore((s) => githubRefusal(s.prs));
   // Each section's actions fail under what was pressed (NOTE-6): connecting
   // under its button, disconnecting under the connected row.
   const jira = useFailure();
@@ -294,9 +294,11 @@ export function Settings() {
           </p>
           {settings?.github_connected && (
             <div className="row" style={{ marginBottom: 14 }}>
-              {ghRejected
+              {ghRefusal === "rejected"
                 ? <span className="ui-status ui-status-danger">token rejected</span>
-                : <span className="ui-status">connected</span>}
+                : ghRefusal === "sso"
+                  ? <span className="ui-status ui-status-danger">needs single sign-on</span>
+                  : <span className="ui-status">connected</span>}
               <span className="muted">{settings.github?.api_url}</span>
               <div className="spacer" />
               <button className="ui-button ui-button-danger" onClick={() => void disconnect("github")}>

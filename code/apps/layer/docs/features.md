@@ -747,7 +747,12 @@ send feedback to an agent, and finish a merged task.
   While the last read was refused, the chip in Settings says "token
   rejected" in place of "connected", which only ever meant a token was
   saved. Saving a token sweeps every task's PRs at once, or straight after
-  a sweep already under way, so the refusal does not linger.
+  a sweep already under way, so the refusal does not linger. A 403 that
+  GitHub marks as single sign-on is said once too: the organization
+  requires SSO and the token is not authorized for it, with the way to
+  authorize it and a button to check again; the chip says "needs single
+  sign-on". It used to show GitHub's "SAML enforcement" JSON beside every
+  repo, Settings said "connected", and no task ever showed as in review.
 - **PR-13** An agent MAY show images in a task's open pull request with
   `pr_images` (after the user agrees): screenshots of a visible change,
   night and day. GitHub has no API for the attachments its own editor
