@@ -38,6 +38,9 @@ impl LocalPostgres {
             timeout: Some(Duration::from_secs(120)),
             ..Settings::default()
         };
+        // postgresql_embedded passes -F for disposable databases. These are
+        // people's persistent workspaces: acknowledge only durable commits.
+        settings.configuration.insert("fsync".into(), "on".into());
         settings
             .configuration
             .insert("listen_addresses".into(), Ipv4Addr::LOCALHOST.to_string());
@@ -55,17 +58,10 @@ impl LocalPostgres {
                 tracing::debug!("no earlier Postgres to stop: {error}");
             }
         }
-        if let Err(error) = postgres.start().await {
-            let pid_file = postgres.settings().data_dir.join("postmaster.pid");
-            if !pid_file.exists() {
-                return Err(error.into());
-            }
-            // Nothing could be stopped above, so the file is stale, but its
-            // pid now belongs to another process: Postgres won't clear it.
-            tracing::warn!("removing a stale postmaster.pid: {error}");
-            std::fs::remove_file(pid_file)?;
-            postgres.start().await?;
-        }
+        // PostgreSQL itself clears a dead owner's PID file. A failed start
+        // or stop does not prove it stale (recovery can exceed the timeout).
+        // Keep the file and the error rather than remove a live owner's lock.
+        postgres.start().await?;
         Ok(Self { postgres })
     }
 

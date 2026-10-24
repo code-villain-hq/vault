@@ -42,6 +42,18 @@ async fn keeps_its_data_to_itself_across_restarts_and_crashes() {
     let root = tempfile::tempdir().unwrap();
 
     let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
+    let mut settings = PgConnection::connect(&postgres.url("postgres"))
+        .await
+        .unwrap();
+    let fsync: String = sqlx::query_scalar("SHOW fsync")
+        .fetch_one(&mut settings)
+        .await
+        .unwrap();
+    assert_eq!(
+        fsync, "on",
+        "persistent workspaces must survive loss of the OS disk cache"
+    );
+    settings.close().await.unwrap();
     // Loopback only, and only with the password, kept where only we can read it.
     assert!(postgres.url("app").contains("@127.0.0.1:"));
     let wrong = format!(
@@ -74,4 +86,25 @@ async fn keeps_its_data_to_itself_across_restarts_and_crashes() {
     let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
     assert_eq!(read(&postgres).await, ["first", "second"]);
     postgres.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn failed_start_and_stop_leave_the_owners_pid_file_alone() {
+    let root = tempfile::tempdir().unwrap();
+    let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
+    postgres.stop().await.unwrap();
+    // Simulate command failures without signalling or disrupting a real
+    // owner. Only this disposable cluster's extracted pg_ctl is replaced.
+    let runtime = root.path().join("runtime");
+    let ctl = std::fs::read_dir(runtime)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path().join("bin/pg_ctl"))
+        .find(|path| path.is_file())
+        .unwrap();
+    std::fs::write(ctl, "#!/bin/sh\nexit 1\n").unwrap();
+    let pid = root.path().join("data/postmaster.pid");
+    std::fs::write(&pid, "12345\n").unwrap();
+    assert!(LocalPostgres::start(root.path(), 0).await.is_err());
+    assert_eq!(std::fs::read_to_string(pid).unwrap(), "12345\n");
 }
