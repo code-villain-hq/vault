@@ -261,3 +261,40 @@ test("failed local writes remain queued, report failure, and survive restart aft
   await reopened.start();
   expect(reopened.get("Task", id)?.title).toBe("Offline work");
 });
+
+test("bulk replay touches each record once and preserves operation order", async () => {
+  const server = new FakeServer();
+  server.online = false;
+  let creates = 0;
+  const client = new SyncClient<Schema>({
+    store: new MemoryStore(),
+    transport: server.transport(),
+    defaults: {
+      Task: () => {
+        creates++;
+        return { number: 0, status: "todo", priority: 0 };
+      },
+    },
+  });
+  try {
+    client.transact(
+      Array.from({ length: 1000 }, (_, i) => ({
+        action: "create",
+        model: "Task",
+        id: String(i),
+        data: { title: "original" },
+      })),
+    );
+    const before = creates;
+    client.transact([
+      { action: "update", model: "Task", id: "0", data: { title: "first" } },
+      { action: "update", model: "Task", id: "0", data: { title: "last" } },
+    ]);
+    expect(creates - before).toBe(1);
+    expect(client.get("Task", "0")?.title).toBe("last");
+    expect(client.get("Task", "1")?.title).toBe("original");
+    await client.saved();
+  } finally {
+    client.stop();
+  }
+});

@@ -60,6 +60,7 @@ export class SyncClient<S extends SchemaShape> {
   #confirmed = new Map<string, Map<string, Row>>();
   /** Local transactions not yet confirmed, oldest first. */
   #pending: Pending[] = [];
+  #pendingByRecord = new Map<string, { transaction: Transaction; op: Operation }[]>();
   /** Confirmed state with pending changes applied: what the app sees. */
   #view = new Map<string, Map<string, Row>>();
   /** Cached arrays for `query`, so React gets a stable value between changes. */
@@ -99,6 +100,7 @@ export class SyncClient<S extends SchemaShape> {
     this.#syncId = saved.syncId;
     this.#confirmed = saved.records;
     this.#pending = saved.outbox.map((transaction) => ({ transaction, sent: false }));
+    for (const pending of this.#pending) this.#indexPending(pending.transaction);
     this.#rebuildView();
     this.#setStatus({ ready: saved.epoch !== null, pending: this.#pending.length });
     await this.#open();
@@ -145,9 +147,7 @@ export class SyncClient<S extends SchemaShape> {
 
   /** True if the record has local changes the server hasn't confirmed. */
   isPending(model: ModelOf<S>, id: string): boolean {
-    return this.#pending.some((p) =>
-      p.transaction.operations.some((op) => op.model === model && op.id === id),
-    );
+    return this.#pendingByRecord.has(JSON.stringify([model, id]));
   }
 
   status(): SyncStatus {
@@ -180,6 +180,7 @@ export class SyncClient<S extends SchemaShape> {
   transact(operations: Operation<ModelOf<S>>[]): string {
     const transaction: Transaction = { id: uuidv7(), operations };
     this.#pending.push({ transaction, sent: false });
+    this.#indexPending(transaction);
     this.#persist((store) => store.addToOutbox(transaction));
     this.#recompute(operations.map((op) => [op.model, op.id]));
     this.#setStatus({ pending: this.#pending.length });
@@ -344,7 +345,18 @@ export class SyncClient<S extends SchemaShape> {
   /** Removes transactions from the outbox, confirmed or refused. */
   #settle(done: Pending[], recompute = true): [string, string][] {
     if (done.length === 0) return [];
-    this.#pending = this.#pending.filter((p) => !done.includes(p));
+    const settled = new Set(done);
+    this.#pending = this.#pending.filter((p) => !settled.has(p));
+    const removed = new Set(done.flatMap((p) => p.transaction.operations));
+    const transactions = new Set(done.map((p) => p.transaction));
+    const affected = new Set([...removed].map((op) => JSON.stringify([op.model, op.id])));
+    for (const key of affected) {
+      const remaining =
+        this.#pendingByRecord.get(key)?.filter((entry) => !transactions.has(entry.transaction)) ??
+        [];
+      if (remaining.length) this.#pendingByRecord.set(key, remaining);
+      else this.#pendingByRecord.delete(key);
+    }
     for (const p of done) this.#persist((store) => store.removeFromOutbox(p.transaction.id));
     const touched = done.flatMap((p) =>
       p.transaction.operations.map((op): [string, string] => [op.model, op.id]),
@@ -366,17 +378,27 @@ export class SyncClient<S extends SchemaShape> {
     this.#queueNotify();
   }
 
-  /** Recomputes records from confirmed state plus pending changes. */
+  #indexPending(transaction: Transaction): void {
+    for (const op of transaction.operations) {
+      const key = JSON.stringify([op.model, op.id]);
+      const pending = this.#pendingByRecord.get(key) ?? [];
+      pending.push({ transaction, op });
+      this.#pendingByRecord.set(key, pending);
+    }
+  }
+
+  /** Replays only this record's pending operations, in transaction order. */
   #recompute(keys: [string, string][]): void {
+    const seen = new Set<string>();
     for (const [model, id] of keys) {
+      const key = JSON.stringify([model, id]);
+      if (seen.has(key)) continue;
+      seen.add(key);
       let row = this.#confirmed.get(model)?.get(id);
-      for (const { transaction } of this.#pending) {
-        for (const op of transaction.operations) {
-          if (op.model !== model || op.id !== id) continue;
-          if (op.action === "create") row ??= this.#optimistic(model, id, op.data);
-          else if (op.action === "update") row = row && { ...row, ...op.data };
-          else row = undefined;
-        }
+      for (const { op } of this.#pendingByRecord.get(key) ?? []) {
+        if (op.action === "create") row ??= this.#optimistic(model, id, op.data);
+        else if (op.action === "update") row = row && { ...row, ...op.data };
+        else row = undefined;
       }
 
       let rows = this.#view.get(model);

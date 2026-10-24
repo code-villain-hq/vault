@@ -138,3 +138,5 @@ Open them in a browser; add `#day` to the address for day.
 - Retention ("do people come back?") as a fourth kind of metric.
 - Alerts: who hears about a red or yellow app, and how.
 - A Health page across all apps, once there are more than three.
+
+App health summaries are shared between clients for up to 15 seconds. The seven-day latency baseline refreshes at most every five minutes per app; recent action statistics are still queried live.

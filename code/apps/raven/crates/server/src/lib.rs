@@ -7,6 +7,7 @@
 pub mod accounts;
 pub mod apps;
 pub mod auth;
+pub mod cache;
 pub mod company;
 pub mod config;
 pub mod error;

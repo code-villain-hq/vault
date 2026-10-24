@@ -10,6 +10,8 @@ use crate::telemetry::Recorder;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub health_cache: Arc<crate::cache::Cache<crate::health::Status>>,
+    pub baseline_cache: Arc<crate::cache::Cache<Vec<crate::metrics::Baseline>>>,
     /// Carries the id of a workspace whose change log grew, or the nil id to
     /// wake every connection (after missed notifications).
     pub wake: broadcast::Sender<Uuid>,
@@ -36,6 +38,10 @@ impl AppState {
         let (wake, _) = broadcast::channel(1024);
         AppState {
             pool,
+            health_cache: Arc::new(crate::cache::Cache::new(std::time::Duration::from_secs(15))),
+            baseline_cache: Arc::new(crate::cache::Cache::new(std::time::Duration::from_secs(
+                300,
+            ))),
             wake,
             cookie_secure,
             company: None,

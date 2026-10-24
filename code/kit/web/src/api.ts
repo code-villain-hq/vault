@@ -1,5 +1,5 @@
 // Calling an app's API in a place, and reading it while a page is open.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   apiUrl,
   appConfig,
@@ -9,6 +9,7 @@ import {
   placeFor,
   rememberToken,
 } from "./places";
+import { poll } from "./poll";
 import { messageOf, UNKNOWN_PROBLEM } from "./problems";
 
 /** What a server says when a request fails. */
@@ -43,11 +44,13 @@ export async function api<T>(
   path: string,
   body?: unknown,
   place = placeFor(path),
+  signal?: AbortSignal,
 ): Promise<T> {
   let response: Response;
   try {
     response = await fetch(apiUrl(path, place), {
       method,
+      signal,
       credentials: credentialsFor(place),
       headers: {
         ...authHeaders(place),
@@ -90,24 +93,36 @@ export function useApi<T>(path: string) {
     error?: string;
     offline?: boolean;
   }>({ path });
-  const load = useCallback(async () => {
-    try {
-      const data = await api<T>("GET", path);
-      setState({ path, data });
-    } catch (e) {
-      const offline = e instanceof RequestError && e.offline;
-      setState((s) => ({ ...s, path, error: messageOf(e), offline }));
-    }
-  }, [path]);
+  const refresher = useRef<() => Promise<void>>(() => Promise.resolve());
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      try {
+        const data = await api<T>(
+          "GET",
+          path,
+          undefined,
+          undefined,
+          AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
+        );
+        if (signal.aborted) return;
+        setState({ path, data });
+      } catch (e) {
+        if (signal.aborted) return;
+        const offline = e instanceof RequestError && e.offline;
+        setState((s) => ({ ...s, path, error: messageOf(e), offline }));
+      }
+    },
+    [path],
+  );
   useEffect(() => {
-    void load();
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void load();
-    }, REFRESH_MS);
-    window.addEventListener("online", load);
+    const polling = poll(load, () => document.visibilityState === "visible", REFRESH_MS);
+    refresher.current = polling.refresh;
+    void polling.refresh();
+    const online = () => void polling.refresh();
+    window.addEventListener("online", online);
     return () => {
-      clearInterval(timer);
-      window.removeEventListener("online", load);
+      polling.stop();
+      window.removeEventListener("online", online);
     };
   }, [load]);
   // A new path starts empty rather than showing the last page's numbers.
@@ -116,6 +131,6 @@ export function useApi<T>(path: string) {
     data: current ? state.data : undefined,
     error: current ? state.error : undefined,
     offline: current && Boolean(state.offline),
-    reload: load,
+    reload: useCallback(() => refresher.current(), []),
   };
 }

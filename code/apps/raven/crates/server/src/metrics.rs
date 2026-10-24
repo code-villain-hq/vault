@@ -72,7 +72,9 @@ pub async fn apps(
         let status = timed(
             "app status",
             "health::status",
-            health::status(&state.pool, id),
+            state.health_cache.get(id, || {
+                health::status(&state.pool, id, &state.baseline_cache)
+            }),
         )
         .await?;
         apps.push(AppSummary {
@@ -133,7 +135,14 @@ pub async fn health_page(
 ) -> Result<Json<HealthPage>, AppError> {
     let pool = &state.pool;
     let app = apps::find(pool, &member, &app).await?;
-    let status = timed("app status", "health::status", health::status(pool, app.id)).await?;
+    let status = timed(
+        "app status",
+        "health::status",
+        state.health_cache.get(app.id, || {
+            health::status(pool, app.id, &state.baseline_cache)
+        }),
+    )
+    .await?;
 
     const CHECKS: &str = "SELECT floor(extract(epoch FROM checked_at) / $2)::bigint, count(*), \
         count(*) FILTER (WHERE NOT ok) FROM health_checks \
@@ -231,34 +240,49 @@ pub struct ActionStats {
     pub normal_calls: Option<i64>,
 }
 
-const ACTIONS: &str = "WITH recent AS ( \
-        SELECT name, count(*) AS calls, count(*) FILTER (WHERE is_error) AS errors, \
-          percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms, \
-          percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms \
-        FROM spans WHERE app_id = $1 AND kind = 'server' \
-          AND started_at > now() - make_interval(secs => $2) \
-        GROUP BY name), \
-      normal AS ( \
-        SELECT name, count(*) AS normal_calls, \
-          percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS normal_p95_ms \
-        FROM spans WHERE app_id = $1 AND kind = 'server' \
-          AND started_at > now() - interval '7 days' \
-        GROUP BY name) \
-    SELECT r.name, r.calls, r.errors, r.p50_ms, r.p95_ms, n.normal_p95_ms, n.normal_calls \
-    FROM recent r LEFT JOIN normal n USING (name)";
+#[derive(Clone, FromRow)]
+pub struct Baseline {
+    name: String,
+    calls: i64,
+    p95_ms: f64,
+}
 
-/// Each action's calls over the last `secs` seconds.
+const BASELINE: &str = "SELECT name, count(*) AS calls, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms FROM spans WHERE app_id = $1 AND kind = 'server' AND started_at > now() - interval '7 days' GROUP BY name";
+const ACTIONS: &str = "SELECT name, count(*) AS calls, count(*) FILTER (WHERE is_error) AS errors, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms, NULL::double precision AS normal_p95_ms, NULL::bigint AS normal_calls FROM spans WHERE app_id = $1 AND kind = 'server' AND started_at > now() - make_interval(secs => $2) GROUP BY name";
+
+/// Recent values stay live; the seven-day baseline is shared for five minutes.
 pub async fn action_stats(
     pool: &PgPool,
     app: Uuid,
     secs: f64,
+    baselines: &crate::cache::Cache<Vec<Baseline>>,
 ) -> Result<Vec<ActionStats>, sqlx::Error> {
-    timed(
+    let normal = baselines
+        .get(app, || {
+            timed(
+                "action baseline",
+                BASELINE,
+                sqlx::query_as(BASELINE).bind(app).fetch_all(pool),
+            )
+        })
+        .await?;
+    let normal: HashMap<_, _> = normal
+        .into_iter()
+        .map(|row| (row.name.clone(), row))
+        .collect();
+    let mut recent: Vec<ActionStats> = timed(
         "action stats",
         ACTIONS,
         sqlx::query_as(ACTIONS).bind(app).bind(secs).fetch_all(pool),
     )
-    .await
+    .await?;
+    for row in &mut recent {
+        if let Some(baseline) = normal.get(&row.name) {
+            row.normal_calls = Some(baseline.calls);
+            row.normal_p95_ms = Some(baseline.p95_ms);
+        }
+    }
+    Ok(recent)
 }
 
 #[derive(Serialize)]
@@ -348,7 +372,7 @@ pub async fn technical_page(
     let pool = &state.pool;
     let app = apps::find(pool, &member, &app).await?;
     let secs = query.secs();
-    let mut actions: Vec<ActionRow> = action_stats(pool, app.id, secs)
+    let mut actions: Vec<ActionRow> = action_stats(pool, app.id, secs, &state.baseline_cache)
         .await?
         .into_iter()
         .map(|stats| ActionRow::new(stats, secs))
@@ -453,7 +477,7 @@ pub async fn action_page(
         window: query.window,
     }
     .secs();
-    let stats = action_stats(pool, app.id, secs)
+    let stats = action_stats(pool, app.id, secs, &state.baseline_cache)
         .await?
         .into_iter()
         .find(|a| a.name == query.name)

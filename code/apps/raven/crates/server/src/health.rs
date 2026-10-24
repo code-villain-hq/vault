@@ -161,7 +161,11 @@ fn sentence(text: &str) -> String {
 pub const RECENT_SECS: f64 = 15.0 * 60.0;
 
 /// The app's status now.
-pub async fn status(pool: &PgPool, app: Uuid) -> Result<Status, sqlx::Error> {
+pub async fn status(
+    pool: &PgPool,
+    app: Uuid,
+    baselines: &crate::cache::Cache<Vec<metrics::Baseline>>,
+) -> Result<Status, sqlx::Error> {
     let checks: Vec<(DateTime<Utc>, bool, Option<String>)> = sqlx::query_as(
         "SELECT checked_at, ok, error FROM health_checks WHERE app_id = $1 \
          ORDER BY checked_at DESC LIMIT 2",
@@ -200,7 +204,7 @@ pub async fn status(pool: &PgPool, app: Uuid) -> Result<Status, sqlx::Error> {
         });
     }
 
-    let actions = metrics::action_stats(pool, app, RECENT_SECS).await?;
+    let actions = metrics::action_stats(pool, app, RECENT_SECS, baselines).await?;
     if let Some(worst) = actions
         .iter()
         .filter(|a| a.errors > 0)

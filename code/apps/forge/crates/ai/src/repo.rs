@@ -5,10 +5,13 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use regex::RegexBuilder;
-use tokio::process::Command;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::sync::Mutex;
 
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
@@ -20,6 +23,7 @@ pub struct Repo {
     files: BTreeMap<String, String>,
     /// The scope's globs, for git commands.
     globs: Vec<String>,
+    reader: Mutex<Option<BlobReader>>,
 }
 
 const MAX_LIST: usize = 400;
@@ -54,6 +58,7 @@ impl Repo {
             root: root.to_path_buf(),
             files,
             globs: globs.to_vec(),
+            reader: Mutex::new(None),
         })
     }
 
@@ -220,13 +225,16 @@ impl Repo {
             .files
             .get(path)
             .ok_or_else(|| RepoError("file is out of scope".into()))?;
-        let size = git(&self.root, &["cat-file", "-s", blob]).await?;
-        if size.trim().parse::<u64>().unwrap_or(u64::MAX) > MAX_FILE_BYTES {
-            return Err(RepoError(
-                "file is too large; read a smaller tracked file".into(),
-            ));
+        let mut reader = self.reader.lock().await;
+        if reader.is_none() {
+            *reader = Some(BlobReader::open(&self.root).map_err(|e| RepoError(e.to_string()))?);
         }
-        git(&self.root, &["cat-file", "blob", blob]).await
+        let mut worker = reader.take().expect("opened above");
+        let result = worker.read(blob).await;
+        if result.is_ok() {
+            *reader = Some(worker);
+        }
+        result.map_err(|e| RepoError(format!("can't read {path}: {e}")))
     }
 
     /// A tracked file in scope, by relative path.
@@ -281,6 +289,66 @@ async fn git(root: &Path, args: &[&str]) -> Result<String, RepoError> {
         )));
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// One bounded, serialized pipe per repository; Git alone resolves object ids.
+/// Dropping the repository kills the worker, including during cancellation.
+struct BlobReader {
+    _child: Child,
+    input: ChildStdin,
+    output: BufReader<ChildStdout>,
+}
+
+impl BlobReader {
+    fn open(root: &Path) -> std::io::Result<Self> {
+        let mut child = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .arg("cat-file")
+            .arg("--batch-command")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()?;
+        Ok(Self {
+            input: child.stdin.take().expect("piped stdin"),
+            output: BufReader::new(child.stdout.take().expect("piped stdout")),
+            _child: child,
+        })
+    }
+
+    async fn header(&mut self, command: &str, blob: &str) -> std::io::Result<usize> {
+        self.input
+            .write_all(format!("{command} {blob}\n").as_bytes())
+            .await?;
+        self.input.flush().await?;
+        let mut header = String::new();
+        self.output.read_line(&mut header).await?;
+        let fields: Vec<_> = header.split_whitespace().collect();
+        if fields.len() != 3 || fields[0] != blob || fields[1] != "blob" {
+            return Err(std::io::Error::other("git returned an invalid blob header"));
+        }
+        fields[2].parse().map_err(std::io::Error::other)
+    }
+
+    async fn read(&mut self, blob: &str) -> std::io::Result<String> {
+        let size = self.header("info", blob).await?;
+        if size as u64 > MAX_FILE_BYTES {
+            return Err(std::io::Error::other(
+                "file is too large; read a smaller tracked file",
+            ));
+        }
+        if self.header("contents", blob).await? != size {
+            return Err(std::io::Error::other("git blob size changed"));
+        }
+        let mut bytes = vec![0; size + 1];
+        self.output.read_exact(&mut bytes).await?;
+        if bytes.pop() != Some(b'\n') {
+            return Err(std::io::Error::other("invalid git blob terminator"));
+        }
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
 }
 
 fn cut(mut text: String, max: usize) -> String {
@@ -429,5 +497,50 @@ mod tests {
                 .contains("tracked text")
         );
         assert_eq!(repo.search("SECRET", None).await.unwrap(), "No matches.");
+    }
+    #[tokio::test]
+    async fn batch_search_handles_many_blobs_and_recovers_after_an_oversized_one() {
+        let dir = repo_with(&[("first.txt", "small text")]);
+        for i in 0..500 {
+            std::fs::write(
+                dir.path().join(format!("file-{i}.txt")),
+                format!("content {i}"),
+            )
+            .unwrap();
+        }
+        std::fs::write(
+            dir.path().join("huge.txt"),
+            vec![b'x'; MAX_FILE_BYTES as usize + 1],
+        )
+        .unwrap();
+        assert!(
+            StdCommand::new("git")
+                .arg("-C")
+                .arg(dir.path())
+                .args(["add", "."])
+                .status()
+                .unwrap()
+                .success()
+        );
+        let repo = Repo::open(dir.path(), &[]).await.unwrap();
+        let start = std::time::Instant::now();
+        assert_eq!(
+            repo.search("absent-pattern", None).await.unwrap(),
+            "No matches."
+        );
+        eprintln!("502-file batch search: {:?}", start.elapsed());
+        assert!(repo.read("huge.txt", None, None).await.is_err());
+        assert!(
+            repo.read("file-499.txt", None, None)
+                .await
+                .unwrap()
+                .contains("content 499")
+        );
+        let (a, b) = tokio::join!(
+            repo.read("file-1.txt", None, None),
+            repo.read("file-2.txt", None, None)
+        );
+        assert!(a.unwrap().contains("content 1"));
+        assert!(b.unwrap().contains("content 2"));
     }
 }
