@@ -27,7 +27,8 @@ pub trait Rules: Send + Sync + 'static {
     /// whenever a workspace's log grows.
     const NOTIFY_CHANNEL: &'static str;
 
-    /// `None` for someone who syncs the whole workspace. For a guest, their
+    /// Return an error for someone who is no longer a member. `None` is
+    /// only for someone who syncs the whole workspace. For a guest, their
     /// access version: a number the app changes whenever what they may see
     /// does (a role, a team they're added to). They then sync only what
     /// [`Model::guest_view`] allows, and a new version makes their client

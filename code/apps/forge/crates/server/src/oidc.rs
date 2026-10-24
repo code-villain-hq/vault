@@ -531,11 +531,11 @@ async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem
     let user = match linked {
         Some(user) => user,
         None => {
-            // An email the provider says it hasn't verified proves nothing.
+            // Linking by email requires the provider to affirm its verification.
             let email = claims
                 .email
                 .as_deref()
-                .filter(|_| claims.email_verified != Some(false))
+                .filter(|_| claims.email_verified == Some(true))
                 .and_then(|e| normalize_email(e).ok())
                 .filter(|e| !is_agent_email(e))
                 .ok_or(Problem::NoEmail)?;
@@ -559,16 +559,25 @@ async fn account(db: &mut PgConnection, claims: &Claims) -> Result<Uuid, Problem
             }
         }
     };
-    let member: bool =
-        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM workspace_members WHERE user_id = $1)")
-            .bind(user)
-            .fetch_one(&mut *db)
-            .await?;
+    let member = lock_membership(db, user).await?;
     if member {
         Ok(user)
     } else {
         Err(Problem::NoAccess)
     }
+}
+
+// Hold eligibility until the session commits. A concurrent removal must
+// either finish first (denying sign-in) or revoke the newly committed session.
+async fn lock_membership(db: &mut PgConnection, user: Uuid) -> Result<bool, sqlx::Error> {
+    let workspace: Option<Uuid> = sqlx::query_scalar(
+        "SELECT workspace_id FROM workspace_members WHERE user_id = $1 \
+         ORDER BY workspace_id LIMIT 1 FOR SHARE",
+    )
+    .bind(user)
+    .fetch_optional(db)
+    .await?;
+    Ok(workspace.is_some())
 }
 
 #[derive(Deserialize)]
@@ -591,7 +600,14 @@ pub async fn desktop(
     let user = login
         .take(&request.code, &request.secret)
         .ok_or_else(|| AppError::unauthorized("this sign-in has expired: start again"))?;
-    let token = start_session(&state.pool, user).await?;
+    let mut db = state.pool.begin().await?;
+    if !lock_membership(&mut db, user).await? {
+        return Err(AppError::unauthorized(
+            "You no longer have access. Ask your company's admin to add you.",
+        ));
+    }
+    let token = start_session(&mut *db, user).await?;
+    db.commit().await?;
     signed_in(&state, &headers, &token, user).await
 }
 

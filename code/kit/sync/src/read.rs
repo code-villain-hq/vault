@@ -86,6 +86,12 @@ pub async fn entries_after<R: Rules>(
     after: i64,
     limit: i64,
 ) -> Result<(Vec<SyncEntry<R::Model>>, i64), SyncError> {
+    // Authorization, log records and guest filters describe one snapshot.
+    let mut db = pool.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .execute(&mut *db)
+        .await?;
+    let guest = R::guest_access(&mut db, viewer).await?;
     type Row = (i64, Uuid, String, Uuid, String, Option<Value>, Option<Uuid>);
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT sync_id, transaction_id, model, model_id, action, data, visible_to FROM sync_log \
@@ -94,7 +100,7 @@ pub async fn entries_after<R: Rules>(
     .bind(viewer.workspace_id)
     .bind(after)
     .bind(limit)
-    .fetch_all(pool)
+    .fetch_all(&mut *db)
     .await?;
 
     let upto = rows.last().map_or(after, |row| row.0);
@@ -103,8 +109,7 @@ pub async fn entries_after<R: Rules>(
         .filter(|row| row.6.is_none_or(|user| user == viewer.user_id))
         .collect();
 
-    let mut db = pool.acquire().await?;
-    let visible = match R::guest_access(&mut db, viewer).await? {
+    let visible = match guest {
         None => None,
         Some(_) => {
             let changed = rows.iter().filter(|row| row.5.is_some()).filter_map(|row| {
@@ -113,7 +118,7 @@ pub async fn entries_after<R: Rules>(
             Some(guest_filter(&mut db, viewer, changed).await?)
         }
     };
-    drop(db);
+    db.commit().await?;
 
     let entries = rows
         .into_iter()

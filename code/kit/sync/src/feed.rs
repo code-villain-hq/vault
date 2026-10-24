@@ -58,7 +58,18 @@ where
     }
 
     let mut last = from.after;
-    send_new::<R>(&mut sender, pool, actor, &mut last).await?;
+    if !send_new::<R, _, _>(
+        &mut sender,
+        pool,
+        actor,
+        &mut last,
+        epoch,
+        &mut still_allowed,
+    )
+    .await?
+    {
+        return Ok(());
+    }
 
     let mut heartbeat = tokio::time::interval(HEARTBEAT);
     heartbeat.tick().await;
@@ -79,18 +90,18 @@ where
                 Some(Ok(_)) => continue,
             },
         }
-        // Before every change sent, not only on the heartbeat: once signed out
-        // or removed from the workspace, nothing more of it reaches them.
-        if !still_allowed().await {
-            sender.send(Message::Close(None)).await?;
+        if !send_new::<R, _, _>(
+            &mut sender,
+            pool,
+            actor,
+            &mut last,
+            epoch,
+            &mut still_allowed,
+        )
+        .await?
+        {
             return Ok(());
         }
-        // Added to a team, or made a guest: their copy starts over.
-        if epoch_of::<R>(pool, actor).await? != epoch {
-            send::<R>(&mut sender, &ServerMessage::Resync).await?;
-            return Ok(());
-        }
-        send_new::<R>(&mut sender, pool, actor, &mut last).await?;
     }
 }
 
@@ -104,18 +115,31 @@ async fn epoch_of<R: Rules>(pool: &PgPool, actor: Actor) -> anyhow::Result<Uuid>
 type Sender = SplitSink<WebSocket, Message>;
 
 /// Sends every change after `last`, page by page, and advances `last`.
-async fn send_new<R: Rules>(
+async fn send_new<R: Rules, F, Fut>(
     sender: &mut Sender,
     pool: &PgPool,
     actor: Actor,
     last: &mut i64,
-) -> anyhow::Result<()> {
+    epoch: Uuid,
+    still_allowed: &mut F,
+) -> anyhow::Result<bool>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = bool>,
+{
     loop {
+        if !check_access::<R, _, _>(sender, pool, actor, epoch, still_allowed).await? {
+            return Ok(false);
+        }
         // `upto` can pass entries meant for others; moving the client past
         // them is what confirms its transactions that created them.
         let (entries, upto) = entries_after::<R>(pool, actor, *last, PAGE).await?;
         if upto == *last {
-            return Ok(());
+            return Ok(true);
+        }
+        // A removal or changed grant during the read must discard this page.
+        if !check_access::<R, _, _>(sender, pool, actor, epoch, still_allowed).await? {
+            return Ok(false);
         }
         *last = upto;
         send::<R>(
@@ -127,6 +151,28 @@ async fn send_new<R: Rules>(
         )
         .await?;
     }
+}
+
+async fn check_access<R: Rules, F, Fut>(
+    sender: &mut Sender,
+    pool: &PgPool,
+    actor: Actor,
+    epoch: Uuid,
+    still_allowed: &mut F,
+) -> anyhow::Result<bool>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = bool>,
+{
+    if !still_allowed().await {
+        sender.send(Message::Close(None)).await?;
+        return Ok(false);
+    }
+    if epoch_of::<R>(pool, actor).await? != epoch {
+        send::<R>(sender, &ServerMessage::Resync).await?;
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 async fn send<R: Rules>(

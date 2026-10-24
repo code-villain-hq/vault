@@ -58,7 +58,8 @@ async fn fake_provider() -> String {
                     });
                     let person = match who {
                         "ada" => json!({ "sub": "sub-ada", "email": "Ada@Example.com", "email_verified": true, "name": "Ada L." }),
-                        "newbie" => json!({ "sub": "sub-new", "email": "new@example.com", "preferred_username": "newbie" }),
+                        "newbie" => json!({ "sub": "sub-new", "email": "new@example.com", "preferred_username": "newbie", "email_verified": true }),
+                        "verification-omitted" => json!({ "sub": "sub-omitted", "email": "bob@example.com" }),
                         "unverified" => json!({ "sub": "sub-unverified", "email": "bob@example.com", "email_verified": false }),
                         "ada-again" => json!({ "sub": "sub-other", "email": "ada@example.com", "email_verified": true }),
                         "for-glyph" => json!({ "sub": "sub-ada", "email": "ada@example.com", "aud": ["glyph"] }),
@@ -377,5 +378,88 @@ async fn a_failed_desktop_sign_in_goes_back_to_the_app(pool: PgPool) {
     assert_eq!(
         to, "/login?error=oidc_expired",
         "a trip that can't be read isn't the app's"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_omitted_verification_claim_cannot_link_an_account(pool: PgPool) {
+    let Setup { app, company } = setup(pool).await;
+    company.signup("Bob", "Acme").await;
+    let (to, session) = sign_in(&app, "verification-omitted", "").await;
+    assert_eq!(to, "/login?error=oidc_no_email");
+    assert!(session.is_none());
+    let linked: Option<String> =
+        sqlx::query_scalar("SELECT oidc_sub FROM users WHERE email = 'bob@example.com'")
+            .fetch_one(&app.pool)
+            .await
+            .unwrap();
+    assert!(linked.is_none());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn removal_invalidates_a_pending_desktop_sign_in(pool: PgPool) {
+    let Setup { app, company } = setup(pool).await;
+    let (_, workspace) = company.signup("Ada", "Acme").await;
+    let secret = "desktop secret";
+    let challenge = hex::encode(Sha256::digest(secret.as_bytes()));
+    let (to, _) = sign_in(&app, "ada", &format!("?desktop={challenge}")).await;
+    let code = param(&to, "code");
+    let mut db = app.pool.begin().await.unwrap();
+    sqlx::query("DELETE FROM workspace_members WHERE workspace_id = $1")
+        .bind(workspace.parse::<uuid::Uuid>().unwrap())
+        .execute(&mut *db)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM sessions")
+        .execute(&mut *db)
+        .await
+        .unwrap();
+    db.commit().await.unwrap();
+    let response = app
+        .router
+        .clone()
+        .oneshot(
+            Request::post("/api/auth/oidc/desktop")
+                .header("x-forge-client", "desktop")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({"code": code, "secret": secret}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let sessions: i64 = sqlx::query_scalar("SELECT count(*) FROM sessions")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(sessions, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_removed_guest_cannot_read_a_snapshot_or_another_log_page(pool: PgPool) {
+    let Setup { app, company } = setup(pool).await;
+    let (_, workspace) = company.signup("Ada", "Acme").await;
+    company.join("Bob", &format!("{workspace}/guest")).await;
+    let actor = forge_domain::Actor {
+        user_id: company.person("Bob").await,
+        workspace_id: workspace.parse().unwrap(),
+    };
+    forge_sync::bootstrap(&app.pool, actor).await.unwrap();
+    forge_sync::entries_after(&app.pool, actor, 0, 1)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2")
+        .bind(actor.workspace_id)
+        .bind(actor.user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    assert!(forge_sync::bootstrap(&app.pool, actor).await.is_err());
+    assert!(
+        forge_sync::entries_after(&app.pool, actor, 0, 500)
+            .await
+            .is_err()
     );
 }

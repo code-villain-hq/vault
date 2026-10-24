@@ -25,7 +25,8 @@ impl Rules for Raven {
         .bind(actor.user_id)
         .fetch_optional(&mut *db)
         .await?;
-        Ok(row.and_then(|(role, version)| (role == "guest").then_some(version)))
+        let (role, version) = row.ok_or_else(|| SyncError::NotFound("workspace".into()))?;
+        Ok((role == "guest").then_some(version))
     }
 
     async fn check_allowed(
