@@ -2787,6 +2787,8 @@ a new workspace, and renames or deletes one.
   notes reach task context. A change to the shared setup made meanwhile,
   by the user or an agent (`remember`, a model an agent offered), is kept
   and sent once the workspace can be reached, in the order it was made. A
+  handoff to the window MUST keep the file queue until IndexedDB confirms
+  the writes are durable, using the same transaction ids on retries. A
   change the workspace refuses says why, and is undone here too; a
   repository added here stays, since its clone is this Mac's.
 - **PROF-14** A change to the shared setup that the workspace sends MUST

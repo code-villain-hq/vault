@@ -86,14 +86,17 @@ places, so agents and startup never wait on the workspace:
 
 ```
  a change here ──▶ config.update / notes ──▶ outbox in the file ── setup:write ──▶
-     window: take_setup_writes ──▶ sync client (IndexedDB outbox) ──▶ server
+     window: read_setup_writes ──▶ sync client (IndexedDB outbox) ──▶ server
  server ──▶ sync client ──▶ apply_setup(snapshot) ──▶ config.mirror / notes.replace
 ```
 
 - **Out** (PROF-13): `config.update` works out the shared setup as records
   before and after each change (`config/shared.rs`), and queues the
   difference as the engine's operations in `config.json`'s `shared.outbox`
-  (notes in `notes.json`'s). No write site knows about the workspace.
+  (notes in `notes.json`'s). `read_setup_writes` assigns stable transaction
+  ids without consuming the queue. After IndexedDB confirms persistence,
+  `ack_setup_writes` removes only those ids; interrupted handoffs retry with
+  the same identity. No write site knows about the workspace.
   What the workspace would refuse is checked with `layer-domain`'s checks
   first, said, and kept here.
 - **In** (PROF-14): the window hands every new snapshot to `apply_setup`
@@ -235,7 +238,7 @@ for, and the reverse, and that each is in this table.
 | `browser:changed` | task id, or `""` for every task | a task's tab changed: made, navigated, retitled, loading, an agent acted, closed; or the browser went away (`browser/`) | `BrowserPanel.tsx` (`useBrowserView`) → `browser_view` |
 | `loop:changed` | pane id | a pane's loop changed: started, waiting, checking, a check run, ended (`loops.rs`, LOOP-9) | `LoopBar.tsx` (`useLoop`) → `loop_view` |
 | `slackbot:changed` | none | the Slack bot's connection changed (off, connecting, connected, failing), or a thread was handed to a chat (`slack_bot/`, BOT-10) | `lib/slackBot.ts` (`useSlackBot`) → `slack_bot_view`, for Settings and the chat list |
-| `setup:write` | none | a change to the shared setup or notes was queued for the workspace (`workspace.rs`, PROF-13) | `lib/workspace-sync.ts` → `takeSetupWrites`, into the sync client |
+| `setup:write` | none | a change to the shared setup or notes was queued for the workspace (`workspace.rs`, PROF-13) | `lib/workspace-sync.ts` → `readSetupWrites`, into the sync client |
 | `profiles:changed` | none | the profiles changed: one made, renamed or deleted in this window, or, when this window is brought forward, in another (`profiles.rs`, PROF-6) | `sidebar/ProfileMenu.tsx` → `listProfiles` |
 | `phone:changed` | none | phone access changed: a way in switched, a phone paired, forgotten, connected or gone (`phone/`) | `PhoneSettings.tsx` → `phoneStatus`, for Settings and the top bar's phone |
 

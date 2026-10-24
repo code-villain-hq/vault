@@ -399,7 +399,8 @@ export const api = {
   /** Once its server has started; null when it did not (PROF-11). */
   workspacePlace: () => invoke<WorkspacePlace | null>("workspace_place"),
   /** The changes queued for the workspace, handed over (PROF-13). */
-  takeSetupWrites: () => invoke<Operation[]>("take_setup_writes"),
+  readSetupWrites: () => invoke<{ id: string; operation: Operation }[]>("read_setup_writes"),
+  ackSetupWrites: (ids: string[]) => invoke<void>("ack_setup_writes", { ids }),
   /** What the workspace keeps, into this Mac's setup and notes (PROF-14). */
   applySetup: (snapshot: SetupSnapshot) => invoke<SetupApplied>("apply_setup", { snapshot }),
   // A workspace on a server (PROF-15 to PROF-18). `address` is a server's

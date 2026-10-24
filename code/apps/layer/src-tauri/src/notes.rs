@@ -103,7 +103,7 @@ fn clean_paths(paths: &[String]) -> Result<Vec<String>> {
     Ok(out)
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 struct Book {
     notes: Vec<Note>,
     /// In a workspace (PROF-12): changes are queued in `outbox` for it.
@@ -313,15 +313,25 @@ impl Notes {
         crate::config::write_whole(&self.path, &book.to_json()?)
     }
 
-    /// What is queued for the workspace, handed over and no longer kept.
-    pub fn take_writes(&self) -> Result<Vec<serde_json::Value>> {
+    /// Read a durable queue without consuming it; retries keep their ids.
+    pub fn read_writes(&self) -> Result<Vec<crate::workspace::outbox::Write>> {
         let mut book = self.book.lock();
-        if book.outbox.is_empty() {
-            return Ok(Vec::new());
+        let mut next = book.clone();
+        if crate::workspace::outbox::identify(&mut next.outbox) {
+            crate::config::write_whole(&self.path, &next.to_json()?)?;
+            *book = next;
         }
-        let ops = std::mem::take(&mut book.outbox);
-        crate::config::write_whole(&self.path, &book.to_json()?)?;
-        Ok(ops)
+        crate::workspace::outbox::writes(&book.outbox)
+    }
+
+    pub fn ack_writes(&self, ids: &[String]) -> Result<()> {
+        let mut book = self.book.lock();
+        let mut next = book.clone();
+        if crate::workspace::outbox::acknowledge(&mut next.outbox, ids) {
+            crate::config::write_whole(&self.path, &next.to_json()?)?;
+            *book = next;
+        }
+        Ok(())
     }
 
     /// The workspace's notes, in place of these (PROF-14). Not while changes

@@ -11,6 +11,7 @@
 
 mod mirror;
 mod moving;
+pub(crate) mod outbox;
 pub mod server;
 
 use std::sync::{Arc, OnceLock};

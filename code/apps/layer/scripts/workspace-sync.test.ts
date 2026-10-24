@@ -1,7 +1,7 @@
 // The window's way between the backend's setup and the workspace
 // (src/lib/workspace-sync.ts), against the sync kit's FakeServer. The
 // backend is a stand-in that holds an outbox and the last snapshot, as
-// `take_setup_writes` and `apply_setup` do. Bun's module mocks reach every
+// `read_setup_writes` / `ack_setup_writes` and `apply_setup` do. Bun's module mocks reach every
 // test file, so each keeps the rest of its module. Outside src/ so tsc, which has no
 // bun types, does not read it.
 import { beforeEach, describe, expect, mock, test } from "bun:test";
@@ -14,6 +14,7 @@ let server: FakeServer;
 let backend: { outbox: Operation[]; snapshot: Record<string, { id: string }[]> | null };
 let written: () => void = () => {};
 let kept: string[] = [];
+const identities = new WeakMap<Operation, string>();
 
 mock.module("@code-villain/sync-client", () => ({
   ...kit,
@@ -36,7 +37,12 @@ mock.module("../src/lib/api", () => ({
   api: {
     ...real.api,
     workspacePlace: async () => ({ origin: "http://127.0.0.1:7685", token: "t", user_id: "u", workspace_id: "w" }),
-    takeSetupWrites: async () => backend.outbox.splice(0),
+    readSetupWrites: async () => backend.outbox.map((operation) => {
+      const id = identities.get(operation) ?? kit.uuidv7();
+      identities.set(operation, id);
+      return { id, operation };
+    }),
+    ackSetupWrites: async (ids: string[]) => { backend.outbox = backend.outbox.filter((op) => !ids.includes(identities.get(op) ?? "")); },
     addMessage: async (_kind: string, _level: string, title: string) => void kept.push(title),
     applySetup: async (snapshot: Record<string, { id: string }[]>) => {
       if (backend.outbox.length) return { applied: false, setup: false };

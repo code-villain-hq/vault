@@ -43,7 +43,8 @@ export function profileAnswers() {
     list_profiles: () => structuredClone(profiles),
     // The harness has no workspace server: the window works without one.
     workspace_place: () => null,
-    take_setup_writes: () => [],
+    read_setup_writes: () => [],
+    ack_setup_writes: () => undefined,
     apply_setup: () => ({ applied: true, setup: false }),
     server_ways: (a: Record<string, unknown>) => {
       const address = String(a.address);

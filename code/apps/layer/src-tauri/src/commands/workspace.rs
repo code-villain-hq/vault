@@ -2,7 +2,6 @@
 //! it here, and what it keeps, brought back (`workspace/mirror.rs`).
 
 use serde::Serialize;
-use serde_json::Value;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -18,20 +17,16 @@ pub async fn workspace_place(this_mac: State<'_, ThisMac>) -> Result<Option<Plac
     Ok(this_mac.place().await.ok())
 }
 
-/// The changes queued for the workspace, oldest first, handed over to the
-/// window's sync client, which keeps them until they are sent.
+/// Reads queued changes with durable transaction ids; only an ack consumes them.
 #[tauri::command]
-pub async fn take_setup_writes(app: AppHandle) -> Result<Vec<Value>> {
-    super::blocking(app, |state| {
-        let mut ops = Vec::new();
-        state.config.mirror(|c| {
-            ops = std::mem::take(&mut c.shared.outbox);
-            !ops.is_empty()
-        })?;
-        ops.extend(state.notes.take_writes()?);
-        Ok(ops)
-    })
-    .await
+pub async fn read_setup_writes(app: AppHandle) -> Result<Vec<crate::workspace::outbox::Write>> {
+    super::blocking(app, crate::workspace::outbox::read).await
+}
+
+/// The window has saved these transactions in IndexedDB (or the server).
+#[tauri::command]
+pub async fn ack_setup_writes(app: AppHandle, ids: Vec<String>) -> Result<()> {
+    super::blocking(app, move |state| crate::workspace::outbox::ack(state, &ids)).await
 }
 
 /// How `apply_setup` went.

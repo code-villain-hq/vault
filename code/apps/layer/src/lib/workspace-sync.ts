@@ -14,6 +14,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
 import { api } from "./api";
 import type { SetupSnapshot } from "./types-profiles";
+import { transferSetupWrites } from "./workspace-handoff";
 
 type Lists = SetupSnapshot[keyof SetupSnapshot][];
 
@@ -116,8 +117,22 @@ export async function startWorkspaceSync(hooks: {
     },
   });
 
-  const take = async () => {
-    for (const op of await api.takeSetupWrites()) client.transact([op]);
+  let taking: Promise<void> | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  const take = (): Promise<void> => {
+    if (taking) return taking;
+    clearTimeout(retry);
+    taking = (async () => {
+      // A failed initial disk read must not be replaced with backend edits.
+      // Once it recovers, the subscription below resumes this handoff.
+      while (!shut && client.status().ready) {
+        if (!(await transferSetupWrites(api.readSetupWrites, api.ackSetupWrites, client))) break;
+      }
+    })().catch((e) => {
+      hooks.onRefused(e instanceof Error ? e.message : String(e));
+      if (!shut) retry = setTimeout(() => void take(), 5000);
+    }).finally(() => { taking = undefined; });
+    return taking;
   };
 
   // One snapshot at a time, and only a new one: `subscribe` also fires for
@@ -171,6 +186,8 @@ export async function startWorkspaceSync(hooks: {
   const unlisten = listen("setup:write", () => void take());
   void push();
   return () => {
+    shut = true;
+    clearTimeout(retry);
     unsubscribe();
     void unlisten.then((un) => un());
     client.stop();

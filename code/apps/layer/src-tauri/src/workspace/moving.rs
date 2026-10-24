@@ -194,7 +194,9 @@ pub(super) mod tests {
 
     pub(in crate::workspace) fn ops(state: &AppState) -> Vec<Value> {
         let mut ops = state.config.read().shared.outbox;
-        ops.extend(state.notes.take_writes().unwrap());
+        let notes = state.notes.read_writes().unwrap();
+        state.notes.ack_writes(&notes.iter().map(|write| write.id.clone()).collect::<Vec<_>>()).unwrap();
+        ops.extend(notes.into_iter().map(|write| write.operation));
         ops
     }
 

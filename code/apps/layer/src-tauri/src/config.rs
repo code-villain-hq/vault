@@ -550,14 +550,14 @@ impl ConfigStore {
     /// back, and nothing is written unless `f` says it changed something.
     pub fn mirror(&self, f: impl FnOnce(&mut AppConfig) -> bool) -> Result<bool> {
         let _disk = self.disk.lock();
-        let snapshot = {
-            let mut guard = self.inner.write();
-            if !f(&mut guard) {
-                return Ok(false);
-            }
-            guard.clone()
-        };
+        let mut snapshot = self.inner.read().clone();
+        if !f(&mut snapshot) {
+            return Ok(false);
+        }
+        // An acknowledgement is effective only after it is durable. Keep
+        // the in-memory queue too when disk refuses the replacement.
         self.persist(&snapshot)?;
+        *self.inner.write() = snapshot;
         Ok(true)
     }
 
