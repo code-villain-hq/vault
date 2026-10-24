@@ -109,23 +109,26 @@ export function createSession<M extends SessionMe>() {
   /** Asks every place who is signed in. A place that can't answer gets its last answer. */
   async function loadSession(): Promise<void> {
     const places = await loadPlaces();
-    const answers = await Promise.all(
-      places.map(async (place): Promise<SignedIn<M> | null> => {
+    // Open known places immediately. Each refresh replaces only its own
+    // answer, so a stalled server cannot hold another workspace hostage.
+    const cached = places.flatMap((place) => {
+      const me = readCache(place);
+      return me ? [{ place, me }] : [];
+    });
+    if (cached.length) set(cached);
+    await Promise.all(
+      places.map(async (place) => {
         try {
-          const me = await api<M>("GET", "/api/me", undefined, place);
-          writeCache(place, me);
-          return { place, me };
+          const me = await api<M>("GET", "/api/me", undefined, place, AbortSignal.timeout(10_000));
+          signedIn(me, place);
         } catch (error) {
-          // Signed out there: the handler has forgotten it.
-          if (error instanceof RequestError && error.status === 401) return null;
-          // Offline, or the server is having trouble (a restart, a proxy error):
-          // carry on with what we knew, and keep the session.
-          const cached = readCache(place);
-          return cached ? { place, me: cached } : null;
+          // A 401 has already cleared this place through the session handler.
+          // Offline answers keep the cached session that is already open.
+          if (error instanceof RequestError && error.status === 401) return;
         }
       }),
     );
-    set(answers.filter((a) => a !== null));
+    if (session.status === "loading") set([]);
   }
 
   /** Signed in, or the answer changed (a new name, a new workspace). */
@@ -140,7 +143,7 @@ export function createSession<M extends SessionMe>() {
     try {
       localStorage.removeItem(cacheKey(place));
     } catch {}
-    // While loading, `loadSession` sets the answer once every place has given one.
+    // With no answer yet, `loadSession` settles loading after its bounded refreshes.
     if (session.status === "signed-in") set(session.places.filter((s) => s.place.id !== place.id));
   }
 
