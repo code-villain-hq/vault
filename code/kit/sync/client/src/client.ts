@@ -1,5 +1,5 @@
 import type { Operation, ServerMessage, SyncEntry, Transaction } from "./protocol";
-import type { LocalStore, Row } from "./store";
+import type { LocalStore, Row, StoredState } from "./store";
 import { RejectedError, type Transport } from "./transport";
 import { uuidv7 } from "./uuid";
 
@@ -17,7 +17,7 @@ export interface SyncStatus {
   pending: number;
   /** True once there is a local copy to show, from disk or downloaded. */
   ready: boolean;
-  /** Local writes are waiting for storage to recover. */
+  /** Local storage could not be read or written; retries preserve the outbox. */
   storageError?: string;
 }
 
@@ -79,6 +79,9 @@ export class SyncClient<S extends SchemaShape> {
   #reconnectTimer?: ReturnType<typeof setTimeout>;
   #reconnectDelay: number;
   #stopped = false;
+  #loaded = false;
+  #starting?: Promise<void>;
+  #startTimer?: ReturnType<typeof setTimeout>;
   /** Store writes run one after another, in the order they were made. */
   #storeQueue: Promise<void> = Promise.resolve();
   #writes: ((store: LocalStore) => Promise<void>)[] = [];
@@ -93,16 +96,43 @@ export class SyncClient<S extends SchemaShape> {
     this.#reconnectDelay = this.#backoff.min;
   }
 
-  /** Loads the local copy, then connects. Never throws for being offline. */
-  async start(): Promise<void> {
-    const saved = await this.#store.load();
+  /** Loads the local copy, retrying storage failures without replacing unread edits. */
+  start(): Promise<void> {
+    if (this.#stopped || this.#loaded) return Promise.resolve();
+    if (this.#starting) return this.#starting;
+    clearTimeout(this.#startTimer);
+    this.#starting = this.#load().finally(() => {
+      this.#starting = undefined;
+    });
+    return this.#starting;
+  }
+
+  async #load(): Promise<void> {
+    let saved: StoredState;
+    try {
+      saved = await this.#store.load();
+    } catch {
+      if (this.#stopped) return;
+      this.#setStatus({
+        connection: "offline",
+        storageError: "Can't read this device's saved work. Retrying; your saved changes are kept.",
+      });
+      this.#startTimer = setTimeout(() => void this.start(), this.#backoff.max);
+      return;
+    }
+    if (this.#stopped) return;
+    this.#loaded = true;
     this.#epoch = saved.epoch;
     this.#syncId = saved.syncId;
     this.#confirmed = saved.records;
     this.#pending = saved.outbox.map((transaction) => ({ transaction, sent: false }));
     for (const pending of this.#pending) this.#indexPending(pending.transaction);
     this.#rebuildView();
-    this.#setStatus({ ready: saved.epoch !== null, pending: this.#pending.length });
+    this.#setStatus({
+      ready: saved.epoch !== null,
+      pending: this.#pending.length,
+      storageError: undefined,
+    });
     await this.#open();
   }
 
@@ -115,11 +145,16 @@ export class SyncClient<S extends SchemaShape> {
     clearTimeout(this.#flushTimer);
     clearTimeout(this.#reconnectTimer);
     clearTimeout(this.#storageTimer);
+    clearTimeout(this.#startTimer);
   }
 
   /** Try to reconnect and send now, for example when the browser comes back online. */
   retryNow(): void {
     if (this.#stopped) return;
+    if (!this.#loaded) {
+      void this.start();
+      return;
+    }
     this.#saveWrites();
     if (!this.#closeFeed) {
       clearTimeout(this.#reconnectTimer);
@@ -177,8 +212,14 @@ export class SyncClient<S extends SchemaShape> {
   }
 
   /** Applies operations locally at once and queues them for the server as one transaction. */
-  transact(operations: Operation<ModelOf<S>>[]): string {
-    const transaction: Transaction = { id: uuidv7(), operations };
+  transact(operations: Operation<ModelOf<S>>[], transactionId?: string): string {
+    if (!this.#loaded || this.#stopped)
+      throw new Error("Saved work is not ready. Wait for this device's storage to recover.");
+    // A durable backend may hand the same transaction over again after a
+    // crash. Preserve its identity, and don't replay an already pending copy.
+    if (transactionId && this.#pending.some((p) => p.transaction.id === transactionId))
+      return transactionId;
+    const transaction: Transaction = { id: transactionId ?? uuidv7(), operations };
     this.#pending.push({ transaction, sent: false });
     this.#indexPending(transaction);
     this.#persist((store) => store.addToOutbox(transaction));
@@ -195,7 +236,7 @@ export class SyncClient<S extends SchemaShape> {
   }
 
   async #open(): Promise<void> {
-    if (this.#stopped || this.#closeFeed) return;
+    if (this.#stopped || !this.#loaded || this.#closeFeed) return;
     this.#setStatus({ connection: "connecting" });
     try {
       if (this.#epoch === null) await this.#bootstrap();
@@ -446,7 +487,7 @@ export class SyncClient<S extends SchemaShape> {
   }
 
   #saveWrites(): void {
-    if (this.#saving || this.#stopped) return;
+    if (this.#saving || this.#stopped || !this.#loaded) return;
     clearTimeout(this.#storageTimer);
     this.#saving = true;
     this.#storeQueue = (async () => {

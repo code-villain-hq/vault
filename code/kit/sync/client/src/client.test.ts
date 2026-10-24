@@ -277,6 +277,7 @@ test("bulk replay touches each record once and preserves operation order", async
     },
   });
   try {
+    await client.start();
     client.transact(
       Array.from({ length: 1000 }, (_, i) => ({
         action: "create",
@@ -297,4 +298,55 @@ test("bulk replay touches each record once and preserves operation order", async
   } finally {
     client.stop();
   }
+});
+
+test("a failed local read retries without replacing the unread offline outbox", async () => {
+  class Store extends MemoryStore {
+    fail = true;
+    override async load() {
+      if (this.fail) throw new Error("storage unavailable");
+      return super.load();
+    }
+  }
+  const server = new FakeServer();
+  const store = new Store();
+  await store.reset(server.epoch, 0, new Map());
+  await store.addToOutbox({
+    id: "saved-offline",
+    operations: [{ action: "create", model: "Task", id: "a", data: { title: "Unread draft" } }],
+  });
+  const client = makeClient(server, store);
+  await client.start();
+  expect(client.status().storageError).toContain("Can't read");
+  expect(client.status().ready).toBe(false);
+  expect(server.bootstraps).toBe(0);
+  expect(() => client.create("Task", { title: "Overwrite" })).toThrow("Saved work is not ready");
+  server.goOffline();
+  store.fail = false;
+  // Automatic retry, without an online event or a manual refresh.
+  await until(() => client.status().ready, "local storage recovery");
+  expect(client.status().storageError).toBeUndefined();
+  expect(client.query("Task").map((t) => t.title)).toEqual(["Unread draft"]);
+  expect(client.status().pending).toBe(1);
+  expect(server.bootstraps).toBe(0);
+});
+
+test("stopping while the local copy is loading never starts a connection", async () => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  class Store extends MemoryStore {
+    override async load() {
+      await held;
+      return super.load();
+    }
+  }
+  const server = new FakeServer();
+  const client = makeClient(server, new Store());
+  const started = client.start();
+  client.stop();
+  release();
+  await started;
+  expect(server.bootstraps).toBe(0);
 });

@@ -17,10 +17,16 @@ interface Schema extends DBSchema {
 
 /** Keeps the local copy of a workspace in IndexedDB. */
 export class IndexedDbStore implements LocalStore {
-  #db: Promise<IDBPDatabase<Schema>>;
+  #db?: Promise<IDBPDatabase<Schema>>;
+  readonly #name: string;
 
   constructor(name: string) {
-    this.#db = openDB<Schema>(name, VERSION, {
+    this.#name = name;
+  }
+
+  async #open(): Promise<IDBPDatabase<Schema>> {
+    if (this.#db) return this.#db;
+    const opening = openDB<Schema>(this.#name, VERSION, {
       // Another tab wants to delete or upgrade the database: let it.
       blocking: () => this.close(),
       upgrade(db) {
@@ -33,14 +39,22 @@ export class IndexedDbStore implements LocalStore {
         );
       },
     });
+    this.#db = opening;
+    try {
+      return await opening;
+    } catch (error) {
+      if (this.#db === opening) this.#db = undefined;
+      throw error;
+    }
   }
 
   close(): void {
-    void this.#db.then((db) => db.close());
+    void this.#db?.then((db) => db.close()).catch(() => {});
+    this.#db = undefined;
   }
 
   async load(): Promise<StoredState> {
-    const db = await this.#db;
+    const db = await this.#open();
     const tx = db.transaction(["records", "meta", "outbox"]);
     const [rows, epoch, syncId, outbox] = await Promise.all([
       tx.objectStore("records").getAll(),
@@ -67,7 +81,7 @@ export class IndexedDbStore implements LocalStore {
   }
 
   async reset(epoch: string, syncId: number, records: Map<string, Map<string, Row>>) {
-    const db = await this.#db;
+    const db = await this.#open();
     const tx = db.transaction(["records", "meta"], "readwrite");
     const store = tx.objectStore("records");
     await store.clear();
@@ -80,7 +94,7 @@ export class IndexedDbStore implements LocalStore {
   }
 
   async apply(entries: SyncEntry[], syncId: number) {
-    const db = await this.#db;
+    const db = await this.#open();
     const tx = db.transaction(["records", "meta"], "readwrite");
     const store = tx.objectStore("records");
     for (const entry of entries) {
@@ -95,12 +109,12 @@ export class IndexedDbStore implements LocalStore {
   }
 
   async addToOutbox(transaction: Transaction) {
-    const db = await this.#db;
+    const db = await this.#open();
     await db.add("outbox", { transaction });
   }
 
   async removeFromOutbox(transactionId: string) {
-    const db = await this.#db;
+    const db = await this.#open();
     const tx = db.transaction("outbox", "readwrite");
     const key = await tx.store.index("by_transaction").getKey(transactionId);
     if (key !== undefined) await tx.store.delete(key);

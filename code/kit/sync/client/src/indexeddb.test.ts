@@ -46,3 +46,22 @@ test("IndexedDbStore keeps records, position and outbox between sessions", async
   expect([...(reopened.records.get("Task")?.values() ?? [])]).toEqual([task("b", "B")]);
   expect(reopened.outbox).toEqual([second]);
 });
+
+test("an unavailable database can be opened again without dropping its saved outbox", async () => {
+  const name = `test-${crypto.randomUUID()}`;
+  const original = new IndexedDbStore(name);
+  await original.addToOutbox({ id: "offline", operations: [] });
+  original.close();
+  const store = new IndexedDbStore(name);
+  const open = indexedDB.open;
+  indexedDB.open = () => {
+    throw new Error("storage unavailable");
+  };
+  try {
+    await expect(store.load()).rejects.toThrow("storage unavailable");
+  } finally {
+    indexedDB.open = open;
+  }
+  expect((await store.load()).outbox.map((t) => t.id)).toEqual(["offline"]);
+  store.close();
+});
