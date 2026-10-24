@@ -20,4 +20,5 @@ jobs:
         working-directory: code/apps/site
     steps:
       - uses: actions/checkout@v4
+      - run: python3 -m unittest
       - run: python3 build.py

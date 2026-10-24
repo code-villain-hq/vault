@@ -165,6 +165,8 @@ def render(markdown: str) -> tuple[str, int]:
             words += len(heading[2].split())
             i += 1
             continue
+        if re.match(r'#{4,6}\s', line):
+            raise SystemExit(f'Heading at line {i + 1}: use ## or ### for sections')
         if re.match(r'#\s', line):
             raise SystemExit('A post has no # heading: the title comes from front matter, sections start at ##')
         if re.match(r'([-*]|\d+\.)\s', line):
