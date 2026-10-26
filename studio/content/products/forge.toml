@@ -1,0 +1,48 @@
+name = "Forge"
+line = "AI-first issue tracker"
+order = 1
+lead = "An issue tracker that keeps issues, specs and decisions side by side, and lets coding agents work in it as members of the team."
+fact = "Web and desktop app · runs for a company or on one Mac"
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/forge"
+
+[hero]
+captures = [
+  { src = "forge-issue.png", alt = "Forge's issue page for SHOP-1, “Checkout fails when the payment provider is slow”: In Progress, urgent, assigned to Claude Code, which is working on it, with the plan and the change it makes to the Checkout spec, shown as a diff." },
+]
+caption = "An issue in Forge · made-up data for Acme Inc"
+
+[[feature]]
+title = "Issues without the clutter."
+text = "Teams with their own workflows; issues with sub-issues, relations, labels and priorities; projects, triage and an inbox. One line per issue, as a list or a board, and ⌘K for everything."
+captures = [
+  { src = "forge-team.png", alt = "The Shop team's active issues, grouped by status: one in review, two in progress, two to do, each with its service, labels, project and assignee." },
+]
+
+[[feature]]
+title = "Specs beside the work."
+text = "Services name their repository and paths, and carry their specs, in OpenSpec’s convention, and their decisions. The issues open on a service sit under them."
+captures = [
+  { src = "forge-service.png", alt = "The Checkout service: its repository and paths, its Checkout spec with one change on the way, and its open issues by status." },
+]
+
+[[feature]]
+title = "The spec changes first."
+text = "An issue writes down what it changes in a spec before work starts. Others see the change on the way, and it takes effect when the issue is done."
+captures = [
+  { src = "forge-spec.png", alt = "The Checkout spec: its purpose and requirements, with “Payment timeout” open and SHOP-1's change to it shown below, to take effect once the issue is done." },
+]
+
+[[point]]
+title = "Agents as members."
+text = "An MCP server gives coding agents read and write access, under their own name."
+
+[[point]]
+title = "Pull requests move issues."
+text = "GitHub and Forgejo pull requests link to the issues they name, send them to review, and close them on merge."
+
+[[point]]
+title = "Local-first."
+text = "Every change shows at once, syncs live to everyone, and waits out an offline afternoon."

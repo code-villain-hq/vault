@@ -9,6 +9,7 @@ import shutil
 from urllib.parse import unquote, urljoin, urlsplit
 
 import blog
+import products
 
 SITE = Path(__file__).resolve().parent
 VAULT = SITE.parents[2]
@@ -23,6 +24,12 @@ REPLACEMENTS = {
     '../../../studio/design/components.css': '/assets/components.css',
     '../../../../studio/design/tokens/': '/assets/tokens/',
     '../../../studio/design/tokens/': '/assets/tokens/',
+    # Pages one folder down first: the shorter paths are inside these.
+    '../../forge/apps/web/public/icon.svg': '/assets/products/forge.svg',
+    '../../layer/src-tauri/icons/icon.svg': '/assets/products/layer.svg',
+    '../../caster/Resources/AppIcon.svg': '/assets/products/caster.svg',
+    '../../glyph/apps/web/public/icon.svg': '/assets/products/glyph.svg',
+    '../../raven/apps/web/public/icon.svg': '/assets/products/raven.svg',
     '../forge/apps/web/public/icon.svg': '/assets/products/forge.svg',
     '../layer/src-tauri/icons/icon.svg': '/assets/products/layer.svg',
     '../caster/Resources/AppIcon.svg': '/assets/products/caster.svg',
@@ -79,14 +86,21 @@ def main() -> None:
     # The vault preview shows drafts; the public package leaves them out.
     shutil.rmtree(SITE / 'blog', ignore_errors=True)
     blog.write(SITE / 'blog', drafts=True)
+    for product in products.products():
+        shutil.rmtree(SITE / product.slug, ignore_errors=True)
+    products.write(SITE)
     copy(SITE / 'index.html', 'index.html')
-    pages = ['index.html', *('blog/' + name for name in blog.write(OUTPUT / 'blog', drafts=False))]
+    pages = [
+        'index.html',
+        *('blog/' + name for name in blog.write(OUTPUT / 'blog', drafts=False)),
+        *products.write(OUTPUT),
+    ]
     for relative in pages:
         text = (OUTPUT / relative).read_text()
         for before, after in REPLACEMENTS.items():
             text = text.replace(before, after)
         (OUTPUT / relative).write_text(text)
-    for name in ['site.css', 'home.css']:
+    for name in ['site.css', 'home.css', 'product.css', 'menu.js']:
         copy(SITE / name, name)
     for path in (SITE / 'assets/fonts').iterdir():
         if path.suffix in {'.ttf', '.css', '.txt'}:

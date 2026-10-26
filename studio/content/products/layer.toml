@@ -1,0 +1,57 @@
+name = "Layer"
+line = "Agent development environment for macOS"
+order = 2
+lead = "A Mac app for coding agents, where no agent holds your credentials. A ticket becomes a task; agents work it, you review it, and it ships as pull requests."
+fact = "Claude Code, Copilot CLI, Gemini CLI, OpenCode · macOS 26"
+
+[[get]]
+label = "Download"
+href = "https://git.codevillain.eu/code-villain/vault/releases"
+primary = true
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/layer"
+
+[hero]
+captures = [
+  { src = "layer-work.png", alt = "Layer's task view for ACME-123, “Fix login race”: the checks pass after one round, an agent asks to write api/src/auth/limit.ts, and beside it the built-in browser shows the sign-in page the agent just clicked, with a request to reach github.com." },
+]
+caption = "Layer’s task view · example task from its test harness"
+
+[[feature]]
+title = "A spec, then the code."
+text = "A task can start by drafting requirements, design and steps from the ticket. You approve each file before an agent writes code, and Layer later checks the branch against them, requirement by requirement: met, not met or unclear, with the lines that show it."
+captures = [
+  { src = "layer-spec.png", alt = "Layer's Spec tab for ACME-123: each requirement checked against the branch, marked met, not met or unclear, with the files and lines that show it." },
+]
+
+[[feature]]
+title = "One diff across every repository."
+text = "A task spans as many repositories as the change needs. Review them as one diff, click a line to leave a note, and send the notes back to the agent. Commit from the app, update from the base, and open a pull request per repository."
+captures = [
+  { src = "layer-diff.png", alt = "Layer's Diff tab: the changed files of the api repository on the left, and the diff of src/auth.ts, where “let attempt = 1” becomes 0 with a comment saying why." },
+]
+
+[[feature]]
+title = "Every review that waits on you."
+text = "Pull requests asking for your review, in one list across repositories: their size, whether checks pass, and whether new commits came in since you last looked. Feedback on your own goes to the agent in one action."
+captures = [
+  { src = "layer-reviews.png", alt = "Layer's Reviews view: four pull requests to review, each with its repository, title, size and tags such as checks running, checks failing and new commits since your review." },
+]
+
+[[point]]
+title = "A task per ticket."
+text = "One branch, one folder, a worktree per repository. Agents run side by side and never touch your clones."
+
+[[point]]
+title = "Agents ask, you allow."
+text = "Jira, GitHub and Slack go through Layer’s own MCP server on loopback. You see each action before Layer runs it."
+
+[[point]]
+title = "Checks until green."
+text = "An agent runs the repository’s check command and fixes what fails, up to 20 rounds."
+
+[[point]]
+title = "A browser of its own."
+text = "Agents open localhost and the sites you allow, in a profile apart from yours, while you watch."

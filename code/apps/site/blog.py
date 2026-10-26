@@ -18,6 +18,8 @@ import re
 import struct
 from string import Template
 
+import products
+
 SITE = Path(__file__).resolve().parent
 VAULT = SITE.parents[2]
 POSTS = VAULT / 'studio/content/blog'
@@ -102,11 +104,12 @@ def write(target: Path, drafts: bool) -> list[str]:
             minutes=max(1, math.ceil(words / WORDS_PER_MINUTE)),
             draft=('\n        <span aria-hidden="true">·</span>\n        ' + DRAFT) if post.draft else '',
             body=body,
+            menu=products.menu(1, 'log'),
         )
         (target / f'{post.slug}.html').write_text(page)
         names.append(f'{post.slug}.html')
     rows = '\n'.join(row(post) for post in shown)
-    (target / 'index.html').write_text(Template((TEMPLATES / 'index.html').read_text()).substitute(rows=rows))
+    (target / 'index.html').write_text(Template((TEMPLATES / 'index.html').read_text()).substitute(rows=rows, menu=products.menu(1, 'log')))
     return ['index.html', *names]
 
 

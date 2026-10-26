@@ -1,0 +1,44 @@
+name = "Raven"
+line = "Observability for the studio’s apps"
+order = 5
+lead = "Whether an app is up, how each action behaves, and where a slow call spent its time."
+fact = "Web and desktop app · runs for a company or on one Mac"
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/raven"
+
+[hero]
+captures = [
+  { src = "raven-health.png", alt = "Raven's health page for Acme Shop: “Needs a look”, one failed call to POST /api/checkout in the last 15 minutes, the last 24 hours in half-hour bars, and the latest checks." },
+]
+caption = "Raven’s health page · made-up data for Acme Shop"
+
+[[feature]]
+title = "Every action, worst first."
+text = "Calls a minute, failures, and typical and slow-end times against each action’s own week. Errors grouped, with the version they started in."
+captures = [
+  { src = "raven-technical.png", alt = "Acme Shop's technical page for the last hour: 2.3 calls a minute, 1.5% failed, version 2.15.0; the error “payment provider timed out after 10s”, first seen in 2.15.0; and each action with its calls, failures and times, POST /api/checkout first at 33% failed." },
+]
+
+[[feature]]
+title = "One action over time."
+text = "How long its calls took and how many failed, minute by minute or across a week, and its slowest calls to open."
+captures = [
+  { src = "raven-action.png", alt = "POST /api/checkout over 24 hours: 187 calls, 1.6% failed, typically 433 ms; its slow end jumps to 10 seconds in the last hours, where the failed calls are." },
+]
+
+[[feature]]
+title = "One call, step by step."
+text = "Where its time went, down to each database query and outside call, with the logs it wrote."
+captures = [
+  { src = "raven-call.png", alt = "One failed checkout: 10 seconds and HTTP 502, two quick queries, then 10 seconds waiting on POST /v1/charges, and the warning and error it logged." },
+]
+
+[[point]]
+title = "Health checks."
+text = "Raven asks each app’s health address every half minute: up, needs a look, or down, in one sentence."
+
+[[point]]
+title = "OpenTelemetry in."
+text = "Apps send traces and logs over HTTP with a key."

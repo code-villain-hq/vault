@@ -1,0 +1,52 @@
+name = "Caster"
+line = "Launcher for macOS"
+order = 3
+lead = "Apps, calculations, and quick answers. A shortcut away."
+fact = "macOS 27 · build from source for now"
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/caster"
+
+[hero]
+captures = [
+  { src = "caster-help.png", alt = "Caster with the query “help”: one line for each thing it does, from apps, sums and currencies to the world clock, weather, emoji, web search, snippets, window size and sleep." },
+]
+caption = "Caster’s own window · type “help”"
+
+[[feature]]
+title = "Answers as you type."
+text = "Sums, currencies at ECB rates, the time in Tokyo, three days of weather, emoji. The answer sits under the query, and Return copies it."
+stack = true
+captures = [
+  { src = "caster-calculator.png", alt = "Caster with the query “33 / 3” and the answer 11 from its calculator." },
+  { src = "caster-currency.png", alt = "Caster with the query “32 sek to eur” and the answer 2.87 EUR." },
+  { src = "caster-emoji.png", alt = "Caster with the query “emoji shrug”: the shrug and sweat smile emoji, each copied with Return." },
+]
+
+[[feature]]
+title = "Apps by a few letters."
+text = "Fuzzy search over your applications. Your five most used wait on an empty query."
+stack = true
+captures = [
+  { src = "caster-apps.png", alt = "Caster with the query “saf” and Safari as the app to open." },
+]
+
+[[feature]]
+title = "What you type every day."
+text = "Your work email, phone and address, set once from the menu bar and typed with a word."
+captures = [
+  { src = "caster-settings.png", alt = "Caster's settings window with fields for work email, private email, phone and address, and a Save button." },
+]
+
+[[point]]
+title = "The Mac at hand."
+text = "Maximise or move a window, sleep, lock, empty the trash, toggle dark mode."
+
+[[point]]
+title = "Search the web."
+text = "Google, YouTube or GitHub, by a letter and the query."
+
+[[point]]
+title = "Nothing more."
+text = "No file search, accounts, API keys or telemetry. AppKit alone."

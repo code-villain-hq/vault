@@ -1,0 +1,50 @@
+name = "Code Villain"
+line = "Editor and terminal theme, in night and day"
+order = 6
+lead = "VS Code, Cursor, Neovim, WezTerm, and the Starship prompt, in Nightshade’s colours for code."
+fact = "Night and day · built from the apps’ own tokens"
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/theme"
+
+[hero]
+captures = [
+  { src = "theme-code.png", alt = "TypeScript from Layer's diff parser in the night theme: keywords in violet, functions in blue, strings in green, numbers in amber, comments in grey italics." },
+]
+caption = "Night · Layer’s diff parser"
+
+[[feature]]
+title = "Night and day."
+text = "Two themes from one palette. The cursor line, a selection, search matches with the current one in poison, and the bracket under the cursor read the same in both."
+stack = true
+captures = [
+  { src = "theme-editor-night.png", alt = "Three lines of code in the night theme, with the cursor line, a selection, a search match and the matching bracket marked." },
+  { src = "theme-editor-day.png", alt = "The same three lines in the day theme." },
+]
+
+[[feature]]
+title = "Diffs you can read."
+text = "Added and removed lines tinted, the code inside them still coloured, and the changed words marked. As Layer draws them, and as the editors do."
+captures = [
+  { src = "theme-diff.png", alt = "A diff in the night theme: a removed line tinted red and its replacement tinted green, with the changed words marked and the code still highlighted." },
+]
+
+[[feature]]
+title = "Every language it meets."
+text = "Treesitter and LSP semantic tokens in Neovim, TextMate scopes in VS Code and Cursor, so Rust, TypeScript, Python and Markdown get the same colours everywhere."
+captures = [
+  { src = "theme-rust-day.png", alt = "Rust from Layer's git module in the day theme." },
+]
+
+[[point]]
+title = "From the tokens."
+text = "One build writes every editor’s colours from the apps’ own palette; CI fails when one drifts."
+
+[[point]]
+title = "One terminal table."
+text = "WezTerm, the editors’ terminals and Neovim’s share one set of sixteen colours."
+
+[[point]]
+title = "Neovim in full."
+text = "Diagnostics and the common plugins, beside the syntax."

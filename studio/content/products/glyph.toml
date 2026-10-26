@@ -1,0 +1,44 @@
+name = "Glyph"
+line = "Translation with models you run yourself"
+order = 4
+lead = "Translates an app’s strings with models you run yourself. A team reviews what they propose before it ships."
+fact = "Web and desktop app · runs for a company or on one Mac"
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/glyph"
+
+[hero]
+captures = [
+  { src = "glyph-translations.png", alt = "Glyph's translations view for the henchmen namespace: the key “contractRenews”, “Renews on {{date}}”, is open with its English source, no Finnish yet, a French text at 77% by mistral and a Swedish one at 59% by viking." },
+]
+caption = "Glyph’s translations view · made-up strings from its demo data"
+
+[[feature]]
+title = "Review by confidence."
+text = "Every suggestion names its model and how sure it was. Work through what’s missing or unsure with the keyboard: write a text, ask a model, accept or reject, one by one or in bulk."
+captures = [
+  { src = "glyph-review.png", alt = "Glyph's review view for Swedish: the 63 texts still missing, each with its key, its English source, and buttons to write a text or ask for a suggestion." },
+]
+
+[[feature]]
+title = "A glossary per language pair."
+text = "The terms a product uses, with the other forms that count and a note for reviewers. Models are told the terms, and a text that leaves one out is flagged."
+captures = [
+  { src = "glyph-glossary.png", alt = "Glyph's glossary from English to Finnish: heist, henchman, lair, minion, overlord and scheme, each with its Finnish term, the other forms that count, and a note where one helps." },
+]
+
+[[feature]]
+title = "Where every language stands."
+text = "Each language’s progress, what’s missing and what’s unsure, by namespace."
+captures = [
+  { src = "glyph-overview.png", alt = "Glyph's overview of 779 keys: Finnish 15% done, French 52%, Swedish 91%, each with its missing and unsure texts, then the same by namespace." },
+]
+
+[[point]]
+title = "Your models."
+text = "Any OpenAI-compatible server, such as llama-server with a Nordic fine-tune. Glyph starts and stops them."
+
+[[point]]
+title = "i18next in and out."
+text = "Keys in namespaces, as i18next has them; JSON flat or nested."

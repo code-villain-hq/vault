@@ -51,8 +51,11 @@ body {
 .site-logo img { width: 10.5rem; height: auto; }
 
 .site-nav {
+  position: relative;
   display: flex;
+  align-items: center;
   gap: 1.5rem;
+  margin-left: auto;
   font-size: var(--type-label-size);
   font-weight: var(--type-label-weight);
   letter-spacing: var(--type-label-tracking);
@@ -75,6 +78,59 @@ body {
 }
 
 .site-foot nav { display: flex; gap: 1.25rem; }
+
+/* Wide pages: the homepage and the product pages. */
+.page-width { width: min(80rem, calc(100% - var(--gutter) * 2)); margin-inline: auto; }
+
+/* A real capture: straight on, on a neutral ground with 24px of surround (16px narrow), 10px corners. */
+.product-figure { margin: 0; }
+.product-figure figcaption { margin-top: 0.6rem; color: var(--faint); font-size: var(--type-small-size); line-height: var(--type-small-leading); }
+.capture-stage { padding: 24px; border-radius: var(--radius-lg); background: var(--surface); }
+.capture-stage img { display: block; width: 100%; height: auto; border-radius: var(--radius-lg); }
+/* Caster is a launcher, not a window: a few of its answers, stacked on `panel`,
+   a step under the launcher's own grey so each window reads. */
+.capture-stack { display: flex; flex-direction: column; justify-content: center; gap: 16px; background: var(--panel); }
+@media (max-width: 480px) {
+  .capture-stage { padding: 16px; }
+}
+
+/* The Products menu: a disclosure in the header, opening on the dialog step
+   of grey. It hangs from the nav's right edge, so it stays on the page however
+   the header wraps. */
+.products-menu summary { display: inline-flex; align-items: center; gap: 0.35rem; padding-block: 0.25rem; cursor: pointer; list-style: none; }
+.products-menu summary::-webkit-details-marker { display: none; }
+.products-menu[open] summary { text-decoration-thickness: 2px; }
+.chevron { width: 0.8em; height: 0.8em; }
+.products-menu[open] .chevron { rotate: 180deg; }
+.products-menu ul {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.15rem;
+  width: min(36rem, calc(100vw - var(--gutter) * 2));
+  margin: 0;
+  padding: 0.6rem;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--dialog);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  letter-spacing: normal;
+  line-height: var(--type-small-leading);
+}
+.products-menu li a { display: flex; gap: 0.75rem; align-items: center; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); }
+.products-menu li a:hover, .products-menu li a:focus-visible { background: var(--hover); }
+.products-menu li a[aria-current] { background: var(--selected); }
+.products-menu img { flex-shrink: 0; }
+.products-menu b { display: block; color: var(--fg); font-weight: var(--type-label-weight); }
+.products-menu b + span { display: block; color: var(--muted); font-size: var(--type-small-size); }
+@media (max-width: 600px) {
+  .products-menu ul { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* Layout for the shared chip (studio/design/components.css). */
 .chip {

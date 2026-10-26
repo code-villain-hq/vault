@@ -61,6 +61,13 @@ code/apps/forge/data/
 
 # The site's blog pages: build.py renders them from studio/content/blog
 code/apps/site/blog/
+# and the product pages from studio/content/products
+code/apps/site/forge/
+code/apps/site/layer/
+code/apps/site/caster/
+code/apps/site/glyph/
+code/apps/site/raven/
+code/apps/site/theme/
 
 # Playwright MCP snapshots
 .playwright-mcp/
