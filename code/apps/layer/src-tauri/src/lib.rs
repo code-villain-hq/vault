@@ -401,6 +401,7 @@ pub fn run() {
             commands::browser_unwatch,
             commands::browser_input,
             commands::browser_copy,
+            commands::browser_screenshot,
             commands::browser_answer_site,
             commands::browser_hold,
             commands::browser_dialog,

@@ -1478,7 +1478,8 @@ afterwards.
 
 The globe in a task's pane bar shows its browser beside the terminals (a
 dot on it says the task's agents have used it). The panel has a tab strip,
-an address bar, back, forward and reload, and the active tab's page, live: the user
+an address bar, back, forward and reload, a camera for a screenshot
+(BRW-22), and the active tab's page, live: the user
 clicks, scrolls, types and pastes in it as in any browser, to sign in or
 to help an agent that is stuck. Under it is what an agent last did, and a
 ring marks where it clicked.
@@ -1623,6 +1624,15 @@ ring marks where it clicked.
   copied only between two hosts (`localhost` and `127.0.0.1`): one
   host's ports share them already. Refused while a filled-in password is
   on either page (BRW-19).
+- **BRW-22** The camera in the panel's bar MUST take the active tab as
+  the panel shows it, as sharp as on screen, as a PNG: a click puts it
+  on the Mac's clipboard (to paste into an agent's terminal, a chat or
+  Slack) and the button reads "Copied" for a moment; ⇧-click saves it
+  in Downloads instead, named after the page's site and the time
+  (`localhost-5173 2026-10-26 at 14.02.11.png`), never over another
+  file, and says the name. It is the user's own picture of what they
+  see, so it is taken while an agent uses the tab, and while a
+  filled-in password is on the page (BRW-19 keeps those from agents).
 - **BRW-6** The tabs MUST come back where they were: each task's tabs'
   pages and which was active are kept in `config.json`, and opened when
   the task's browser is next needed. The chats' are kept the same way

@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronRight, Coffee, Copy, Globe,
+  ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, Camera, ChevronRight, Coffee, Copy, Globe,
   KeyRound, PanelLeft, Plus, Repeat, RotateCw, Settings, Smartphone, X,
   type LucideIcon,
 } from "lucide-react";
@@ -44,6 +44,8 @@ export const GlobeIcon = icon(Globe);
 export const BackIcon = icon(ArrowLeft);
 export const ForwardIcon = icon(ArrowRight);
 export const ReloadIcon = icon(RotateCw);
+/** A camera, for a screenshot of the browser's tab (BRW-22). */
+export const CameraIcon = icon(Camera);
 /** A key, for a saved sign-in. */
 export const KeyIcon = icon(KeyRound);
 /** Two arrows chasing each other, for a loop (§21). */

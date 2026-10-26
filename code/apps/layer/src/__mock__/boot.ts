@@ -756,6 +756,7 @@ const answer: Record<string, Answer> = {
   },
   browser_input: () => null,
   browser_copy: () => "copied from the page",
+  browser_screenshot: (a) => (a.save ? "localhost-5173 2026-10-26 at 14.02.11.png" : null),
 
   // Plugins the UI reaches through @tauri-apps packages.
   "plugin:notification|is_permission_granted": () => true,

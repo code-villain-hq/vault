@@ -49,10 +49,11 @@ tauri-plugin-notification = "2"
 notify-rust = "4"
 # Profiles (§25): bringing another copy of the app forward, and marking each
 # copy's Dock icon. Tauri has neither. Already in the build through tao, so
-# no new crates: only these classes' bindings are added.
+# no new crates: only these classes' bindings are added. NSPasteboard and
+# NSData put the browser's screenshot on the clipboard as a PNG (BRW-22).
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSDictionary", "NSGeometry", "NSAttributedString"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSRunningApplication", "NSImage", "NSBezierPath", "NSColor", "NSFont", "NSStringDrawing", "NSAttributedString", "objc2-core-foundation", "libc"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSDictionary", "NSGeometry", "NSAttributedString", "NSData"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSRunningApplication", "NSImage", "NSBezierPath", "NSColor", "NSFont", "NSStringDrawing", "NSAttributedString", "NSPasteboard", "objc2-core-foundation", "libc"] }
 # Workspaces (§25): each runs Layer's server on its own Postgres, bundled
 # in the app (`workspace.rs`), and keeps its shared setup there.
 code-villain-desktop = { workspace = true }

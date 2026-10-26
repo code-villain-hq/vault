@@ -228,20 +228,22 @@ impl Page {
     /// pixel however sharp the panel shows it: an image costs an agent's
     /// context by its size.
     pub async fn screenshot(&self, v: Viewport) -> Result<String> {
+        self.capture(v, json!({ "format": "jpeg", "quality": 80 }), 1.0 / v.scale.max(1.0)).await
+    }
+
+    /// The visible part of the page as a PNG, base64, as sharp as the panel
+    /// shows it: for the user to paste or keep (BRW-22), not for a model.
+    pub async fn picture(&self, v: Viewport) -> Result<String> {
+        self.capture(v, json!({ "format": "png" }), 1.0).await
+    }
+
+    async fn capture(&self, v: Viewport, mut params: Value, scale: f64) -> Result<String> {
         // A clip is measured from the top of the document, not the window:
         // without the scroll, a scrolled page came back as its top.
         let m = self.call("Page.getLayoutMetrics", json!({})).await?;
         let at = |k: &str| m.pointer(&format!("/cssVisualViewport/{k}")).and_then(Value::as_f64).unwrap_or(0.0);
-        let r = self
-            .call(
-                "Page.captureScreenshot",
-                json!({
-                    "format": "jpeg",
-                    "quality": 80,
-                    "clip": { "x": at("pageX"), "y": at("pageY"), "width": v.width, "height": v.height, "scale": 1.0 / v.scale.max(1.0) },
-                }),
-            )
-            .await?;
+        params["clip"] = json!({ "x": at("pageX"), "y": at("pageY"), "width": v.width, "height": v.height, "scale": scale });
+        let r = self.call("Page.captureScreenshot", params).await?;
         r.get("data")
             .and_then(Value::as_str)
             .map(str::to_string)

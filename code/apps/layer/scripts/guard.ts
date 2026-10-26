@@ -520,6 +520,10 @@ const CEILINGS: Record<string, number> = {
   "src/components/PrPanel.tsx": 800,
   "src/store.ts": 800,
   "src/components/Terminals.tsx": 700,
+  // The panel and its bar are one view (BRW-9); each control in the bar
+  // that does more than a call is its own component (SaveSignIn,
+  // BrowserScreenshot), and placing the screenshot's took it to 601.
+  "src/components/BrowserPanel.tsx": 620,
   "src-tauri/src/commands/jira.rs": 1400,
   "src-tauri/src/pty.rs": 1350,
   "src-tauri/src/commands/github.rs": 1100,

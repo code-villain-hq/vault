@@ -163,6 +163,68 @@ pub async fn browser_copy(app: AppHandle, task_id: String) -> Result<String> {
     Ok(v.as_str().unwrap_or_default().to_string())
 }
 
+/// The tab as the panel shows it, from the camera in the panel's bar
+/// (BRW-22): on the Mac's clipboard, or with `save` a PNG in Downloads,
+/// whose file name it answers with.
+#[tauri::command]
+pub async fn browser_screenshot(app: AppHandle, task_id: String, save: bool) -> Result<Option<String>> {
+    use base64::Engine;
+    let state = app.state::<AppState>();
+    let page = state.browser.page(&app, &task_id).await?;
+    let data = page.picture(state.browser.viewport(&task_id)).await?;
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|e| Error::Other(format!("the screenshot could not be read: {e}")))?;
+    if !save {
+        return if super::off_runtime(move || to_pasteboard(&png)).await? {
+            Ok(None)
+        } else {
+            Err(Error::Other("Couldn't reach the clipboard. Try again.".into()))
+        };
+    }
+    let dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| Error::Other(format!("no Downloads folder to save the screenshot in: {e}")))?;
+    // Named as macOS names its own, after the page's site rather than
+    // "Screenshot": a folder of them says which app each was of.
+    let site = tauri::Url::parse(&state.browser.view(&task_id).url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| u.port().map_or(h.to_string(), |p| format!("{h}-{p}"))))
+        .unwrap_or_else(|| "Browser".into());
+    let stem = format!("{site} {}", chrono::Local::now().format("%Y-%m-%d at %H.%M.%S"));
+    let name = super::off_runtime(move || save_new(&dir, &stem, &png))
+        .await?
+        .map_err(|e| Error::Other(format!("the screenshot could not be saved: {e}")))?;
+    Ok(Some(name))
+}
+
+/// Write `png` as `<stem>.png` in `dir`, or `<stem> 2.png` and on if that is
+/// taken (two in one second): a screenshot never replaces another file.
+fn save_new(dir: &std::path::Path, stem: &str, png: &[u8]) -> std::io::Result<String> {
+    use std::io::Write;
+    for n in 1..100 {
+        let name = if n == 1 { format!("{stem}.png") } else { format!("{stem} {n}.png") };
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join(&name)) {
+            Ok(mut f) => return f.write_all(png).map(|()| name),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, format!("“{stem}.png” and 98 more are taken")))
+}
+
+/// The PNG on the general pasteboard, the one ⌘V reads, as `public.png`.
+/// The clipboard plugin takes only decoded pixels, which would need a PNG
+/// decoder in the build to turn Chrome's PNG back into; the pasteboard
+/// takes the file as it is. NSPasteboard is safe off the main thread.
+fn to_pasteboard(png: &[u8]) -> bool {
+    use objc2_app_kit::{NSPasteboard, NSPasteboardTypePNG};
+    let board = NSPasteboard::generalPasteboard();
+    board.clearContents();
+    board.setData_forType(Some(&objc2_foundation::NSData::with_bytes(png)), unsafe { NSPasteboardTypePNG })
+}
+
 /// Take the task's tab from its agents, or hand it back (BRW-12).
 #[tauri::command]
 pub fn browser_hold(app: AppHandle, task_id: String, held: bool) {
@@ -300,5 +362,17 @@ mod tests {
         assert_eq!(address("tauri channel raw").unwrap(), "https://duckduckgo.com/?q=tauri+channel+raw");
         assert_eq!(address("a&b").unwrap(), "https://duckduckgo.com/?q=a%26b");
         assert!(address("file:///etc/passwd").is_err());
+    }
+
+    #[test]
+    fn a_saved_screenshot_never_replaces_another_file() {
+        let dir = std::env::temp_dir().join(format!("layer-shot-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("localhost-5173 now.png"), b"kept").unwrap();
+        assert_eq!(save_new(&dir, "localhost-5173 now", b"one").unwrap(), "localhost-5173 now 2.png");
+        assert_eq!(save_new(&dir, "localhost-5173 now", b"two").unwrap(), "localhost-5173 now 3.png");
+        assert_eq!(std::fs::read(dir.join("localhost-5173 now.png")).unwrap(), b"kept");
+        assert_eq!(std::fs::read(dir.join("localhost-5173 now 2.png")).unwrap(), b"one");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

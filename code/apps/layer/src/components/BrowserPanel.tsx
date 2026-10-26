@@ -8,6 +8,7 @@ import { copyText } from "../lib/clipboard";
 import { ago } from "../lib/time";
 import type { BrowserInput, BrowserView } from "../lib/types";
 import { useStore } from "../store";
+import { BrowserScreenshot } from "./BrowserScreenshot";
 import { BrowserTabs } from "./BrowserTabs";
 import { SaveSignIn } from "./SaveSignIn";
 import { BackIcon, CloseIcon, ExternalIcon, ForwardIcon, ReloadIcon } from "./icons";
@@ -413,6 +414,7 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
           </button>
         )}
         <SaveSignIn taskId={taskId} disabled={!host || driving} />
+        <BrowserScreenshot taskId={taskId} disabled={!tab} />
         <button
           className="ui-button ui-icon-button"
           title="Open this page in your own browser"

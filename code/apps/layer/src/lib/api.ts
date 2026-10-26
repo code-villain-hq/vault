@@ -438,6 +438,9 @@ export const api = {
   browserInput: (taskId: string, input: BrowserInput) =>
     invoke<void>("browser_input", { taskId, input }),
   browserCopy: (taskId: string) => invoke<string>("browser_copy", { taskId }),
+  /** The tab on the clipboard, or with `save` in Downloads: the saved file's name (BRW-22). */
+  browserScreenshot: (taskId: string, save: boolean) =>
+    invoke<string | null>("browser_screenshot", { taskId, save }),
   browserAnswerSite: (id: number, allow: boolean) => invoke<void>("browser_answer_site", { id, allow }),
   browserHold: (taskId: string, held: boolean) => invoke<void>("browser_hold", { taskId, held }),
   /** A new tab beside the active one, made active (BRW-16). */
