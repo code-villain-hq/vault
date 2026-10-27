@@ -411,6 +411,7 @@ export function adoptedDecision(
   // Accepted before the issue last moved: an old answer, not this question.
   const moved = history
     ?.filter((e) => e.field === "state")
+    // biome-ignore lint/complexity/useMathMinMax: ISO timestamps, which Math.max would make NaN
     .reduce((latest, e) => (e.at > latest ? e.at : latest), issue.created_at);
   if (moved && Date.parse(newest.resolved_at) < Date.parse(moved)) return;
   return newest;
