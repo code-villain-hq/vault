@@ -913,16 +913,24 @@ offers Start work.
   | Mine | assigned to you, not in the "done" category | assigned to you and open, in the workspace's repositories | assigned to you, in no Completed or Canceled state |
   | In progress | the "indeterminate" category | no such state: open and assigned | a state of type Started |
   | Done | the "done" category | closed | a state of type Completed or Canceled |
-  | An epic (§26) | a type at hierarchy level 1 or above | an issue with sub-issues | an issue with sub-issues |
+  | An epic (§26) | a type at hierarchy level 1 or above | an issue of the type chosen for epics in Settings; without issue types, an issue with sub-issues | an issue with sub-issues |
   | Filing (TKT-3) | the project's required fields (`createmeta`) | one of the workspace's repositories, a title, a body | a team, a title, a description |
   | Its account | Tickets (Jira): site, email, token | Code (GitHub)'s token: nothing more to connect | Tickets (Forge): the site, then you sign in to it in the browser, as Forge's own desktop app does |
 
   Forge names its states per team, as Jira does its statuses, so a state
-  is known by its type, never its name.
+  is known by its type, never its name. GitHub's issue types are an
+  organisation's own, with names and no hierarchy levels, so which one
+  is the epic is chosen in Settings, from the organisation's types, never
+  guessed from a name. Without them an epic is only known once it has a
+  sub-issue: one just filed looks like any other issue.
 - **TKT-18** A GitHub issue or a Forge ticket MUST follow the work the way
   its own tracker moves it, not by the app moving it. The task's branch
   carries its key, and each of its pull requests says "Fixes `<key>`" in
-  its body. GitHub closes the issue when one merges. Forge moves the
+  its body. GitHub closes the issue when one merges into the repository's
+  default branch, and only then. A task based on another branch (TASK-3)
+  closes nothing that way, so once every pull request of such a task has
+  merged, with nothing left unmerged or uncommitted, the app closes the
+  issue itself, once per task, as TKT-8 moves a Jira ticket. Forge moves the
   ticket by its pull requests alone, never by pushes: a draft to its
   team's first Started state (In Progress), one ready for review that
   could be merged to the last Started state (In Review), and a merge to
@@ -935,6 +943,12 @@ offers Start work.
   progress before the first pull request rather than after it. A GitHub
   issue has no state to move to, so Start work assigns it to you if it
   has no one.
+- **TKT-19** Find work MUST search in the tracker's own language, quoting
+  typed text as it requires (TKT-4): JQL for Jira, GitHub's issue search
+  limited to the workspace's repositories, Forge's issue search. A bare
+  number (TKT-12) is a key in the Jira project or Forge team set in
+  Settings. With GitHub Issues it names that issue in each of the
+  workspace's repositories, so every one that has it is listed.
 - **TKT-20** An agent MUST get the tools of the workspace's tracker only,
   each speaking that tracker's terms: `jira_*` for Jira, `github_*` issue
   tools for GitHub Issues, `forge_*` for Forge. One set for all three
@@ -942,20 +956,25 @@ offers Start work.
   the same thing, and fit none of them. The tools that already work on
   "the task's ticket" (`start_work`, `finish_task`, `subtask_start`) work
   on the workspace's tracker, whichever it is.
-- **TKT-19** Find work MUST search in the tracker's own language, quoting
-  typed text as it requires (TKT-4): JQL for Jira, GitHub's issue search
-  limited to the workspace's repositories, Forge's issue search. A bare
-  number (TKT-12) is a key in the Jira project or Forge team set in
-  Settings. With GitHub Issues it names that issue in each of the
-  workspace's repositories, so every one that has it is listed.
+- **TKT-21** With GitHub Issues, a task's branch MUST be the issue's
+  number and the slug of its title (`12-fix-the-login`), as GitHub's own
+  "Create a branch" names it, in place of the key TASK-2 gives:
+  `owner/repo#12` is no branch name. Since the number alone names no
+  repository, where the app reads a pull request's ticket from its branch
+  or title (REV-7, REV-11) it asks GitHub which issues the pull request
+  closes instead.
 
 Code: `commands/jira.rs`, `commands/ticket_flow.rs`, `integrations/jira.rs`,
 `integrations/jira/flow.rs`, `components/tickets/`, `TicketFlow.tsx`,
 `sidebar/DeleteTask.tsx`.
 
 Known gaps:
-- TKT-15 to TKT-20 are written ahead of the code: only Jira is built,
+- TKT-15 to TKT-21 are written ahead of the code: only Jira is built,
   Settings has no choice of tracker, and a workspace's tickets are Jira's.
+- Open question: GitHub issues are only open or closed, and many teams
+  keep "in progress" in a GitHub Project's Status field instead. Whether
+  that board's Status is the tracker's in-progress state, moved as TKT-8
+  moves Jira's, is not decided.
 - Forge's desktop sign-in hands its session back only to `forge://`.
   Before Layer can sign in to Forge, Forge has to hand it back to
   `layer://` too. Forge's API tokens are agents' only (Settings → Agents),
@@ -1255,7 +1274,8 @@ Known gaps:
 | Tickets: issue tracker | none | Jira, GitHub Issues or Forge, one per workspace (TKT-15) |
 | Tickets: Jira | — | site URL, email, API token, optional project key and JQL |
 | Tickets: Forge | — | site URL, then a sign-in in the browser; optional team key |
-| Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug), review team |
+| Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug; a fine-grained token also needs Issues, read and write, when GitHub Issues is the tracker), review team |
+| Tickets: GitHub Issues | — | the issue type epics are, when the organisation has issue types (TKT-17) |
 | Observability: Grafana | — | site URL, service account token (reads and queries datasources), OBS-1; the Loki datasource for your services' logs, none chosen, OBS-5 |
 | Observability: S3 log sources | none | each a name, AWS profile, region, bucket, prefix and optional Athena table; no AWS keys, OBS-8, OBS-9 |
 | Messaging: Slack | — | the bot: bot token (`xoxb-`), app-level token (`xapp-`, `connections:write`), the owner's member ID, the agent and its model (BOT-17), on/off, work without asking, personality (BOT-*); its notifications: the channel, four switches (BOT-15, NOTE-5) |
