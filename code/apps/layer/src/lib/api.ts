@@ -320,6 +320,8 @@ export const api = {
   }),
   // epics (§26)
   epicView: (epicId: string) => invoke<EpicView>("epic_view", { epicId }),
+  /** Make tasks whose tickets sit under the epic's in Jira its sub-tasks (EPIC-13). */
+  adoptSubTasks: (epicId: string, taskIds: string[]) => invoke<EpicView>("adopt_sub_tasks", { epicId, taskIds }),
   /** File the sub-tasks not filed yet: tickets under the epic, tasks, their spec (EPIC-7). */
   fileSubTasks: (epicId: string, issueType: string | null, fields: Record<string, unknown> | null) =>
     invoke<Filed>("file_sub_tasks", { epicId, issueType, fields }),

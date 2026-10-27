@@ -153,6 +153,32 @@ pub async fn epic_view(app: AppHandle, epic_id: String) -> Result<EpicView> {
     super::blocking(app, move |state| Ok(view(state, &an_epic(state, &epic_id)?))).await
 }
 
+/// Make `task_ids` the epic's sub-tasks (EPIC-13): tasks whose tickets sit
+/// under the epic's in Jira, which the window finds as it already asks Jira
+/// for each task's epic (TASK-17). The epic's view, after.
+#[tauri::command]
+pub async fn adopt_sub_tasks(app: AppHandle, epic_id: String, task_ids: Vec<String>) -> Result<EpicView> {
+    super::blocking(app, move |state| {
+        let epic = an_epic(state, &epic_id)?;
+        let of = epic.clone();
+        state.config.update(move |c| adopt(&mut c.tasks, &of, &task_ids))?;
+        Ok(view(state, &epic))
+    })
+    .await
+}
+
+/// Links each of `ids` to `epic`, named after its ticket's summary, but
+/// never an epic, a task already some epic's sub-task, or a task on the
+/// epic's own ticket: one made before epics, which stays an ordinary task.
+fn adopt(tasks: &mut [Task], epic: &Task, ids: &[String]) {
+    for t in tasks.iter_mut().filter(|t| ids.contains(&t.id)) {
+        if t.epic || t.id == epic.id || t.sub_task.is_some() || (epic.issue_key.is_some() && t.issue_key == epic.issue_key) {
+            continue;
+        }
+        t.sub_task = Some(SubTaskOf { epic: epic.id.clone(), title: title_of(t) });
+    }
+}
+
 fn filed_file(state: &AppState, epic: &Task) -> Option<PathBuf> {
     agent_file_dir(state, epic).map(|d| d.join(DRAFTS).join(FILED))
 }
@@ -425,4 +451,44 @@ pub(crate) async fn start_sub_task_inner(app: &AppHandle, task_id: String, agent
 #[tauri::command]
 pub async fn start_sub_task(app: AppHandle, task_id: String, agent_id: String, anyway: Option<bool>) -> Result<StartedSubTask> {
     start_sub_task_inner(&app, task_id, agent_id, anyway.unwrap_or(false)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn task(id: &str, key: &str) -> Task {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "name": format!("{key} Work on {id}"), "root": "/tmp", "branch": key,
+            "issue_key": key, "created_at": "2026-10-27T00:00:00Z",
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn tasks_under_an_epics_ticket_become_its_sub_tasks_named_after_their_tickets() {
+        let mut epic = task("e", "DT-1");
+        epic.epic = true;
+        let mut tasks = vec![epic.clone(), task("a", "DT-2"), task("b", "DT-3")];
+        adopt(&mut tasks, &epic, &["a".into()]);
+        assert_eq!(tasks[1].sub_task, Some(SubTaskOf { epic: "e".into(), title: "Work on a".into() }));
+        assert_eq!(tasks[2].sub_task, None);
+    }
+
+    #[test]
+    fn adopting_leaves_epics_other_epics_sub_tasks_and_the_epics_own_old_task_alone() {
+        let mut epic = task("e", "DT-1");
+        epic.epic = true;
+        let mut other = task("o", "DT-9");
+        other.epic = true;
+        let mut theirs = task("s", "DT-4");
+        theirs.sub_task = Some(SubTaskOf { epic: "o".into(), title: "Theirs".into() });
+        let old = task("old", "DT-1");
+        let mut tasks = vec![epic.clone(), other, theirs, old];
+        adopt(&mut tasks, &epic, &["e".into(), "o".into(), "s".into(), "old".into()]);
+        assert_eq!(tasks[0].sub_task, None);
+        assert_eq!(tasks[1].sub_task, None);
+        assert_eq!(tasks[2].sub_task.as_ref().map(|s| s.epic.as_str()), Some("o"));
+        assert_eq!(tasks[3].sub_task, None);
+    }
 }

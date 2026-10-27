@@ -68,6 +68,11 @@ export function seedEpic(world: World) {
   world.prs.push(prs("t-lock", "api", 51, true, "approved"), prs("t-retry", "api", 53, false, "changes_requested"));
   world.panes.push(pane("pane-retry", "t-retry", "agent", "Claude Code · api", "claude", "asking", 90, { topic: "Retry a lost race" }));
   world.output["pane-retry"] = "Ana asked for a test of the retry path. Add it to session.test.ts, or file it apart?\r\n";
+  // ACME-200 is a Jira epic with a task here (ACME-130) and no epic here (EPIC-13).
+  world.elsewhere.push({
+    ...world.issues[0], key: "ACME-200", summary: "Audit and compliance", issue_type: "Epic", status: "In Progress",
+    status_category: "indeterminate", epic_key: null, epic_summary: null, url: "https://acme.atlassian.net/browse/ACME-200",
+  });
   world.issues.push(
     { ...world.issues[0], key: "ACME-100", summary: "Sign-in overhaul", issue_type: "Epic", epic_key: null, epic_summary: null, url: "https://acme.atlassian.net/browse/ACME-100" },
     ...PLAN.filter((p) => p.key).map((p, i) => ({
@@ -78,15 +83,29 @@ export function seedEpic(world: World) {
 }
 
 export function epicAnswers(world: World, spawn: (a: Args, taskId: string) => PaneInfo) {
-  const view = (epicId: string): EpicView => ({
-    planned: epicId === EPIC,
-    sub_tasks: epicId !== EPIC ? [] : PLAN.map((p) => ({
+  // Tasks from before an epic (EPIC-13) follow its plan, with no steps of their own.
+  const view = (epicId: string): EpicView => {
+    const planned = epicId === EPIC ? PLAN.map((p) => ({
       ...p,
       task_id: world.tasks.find((t) => t.sub_task?.epic === epicId && t.sub_task.title === p.title)?.id ?? null,
-    })),
-  });
+    })) : [];
+    const before = world.tasks
+      .filter((t) => t.sub_task?.epic === epicId && !planned.some((p) => p.task_id === t.id))
+      .map((t): SubTaskView => ({
+        title: t.sub_task?.title ?? t.name, key: t.issue_key, existing: false, repos: t.checkouts.map((c) => c.project_name),
+        serves: [], steps: 0, done: 0, waits_for: [], task_id: t.id,
+      }));
+    return { planned: epicId === EPIC, sub_tasks: [...planned, ...before] };
+  };
   return {
     epic_view: (a: Args) => view(a.epicId as string),
+    adopt_sub_tasks: (a: Args) => {
+      const epicId = a.epicId as string;
+      for (const t of world.tasks.filter((t) => (a.taskIds as string[]).includes(t.id) && !t.sub_task && !t.epic)) {
+        t.sub_task = { epic: epicId, title: t.issue_key ? t.name.replace(`${t.issue_key} `, "") : t.name };
+      }
+      return view(epicId);
+    },
     file_sub_tasks: (a: Args) => {
       const epicId = a.epicId as string;
       for (const p of view(epicId).sub_tasks.filter((s) => !s.task_id)) {

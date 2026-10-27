@@ -267,6 +267,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_projects,
             commands::epic_view,
+            commands::adopt_sub_tasks,
             commands::file_sub_tasks,
             commands::start_sub_task,
             commands::add_projects,

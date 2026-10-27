@@ -276,7 +276,8 @@ count, running agents, uncommitted changes and the review verdict.
   ticket's epic; an epic-level ticket is its own; a task with no ticket, or
   whose ticket has no epic, is under "No epic", last. A ticket not on your
   own list is asked of Jira (`jira_issues_by_key`), once a session, and only
-  while the list is grouped by epic. By repository, a task in several is
+  while Jira is connected: Epics needs it however the list is grouped
+  (EPIC-13). By repository, a task in several is
   listed once, under all of their names. Inside each group, and between
   groups, the stage order holds: what is being written first, what has
   landed last. Epic is not offered without Jira. Twenty tasks over five
@@ -3001,7 +3002,10 @@ paper.
   task's (hollow while it waits), its title, and its state in a word. A
   sub-task is not listed again under Tasks. It opens as any task does, with
   all of its tabs, and its header links to its epic. A sub-task whose epic
-  was deleted is an ordinary task again.
+  was deleted is an ordinary task again. Beside the epics made here, the
+  section lists each Jira epic a task's ticket sits under (its parent, found
+  as TASK-17 finds it, whatever the list is grouped by), with those tasks
+  under it (EPIC-13).
 - **EPIC-10** A sub-task's state MUST be the first that holds of: merged,
   changes, approved, in review (its pull requests, as the task list reads
   them), asking (an agent in it needs you), working (an agent in it is
@@ -3024,13 +3028,32 @@ paper.
   message to the sub-task's running agents, typed into a terminal or sent
   as a prompt over ACP, as TASK-6 tells them).
 
+### Tasks from before
+
+- **EPIC-13** A task whose ticket sits under an epic's ticket in Jira MUST
+  be that epic's sub-task, however and whenever the task was made: listed
+  under the epic (EPIC-9), and on its Sub-tasks tab with its own steps, if
+  its spec has any, its state (EPIC-10) and its action (EPIC-8), and known
+  to the epic's chat (EPIC-12). It is linked the first time the task list
+  sees it under an epic made here, and stays linked if its ticket later
+  leaves the epic. A task on the epic's own ticket made before epics
+  existed stays an ordinary task. A Jira epic that has tasks here but is
+  not an epic here yet opens Start work on its ticket (EPIC-2), with its
+  tasks' repositories picked. The epic it makes opens on Sub-tasks, with
+  those tasks under it, and drafts no requirements: its work is already
+  under way, and a spec can still be written on its Spec tab. Before, only
+  epics made from then on had sub-tasks, and every task started earlier
+  stayed under Tasks.
+
 Code: `spec.rs` (`sub_tasks`: grouping steps into sub-tasks, and each
 one's `tasks.md`), `commands/epics.rs` (what the tab is shown, filing,
-starting, telling), `commands/spec_prompts.rs` (the grouped tasks draft),
+starting, telling, `adopt_sub_tasks` for EPIC-13),
+`commands/spec_prompts.rs` (the grouped tasks draft),
 `commands/task_context.rs` (the epic chat's context), `mcp.rs`
 (`epic_subtasks`, `subtask_start`, `subtask_tell`), `EpicView.tsx`,
 `epic/` (the Sub-tasks tab, filing, the chat column), `lib/epicState.ts`
-(EPIC-10), `sidebar/EpicRow.tsx`, `tickets/StartWorkDialog.tsx` (EPIC-2),
+(EPIC-10), `sidebar/EpicRow.tsx`, `sidebar/EpicsSection.tsx` (EPIC-9,
+EPIC-13), `tickets/StartWorkDialog.tsx` (EPIC-2, EPIC-13),
 `tickets/CreateEpicDialog.tsx` (EPIC-3).
 
 Known gaps:

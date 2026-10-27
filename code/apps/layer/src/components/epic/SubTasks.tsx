@@ -19,7 +19,8 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
   const [filing, setFiling] = useState(false);
 
   if (!view) return <div className="epic-subs"><Spinner /></div>;
-  if (!view.planned) {
+  // An epic made from tasks already under way has them and no spec yet (EPIC-13).
+  if (!view.planned && view.sub_tasks.length === 0) {
     return (
       <div className="epic-subs">
         <div className="empty">
@@ -80,7 +81,9 @@ function SubTaskRow({ sub, all }: { sub: SubTaskView; all: SubTaskView[] }) {
     <div className={`epic-row${sub.task_id ? "" : " proposed"}${state === "waits" ? " queued" : ""}`} onClick={open}>
       <span className="key">{sub.key ?? "new"}</span>
       <span className="title"><span className={`dot ${dot}`} />{sub.title}</span>
-      <span className="steps" title={`${sub.done} of ${sub.steps} steps ticked`}>{sub.done}/{sub.steps}</span>
+      <span className="steps" title={sub.steps ? `${sub.done} of ${sub.steps} steps ticked` : "No steps in its spec"}>
+        {sub.steps ? `${sub.done}/${sub.steps}` : "—"}
+      </span>
       <span className="steps">{sub.serves.join(", ")}</span>
       <span className="state" style={{ color: STATE_COLOR[state] }}>{stateText(state, sub, waits)}</span>
       <span className="act">

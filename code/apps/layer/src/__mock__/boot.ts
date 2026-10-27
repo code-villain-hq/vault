@@ -547,7 +547,7 @@ const answer: Record<string, Answer> = {
     const key = a.key as string;
     const root = `/Users/you/.villain-worktrees/${key}`;
     const task: TaskView = {
-      id: `t-${key.toLowerCase()}`, name: `${key} ${world.issues.find((i) => i.key === key)?.summary ?? ""}`.trim(),
+      id: `t-${key.toLowerCase()}`, name: `${key} ${[...world.issues, ...world.elsewhere].find((i) => i.key === key)?.summary ?? ""}`.trim(),
       root, branch: key, issue_key: key, issue_url: `https://acme.atlassian.net/browse/${key}`,
       created_at: new Date().toISOString(), pane_count: 0, epic: !!a.epic,
       checkouts: (a.projectIds as string[]).map((pid) => {

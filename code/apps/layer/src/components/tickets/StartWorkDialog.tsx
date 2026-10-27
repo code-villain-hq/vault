@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import { useSpecs } from "../../lib/specs";
-import type { AgentStatus, JiraIssue, Project } from "../../lib/types";
+import type { AgentStatus, JiraIssue, Project, TaskView } from "../../lib/types";
 import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { RepoPicker } from "../RepoPicker";
 import { suggestBase } from "../../lib/derive";
@@ -14,12 +14,15 @@ export function StartWorkDialog({
   projects,
   agents,
   types,
+  subTasks = [],
   onClose,
 }: {
   issue: JiraIssue;
   projects: Project[];
   agents: AgentStatus[];
   types: TypeMap;
+  /** An epic's tasks here from before it was one (EPIC-13): they become its sub-tasks. */
+  subTasks?: TaskView[];
   onClose: () => void;
 }) {
   const refreshIssues = useStore((s) => s.refreshIssues);
@@ -48,6 +51,9 @@ export function StartWorkDialog({
   // An epic-level ticket is made an epic: its spec makes the sub-tasks, and
   // no agent starts on it (EPIC-2).
   const epic = isEpicType(types, issue.issue_type);
+  // Its work is already under way: it opens on those tasks, with no spec drafted.
+  const adopting = epic && subTasks.length > 0;
+  const theirRepos = [...new Set(subTasks.flatMap((t) => t.checkouts.map((c) => c.project_id)))].join(",");
   const selected = projects.filter((p) => picked.includes(p.id));
 
   // A default, once. Re-filled whenever the value was empty — and on every
@@ -65,6 +71,11 @@ export function StartWorkDialog({
     setBase("");
     setBaseOptions([]);
     setPicked([]);
+    if (theirRepos) {
+      setPicked(theirRepos.split(","));
+      setReason(`the repositories its ${subTasks.length === 1 ? "task" : "tasks"} here ${subTasks.length === 1 ? "is" : "are"} in`);
+      return;
+    }
     let stop = false;
     // A suggestion, so it gives way to what was picked while it was out.
     api.suggestRepos({ issueKey: issue.key, epicKey: issue.epic_key })
@@ -75,7 +86,7 @@ export function StartWorkDialog({
       })
       .catch(() => { if (!stop) setReason(null); });
     return () => { stop = true; };
-  }, [issue, failure.clear]);
+  }, [issue, theirRepos, failure.clear]);
 
   // Prefill from the repos' defaults when they agree; load the union of their
   // remote-tracking branches for the picker. Typing still works — a branch
@@ -119,7 +130,7 @@ export function StartWorkDialog({
     if (picked.length === 0) return;
     setStarting(true);
     failure.clear();
-    const spec = epic || (specFirst && !!agentId);
+    const spec = (epic && !adopting) || (!epic && specFirst && !!agentId);
     try {
       const task = await api.jiraStartWork(
         issue.key,
@@ -167,7 +178,9 @@ export function StartWorkDialog({
           >
             {starting
               ? "Creating worktrees…"
-              : epic
+              : adopting
+                ? `Make it an epic in ${picked.length} repo${picked.length === 1 ? "" : "s"}`
+                : epic
                 ? `Write the epic's spec in ${picked.length} repo${picked.length === 1 ? "" : "s"}`
                 : `Start work in ${picked.length} repo${picked.length === 1 ? "" : "s"}`}
           </button>
@@ -233,7 +246,13 @@ export function StartWorkDialog({
         />
       </Field>
 
-      {epic ? (
+      {adopting ? (
+        <div className="muted" style={{ marginBottom: 14, lineHeight: 1.6 }}>
+          An epic: {subTasks.length === 1 ? "its task here becomes its sub-task" : `its ${subTasks.length} tasks here become its sub-tasks`},
+          and its chat runs them. The work is under way, so no spec is drafted; one can still be
+          written on its Spec tab.
+        </div>
+      ) : epic ? (
         <div className="muted" style={{ marginBottom: 14, lineHeight: 1.6 }}>
           An epic: its spec is written here, and its tasks become sub-tasks, each
           filed under {issue.key} and worked in a task of its own.
