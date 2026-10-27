@@ -1,6 +1,6 @@
 # Almanac
 
-*A Code Villain product. Idea stage: the problem and two storyboards are
+*A Code Villain product. Idea stage: the problem and three storyboards are
 agreed; nothing is built.*
 
 What you learn in chats is lost in the scroll. When to water a plant, a
@@ -25,10 +25,21 @@ Almanac keeps it by topic.
 - **A topic keeps things itself**, and asks only when it's unsure. A
   question waits where it's about, not in a chat.
 - **Reminders and a calendar** are a must. Almanac decides when to offer a
-  reminder. Reminders only need to reach the Mac.
+  reminder. Reminders only need to reach the Mac. Calendar shows the
+  workspace's week: every topic's dates, each with its topic's icon, and
+  a bell on what notifies the Mac.
+- **Starting a topic** takes a name and a sentence on what it sticks to,
+  which can stay empty: Almanac then writes it from the name. Almanac
+  picks the icon and the group. An empty topic says what will be there
+  and offers first questions taken from what it sticks to.
+- **A talk opens beside the page.** The page keeps short points with their
+  sources, not the whole answer. Closed, the talk waits behind the talks
+  icon.
 - **A topic opens on what it's for:** Pflanzen on its week and a card per
   plant, Haare on today's routine as numbered steps, Manage up on the
-  handover as a document that grows. New parts carry the unread dot.
+  handover as a document that grows, Karl Marx on what you're reading.
+  Almanac finds the shape in the talks; nobody sets it up. New parts
+  carry the unread dot.
 - **Dumps:** a shortcut anywhere on the Mac opens one field, with no topic
   to pick. Almanac says where the dump went, with Open and Undo, and
   offers a reminder when there's something to do. When two topics fit, or
@@ -40,6 +51,9 @@ Almanac keeps it by topic.
 
 Open them in a browser. Each shows night and day.
 
+- [`storyboards/starting-a-topic.html`](storyboards/starting-a-topic.html):
+  naming a topic, its empty page, a first talk, the topic a month later,
+  and the Calendar.
 - [`storyboards/opening-a-topic.html`](storyboards/opening-a-topic.html):
   Pflanzen, Haare and Manage up as they open.
 - [`storyboards/dumping.html`](storyboards/dumping.html): a dump, where it
@@ -55,4 +69,5 @@ Open them in a browser. Each shows night and day.
 - Whether a dump picks its own workspace. Today it goes to the one the
   panel shows, the one you used last. Picking by itself could put a
   personal note where colleagues see it.
+- Whether Calendar also shows Work, or only the workspace you're in.
 - Which model answers, and whether a topic searches the web.

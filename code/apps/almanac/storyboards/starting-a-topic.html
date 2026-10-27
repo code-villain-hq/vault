@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: starting a topic</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-mono.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.step > p { color: var(--muted); max-width: 84ch; }
+.choices { color: var(--muted); max-width: 84ch; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* App window: the desktop app, so the traffic lights stand where the wordmark would. */
+.win { display: grid; grid-template-columns: 224px 1fr; grid-template-rows: 48px 1fr; height: 700px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); }
+.win.tall { height: 940px; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+.toprow { height: 48px; display: flex; align-items: center; padding-left: 8px; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.tools { margin-left: auto; display: flex; gap: 2px; align-items: center; }
+.picker { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; margin: 2px 0 10px; font-weight: 600; }
+.picker .chev { margin-left: auto; color: var(--muted); }
+.avatar { width: 20px; height: 20px; border-radius: 5px; background: var(--cloak); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 14px 8px 4px; }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.body { flex: 1; overflow: hidden; padding: 28px 36px 0; }
+.ask { padding: 12px 36px 18px; }
+.askbox { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 6px 0 14px; max-width: 720px; }
+.askbox .ph { color: var(--faint); flex: 1; }
+
+/* A topic's head: what it is and what it sticks to. */
+.thead { display: flex; align-items: center; gap: 10px; }
+.thead svg { color: var(--muted); }
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.about { color: var(--muted); margin-top: 4px; }
+.sec { margin-top: 26px; max-width: 720px; }
+.label { color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 10px 4px; }
+
+/* The week: what's due, day by day. */
+.wide { max-width: 940px; }
+.weekhead { display: flex; align-items: center; gap: 8px; padding: 0 0 6px; }
+.weekhead .range { color: var(--muted); font-size: var(--type-ui-small-size); }
+.weekhead .tools { gap: 0; }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day { border-radius: var(--radius-md); padding: 8px; min-height: 96px; display: flex; flex-direction: column; gap: 6px; }
+.day .dl { display: flex; gap: 6px; align-items: baseline; color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 2px; }
+.day .dl b { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.day.today { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.day.today .dl, .day.today .dl b { color: var(--fg); font-weight: 700; }
+.ev { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: var(--radius-md); background: var(--surface); font-size: var(--type-ui-small-size); line-height: 1.3; }
+.ev svg { color: var(--muted); flex: none; }
+.ev.done { background: none; color: var(--faint); }
+.ev.done svg { color: var(--faint); }
+
+/* Pflanzen: one card per plant. */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.card h4 { font-size: var(--type-ui-size); font-weight: 700; display: flex; gap: 8px; align-items: baseline; }
+.card h4 span { color: var(--faint); font-weight: 400; font-size: var(--type-ui-small-size); }
+.rhythm { display: grid; gap: 6px; }
+.rhythm .line { display: flex; justify-content: space-between; gap: 8px; font-size: var(--type-ui-small-size); color: var(--muted); }
+.rhythm .line b { color: var(--fg); font-weight: 600; }
+.meter { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 10%, transparent); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 3px; background: color-mix(in srgb, var(--fg) 45%, transparent); }
+.card ul { display: grid; gap: 6px; font-size: var(--type-ui-small-size); line-height: 1.45; }
+.card .from { margin-top: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Haare: today's routine, step by step. */
+.routine-head { display: flex; align-items: baseline; gap: 8px; padding: 0 0 8px; }
+.routine-head b { font-weight: 700; }
+.routine-head span { color: var(--muted); font-size: var(--type-ui-small-size); }
+.steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stepcard { background: var(--surface); border-radius: var(--radius-lg); padding: 16px 18px 18px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: start; }
+.stepcard .num { font-size: 28px; font-weight: 700; line-height: 1; color: var(--muted); grid-row: 1 / 3; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.stepcard .thing { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.stepcard p { grid-column: 2; color: var(--muted); }
+.tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1.75px color-mix(in srgb, var(--fg) 35%, transparent); grid-column: 3; grid-row: 1; }
+.stepcard.done .tick { box-shadow: none; background: color-mix(in srgb, var(--fg) var(--button-tint), transparent); color: var(--muted); }
+.stepcard.done .thing, .stepcard.done .num { color: var(--faint); }
+.fact { display: flex; gap: 16px; padding: 5px 10px; align-items: baseline; }
+.fact .d { margin-left: auto; color: var(--faint); font-size: var(--type-ui-small-size); white-space: nowrap; }
+
+/* Manage up: the handover is the page. */
+.doc { max-width: 66ch; margin-top: 24px; font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.doc h2 { font-size: var(--type-title-size); line-height: var(--type-title-leading); font-weight: 700; }
+.doc .meta { color: var(--faint); font-size: var(--type-ui-small-size); margin-top: 2px; }
+.doc h3 { font-size: var(--type-body-size); font-weight: 700; margin-top: 20px; }
+.doc p { margin-top: 4px; }
+.doc ol { margin-top: 4px; counter-reset: n; }
+.doc ol li { counter-increment: n; padding-left: 1.6em; position: relative; }
+.doc ol li::before { content: counter(n) "."; position: absolute; left: 0; color: var(--muted); }
+.new { position: relative; }
+.new .ui-live-dot { position: absolute; left: -18px; top: 0.7em; }
+.new .src { display: block; color: var(--faint); font-size: var(--type-ui-small-size); margin-top: 2px; }
+.unsure { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); }
+.unsure .acts { display: flex; gap: 8px; margin-top: 10px; }
+.sources { margin-top: 20px; font-size: var(--type-ui-small-size); color: var(--muted); }
+.sources li { padding: 1px 0; }
+.sources .ui-link { font-weight: 600; }
+
+/* The desk: whatever you're doing on the Mac when you dump. */
+.desk { position: relative; height: 380px; border-radius: 12px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); }
+.desk.low { height: 330px; }
+.ghost { position: absolute; inset: 28px 60px -20px; border-radius: 12px; background: color-mix(in srgb, var(--fg) 4%, var(--bg)); padding: 56px 64px; display: grid; align-content: start; gap: 14px; }
+.ghost b { display: block; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.desk .slots { position: absolute; inset: 64px 0 auto; display: flex; justify-content: center; gap: 24px; }
+
+/* The dump panel: one field, no topic to pick. */
+.dump { width: 620px; padding: 16px 18px 14px; display: grid; gap: 14px; }
+.slots.pair { gap: 20px; }
+.slots.pair .dump { width: 500px; }
+.dtext { font-size: var(--type-body-size); line-height: var(--type-body-leading); min-height: 3.2em; }
+.caret { display: inline-block; width: 1.5px; height: 1.1em; margin-left: 1px; vertical-align: -0.15em; background: var(--accent); }
+.dsent { color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dfoot { display: flex; align-items: center; gap: 12px; }
+.ws { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 8px 0 4px; border-radius: var(--radius-md); font-weight: 600; }
+.ws .avatar { width: 18px; height: 18px; font-size: 10px; }
+.ws .chev { color: var(--muted); }
+.hint { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 5px; }
+.dfoot .ui-button-primary { margin-left: auto; }
+.dfoot .hint:last-child { margin-left: auto; }
+.kept { display: flex; align-items: center; gap: 10px; }
+.kept > svg { color: var(--muted); }
+.kept .ui-link { font-size: var(--type-control-size); margin-left: auto; }
+.offer { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.offer > svg { color: var(--muted); }
+.offer .ui-button { margin-left: auto; }
+.q { padding: 12px 14px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); display: grid; gap: 10px; }
+.q .acts { display: flex; gap: 8px; }
+.q .then { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Katzen: a card per cat, two of them. */
+.cards.two { grid-template-columns: repeat(2, 1fr); }
+.card li.new { display: flex; gap: 8px; }
+.card li.new .ui-live-dot { position: static; margin-top: 0.55em; }
+.card li .src { display: block; color: var(--faint); margin-top: 1px; }
+.nav .ui-live-dot { margin-left: auto; margin-right: 4px; }
+
+/* Starting a topic: a dialog over the window. */
+.win { position: relative; }
+.veil { position: absolute; inset: 0; display: grid; justify-content: center; align-content: start; padding-top: 104px; }
+.newtopic { width: 500px; padding: 20px 22px 18px; display: grid; gap: 16px; }
+.newtopic h3 { font-size: var(--type-title-size); line-height: var(--type-title-leading); font-weight: 700; }
+.fld { display: grid; gap: 6px; }
+.fld label { font-weight: 600; }
+.fld .ui-field { padding: 8px 12px; }
+.fld .area { min-height: 92px; }
+.is-focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.newtopic .help { color: var(--faint); font-size: var(--type-ui-small-size); }
+.btns { margin-left: auto; display: flex; gap: 8px; }
+
+/* An empty topic: what will be here, and the first questions. */
+.empty { margin-top: 64px; max-width: 520px; }
+.empty b { font-weight: 700; }
+.empty p { color: var(--muted); margin-top: 2px; }
+.starts { margin-top: 20px; display: grid; gap: 6px; justify-items: start; }
+.starts .label { padding: 0 0 2px; }
+.askbox .caret { margin: 0 2px 0 0; }
+
+/* A talk: a second panel beside the page. */
+.win.split { grid-template-columns: 224px 1fr 440px; }
+.win.split .top { grid-column: 2 / 4; }
+.split .body { padding: 28px 32px 0; }
+.talk { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.thd { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 8px 0 20px; flex: none; }
+.thd b { font-weight: 700; }
+.thd span { color: var(--faint); font-size: var(--type-ui-small-size); }
+.tbody { flex: 1; overflow: hidden; padding: 6px 20px 0; display: flex; flex-direction: column; gap: 16px; }
+.you { align-self: flex-end; max-width: 85%; padding: 8px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.answer { display: grid; gap: 8px; }
+.answer ul { display: grid; gap: 4px; }
+.answer li { padding-left: 14px; position: relative; }
+.answer li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.talk .sources { margin-top: -6px; }
+.keptnote { color: var(--faint); font-size: var(--type-ui-small-size); }
+.talk .ask { padding: 12px 16px 16px; }
+.card.one { max-width: 440px; }
+.card h4 .ui-live-dot { align-self: center; }
+
+/* Karl Marx a month on: the reading order. */
+.reading { display: grid; gap: 2px; }
+.rd { display: grid; grid-template-columns: 22px 1fr auto; gap: 1px 12px; padding: 8px 12px 9px; border-radius: var(--radius-md); align-items: baseline; }
+.rd .num { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; grid-row: 1 / 3; }
+.rd b { font-weight: 700; }
+.rd b span { color: var(--faint); font-weight: 400; font-size: var(--type-ui-small-size); margin-left: 6px; }
+.rd p { grid-column: 2; color: var(--muted); }
+.rd .st { grid-column: 3; grid-row: 1; color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 4px; }
+.rd.now { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.rd.now .st { color: var(--fg); font-weight: 600; }
+.rd.done b, .rd.done .num { color: var(--faint); }
+.cards .card li.new .ui-live-dot { margin-top: 0.5em; }
+
+/* Calendar: every topic's dates in one week. */
+.week.cal .day { min-height: 250px; }
+.ev.c { align-items: flex-start; }
+.ev.c > svg { margin-top: 2px; }
+.ev .when { display: flex; align-items: center; gap: 4px; color: var(--faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.ev .when svg { color: var(--faint); }
+.fact > svg { color: var(--muted); align-self: center; flex: none; margin-right: -6px; }
+.fact .bell { color: var(--faint); align-self: center; margin-left: auto; margin-right: -8px; }
+.fact .bell + .d { margin-left: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Starting a topic</h1>
+  <p>How a topic begins: you name it and say what it sticks to, it opens empty, and a talk starts to fill it. Then Karl Marx a month later, and the Calendar that gathers every topic's dates. Night and day, with the Nightshade tokens. The content is made up.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>You name it and say what it sticks to</h2>
+  <p>Sunday, Sep 27. New topic, or C, opens a dialog over the topic you're in. It has two fields: the name, and a sentence or two on what the topic sticks to, like a topic bot in Grok.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> what it sticks to can stay empty. Almanac then writes it from the name and shows it on the topic, where you can change it.</li>
+    <li><b>My choice:</b> Almanac picks the icon and the group. Karl Marx goes into red and green, next to Vegan. You can change both later.</li>
+    <li><b>My choice:</b> the topic goes into the workspace you're in. <span class="ui-kbd">⌘↩</span> starts it.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="new-topic"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="new-topic"></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>It opens empty, on what you could ask</h2>
+  <p>Karl Marx has nothing to show yet, so it opens on the one thing that fills it: asking. What it sticks to is the line under the name.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> the empty page says what will be here, and offers three first questions taken from what it sticks to. One click asks.</li>
+    <li><b>My choice:</b> the ask field is already focused, so you can just type.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="marx-empty"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="marx-empty"></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">3</span>A talk opens beside the page</h2>
+  <p>You ask about rents. The answer comes in a talk on the right. The page on the left keeps the gist and where Marx or Engels wrote it. As the topic was told, it says what is Engels and what is a later reading.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> the page keeps short points and their sources, not the whole answer. The new part carries the unread dot.</li>
+    <li><b>My choice:</b> the answer says where it was kept. <span class="ui-kbd">esc</span> closes the talk, and it waits behind the talks icon.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="marx-talk"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="marx-talk"></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">4</span>A month later, it opens on what you're reading</h2>
+  <p>Wednesday, Oct 28. In the talks since, you asked where to start and said you joined a reading circle. So Karl Marx opens on a reading order, then a card per theme.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> nobody set up the reading order. Almanac found that shape in the talks, as Pflanzen found its week.</li>
+    <li><b>My choice:</b> the reading circle meets on Thursday. Almanac offered a reminder in that talk, and you said yes, so it's on the Calendar.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="marx-month"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="marx-month"></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">5</span>Calendar gathers every topic's dates</h2>
+  <p>The same day. Calendar shows the week for all of Home: watering from Pflanzen, wash days from Haare, the cats, the reading circle. Each date carries its topic's icon and opens in its topic.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> a bell marks the dates that notify the Mac. The rest show only here and in their topic.</li>
+    <li><b>My choice:</b> dates after this week wait under Later.</li>
+    <li><b>Open:</b> whether Calendar also shows Work, or only the workspace you're in.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="calendar"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="calendar"></div></div>
+</section>
+
+</div>
+
+<template id="new-topic">
+  <div class="win">
+    <aside class="side">
+      <div class="toprow">
+        <div class="lights"><span></span><span></span><span></span></div>
+        <div class="tools">
+          <button class="ui-button ui-icon-button" aria-label="Search"><i data-i="search"></i></button>
+          <button class="ui-button ui-icon-button" aria-label="New topic"><i data-i="plus"></i></button>
+        </div>
+      </div>
+      <div class="picker"><span class="avatar">H</span>Home<i class="chev" data-i="chevron"></i></div>
+      <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+      <div class="group">Hobby</div>
+      <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+      <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+      <div class="nav ui-row"><i data-i="brush"></i>Zeichnen</div>
+      <div class="group">Pflege</div>
+      <div class="nav ui-row"><i data-i="shower"></i>Haare</div>
+      <div class="group">red and green</div>
+      <div class="nav ui-row is-selected"><i data-i="leaf"></i>Vegan</div>
+    </aside>
+    <div class="top">Home <span>›</span> <b>Vegan</b>
+      <div class="tools"><button class="ui-button ui-icon-button" aria-label="Past talks"><i data-i="talks"></i></button></div>
+    </div>
+    <main class="content">
+      <div class="body">
+        <div class="thead"><i data-i="leaf" data-s="18"></i><h1 class="title">Vegan</h1></div>
+        <p class="about">Kochen und essen ohne Tierprodukte.</p>
+        <div class="sec">
+          <div class="fact ui-row">Linsen und Reis zusammen geben alle Eiweiße, die man braucht.<span class="d">Sep 3</span></div>
+          <div class="fact ui-row">B12 nehmen: Es kommt aus keiner Pflanze.<span class="d">Aug 21</span></div>
+          <div class="fact ui-row">Statt Eischnee: das Wasser aus der Kichererbsendose.<span class="d">Aug 21</span></div>
+        </div>
+      </div>
+      <div class="ask">
+        <div class="askbox ui-field"><span class="ph">Ask Vegan, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="send"></i></button></div>
+      </div>
+    </main>
+    <div class="veil ui-backdrop">
+      <div class="newtopic ui-dialog" role="dialog" aria-label="New topic">
+        <h3>New topic</h3>
+        <div class="fld">
+          <label>Name</label>
+          <div class="ui-field">Karl Marx</div>
+        </div>
+        <div class="fld">
+          <label>What it sticks to</label>
+          <div class="ui-field area is-focus">Was Marx und Engels geschrieben haben. Sagt, wo es steht, und wenn etwas nur eine spätere Lesart ist.<span class="caret"></span></div>
+        </div>
+        <p class="help">Almanac picks an icon and a group. You can change both later.</p>
+        <div class="dfoot">
+          <span class="ws ui-row"><span class="avatar">H</span>Home<i class="chev" data-i="chevron"></i></span>
+          <div class="btns">
+            <button class="ui-button">Cancel</button>
+            <button class="ui-button ui-button-primary">Start topic</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="marx-empty">
+  <div class="win">
+    <aside class="side">
+      <div class="toprow">
+        <div class="lights"><span></span><span></span><span></span></div>
+        <div class="tools">
+          <button class="ui-button ui-icon-button" aria-label="Search"><i data-i="search"></i></button>
+          <button class="ui-button ui-icon-button" aria-label="New topic"><i data-i="plus"></i></button>
+        </div>
+      </div>
+      <div class="picker"><span class="avatar">H</span>Home<i class="chev" data-i="chevron"></i></div>
+      <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+      <div class="group">Hobby</div>
+      <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+      <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+      <div class="nav ui-row"><i data-i="brush"></i>Zeichnen</div>
+      <div class="group">Pflege</div>
+      <div class="nav ui-row"><i data-i="shower"></i>Haare</div>
+      <div class="group">red and green</div>
+      <div class="nav ui-row is-selected"><i data-i="book"></i>Karl Marx</div>
+      <div class="nav ui-row"><i data-i="leaf"></i>Vegan</div>
+    </aside>
+    <div class="top">Home <span>›</span> <b>Karl Marx</b>
+      <div class="tools"><button class="ui-button ui-icon-button" aria-label="Past talks"><i data-i="talks"></i></button></div>
+    </div>
+    <main class="content">
+      <div class="body">
+        <div class="thead"><i data-i="book" data-s="18"></i><h1 class="title">Karl Marx</h1></div>
+        <p class="about">Was Marx und Engels geschrieben haben. Sagt, wo es steht, und wenn etwas nur eine spätere Lesart ist.</p>
+        <div class="empty">
+          <b>Nothing kept yet.</b>
+          <p>What you ask Karl Marx is kept here by theme, with where Marx or Engels wrote it.</p>
+          <div class="starts">
+            <div class="label">To start</div>
+            <button class="ui-button">Was ist Mehrwert?</button>
+            <button class="ui-button">Was sagen Marx und Engels über Mieten?</button>
+            <button class="ui-button">Wo fange ich mit dem Lesen an?</button>
+          </div>
+        </div>
+      </div>
+      <div class="ask">
+        <div class="askbox ui-field is-focus"><span class="caret"></span><span class="ph">Ask Karl Marx, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="send"></i></button></div>
+      </div>
+    </main>
+  </div>
+</template>
+
+<template id="marx-talk">
+  <div class="win split">
+    <aside class="side">
+      <div class="toprow">
+        <div class="lights"><span></span><span></span><span></span></div>
+        <div class="tools">
+          <button class="ui-button ui-icon-button" aria-label="Search"><i data-i="search"></i></button>
+          <button class="ui-button ui-icon-button" aria-label="New topic"><i data-i="plus"></i></button>
+        </div>
+      </div>
+      <div class="picker"><span class="avatar">H</span>Home<i class="chev" data-i="chevron"></i></div>
+      <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+      <div class="group">Hobby</div>
+      <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+      <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+      <div class="nav ui-row"><i data-i="brush"></i>Zeichnen</div>
+      <div class="group">Pflege</div>
+      <div class="nav ui-row"><i data-i="shower"></i>Haare</div>
+      <div class="group">red and green</div>
+      <div class="nav ui-row is-selected"><i data-i="book"></i>Karl Marx</div>
+      <div class="nav ui-row"><i data-i="leaf"></i>Vegan</div>
+    </aside>
+    <div class="top">Home <span>›</span> <b>Karl Marx</b>
+      <div class="tools"><button class="ui-button ui-icon-button" aria-label="Past talks"><i data-i="talks"></i></button></div>
+    </div>
+    <main class="content">
+      <div class="body">
+        <div class="thead"><i data-i="book" data-s="18"></i><h1 class="title">Karl Marx</h1></div>
+        <p class="about">Was Marx und Engels geschrieben haben. Sagt, wo es steht, und wenn etwas nur eine spätere Lesart ist.</p>
+        <div class="sec">
+          <div class="card one">
+            <h4>Mieten und Wohnen<span class="ui-live-dot" aria-label="New"></span></h4>
+            <ul>
+              <li>Mieter und Vermieter machen ein gewöhnliches Geschäft. Ausgebeutet wird bei der Arbeit.<span class="src">Engels, Zur Wohnungsfrage, 1872</span></li>
+              <li>Die Wohnungsnot gehört zum Kapitalismus. Abreißen verlegt die Elendsviertel nur.<span class="src">Engels, Zur Wohnungsfrage</span></li>
+              <li>In wachsenden Städten steigt die Rente für Bauland von selbst.<span class="src">Marx, Das Kapital III, Kapitel 46</span></li>
+              <li>Mieten selbst als Ausbeutung zu sehen ist eine spätere Lesart.<span class="src">Not in Marx or Engels</span></li>
+            </ul>
+            <div class="from">Kept from 1 talk, just now</div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <aside class="talk">
+      <div class="thd"><b>Talk</b><span>just now</span>
+        <div class="tools"><button class="ui-button ui-icon-button" aria-label="Close the talk"><i data-i="x"></i></button></div>
+      </div>
+      <div class="tbody">
+        <div class="you">Was sagen Marx und Engels über Mieten?</div>
+        <div class="answer">
+          <p>Dazu hat vor allem Engels geschrieben, nicht Marx: in <em>Zur Wohnungsfrage</em>, 1872.</p>
+          <ul>
+            <li>Mieter und Vermieter machen ein gewöhnliches Geschäft. Ausgebeutet wird man bei der Arbeit, nicht bei der Miete.</li>
+            <li>Die Wohnungsnot gehört zum Kapitalismus. Reißt man die Elendsviertel ab, entstehen sie woanders neu.</li>
+          </ul>
+          <p>Marx kommt im <em>Kapital</em>, Band III, darauf: In wachsenden Städten steigt die Rente für Bauland, ohne dass der Eigentümer etwas dafür tut.</p>
+          <p>Mieten selbst als Ausbeutung zu sehen ist eine spätere Lesart. Engels sah es anders.</p>
+        </div>
+        <ul class="sources">
+          <li><a class="ui-link" href="#">Engels, Zur Wohnungsfrage ↗</a></li>
+          <li><a class="ui-link" href="#">Marx, Das Kapital III, Kapitel 46 ↗</a></li>
+        </ul>
+        <div class="keptnote">Kept on the page under Mieten und Wohnen.</div>
+      </div>
+      <div class="ask">
+        <div class="askbox ui-field is-focus"><span class="caret"></span><span class="ph">Ask more</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="send"></i></button></div>
+      </div>
+    </aside>
+  </div>
+</template>
+
+<template id="marx-month">
+  <div class="win">
+    <aside class="side">
+      <div class="toprow">
+        <div class="lights"><span></span><span></span><span></span></div>
+        <div class="tools">
+          <button class="ui-button ui-icon-button" aria-label="Search"><i data-i="search"></i></button>
+          <button class="ui-button ui-icon-button" aria-label="New topic"><i data-i="plus"></i></button>
+        </div>
+      </div>
+      <div class="picker"><span class="avatar">H</span>Home<i class="chev" data-i="chevron"></i></div>
+      <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+      <div class="group">Hobby</div>
+      <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+      <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+      <div class="nav ui-row"><i data-i="brush"></i>Zeichnen</div>
+      <div class="group">Pflege</div>
+      <div class="nav ui-row"><i data-i="shower"></i>Haare</div>
+      <div class="nav ui-row"><i data-i="tooth"></i>Zähne</div>
+      <div class="group">red and green</div>
+      <div class="nav ui-row is-selected"><i data-i="book"></i>Karl Marx</div>
+      <div class="nav ui-row"><i data-i="leaf"></i>Vegan</div>
+    </aside>
+    <div class="top">Home <span>›</span> <b>Karl Marx</b>
+      <div class="tools"><button class="ui-button ui-icon-button" aria-label="Past talks"><i data-i="talks"></i></button></div>
+    </div>
+    <main class="content">
+      <div class="body">
+        <div class="thead"><i data-i="book" data-s="18"></i><h1 class="title">Karl Marx</h1></div>
+        <p class="about">Was Marx und Engels geschrieben haben. Sagt, wo es steht, und wenn etwas nur eine spätere Lesart ist.</p>
+
+        <div class="sec wide">
+          <div class="routine-head"><b>What to read</b><span>In this order, with the reading circle</span></div>
+          <div class="reading">
+            <div class="rd done">
+              <span class="num">1</span>
+              <b>Lohnarbeit und Kapital<span>1849</span></b>
+              <span class="st"><i data-i="check" data-s="13"></i>Read</span>
+              <p>Kurz, der beste Einstieg. In der Ausgabe von 1891.</p>
+            </div>
+            <div class="rd now">
+              <span class="num">2</span>
+              <b>Lohn, Preis und Profit<span>1865</span></b>
+              <span class="st">Thursday</span>
+              <p>Ein Vortrag, etwa 60 Seiten. Kapitel 6 bis 9 für den Lesekreis.</p>
+            </div>
+            <div class="rd">
+              <span class="num">3</span>
+              <b>Das Kapital, Band I<span>1867</span></b>
+              <span class="st"></span>
+              <p>Danach. Kapitel 1 ist das schwerste, man darf es zweimal lesen.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec wide">
+          <div class="cards">
+            <div class="card">
+              <h4>Arbeit und Lohn</h4>
+              <ul>
+                <li>Der Arbeiter verkauft seine Arbeitskraft, nicht seine Arbeit.<span class="src">Lohnarbeit und Kapital, 1891</span></li>
+                <li>Das Wort hat Engels 1891 geändert. Ältere Ausgaben sagen Arbeit.<span class="src">Engels, Einleitung 1891</span></li>
+              </ul>
+              <div class="from">Kept from 2 talks, Oct 3</div>
+            </div>
+            <div class="card">
+              <h4>Mehrwert</h4>
+              <ul>
+                <li>Was die Arbeit mehr schafft, als sie im Lohn zurückbekommt.<span class="src">Das Kapital I, Kapitel 7</span></li>
+                <li class="new"><span class="ui-live-dot" aria-label="New"></span><span>Maschinen schaffen keinen Mehrwert, sie geben nur ihren Wert weiter.<span class="src">Das Kapital I, Kapitel 6 · yesterday</span></span></li>
+              </ul>
+              <div class="from">Kept from 2 talks, last yesterday</div>
+            </div>
+            <div class="card">
+              <h4>Mieten und Wohnen</h4>
+              <ul>
+                <li>Mieter und Vermieter machen ein gewöhnliches Geschäft. Ausgebeutet wird bei der Arbeit.<span class="src">Engels, Zur Wohnungsfrage, 1872</span></li>
+                <li>Die Wohnungsnot gehört zum Kapitalismus.<span class="src">Engels, Zur Wohnungsfrage</span></li>
+              </ul>
+              <div class="from">Kept from 1 talk, Sep 27</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ask">
+        <div class="askbox ui-field"><span class="ph">Ask Karl Marx, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="send"></i></button></div>
+      </div>
+    </main>
+  </div>
+</template>
+
+<template id="calendar">
+  <div class="win">
+    <aside class="side">
+      <div class="toprow">
+        <div class="lights"><span></span><span></span><span></span></div>
+        <div class="tools">
+          <button class="ui-button ui-icon-button" aria-label="Search"><i data-i="search"></i></button>
+          <button class="ui-button ui-icon-button" aria-label="New topic"><i data-i="plus"></i></button>
+        </div>
+      </div>
+      <div class="picker"><span class="avatar">H</span>Home<i class="chev" data-i="chevron"></i></div>
+      <div class="nav ui-row is-selected"><i data-i="calendar"></i>Calendar</div>
+      <div class="group">Hobby</div>
+      <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+      <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+      <div class="nav ui-row"><i data-i="brush"></i>Zeichnen</div>
+      <div class="group">Pflege</div>
+      <div class="nav ui-row"><i data-i="shower"></i>Haare</div>
+      <div class="nav ui-row"><i data-i="tooth"></i>Zähne</div>
+      <div class="group">red and green</div>
+      <div class="nav ui-row"><i data-i="book"></i>Karl Marx</div>
+      <div class="nav ui-row"><i data-i="leaf"></i>Vegan</div>
+    </aside>
+    <div class="top">Home <span>›</span> <b>Calendar</b></div>
+    <main class="content">
+      <div class="body">
+        <div class="thead"><i data-i="calendar" data-s="18"></i><h1 class="title">Calendar</h1></div>
+        <p class="about">What's due in Home, from every topic.</p>
+
+        <div class="sec wide">
+          <div class="weekhead">
+            <span class="range">Oct 26 – Nov 1</span>
+            <div class="tools">
+              <button class="ui-button ui-icon-button" aria-label="Last week"><i data-i="left"></i></button>
+              <button class="ui-button ui-icon-button" aria-label="Next week"><i data-i="right"></i></button>
+            </div>
+          </div>
+          <div class="week cal">
+            <div class="day"><div class="dl">Mon <b>26</b></div><div class="ev done"><i data-i="shower" data-s="12"></i>Waschtag</div></div>
+            <div class="day"><div class="dl">Tue <b>27</b></div></div>
+            <div class="day today"><div class="dl">Wed <b>28</b></div><div class="ev"><i data-i="sprout" data-s="12"></i>Efeutute gießen</div></div>
+            <div class="day"><div class="dl">Thu <b>29</b></div>
+              <div class="ev"><i data-i="sprout" data-s="12"></i>Monstera gießen</div>
+              <div class="ev"><i data-i="shower" data-s="12"></i>Waschtag</div>
+              <div class="ev c"><i data-i="book" data-s="12"></i><span>Lesekreis<span class="when"><i data-i="bell" data-s="11"></i>19:00</span></span></div>
+            </div>
+            <div class="day"><div class="dl">Fri <b>30</b></div><div class="ev c"><i data-i="cat" data-s="12"></i><span>Trockenfutter bestellen<span class="when"><i data-i="bell" data-s="11"></i>9:00</span></span></div></div>
+            <div class="day"><div class="dl">Sat <b>31</b></div><div class="ev c"><i data-i="cat" data-s="12"></i><span>Luna Wurmkur<span class="when"><i data-i="bell" data-s="11"></i>10:00</span></span></div></div>
+            <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><i data-i="sprout" data-s="12"></i>Basilikum düngen</div></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="label">Later</div>
+          <div class="fact ui-row"><i data-i="tooth"></i>Zahnarzt anrufen, für einen Termin im November<i class="bell" data-i="bell" data-s="13"></i><span class="d">Nov 2</span></div>
+          <div class="fact ui-row"><i data-i="cat"></i>Frisst Mochi das alte Futter wieder?<span class="d">Nov 6</span></div>
+          <div class="fact ui-row"><i data-i="book"></i>Lesekreis: Das Kapital, Kapitel 1<i class="bell" data-i="bell" data-s="13"></i><span class="d">Nov 12</span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+  brush: '<path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>',
+  shower: '<path d="m4 4 2.5 2.5"/><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7"/><path d="M15 5 5 15"/><path d="M14 17v.01"/><path d="M10 16v.01"/><path d="M13 13v.01"/><path d="M16 10v.01"/><path d="M11 20v.01"/><path d="M17 14v.01"/><path d="M20 11v.01"/>',
+  book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  presentation: '<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/>',
+  plane: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  talks: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  send: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  flask: '<path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  pill: '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
+  tooth: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+};
+for (const slot of document.querySelectorAll("[data-use]")) {
+  slot.append(document.getElementById(slot.dataset.use).content.cloneNode(true));
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 15;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>
