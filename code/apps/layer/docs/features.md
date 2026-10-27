@@ -282,8 +282,21 @@ count, running agents, uncommitted changes and the review verdict.
   landed last. Epic is not offered without Jira. Twenty tasks over five
   epics read as one list; which belonged to which piece of work was only in
   the ticket.
+- **TASK-18** An agent MUST be able to finish a task as Finish task does
+  (TASK-8), when the user asks it to: `finish_task`, with `confirm`. It
+  refuses, changing nothing, while one of the task's pull requests is
+  open, when the agent runs in that task (it would be stopped first and
+  never hear back), or when the transition it names is not into the
+  `done` category. Branches are deleted only where a merged PR covers
+  them, as in the dialog. Without a transition named, the ticket goes as
+  TASK-9 would pre-select; when that would be a guess it stays, and the
+  reply lists the ways to close it. A ticket already done stays. A
+  chat's room context says that the user asking for a move or a finish
+  is the agreement `confirm` stands for. (A chat could move a ticket,
+  but the task stayed in the sidebar with its worktrees until someone
+  opened the dialog.)
 
-Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17).
+Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `commands/finish_tool.rs` (TASK-18), `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17).
 
 Known gaps:
 - A folder cut off before its last commit was recorded, or whose last
@@ -1081,6 +1094,7 @@ never hold credentials themselves.
 | `forget_repo` | unregister a repo (never deletes files) | yes |
 | `create_task` | a task with no ticket | |
 | `open_prs` | push and open PRs for a task | yes |
+| `finish_task` | finish a landed task: agents, worktrees, covered branches, ticket to done (TASK-18) | yes |
 | `pr_images` | show image files in a repo's open PR, in a section the app owns (PR-13) | yes |
 | `repo_notes` | a repository's notes, with what changed since each was checked (MEM-5) | |
 | `remember` | keep a lasting fact about a repository, after asking the user (MEM-1) | yes |

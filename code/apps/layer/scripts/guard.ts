@@ -608,7 +608,7 @@ const architecture = existsSync("docs/architecture.md") ? read("docs/architectur
 
 // Every file that defines MCP tools: the browser's are kept with the browser,
 // Grafana's with the rest of Grafana, S3's with the rest of S3.
-for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs"]) {
+for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs", "src-tauri/src/commands/finish_tool.rs"]) {
   const mcp = rust.get(file);
   if (!mcp) continue;
   for (const m of mcp.code.matchAll(/\btool\(\s*"/g)) {

@@ -224,7 +224,7 @@ async fn dispatch(app: &AppHandle, method: &str, params: Value, caller: Option<&
         "ping" => Ok(json!({})),
         "tools/list" => {
             let mut all = tools();
-            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()));
+            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()));
             Ok(json!({ "tools": all }))
         }
         "tools/call" => {
@@ -305,6 +305,7 @@ const DANGER: &[&str] = &[
     "pr_images",
     "remember",
     "forget_note",
+    "finish_task",
 ];
 
 fn confirm_prop() -> Value {
@@ -912,6 +913,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         n if commands::s3_logs_owns(n) => commands::s3_logs_call(&state, n, args).await,
         n if commands::spec_owns(n) => commands::spec_call(app, args, caller).await,
         n if commands::pr_images_owns(n) => commands::pr_images_call(&state, args).await,
+        n if commands::finish_owns(n) => commands::finish_call(app, args, caller).await,
 
         "slack_delete" => {
             let links: Vec<String> = args
@@ -1124,7 +1126,7 @@ mod tests {
     /// feature included: a danger tool defined there is gated here too.
     fn served() -> Vec<Value> {
         let mut all = tools();
-        all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()));
+        all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()));
         all
     }
 
