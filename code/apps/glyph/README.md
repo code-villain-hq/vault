@@ -1,6 +1,6 @@
 # Glyph
 
-*A Code Villain product.*
+_A Code Villain product._
 
 Glyph translates an app's i18n strings with local models, and a team
 reviews what the models propose before it ships.
