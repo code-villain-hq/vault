@@ -36,6 +36,7 @@ import { ago, SCENARIOS } from "./world";
 import { acpAnswers, seedAcp } from "./acp";
 import { loopAnswers, seedLoop } from "./loop";
 import { specAnswers } from "./spec";
+import { epicAnswers, seedEpic } from "./epic";
 import { runAnswers } from "./runs";
 import { profileAnswers } from "./profiles";
 
@@ -51,6 +52,7 @@ const calls: { cmd: string; args: Args }[] = [];
 const theme = params.get("theme");
 if (theme) world.settings.ui.theme = theme as typeof world.settings.ui.theme;
 if (params.get("role") === "member" && world.settings.workspace) world.settings.workspace.admin = false;
+seedEpic(world);
 for (const p of world.panes) if (p.acp) seedAcp(p.id);
 for (const p of world.panes) {
   const phase = params.get("loop");
@@ -383,6 +385,8 @@ const answer: Record<string, Answer> = {
   handoff_prompt: () => "Continue ACME-123: Fix login race.\n\nWhat changed so far…\n\nThe last agent's terminal ended with…",
   // Specs (§19). A draft arrives in pieces, as the real one does.
   ...specAnswers(world),
+  // Epics (§26).
+  ...epicAnswers(world, (a, taskId) => newPane(a, "agent", taskId)),
   // The run log (§22).
   ...runAnswers(world.tasks.length > 0),
   ...profileAnswers(),
@@ -490,6 +494,17 @@ const answer: Record<string, Answer> = {
   // Jira.
   jira_issues: () => ({ issues: structuredClone(world.issues), more: false }),
   jira_issue_types: () => world.issueTypes,
+  // Unanswered, New epic closed on a null epic and never asked for its repositories (EPIC-2).
+  jira_create_issue: (a) => {
+    const req = a.req as { summary: string; issue_type: string; project_key: string | null; parent_key: string | null };
+    const key = `${req.project_key ?? "ACME"}-${300 + world.issues.length}`;
+    const made = {
+      ...world.issues[0], key, summary: req.summary, issue_type: req.issue_type, status: "To Do", status_id: "1",
+      status_category: "new", epic_key: req.parent_key, epic_summary: null, url: `https://acme.atlassian.net/browse/${key}`,
+    };
+    world.issues.push(made);
+    return structuredClone(made);
+  },
   jira_transitions: () => world.transitions,
   jira_transition: (a) => {
     const t = world.transitions.find((x) => x.id === a.transitionId);
@@ -534,7 +549,7 @@ const answer: Record<string, Answer> = {
     const task: TaskView = {
       id: `t-${key.toLowerCase()}`, name: `${key} ${world.issues.find((i) => i.key === key)?.summary ?? ""}`.trim(),
       root, branch: key, issue_key: key, issue_url: `https://acme.atlassian.net/browse/${key}`,
-      created_at: new Date().toISOString(), pane_count: 0,
+      created_at: new Date().toISOString(), pane_count: 0, epic: !!a.epic,
       checkouts: (a.projectIds as string[]).map((pid) => {
         const name = world.projects.find((p) => p.id === pid)?.name ?? pid;
         return {

@@ -246,7 +246,7 @@ const tasks: TaskView[] = [
   },
 ];
 
-function pane(
+export function pane(
   id: string, task: string, kind: PaneInfo["kind"], title: string, agent: string | null,
   activity: PaneInfo["activity"], since: number, extra: Partial<PaneInfo> = {},
 ): PaneInfo {
