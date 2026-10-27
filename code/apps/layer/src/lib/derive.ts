@@ -4,7 +4,7 @@
  * reaches the backend.
  */
 import type {
-  AgentStatus, AuthoredPr, CheckoutPr, JiraIssue, PaneInfo, Project, RepoHealth, ReviewQueue, TaskView, UpdateBy,
+  AgentStatus, AuthoredPr, CheckoutPr, Ticket, PaneInfo, Project, RepoHealth, ReviewQueue, TaskView, UpdateBy,
 } from "./types";
 
 /** Panes started from the Chat view carry this instead of a real task id. */
@@ -142,7 +142,7 @@ export function fleetAgents(panes: readonly PaneInfo[]) {
  * on it puts what you are in the middle of at the top, where an alphabetical
  * list would bury it under whatever happens to start with an A.
  */
-export function groupByEpic(issues: JiraIssue[], started: Set<string> = new Set()) {
+export function groupByEpic(issues: Ticket[], started: Set<string> = new Set()) {
   // An epic that heads a group is represented by that header. Listing it again
   // as a card in the orphan bucket would show the same ticket twice.
   const heads = new Set(
@@ -151,7 +151,7 @@ export function groupByEpic(issues: JiraIssue[], started: Set<string> = new Set(
 
   const buckets = new Map<
     string,
-    { key: string; summary: string; issue?: JiraIssue; issues: JiraIssue[] }
+    { key: string; summary: string; issue?: Ticket; issues: Ticket[] }
   >();
 
   for (const issue of issues) {
@@ -176,7 +176,7 @@ export function groupByEpic(issues: JiraIssue[], started: Set<string> = new Set(
     }
   }
 
-  const live = (b: { issues: JiraIssue[] }) =>
+  const live = (b: { issues: Ticket[] }) =>
     b.issues.filter(
       (i) => i.status_category === "indeterminate" || started.has(i.key),
     ).length;

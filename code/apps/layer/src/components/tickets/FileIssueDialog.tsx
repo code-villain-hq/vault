@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
-import type { JiraIssue, JiraIssueType } from "../../lib/types";
+import type { Ticket, TicketType } from "../../lib/types";
 import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { creatableTypes, preferredCreatable } from "../task-forms/creatable";
@@ -18,10 +18,10 @@ export function FileIssueDialog({
 }: {
   /** Set when filing under an epic. Absent means a ticket in a project you pick. */
   epic: { key: string; summary: string } | null;
-  issueTypes: JiraIssueType[];
+  issueTypes: TicketType[];
   types: TypeMap;
   onClose: () => void;
-  onFiled: (issue: JiraIssue) => void;
+  onFiled: (issue: Ticket) => void;
 }) {
   const settings = useStore((s) => s.settings);
   const issues = useStore((s) => s.issues);
@@ -80,7 +80,7 @@ export function FileIssueDialog({
     setFilingBusy(true);
     failure.clear();
     try {
-      const issue = await api.jiraCreateIssue({
+      const issue = await api.fileTicket({
         summary: newSummary.trim(),
         description: newDesc.trim(),
         issue_type: newType,

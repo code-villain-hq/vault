@@ -275,8 +275,8 @@ count, running agents, uncommitted changes and the review verdict.
   heading and remembered across launches. By epic, a task is under its
   ticket's epic; an epic-level ticket is its own; a task with no ticket, or
   whose ticket has no epic, is under "No epic", last. A ticket not on your
-  own list is asked of Jira (`jira_issues_by_key`), once a session, and only
-  while Jira is connected: Epics needs it however the list is grouped
+  own list is asked of the tracker (`tickets_by_key`), once a session, and
+  only while there is one: Epics needs it however the list is grouped
   (EPIC-13). By repository, a task in several is
   listed once, under all of their names. Inside each group, and between
   groups, the stage order holds: what is being written first, what has
@@ -964,13 +964,19 @@ offers Start work.
   or title (REV-7, REV-11) it asks GitHub which issues the pull request
   closes instead.
 
-Code: `commands/jira.rs`, `commands/ticket_flow.rs`, `integrations/jira.rs`,
+Code: `tickets.rs` (the tracker: `Tracker`, and Jira's side in
+`tickets/jira.rs`), `commands/tickets.rs`, `commands/jira.rs`,
+`commands/ticket_flow.rs`, `integrations/jira.rs`,
 `integrations/jira/flow.rs`, `components/tickets/`, `TicketFlow.tsx`,
-`sidebar/DeleteTask.tsx`.
+`sidebar/DeleteTask.tsx`. The choice is the workspace's `tracker`
+connection; `AppConfig::tracker_in_use` reads it.
 
 Known gaps:
 - TKT-15 to TKT-21 are written ahead of the code: only Jira is built,
-  Settings has no choice of tracker, and a workspace's tickets are Jira's.
+  and Settings has no choice of tracker yet. A workspace keeps its choice
+  as a `tracker` connection, and one with none uses Jira while it is
+  connected. Moving tickets (TKT-8), deleting a task's ticket and the
+  agents' `jira_*` tools are still Jira's own.
 - Open question: GitHub issues are only open or closed, and many teams
   keep "in progress" in a GitHub Project's Status field instead. Whether
   that board's Status is the tracker's in-progress state, moved as TKT-8

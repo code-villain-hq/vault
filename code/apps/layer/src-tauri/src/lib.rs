@@ -25,6 +25,7 @@ mod slack_bot;
 mod spec;
 mod target;
 mod theme;
+mod tickets;
 mod workspace;
 
 use commands::AppState;
@@ -153,7 +154,7 @@ pub fn run() {
             let state = AppState {
                 config,
                 ptys: PtyManager::default(),
-                jira_types: Default::default(),
+                ticket_types: Default::default(),
                 epic_field_missing: Default::default(),
                 pending_notices: Default::default(),
                 status_cache: Default::default(),
@@ -325,20 +326,20 @@ pub fn run() {
             commands::abort_update,
             commands::send_merge_conflicts,
             commands::jira_connect,
-            commands::jira_issues,
-            commands::jira_issue_types,
-            commands::jira_browse,
-            commands::jira_priorities,
-            commands::jira_issues_by_key,
+            commands::tickets_mine,
+            commands::ticket_types,
+            commands::tickets_find,
+            commands::ticket_priorities,
+            commands::tickets_by_key,
             commands::jira_transitions,
             commands::jira_sync_status,
             commands::jira_transition,
             commands::jira_project_statuses,
             commands::set_ticket_flow,
             commands::set_ticket_start,
-            commands::jira_create_fields,
-            commands::jira_create_issue,
-            commands::jira_start_work,
+            commands::ticket_required_fields,
+            commands::file_ticket,
+            commands::start_work_on_ticket,
             commands::task_prompt,
             commands::handoff_prompt,
             commands::draft_pr_description,

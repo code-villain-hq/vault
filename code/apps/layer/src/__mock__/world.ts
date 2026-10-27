@@ -12,9 +12,9 @@ import type {
   AuthoredPr,
   ChangedFile,
   CleanupItem,
-  CreateField,
-  JiraIssue,
-  JiraIssueType,
+  RequiredField,
+  Ticket,
+  TicketType,
   JiraTransition,
   Message,
   PaneInfo,
@@ -45,12 +45,12 @@ export interface World {
   settings: Settings;
   prs: TaskPrs[];
   reviews: ReviewQueue;
-  issues: JiraIssue[];
+  issues: Ticket[];
   /** Tickets not on your list, which grouping by epic asks Jira for (TASK-17, REV-11). */
-  elsewhere: JiraIssue[];
-  issueTypes: JiraIssueType[];
+  elsewhere: Ticket[];
+  issueTypes: TicketType[];
   transitions: JiraTransition[];
-  requiredFields: CreateField[];
+  requiredFields: RequiredField[];
   changed: ChangedFile[];
   feedback: RepoFeedback[];
   /** What each pane's terminal shows when it comes on screen. */
@@ -93,6 +93,7 @@ const disconnected: Settings = {
   worktree_root: "/Users/you/.villain-worktrees",
   worktree_root_is_default: true,
   jira_connected: false,
+  tracker: null,
   github_connected: false,
   slack_connected: false,
   grafana_connected: false,
@@ -111,7 +112,7 @@ const agents: AgentStatus[] = [
   { id: "gemini", name: "Gemini CLI", program: "gemini", installed: true, path: "/usr/local/bin/gemini", resumes: false, acp: false },
 ];
 
-const issueTypes: JiraIssueType[] = [
+const issueTypes: TicketType[] = [
   { id: "1", name: "Epic", subtask: false, hierarchy_level: 1, icon: null },
   { id: "2", name: "Story", subtask: false, hierarchy_level: 0, icon: null },
   { id: "3", name: "Task", subtask: false, hierarchy_level: 0, icon: null },
@@ -125,7 +126,7 @@ const STATUS_IDS: Record<string, string> = { "To Do": "1", "In Progress": "3", R
 function issue(
   key: string, summary: string, status: string, category: string, epic: string | null, days = 3,
   priority = "Medium", touched = days / 2,
-): JiraIssue {
+): Ticket {
   return {
     key,
     summary,
@@ -430,6 +431,7 @@ function busy(): World {
         ],
       },
       jira_connected: true,
+      tracker: "jira",
       github_connected: true,
       slack_connected: true,
       browser_sites: ["docs.acme.dev"],

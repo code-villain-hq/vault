@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
-import type { JiraIssue } from "../../lib/types";
+import type { Ticket } from "../../lib/types";
 import { ChevronIcon } from "../icons";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 
@@ -18,7 +18,7 @@ export function EpicGroup({
   onJira,
   children,
 }: {
-  epic: { key: string; summary: string; issue?: JiraIssue; issues: JiraIssue[]; live: number };
+  epic: { key: string; summary: string; issue?: Ticket; issues: Ticket[]; live: number };
   typeName: string;
   types: TypeMap;
   closed: boolean;

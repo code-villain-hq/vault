@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { useEpics } from "../../lib/epics";
 import type { EpicOf } from "../../lib/grouping";
-import type { JiraIssue, TaskView } from "../../lib/types";
+import type { Ticket, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
 import { typeMap } from "../IssueType";
 import { StartWorkDialog } from "../tickets/StartWorkDialog";
@@ -71,12 +71,12 @@ export function EpicsSection({ sections, selected, expanded, onSelect, onToggle,
   const issueTypes = useStore((s) => s.issueTypes);
   const fail = useStore((s) => s.fail);
   const types = useMemo(() => typeMap(issueTypes), [issueTypes]);
-  const [making, setMaking] = useState<{ issue: JiraIssue; tasks: TaskView[] } | null>(null);
+  const [making, setMaking] = useState<{ issue: Ticket; tasks: TaskView[] } | null>(null);
 
   async function open(epic: EpicOf, tasks: TaskView[]) {
     try {
       const issue = useStore.getState().issues.find((i) => i.key === epic.key)
-        ?? (await api.jiraIssuesByKey([epic.key]))[0];
+        ?? (await api.ticketsByKey([epic.key]))[0];
       if (issue) setMaking({ issue, tasks });
       else fail(`Jira did not return ${epic.key}.`);
     } catch (e) {

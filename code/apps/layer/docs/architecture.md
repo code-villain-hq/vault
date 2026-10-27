@@ -62,8 +62,9 @@ account and come from its groups (`layer.example.toml`).
 ```
 
 **What syncs** is the setup a team shares: `Repository` (by its remote,
-`remote_key`), `Connection` (one per kind: Jira, GitHub, Slack, Grafana;
-never a token or an email), `LogSource`, `AgentModel` and `Note`. Tasks,
+`remote_key`), `Connection` (one per kind: Jira, GitHub, Slack, Grafana,
+and the tracker that says which one tickets come from; never a token or
+an email), `LogSource`, `AgentModel` and `Note`. Tasks,
 checkouts, panes, runs, messages and every token stay on the Mac that has
 them. Members write repositories, notes and models; admins write
 connections and log sources (`rules.rs`). `User`, the workspace's members
@@ -187,7 +188,7 @@ per process: three items meant a stack of password dialogs on every launch.
 It is read once per process and cached, and written under a lock.
 
 **In memory: `AppState`** (`commands/mod.rs`) holds the config store, the
-PTY manager, per-run caches (Jira issue types, the Epic Link field
+PTY manager, per-run caches (the tracker's ticket types, the Epic Link field
 lookup, git status per checkout), notices queued before the UI listened,
 and what news has been seen.
 
@@ -539,6 +540,11 @@ push.
   longer (job logs) sets its own timeout.
 - **Tokens** come from `secrets.rs` per call. `stored_or` decides whether a
   blank token field may reuse the saved one (same origin only).
+- **Tickets** come from the workspace's tracker, through `tickets.rs`:
+  `Tracker::connect` picks it as `AppConfig::tracker_in_use` says, and
+  answers in the tracker's own shapes (`Ticket`, `TicketPage`,
+  `TicketType`). Only Jira is one yet (`tickets/jira.rs`); what a tracker
+  does its own way, like Jira's transitions, stays with its client.
 - **Jira** is REST v3 with Basic auth. JQL strings go through `jql_string`,
   path segments through `segment()`. Search pages by `nextPageToken`, and
   `createmeta` pages too. Names are never assumed (TKT-2). Where a ticket

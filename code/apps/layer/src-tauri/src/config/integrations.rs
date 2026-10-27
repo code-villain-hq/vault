@@ -6,6 +6,17 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::{AppConfig, TrackerKind};
+
+impl AppConfig {
+    /// Where this Mac's tickets come from: the workspace's choice, or Jira
+    /// while it is connected and nothing was chosen, so a workspace
+    /// connected before there was a choice keeps it (TKT-15).
+    pub fn tracker_in_use(&self) -> Option<TrackerKind> {
+        self.tracker.or_else(|| self.jira.as_ref().map(|_| TrackerKind::Jira))
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct JiraConfig {
     /// The custom field this site keeps the Epic Link in, discovered on
@@ -208,4 +219,19 @@ pub struct GrafanaConfig {
     /// and only the user knows which one their services write to.
     #[serde(default)]
     pub datasource: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tickets_come_from_the_workspaces_tracker_or_from_jira_connected_before_there_was_a_choice() {
+        let jira = JiraConfig { base_url: "https://acme.atlassian.net".into(), ..Default::default() };
+        let chosen = AppConfig { tracker: Some(TrackerKind::Jira), ..Default::default() };
+        assert_eq!(chosen.tracker_in_use(), Some(TrackerKind::Jira));
+        let before = AppConfig { jira: Some(jira), ..Default::default() };
+        assert_eq!(before.tracker_in_use(), Some(TrackerKind::Jira));
+        assert_eq!(AppConfig::default().tracker_in_use(), None);
+    }
 }

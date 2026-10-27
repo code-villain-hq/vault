@@ -81,7 +81,7 @@ export function Sidebar() {
   const fail = useStore((s) => s.fail);
   const dialog = useFailure();
   const cursorIde = useStore((s) => s.cursorIde);
-  const jiraConnected = useStore((s) => s.settings?.jira_connected ?? false);
+  const trackerInUse = useStore((s) => s.settings?.tracker != null);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [addingRepoTo, setAddingRepoTo] = useState<TaskView | null>(null);
@@ -103,7 +103,7 @@ export function Sidebar() {
   const [grouping, setGroupingState] = useState<Grouping>(() => readOneOf("tasksGroup", GROUPINGS, "stage"));
   const [groupMenu, setGroupMenu] = useState<{ x: number; y: number } | null>(null);
   // Without Jira there is no epic to ask for; the choice is kept for when it is back.
-  const by: Grouping = grouping === "epic" && !jiraConnected ? "stage" : grouping;
+  const by: Grouping = grouping === "epic" && !trackerInUse ? "stage" : grouping;
 
   function askDeleteTask(task: TaskView) {
     if (deleting) return;
@@ -469,7 +469,7 @@ export function Sidebar() {
           x={groupMenu.x}
           y={groupMenu.y}
           onClose={() => setGroupMenu(null)}
-          items={GROUPINGS.filter((g) => g !== "epic" || jiraConnected).map((g) => ({
+          items={GROUPINGS.filter((g) => g !== "epic" || trackerInUse).map((g) => ({
             label: `${g === by ? "✓ " : ""}${GROUPING_LABEL[g]}`,
             onSelect: () => {
               setGroupingState(g);

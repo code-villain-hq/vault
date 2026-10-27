@@ -1,4 +1,4 @@
-import type { JiraIssue } from "./types";
+import type { Ticket } from "./types";
 
 /** The orders Tickets lists in (TKT-13). Find work asks Jira for the same. */
 export const TICKET_SORTS = ["updated", "newest", "oldest", "priority"] as const;
@@ -19,11 +19,11 @@ const at = (t: string | null) => (t ? Date.parse(t) || 0 : 0);
  * does not name, goes after every ranked one. Ties go to the most recently
  * updated, and past that the order Jira sent.
  */
-export function sortTickets(issues: JiraIssue[], sort: TicketSort, priorities: readonly string[]): JiraIssue[] {
+export function sortTickets(issues: Ticket[], sort: TicketSort, priorities: readonly string[]): Ticket[] {
   const rank = new Map(priorities.map((p, i) => [p, i]));
-  const of = (i: JiraIssue) => (i.priority !== null ? rank.get(i.priority) : undefined) ?? priorities.length;
-  const updated = (a: JiraIssue, b: JiraIssue) => at(b.updated) - at(a.updated);
-  const by: Record<TicketSort, (a: JiraIssue, b: JiraIssue) => number> = {
+  const of = (i: Ticket) => (i.priority !== null ? rank.get(i.priority) : undefined) ?? priorities.length;
+  const updated = (a: Ticket, b: Ticket) => at(b.updated) - at(a.updated);
+  const by: Record<TicketSort, (a: Ticket, b: Ticket) => number> = {
     updated,
     newest: (a, b) => at(b.created) - at(a.created) || updated(a, b),
     oldest: (a, b) => at(a.created) - at(b.created) || updated(a, b),

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { groupByStatus } from "../src/lib/ticket-group";
-import type { JiraIssue } from "../src/lib/types";
+import type { Ticket } from "../src/lib/types";
 
-const t = (key: string, status: string, status_category: string) => ({ key, status, status_category }) as JiraIssue;
+const t = (key: string, status: string, status_category: string) => ({ key, status, status_category }) as Ticket;
 
 describe("grouping tickets by status (TKT-14)", () => {
   test("puts work under way first, then what waits, then what is done, keeping the sort within each", () => {

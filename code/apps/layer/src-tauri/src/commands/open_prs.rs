@@ -11,7 +11,7 @@ use crate::integrations::github;
 
 use super::diff::RepoResult;
 use super::github::github_client;
-use super::jira::jira_client;
+use super::tickets::tracker;
 use super::slack::{record_post, slack_for};
 use super::{off_runtime, AppState};
 
@@ -209,7 +209,7 @@ pub async fn github_open_prs(
             .collect();
 
         if let Some(key) = task.issue_key.as_ref() {
-            if let Ok((jira, _)) = jira_client(&state) {
+            if let Ok(tracker) = tracker(&state) {
                 let text = format!(
                     "Pull request{} for this ticket:\n{}",
                     if opened.len() == 1 { "" } else { "s" },
@@ -218,7 +218,7 @@ pub async fn github_open_prs(
                 // Said, not swallowed: this only runs for PRs opened by this
                 // call, so a retry finds them already open and never posts —
                 // the ticket that is meant to be the hub would just not know.
-                if let Err(e) = jira.comment(key, &text).await {
+                if let Err(e) = tracker.comment(key, &text).await {
                     results.push(RepoResult {
                         checkout_id: key.clone(),
                         repo: key.clone(),

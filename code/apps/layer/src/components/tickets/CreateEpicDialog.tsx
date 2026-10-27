@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
-import type { JiraIssue, JiraIssueType } from "../../lib/types";
+import type { Ticket, TicketType } from "../../lib/types";
 import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { epicTypes, preferredEpic } from "../task-forms/creatable";
@@ -16,12 +16,12 @@ export function CreateEpicDialog({
   onClose,
   onCreated,
 }: {
-  issueTypes: JiraIssueType[];
+  issueTypes: TicketType[];
   types: TypeMap;
-  issues: JiraIssue[];
+  issues: Ticket[];
   onClose: () => void;
   /** Offers Start work on it, to write its spec (EPIC-3). */
-  onCreated: (epic: JiraIssue) => void;
+  onCreated: (epic: Ticket) => void;
 }) {
   const settings = useStore((s) => s.settings);
   const refreshIssues = useStore((s) => s.refreshIssues);
@@ -73,7 +73,7 @@ export function CreateEpicDialog({
     failure.clear();
     try {
       // The epic appears in Tickets (NOTE-7).
-      const epic = await api.jiraCreateIssue({
+      const epic = await api.fileTicket({
         summary: summary.trim(),
         description: desc.trim(),
         issue_type: epicType,

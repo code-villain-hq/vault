@@ -178,7 +178,7 @@ pub(super) mod tests {
             slack_bot: Default::default(),
             config: ConfigStore::for_tests(root.join("config.json"), cfg),
             ptys: Default::default(),
-            jira_types: Default::default(),
+            ticket_types: Default::default(),
             epic_field_missing: Default::default(),
             pending_notices: Default::default(),
             status_cache: Default::default(),

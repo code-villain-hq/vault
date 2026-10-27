@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import type { JiraIssue, JiraIssueType, JiraPage } from "../../lib/types";
+import type { Ticket, TicketType, TicketPage } from "../../lib/types";
 import type { TypeMap } from "../IssueType";
 import { TypeFilter } from "./TypeFilter";
 import { TicketCard } from "./TicketCard";
@@ -27,7 +27,7 @@ export function BrowsePanel({
   onContextMenu,
   focusIssueKey,
 }: {
-  issueTypes: JiraIssueType[];
+  issueTypes: TicketType[];
   types: TypeMap;
   kinds: string[];
   onKinds: (kinds: string[]) => void;
@@ -38,15 +38,15 @@ export function BrowsePanel({
   includeDone: boolean;
   onIncludeDone: (include: boolean) => void;
   searching: boolean;
-  found: JiraPage | null;
+  found: TicketPage | null;
   onSearch: () => void;
   taskFor: (key: string) => string | null;
   syncing: string | null;
-  onOpen: (issue: JiraIssue) => void;
+  onOpen: (issue: Ticket) => void;
   onSelectTask: (taskId: string) => void;
   onSync: (key: string) => void;
   onFileUnder: (epic: { key: string; summary: string }) => void;
-  onContextMenu: (e: MouseEvent, issue: JiraIssue) => void;
+  onContextMenu: (e: MouseEvent, issue: Ticket) => void;
   focusIssueKey?: string | null;
 }) {
   return (

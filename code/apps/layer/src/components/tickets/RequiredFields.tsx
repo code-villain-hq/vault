@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { CreateField } from "../../lib/types";
+import type { RequiredField } from "../../lib/types";
 import { Field } from "../ui";
 
 /**
@@ -13,7 +13,7 @@ import { Field } from "../ui";
  * re-ran this and cleared whatever had already been picked.
  */
 export function useRequiredFields(projectKey: string, typeId: string | undefined, own: string[]) {
-  const [needed, setNeeded] = useState<CreateField[]>([]);
+  const [needed, setNeeded] = useState<RequiredField[]>([]);
   const [loading, setLoading] = useState(false);
   const [extra, setExtra] = useState<Record<string, string[]>>({});
 
@@ -28,7 +28,7 @@ export function useRequiredFields(projectKey: string, typeId: string | undefined
     // and each letter was a round-trip to Jira for a project that does not
     // exist, and cleared what had been picked.
     const t = window.setTimeout(() => {
-      api.jiraCreateFields(projectKey, typeId)
+      api.ticketRequiredFields(projectKey, typeId)
         .then((f) => { if (current) setNeeded(f.filter((x) => x.required)); })
         // A site that will not describe its own form is no reason to block
         // the dialog: Jira still says what is missing if the create is refused.

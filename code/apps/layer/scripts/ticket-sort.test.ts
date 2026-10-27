@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { groupByEpic } from "../src/lib/derive";
 import { sortTickets } from "../src/lib/ticket-sort";
-import type { JiraIssue } from "../src/lib/types";
+import type { Ticket } from "../src/lib/types";
 
-const t = (key: string, o: Partial<JiraIssue>) =>
-  ({ key, epic_key: null, epic_summary: null, status_category: "new", priority: null, created: null, updated: null, ...o }) as JiraIssue;
-const keys = (l: JiraIssue[]) => l.map((i) => i.key);
+const t = (key: string, o: Partial<Ticket>) =>
+  ({ key, epic_key: null, epic_summary: null, status_category: "new", priority: null, created: null, updated: null, ...o }) as Ticket;
+const keys = (l: Ticket[]) => l.map((i) => i.key);
 const day = (n: number) => new Date(Date.UTC(2026, 9, n)).toISOString();
 
 const PRIORITIES = ["Blocker", "Major", "Minor"];

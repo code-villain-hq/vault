@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { byEpic, epicsOf, groupBy, sortPrs, ticketKeyIn } from "../src/lib/grouping";
-import type { JiraIssue } from "../src/lib/types";
+import type { Ticket } from "../src/lib/types";
 
 const issue = (key: string, epic_key: string | null, epic_summary: string | null, issue_type = "Story") =>
-  ({ key, summary: `${key} title`, epic_key, epic_summary, issue_type }) as JiraIssue;
+  ({ key, summary: `${key} title`, epic_key, epic_summary, issue_type }) as Ticket;
 
 describe("finding a pull request's ticket", () => {
   test("reads the key a branch or title starts with, as pr_task.rs does", () => {

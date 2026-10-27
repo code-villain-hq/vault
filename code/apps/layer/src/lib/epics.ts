@@ -21,7 +21,7 @@ async function lookUp(keys: string[]) {
   if (fresh.length === 0) return;
   for (const k of fresh) asked.add(k);
   try {
-    const issues = await api.jiraIssuesByKey(fresh);
+    const issues = await api.ticketsByKey(fresh);
     const types = typeMap(useStore.getState().issueTypes);
     const found = epicsOf(issues, (t) => isEpicType(types, t));
     // A key Jira did not return has no epic it can tell of.
@@ -42,7 +42,7 @@ async function lookUp(keys: string[]) {
 export function useEpics(keys: string[], on: boolean): Record<string, EpicOf | null> {
   const issues = useStore((s) => s.issues);
   const issueTypes = useStore((s) => s.issueTypes);
-  const connected = useStore((s) => s.settings?.jira_connected ?? false);
+  const connected = useStore((s) => s.settings?.tracker != null);
   const looked = useLookedUp((s) => s.byKey);
   const own = useMemo(() => {
     const types = typeMap(issueTypes);

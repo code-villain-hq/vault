@@ -7,7 +7,7 @@ import { groupByEpic } from "../../lib/derive";
 import { readOneOf, write } from "../../lib/persist";
 import { groupByStatus, TICKET_GROUP_LABEL, TICKET_GROUPS, type TicketGroup } from "../../lib/ticket-group";
 import { sortTickets, TICKET_SORT_LABEL, TICKET_SORTS, type TicketSort } from "../../lib/ticket-sort";
-import type { JiraIssue, JiraPage } from "../../lib/types";
+import type { Ticket, TicketPage } from "../../lib/types";
 import { BusyLabel, ContextMenu, ErrorMessage, useFailure, type MenuItem } from "../ui";
 import { isEpicType, typeMap } from "../IssueType";
 import { BrowsePanel } from "./BrowsePanel";
@@ -43,17 +43,17 @@ export function TicketsView() {
   const focusIssueKey = useStore((s) => s.focusIssueKey);
   const clearFocusIssue = useStore((s) => s.clearFocusIssue);
 
-  const [open, setOpen] = useState<JiraIssue | null>(null);
+  const [open, setOpen] = useState<Ticket | null>(null);
   // Reading a ticket is not starting one. Jira already sent the description
   // with the rest of the issue, so this costs nothing but a dialog.
-  const [reading, setReading] = useState<JiraIssue | null>(null);
+  const [reading, setReading] = useState<Ticket | null>(null);
   const [shut, setShut] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [sub, setSub] = useState<"mine" | "browse">("mine");
   const [browseText, setBrowseText] = useState("");
   const [whose, setWhose] = useState("notmine");
   const [includeDone, setIncludeDone] = useState(false);
-  const [found, setFound] = useState<JiraPage | null>(null);
+  const [found, setFound] = useState<TicketPage | null>(null);
   const [searching, setSearching] = useState(false);
   // Shared by both tabs: your own list filters in place, a search asks Jira.
   const [kinds, setKinds] = useState<string[]>([]);
@@ -124,7 +124,7 @@ export function TicketsView() {
       // Counted like any other search, so a newer one is not overwritten by
       // this landing late, nor has its spinner cleared by it.
       const asked = ++searchSeq.current;
-      void api.jiraBrowse(key, "anyone", true, [], sort)
+      void api.ticketsFind(key, "anyone", true, [], sort)
         .then((page) => {
           if (asked !== searchSeq.current) return;
           setFound(page);
@@ -182,7 +182,7 @@ export function TicketsView() {
 
   /// What you can do with a ticket without opening it. Status moves live in
   /// Read ticket — packing every transition into this menu grows it too tall.
-  function issueMenu(issue: JiraIssue): MenuItem[] {
+  function issueMenu(issue: Ticket): MenuItem[] {
     const task = taskFor(issue.key);
     return [
       {
@@ -225,7 +225,7 @@ export function TicketsView() {
     setSearching(true);
     search.clear();
     try {
-      const page = await api.jiraBrowse(browseText.trim(), whose, includeDone, kinds, sort);
+      const page = await api.ticketsFind(browseText.trim(), whose, includeDone, kinds, sort);
       if (asked === searchSeq.current) setFound(page);
     } catch (e) {
       if (asked !== searchSeq.current) return;
@@ -272,7 +272,7 @@ export function TicketsView() {
 
   if (!settings) return null;
 
-  if (!settings.jira_connected) {
+  if (settings.tracker == null) {
     return (
       <div className="empty">
         <h2>Jira not connected</h2>
@@ -291,7 +291,7 @@ export function TicketsView() {
     : group === "status" ? ` in ${statuses.length} status${statuses.length === 1 ? "" : "es"}`
     : "";
 
-  function renderCard(issue: JiraIssue) {
+  function renderCard(issue: Ticket) {
     return (
       <TicketCard
         key={issue.key}

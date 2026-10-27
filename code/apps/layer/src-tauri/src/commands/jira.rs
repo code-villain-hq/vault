@@ -1,9 +1,8 @@
-//! Jira connect, browse, transitions, start work, prompts.
+//! Jira connect and transitions, and the prompts an agent starts with.
 
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::config::{JiraConfig, Task};
@@ -13,11 +12,11 @@ use crate::integrations::jira::{self, Jira};
 use crate::secrets;
 use crate::oneshot::oneshot_haiku;
 use crate::shellenv;
+use crate::tickets::Ticket;
 
 use super::AppState;
-use super::panes::{agent_file_dir, resolve_scope, start_agent, Resume};
+use super::panes::{agent_file_dir, resolve_scope};
 use super::task_context::keep_ticket;
-use super::tasks::{new_task, NewTask};
 
 // -------------------------------------------------------------------- jira
 
@@ -93,63 +92,10 @@ pub async fn jira_connect(
     // Another site, or the same one reconnected: either way what was cached
     // about the last connection is not to be trusted. The types were kept
     // until restart, and the epic search was built from the old site's names.
-    *state.jira_types.lock() = None;
+    *state.ticket_types.lock() = None;
     *state.epic_field_missing.lock() = None;
     state.config.update(|c| c.jira = Some(cfg))?;
     Ok(who.display_name)
-}
-
-/// Every issue type this Jira defines, with its own icon. Nothing about types
-/// is hardcoded — a site with custom types renders exactly as it does in Jira.
-#[tauri::command]
-pub async fn jira_issue_types(
-    state: State<'_, AppState>,
-    refresh: Option<bool>,
-) -> Result<Vec<jira::IssueType>> {
-    jira_issue_types_inner(&state, refresh == Some(true)).await
-}
-
-pub(crate) async fn jira_issue_types_inner(
-    state: &AppState,
-    refresh: bool,
-) -> Result<Vec<jira::IssueType>> {
-    if !refresh {
-        if let Some(cached) = state.jira_types.lock().clone() {
-            return Ok(cached);
-        }
-    }
-    let (client, _) = jira_client(state)?;
-    let types = client.issue_types().await?;
-    *state.jira_types.lock() = Some(types.clone());
-    Ok(types)
-}
-
-/// The site's priorities, highest first, for sorting your list by them
-/// (TKT-13). The UI asks once per connection.
-#[tauri::command]
-pub async fn jira_priorities(state: State<'_, AppState>) -> Result<Vec<String>> {
-    let (client, _) = jira_client(&state)?;
-    client.priorities().await
-}
-
-#[tauri::command]
-pub async fn jira_issues(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<jira::Page> {
-    let page = my_issues(&state).await?;
-    crate::news::saw_tickets(&app, &page.issues);
-    Ok(page)
-}
-
-/// Your queue, for the UI and for the watch that banners what is new.
-pub(crate) async fn my_issues(state: &AppState) -> Result<jira::Page> {
-    learn_epic_field(state).await;
-    let (client, cfg) = jira_client(state)?;
-    let jql = cfg
-        .jql
-        .clone()
-        .unwrap_or_else(|| jira::default_jql(cfg.project_key.as_deref()));
-    // Your own queue should be all of it: this is the list the app groups into
-    // epics and reasons about, and a silent cut makes that grouping wrong.
-    client.search(&jql, 500).await
 }
 
 /// Find this site's Epic Link field once, for a connection made before the app
@@ -183,76 +129,6 @@ pub(crate) async fn learn_epic_field(state: &AppState) {
     }
 }
 
-/// Look past your own queue: unassigned work, or anyone else's.
-///
-/// The JQL is built here rather than in the UI so what is typed stays a search
-/// term. Results are capped: this is for finding a ticket, not for paging
-/// through a backlog.
-#[tauri::command]
-pub async fn jira_browse(
-    state: State<'_, AppState>,
-    text: Option<String>,
-    whose: String,
-    include_done: Option<bool>,
-    types: Option<Vec<String>>,
-    order: Option<String>,
-) -> Result<jira::Page> {
-    let (client, cfg) = jira_client(&state)?;
-    let project = cfg.project_key.as_deref();
-    let whose = jira::Whose::parse(&whose);
-    let order = jira::Order::parse(order.as_deref().unwrap_or_default());
-    let include_done = include_done.unwrap_or(false);
-    let types = types.unwrap_or_default();
-    // A search is refined rather than read end to end, so it stays capped —
-    // but it now says when there was more.
-    const CAP: u32 = 100;
-
-    // A bare number is only a guess at a key (TKT-12). Jira refuses a query
-    // naming a key it does not have, and the filters may hide the one it
-    // does, so either way the number is searched for as text after all.
-    if let Some(key) = text.as_deref().and_then(|t| jira::number_as_key(project, t)) {
-        let jql = jira::browse_jql(project, Some(&key), whose, include_done, &types, order);
-        if let Ok(page) = client.search(&jql, CAP).await {
-            if !page.issues.is_empty() {
-                return Ok(page);
-            }
-        }
-    }
-    let jql = jira::browse_jql(project, text.as_deref(), whose, include_done, &types, order);
-    client.search(&jql, CAP).await
-}
-
-/// These tickets, wherever they are, for the epic each belongs to (TASK-17,
-/// REV-11). A task's ticket or a PR's is often not on your own list: done,
-/// given to someone else, or never yours.
-///
-/// Jira refuses the whole query when one key does not exist, and a key read
-/// from a branch name may be a guess; then each is asked for on its own, and
-/// the ones Jira does not have are left out.
-#[tauri::command]
-pub async fn jira_issues_by_key(state: State<'_, AppState>, keys: Vec<String>) -> Result<Vec<jira::Issue>> {
-    // The sidebar and both review lists together; past this, the rest show
-    // under "No epic" rather than sending a query per ticket.
-    const CAP: usize = 100;
-    let (client, _) = jira_client(&state)?;
-    let Some(jql) = jira::keys_jql(&keys[..keys.len().min(CAP)]) else {
-        return Ok(Vec::new());
-    };
-    match client.search(&jql, CAP as u32).await {
-        Ok(page) => Ok(page.issues),
-        Err(Error::Other(msg)) if msg.starts_with("Jira 400") => {
-            let mut found = Vec::new();
-            for key in keys.iter().take(CAP).filter(|k| jira::looks_like_a_key(k)) {
-                if let Ok(issue) = client.issue(key).await {
-                    found.push(issue);
-                }
-            }
-            Ok(found)
-        }
-        Err(e) => Err(e),
-    }
-}
-
 #[tauri::command]
 pub async fn jira_transitions(
     state: State<'_, AppState>,
@@ -275,7 +151,7 @@ pub async fn jira_transition(
 /// The opening prompt. Spells out the layout so the agent knows what it can see
 /// from where it was started: the task root (sibling folders) or one repo.
 pub(crate) fn ticket_prompt(
-    issue: &jira::Issue,
+    issue: &Ticket,
     task: &Task,
     repos: &[(String, String)],
     at_task_root: bool,
@@ -390,8 +266,8 @@ pub async fn task_prompt(
         .unwrap_or_default();
 
     if let Some(key) = task.issue_key.as_deref() {
-        if let Ok((client, _)) = jira_client(&state) {
-            if let Ok(issue) = client.issue(key).await {
+        if let Ok(tracker) = super::tracker(&state) {
+            if let Ok(issue) = tracker.ticket(key).await {
                 let prompt = ticket_prompt(&issue, &task, &repos, at_task_root);
                 keep_ticket(app, task, issue).await;
                 return Ok(prompt + &spec);
@@ -905,139 +781,6 @@ pub async fn handoff_prompt(
     Ok(out)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct NewIssue {
-    pub summary: String,
-    #[serde(default)]
-    pub description: String,
-    pub issue_type: String,
-    /// Falls back to the parent's project, then to the one in Settings.
-    #[serde(default)]
-    pub project_key: Option<String>,
-    #[serde(default)]
-    pub parent_key: Option<String>,
-    /// Anything else this project requires, already shaped the way Jira wants
-    /// it by the caller, which is the side that has the metadata.
-    #[serde(default)]
-    pub fields: Option<Value>,
-}
-
-/// The project a key belongs to: everything before the first dash.
-pub(crate) fn project_of(key: &str) -> Option<String> {
-    let (project, number) = key.split_once('-')?;
-    (!project.is_empty() && !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()))
-        .then(|| project.to_uppercase())
-}
-
-/// Whatever this site calls an ordinary issue.
-///
-/// Not "Task": that is one site's name for it. Hierarchy level is Jira's own
-/// and means the same everywhere — 0 is a standard issue — so the plain type
-/// is found rather than assumed, preferring one actually called Task when
-/// there is one.
-pub(crate) async fn default_issue_type(state: &AppState) -> Result<String> {
-    let types = jira_issue_types_inner(state, false).await?;
-    let plain: Vec<&jira::IssueType> = types
-        .iter()
-        .filter(|t| t.hierarchy_level == 0 && !t.subtask)
-        .collect();
-    plain
-        .iter()
-        .find(|t| t.name.eq_ignore_ascii_case("task"))
-        .or_else(|| plain.first())
-        .map(|t| t.name.clone())
-        .ok_or_else(|| Error::Other("this Jira defines no ordinary issue type".into()))
-}
-
-/// What a project demands before it will accept a new issue of this type.
-#[tauri::command]
-pub async fn jira_create_fields(
-    state: State<'_, AppState>,
-    project_key: String,
-    issue_type_id: String,
-) -> Result<Vec<jira::CreateField>> {
-    create_fields_for(&state, &project_key, &issue_type_id).await
-}
-
-/// `create_fields`, for a type id that may belong to another project.
-///
-/// The type list is one entry per name, but a team-managed project has its
-/// own "Task" with an id of its own, so the id picked from that list is often
-/// some other project's — and Jira answers it with a 404. When it does, the
-/// same name is looked up in the project being filed into.
-pub(crate) async fn create_fields_for(
-    state: &AppState,
-    project_key: &str,
-    issue_type_id: &str,
-) -> Result<Vec<jira::CreateField>> {
-    let (client, _) = jira_client(state)?;
-    let first = client.create_fields(project_key, issue_type_id).await;
-    if first.is_ok() {
-        return first;
-    }
-    let name = jira_issue_types_inner(state, false)
-        .await
-        .ok()
-        .and_then(|types| types.into_iter().find(|t| t.id == issue_type_id).map(|t| t.name));
-    let Some(name) = name else {
-        return first;
-    };
-    let own = client
-        .project_issue_types(project_key)
-        .await
-        .ok()
-        .and_then(|types| {
-            types
-                .into_iter()
-                .find(|(id, n)| n.eq_ignore_ascii_case(&name) && id != issue_type_id)
-                .map(|(id, _)| id)
-        });
-    match own {
-        Some(id) => client.create_fields(project_key, &id).await,
-        None => first,
-    }
-}
-
-/// File a ticket without starting work on it.
-///
-/// Filing under an epic and opening worktrees are different intentions:
-/// adding a ticket to a plan is not saying you will start it now. Start work
-/// on the ticket does that (`jira_start_work`).
-#[tauri::command]
-pub async fn jira_create_issue(state: State<'_, AppState>, req: NewIssue) -> Result<jira::Issue> {
-    let summary = req.summary.trim().to_string();
-    if summary.is_empty() {
-        return Err(Error::Other("the ticket needs a summary".into()));
-    }
-    let (client, cfg) = jira_client(&state)?;
-
-    // A sub-task has to be filed in its parent's project, and the parent's key
-    // says which that is — so an epic found by searching needs nothing else.
-    let project_key = req
-        .project_key
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_uppercase)
-        .or_else(|| req.parent_key.as_deref().and_then(project_of))
-        .or_else(|| cfg.project_key.clone())
-        .ok_or_else(|| {
-            Error::Other("no Jira project to file into — set a project key in Settings".into())
-        })?;
-
-    let key = client
-        .create_issue(
-            &project_key,
-            &summary,
-            &req.description,
-            &req.issue_type,
-            req.parent_key.as_deref(),
-            &req.fields.clone().unwrap_or(Value::Null),
-        )
-        .await?;
-    client.issue(&key).await
-}
-
 /// Move a ticket into progress on request, for one that fell out of step.
 ///
 /// Tasks created before this app moved tickets — or while the setting was off,
@@ -1047,87 +790,5 @@ pub async fn jira_create_issue(state: State<'_, AppState>, req: NewIssue) -> Res
 pub async fn jira_sync_status(state: State<'_, AppState>, key: String) -> Result<Option<String>> {
     let (client, _) = jira_client(&state)?;
     client.start_progress(&key).await
-}
-
-/// A task, and the status its ticket was moved to on the way.
-#[derive(Debug, Serialize)]
-pub struct Started {
-    #[serde(flatten)]
-    pub task: Task,
-    /// The status Jira was moved to, when it was moved.
-    pub moved: Option<String>,
-}
-
-/// The one-click path: ticket -> worktree per repo -> agent primed with both
-/// the ticket and the layout.
-#[tauri::command]
-#[allow(clippy::too_many_arguments)]
-pub async fn jira_start_work(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    key: String,
-    project_ids: Vec<String>,
-    agent_id: Option<String>,
-    branch_suffix: Option<String>,
-    base: Option<String>,
-    epic: Option<bool>,
-) -> Result<Started> {
-    let epic = epic.unwrap_or(false);
-    // A second task for the same ticket would try to check the same branch out
-    // twice and fail deep inside git. Unless a suffix asks for a distinct
-    // branch, point at what already exists.
-    if branch_suffix.as_deref().unwrap_or_default().trim().is_empty() {
-        if let Some(existing) = state
-            .config
-            .read()
-            .tasks
-            .iter()
-            .find(|t| t.issue_key.as_deref() == Some(key.as_str()))
-        {
-            return Err(Error::Other(format!(
-                "{key} already has a task on branch {}. Open that one, or pass a \
-                 branch_suffix to work on the ticket a second time.",
-                existing.branch
-            )));
-        }
-    }
-
-    let (client, _) = jira_client(&state)?;
-    let issue = client.issue(&key).await?;
-
-    let new = NewTask {
-        name: format!("{} {}", issue.key, issue.summary),
-        project_ids,
-        branch: None,
-        branch_suffix,
-        base,
-        issue_key: Some(issue.key.clone()),
-        issue_url: Some(issue.url.clone()),
-        epic_key: issue.epic_key.clone(),
-        epic,
-        sub_task: None,
-    };
-    // Worktrees on the blocking pool, as in `create_task`.
-    let task = super::blocking(app.clone(), move |state| new_task(state, new)).await?;
-    keep_ticket(app.clone(), task.clone(), issue.clone()).await;
-
-    // An epic's work is done in its sub-tasks: no agent starts in it, and
-    // its ticket moves when the first of them starts (EPIC-2).
-    if epic {
-        return Ok(Started { task, moved: None });
-    }
-    if let Some(agent_id) = agent_id {
-        let repos = task_repos(&state, &task);
-        let prompt = ticket_prompt(&issue, &task, &repos, true);
-        let task_id = task.id.clone();
-        let handle = app.clone();
-        super::blocking(app.clone(), move |state| {
-            start_agent(&handle, state, task_id, agent_id, None, Some(prompt), Resume::No, None, None, false)
-        })
-        .await?;
-    }
-
-    let moved = super::ticket_flow::started(&state, &issue.key).await;
-    Ok(Started { task, moved })
 }
 

@@ -492,10 +492,10 @@ const answer: Record<string, Answer> = {
   },
 
   // Jira.
-  jira_issues: () => ({ issues: structuredClone(world.issues), more: false }),
-  jira_issue_types: () => world.issueTypes,
+  tickets_mine: () => ({ issues: structuredClone(world.issues), more: false }),
+  ticket_types: () => world.issueTypes,
   // Unanswered, New epic closed on a null epic and never asked for its repositories (EPIC-2).
-  jira_create_issue: (a) => {
+  file_ticket: (a) => {
     const req = a.req as { summary: string; issue_type: string; project_key: string | null; parent_key: string | null };
     const key = `${req.project_key ?? "ACME"}-${300 + world.issues.length}`;
     const made = {
@@ -537,13 +537,13 @@ const answer: Record<string, Answer> = {
     world.tasks = world.tasks.filter((t) => t.id !== a.id);
     return [];
   },
-  jira_create_fields: () => world.requiredFields,
+  ticket_required_fields: () => world.requiredFields,
   // Jira orders a search (TKT-13); here the list is sorted as Jira would.
-  jira_browse: (a) => ({ issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES), more: false }),
-  jira_priorities: () => PRIORITIES,
-  jira_issues_by_key: (a) =>
+  tickets_find: (a) => ({ issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES), more: false }),
+  ticket_priorities: () => PRIORITIES,
+  tickets_by_key: (a) =>
     [...world.issues, ...world.elsewhere].filter((i) => (a.keys as string[]).includes(i.key)),
-  jira_start_work: (a) => {
+  start_work_on_ticket: (a) => {
     const key = a.key as string;
     const root = `/Users/you/.villain-worktrees/${key}`;
     const task: TaskView = {

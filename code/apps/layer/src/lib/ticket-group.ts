@@ -1,4 +1,4 @@
-import type { JiraIssue } from "./types";
+import type { Ticket } from "./types";
 
 /** How Mine is grouped (TKT-14). A ticket has one epic and one status, so it is listed once. */
 export const TICKET_GROUPS = ["epic", "status", "none"] as const;
@@ -18,8 +18,8 @@ const CATEGORY_ORDER = ["indeterminate", "new", "done"];
  * `issues` comes in sorted (TKT-13), and each group keeps that order; groups
  * in one category follow the order of their top ticket.
  */
-export function groupByStatus(issues: JiraIssue[]) {
-  const buckets = new Map<string, { key: string; name: string; category: string; issues: JiraIssue[] }>();
+export function groupByStatus(issues: Ticket[]) {
+  const buckets = new Map<string, { key: string; name: string; category: string; issues: Ticket[] }>();
   for (const issue of issues) {
     const key = `status:${issue.status}`;
     const bucket = buckets.get(key) ?? { key, name: issue.status, category: issue.status_category, issues: [] };

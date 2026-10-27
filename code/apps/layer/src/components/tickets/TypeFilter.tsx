@@ -1,4 +1,4 @@
-import type { JiraIssueType } from "../../lib/types";
+import type { TicketType } from "../../lib/types";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 
 /// Issue types as toggles. Nothing picked means every type — the same thing
@@ -9,7 +9,7 @@ export function TypeFilter({
   kinds,
   onChange,
 }: {
-  issueTypes: JiraIssueType[];
+  issueTypes: TicketType[];
   types: TypeMap;
   kinds: string[];
   onChange: (kinds: string[]) => void;

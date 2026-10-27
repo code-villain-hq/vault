@@ -1,4 +1,4 @@
-import type { JiraIssueType } from "../lib/types";
+import type { TicketType } from "../lib/types";
 
 /**
  * Issue-type badges, driven entirely by what the Jira site reports.
@@ -10,13 +10,13 @@ import type { JiraIssueType } from "../lib/types";
  * issue, -1 is a sub-task.
  */
 
-export type TypeMap = Record<string, JiraIssueType>;
+export type TypeMap = Record<string, TicketType>;
 
-export function typeMap(types: JiraIssueType[]): TypeMap {
+export function typeMap(types: TicketType[]): TypeMap {
   return Object.fromEntries(types.map((t) => [t.name.trim().toLowerCase(), t]));
 }
 
-export function lookupType(types: TypeMap, name: string): JiraIssueType | undefined {
+export function lookupType(types: TypeMap, name: string): TicketType | undefined {
   return types[name.trim().toLowerCase()];
 }
 

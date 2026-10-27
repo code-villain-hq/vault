@@ -81,13 +81,10 @@ pub(crate) fn not_a_review(task: &Task, what: &str) -> Result<()> {
 }
 
 /// The ticket a pull request is for, from its branch or title, linked only
-/// where Jira is connected, so that the link opens something.
+/// where a tracker is in use, so that the link opens something.
 fn ticket_for(state: &AppState, head: &str, title: &str) -> (Option<String>, Option<String>) {
     let issue_key = ticket_key_in(head).or_else(|| ticket_key_in(title));
-    let issue_url = issue_key.as_ref().and_then(|key| {
-        let jira = state.config.read().jira?;
-        Some(format!("{}/browse/{key}", jira.base_url.trim_end_matches('/')))
-    });
+    let issue_url = issue_key.as_ref().and_then(|key| state.config.with(|c| crate::tickets::url_of(c, key)));
     (issue_key.filter(|_| issue_url.is_some()), issue_url)
 }
 
@@ -173,7 +170,7 @@ mod tests {
             slack_bot: Default::default(),
             config: ConfigStore::for_tests(root.join("config.json"), cfg),
             ptys: crate::pty::PtyManager::default(),
-            jira_types: Default::default(),
+            ticket_types: Default::default(),
             epic_field_missing: Default::default(),
             pending_notices: Default::default(),
             status_cache: Default::default(),

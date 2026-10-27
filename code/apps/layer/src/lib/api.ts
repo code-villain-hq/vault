@@ -9,15 +9,15 @@ import type {
   CheckoutPr,
   Cleaned,
   CleanupItem,
-  CreateField,
+  RequiredField,
   DiffScope,
   FeedbackItem,
   FlowStatus,
   Finished,
   FoundRepo,
-  JiraIssue,
-  JiraIssueType,
-  JiraPage,
+  Ticket,
+  TicketType,
+  TicketPage,
   JiraTransition,
   LoopView,
   PaneInfo,
@@ -233,9 +233,9 @@ export const api = {
     baseUrl: string, email: string, token: string,
     projectKey?: string | null, jql?: string | null,
   ) => invoke<string>("jira_connect", { baseUrl, email, token, projectKey, jql }),
-  jiraIssues: () => invoke<JiraPage>("jira_issues"),
-  jiraIssueTypes: (refresh = false) =>
-    invoke<JiraIssueType[]>("jira_issue_types", { refresh }),
+  ticketsMine: () => invoke<TicketPage>("tickets_mine"),
+  ticketTypes: (refresh = false) =>
+    invoke<TicketType[]>("ticket_types", { refresh }),
   jiraTransitions: (key: string) => invoke<JiraTransition[]>("jira_transitions", { key }),
   jiraTransition: (key: string, transitionId: string) =>
     invoke<void>("jira_transition", { key, transitionId }),
@@ -296,25 +296,25 @@ export const api = {
   setTicketFlow: (projectKey: string, stage: "review" | "merged", status: FlowStatus | null) =>
     invoke<void>("set_ticket_flow", { projectKey, stage, status }),
   setTicketStart: (projectKey: string, to: StartTo) => invoke<void>("set_ticket_start", { projectKey, to }),
-  jiraBrowse: (text: string, whose: string, includeDone: boolean, types: string[], order: string) =>
-    invoke<JiraPage>("jira_browse", { text: text || null, whose, includeDone, types, order }),
-  jiraPriorities: () => invoke<string[]>("jira_priorities"),
-  jiraIssuesByKey: (keys: string[]) => invoke<JiraIssue[]>("jira_issues_by_key", { keys }),
-  jiraCreateFields: (projectKey: string, issueTypeId: string) =>
-    invoke<CreateField[]>("jira_create_fields", { projectKey, issueTypeId }),
-  jiraCreateIssue: (req: {
+  ticketsFind: (text: string, whose: string, includeDone: boolean, types: string[], order: string) =>
+    invoke<TicketPage>("tickets_find", { text: text || null, whose, includeDone, types, order }),
+  ticketPriorities: () => invoke<string[]>("ticket_priorities"),
+  ticketsByKey: (keys: string[]) => invoke<Ticket[]>("tickets_by_key", { keys }),
+  ticketRequiredFields: (projectKey: string, issueTypeId: string) =>
+    invoke<RequiredField[]>("ticket_required_fields", { projectKey, issueTypeId }),
+  fileTicket: (req: {
     summary: string;
     description: string;
     issue_type: string;
     project_key: string | null;
     parent_key: string | null;
     fields: Record<string, unknown> | null;
-  }) => invoke<JiraIssue>("jira_create_issue", { req }),
+  }) => invoke<Ticket>("file_ticket", { req }),
   /** `epic`: an epic-level ticket, made an epic whose spec makes sub-tasks (EPIC-2). */
-  jiraStartWork: (
+  startWorkOnTicket: (
     key: string, projectIds: string[],
     agentId?: string | null, branchSuffix?: string | null, base?: string | null, epic = false,
-  ) => invoke<Started>("jira_start_work", {
+  ) => invoke<Started>("start_work_on_ticket", {
     key, projectIds, agentId: agentId ?? null, branchSuffix: branchSuffix ?? null,
     base: base ?? null, epic,
   }),

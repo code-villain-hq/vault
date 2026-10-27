@@ -8,8 +8,8 @@ import { useSpecs } from "./lib/specs";
 import type {
   AgentStatus,
   CheckoutPr,
-  JiraIssue,
-  JiraIssueType,
+  Ticket,
+  TicketType,
   Message,
   MessageKind,
   PaneInfo,
@@ -84,8 +84,8 @@ interface State {
   reviewQueueLoading: boolean;
   reviewQueueError: string | null;
   settings: Settings | null;
-  issues: JiraIssue[];
-  issueTypes: JiraIssueType[];
+  issues: Ticket[];
+  issueTypes: TicketType[];
   /** The site's priorities, highest first, for sorting by them (TKT-13). */
   priorities: string[];
   issuesLoading: boolean;
@@ -603,12 +603,12 @@ export const useStore = create<State>((set, get) => {
     set((s) => ({ settings: keep(s.settings, settings) }));
     // Only until the first list lands: someone with nothing assigned has an
     // empty list for good, and every settings change re-fetched 500 issues.
-    if (settings.jira_connected && !get().issuesLoaded && !get().issuesLoading) {
+    if (settings.tracker != null && !get().issuesLoaded && !get().issuesLoading) {
       void get().refreshIssues();
     }
     // Disconnecting has to take the list with it, or the badge keeps counting
     // tickets from a site the app can no longer reach.
-    if (!settings.jira_connected && (get().issues.length > 0 || get().issuesLoaded)) {
+    if (settings.tracker == null && (get().issues.length > 0 || get().issuesLoaded)) {
       set({ issues: [], issueTypes: [], priorities: [], issuesTruncated: false, issuesLoaded: false });
     }
     // Only when GitHub itself changed. Every slider moved and every update
@@ -658,22 +658,22 @@ export const useStore = create<State>((set, get) => {
     }),
 
   refreshIssues: async (opts) => {
-    if (!get().settings?.jira_connected) return;
+    if (get().settings?.tracker == null) return;
     // A timer tick should not flash the spinner over a list already on screen.
     const spin = !opts?.quiet || !get().issuesLoaded;
     if (spin) set({ issuesLoading: true });
     try {
       const [page, issueTypes, priorities] = await Promise.all([
-        api.jiraIssues(),
+        api.ticketsMine(),
         // Types rarely change and are cached in the backend; a failure here
         // must not stop the issues themselves from showing.
-        api.jiraIssueTypes().catch(() => get().issueTypes),
+        api.ticketTypes().catch(() => get().issueTypes),
         // Asked once per connection, as rarely changed. Without them a sort
         // by priority keeps the order it had.
-        get().priorities.length > 0 ? get().priorities : api.jiraPriorities().catch(() => []),
+        get().priorities.length > 0 ? get().priorities : api.ticketPriorities().catch(() => []),
       ]);
       // As for reviews: an answer from a site disconnected meanwhile is not kept.
-      if (!get().settings?.jira_connected) return;
+      if (get().settings?.tracker == null) return;
       set((s) => ({
         issues: reuse(s.issues, page.issues, (i) => i.key),
         issuesTruncated: page.more,

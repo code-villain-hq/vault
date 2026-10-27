@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import type { JiraIssue } from "../../lib/types";
+import type { Ticket } from "../../lib/types";
 import { age } from "../../lib/time";
 import { IssueTypeIcon, hierarchyClass, isEpicType, type TypeMap } from "../IssueType";
 import { statusClass } from "./status";
@@ -17,7 +17,7 @@ export function TicketCard({
   onFileUnder,
   onContextMenu,
 }: {
-  issue: JiraIssue;
+  issue: Ticket;
   types: TypeMap;
   taskId: string | null;
   syncing: boolean;

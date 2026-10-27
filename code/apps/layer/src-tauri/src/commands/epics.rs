@@ -12,11 +12,11 @@ use tauri::{AppHandle, Manager};
 
 use crate::config::{SubTaskOf, Task};
 use crate::error::{Error, Result};
-use crate::integrations::jira::{Issue, Jira};
 use crate::pty::PaneInfo;
 use crate::spec::{self, Part, SubTask};
+use crate::tickets::{NewTicket, Ticket, Tracker};
 
-use super::jira::{default_issue_type, jira_client, project_of};
+use super::tickets::{default_ticket_type, tracker};
 use super::panes::{agent_file_dir, start_agent, Resume};
 use super::spec::{and_list, approve, spec_of, Slot, DRAFTS};
 use super::task_context::{keep_ticket, write_task_context};
@@ -236,21 +236,21 @@ pub async fn file_sub_tasks(app: AppHandle, epic_id: String, issue_type: Option<
     if !planned {
         return Err(Error::Other("approve the epic's tasks first: they say what its sub-tasks are".into()));
     }
-    let jira = match (&epic.issue_key, jira_client(&state)) {
-        (_, Ok((client, _))) => Some(client),
+    let tracker = match (&epic.issue_key, tracker(&state)) {
+        (_, Ok(tracker)) => Some(tracker),
         (Some(_), Err(e)) => return Err(e),
         (None, Err(_)) => None,
     };
-    let issue_type = match (&jira, epic.issue_key.is_some(), issue_type.filter(|t| !t.trim().is_empty())) {
+    let issue_type = match (&tracker, epic.issue_key.is_some(), issue_type.filter(|t| !t.trim().is_empty())) {
         (Some(_), true, Some(t)) => t,
-        (Some(_), true, None) => default_issue_type(&state).await?,
+        (Some(_), true, None) => default_ticket_type(&state).await?,
         _ => String::new(),
     };
     let fields = fields.unwrap_or(Value::Null);
     let mut failed = Vec::new();
     for one in todo {
         let title = one.sub.title.clone();
-        if let Err(e) = file_one(&app, &epic, one, jira.as_ref(), &issue_type, &fields).await {
+        if let Err(e) = file_one(&app, &epic, one, tracker.as_ref(), &issue_type, &fields).await {
             failed.push(SubTaskFailure { title, error: e.to_string() });
         }
     }
@@ -294,25 +294,32 @@ fn to_file(state: &AppState, epic: &Task) -> (bool, Vec<ToFile>) {
     (planned, todo)
 }
 
-async fn file_one(app: &AppHandle, epic: &Task, one: ToFile, jira: Option<&Jira>, issue_type: &str, fields: &Value) -> Result<()> {
+async fn file_one(app: &AppHandle, epic: &Task, one: ToFile, tracker: Option<&Tracker>, issue_type: &str, fields: &Value) -> Result<()> {
     let state = app.state::<AppState>();
     let ToFile { sub, description, project_ids, remembered } = one;
     if project_ids.is_empty() {
         return Err(Error::Other("none of its repositories is in the epic".into()));
     }
-    let issue: Option<Issue> = match (jira, sub.key.clone().or(remembered), epic.issue_key.as_deref()) {
+    let issue: Option<Ticket> = match (tracker, sub.key.clone().or(remembered), epic.issue_key.as_deref()) {
         (Some(client), Some(key), parent) => {
             if let (Some(parent), Some(_)) = (parent, &sub.key) {
-                client.set_parent(&key, parent).await.map_err(|e| Error::Other(format!("{key} could not be moved under the epic: {e}")))?;
+                client.put_under(&key, parent).await.map_err(|e| Error::Other(format!("{key} could not be moved under the epic: {e}")))?;
             }
-            Some(client.issue(&key).await?)
+            Some(client.ticket(&key).await?)
         }
         (Some(client), None, Some(parent)) => {
-            let project = project_of(parent).ok_or_else(|| Error::Other(format!("{parent} is not a ticket key")))?;
-            let key = client.create_issue(&project, &sub.title, &description, issue_type, Some(parent), fields).await?;
+            let new = NewTicket {
+                summary: sub.title.clone(),
+                description: description.clone(),
+                issue_type: issue_type.to_string(),
+                project_key: None,
+                parent_key: Some(parent.to_string()),
+                fields: Some(fields.clone()),
+            };
+            let key = client.file(&new).await?;
             let (e, t, k) = (epic.clone(), sub.title.clone(), key.clone());
             super::blocking(app.clone(), move |state| remember(state, &e, &t, &k)).await?;
-            Some(client.issue(&key).await?)
+            Some(client.ticket(&key).await?)
         }
         _ => None,
     };
@@ -440,8 +447,8 @@ pub(crate) async fn start_sub_task_inner(app: &AppHandle, task_id: String, agent
         Some(key) => super::ticket_flow::started(&state, key).await,
         None => None,
     };
-    if let (Some(key), Ok((client, _))) = (state.config.task(&of.epic)?.issue_key, jira_client(&state)) {
-        if client.issue(&key).await.is_ok_and(|i| i.status_category == "new") {
+    if let (Some(key), Ok(tracker)) = (state.config.task(&of.epic)?.issue_key, tracker(&state)) {
+        if tracker.ticket(&key).await.is_ok_and(|i| i.status_category == "new") {
             super::ticket_flow::started(&state, &key).await;
         }
     }

@@ -1,3 +1,4 @@
+import type { TrackerKind } from "@layer/types";
 import type { SavedSignIn } from "./types-browser";
 import type { GithubConfig, GrafanaConfig, JiraConfig, LogSource, ModelChoice, SlackBotConfig, SlackConfig } from "./types-integrations";
 
@@ -284,7 +285,7 @@ export interface RepoResult {
   detail: string;
 }
 
-export interface JiraIssue {
+export interface Ticket {
   key: string;
   summary: string;
   description: string;
@@ -305,12 +306,12 @@ export interface JiraIssue {
   updated: string | null;
 }
 
-/** A field a project insists on before it will accept a new issue. */
-export interface CreateField {
+/** A field a project insists on before it will accept a new ticket. */
+export interface RequiredField {
   id: string;
   name: string;
   required: boolean;
-  /** "array" when Jira expects several values. */
+  /** "array" when the tracker expects several values. */
   kind: string;
   allowed: { id: string; name: string }[];
 }
@@ -325,19 +326,19 @@ export interface Started extends Task {
   moved: string | null;
 }
 
-/** A page of search results, and whether Jira still had more to give. */
-export interface JiraPage {
-  issues: JiraIssue[];
+/** A page of search results, and whether the tracker still had more to give. */
+export interface TicketPage {
+  issues: Ticket[];
   more: boolean;
 }
 
-export interface JiraIssueType {
+export interface TicketType {
   id: string;
   name: string;
   subtask: boolean;
-  /** 1+ is epic-level, 0 a standard issue, -1 a sub-task. */
+  /** 1+ is epic-level, 0 a standard ticket, -1 a sub-task. */
   hierarchy_level: number;
-  /** Jira's own icon, inlined as a data URI by the backend. */
+  /** The tracker's own icon, inlined as a data URI by the backend. */
   icon: string | null;
 }
 
@@ -428,6 +429,8 @@ export interface Settings {
   worktree_root: string;
   worktree_root_is_default: boolean;
   jira_connected: boolean;
+  /** Where tickets come from (TKT-15), or null while there is no tracker. */
+  tracker: TrackerKind | null;
   github_connected: boolean;
   slack_connected: boolean;
   grafana_connected: boolean;

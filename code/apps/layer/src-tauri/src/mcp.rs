@@ -722,12 +722,12 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         }
 
         "jira_issue_types" => Ok(serde_json::to_value(
-            commands::jira_issue_types_inner(&state, false).await?,
+            commands::ticket_types_inner(&state, false).await?,
         )?),
 
         "jira_create_fields" => {
             Ok(serde_json::to_value(
-                commands::create_fields_for(
+                commands::required_fields_for(
                     &state,
                     required(&args, "project_key")?,
                     required(&args, "issue_type_id")?,
@@ -755,7 +755,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
                     // Not "Task": that is one site's name for it.
                     &match arg(&args, "issue_type") {
                         Some(t) => t.to_string(),
-                        None => commands::default_issue_type(&state).await?,
+                        None => commands::default_ticket_type(&state).await?,
                     },
                     arg(&args, "parent_key"),
                     // Without it jira_create_fields was advice nobody could
@@ -951,7 +951,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
             let ids = resolve_repos(&state, &args)?;
             let chat = caller_chat(&state.ptys, caller);
 
-            let mut started = commands::jira_start_work(
+            let mut started = commands::start_work_on_ticket(
                 app.clone(),
                 state,
                 issue_key,

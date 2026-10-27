@@ -13,6 +13,7 @@ pub use flow::ProjectStatus;
 pub use order::Order;
 use crate::config::JiraConfig;
 use crate::error::{Error, Result};
+use crate::tickets::{AllowedValue, RequiredField, Ticket, TicketPage, TicketType};
 
 pub struct Jira {
     base_url: String,
@@ -22,45 +23,6 @@ pub struct Jira {
     /// site, so the same field is a different number on every Jira — it has to
     /// be discovered rather than written down.
     epic_field: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct Issue {
-    pub key: String,
-    pub summary: String,
-    pub description: String,
-    pub status: String,
-    pub status_id: String,
-    pub status_category: String,
-    pub issue_type: String,
-    pub priority: Option<String>,
-    pub assignee: Option<String>,
-    pub labels: Vec<String>,
-    pub components: Vec<String>,
-    /// The epic (or other parent) this issue sits under, when it has one.
-    pub epic_key: Option<String>,
-    pub epic_summary: Option<String>,
-    pub url: String,
-    /// When it was filed, as RFC 3339 (TKT-11). None if Jira left it out.
-    pub created: Option<String>,
-    /// When it last changed, as RFC 3339, for sorting by it (TKT-13).
-    pub updated: Option<String>,
-}
-
-/// An issue type exactly as this Jira defines it. Nothing about types is
-/// assumed: the names, the icons and the hierarchy all come from the site, so
-/// a project with custom types renders as correctly as a stock one.
-#[derive(Debug, Clone, Serialize)]
-pub struct IssueType {
-    pub id: String,
-    pub name: String,
-    pub subtask: bool,
-    /// 1 and above is epic-level, 0 is a standard issue, -1 is a sub-task.
-    /// This is the one structural fact that holds across every Jira.
-    pub hierarchy_level: i32,
-    /// Jira's own icon as a data URI. Avatar URLs need authentication, so the
-    /// image is fetched here rather than by an <img> tag in the web view.
-    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -138,13 +100,13 @@ impl Jira {
     }
 
     /// Every issue type this site defines, with its icon inlined.
-    pub async fn issue_types(&self) -> Result<Vec<IssueType>> {
+    pub async fn issue_types(&self) -> Result<Vec<TicketType>> {
         let v = self
             .json(self.req(reqwest::Method::GET, "/rest/api/3/issuetype"))
             .await?;
         let raw = v.as_array().cloned().unwrap_or_default();
 
-        let mut out: Vec<IssueType> = Vec::new();
+        let mut out: Vec<TicketType> = Vec::new();
         let mut icons: Vec<String> = Vec::new();
         for t in raw {
             let name = str_at(&t, "name");
@@ -153,7 +115,7 @@ impl Jira {
                 continue;
             }
             icons.push(str_at(&t, "iconUrl"));
-            out.push(IssueType {
+            out.push(TicketType {
                 id: str_at(&t, "id"),
                 subtask: t.get("subtask").and_then(|b| b.as_bool()).unwrap_or(false),
                 hierarchy_level: t
@@ -216,10 +178,10 @@ impl Jira {
     ///
     /// Jira returns a page at a time whatever is asked for, so a single request
     /// quietly truncates: a queue of seventy issues came back as fifty, with
-    /// nothing to say twenty were missing. `Page::more` says whether Jira still
-    /// had results when the cap was reached, so a caller can tell the
+    /// nothing to say twenty were missing. `TicketPage::more` says whether
+    /// Jira still had results when the cap was reached, so a caller can tell the
     /// difference between "that is all of it" and "that is all you asked for".
-    pub async fn search(&self, jql: &str, max: u32) -> Result<Page> {
+    pub async fn search(&self, jql: &str, max: u32) -> Result<TicketPage> {
         let mut fields = json!([
             "summary", "description", "status", "issuetype",
             "priority", "assignee", "labels", "components", "parent", "created", "updated",
@@ -231,7 +193,7 @@ impl Jira {
             }
         }
 
-        let mut issues: Vec<Issue> = Vec::new();
+        let mut issues: Vec<Ticket> = Vec::new();
         let mut token: Option<String> = None;
         let mut more = false;
 
@@ -287,13 +249,13 @@ impl Jira {
         }
 
         // Only truthfully "more" if we stopped at the cap with a page to spare.
-        Ok(Page {
+        Ok(TicketPage {
             more: more && token.is_some() && issues.len() >= max as usize,
             issues,
         })
     }
 
-    pub async fn issue(&self, key: &str) -> Result<Issue> {
+    pub async fn issue(&self, key: &str) -> Result<Ticket> {
         let v = self
             .json(self.req(reqwest::Method::GET, &format!("/rest/api/3/issue/{}", segment(key)?)))
             .await?;
@@ -422,7 +384,7 @@ impl Jira {
         &self,
         project_key: &str,
         issue_type_id: &str,
-    ) -> Result<Vec<CreateField>> {
+    ) -> Result<Vec<RequiredField>> {
         // Paged, fifty to a page by default. Reading the first page alone
         // lost whatever came after it — and a required field past the
         // fiftieth never reached the form, so creating failed with "X is
@@ -460,7 +422,7 @@ impl Jira {
 
         Ok(fields
             .iter()
-            .map(|f| CreateField {
+            .map(|f| RequiredField {
                 id: str_at(f, "fieldId"),
                 name: str_at(f, "name"),
                 required: f.get("required").and_then(Value::as_bool).unwrap_or(false),
@@ -547,10 +509,10 @@ impl Jira {
         Ok(())
     }
 
-    fn to_issue(&self, v: &Value) -> Issue {
+    fn to_issue(&self, v: &Value) -> Ticket {
         let f = v.get("fields").cloned().unwrap_or(Value::Null);
         let key = str_at(v, "key");
-        Issue {
+        Ticket {
             url: format!("{}/browse/{}", self.base_url, key),
             key,
             summary: str_at(&f, "summary"),
@@ -707,32 +669,6 @@ fn children(node: &Value, out: &mut String) {
             walk(child, out);
         }
     }
-}
-
-/// A field a project insists on before it will accept a new issue.
-#[derive(Debug, Clone, Serialize)]
-pub struct CreateField {
-    pub id: String,
-    pub name: String,
-    pub required: bool,
-    /// "array" when Jira expects several values, otherwise the scalar type.
-    pub kind: String,
-    /// The values this field will accept, when it is a closed set.
-    pub allowed: Vec<AllowedValue>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AllowedValue {
-    pub id: String,
-    pub name: String,
-}
-
-/// A page of search results, and whether Jira had more to give.
-#[derive(Debug, Clone, Serialize)]
-pub struct Page {
-    pub issues: Vec<Issue>,
-    /// True when the cap was reached and Jira still had results.
-    pub more: bool,
 }
 
 /// A key or id as one segment of a REST path.

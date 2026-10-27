@@ -79,7 +79,7 @@ impl Seen {
     }
 
     /// The tickets in `issues` not seen before, remembering them.
-    fn tickets(&self, issues: &[crate::integrations::jira::Issue]) -> Vec<(String, String)> {
+    fn tickets(&self, issues: &[crate::tickets::Ticket]) -> Vec<(String, String)> {
         let mut seen = self.tickets.lock();
         let fresh = match seen.as_ref() {
             Some(prev) => issues
@@ -129,7 +129,7 @@ pub fn saw_reviews(app: &AppHandle, queue: &ReviewQueue) {
 }
 
 /// Your ticket list has come in, from wherever it was asked for.
-pub fn saw_tickets(app: &AppHandle, issues: &[crate::integrations::jira::Issue]) {
+pub fn saw_tickets(app: &AppHandle, issues: &[crate::tickets::Ticket]) {
     let fresh = app.state::<AppState>().news.tickets(issues);
     let news = ticket_news(&fresh);
     messages::record_all(app, news.clone());
@@ -194,17 +194,17 @@ pub fn spawn(app: AppHandle) {
             if !announce_now(&app) {
                 continue;
             }
-            let (github, jira) = {
+            let (github, tickets) = {
                 let cfg = state.config.read();
-                (cfg.github.is_some(), cfg.jira.is_some())
+                (cfg.github.is_some(), cfg.tracker_in_use().is_some())
             };
             if github {
                 if let Ok(queue) = crate::commands::review_queue(&state).await {
                     saw_reviews(&app, &queue);
                 }
             }
-            if jira {
-                if let Ok(page) = crate::commands::my_issues(&state).await {
+            if tickets {
+                if let Ok(page) = crate::commands::my_tickets(&state).await {
                     saw_tickets(&app, &page.issues);
                 }
             }
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn a_ticket_is_news_once() {
         let seen = Seen::default();
-        let issue = |key: &str| crate::integrations::jira::Issue {
+        let issue = |key: &str| crate::tickets::Ticket {
             key: key.into(),
             summary: format!("s {key}"),
             ..Default::default()

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import { useSpecs } from "../../lib/specs";
-import type { AgentStatus, JiraIssue, Project, TaskView } from "../../lib/types";
+import type { AgentStatus, Ticket, Project, TaskView } from "../../lib/types";
 import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { RepoPicker } from "../RepoPicker";
 import { suggestBase } from "../../lib/derive";
@@ -17,7 +17,7 @@ export function StartWorkDialog({
   subTasks = [],
   onClose,
 }: {
-  issue: JiraIssue;
+  issue: Ticket;
   projects: Project[];
   agents: AgentStatus[];
   types: TypeMap;
@@ -132,7 +132,7 @@ export function StartWorkDialog({
     failure.clear();
     const spec = (epic && !adopting) || (!epic && specFirst && !!agentId);
     try {
-      const task = await api.jiraStartWork(
+      const task = await api.startWorkOnTicket(
         issue.key,
         picked,
         spec ? null : agentId || null,

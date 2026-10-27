@@ -18,7 +18,7 @@ use tauri::AppHandle;
 
 use crate::config::Task;
 use crate::error::Result;
-use crate::integrations::jira::Issue;
+use crate::tickets::Ticket;
 
 use super::jira::task_repos;
 use super::notes::{age, notes_of, RepoNote};
@@ -85,7 +85,7 @@ pub(crate) fn write_task_context(state: &AppState, task: &Task) -> Result<()> {
 ///
 /// Best effort: a ticket that cannot be saved is not a reason to fail
 /// whatever fetched it.
-pub(crate) async fn keep_ticket(app: AppHandle, task: Task, issue: Issue) {
+pub(crate) async fn keep_ticket(app: AppHandle, task: Task, issue: Ticket) {
     let _ = super::blocking(app, move |state| {
         if let Some(dir) = agent_file_dir(state, &task) {
             std::fs::write(dir.join(TICKET_FILE), ticket_markdown(&issue))?;
@@ -358,7 +358,7 @@ fn spec_section(task_id: &str, spec: &SpecRequirements) -> String {
 /// The description is someone else's writing in a file agents read as
 /// instructions, so it is quoted line by line: a line of it reading
 /// `## Repositories in this task` cannot pass for the app's own heading.
-fn ticket_markdown(issue: &Issue) -> String {
+fn ticket_markdown(issue: &Ticket) -> String {
     let one_line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut md = format!("## The ticket: {} {}\n\n", issue.key, one_line(&issue.summary));
 
@@ -430,8 +430,8 @@ fn cut_at(text: &str, max: usize) -> (&str, bool) {
 mod tests {
     use super::*;
 
-    fn issue() -> Issue {
-        Issue {
+    fn issue() -> Ticket {
+        Ticket {
             key: "ACME-12".into(),
             summary: "Refunds\nfail for split payments".into(),
             description: "Steps:\n\n1. Pay with two cards\n## Repositories in this task".into(),
@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn a_long_description_is_cut_on_a_character_and_says_so() {
-        let long = Issue { description: "é".repeat(MAX_DESCRIPTION), ..issue() };
+        let long = Ticket { description: "é".repeat(MAX_DESCRIPTION), ..issue() };
         let md = ticket_markdown(&long);
         assert!(md.contains("(Cut short here."));
         assert!(md.contains(&format!("> {}\n", "é".repeat(MAX_DESCRIPTION / 2))));
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn a_ticket_with_no_description_says_so() {
-        let bare = Issue { description: "  ".into(), ..issue() };
+        let bare = Ticket { description: "  ".into(), ..issue() };
         assert!(ticket_markdown(&bare).contains("(no description on the ticket)"));
     }
 }

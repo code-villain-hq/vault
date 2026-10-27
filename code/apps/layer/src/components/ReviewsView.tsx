@@ -125,9 +125,9 @@ export function ReviewsView() {
     review: readOneOf("reviewsSort.review", SORTS_OF.review, "newest"),
     authored: readOneOf("reviewsSort.authored", SORTS_OF.authored, "newest"),
   }));
-  const jiraConnected = useStore((s) => s.settings?.jira_connected ?? false);
+  const trackerInUse = useStore((s) => s.settings?.tracker != null);
   // Without Jira there is no epic to ask for; the choice is kept for when it is back.
-  const by = grouping[side] === "epic" && !jiraConnected ? GROUPS[side][0][0] : grouping[side];
+  const by = grouping[side] === "epic" && !trackerInUse ? GROUPS[side][0][0] : grouping[side];
   const sort = sorting[side];
 
   // A banner or a message about one pull request: open its list, bring it
@@ -211,7 +211,7 @@ export function ReviewsView() {
         <h2>Reviews</h2>
         <span className="sub">Group</span>
         <span className="ui-segmented" role="group" aria-label="Group by">
-          {GROUPS[side].filter(([g]) => g !== "epic" || jiraConnected).map(([g, label]) => (
+          {GROUPS[side].filter(([g]) => g !== "epic" || trackerInUse).map(([g, label]) => (
             <button
               key={g}
               type="button"

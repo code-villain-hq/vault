@@ -1,4 +1,4 @@
-import type { JiraIssue } from "./types";
+import type { Ticket } from "./types";
 
 /** The epic a ticket belongs to: its key, and its title when Jira sent one. */
 export interface EpicOf {
@@ -70,7 +70,7 @@ export function ticketKeyIn(text: string): string | null {
  * ticket is its own epic: work on the epic itself belongs under it, not
  * under "No epic". `null` is a ticket known to have none.
  */
-export function epicsOf(issues: JiraIssue[], isEpic: (type: string) => boolean): Record<string, EpicOf | null> {
+export function epicsOf(issues: Ticket[], isEpic: (type: string) => boolean): Record<string, EpicOf | null> {
   const titles = new Map<string, string>();
   for (const i of issues) {
     if (i.epic_key && i.epic_summary) titles.set(i.epic_key, i.epic_summary);

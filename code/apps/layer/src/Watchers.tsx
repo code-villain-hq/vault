@@ -240,7 +240,7 @@ export function Watchers() {
     // guard: allow poll — Jira cannot push to a desktop app, and this skips itself while away.
     const t = setInterval(() => {
       const s = useStore.getState();
-      if (s.appActive && s.settings?.jira_connected) void s.refreshIssues({ quiet: true });
+      if (s.appActive && s.settings?.tracker != null) void s.refreshIssues({ quiet: true });
     }, 180_000);
     return () => clearInterval(t);
   }, []);

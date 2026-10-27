@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../../lib/api";
-import type { JiraIssue, JiraTransition } from "../../lib/types";
+import type { Ticket, JiraTransition } from "../../lib/types";
 import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { statusClass } from "./status";
@@ -14,7 +14,7 @@ export function ReadTicketDialog({
   onStart,
   onMoved,
 }: {
-  issue: JiraIssue;
+  issue: Ticket;
   types: TypeMap;
   hasTask: boolean;
   onClose: () => void;

@@ -28,6 +28,8 @@ pub struct Settings {
     pub worktree_root: String,
     pub worktree_root_is_default: bool,
     pub jira_connected: bool,
+    /// Where tickets come from (TKT-15), or None while there is no tracker.
+    pub tracker: Option<crate::config::TrackerKind>,
     pub github_connected: bool,
     pub slack_connected: bool,
     pub grafana_connected: bool,
@@ -62,6 +64,7 @@ pub fn get_settings(state: State<AppState>) -> Settings {
         // These configs are only persisted after the token verified, so their
         // presence is the connection state. No keychain read, no password prompt.
         jira_connected: c.jira.is_some(),
+        tracker: c.tracker_in_use(),
         github_connected: c.github.is_some(),
         slack_connected: super::notifications(&c).is_some(),
         grafana_connected: c.grafana.is_some(),
@@ -190,7 +193,7 @@ fn disconnect_inner(state: &AppState, which: &str) -> Result<()> {
             secrets::delete(secrets::JIRA)?;
             // What was learned about that site goes with it; reconnecting to
             // another one should not be told the old one's issue types.
-            *state.jira_types.lock() = None;
+            *state.ticket_types.lock() = None;
             *state.epic_field_missing.lock() = None;
             state.config.update(|c| c.jira = None)
         }

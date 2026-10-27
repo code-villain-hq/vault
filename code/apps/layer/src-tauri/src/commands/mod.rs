@@ -15,7 +15,7 @@ pub struct AppState {
     pub ptys: PtyManager,
     /// Issue types are per-site and change about never, but each icon is a
     /// separate authenticated fetch, so they are pulled once per run.
-    pub jira_types: parking_lot::Mutex<Option<Vec<crate::integrations::jira::IssueType>>>,
+    pub ticket_types: parking_lot::Mutex<Option<Vec<crate::tickets::TicketType>>>,
     /// The Jira site already searched for an Epic Link field and found none.
     pub epic_field_missing: parking_lot::Mutex<Option<String>>,
     /// Notices raised before the UI is listening. Drained once on boot.
@@ -146,6 +146,7 @@ mod finish_tool;
 mod outgoing;
 mod landed;
 mod task_context;
+mod tickets;
 mod spec;
 mod spec_draft;
 mod spec_outside;
@@ -179,6 +180,7 @@ pub use grafana::*;
 pub use s3_logs::*;
 pub use settings::*;
 pub use ticket_flow::*;
+pub use tickets::*;
 pub use messages::*;
 pub use pr_task::*;
 pub use open_prs::*;
@@ -206,7 +208,6 @@ mod tests {
     use super::panes_restore::{panes_to_restore, RESTORE_LIMIT};
     use super::slack::{notifications, slack_allows};
     use super::tasks::{derive_branch, suggest_from};
-    use super::jira::project_of;
     use crate::config::{AppConfig, Project, SavedPane, SlackBotConfig, SlackConfig};
 
     fn project(id: &str, group: Option<&str>) -> Project {
@@ -390,18 +391,6 @@ mod tests {
             session: None,
             on_loop: None,
         }
-    }
-
-    #[test]
-    fn a_key_says_which_project_it_belongs_to() {
-        // An epic found by searching carries its project in its key, which is
-        // what lets a ticket be filed under it with nothing else configured.
-        assert_eq!(project_of("ACME-19335").as_deref(), Some("ACME"));
-        assert_eq!(project_of("sre-1189").as_deref(), Some("SRE"));
-        assert_eq!(project_of("ACME-19335-suffix"), None);
-        assert_eq!(project_of("ACME-"), None);
-        assert_eq!(project_of("-1"), None);
-        assert_eq!(project_of("nodash"), None);
     }
 
     #[test]
@@ -593,7 +582,7 @@ mod tests {
             slack_bot: Default::default(),
             config: ConfigStore::for_tests(root.join("config.json"), cfg),
             ptys: crate::pty::PtyManager::default(),
-            jira_types: Default::default(),
+            ticket_types: Default::default(),
             epic_field_missing: Default::default(),
             pending_notices: Default::default(),
             status_cache: Default::default(),
