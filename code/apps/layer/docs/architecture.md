@@ -388,7 +388,8 @@ app's config folder and returns its extra arguments and environment.
 - **The MCP server** (`mcp.rs`) is axum on `127.0.0.1:0` with a fresh
   bearer token per run. It speaks JSON-RPC over `POST /mcp`. Tools are
   defined in `tools()` and handled in `call()`. Those in `DANGER` need
-  `confirm: true`. The endpoint's `hook_token` is separate and accepted
+  `confirm: true`. The tracker's tools are listed only for the workspace's
+  tracker (`commands/tracker_tools.rs`, TKT-20). The endpoint's `hook_token` is separate and accepted
   only by `/hook`.
 - **Context files.** `write_task_context` (`commands/task_context.rs`)
   writes the same text as `AGENTS.md` and `CLAUDE.md` into a task folder:

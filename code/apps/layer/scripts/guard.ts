@@ -563,8 +563,9 @@ const CEILINGS: Record<string, number> = {
   // Grafana's tools (OBS-2) are defined in commands/grafana.rs; only their
   // dispatch is here, the line that took it to 1101. The epic chat's tools
   // (EPIC-12) are in commands/epic_tools.rs; their dispatch and confirm gate
-  // took it to 1113.
-  "src-tauri/src/mcp.rs": 1115,
+  // took it to 1113. The trackers' tools (TKT-20) moved out to
+  // commands/tracker_tools.rs, which brought it back to 944.
+  "src-tauri/src/mcp.rs": 960,
   // The same for the browser's tools (BRW-*); each tool's work lives in
   // its own module (sign_in.rs, session.rs, tabs.rs), its definition here.
   "src-tauri/src/browser/tools.rs": 700,
@@ -612,7 +613,7 @@ const architecture = existsSync("docs/architecture.md") ? read("docs/architectur
 
 // Every file that defines MCP tools: the browser's are kept with the browser,
 // Grafana's with the rest of Grafana, S3's with the rest of S3.
-for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs", "src-tauri/src/commands/finish_tool.rs", "src-tauri/src/commands/epic_tools.rs"]) {
+for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs", "src-tauri/src/commands/finish_tool.rs", "src-tauri/src/commands/epic_tools.rs", "src-tauri/src/commands/tracker_tools.rs"]) {
   const mcp = rust.get(file);
   if (!mcp) continue;
   for (const m of mcp.code.matchAll(/\btool\(\s*"/g)) {

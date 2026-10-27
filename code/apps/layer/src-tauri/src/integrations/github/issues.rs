@@ -118,6 +118,17 @@ impl GitHub {
         Ok(())
     }
 
+    /// Close an issue, as done or as not planned: GitHub's two reasons.
+    pub async fn close_issue(&self, (owner, name, number): &IssueRef, not_planned: bool) -> Result<()> {
+        let reason = if not_planned { "not_planned" } else { "completed" };
+        self.json(
+            self.req(reqwest::Method::PATCH, &format!("/repos/{owner}/{name}/issues/{number}"))
+                .json(&json!({ "state": "closed", "state_reason": reason })),
+        )
+        .await?;
+        Ok(())
+    }
+
     /// Give an issue to this account, beside whoever has it.
     pub async fn assign(&self, (owner, name, number): &IssueRef, login: &str) -> Result<()> {
         self.json(

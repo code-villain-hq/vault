@@ -38,6 +38,11 @@ impl Issues {
         repos.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
         Self { repos }
     }
+
+    pub fn holds(&self, (owner, name, _): &IssueRef) -> bool {
+        let repo = format!("{owner}/{name}");
+        self.repos.iter().any(|r| r.eq_ignore_ascii_case(&repo))
+    }
 }
 
 /// A host without its scheme, credentials or port.
@@ -180,6 +185,28 @@ pub(super) async fn ticket(client: &GitHub, key: &str) -> Result<Ticket> {
     client.issues(&[one]).await?.into_iter().next().ok_or_else(|| Error::NotFound(key.to_string()))
 }
 
+/// An agent's search (TKT-20), in GitHub's own words. A `repo:` it names
+/// itself would widen the search past the workspace, so what comes back is
+/// held to the workspace's repositories too.
+pub async fn search_for_agent(client: &GitHub, issues: &Issues, query: &str, cap: usize) -> Result<TicketPage> {
+    let mut page = search(client, issues, query, cap).await?;
+    page.issues.retain(|t| parse_key(&t.key).is_some_and(|r| issues.holds(&r)));
+    Ok(page)
+}
+
+/// An issue an agent names, if it is in one of the workspace's repositories:
+/// the app's token reaches further than the workspace does.
+pub fn in_workspace(issues: &Issues, key: &str) -> Result<IssueRef> {
+    let one = issue(key)?;
+    if !issues.holds(&one) {
+        return Err(Error::Other(format!(
+            "{key} is not in one of the workspace's repositories ({})",
+            issues.repos.join(", ")
+        )));
+    }
+    Ok(one)
+}
+
 pub(super) fn issue(key: &str) -> Result<IssueRef> {
     parse_key(key).ok_or_else(|| Error::Other(format!("{key} is not a GitHub issue (owner/repo#12)")))
 }
@@ -258,6 +285,14 @@ mod tests {
         }
         assert_eq!(Issues::of(&cfg, "https://github.com").repos, ["acme/api", "acme/web"]);
         assert_eq!(Issues::of(&cfg, "https://ghe.example.com:8443").repos, ["acme/tools"]);
+    }
+
+    #[test]
+    fn an_agent_reaches_only_the_workspace_repositories() {
+        let issues = Issues { repos: vec!["acme/web".into()] };
+        assert!(in_workspace(&issues, "ACME/Web#3").is_ok());
+        assert!(in_workspace(&issues, "acme/secrets#3").is_err());
+        assert!(in_workspace(&issues, "ACME-3").is_err());
     }
 
     #[test]

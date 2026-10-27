@@ -223,8 +223,9 @@ async fn dispatch(app: &AppHandle, method: &str, params: Value, caller: Option<&
         })),
         "ping" => Ok(json!({})),
         "tools/list" => {
+            let uses = app.state::<AppState>().config.read().tracker_in_use();
             let mut all = tools();
-            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()));
+            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()).chain(commands::tracker_tools(uses)));
             Ok(json!({ "tools": all }))
         }
         "tools/call" => {
@@ -298,6 +299,7 @@ pub(crate) fn bool_prop(desc: &str) -> Value {
 /// need an explicit second call with `confirm: true` after the user agrees.
 const DANGER: &[&str] = &[
     "jira_transition",
+    "github_close_issue",
     "slack_delete",
     "slack_cleanup",
     "forget_repo",
@@ -309,7 +311,7 @@ const DANGER: &[&str] = &[
     "subtask_start",
 ];
 
-fn confirm_prop() -> Value {
+pub(crate) fn confirm_prop() -> Value {
     bool_prop(
         "Set true only after the user agrees. Calls without it are refused — \
          this tool changes shared state that is hard to undo.",
@@ -355,78 +357,6 @@ fn tools() -> Vec<Value> {
              repositories.",
             json!({ "task_id": str_prop("Task id from list_tasks") }),
             vec!["task_id"],
-        ),
-        tool(
-            "jira_search",
-            "Search Jira with JQL, using the credentials stored in the app.",
-            json!({
-                "jql": str_prop("A JQL query, e.g. project = ACME AND statusCategory != Done"),
-                "max": { "type": "integer", "description": "Maximum results, default 25" }
-            }),
-            vec!["jql"],
-        ),
-        tool(
-            "jira_get_issue",
-            "Read one Jira issue in full, including its description and epic.",
-            json!({ "key": str_prop("Issue key, e.g. ACME-1234") }),
-            vec!["key"],
-        ),
-        tool(
-            "jira_issue_types",
-            "The issue types this Jira defines, with their hierarchy level: 1 and \
-             above is epic-level, 0 a standard issue, -1 a sub-task. Names differ \
-             between sites, so ask rather than assuming one is called Task.",
-            json!({}),
-            vec![],
-        ),
-        tool(
-            "jira_create_fields",
-            "What a project demands before it will accept a new issue of a given \
-             type: the required fields and the values each will take. Ask this \
-             before jira_create_issue — many projects make components or a custom \
-             field mandatory, and the create is refused without them.",
-            json!({
-                "project_key": str_prop("Project key, e.g. the ACME in ACME-1234"),
-                "issue_type_id": str_prop("Issue type id; jira_issue_types lists them")
-            }),
-            vec!["project_key", "issue_type_id"],
-        ),
-        tool(
-            "jira_create_issue",
-            "File a new Jira issue. Returns the new key.",
-            json!({
-                "summary": str_prop("One-line title"),
-                "description": str_prop("Body text; blank lines separate paragraphs"),
-                "issue_type": str_prop("Type name as this site defines it, e.g. Bug or Task. Defaults to Task."),
-                "project_key": str_prop("Defaults to the project configured in the app"),
-                "parent_key": str_prop("Epic or parent key to file this under"),
-                "fields": {
-                    "type": "object",
-                    "description": "The other fields jira_create_fields says this project \
-                                    requires, by field id: {\"id\": \"…\"} for one allowed \
-                                    value, a list of them for an array field, e.g. \
-                                    {\"components\": [{\"id\": \"10001\"}]}"
-                }
-            }),
-            vec!["summary"],
-        ),
-        tool(
-            "jira_comment",
-            "Add a comment to a Jira issue.",
-            json!({ "key": str_prop("Issue key"), "text": str_prop("Comment body") }),
-            vec!["key", "text"],
-        ),
-        tool(
-            "jira_transition",
-            "Move a Jira issue to another status by the transition's name, e.g. \
-             'Start progress'. Call with no transition to list what is available. \
-             Applying a transition needs confirm: true after the user agrees.",
-            json!({
-                "key": str_prop("Issue key"),
-                "transition": str_prop("Transition name; omit to list the options"),
-                "confirm": confirm_prop()
-            }),
-            vec!["key"],
         ),
         tool(
             "slack_post",
@@ -706,105 +636,6 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
             )?)
         }
 
-        "jira_search" => {
-            let jql = required(&args, "jql")?.to_string();
-            // Clamped before the cast: a huge value wrapped to 0 and came back
-            // empty, and one just under the wrap paged through the whole site.
-            let max = args.get("max").and_then(|m| m.as_u64()).unwrap_or(25).clamp(1, 500) as u32;
-            let (client, _) = commands::jira_client(&state)?;
-            Ok(serde_json::to_value(client.search(&jql, max).await?.issues)?)
-        }
-
-        "jira_get_issue" => {
-            let key = required(&args, "key")?.to_string();
-            let (client, _) = commands::jira_client(&state)?;
-            Ok(serde_json::to_value(client.issue(&key).await?)?)
-        }
-
-        "jira_issue_types" => Ok(serde_json::to_value(
-            commands::ticket_types_inner(&state, false).await?,
-        )?),
-
-        "jira_create_fields" => {
-            Ok(serde_json::to_value(
-                commands::required_fields_for(
-                    &state,
-                    required(&args, "project_key")?,
-                    required(&args, "issue_type_id")?,
-                )
-                .await?,
-            )?)
-        }
-
-        "jira_create_issue" => {
-            let (client, cfg) = commands::jira_client(&state)?;
-            let project = arg(&args, "project_key")
-                .map(str::to_string)
-                .or_else(|| cfg.project_key.clone())
-                .ok_or_else(|| {
-                    crate::error::Error::Other(
-                        "no project_key given and none configured in the app".into(),
-                    )
-                })?;
-
-            let key = client
-                .create_issue(
-                    &project,
-                    required(&args, "summary")?,
-                    arg(&args, "description").unwrap_or_default(),
-                    // Not "Task": that is one site's name for it.
-                    &match arg(&args, "issue_type") {
-                        Some(t) => t.to_string(),
-                        None => commands::default_ticket_type(&state).await?,
-                    },
-                    arg(&args, "parent_key"),
-                    // Without it jira_create_fields was advice nobody could
-                    // act on: a project that demands a component refused
-                    // every issue an agent filed.
-                    // Some clients send an object argument as its JSON text.
-                    &match args.get("fields") {
-                        Some(Value::String(s)) => serde_json::from_str(s).unwrap_or(Value::Null),
-                        Some(v) => v.clone(),
-                        None => Value::Null,
-                    },
-                )
-                .await?;
-            Ok(json!({ "key": key, "url": format!("{}/browse/{key}", cfg.base_url) }))
-        }
-
-        "jira_comment" => {
-            let (client, _) = commands::jira_client(&state)?;
-            client
-                .comment(required(&args, "key")?, required(&args, "text")?)
-                .await?;
-            Ok(json!({ "ok": true }))
-        }
-
-        "jira_transition" => {
-            let key = required(&args, "key")?;
-            let (client, _) = commands::jira_client(&state)?;
-            let available = client.transitions(key).await?;
-
-            let Some(wanted) = arg(&args, "transition") else {
-                return Ok(serde_json::to_value(available)?);
-            };
-            let found = available
-                .iter()
-                .find(|t| t.name.eq_ignore_ascii_case(wanted))
-                .ok_or_else(|| {
-                    crate::error::Error::Other(format!(
-                        "no transition named {wanted}; available: {}",
-                        available
-                            .iter()
-                            .map(|t| t.name.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ))
-                })?;
-            client.transition(key, &found.id).await?;
-            Ok(json!({ "ok": true, "status": found.to_status }))
-        }
-
         "slack_post" => {
             let text = required(&args, "text")?.to_string();
             let context = arg(&args, "context").map(str::to_string);
@@ -912,6 +743,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         }
 
         "slack_diagnose" => Ok(commands::slack_diagnose(state).await?),
+        n if commands::tracker_owns(n) => commands::tracker_call(app, n, args).await,
         n if commands::grafana_owns(n) => commands::grafana_call(&state, n, args).await,
         n if commands::s3_logs_owns(n) => commands::s3_logs_call(&state, n, args).await,
         n if commands::spec_owns(n) => commands::spec_call(app, args, caller).await,
@@ -1114,6 +946,7 @@ fn lock_config_perms(path: &std::path::Path) -> Result<()> {
 mod tests {
     use super::*;
     use axum::http::HeaderValue;
+    use crate::config::TrackerKind;
 
     #[test]
     fn a_missing_or_wrong_bearer_is_refused() {
@@ -1132,6 +965,7 @@ mod tests {
     fn served() -> Vec<Value> {
         let mut all = tools();
         all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()));
+        all.extend(commands::tracker_tools(Some(TrackerKind::Jira)).into_iter().chain(commands::tracker_tools(Some(TrackerKind::Github))));
         all
     }
 
@@ -1172,6 +1006,7 @@ mod tests {
             &json!({ "transition": "Done" })
         ));
         assert!(!tool_needs_confirm("jira_transition", &json!({ "key": "ACME-1" })));
+        assert!(tool_needs_confirm("github_close_issue", &json!({ "key": "acme/web#1" })));
         assert!(!tool_needs_confirm("slack_cleanup", &json!({ "dry_run": true })));
         assert!(tool_needs_confirm("slack_cleanup", &json!({})));
         assert!(!tool_needs_confirm("list_tasks", &json!({})));

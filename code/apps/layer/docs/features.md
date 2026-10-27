@@ -970,23 +970,24 @@ Code: `tickets.rs` (the tracker: `Tracker`; Jira's side in
 `integrations/jira.rs`, `integrations/jira/flow.rs`,
 `integrations/github/issues.rs`, `components/tickets/`, `TrackerChoice.tsx`
 (TKT-15, TKT-16), `lib/tracker.ts`, `TicketFlow.tsx`,
-`sidebar/DeleteTask.tsx`. The choice is the workspace's `tracker`
-connection; `AppConfig::tracker_in_use` reads it, and `jira_client` refuses
-every Jira-only path (moves, transitions, the `jira_*` tools) when it is
-not Jira.
+`sidebar/DeleteTask.tsx`, `commands/tracker_tools.rs` (TKT-20). The
+choice is the workspace's `tracker` connection; `AppConfig::tracker_in_use`
+reads it, and `jira_client` refuses every Jira-only path (moves,
+transitions) when it is not Jira. Agents are offered only the tracker's
+own tools, and a call to another tracker's is refused. The `github_*`
+tools reach only the workspace's repositories, though Code's token reaches
+further.
 
 Known gaps:
 - Jira and GitHub Issues are built; Forge is not, and is not offered.
   Nor is "none" (TKT-15): a workspace with no choice uses Jira while it
   is connected.
-- GitHub Issues, not yet built: the `github_*` tools for agents (TKT-20;
-  the `jira_*` tools refuse, except `jira_issue_types` and
-  `jira_create_fields`, which answer for the workspace's tracker); the
-  epic chosen from the organisation's issue types (TKT-17), so an epic is
-  only an issue with sub-issues, and one just filed as an epic looks like
-  any other issue; closing the issue of a task based on another branch
+- GitHub Issues, not yet built: the epic chosen from the organisation's
+  issue types (TKT-17), so an epic is only an issue with sub-issues,
+  and one just filed as an epic looks like any other issue; closing the issue of a task based on another branch
   (TKT-18); reading a pull request's ticket from the issues it closes
-  (TKT-21, REV-7, REV-11). Filing offers the repositories of the issues
+  (TKT-21, REV-7, REV-11). No `github_*` tool assigns, labels or
+  reopens an issue. Filing offers the repositories of the issues
   on the board, not the workspace's list. A GitHub Enterprise Server
   without sub-issues fails every read. Tried only in the mock harness
   and by tests, never against github.com.
@@ -1196,6 +1197,11 @@ never hold credentials themselves.
 | `jira_create_issue` | file an issue, required `fields` included | |
 | `jira_comment` | comment on an issue | |
 | `jira_transition` | list transitions, or move an issue | to move |
+| `github_search_issues` | GitHub's issue search, in the workspace's repositories, 1–500 results | |
+| `github_get_issue` | one issue in full | |
+| `github_create_issue` | file an issue in a workspace repository, or a sub-issue under `parent` | |
+| `github_comment` | comment on an issue | |
+| `github_close_issue` | close an issue, as completed or not planned | yes |
 | `slack_post` | post to the configured channel | |
 | `slack_cleanup` | delete this app's own posts (`dry_run` to list) | to delete |
 | `slack_delete` | delete specific posts by permalink | yes |
