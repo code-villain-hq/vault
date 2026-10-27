@@ -1,17 +1,17 @@
 # Raven
 
-*A Code Villain product. First build: Health and Technical work; Product
-is decided but not built.*
+_A Code Villain product. First build: Health and Technical work; Product
+is decided but not built._
 
 Raven watches the studio's running apps and tells you what it sees, on
 three levels. Each level has its own reader and speaks that reader's
 language:
 
-| Level | Reader | Question | Words it uses |
-| --- | --- | --- | --- |
-| Health | Anyone | Is it up, and is it well? | Up, slow, failing, since when |
-| Technical | Developer | How does it behave? | Errors, response times, queries, logs, versions |
-| Product | PO / PM | How is it used? | Events, counts, durations, funnels |
+| Level     | Reader    | Question                  | Words it uses                                   |
+| --------- | --------- | ------------------------- | ----------------------------------------------- |
+| Health    | Anyone    | Is it up, and is it well? | Up, slow, failing, since when                   |
+| Technical | Developer | How does it behave?       | Errors, response times, queries, logs, versions |
+| Product   | PO / PM   | How is it used?           | Events, counts, durations, funnels              |
 
 You start at Health and only go deeper when something catches your eye.
 
