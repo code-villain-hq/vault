@@ -27,6 +27,7 @@ pub use browser::{BrowserConfig, SavedSignIn, SavedTabs};
 pub use phone::{PhoneConfig, PhoneDevice};
 pub use project::Project;
 pub use shared::Shared;
+pub use layer_domain::TrackerKind;
 
 /// 3: the shared setup is kept in a workspace (§25), `shared` says which.
 pub const SCHEMA_VERSION: u32 = 3;
@@ -326,6 +327,10 @@ pub struct AppConfig {
     pub slack: Option<SlackConfig>,
     #[serde(default)]
     pub grafana: Option<GrafanaConfig>,
+    /// Which connection the workspace's tickets come from, as its `tracker`
+    /// connection says (TKT-15). Read through `tracker_in_use`.
+    #[serde(default)]
+    pub tracker: Option<TrackerKind>,
     /// Logs in S3 agents read (OBS-9).
     #[serde(default)]
     pub log_sources: Vec<LogSource>,

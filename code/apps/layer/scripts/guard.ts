@@ -579,8 +579,9 @@ const CEILINGS: Record<string, number> = {
   // struct is harder to find than a long file. `ConfigStore::with`, the
   // borrowing read beside `read` that the hot paths use, took it to 661; it
   // belongs beside the lock it borrows. `SubTaskOf` (EPIC-9) sits beside the
-  // `Task` that holds it, at 669.
-  "src-tauri/src/config.rs": 670,
+  // `Task` that holds it, at 669. The workspace's tracker (TKT-15), beside
+  // the connections it chooses between, at 674.
+  "src-tauri/src/config.rs": 675,
 };
 
 for (const f of files) {

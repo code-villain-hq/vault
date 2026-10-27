@@ -175,6 +175,9 @@ fn merge(
         .iter()
         .map(|r| (r.kind.clone(), Held { id: r.id.clone(), settings: r.settings.clone() }))
         .collect();
+    // A tracker the workspace no longer has is gone here too.
+    c.tracker = None;
+    c.shared.connections.remove("tracker");
     for record in connections {
         if take_held(c, &record.kind, &record.settings, true) {
             c.shared.connections.insert(record.kind, record.id);
@@ -212,6 +215,7 @@ fn shared_view(c: &AppConfig) -> Value {
         "github": c.github,
         "slack": c.slack,
         "grafana": c.grafana,
+        "tracker": c.tracker,
         "log_sources": c.log_sources,
         "agent_models": c.agent_models,
         "shared": c.shared,
@@ -349,5 +353,24 @@ mod tests {
 
         assert_eq!(apply(&state, snapshot(&held)).unwrap(), None);
         assert_eq!(state.config.read().projects[0].check.as_deref(), Some("make test"));
+    }
+
+    #[test]
+    fn the_workspaces_tracker_comes_in_whole_and_goes_with_it() {
+        let (state, mut held) = moved();
+        held["connections"].as_array_mut().unwrap().push(json!({
+            "id": uuid::Uuid::now_v7().to_string(),
+            "kind": "tracker",
+            "settings": { "uses": "jira" },
+        }));
+        assert_eq!(apply(&state, snapshot(&held)).unwrap(), Some((true, false)));
+        assert_eq!(state.config.read().tracker, Some(crate::config::TrackerKind::Jira));
+
+        held["connections"].as_array_mut().unwrap().retain(|c| c["kind"] != "tracker");
+        assert_eq!(apply(&state, snapshot(&held)).unwrap(), Some((true, false)));
+        let cfg = state.config.read();
+        assert_eq!(cfg.tracker, None);
+        assert!(!cfg.shared.connections.contains_key("tracker"), "a choice made later is a new record");
+        assert!(cfg.shared.outbox.is_empty(), "what came from the workspace is not sent back");
     }
 }

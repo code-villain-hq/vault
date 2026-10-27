@@ -9,7 +9,8 @@ use uuid::Uuid;
 use crate::model::{Validate, ValidationError, invalid, parse, text, web_address};
 
 /// Where the workspace's Jira, GitHub, Slack or Grafana is, and how it is
-/// used: one of each kind. What is one person's own never syncs: their
+/// used: one of each kind. The `tracker` kind is no service of its own: it
+/// says which one the workspace's tickets come from (TKT-15). What is one person's own never syncs: their
 /// token (in their keychain), their Jira email, and Slack's notify switches.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -19,7 +20,7 @@ pub struct Connection {
     /// One connection per kind in a workspace. It can't change.
     pub kind: ConnectionKind,
     /// The kind's settings: [`JiraSettings`], [`GithubSettings`],
-    /// [`SlackSettings`] or [`GrafanaSettings`].
+    /// [`SlackSettings`], [`GrafanaSettings`] or [`TrackerSettings`].
     #[ts(as = "ConnectionSettings")]
     pub settings: Value,
     pub created_at: DateTime<Utc>,
@@ -36,6 +37,7 @@ pub enum ConnectionSettings {
     Github(GithubSettings),
     Slack(SlackSettings),
     Grafana(GrafanaSettings),
+    Tracker(TrackerSettings),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -46,6 +48,7 @@ pub enum ConnectionKind {
     Github,
     Slack,
     Grafana,
+    Tracker,
 }
 
 impl ConnectionKind {
@@ -57,6 +60,7 @@ impl ConnectionKind {
             ConnectionKind::Github => parse::<GithubSettings>(settings)?.validate(),
             ConnectionKind::Slack => parse::<SlackSettings>(settings)?.validate(),
             ConnectionKind::Grafana => parse::<GrafanaSettings>(settings)?.validate(),
+            ConnectionKind::Tracker => parse::<TrackerSettings>(settings).map(|_| ()),
         }
     }
 }
@@ -141,6 +145,25 @@ pub struct GrafanaSettings {
     pub base_url: String,
     /// The Loki datasource agents query when they name none.
     pub datasource: Option<String>,
+}
+
+/// Which connection the workspace's tickets come from (TKT-15). A
+/// workspace without one reads as Jira while it has a Jira connection, so
+/// those connected before there was a choice keep it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct TrackerSettings {
+    pub uses: TrackerKind,
+}
+
+/// The issue trackers a workspace can use. GitHub Issues and Forge join
+/// as each is built.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum TrackerKind {
+    Jira,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -254,5 +277,25 @@ mod tests {
             } }
         });
         assert!(ConnectionKind::Jira.check_settings(&jira).is_ok());
+    }
+
+    #[test]
+    fn a_tracker_names_one_the_app_knows_and_nothing_else() {
+        assert!(
+            ConnectionKind::Tracker
+                .check_settings(&json!({ "uses": "jira" }))
+                .is_ok()
+        );
+        assert!(
+            ConnectionKind::Tracker
+                .check_settings(&json!({ "uses": "redmine" }))
+                .is_err()
+        );
+        assert!(
+            ConnectionKind::Tracker
+                .check_settings(&json!({ "uses": "jira", "token": "secret" }))
+                .is_err()
+        );
+        assert!(ConnectionKind::Tracker.check_settings(&json!({})).is_err());
     }
 }

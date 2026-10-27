@@ -29,7 +29,8 @@ pub use account::{
 pub use agent_model::{AgentModel, AgentModelCreate, AgentModelPatch, ModelChoice};
 pub use connection::{
     Connection, ConnectionCreate, ConnectionKind, ConnectionPatch, ConnectionSettings, FlowStatus,
-    GithubSettings, GrafanaSettings, JiraSettings, SlackSettings, StartTo, TicketFlow,
+    GithubSettings, GrafanaSettings, JiraSettings, SlackSettings, StartTo, TicketFlow, TrackerKind,
+    TrackerSettings,
 };
 pub use log_source::{AthenaTable, LogSource, LogSourceCreate, LogSourcePatch};
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};

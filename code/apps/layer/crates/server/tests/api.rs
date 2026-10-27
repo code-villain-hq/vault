@@ -158,6 +158,26 @@ async fn members_write_repositories_and_notes_and_admins_the_connections(pool: P
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_has_one_tracker_and_only_admins_choose_it(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    let token = app.invite(&ada, &workspace, "member").await;
+    let grace = app.join("Grace", &token).await;
+
+    let tracker = json!({ "kind": "tracker", "settings": { "uses": "jira" } });
+    let refused = create(&app, &grace, &workspace, "Connection", tracker.clone()).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+    let chosen = create(&app, &ada, &workspace, "Connection", tracker.clone()).await;
+    assert_eq!(chosen.status, StatusCode::OK, "{}", chosen.body);
+    let second = create(&app, &ada, &workspace, "Connection", tracker).await;
+    assert_ne!(second.status, StatusCode::OK, "{}", second.body);
+    let unknown = json!({ "kind": "tracker", "settings": { "uses": "redmine" } });
+    let refused = create(&app, &ada, &workspace, "Connection", unknown).await;
+    assert_ne!(refused.status, StatusCode::OK, "{}", refused.body);
+    assert_eq!(app.records(&grace, &workspace, "Connection").await.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_guest_works_only_in_the_repositories_an_admin_adds_them_to(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;

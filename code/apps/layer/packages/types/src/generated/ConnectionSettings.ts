@@ -3,9 +3,10 @@ import type { GithubSettings } from "./GithubSettings";
 import type { GrafanaSettings } from "./GrafanaSettings";
 import type { JiraSettings } from "./JiraSettings";
 import type { SlackSettings } from "./SlackSettings";
+import type { TrackerSettings } from "./TrackerSettings";
 
 /**
  * A connection's settings, for the clients: which kind they are is the
  * record's `kind`.
  */
-export type ConnectionSettings = JiraSettings | GithubSettings | SlackSettings | GrafanaSettings;
+export type ConnectionSettings = JiraSettings | GithubSettings | SlackSettings | GrafanaSettings | TrackerSettings;

@@ -445,7 +445,7 @@ export interface Settings {
   workspace: WorkspaceView | null;
 }
 
-export type ConnectionKind = "jira" | "github" | "slack" | "grafana";
+export type ConnectionKind = "jira" | "github" | "slack" | "grafana" | "tracker";
 
 /** Settings' workspace (SET-7): who changes its connections, and what they say. */
 export interface WorkspaceView {

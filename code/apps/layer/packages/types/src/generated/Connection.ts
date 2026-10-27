@@ -4,7 +4,8 @@ import type { ConnectionSettings } from "./ConnectionSettings";
 
 /**
  * Where the workspace's Jira, GitHub, Slack or Grafana is, and how it is
- * used: one of each kind. What is one person's own never syncs: their
+ * used: one of each kind. The `tracker` kind is no service of its own: it
+ * says which one the workspace's tickets come from (TKT-15). What is one person's own never syncs: their
  * token (in their keychain), their Jira email, and Slack's notify switches.
  */
 export type Connection = { id: string, workspace_id: string, 
@@ -14,6 +15,6 @@ export type Connection = { id: string, workspace_id: string,
 kind: ConnectionKind, 
 /**
  * The kind's settings: [`JiraSettings`], [`GithubSettings`],
- * [`SlackSettings`] or [`GrafanaSettings`].
+ * [`SlackSettings`], [`GrafanaSettings`] or [`TrackerSettings`].
  */
 settings: ConnectionSettings, created_at: string, updated_at: string, };

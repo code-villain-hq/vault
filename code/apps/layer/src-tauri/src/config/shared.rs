@@ -212,6 +212,9 @@ fn connection_settings(cfg: &AppConfig) -> Vec<(&'static str, Value)> {
     if let Some(g) = &cfg.grafana {
         out.push(("grafana", json!({ "base_url": g.base_url, "datasource": g.datasource })));
     }
+    if let Some(t) = cfg.tracker {
+        out.push(("tracker", json!({ "uses": t })));
+    }
     out
 }
 
@@ -295,6 +298,7 @@ struct Settings {
     review_team: Option<String>,
     channel: Option<String>,
     datasource: Option<String>,
+    uses: Option<layer_domain::TrackerKind>,
 }
 
 /// The workspace's settings for this Mac's connection of `kind`, if it has
@@ -327,6 +331,8 @@ pub fn take_held(c: &mut AppConfig, kind: &str, settings: &Value, everything: bo
             }
             g.datasource = s.datasource;
         }),
+        // No half of it is this Mac's: the choice is the workspace's alone.
+        "tracker" => s.uses.map(|t| c.tracker = Some(t)),
         _ => None,
     };
     here.is_some()
@@ -519,6 +525,17 @@ mod tests {
         assert_eq!(op["data"]["kind"], "jira");
         assert_eq!(op["data"]["settings"]["project_key"], "ACME");
         assert!(!op.to_string().contains("me@acme.example"));
+    }
+
+    #[test]
+    fn the_tracker_is_sent_as_a_connection_of_its_own() {
+        let mut cfg = in_a_workspace(vec![]);
+        change(&mut cfg, |c| c.tracker = Some(crate::config::TrackerKind::Jira));
+        let op = &cfg.shared.outbox[0];
+        assert_eq!((op["model"].as_str(), op["action"].as_str()), (Some(CONNECTION), Some("create")));
+        assert_eq!(op["data"], json!({ "kind": "tracker", "settings": { "uses": "jira" } }));
+        let kind = layer_domain::ConnectionKind::Tracker;
+        assert!(kind.check_settings(&op["data"]["settings"]).is_ok(), "the workspace takes what is sent");
     }
 
     #[test]
