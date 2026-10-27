@@ -684,6 +684,15 @@ Each of these is recorded at the code it shaped. Leave those comments alone.
 - **A panic that crosses into AppKit aborts** with no location. The panic
   hook in `lib.rs` writes `~/Library/Logs/villain-layer/panic.log` first,
   and must not panic itself.
+- **AppKit's own exceptions have to pass through Rust.** On macOS 27 the
+  text-selection UI fails an assertion when the mouse enters it, and raises
+  an Objective-C exception inside the event. `-[NSApplication run]` catches
+  it and carries on, but it first unwinds through tao's `sendEvent:`, which
+  is Rust. With `panic = "abort"`, and with tao 0.37.1's `extern "C"`
+  callbacks, nothing could unwind through that frame: the app aborted with
+  "panic in a function that cannot unwind", three times in a week. Release
+  builds unwind now, tao is 0.37.2, and the panic hook aborts, so a panic of
+  ours still quits.
 - **portable-pty's `ChildKiller::kill` is a SIGHUP to the leader.** An agent
   ignoring SIGTERM ignored that too, and ran on after its pane was gone.
 - **xterm reports only its own grid changes**, so a process spawned at

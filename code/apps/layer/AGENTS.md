@@ -78,9 +78,15 @@ by `scripts/guard.ts`. Its failure message says what to do, and
 
 ### Don't take the agents down with the app
 
-- **No panics in shipped code.** Release builds use `panic = "abort"`, so a
-  panic anywhere quits the app and every agent in it. No `unwrap`, `expect`,
-  `panic!`, `todo!` or `unreachable!` outside tests. Return an error.
+- **No panics in shipped code.** A panic anywhere quits the app and every
+  agent in it: the panic hook in `lib.rs` writes it down and aborts. No
+  `unwrap`, `expect`, `panic!`, `todo!` or `unreachable!` outside tests.
+  Return an error. **(guard)**
+- **Release builds unwind** (`panic = "unwind"`), for AppKit. An
+  Objective-C exception it raises inside an event has to unwind back through
+  tao's Rust `sendEvent:` to `NSApplication`, which survives it. Under
+  `"abort"`, or with tao before 0.37.2, the app aborted there instead. Keep
+  the panic hooks' `abort()`, or a panic would end only its own task.
   **(guard)**
 - **An agent is stopped, then killed.** Use `PtyManager::stop` / `close`,
   which send SIGTERM, wait, then SIGKILL the process group. portable-pty's
@@ -183,6 +189,7 @@ beside the code, with a reason: `// guard: allow <rule> — <why>`.
 | `event-sync` | an event emitted that nothing listens for, or listened for that nothing emits | Fix the name, or remove the dead end |
 | `poll` | a new `setInterval` without a reason | Use an event; or poll only while `appActive`, and say why |
 | `panic` | `unwrap`, `expect`, `panic!`, `todo!`, `unreachable!` or `dbg!` outside tests | Return an error |
+| `unwind` | a release profile that does not unwind, tao before 0.37.2, or a panic hook that does not end in `abort()` | Put it back: AppKit's exceptions must pass through tao, and our panics must still quit |
 | `git-only-in-git-rs` | `Command::new("git")` outside `git.rs` | A named function in `git.rs` |
 | `tests-last` | a Rust test module that is not at the end of its file | Move it |
 | `console` | `console.log`, `console.debug`, `console.info` or `debugger` in `src/` | Remove it; use `toast` for the user |

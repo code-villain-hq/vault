@@ -40,13 +40,20 @@ fn panic_log() -> std::path::PathBuf {
         .join("panic.log")
 }
 
-/// Say why, before the process dies.
+/// Say why, then quit.
 ///
 /// A panic that crosses an `extern "C"` frame — anything reached from the
 /// webview or from AppKit — aborts instead of unwinding, and all the default
 /// handler prints is "panic in a function that cannot unwind", with no file,
 /// no line and no trace. The hook still runs first, so this is the only
 /// chance to record where it actually happened.
+///
+/// Release builds unwind, so that AppKit's own exceptions can pass back
+/// through tao to `NSApplication` (see the release profile in `Cargo.toml`).
+/// A panic of ours must still end the app as it did under `panic = "abort"`:
+/// unwound, a panic in a tokio task ends only that task, and the MCP server
+/// or a pane's reader could be gone with the window still up and nobody
+/// told. So the hook aborts once it has written the report.
 ///
 /// Nothing in here may panic: a panic inside the hook aborts immediately and
 /// takes the report with it.
@@ -88,6 +95,7 @@ fn report_panics() {
             use std::io::Write;
             let _ = writeln!(f, "{} {text}", chrono::Utc::now().to_rfc3339());
         }
+        std::process::abort();
     }));
 }
 

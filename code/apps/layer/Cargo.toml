@@ -45,13 +45,23 @@ layer-domain = { path = "crates/domain" }
 layer-server = { path = "crates/server" }
 layer-sync = { path = "crates/sync" }
 
-# `panic = "abort"`: a panic anywhere quits the app and every agent in it,
-# so shipped code has none (the guard's `panic` rule).
+# A panic anywhere quits the app and every agent in it, so shipped code has
+# none (the guard's `panic` rule). The hook in `src-tauri/src/lib.rs` writes
+# it down and aborts.
+#
+# `panic = "unwind"` all the same, for AppKit. An Objective-C exception it
+# raises inside an event (macOS 27's text-selection UI fails an assertion
+# when the mouse enters it) has to unwind back through tao's Rust
+# `sendEvent:` to `-[NSApplication run]`, which logs it and carries on, as
+# it does for every Cocoa app. Under `"abort"` no Rust frame can be unwound
+# through, so the app aborted there instead: three times between Oct 21 and
+# Oct 27, with "panic in a function that cannot unwind". tao 0.37.2 is the
+# first whose callbacks let it through (the guard's `unwind` rule).
 [profile.release]
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+panic = "unwind"
 strip = true
 
 [workspace.lints.rust]

@@ -451,7 +451,36 @@ for (const [file, { code }] of rust) {
     const line = lineAt(code, m.index!);
     if (allowed(file, line, "panic")) continue;
     report("panic", file, line,
-      `\`${m[0]}\` outside tests. Release builds abort on a panic (panic = "abort"), and an abort takes every running agent down with the app. Return an error (\`?\`, ok_or, unwrap_or_else) instead.`);
+      `\`${m[0]}\` outside tests. A panic quits the app (the panic hook in lib.rs aborts), and that takes every running agent down with it. Return an error (\`?\`, ok_or, unwrap_or_else) instead.`);
+  }
+}
+
+// An Objective-C exception AppKit raises inside an event has to unwind back
+// through tao's Rust `sendEvent:` to NSApplication, which survives it. With
+// `panic = "abort"`, or a tao whose callbacks are plain `extern "C"`, the app
+// aborts there instead: it did, three times in a week. A panic of our own must
+// still quit, so each panic hook ends in an abort.
+{
+  const toml = read("Cargo.toml");
+  const profile = /^\[profile\.release\]\n([^[]*)/m.exec(toml);
+  if (!profile || !/^panic\s*=\s*"unwind"\s*$/m.test(profile[1])) {
+    report("unwind", "Cargo.toml", profile ? lineAt(toml, profile.index) : 1,
+      `The release profile must say panic = "unwind". An exception AppKit raises inside an event (macOS 27's text-selection UI does) has to unwind back through tao's Rust frames to NSApplication, which logs it and carries on. Under "abort" no Rust frame can be unwound through, and the app quits with every agent in it. A panic of ours still quits: the panic hooks abort.`);
+  }
+
+  const lock = read("Cargo.lock");
+  const tao = /^name = "tao"\nversion = "(\d+)\.(\d+)\.(\d+)"/m.exec(lock);
+  const [major, minor, patch] = tao ? tao.slice(1).map(Number) : [];
+  if (tao && major === 0 && (minor < 37 || (minor === 37 && patch < 2))) {
+    report("unwind", "Cargo.lock", lineAt(lock, tao.index),
+      `tao ${tao.slice(1).join(".")}'s Objective-C callbacks are extern "C", so an exception AppKit raises inside an event aborts the app in tao's sendEvent: instead of reaching NSApplication. 0.37.2 is the first that lets it through (tauri-apps/tao#1354): cargo update -p tao.`);
+  }
+
+  for (const file of ["src-tauri/src/lib.rs", "crates/server/src/main.rs"]) {
+    if (!/set_hook\(Box::new\([\s\S]*?std::process::abort\(\);\s*\}\)\);/.test(read(file))) {
+      report("unwind", file, 1,
+        `The panic hook here must end in std::process::abort(). Release builds unwind (for AppKit's exceptions), so without it a panic ends only the task it happened in, and the app or server runs on with part of it gone and nobody told.`);
+    }
   }
 }
 

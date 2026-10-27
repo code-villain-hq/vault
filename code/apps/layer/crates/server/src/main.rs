@@ -17,6 +17,17 @@ const USAGE: &str = "usage: layer-server [--config <file>]";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // The release profile unwinds, for the desktop app's sake (AppKit's
+    // exceptions, `Cargo.toml`). A panic here still ends the server, as it
+    // did under `panic = "abort"`: unwound, it would end only the task it
+    // happened in, and a background task gone while the server still
+    // answers is worse than a restart.
+    let report = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        report(info);
+        std::process::abort();
+    }));
+
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
