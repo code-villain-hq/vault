@@ -139,6 +139,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
   const { api, useWorkspace, PageHeader, access } = app;
   const roleOptions = roles(access);
 
+  // biome-ignore lint/correctness/noComponentHookFactories: accountPages is called once, at module level
   function MembersPage({
     agents,
     removeBody = "They lose access at once.",
@@ -311,6 +312,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
   }
 
   /** The workspace's name, for admins, saved when they leave the field or press Enter. */
+  // biome-ignore lint/correctness/noComponentHookFactories: accountPages is called once, at module level
   function WorkspaceSection() {
     const { place, workspace } = useWorkspace();
     const [value, setValue] = useState(workspace.name);
@@ -347,6 +349,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
   }
 
   /** Your name, saved when you leave the field or press Enter. */
+  // biome-ignore lint/correctness/noComponentHookFactories: accountPages is called once, at module level
   function NameField({ name }: { name: string }) {
     const { place } = useWorkspace();
     const [value, setValue] = useState(name);
@@ -378,6 +381,7 @@ export function accountPages<P extends AccountPlace, M extends AccountMe>(app: A
   }
 
   /** Your account; `children` are the app's own sections, shown after Profile. */
+  // biome-ignore lint/correctness/noComponentHookFactories: accountPages is called once, at module level
   function AccountPage({ children }: { children?: ReactNode }) {
     const signOutError = useSignOutError();
     const { place, me } = useWorkspace();

@@ -99,6 +99,7 @@ export function createSession<M extends SessionMe>() {
     return session;
   }
 
+  // biome-ignore lint/correctness/noComponentHookFactories: createSession is called once, at module level
   function useSession(): Session<M> {
     return useSyncExternalStore((listener) => {
       listeners.add(listener);

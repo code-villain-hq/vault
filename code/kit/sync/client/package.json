@@ -8,7 +8,7 @@
     "idb": "8.0.4"
   },
   "devDependencies": {
-    "@types/bun": "1.4.3",
-    "fake-indexeddb": "6.2.5"
+    "@types/bun": "1.4.4",
+    "fake-indexeddb": "6.2.6"
   }
 }
