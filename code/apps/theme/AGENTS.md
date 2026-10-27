@@ -26,7 +26,7 @@ Neovim, with lazy.nvim:
 Cursor and VS Code load only extensions they installed themselves; a folder linked into `~/.cursor/extensions` is ignored. Package `vscode/` and install the `.vsix`:
 
 ```sh
-cd vscode && bunx --bun @vscode/vsce@3.6.0 package --allow-missing-repository --skip-license -o /tmp/code-villain.vsix
+cd vscode && bunx --bun @vscode/vsce@4.0.0 package --allow-missing-repository --skip-license -o /tmp/code-villain.vsix
 cursor --install-extension /tmp/code-villain.vsix   # or: code --install-extension
 ```
 
