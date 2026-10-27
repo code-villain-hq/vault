@@ -6,7 +6,10 @@ cask "villain-layer" do
   version "@VERSION@"
   sha256 "@SHA256@"
 
-  url "https://git.codevillain.eu/code-villain/vault/releases/download/layer-v#{version}/Layer-#{version}-macos-arm64.dmg"
+  # From GitHub's mirror of the vault, not Forgejo, whose proxy cuts a
+  # download at about 48 s: brew's failed every time (docs/releasing.md).
+  url "https://github.com/code-villain-hq/vault/releases/download/layer-v#{version}/Layer-#{version}-macos-arm64.dmg",
+      verified: "github.com/code-villain-hq/vault/"
   name "Layer"
   desc "Agent development environment"
   homepage "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/layer"

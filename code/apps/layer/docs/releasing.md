@@ -8,9 +8,12 @@ A release is built on your Mac and published on the vault's Forgejo, at
   and puts `Layer-<version>-macos-arm64.dmg` with its SHA-256 on a **draft**
   release for the commit. Nothing is public yet, not even the tag.
 - `bun run release:publish` publishes the draft, which makes the tag
-  `layer-v<version>` on Forgejo, and puts it in the Homebrew tap
-  ([below](#homebrew)). Forgejo publishes a release at once when its tag
-  already exists, so the script never pushes the tag itself.
+  `layer-v<version>` on Forgejo, puts the same .dmg on that tag's release
+  on the GitHub mirror, and puts it in the Homebrew tap
+  ([below](#homebrew)). Run it where the release was built: the .dmg it
+  mirrors is the one in `target/`, checked against the release's SHA-256.
+  Forgejo publishes a release at once when its tag already exists, so the
+  script never pushes the tag itself.
 
 Tags carry the `layer-` prefix because the vault holds more than one app.
 Releases up to 0.8.0 were universal (Intel too) and are on the old GitHub
@@ -47,7 +50,19 @@ security add-generic-password -s git.codevillain.eu -a release -w
 **Git over SSH** to git.codevillain.eu, as for pushing the vault: the script
 pushes the tap with your own `git`. It never pushes the tag (above).
 
+**`gh`, signed in** with access to code-villain-hq/vault, for the mirror's
+release.
+
 ## Homebrew
+
+The cask downloads the .dmg from the release of the same tag on the
+vault's GitHub mirror, [code-villain-hq/vault](https://github.com/code-villain-hq/vault/releases),
+not from Forgejo. Uberspace's proxy cuts any transfer at about 48 seconds,
+and Layer's .dmg is near 100 MB since it bundles Postgres: at 1.4 MB/s,
+brew's download stopped at 70 MB every time. A browser download that is cut
+can be resumed. `release:publish` makes the mirror's release with `gh`,
+once the mirror has the tag; if it has not synced yet, it says so, and
+running it again carries on.
 
 The cask is written here, in
 [`packaging/homebrew/villain-layer.rb`](../packaging/homebrew/villain-layer.rb),

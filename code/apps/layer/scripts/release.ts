@@ -5,8 +5,9 @@
  *
  *     bun run release           check, build, and draft the layer-v<version>
  *                               release (Forgejo makes the tag on publish) with its .dmg
- *     bun run release:publish   publish that draft and put it in the
- *                               Homebrew tap
+ *     bun run release:publish   publish that draft, put its .dmg on the
+ *                               GitHub mirror's release, and put it in
+ *                               the Homebrew tap
  *
  * The draft is there to be read before anyone can download it. Apple silicon
  * only. Signed ad hoc, unless APPLE_SIGNING_IDENTITY, APPLE_ID,
@@ -25,6 +26,8 @@ process.chdir(new URL("..", import.meta.url).pathname);
 const FORGEJO = "https://git.codevillain.eu";
 const REPO = "code-villain/vault";
 const TAP = "git.codevillain.eu:code-villain/homebrew-tap.git";
+/** Where brew downloads the .dmg from: the vault's public mirror (see `mirror`). */
+const MIRROR = "code-villain-hq/vault";
 const SIGNING = ["APPLE_SIGNING_IDENTITY", "APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"];
 
 function fail(message: string): never {
@@ -191,6 +194,7 @@ async function publish() {
   const listed = await (await fetch(sums.browser_download_url)).text();
   const sha = listed.split("\n").find((line) => line.trim().endsWith(dmgName))?.split(/\s+/)[0];
   if (!sha) fail(`${tag}'s SHA256SUMS.txt has no line for ${dmgName}.`);
+  mirror(sha);
   const cask = readFileSync("packaging/homebrew/villain-layer.rb", "utf8")
     .replace("@VERSION@", version)
     .replace("@SHA256@", sha);
@@ -221,6 +225,36 @@ async function publish() {
   run(["git", ...author, "commit", "--quiet", "-m", `villain-layer ${version}`], { cwd: tap });
   run(["git", "push", "--quiet"], { cwd: tap });
   console.log(`The tap has Layer ${version}.`);
+}
+
+/**
+ * Put the released .dmg on the same tag's release on GitHub's mirror, which
+ * the cask downloads from. Uberspace's proxy cuts any transfer at about 48 s,
+ * which was 70 of 0.11.0's 99 MB: brew's download failed every time from
+ * Forgejo. The file is the one built here, checked against the SHA-256 that
+ * Forgejo's release lists.
+ */
+function mirror(sha: string) {
+  if (Bun.spawnSync(["gh", "release", "view", tag, "--repo", MIRROR]).exitCode === 0) {
+    return console.log(`${MIRROR} already has ${tag}.`);
+  }
+  if (Bun.spawnSync(["gh", "api", `repos/${MIRROR}/git/refs/tags/${tag}`]).exitCode !== 0) {
+    fail(`${tag} has not reached ${MIRROR} yet. Run this again once the mirror has synced.`);
+  }
+  const dir = "target/release/bundle/dmg";
+  const built = readdirSync(dir).filter((f) => f.endsWith(".dmg") && f.includes(version));
+  if (built.length !== 1) fail(`expected one ${version} .dmg in ${dir}, found ${built.length}. Publish where the release was built.`);
+  if (read(["shasum", "-a", "256", join(dir, built[0])]).split(/\s+/)[0] !== sha) {
+    fail(`the .dmg in ${dir} is not the one released. Publish where the release was built.`);
+  }
+  const out = mkdtempSync(join(tmpdir(), "layer-mirror-"));
+  copyFileSync(join(dir, built[0]), join(out, dmgName));
+  writeFileSync(join(out, "SHA256SUMS.txt"), `${sha}  ${dmgName}\n`);
+  run([
+    "gh", "release", "create", tag, "--repo", MIRROR, "--verify-tag", "--title", `Layer ${version}`,
+    "--notes", `The release, with its notes, is on Forgejo: ${FORGEJO}/${REPO}/releases/tag/${tag}. This copy of its .dmg is what Homebrew downloads.`,
+    join(out, dmgName), join(out, "SHA256SUMS.txt"),
+  ]);
 }
 
 if (process.argv[2] === "publish") await publish();
