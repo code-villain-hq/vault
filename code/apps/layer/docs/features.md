@@ -801,6 +801,12 @@ Known gaps:
 
 ## 9. Tickets
 
+A workspace's tickets come from one issue tracker: Jira, GitHub Issues or
+Forge. Everything in this section is that tracker's: Mine, Find work, Start
+work, filing, epics (§26) and tickets following the work. Where a
+requirement below names Jira, GitHub Issues and Forge do the same in their
+own terms (TKT-17).
+
 The Tickets view has two tabs. **Mine** is your assigned, not-done tickets,
 grouped by epic, by status or not at all (TKT-14), with a filter, type toggles
 and a sort (TKT-13). **Find work** searches
@@ -883,12 +889,80 @@ offers Start work.
   rather than name. Within a group, tickets keep the order TKT-13 gives.
   Ungrouped, Mine is one list in that order. Grouping by repository is not
   offered: a ticket has no repository until a task is started from it.
+- **TKT-15** A workspace MUST have one issue tracker, or none: Jira,
+  GitHub Issues or Forge. Admins choose it on the Tickets page of
+  Settings, in the workspace's block (SET-7), so it is the same for
+  everyone in the workspace. A second tracker in the same workspace is
+  not offered: every issue filed would first ask "which tracker?", an
+  epic in one could not hold tickets from the other, and the same work
+  could be tracked in both with neither one the truth. Someone who works
+  in two trackers uses two workspaces, which run side by side (§25). A
+  workspace that had a Jira connection before trackers could be chosen
+  starts with Jira as its tracker.
+- **TKT-16** Changing the tracker MUST first say how many tasks have a
+  ticket in the tracker being left, and keep those tasks as they are.
+  Their ticket stays a link to where it lives, but no longer follows the
+  work (TKT-8, TKT-18) or shows its status (TKT-10): the app reads only
+  the workspace's tracker.
+- **TKT-17** Each tracker MUST be read in its own terms, never through
+  another's names (TKT-2):
+
+  | | Jira | GitHub Issues | Forge |
+  |---|---|---|---|
+  | A ticket's key | `ACME-12` | `owner/repo#12` | `FOR-12` |
+  | Mine | assigned to you, not in the "done" category | assigned to you and open, in the workspace's repositories | assigned to you, in no Completed or Canceled state |
+  | In progress | the "indeterminate" category | no such state: open and assigned | a state of type Started |
+  | Done | the "done" category | closed | a state of type Completed or Canceled |
+  | An epic (§26) | a type at hierarchy level 1 or above | an issue with sub-issues | an issue with sub-issues |
+  | Filing (TKT-3) | the project's required fields (`createmeta`) | one of the workspace's repositories, a title, a body | a team, a title, a description |
+  | Its account | Tickets (Jira): site, email, token | Code (GitHub)'s token: nothing more to connect | Tickets (Forge): the site, then you sign in to it in the browser, as Forge's own desktop app does |
+
+  Forge names its states per team, as Jira does its statuses, so a state
+  is known by its type, never its name.
+- **TKT-18** A GitHub issue or a Forge ticket MUST follow the work the way
+  its own tracker moves it, not by the app moving it. The task's branch
+  carries its key, and each of its pull requests says "Fixes `<key>`" in
+  its body. GitHub closes the issue when one merges. Forge moves the
+  ticket by its pull requests alone, never by pushes: a draft to its
+  team's first Started state (In Progress), one ready for review that
+  could be merged to the last Started state (In Review), and a merge to
+  the first Completed state (Done); closed unmerged or turned back into a
+  draft, it comes back out of review. So the review and after-merge
+  statuses chosen in Settings (TKT-8) are Jira's alone. Start work (TKT-1)
+  moves a Forge ticket to its team's first Started state, unless it is in
+  a Started or Completed state already: the state Forge itself gives a
+  draft, so the two never pull against each other, and the ticket is in
+  progress before the first pull request rather than after it. A GitHub
+  issue has no state to move to, so Start work assigns it to you if it
+  has no one.
+- **TKT-20** An agent MUST get the tools of the workspace's tracker only,
+  each speaking that tracker's terms: `jira_*` for Jira, `github_*` issue
+  tools for GitHub Issues, `forge_*` for Forge. One set for all three
+  would have to call a Jira transition, a GitHub close and a Forge state
+  the same thing, and fit none of them. The tools that already work on
+  "the task's ticket" (`start_work`, `finish_task`, `subtask_start`) work
+  on the workspace's tracker, whichever it is.
+- **TKT-19** Find work MUST search in the tracker's own language, quoting
+  typed text as it requires (TKT-4): JQL for Jira, GitHub's issue search
+  limited to the workspace's repositories, Forge's issue search. A bare
+  number (TKT-12) is a key in the Jira project or Forge team set in
+  Settings. With GitHub Issues it names that issue in each of the
+  workspace's repositories, so every one that has it is listed.
 
 Code: `commands/jira.rs`, `commands/ticket_flow.rs`, `integrations/jira.rs`,
 `integrations/jira/flow.rs`, `components/tickets/`, `TicketFlow.tsx`,
 `sidebar/DeleteTask.tsx`.
 
 Known gaps:
+- TKT-15 to TKT-20 are written ahead of the code: only Jira is built,
+  Settings has no choice of tracker, and a workspace's tickets are Jira's.
+- Forge's desktop sign-in hands its session back only to `forge://`.
+  Before Layer can sign in to Forge, Forge has to hand it back to
+  `layer://` too. Forge's API tokens are agents' only (Settings → Agents),
+  and one would make Mine the agent's tickets and every move the agent's.
+- Forge moves a ticket only for repositories connected to it (its GitHub
+  app, or Forgejo). Anywhere else a ticket stays in progress after its
+  merge, and nothing says why.
 - Jira Cloud only: email and API token, REST v3. No Data Center or Server
   personal access tokens.
 - Rich-text mentions, status and date nodes, and link targets are dropped
@@ -1178,7 +1252,9 @@ Known gaps:
 | Terminal text | 13px | 9–24px |
 | Conversation text | 14px | 9–24px, an agent over ACP (ACP-15) |
 | Task folder location | `~/.villain-worktrees` | where task folders go |
+| Tickets: issue tracker | none | Jira, GitHub Issues or Forge, one per workspace (TKT-15) |
 | Tickets: Jira | — | site URL, email, API token, optional project key and JQL |
+| Tickets: Forge | — | site URL, then a sign-in in the browser; optional team key |
 | Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug), review team |
 | Observability: Grafana | — | site URL, service account token (reads and queries datasources), OBS-1; the Loki datasource for your services' logs, none chosen, OBS-5 |
 | Observability: S3 log sources | none | each a name, AWS profile, region, bucket, prefix and optional Athena table; no AWS keys, OBS-8, OBS-9 |
