@@ -436,7 +436,7 @@ pub async fn approve_spec(app: tauri::AppHandle, task_id: String, texts: Vec<Par
     .await
 }
 
-fn approve(spec: &Spec, task: &Task, texts: &[(Slot, String)], kind: Option<Kind>) -> Result<Vec<RepoFailure>> {
+pub(super) fn approve(spec: &Spec, task: &Task, texts: &[(Slot, String)], kind: Option<Kind>) -> Result<Vec<RepoFailure>> {
     if texts.is_empty() {
         return Ok(Vec::new());
     }
@@ -613,6 +613,8 @@ mod tests {
             review: None,
             browser: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
         }
     }
 

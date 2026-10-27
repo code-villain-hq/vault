@@ -367,6 +367,8 @@ pub(super) mod tests {
             chat: None,
             review: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
             browser: None,
         });
         cfg.checkouts.push(Checkout {

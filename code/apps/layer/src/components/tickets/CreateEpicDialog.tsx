@@ -14,11 +14,14 @@ export function CreateEpicDialog({
   types,
   issues,
   onClose,
+  onCreated,
 }: {
   issueTypes: JiraIssueType[];
   types: TypeMap;
   issues: JiraIssue[];
   onClose: () => void;
+  /** Offers Start work on it, to write its spec (EPIC-3). */
+  onCreated: (epic: JiraIssue) => void;
 }) {
   const settings = useStore((s) => s.settings);
   const refreshIssues = useStore((s) => s.refreshIssues);
@@ -70,7 +73,7 @@ export function CreateEpicDialog({
     failure.clear();
     try {
       // The epic appears in Tickets (NOTE-7).
-      await api.jiraCreateIssue({
+      const epic = await api.jiraCreateIssue({
         summary: summary.trim(),
         description: desc.trim(),
         issue_type: epicType,
@@ -80,6 +83,7 @@ export function CreateEpicDialog({
       });
       onClose();
       await refreshIssues();
+      onCreated(epic);
     } catch (e) {
       failure.fail(e);
     } finally {
@@ -116,8 +120,8 @@ export function CreateEpicDialog({
       }
     >
       <div className="muted" style={{ marginBottom: 12, lineHeight: 1.6 }}>
-        Creates a top-level epic in the project you pick. Nothing is checked out;
-        file tickets under it once it exists.
+        Creates a top-level epic in the project you pick. Then pick its
+        repositories to write its spec: its tasks become its sub-tasks.
       </div>
 
       <Field label="Project" hint="The key the epic is filed under.">

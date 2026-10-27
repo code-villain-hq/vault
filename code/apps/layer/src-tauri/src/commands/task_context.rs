@@ -211,6 +211,20 @@ fn note_line(n: &RepoNote, now: i64) -> String {
 /// The context file's text. `repos` are (folder, clone it came from) pairs,
 /// `ticket` is the saved `TICKET.md`, if there is one, and `spec` the
 /// approved requirements.
+/// What the epic's chat is for (EPIC-11): its sub-tasks do the work, each
+/// in a task of its own, and it only keeps them going.
+const EPIC: &str = "## This is an epic
+
+You orchestrate its sub-tasks; you write no code. The repositories here hold \
+the epic's spec, not its work: never edit them, commit, push or open pull \
+requests. Each sub-task is a ticket and a task of its own, with its own agents. \
+`epic_subtasks` lists them with their state and what each waits for; \
+`subtask_start` starts one whose waits have merged, after the person says so; \
+`subtask_tell` passes a message to a sub-task's agents. Bring a sub-task's \
+question to the person rather than answering it yourself.
+
+";
+
 fn task_context(
     task: &Task,
     repos: &[(String, String)],
@@ -240,6 +254,9 @@ This task reviews pull request {}#{}{}, at commit `{}`: {}.              `{}` is
             r.url,
             task.branch,
         ));
+    }
+    if task.epic {
+        md.push_str(EPIC);
     }
     if let Some(spec) = spec {
         md.push_str(&spec_section(&task.id, spec));
@@ -441,6 +458,8 @@ mod tests {
             chat: None,
             review: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
             browser: None,
         }
     }
@@ -476,6 +495,14 @@ mod tests {
         assert!(md.contains("reviews pull request acme/api#61 by ana, at commit `abc123`"));
         assert!(md.contains("Do not push"));
         assert!(!task_context(&task(), &[], None, None).contains("This is a review"));
+    }
+
+    #[test]
+    fn an_epics_chat_is_told_it_only_orchestrates() {
+        let epic = Task { epic: true, ..task() };
+        let md = task_context(&epic, &[], None, None);
+        assert!(md.contains("## This is an epic\n\nYou orchestrate its sub-tasks; you write no code."));
+        assert!(!task_context(&task(), &[], None, None).contains("This is an epic"));
     }
 
     #[test]

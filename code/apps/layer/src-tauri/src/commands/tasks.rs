@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
-use crate::config::{Checkout, ConfigStore, Project, Task};
+use crate::config::{Checkout, ConfigStore, Project, SubTaskOf, Task};
 use crate::error::{Error, Result};
 use crate::git;
 use crate::pty::PaneKind;
@@ -402,6 +402,12 @@ pub struct NewTask {
     /// Recorded only so the next ticket under the same epic can be prefilled.
     #[serde(default)]
     pub epic_key: Option<String>,
+    /// An epic (EPIC-1), from Start work on an epic-level ticket.
+    #[serde(default)]
+    pub epic: bool,
+    /// A sub-task filed from an epic (EPIC-7).
+    #[serde(default)]
+    pub sub_task: Option<SubTaskOf>,
 }
 
 /// Note on a task that a chat's agent created it, so the task can point at
@@ -452,6 +458,8 @@ pub(crate) fn new_task(state: &AppState, req: NewTask) -> Result<Task> {
         chat: None,
         review: None,
         browser_url: None,
+        epic: req.epic,
+        sub_task: req.sub_task.clone(),
         browser: None,
     };
     state.config.update(|c| c.tasks.push(task.clone()))?;
@@ -1056,6 +1064,8 @@ mod tests {
                 issue_key: None,
                 issue_url: None,
                 epic_key: None,
+                epic: false,
+                sub_task: None,
             },
         )
         .unwrap()

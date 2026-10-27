@@ -561,8 +561,10 @@ const CEILINGS: Record<string, number> = {
   // Every MCP tool is defined and dispatched here, and docs-sync reads the
   // definitions from this file; the repo-notes tools took it past 1000.
   // Grafana's tools (OBS-2) are defined in commands/grafana.rs; only their
-  // dispatch is here, the line that took it to 1101.
-  "src-tauri/src/mcp.rs": 1110,
+  // dispatch is here, the line that took it to 1101. The epic chat's tools
+  // (EPIC-12) are in commands/epic_tools.rs; their dispatch and confirm gate
+  // took it to 1113.
+  "src-tauri/src/mcp.rs": 1115,
   // The same for the browser's tools (BRW-*); each tool's work lives in
   // its own module (sign_in.rs, session.rs, tabs.rs), its definition here.
   "src-tauri/src/browser/tools.rs": 700,
@@ -576,8 +578,9 @@ const CEILINGS: Record<string, number> = {
   // check command (LOOP-1) took it past 600, and a field split from its
   // struct is harder to find than a long file. `ConfigStore::with`, the
   // borrowing read beside `read` that the hot paths use, took it to 661; it
-  // belongs beside the lock it borrows.
-  "src-tauri/src/config.rs": 665,
+  // belongs beside the lock it borrows. `SubTaskOf` (EPIC-9) sits beside the
+  // `Task` that holds it, at 669.
+  "src-tauri/src/config.rs": 670,
 };
 
 for (const f of files) {
@@ -608,7 +611,7 @@ const architecture = existsSync("docs/architecture.md") ? read("docs/architectur
 
 // Every file that defines MCP tools: the browser's are kept with the browser,
 // Grafana's with the rest of Grafana, S3's with the rest of S3.
-for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs", "src-tauri/src/commands/finish_tool.rs"]) {
+for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs", "src-tauri/src/commands/finish_tool.rs", "src-tauri/src/commands/epic_tools.rs"]) {
   const mcp = rust.get(file);
   if (!mcp) continue;
   for (const m of mcp.code.matchAll(/\btool\(\s*"/g)) {

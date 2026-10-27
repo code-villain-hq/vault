@@ -151,7 +151,9 @@ pub(super) fn design_prompt(kind: Kind, folders: &[String], reqs: &str, old: Opt
     p
 }
 
-pub(super) fn tasks_prompt(folders: &[String], reqs: &str, design: &str, old: &[(String, String)]) -> String {
+/// For an epic (`epic`), the steps are grouped into its sub-tasks, each a
+/// ticket and a task of its own (EPIC-4).
+pub(super) fn tasks_prompt(folders: &[String], reqs: &str, design: &str, old: &[(String, String)], epic: bool) -> String {
     let mut p = String::from("Break the work below into the steps coding agents will take, in order.\n\n");
     if folders.len() > 1 {
         p.push_str(&format!(
@@ -174,6 +176,17 @@ pub(super) fn tasks_prompt(folders: &[String], reqs: &str, design: &str, old: &[
              item is `- [ ] 1. <step> (R-1, R-2)`, numbered in order, naming in parentheses the \
              requirements it serves.",
             folders.first().map(String::as_str).unwrap_or("")
+        ));
+    }
+    if epic {
+        p.push_str(concat!(
+            " This is an epic: its steps are shared out among sub-tasks, each a ticket of its own ",
+            "that one agent finishes in one pull request. Instead of `## Tasks`, group the steps ",
+            "under a second-level heading per sub-task, a short title of what it delivers ",
+            "(`## Session refresh`), and keep numbering across the groups. A sub-task that spans ",
+            "repositories has the same heading in each. Two to six sub-tasks; a step that waits ",
+            "for another sub-task's step says so last in its parentheses: `(R-2; after 3)` for a step ",
+            "of the same repository, `after <repository> 3` for another's.",
         ));
     }
     p.push_str(&format!(
@@ -295,6 +308,8 @@ mod tests {
             review: None,
             browser: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
         }
     }
 
@@ -340,10 +355,18 @@ mod tests {
 
     #[test]
     fn every_repositorys_tasks_are_drafted_together_and_may_wait_on_each_other() {
-        let p = tasks_prompt(&two(), "reqs", "design", &[("web".into(), "- [x] 1. Done".into())]);
+        let p = tasks_prompt(&two(), "reqs", "design", &[("web".into(), "- [x] 1. Done".into())], false);
         assert!(p.contains("(`# api`)"));
         assert!(p.contains("`(R-2, C-1; after api 3)`"));
         assert!(p.contains("# The tasks of `web` approved before"));
+        assert!(!p.contains("This is an epic"));
+    }
+
+    #[test]
+    fn an_epics_tasks_are_grouped_into_its_sub_tasks() {
+        let p = tasks_prompt(&two(), "reqs", "design", &[], true);
+        assert!(p.contains("under a second-level heading per sub-task"), "{p}");
+        assert!(p.contains("same heading in each"));
     }
 
     #[test]

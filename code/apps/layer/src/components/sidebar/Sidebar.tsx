@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, errMessage, failureText } from "../../lib/api";
 import { copyAndSay } from "../../lib/clipboard";
@@ -14,6 +14,7 @@ import { RepoPicker } from "../RepoPicker";
 import { FinishTask } from "../FinishTask";
 import { DeleteTask } from "./DeleteTask";
 import { TaskRow } from "./TaskRow";
+import { EpicRow } from "./EpicRow";
 import { ProfileMenu } from "./ProfileMenu";
 import { SyncStatus } from "./SyncStatus";
 
@@ -64,7 +65,14 @@ function FleetRow({ selected, onSelect }: { selected: boolean; onSelect: () => v
 
 export function Sidebar() {
   const projects = useStore((s) => s.projects);
-  const tasks = useStore((s) => s.tasks);
+  const everyTask = useStore((s) => s.tasks);
+  // Epics made in Layer lead, their sub-tasks under them and not again under
+  // Tasks (EPIC-9). A sub-task whose epic is gone is an ordinary task.
+  const { layerEpics, subsOf, tasks } = useMemo(() => {
+    const layerEpics = everyTask.filter((t) => t.epic);
+    const subsOf = Object.fromEntries(layerEpics.map((e) => [e.id, everyTask.filter((t) => t.sub_task?.epic === e.id)]));
+    return { layerEpics, subsOf, tasks: everyTask.filter((t) => !t.epic && !(t.sub_task && subsOf[t.sub_task.epic])) };
+  }, [everyTask]);
   const prs = useStore((s) => s.prs);
   const selected = useStore((s) => s.selectedTask);
   const select = useStore((s) => s.select);
@@ -362,6 +370,21 @@ export function Sidebar() {
     <div className="sidebar">
       <div className="sidebar-body" style={{ paddingTop: 6 }}>
         <FleetRow selected={selected === null} onSelect={() => select(null)} />
+
+        {layerEpics.length > 0 && <div className="section-head">Epics</div>}
+        {layerEpics.map((epic) => (
+          <EpicRow
+            key={epic.id}
+            epic={epic}
+            subTasks={subsOf[epic.id]}
+            selected={selected}
+            // An epic is open until closed: its sub-tasks are what it is.
+            open={!(expanded[epic.id] ?? false)}
+            onSelect={select}
+            onToggle={onToggle}
+            onMenu={onMenu}
+          />
+        ))}
 
         <div className="section-head">
           Tasks

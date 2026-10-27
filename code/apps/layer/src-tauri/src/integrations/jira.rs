@@ -382,6 +382,16 @@ impl Jira {
         Ok(str_at(&v, "key"))
     }
 
+    /// Put an existing issue under `parent`, an epic (EPIC-7).
+    pub async fn set_parent(&self, key: &str, parent: &str) -> Result<()> {
+        self.json(
+            self.req(reqwest::Method::PUT, &format!("/rest/api/3/issue/{}", segment(key)?))
+                .json(&json!({ "fields": { "parent": { "key": parent } } })),
+        )
+        .await?;
+        Ok(())
+    }
+
     /// The id this site uses for the Epic Link field, if it still has one.
     ///
     /// Matched on the field's `schema.custom`, which is the same string on

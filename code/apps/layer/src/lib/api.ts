@@ -70,6 +70,7 @@ import type {
   S3Found,
 } from "./types";
 import type { RunLog } from "./types-runs";
+import type { EpicView, Filed, StartedSubTask } from "./types-epic";
 import type { Operation } from "@layer/types";
 import type {
   Elsewhere, ProfileView, ServerSignedIn, ServerWays, SetupApplied, SetupSnapshot, WorkspacePlace,
@@ -309,13 +310,22 @@ export const api = {
     parent_key: string | null;
     fields: Record<string, unknown> | null;
   }) => invoke<JiraIssue>("jira_create_issue", { req }),
+  /** `epic`: an epic-level ticket, made an epic whose spec makes sub-tasks (EPIC-2). */
   jiraStartWork: (
     key: string, projectIds: string[],
-    agentId?: string | null, branchSuffix?: string | null, base?: string | null,
+    agentId?: string | null, branchSuffix?: string | null, base?: string | null, epic = false,
   ) => invoke<Started>("jira_start_work", {
     key, projectIds, agentId: agentId ?? null, branchSuffix: branchSuffix ?? null,
-    base: base ?? null,
+    base: base ?? null, epic,
   }),
+  // epics (§26)
+  epicView: (epicId: string) => invoke<EpicView>("epic_view", { epicId }),
+  /** File the sub-tasks not filed yet: tickets under the epic, tasks, their spec (EPIC-7). */
+  fileSubTasks: (epicId: string, issueType: string | null, fields: Record<string, unknown> | null) =>
+    invoke<Filed>("file_sub_tasks", { epicId, issueType, fields }),
+  /** `anyway`: start one that waits, after the user agreed (EPIC-8). */
+  startSubTask: (taskId: string, agentId: string, anyway = false) =>
+    invoke<StartedSubTask>("start_sub_task", { taskId, agentId, anyway }),
 
   // github
   githubConnect: (apiUrl: string, webUrl: string, token: string, reviewTeam: string | null) =>

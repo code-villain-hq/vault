@@ -1061,6 +1061,7 @@ pub struct Started {
 /// The one-click path: ticket -> worktree per repo -> agent primed with both
 /// the ticket and the layout.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn jira_start_work(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -1069,7 +1070,9 @@ pub async fn jira_start_work(
     agent_id: Option<String>,
     branch_suffix: Option<String>,
     base: Option<String>,
+    epic: Option<bool>,
 ) -> Result<Started> {
+    let epic = epic.unwrap_or(false);
     // A second task for the same ticket would try to check the same branch out
     // twice and fail deep inside git. Unless a suffix asks for a distinct
     // branch, point at what already exists.
@@ -1101,11 +1104,18 @@ pub async fn jira_start_work(
         issue_key: Some(issue.key.clone()),
         issue_url: Some(issue.url.clone()),
         epic_key: issue.epic_key.clone(),
+        epic,
+        sub_task: None,
     };
     // Worktrees on the blocking pool, as in `create_task`.
     let task = super::blocking(app.clone(), move |state| new_task(state, new)).await?;
     keep_ticket(app.clone(), task.clone(), issue.clone()).await;
 
+    // An epic's work is done in its sub-tasks: no agent starts in it, and
+    // its ticket moves when the first of them starts (EPIC-2).
+    if epic {
+        return Ok(Started { task, moved: None });
+    }
     if let Some(agent_id) = agent_id {
         let repos = task_repos(&state, &task);
         let prompt = ticket_prompt(&issue, &task, &repos, true);

@@ -514,6 +514,7 @@ export function TicketsView() {
           types={types}
           issues={issues}
           onClose={() => setCreatingEpic(false)}
+          onCreated={setOpen}
         />
       )}
 

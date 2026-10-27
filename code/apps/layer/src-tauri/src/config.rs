@@ -67,6 +67,21 @@ pub struct Task {
     /// and never written again.
     #[serde(default, skip_serializing)]
     pub browser_url: Option<String>,
+    /// An epic (EPIC-1): its worktrees hold its spec, and its work is done
+    /// in its sub-tasks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub epic: bool,
+    /// The epic this is a sub-task of (EPIC-7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_task: Option<SubTaskOf>,
+}
+
+/// Which epic a sub-task was filed from, and which of its sub-tasks it is:
+/// its title, as the epic's tasks name it (EPIC-4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubTaskOf {
+    pub epic: String,
+    pub title: String,
 }
 
 impl Task {
@@ -366,6 +381,8 @@ impl AppConfig {
                 chat: None,
                 review: None,
                 browser_url: None,
+                epic: false,
+                sub_task: None,
                 browser: None,
             });
             self.checkouts.push(Checkout {

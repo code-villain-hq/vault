@@ -281,7 +281,8 @@ count, running agents, uncommitted changes and the review verdict.
   groups, the stage order holds: what is being written first, what has
   landed last. Epic is not offered without Jira. Twenty tasks over five
   epics read as one list; which belonged to which piece of work was only in
-  the ticket.
+  the ticket. An epic made in Layer, and its sub-tasks, are listed above
+  every grouping, in Epics (EPIC-9).
 - **TASK-18** An agent MUST be able to finish a task as Finish task does
   (TASK-8), when the user asks it to: `finish_task`, with `confirm`. It
   refuses, changing nothing, while one of the task's pull requests is
@@ -806,7 +807,8 @@ beyond them: not mine / unassigned / anyone, done included or not, by type,
 by text, or by key. A ticket opens its task if there is one; otherwise it
 offers Start work.
 
-- **TKT-1** Start work MUST create the task for the ticket. It suggests
+- **TKT-1** Start work MUST create the task for the ticket (for an
+  epic-level ticket, an epic, EPIC-2). It suggests
   repos from what was used before for its epic, then its project, and says
   which it was ("preselected from the last task under ACME-100"), so a
   stale guess is visible. It picks
@@ -1102,6 +1104,9 @@ never hold credentials themselves.
 | `forget_note` | remove a note that no longer holds, with a reason for the message center | yes |
 | `spec_task` | tick (or untick) a numbered step of a repository's spec `tasks.md` (SPEC-13) | |
 | `spec_propose` | propose a change to the task's spec, with why, as a draft for the user to approve (SPEC-24) | |
+| `epic_subtasks` | an epic's sub-tasks: ticket, task, steps ticked, what each waits for, its agents (EPIC-12) | |
+| `subtask_start` | start a sub-task's agent on its spec, and move its ticket (EPIC-8) | yes |
+| `subtask_tell` | send one message to a sub-task's running agents (EPIC-12) | |
 | `browser_navigate` | open a page in the task's browser tab (BRW-3), and get its outline | |
 | `browser_back` | back one page | |
 | `browser_snapshot` | the page as an outline, each element it can act on numbered | |
@@ -2903,6 +2908,148 @@ Known gaps:
 - A workspace on this Mac cannot move to a server yet.
 - Renaming a workspace renames it in the menu and the window; its server
   keeps the first name, which nothing shows yet.
+
+---
+
+## 26. Epics
+
+An epic is a piece of work too big for one agent and one pull request: a
+spec, approved once, whose steps become sub-tasks, each filed in Jira under
+the epic and each a task of its own. The epic is where they are planned
+and followed. It lists its sub-tasks above the task list, with each one's
+state on one line under it. Its page has two tabs, Sub-tasks and Spec,
+and a chat beside them that starts sub-tasks, passes messages to their
+agents and brings their questions to you. It writes no code.
+
+A spec used to make one task. Planning an epic meant writing its spec in a
+task of its own, filing each sub-task in Jira by hand, copying its part of
+the spec over, and keeping track of which could start in a head or on
+paper.
+
+### Making one
+
+- **EPIC-1** An epic MUST be a task marked as one (`Task.epic`). Its
+  worktrees are there for its spec: they are read while it is drafted
+  (SPEC-5) and the approved files are committed there (SPEC-6). No agent
+  writes code in them, the epic's branch is never pushed, and it opens no
+  pull request. Its page has the tabs Sub-tasks and Spec only, and its
+  header neither Update from base nor the worktree counts.
+- **EPIC-2** Start work on an epic-level ticket (hierarchy level 1 or
+  above, TKT-2) MUST make an epic: the repositories picked as for any
+  ticket (TKT-1), no agent started, and the ticket not moved. It opens on
+  its Spec tab with the requirements being drafted, as "Write a spec
+  first" does (SPEC-18). The epic's ticket moves the first time one of
+  its sub-tasks is started (EPIC-8).
+- **EPIC-3** New epic, once the epic is filed, MUST offer to write its
+  spec: Start work on the new epic (EPIC-2), with its repositories picked
+  there.
+
+### Its spec
+
+- **EPIC-4** An epic's spec MUST be drafted and approved as any task's
+  (§19), except that its tasks are grouped into sub-tasks. Under each
+  repository the tasks draft heads each group with a second-level heading,
+  its title (`## Session refresh endpoint`), and numbers the steps across
+  the groups from 1, as before. The same title in several repositories is
+  one sub-task across them. A heading that starts with a ticket key
+  (`## ACME-104 Session refresh`) uses that ticket rather than filing a
+  new one. Steps under no heading, or under `## Tasks`, make one sub-task
+  for their repository, called after the epic and the repository.
+- **EPIC-5** A sub-task MUST wait for another when one of its steps is
+  after one of the other's (`after api 4`, SPEC-1). The order sub-tasks
+  are listed in follows that: what starts first leads.
+- **EPIC-6** The epic's Spec tab MUST NOT offer Start agent (SPEC-12) or
+  Check against spec (SPEC-15): the work, and what is checked, is in its
+  sub-tasks.
+
+### Filing sub-tasks
+
+- **EPIC-7** Once its tasks are approved, the Sub-tasks tab MUST list the
+  sub-tasks they make, each with its repositories, its steps, the
+  requirements those serve, whether its ticket is new or existing, and
+  what it waits for ("starts first", "after Session refresh endpoint"), and
+  lead with the one action: File them. Filing asks for the type (the
+  project's default, TKT-2) and for what the project requires (TKT-3), once
+  for all of them, and then, for each sub-task not filed yet:
+  1. a ticket: filed under the epic (its parent), its summary the title and
+     its description the requirements it serves and its steps; or the
+     existing ticket, moved under the epic. An epic with no ticket files
+     none, and its sub-tasks have no ticket either.
+  2. a task for it (TASK-1 to TASK-4): its repositories, a branch named
+     after its ticket (TASK-2), cut from each repository's default branch.
+  3. its spec, approved (SPEC-6): the epic's requirements and design, and
+     in each repository that sub-task's steps alone, with their numbers. An
+     `after` on another sub-task's step is left out: waiting for it is the
+     epic's job (EPIC-5).
+
+  No agent starts and no ticket moves. A sub-task that could not be filed
+  is named with why, the others are kept, and filing again makes only
+  what is missing. Before, the plan stayed in one `tasks.md` and every
+  ticket under the epic was filed and given its part by hand.
+- **EPIC-8** Each filed sub-task's row on the Sub-tasks tab MUST show its
+  ticket key, its steps ticked of the total, and its state (EPIC-10), and
+  offer its one action: Start for a ready one, which starts the default
+  agent on its spec as Start agent does (SPEC-12) and moves its ticket
+  (and, the first time, the epic's) as Start work does (TKT-1); Open for
+  the rest. Starting one that waits asks first, naming what it waits for.
+
+### Following them
+
+- **EPIC-9** The task list MUST show epics in a section of their own,
+  above Tasks: each epic on one row, with "N of M merged" (or "M to file"
+  before filing), and its sub-tasks under it, one line each: a dot as a
+  task's (hollow while it waits), its title, and its state in a word. A
+  sub-task is not listed again under Tasks. It opens as any task does, with
+  all of its tabs, and its header links to its epic. A sub-task whose epic
+  was deleted is an ordinary task again.
+- **EPIC-10** A sub-task's state MUST be the first that holds of: merged,
+  changes, approved, in review (its pull requests, as the task list reads
+  them), asking (an agent in it needs you), working (an agent in it is
+  running), waits (a sub-task it waits for is not merged), ready.
+
+### The epic's chat
+
+- **EPIC-11** Beside the epic's tabs MUST be the epic's chat: a
+  conversation over ACP (§20) in the epic's folder, started from there
+  with the default agent and kept as any pane is. Its context file says it
+  orchestrates the sub-tasks: it reads the spec and their state, starts
+  them in order, passes messages to their agents, and brings their
+  questions to the user; it writes no code and changes no file. A
+  sub-task's agent works in the sub-task, never in the epic's chat.
+- **EPIC-12** The epic's chat MUST have three tools: `epic_subtasks` (each
+  sub-task: its title, ticket, task, repositories, steps ticked of the
+  total, what it waits for, and its agents, running and needing you),
+  `subtask_start` (as Start, EPIC-8; with `confirm`, and refused for one
+  that waits until what it waits for is merged), and `subtask_tell` (one
+  message to the sub-task's running agents, typed into a terminal or sent
+  as a prompt over ACP, as TASK-6 tells them).
+
+Code: `spec.rs` (`sub_tasks`: grouping steps into sub-tasks, and each
+one's `tasks.md`), `commands/epics.rs` (what the tab is shown, filing,
+starting, telling), `commands/spec_prompts.rs` (the grouped tasks draft),
+`commands/task_context.rs` (the epic chat's context), `mcp.rs`
+(`epic_subtasks`, `subtask_start`, `subtask_tell`), `EpicView.tsx`,
+`epic/` (the Sub-tasks tab, filing, the chat column), `lib/epicState.ts`
+(EPIC-10), `sidebar/EpicRow.tsx`, `tickets/StartWorkDialog.tsx` (EPIC-2),
+`tickets/CreateEpicDialog.tsx` (EPIC-3).
+
+Known gaps:
+- Nothing stops the epic's chat from editing files: it is told not to,
+  and it runs in a folder that holds the epic's worktrees.
+- The epic's chat is not told when a sub-task's agent asks something,
+  finishes or has its pull requests merged. It finds out with
+  `epic_subtasks` when it looks.
+- Changing an epic's approved spec after filing changes no sub-task: each
+  keeps the spec it was filed with, and is changed in its own Spec tab.
+- A sub-task the tasks draft adds after filing is filed with the next
+  File; one it drops stays filed.
+- Each sub-task's pull request carries the whole requirements and design,
+  as §19's gaps say of a task in several repositories.
+- An epic is not finished by itself once every sub-task is merged: its
+  ticket and its worktrees stay until Finish task (TASK-8).
+- A project whose required fields have no fixed values cannot file
+  sub-tasks from here (TKT-3). Filed by hand and named by key in the
+  spec's headings (EPIC-4), they are taken as existing tickets.
 
 ---
 

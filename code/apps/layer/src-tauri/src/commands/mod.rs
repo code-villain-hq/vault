@@ -152,6 +152,8 @@ mod spec_outside;
 mod spec_prompts;
 mod spec_view;
 mod spec_work;
+mod epics;
+mod epic_tools;
 mod notes;
 mod phone;
 mod browser;
@@ -190,6 +192,8 @@ pub use spec_draft::*;
 pub use spec_outside::*;
 pub use spec_view::*;
 pub use spec_work::*;
+pub use epics::*;
+pub use epic_tools::*;
 pub use phone::*;
 pub use browser::*;
 pub use loops::*;
@@ -570,6 +574,8 @@ mod tests {
             chat: None,
             review: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
             browser: None,
         });
         cfg.checkouts.push(Checkout {

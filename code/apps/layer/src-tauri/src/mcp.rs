@@ -224,7 +224,7 @@ async fn dispatch(app: &AppHandle, method: &str, params: Value, caller: Option<&
         "ping" => Ok(json!({})),
         "tools/list" => {
             let mut all = tools();
-            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()));
+            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()));
             Ok(json!({ "tools": all }))
         }
         "tools/call" => {
@@ -306,6 +306,7 @@ const DANGER: &[&str] = &[
     "remember",
     "forget_note",
     "finish_task",
+    "subtask_start",
 ];
 
 fn confirm_prop() -> Value {
@@ -895,6 +896,8 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
                 issue_key: None,
                 issue_url: None,
                 epic_key: None,
+                epic: false,
+                sub_task: None,
             };
             let chat = caller_chat(&state.ptys, caller);
             let task = commands::blocking(app.clone(), move |s| {
@@ -914,6 +917,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         n if commands::spec_owns(n) => commands::spec_call(app, args, caller).await,
         n if commands::pr_images_owns(n) => commands::pr_images_call(&state, args).await,
         n if commands::finish_owns(n) => commands::finish_call(app, args, caller).await,
+        n if commands::epic_owns(n) => commands::epic_call(app, n, args, caller).await,
 
         "slack_delete" => {
             let links: Vec<String> = args
@@ -955,6 +959,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
                 arg(&args, "agent").map(str::to_string),
                 arg(&args, "branch_suffix").map(str::to_string),
                 arg(&args, "base").map(str::to_string),
+                None,
             )
             .await?;
             if let Some(room) = chat {
@@ -1126,7 +1131,7 @@ mod tests {
     /// feature included: a danger tool defined there is gated here too.
     fn served() -> Vec<Value> {
         let mut all = tools();
-        all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()));
+        all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()));
         all
     }
 

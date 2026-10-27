@@ -480,6 +480,8 @@ mod tests {
             chat: None,
             review: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
             browser: None,
         };
         let cfg = AppConfig { tasks: vec![task], ..Default::default() };

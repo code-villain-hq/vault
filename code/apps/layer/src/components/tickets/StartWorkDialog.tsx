@@ -7,7 +7,7 @@ import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { RepoPicker } from "../RepoPicker";
 import { suggestBase } from "../../lib/derive";
 import { read, write } from "../../lib/persist";
-import { IssueTypeIcon, type TypeMap } from "../IssueType";
+import { IssueTypeIcon, isEpicType, type TypeMap } from "../IssueType";
 
 export function StartWorkDialog({
   issue,
@@ -45,6 +45,9 @@ export function StartWorkDialog({
   const [specFirst, setSpecFirst] = useState(() => read("specFirst", true));
 
   const installed = agents.filter((a) => a.installed);
+  // An epic-level ticket is made an epic: its spec makes the sub-tasks, and
+  // no agent starts on it (EPIC-2).
+  const epic = isEpicType(types, issue.issue_type);
   const selected = projects.filter((p) => picked.includes(p.id));
 
   // A default, once. Re-filled whenever the value was empty — and on every
@@ -116,7 +119,7 @@ export function StartWorkDialog({
     if (picked.length === 0) return;
     setStarting(true);
     failure.clear();
-    const spec = specFirst && !!agentId;
+    const spec = epic || (specFirst && !!agentId);
     try {
       const task = await api.jiraStartWork(
         issue.key,
@@ -124,13 +127,14 @@ export function StartWorkDialog({
         spec ? null : agentId || null,
         suffix || null,
         base.trim() || null,
+        epic,
       );
       // Refresh the issues too: the ticket has usually just moved, and the
       // status on the card is the thing the move was meant to correct.
       await Promise.all([refreshTasks(), refreshPanes(), refreshIssues()]);
       select(task.id);
       if (spec) {
-        setPendingSpec({ taskId: task.id, agentId: agentId || null });
+        setPendingSpec({ taskId: task.id, agentId: epic ? null : agentId || null });
         setTab("spec");
       }
       // The task is selected and its ticket's card moved: nothing more to say (NOTE-7).
@@ -163,7 +167,9 @@ export function StartWorkDialog({
           >
             {starting
               ? "Creating worktrees…"
-              : `Start work in ${picked.length} repo${picked.length === 1 ? "" : "s"}`}
+              : epic
+                ? `Write the epic's spec in ${picked.length} repo${picked.length === 1 ? "" : "s"}`
+                : `Start work in ${picked.length} repo${picked.length === 1 ? "" : "s"}`}
           </button>
         </>
       }
@@ -227,6 +233,12 @@ export function StartWorkDialog({
         />
       </Field>
 
+      {epic ? (
+        <div className="muted" style={{ marginBottom: 14, lineHeight: 1.6 }}>
+          An epic: its spec is written here, and its tasks become sub-tasks, each
+          filed under {issue.key} and worked in a task of its own.
+        </div>
+      ) : <>
       <Field
         label="Agent"
         hint={
@@ -251,6 +263,7 @@ export function StartWorkDialog({
           Write a spec first: the agent starts from the Spec tab once you have agreed it
         </label>
       )}
+      </>}
 
       {issue.description.trim() && (
         <Field label="Description">

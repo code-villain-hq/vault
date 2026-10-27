@@ -90,6 +90,10 @@ export interface Task {
    * makes one now; one left from then is never pushed.
    */
   review?: ReviewOf | null;
+  /** An epic made in Layer (EPIC-1): its spec makes sub-tasks; it holds no code. */
+  epic?: boolean;
+  /** The epic this task is a sub-task of, and its title there (EPIC-7). */
+  sub_task?: SubTaskOf | null;
 }
 
 /** The pull request a review task left from 0.5.0 is of. */
@@ -381,6 +385,8 @@ export interface TicketMove {
 
 // GitHub's pull requests, checks and reviews: their own file, re-exported here.
 export * from "./types-github";
+export * from "./types-epic";
+import type { SubTaskOf } from "./types-epic";
 export * from "./types-spec";
 // The browser panel's (§18), likewise.
 export * from "./types-browser";

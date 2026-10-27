@@ -1,0 +1,54 @@
+/* An epic (§26): its sub-tasks in the sidebar, one line each under it, and
+   its page, the sub-tasks or the spec beside the epic's chat. */
+
+.sub-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px 4px 29px; margin-bottom: 1px;
+  border-radius: var(--radius-md); cursor: pointer;
+}
+.sub-row:hover { background: var(--hover); }
+.sub-row.active { background: var(--selected); }
+.sub-row .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-row .meta { font-size: var(--type-ui-small-size); color: var(--faint); white-space: nowrap; }
+/* Waiting on another sub-task: hollow, and quieter. */
+.sub-row:has(.dot.queued) { color: var(--muted); }
+.dot.queued { background: transparent; box-shadow: inset 0 0 0 1px var(--faint); }
+
+.content.epic { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); }
+.epic-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.epic-subs { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
+.epic-subs > .empty { height: 100%; }
+.epic-group { padding: 14px 8px 4px; color: var(--faint); font-size: var(--type-ui-small-size); }
+.epic-row {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) 42px 64px minmax(0, 190px) auto;
+  align-items: center; gap: 10px; padding: 7px 8px;
+  border-radius: var(--radius-md); cursor: pointer;
+}
+.epic-row:hover { background: var(--hover); }
+.epic-row.proposed { cursor: default; }
+.epic-row.proposed:hover { background: transparent; }
+.epic-row .key { font-family: var(--font-mono); font-size: var(--type-ui-small-size); color: var(--faint); }
+.epic-row.proposed .key { font-style: italic; }
+.epic-row .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.epic-row .steps { font-size: var(--type-ui-small-size); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.epic-row .state { font-size: var(--type-ui-small-size); color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.epic-row.queued .title { color: var(--muted); }
+.epic-row .act { min-width: 0; display: flex; justify-content: flex-end; }
+
+.epic-lead {
+  display: flex; align-items: center; gap: 12px;
+  margin: 4px 8px 10px; padding: 12px 14px;
+  background: var(--surface); border-radius: var(--radius-md);
+}
+.epic-lead .what { flex: 1; line-height: 1.5; }
+.epic-lead .what b { font-weight: 600; }
+
+.epic-chat {
+  min-height: 0; display: flex; flex-direction: column;
+  margin: 0 8px 8px 0; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden;
+}
+.epic-chat-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 0; color: var(--muted); font-size: var(--type-ui-small-size); }
+.epic-chat-head b { white-space: nowrap; color: var(--fg); font-weight: 600; font-size: var(--type-ui-size); }
+.epic-chat .pane-stack { flex: 1; }
+.epic-chat-empty { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 12px; padding: 14px; }
+.epic-chat-empty p { margin: 0; line-height: 1.55; }

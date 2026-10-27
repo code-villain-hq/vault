@@ -108,7 +108,8 @@ export function SpecSide({ task, spec, current, repo, children }: {
               })}
             </ol>
           )}
-          <div className="spec-checks">
+          {/* An epic's code is its sub-tasks', checked there (EPIC-6). */}
+          {!task.epic && <div className="spec-checks">
             {spec.repos.map((r) => {
               const busy = checking?.includes(r.checkout_id) ?? false;
               const named = spec.requirements.some((q) => q.repos.length === 0 || q.repos.some((f) => f.toLowerCase() === r.folder.toLowerCase()));
@@ -131,7 +132,7 @@ export function SpecSide({ task, spec, current, repo, children }: {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </section>
 
         <section>

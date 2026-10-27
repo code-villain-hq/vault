@@ -10,6 +10,7 @@ import { Terminals } from "./components/Terminals";
 import { DiffView } from "./components/DiffView";
 import { PrPanel } from "./components/PrPanel";
 import { SpecView } from "./components/SpecView";
+import { EpicMain } from "./components/EpicView";
 import { specProgress, useSpecs } from "./lib/specs";
 import { TicketsView } from "./components/tickets/TicketsView";
 import { AgentsView } from "./components/AgentsView";
@@ -388,7 +389,7 @@ function Shell() {
             <SidebarGrip />
             <div className="main">
               {task ? (
-                <TaskMain key={task.id} task={task} />
+                task.epic ? <EpicMain key={task.id} epic={task} /> : <TaskMain key={task.id} task={task} />
               ) : (
                 // With nothing selected, show what every agent is doing rather
                 // than an empty panel — the sidebar covers the task list, this

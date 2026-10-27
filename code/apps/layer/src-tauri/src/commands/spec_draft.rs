@@ -115,7 +115,7 @@ pub async fn draft_spec(app: AppHandle, task_id: String, part: Part, kind: Optio
                     .iter()
                     .filter_map(|h| Some((h.folder.clone(), spec.approved(&Slot::tasks(&h.folder))?)))
                     .collect();
-                let prompt = tasks_prompt(&folders, &reqs, &design, &old);
+                let prompt = tasks_prompt(&folders, &reqs, &design, &old, task.epic);
                 let id_of = |folder: &str| spec.home(folder).map(|h| h.checkout.id.clone());
                 let mut so_far = String::new();
                 let out = oneshot(&program, home_dir(), how(false), &prompt, |delta| {
@@ -368,6 +368,8 @@ mod tests {
             review: None,
             browser: None,
             browser_url: None,
+            epic: false,
+            sub_task: None,
         }
     }
 

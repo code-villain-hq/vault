@@ -5,6 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
+mod sub_tasks;
+pub use sub_tasks::{sub_tasks, SubTask};
+
 /// One of a spec's files, in the order they are drafted and approved
 /// (SPEC-4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

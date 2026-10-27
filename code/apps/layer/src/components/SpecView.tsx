@@ -226,7 +226,8 @@ export function SpecView({ task }: { task: TaskView }) {
     <div className="spec">
       {/* One primary on the screen: approving what is waiting comes before
           starting an agent on it. */}
-      <SpecStartAgent task={task} spec={spec} agentId={agentId} setAgentId={setAgentId} quiet={canApprove} />
+      {/* An epic's agents are its sub-tasks', started from Sub-tasks (EPIC-6). */}
+      {!task.epic && <SpecStartAgent task={task} spec={spec} agentId={agentId} setAgentId={setAgentId} quiet={canApprove} />}
       <div className="spec-steps">
         {PARTS.map((p, i) => {
           const vs = filesOf(spec, p).map((f) => partView(spec, f.part, f.checkoutId)!);
