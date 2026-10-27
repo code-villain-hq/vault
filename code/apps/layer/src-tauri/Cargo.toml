@@ -41,8 +41,8 @@ keyring = "4"
 thiserror = "2"
 uuid = { version = "1", features = ["v4", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-base64 = "0.22"
-parking_lot = "0.12"
+base64 = "0.23"
+parking_lot = "0.13"
 libc = "0.2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-notification = "2"
