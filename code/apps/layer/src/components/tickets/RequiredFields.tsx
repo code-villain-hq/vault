@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { RequiredField } from "../../lib/types";
+import { useTrackerName } from "../../lib/tracker";
 import { Field } from "../ui";
 
 /**
@@ -79,11 +80,12 @@ export function RequiredFieldPickers({
   rf: ReturnType<typeof useRequiredFields>;
   refused: string;
 }) {
+  const tracker = useTrackerName();
   return (
     <>
       {rf.loading && (
         <div className="muted" style={{ marginBottom: 10 }}>
-          Asking Jira what this project requires…
+          Asking {tracker} what a new ticket needs here…
         </div>
       )}
       {rf.unsupported.length > 0 && (

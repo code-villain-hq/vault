@@ -1,8 +1,9 @@
 //! Where the workspace's tickets come from (TKT-15): one tracker, chosen per
 //! workspace. The app asks `Tracker` and gets the same shapes back whichever
-//! it is. Only Jira can be one yet; what a tracker does in its own way, like
+//! it is: Jira or GitHub Issues. What a tracker does in its own way, like
 //! Jira's transitions, stays with its client.
 
+pub mod github;
 mod jira;
 
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ use serde_json::Value;
 
 use crate::config::{AppConfig, JiraConfig, TrackerKind};
 use crate::error::{Error, Result};
+use crate::integrations::github::GitHub;
 use crate::integrations::jira::Jira;
 use crate::secrets;
 
@@ -109,6 +111,7 @@ pub struct NewTicket {
 /// The workspace's tracker, connected.
 pub enum Tracker {
     Jira(Jira, JiraConfig),
+    Github(GitHub, github::Issues),
 }
 
 impl Tracker {
@@ -120,12 +123,26 @@ impl Tracker {
                 let token = secrets::get(secrets::JIRA)?.ok_or(Error::NotConfigured("Jira"))?;
                 Ok(Self::Jira(Jira::new(&jira, &token)?, jira))
             }
+            // Code's own connection: nothing more to connect (TKT-17).
+            Some(TrackerKind::Github) => {
+                let gh = cfg.github.clone().ok_or(Error::NotConfigured("GitHub"))?;
+                let token = secrets::get(secrets::GITHUB)?.ok_or(Error::NotConfigured("GitHub"))?;
+                Ok(Self::Github(GitHub::new(&gh, &token)?, github::Issues::of(cfg, &gh.web_url)))
+            }
+        }
+    }
+
+    pub fn kind(&self) -> TrackerKind {
+        match self {
+            Self::Jira(..) => TrackerKind::Jira,
+            Self::Github(..) => TrackerKind::Github,
         }
     }
 
     pub async fn ticket(&self, key: &str) -> Result<Ticket> {
         match self {
             Self::Jira(client, _) => client.issue(key).await,
+            Self::Github(client, _) => github::ticket(client, key).await,
         }
     }
 
@@ -133,12 +150,14 @@ impl Tracker {
     pub async fn mine(&self) -> Result<TicketPage> {
         match self {
             Self::Jira(client, cfg) => jira::mine(client, cfg).await,
+            Self::Github(client, issues) => github::mine(client, issues).await,
         }
     }
 
     pub async fn find(&self, find: Find) -> Result<TicketPage> {
         match self {
             Self::Jira(client, cfg) => jira::find(client, cfg, find).await,
+            Self::Github(client, issues) => github::find(client, issues, find).await,
         }
     }
 
@@ -147,12 +166,14 @@ impl Tracker {
     pub async fn by_key(&self, keys: &[String]) -> Result<Vec<Ticket>> {
         match self {
             Self::Jira(client, _) => jira::by_key(client, keys).await,
+            Self::Github(client, _) => github::by_key(client, keys).await,
         }
     }
 
     pub async fn types(&self) -> Result<Vec<TicketType>> {
         match self {
             Self::Jira(client, _) => client.issue_types().await,
+            Self::Github(..) => Ok(github::types()),
         }
     }
 
@@ -160,12 +181,16 @@ impl Tracker {
     pub async fn priorities(&self) -> Result<Vec<String>> {
         match self {
             Self::Jira(client, _) => client.priorities().await,
+            // Issues have none.
+            Self::Github(..) => Ok(Vec::new()),
         }
     }
 
     pub async fn required_fields(&self, project_key: &str, type_id: &str) -> Result<Vec<RequiredField>> {
         match self {
             Self::Jira(client, _) => client.create_fields(project_key, type_id).await,
+            // A title and a body, and nothing a repository can insist on.
+            Self::Github(..) => Ok(Vec::new()),
         }
     }
 
@@ -179,6 +204,7 @@ impl Tracker {
                 .into_iter()
                 .find(|(id, n)| n.eq_ignore_ascii_case(name) && id != not)
                 .map(|(id, _)| id),
+            Self::Github(..) => None,
         }
     }
 
@@ -186,6 +212,7 @@ impl Tracker {
     pub async fn file(&self, new: &NewTicket) -> Result<String> {
         match self {
             Self::Jira(client, cfg) => jira::file(client, cfg, new).await,
+            Self::Github(client, issues) => github::file(client, issues, new).await,
         }
     }
 
@@ -193,12 +220,24 @@ impl Tracker {
     pub async fn put_under(&self, key: &str, parent: &str) -> Result<()> {
         match self {
             Self::Jira(client, _) => client.set_parent(key, parent).await,
+            Self::Github(client, _) => client.put_under(&github::issue(key)?, &github::issue(parent)?).await,
+        }
+    }
+
+    /// What starting work does to a ticket beyond the task, when the
+    /// tracker does not move it by itself: Jira's move is `ticket_flow`'s,
+    /// and a GitHub issue is given to you if nobody has it (TKT-18).
+    pub async fn take(&self, ticket: &Ticket) -> Result<()> {
+        match self {
+            Self::Jira(..) => Ok(()),
+            Self::Github(client, _) => github::take(client, ticket).await,
         }
     }
 
     pub async fn comment(&self, key: &str, text: &str) -> Result<()> {
         match self {
             Self::Jira(client, _) => client.comment(key, text).await,
+            Self::Github(client, _) => client.comment_issue(&github::issue(key)?, text).await,
         }
     }
 }
@@ -207,5 +246,6 @@ impl Tracker {
 pub fn url_of(cfg: &AppConfig, key: &str) -> Option<String> {
     match cfg.tracker_in_use()? {
         TrackerKind::Jira => Some(format!("{}/browse/{key}", cfg.jira.as_ref()?.base_url.trim_end_matches('/'))),
+        TrackerKind::Github => github::url_of(&cfg.github.as_ref()?.web_url, key),
     }
 }

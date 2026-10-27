@@ -543,8 +543,12 @@ push.
 - **Tickets** come from the workspace's tracker, through `tickets.rs`:
   `Tracker::connect` picks it as `AppConfig::tracker_in_use` says, and
   answers in the tracker's own shapes (`Ticket`, `TicketPage`,
-  `TicketType`). Only Jira is one yet (`tickets/jira.rs`); what a tracker
-  does its own way, like Jira's transitions, stays with its client.
+  `TicketType`): Jira (`tickets/jira.rs`) or GitHub Issues
+  (`tickets/github.rs`, over `integrations/github/issues.rs`: GraphQL
+  search limited to the workspace's repositories, REST to file, comment
+  and assign). Admins choose it with `set_tracker`. What a tracker does
+  its own way, like Jira's transitions, stays with its client, behind
+  `commands::jira_client`, which refuses when Jira is not the tracker.
 - **Jira** is REST v3 with Basic auth. JQL strings go through `jql_string`,
   path segments through `segment()`. Search pages by `nextPageToken`, and
   `createmeta` pages too. Names are never assumed (TKT-2). Where a ticket

@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 import type { Ticket } from "../../lib/types";
 import { age } from "../../lib/time";
+import { useStore } from "../../store";
 import { IssueTypeIcon, hierarchyClass, isEpicType, type TypeMap } from "../IssueType";
 import { statusClass } from "./status";
 
@@ -30,6 +31,8 @@ export function TicketCard({
 }) {
   // Jira's middle category: whatever this workflow calls being under way.
   const moving = issue.status_category === "indeterminate";
+  // GitHub has no status to move to: starting work assigned it (TKT-18).
+  const movable = useStore((s) => s.settings?.tracker === "jira");
   return (
     <div
       data-issue-key={issue.key}
@@ -60,7 +63,7 @@ export function TicketCard({
           Start work.
         */}
         {taskId && moving && <span className="ui-status ui-status-ok">open task →</span>}
-        {taskId && !moving && (
+        {taskId && !moving && movable && (
           // A branch and an agent are running against a ticket the board
           // still calls Open. Say so, and offer the click that fixes it.
           <button

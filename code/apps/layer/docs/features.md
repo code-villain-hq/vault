@@ -964,19 +964,32 @@ offers Start work.
   or title (REV-7, REV-11) it asks GitHub which issues the pull request
   closes instead.
 
-Code: `tickets.rs` (the tracker: `Tracker`, and Jira's side in
-`tickets/jira.rs`), `commands/tickets.rs`, `commands/jira.rs`,
-`commands/ticket_flow.rs`, `integrations/jira.rs`,
-`integrations/jira/flow.rs`, `components/tickets/`, `TicketFlow.tsx`,
+Code: `tickets.rs` (the tracker: `Tracker`; Jira's side in
+`tickets/jira.rs`, GitHub's in `tickets/github.rs`), `commands/tickets.rs`
+(`set_tracker`), `commands/jira.rs`, `commands/ticket_flow.rs`,
+`integrations/jira.rs`, `integrations/jira/flow.rs`,
+`integrations/github/issues.rs`, `components/tickets/`, `TrackerChoice.tsx`
+(TKT-15, TKT-16), `lib/tracker.ts`, `TicketFlow.tsx`,
 `sidebar/DeleteTask.tsx`. The choice is the workspace's `tracker`
-connection; `AppConfig::tracker_in_use` reads it.
+connection; `AppConfig::tracker_in_use` reads it, and `jira_client` refuses
+every Jira-only path (moves, transitions, the `jira_*` tools) when it is
+not Jira.
 
 Known gaps:
-- TKT-15 to TKT-21 are written ahead of the code: only Jira is built,
-  and Settings has no choice of tracker yet. A workspace keeps its choice
-  as a `tracker` connection, and one with none uses Jira while it is
-  connected. Moving tickets (TKT-8), deleting a task's ticket and the
-  agents' `jira_*` tools are still Jira's own.
+- Jira and GitHub Issues are built; Forge is not, and is not offered.
+  Nor is "none" (TKT-15): a workspace with no choice uses Jira while it
+  is connected.
+- GitHub Issues, not yet built: the `github_*` tools for agents (TKT-20;
+  the `jira_*` tools refuse, except `jira_issue_types` and
+  `jira_create_fields`, which answer for the workspace's tracker); the
+  epic chosen from the organisation's issue types (TKT-17), so an epic is
+  only an issue with sub-issues, and one just filed as an epic looks like
+  any other issue; closing the issue of a task based on another branch
+  (TKT-18); reading a pull request's ticket from the issues it closes
+  (TKT-21, REV-7, REV-11). Filing offers the repositories of the issues
+  on the board, not the workspace's list. A GitHub Enterprise Server
+  without sub-issues fails every read. Tried only in the mock harness
+  and by tests, never against github.com.
 - Open question: GitHub issues are only open or closed, and many teams
   keep "in progress" in a GitHub Project's Status field instead. Whether
   that board's Status is the tracker's in-progress state, moved as TKT-8

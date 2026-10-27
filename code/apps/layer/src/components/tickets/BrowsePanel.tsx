@@ -3,6 +3,7 @@ import type { Ticket, TicketType, TicketPage } from "../../lib/types";
 import type { TypeMap } from "../IssueType";
 import { TypeFilter } from "./TypeFilter";
 import { TicketCard } from "./TicketCard";
+import { useTrackerName } from "../../lib/tracker";
 
 export function BrowsePanel({
   issueTypes,
@@ -49,6 +50,7 @@ export function BrowsePanel({
   onContextMenu: (e: MouseEvent, issue: Ticket) => void;
   focusIssueKey?: string | null;
 }) {
+  const tracker = useTrackerName();
   return (
     <>
       <TypeFilter
@@ -122,7 +124,7 @@ export function BrowsePanel({
           </div>
           {found.more && (
             <div className="muted" style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}>
-              Jira had more than these. Add a word to the search, or narrow it
+              {tracker} had more than these. Add a word to the search, or narrow it
               by type.
             </div>
           )}

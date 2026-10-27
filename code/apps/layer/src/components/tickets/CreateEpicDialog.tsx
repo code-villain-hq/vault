@@ -1,29 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
-import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
 import type { Ticket, TicketType } from "../../lib/types";
-import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
+import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { epicTypes, preferredEpic } from "../task-forms/creatable";
 import { OptimizeDescription } from "./OptimizeDescription";
 import { RequiredFieldPickers, useRequiredFields } from "./RequiredFields";
+import { useProjectChoice } from "./ProjectField";
 
 export function CreateEpicDialog({
   issueTypes,
   types,
-  issues,
   onClose,
   onCreated,
 }: {
   issueTypes: TicketType[];
   types: TypeMap;
-  issues: Ticket[];
   onClose: () => void;
   /** Offers Start work on it, to write its spec (EPIC-3). */
   onCreated: (epic: Ticket) => void;
 }) {
-  const settings = useStore((s) => s.settings);
   const refreshIssues = useStore((s) => s.refreshIssues);
   // Creating fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
@@ -31,21 +28,11 @@ export function CreateEpicDialog({
   const [summary, setSummary] = useState("");
   const [desc, setDesc] = useState("");
   const [epicType, setEpicType] = useState("");
-  const [project, setProject] = useState(() => read("jiraProject", ""));
+  const place = useProjectChoice();
+  const project = place.project;
   const [busy, setBusy] = useState(false);
 
   const epics = useMemo(() => epicTypes(issueTypes), [issueTypes]);
-  const boardKeys = useMemo(
-    () => [...new Set(issues.map((i) => i.key.split("-")[0]).filter(Boolean))],
-    [issues],
-  );
-  const defaultProject = settings?.jira?.project_key ?? boardKeys[0] ?? "";
-
-  useEffect(() => {
-    setProject((current) => current || defaultProject);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     if (epicType && epics.some((t) => t.name === epicType)) return;
     setEpicType(preferredEpic(epics)?.name ?? "");
@@ -120,23 +107,11 @@ export function CreateEpicDialog({
       }
     >
       <div className="muted" style={{ marginBottom: 12, lineHeight: 1.6 }}>
-        Creates a top-level epic in the project you pick. Then pick its
+        Creates a top-level epic in the {place.github ? "repository" : "project"} you pick. Then pick its
         repositories to write its spec: its tasks become its sub-tasks.
       </div>
 
-      <Field label="Project" hint="The key the epic is filed under.">
-        <Combo
-          value={project}
-          options={boardKeys}
-          placeholder="ACME"
-          width="100%"
-          onChange={(raw) => {
-            const v = raw.trim().toUpperCase();
-            setProject(v);
-            write("jiraProject", v);
-          }}
-        />
-      </Field>
+      {place.field("epic")}
 
       <Field label="Summary">
         <input className="ui-field"

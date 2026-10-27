@@ -18,6 +18,22 @@ pub(crate) fn tracker(state: &AppState) -> Result<Tracker> {
     state.config.with(Tracker::connect)
 }
 
+/// Choose where the workspace's tickets come from (TKT-15). Admins only:
+/// it is the workspace's, the same for everyone in it. Tasks keep the
+/// tickets they have (TKT-16); the cached types were the old tracker's.
+#[tauri::command]
+pub fn set_tracker(state: State<AppState>, uses: TrackerKind) -> Result<()> {
+    state.config.update(|c| {
+        if c.shared.workspace.as_ref().is_some_and(|w| !w.is_admin()) {
+            return Err(Error::Other("only the workspace's admins choose its tracker".into()));
+        }
+        c.tracker = Some(uses);
+        Ok(())
+    })??;
+    *state.ticket_types.lock() = None;
+    Ok(())
+}
+
 /// Every type of ticket the tracker defines, with its own icon. Nothing about
 /// types is hardcoded — a site with custom types renders exactly as it does
 /// in its tracker.
@@ -203,7 +219,8 @@ pub async fn start_work_on_ticket(
         }
     }
 
-    let issue = tracker(&state)?.ticket(&key).await?;
+    let tracker = tracker(&state)?;
+    let issue = tracker.ticket(&key).await?;
 
     let new = NewTask {
         name: format!("{} {}", issue.key, issue.summary),
@@ -237,6 +254,10 @@ pub async fn start_work_on_ticket(
         .await?;
     }
 
+    // Best effort, as Jira's move is: the task is made either way.
+    if let Err(e) = tracker.take(&issue).await {
+        eprintln!("could not give {key} to you as work started: {e}");
+    }
     let moved = super::ticket_flow::started(&state, &issue.key).await;
     Ok(Started { task, moved })
 }

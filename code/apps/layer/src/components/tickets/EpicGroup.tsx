@@ -10,12 +10,13 @@ export function EpicGroup({
   types,
   closed,
   taskId,
-  jiraBase,
+  tracker,
+  link,
   onToggle,
   onContextMenu,
   onWork,
   onFile,
-  onJira,
+  onOpen,
   children,
 }: {
   epic: { key: string; summary: string; issue?: Ticket; issues: Ticket[]; live: number };
@@ -24,12 +25,14 @@ export function EpicGroup({
   closed: boolean;
   /** The task already running for the epic itself, when it is yours. */
   taskId: string | null;
-  jiraBase: string;
+  /** The tracker's name, and the epic's link in it. */
+  tracker: string;
+  link: string | null;
   onToggle: () => void;
   onContextMenu: (e: MouseEvent) => void;
   onWork: () => void;
   onFile: () => void;
-  onJira: () => void;
+  onOpen: () => void;
   children: ReactNode;
 }) {
   return (
@@ -63,7 +66,7 @@ export function EpicGroup({
           </button>
         )}
         {/*
-          Jira itself is always reachable: the key is enough for a link,
+          The tracker itself is always reachable: the key is enough for a link,
           so every epic gets the same way out rather than some of them
           appearing actionable and the rest not.
         */}
@@ -79,16 +82,16 @@ export function EpicGroup({
             + ticket
           </button>
         )}
-        {epic.key && jiraBase && (
+        {epic.key && link && (
           <button
             className="ui-link"
-            title={`Open ${epic.key} in Jira`}
+            title={`Open ${epic.key} in ${tracker}`}
             onClick={(e) => {
               e.stopPropagation();
-              onJira();
+              onOpen();
             }}
           >
-            Jira ↗
+            {tracker} ↗
           </button>
         )}
       </div>

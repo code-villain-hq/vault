@@ -318,6 +318,15 @@ mod tests {
     }
 
     #[test]
+    fn a_github_issue_branch_is_its_number_and_title() {
+        // `acme/web#12` is no branch name (TKT-21).
+        let name = "acme/web#12 Fix the login";
+        assert_eq!(derive_branch(None, Some("acme/web#12"), None, name), "12-fix-the-login");
+        assert_eq!(derive_branch(None, Some("acme/web#12"), Some("again"), name), "12-fix-the-login-again");
+        assert_eq!(derive_branch(None, Some("acme/web#12"), None, "Корзина"), "12");
+    }
+
+    #[test]
     fn slack_switches_gate_each_kind_of_message() {
         let all_on = SlackConfig::default();
         assert!(slack_allows(&all_on, "agent_done"));

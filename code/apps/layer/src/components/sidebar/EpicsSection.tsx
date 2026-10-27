@@ -4,6 +4,7 @@ import { useEpics } from "../../lib/epics";
 import type { EpicOf } from "../../lib/grouping";
 import type { Ticket, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
+import { trackerOfKey } from "../../lib/tracker";
 import { typeMap } from "../IssueType";
 import { StartWorkDialog } from "../tickets/StartWorkDialog";
 import { EpicRow, JiraEpicRow } from "./EpicRow";
@@ -78,7 +79,7 @@ export function EpicsSection({ sections, selected, expanded, onSelect, onToggle,
       const issue = useStore.getState().issues.find((i) => i.key === epic.key)
         ?? (await api.ticketsByKey([epic.key]))[0];
       if (issue) setMaking({ issue, tasks });
-      else fail(`Jira did not return ${epic.key}.`);
+      else fail(`${trackerOfKey(epic.key)} did not return ${epic.key}.`);
     } catch (e) {
       fail(e);
     }

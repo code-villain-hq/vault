@@ -429,8 +429,10 @@ export interface Settings {
   worktree_root: string;
   worktree_root_is_default: boolean;
   jira_connected: boolean;
-  /** Where tickets come from (TKT-15), or null while there is no tracker. */
+  /** Where tickets come from (TKT-15), or null while there is no tracker or it is not connected here. */
   tracker: TrackerKind | null;
+  /** The workspace's choice of tracker, connected or not. */
+  tracker_chosen: TrackerKind | null;
   github_connected: boolean;
   slack_connected: boolean;
   grafana_connected: boolean;

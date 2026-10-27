@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { projectOf } from "../../lib/tracker";
+import { useProjectChoice } from "./ProjectField";
 import { api } from "../../lib/api";
-import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
 import type { Ticket, TicketType } from "../../lib/types";
-import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
+import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { creatableTypes, preferredCreatable } from "../task-forms/creatable";
 import { OptimizeDescription } from "./OptimizeDescription";
@@ -23,33 +24,20 @@ export function FileIssueDialog({
   onClose: () => void;
   onFiled: (issue: Ticket) => void;
 }) {
-  const settings = useStore((s) => s.settings);
-  const issues = useStore((s) => s.issues);
   const refreshIssues = useStore((s) => s.refreshIssues);
   // Filing fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
 
-  const [project, setProject] = useState(() => read("jiraProject", ""));
+  const place = useProjectChoice();
   const [newSummary, setNewSummary] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newType, setNewType] = useState("");
   const [filingBusy, setFilingBusy] = useState(false);
 
   const creatable = useMemo(() => creatableTypes(issueTypes), [issueTypes]);
-  const boardKeys = useMemo(
-    () => [...new Set(issues.map((i) => i.key.split("-")[0]).filter(Boolean))],
-    [issues],
-  );
-  const defaultProject = settings?.jira?.project_key ?? boardKeys[0] ?? "";
   // An epic already says which project. Otherwise the last one filed in, then
   // the board's own key.
-  const projectKey = epic ? epic.key.split("-")[0] : project.trim();
-
-  useEffect(() => {
-    if (epic) return;
-    setProject((current) => current || defaultProject);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const projectKey = epic ? projectOf(epic.key) : place.project;
 
   useEffect(() => {
     if (newType && creatable.some((t) => t.name === newType)) return;
@@ -126,29 +114,15 @@ export function FileIssueDialog({
         {epic ? (
           <>
             Filed under <b>{epic.key}</b>
-            {epic.summary ? ` — ${epic.summary}` : ""}, in that epic's own project.
+            {epic.summary ? ` — ${epic.summary}` : ""}, in that epic's own {place.github ? "repository" : "project"}.
           </>
         ) : (
-          <>Filed in the project you pick, with no parent epic.</>
+          <>Filed in the {place.github ? "repository" : "project"} you pick, with no parent epic.</>
         )}{" "}
         Nothing is checked out; the start-work dialog opens once it exists.
       </div>
 
-      {!epic && (
-        <Field label="Project" hint="The key the ticket is filed under.">
-          <Combo
-            value={project}
-            options={boardKeys}
-            placeholder="ACME"
-            width="100%"
-            onChange={(raw) => {
-              const v = raw.trim().toUpperCase();
-              setProject(v);
-              write("jiraProject", v);
-            }}
-          />
-        </Field>
-      )}
+      {!epic && place.field("ticket")}
 
       <Field label="Summary">
         <input className="ui-field"

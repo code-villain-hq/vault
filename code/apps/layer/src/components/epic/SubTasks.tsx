@@ -3,6 +3,7 @@ import { api } from "../../lib/api";
 import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, type SubTaskState } from "../../lib/epicState";
 import { useTaskAgents } from "../../lib/panes";
+import { trackerOfKey } from "../../lib/tracker";
 import { useStore } from "../../store";
 import type { EpicView, SubTaskView, TaskView } from "../../lib/types";
 import { Confirm, ErrorMessage, Spinner, useFailure } from "../ui";
@@ -46,7 +47,7 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
           <div className="what">
             <b>The approved spec makes {all.length === toFile ? "" : `${toFile} more `}{toFile === 1 ? "a sub-task" : `${toFile} sub-tasks`}.</b>{" "}
             <span className="muted">
-              Each is {epic.issue_key ? `filed in Jira under ${epic.issue_key} and ` : ""}given its own task here.
+              Each is {epic.issue_key ? `filed in ${trackerOfKey(epic.issue_key)} under ${epic.issue_key} and ` : ""}given its own task here.
             </span>
           </div>
           <button className="ui-button ui-button-primary" onClick={() => setFiling(true)}>

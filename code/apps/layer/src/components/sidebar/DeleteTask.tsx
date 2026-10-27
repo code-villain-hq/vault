@@ -21,7 +21,8 @@ export function DeleteTask({ task, onCancel, onDelete }: {
   const settings = useStore((s) => s.settings);
   const rows = useStore((s) => s.prs[task.id]);
   const issue = useStore((s) => s.issues.find((i) => i.key === task.issue_key));
-  const key = settings?.jira_connected ? task.issue_key : null;
+  // Only Jira has transitions to offer (TKT-18).
+  const key = settings?.tracker === "jira" ? task.issue_key : null;
   const merged = (rows ?? []).some((r) => r.pr?.merged);
   const [transitions, setTransitions] = useState<JiraTransition[] | null>(key ? null : []);
   const [ticketError, setTicketError] = useState<string | null>(null);

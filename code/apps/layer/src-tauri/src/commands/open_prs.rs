@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use tauri::State;
 
+use crate::config::TrackerKind;
 use crate::error::Result;
 use crate::git;
 use crate::integrations::github;
@@ -31,6 +32,8 @@ pub async fn github_open_prs(
     let task = state.config.task(&task_id)?;
     super::pr_task::not_a_review(&task, "pushed or opened as a pull request")?;
     let (client, _) = github_client(&state)?;
+    let tracker = tracker(&state).ok();
+    let body = fixes(tracker.as_ref().map(|t| t.kind()), task.issue_key.as_deref(), body);
 
     let mut results = Vec::new();
     let mut opened: Vec<github::Sibling> = Vec::new();
@@ -208,8 +211,9 @@ pub async fn github_open_prs(
             .map(|p| format!("{}: {}", p.repo, p.url))
             .collect();
 
+        // A GitHub issue lists the pull requests that fix it by itself.
         if let Some(key) = task.issue_key.as_ref() {
-            if let Ok(tracker) = tracker(&state) {
+            if let Some(tracker) = tracker.as_ref().filter(|t| t.kind() == TrackerKind::Jira) {
                 let text = format!(
                     "Pull request{} for this ticket:\n{}",
                     if opened.len() == 1 { "" } else { "s" },
@@ -253,6 +257,21 @@ pub async fn github_open_prs(
     Ok(results)
 }
 
+/// A pull request for a GitHub issue says it fixes it, which is how GitHub
+/// links the two and closes the issue on merge (TKT-18).
+fn fixes(tracker: Option<TrackerKind>, key: Option<&str>, body: String) -> String {
+    let Some(key) = key.filter(|_| tracker == Some(TrackerKind::Github)) else {
+        return body;
+    };
+    let line = format!("Fixes {key}");
+    if body.to_lowercase().contains(&line.to_lowercase()) {
+        return body;
+    }
+    match body.trim_end() {
+        "" => line,
+        text => format!("{text}\n\n{line}"),
+    }
+}
 
 /// Whether the branch has a commit since `from`, or its branch point.
 fn committed_since(dir: &Path, base: &str, from: Option<&str>) -> bool {
@@ -263,6 +282,17 @@ fn committed_since(dir: &Path, base: &str, from: Option<&str>) -> bool {
 mod tests {
     use super::super::repos::tests::{commit, git};
     use super::*;
+
+    #[test]
+    fn a_github_issue_pull_request_says_it_fixes_it_once() {
+        let gh = Some(TrackerKind::Github);
+        assert_eq!(fixes(gh, Some("acme/web#12"), "Loops no more.\n".into()), "Loops no more.\n\nFixes acme/web#12");
+        assert_eq!(fixes(gh, Some("acme/web#12"), "fixes acme/web#12".into()), "fixes acme/web#12");
+        assert_eq!(fixes(gh, Some("acme/web#12"), String::new()), "Fixes acme/web#12");
+        // Jira moves its tickets itself, and a task without one fixes nothing.
+        assert_eq!(fixes(Some(TrackerKind::Jira), Some("ACME-1"), "x".into()), "x");
+        assert_eq!(fixes(gh, None, "x".into()), "x");
+    }
 
     #[test]
     fn only_committed_work_counts_as_committed() {

@@ -4,6 +4,7 @@ import { copyAndSay } from "../../lib/clipboard";
 import { api } from "../../lib/api";
 import { useStore } from "../../store";
 import { groupByEpic } from "../../lib/derive";
+import { ticketLink, trackerName } from "../../lib/tracker";
 import { readOneOf, write } from "../../lib/persist";
 import { groupByStatus, TICKET_GROUP_LABEL, TICKET_GROUPS, type TicketGroup } from "../../lib/ticket-group";
 import { sortTickets, TICKET_SORT_LABEL, TICKET_SORTS, type TicketSort } from "../../lib/ticket-sort";
@@ -78,7 +79,8 @@ export function TicketsView() {
   const [creatingEpic, setCreatingEpic] = useState(false);
   const [creatingTicket, setCreatingTicket] = useState(false);
 
-  const jiraBase = settings?.jira?.base_url.replace(/\/+$/, "") ?? "";
+  const tracker = trackerName(settings?.tracker_chosen);
+  const linkOf = (key: string) => ticketLink(settings, key);
   const types = useMemo(() => typeMap(issueTypes), [issueTypes]);
 
   // Narrowing by type or by who holds it is a different question for Jira, so
@@ -170,11 +172,13 @@ export function TicketsView() {
   }
 
   function linkItems(key: string, summary: string, after = true): MenuItem[] {
-    const link = `${jiraBase}/browse/${key}`;
+    const link = linkOf(key);
     return [
       // A divider only when something precedes them.
-      { label: "Open in Jira", separated: after, onSelect: () => void openUrl(link).catch(() => fail(noBrowser)) },
-      { label: "Copy link", onSelect: () => copyAndSay(link, link) },
+      ...(link ? [
+        { label: `Open in ${tracker}`, separated: after, onSelect: () => void openUrl(link).catch(() => fail(noBrowser)) },
+        { label: "Copy link", onSelect: () => copyAndSay(link, link) },
+      ] : []),
       { label: `Copy ${key}`, onSelect: () => copyAndSay(key, key) },
       { label: "Copy summary", onSelect: () => copyAndSay(`${key} ${summary}`, key) },
     ];
@@ -273,11 +277,19 @@ export function TicketsView() {
   if (!settings) return null;
 
   if (settings.tracker == null) {
+    // GitHub Issues use Code's token: connecting is done there (TKT-17).
+    const github = settings.tracker_chosen === "github";
     return (
       <div className="empty">
-        <h2>Jira not connected</h2>
-        <p>Connect Jira to pull your assigned issues and start work from a ticket.</p>
-        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect Jira</button>
+        <h2>{tracker} not connected</h2>
+        <p>
+          {github
+            ? "Connect GitHub to pull the issues assigned to you in the workspace's repositories, and start work from one."
+            : "Connect Jira to pull your assigned issues and start work from a ticket."}
+        </p>
+        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true, github ? "github" : "jira")}>
+          Connect {tracker}
+        </button>
       </div>
     );
   }
@@ -474,7 +486,8 @@ export function TicketsView() {
             types={types}
             closed={closed}
             taskId={own ? taskFor(own.key) : null}
-            jiraBase={jiraBase}
+            tracker={tracker}
+            link={linkOf(epic.key)}
             onToggle={() => setShut((c) => ({ ...c, [epic.key]: !closed }))}
             onContextMenu={(e) => {
               if (!epic.key) return;
@@ -491,7 +504,7 @@ export function TicketsView() {
             }}
             onWork={work}
             onFile={() => setFiling({ key: epic.key, summary: epic.summary })}
-            onJira={() => void openUrl(`${jiraBase}/browse/${epic.key}`).catch(() => fail(noBrowser))}
+            onOpen={() => void openUrl(linkOf(epic.key) ?? "").catch(() => fail(noBrowser))}
           >
             {epic.issues.map(renderCard)}
           </EpicGroup>
@@ -512,7 +525,6 @@ export function TicketsView() {
         <CreateEpicDialog
           issueTypes={issueTypes}
           types={types}
-          issues={issues}
           onClose={() => setCreatingEpic(false)}
           onCreated={setOpen}
         />

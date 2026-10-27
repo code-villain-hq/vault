@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../../lib/api";
 import type { Ticket, JiraTransition } from "../../lib/types";
+import { useStore } from "../../store";
+import { trackerOfKey } from "../../lib/tracker";
 import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { statusClass } from "./status";
@@ -25,6 +27,8 @@ export function ReadTicketDialog({
   const failure = useFailure();
   const [transitions, setTransitions] = useState<JiraTransition[]>([]);
   const [moving, setMoving] = useState(false);
+  // Only Jira has moves to offer: a GitHub issue is open or closed (TKT-18).
+  const jira = useStore((s) => s.settings?.tracker === "jira");
 
   // Keyed on the status as well as the ticket: which moves are on offer
   // depends on where it is now, and after a move the old list offered the
@@ -33,11 +37,12 @@ export function ReadTicketDialog({
     let current = true;
     failure.clear();
     setTransitions([]);
+    if (!jira) return;
     api.jiraTransitions(issue.key)
       .then((t) => { if (current) setTransitions(t); })
       .catch(() => { if (current) setTransitions([]); });
     return () => { current = false; };
-  }, [issue.key, issue.status, failure.clear]);
+  }, [issue.key, issue.status, failure.clear, jira]);
 
   async function doTransition(t: JiraTransition) {
     setMoving(true);
@@ -68,7 +73,7 @@ export function ReadTicketDialog({
             }}
             title="The same ticket, on the website"
           >
-            Open in Jira ↗
+            Open in {trackerOfKey(issue.key)} ↗
           </button>
           <div className="spacer" />
           {!hasTask && (

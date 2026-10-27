@@ -7,6 +7,7 @@ import { taskReview } from "../../lib/derive";
 import { byEpic, groupBy } from "../../lib/grouping";
 import { readOneOf, write } from "../../lib/persist";
 import { useFleetAgents } from "../../lib/panes";
+import { trackerOfKey } from "../../lib/tracker";
 import type { JiraTransition, TaskView } from "../../lib/types";
 import { BusyOverlay, Confirm, ContextMenu, ErrorMessage, Field, Modal, useFailure, type MenuItem } from "../ui";
 import { RepoPicker } from "../RepoPicker";
@@ -259,7 +260,7 @@ export function Sidebar() {
     ];
     if (task.issue_url) {
       items.push({
-        label: `Open ${task.issue_key} in Jira`,
+        label: `Open ${task.issue_key} in ${trackerOfKey(task.issue_key ?? "")}`,
         onSelect: () => void openUrl(task.issue_url!),
       });
     }

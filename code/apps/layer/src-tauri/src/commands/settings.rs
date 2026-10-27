@@ -6,7 +6,7 @@ use std::process::Command;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime, State};
 
-use crate::config::{GithubConfig, GrafanaConfig, JiraConfig, SlackBotConfig, SlackConfig, UiPrefs};
+use crate::config::{GithubConfig, GrafanaConfig, JiraConfig, SlackBotConfig, SlackConfig, TrackerKind, UiPrefs};
 use crate::error::{Error, Result};
 use crate::secrets;
 use crate::shellenv;
@@ -28,8 +28,11 @@ pub struct Settings {
     pub worktree_root: String,
     pub worktree_root_is_default: bool,
     pub jira_connected: bool,
-    /// Where tickets come from (TKT-15), or None while there is no tracker.
+    /// Where tickets come from (TKT-15), or None while there is no tracker
+    /// or it is not connected here.
     pub tracker: Option<crate::config::TrackerKind>,
+    /// The workspace's choice of tracker, connected or not.
+    pub tracker_chosen: Option<crate::config::TrackerKind>,
     pub github_connected: bool,
     pub slack_connected: bool,
     pub grafana_connected: bool,
@@ -64,7 +67,11 @@ pub fn get_settings(state: State<AppState>) -> Settings {
         // These configs are only persisted after the token verified, so their
         // presence is the connection state. No keychain read, no password prompt.
         jira_connected: c.jira.is_some(),
-        tracker: c.tracker_in_use(),
+        tracker: c.tracker_in_use().filter(|t| match t {
+            TrackerKind::Jira => c.jira.is_some(),
+            TrackerKind::Github => c.github.is_some(),
+        }),
+        tracker_chosen: c.tracker_in_use(),
         github_connected: c.github.is_some(),
         slack_connected: super::notifications(&c).is_some(),
         grafana_connected: c.grafana.is_some(),

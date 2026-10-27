@@ -16,6 +16,7 @@
  *   &loop=checking|held|passed|gave_up   the task's agents on a loop (§21)
  *   &spec=split            ACME-123 with a spec per repository from before (SPEC-25)
  *   &role=member          a member of the workspace, who sees its settings (SET-7)
+ *   &tracker=github       the workspace's tickets are GitHub issues (TKT-15)
  *   &theme=night|day|tokyo-night|cursor-dark|cursor-light|ayu-dark|ayu-light|system   the saved theme (SET-5)
  *
  * From the console, or a browser tool's JavaScript:
@@ -39,6 +40,7 @@ import { specAnswers } from "./spec";
 import { epicAnswers, seedEpic } from "./epic";
 import { runAnswers } from "./runs";
 import { profileAnswers } from "./profiles";
+import { githubTracker } from "./tracker";
 
 type Args = Record<string, unknown>;
 type Answer = (args: Args) => unknown;
@@ -53,6 +55,8 @@ const theme = params.get("theme");
 if (theme) world.settings.ui.theme = theme as typeof world.settings.ui.theme;
 if (params.get("role") === "member" && world.settings.workspace) world.settings.workspace.admin = false;
 seedEpic(world);
+// After the epic, so its tickets become issues too.
+if (params.get("tracker") === "github") githubTracker(world);
 for (const p of world.panes) if (p.acp) seedAcp(p.id);
 for (const p of world.panes) {
   const phase = params.get("loop");
@@ -497,10 +501,16 @@ const answer: Record<string, Answer> = {
   // Unanswered, New epic closed on a null epic and never asked for its repositories (EPIC-2).
   file_ticket: (a) => {
     const req = a.req as { summary: string; issue_type: string; project_key: string | null; parent_key: string | null };
-    const key = `${req.project_key ?? "ACME"}-${300 + world.issues.length}`;
+    const n = 300 + world.issues.length;
+    const github = world.settings.tracker === "github";
+    // A GitHub issue is filed in a repository, the parent's when none is named.
+    const repo = req.project_key ?? req.parent_key?.split("#")[0] ?? "acme/web";
+    const key = github ? `${repo}#${n}` : `${req.project_key ?? "ACME"}-${n}`;
     const made = {
-      ...world.issues[0], key, summary: req.summary, issue_type: req.issue_type, status: "To Do", status_id: "1",
-      status_category: "new", epic_key: req.parent_key, epic_summary: null, url: `https://acme.atlassian.net/browse/${key}`,
+      ...world.issues[0], key, summary: req.summary, issue_type: github ? "Issue" : req.issue_type,
+      status: github ? "Open" : "To Do", status_id: github ? "open" : "1", status_category: "new",
+      epic_key: req.parent_key, epic_summary: null,
+      url: github ? `https://github.com/${repo}/issues/${n}` : `https://acme.atlassian.net/browse/${key}`,
     };
     world.issues.push(made);
     return structuredClone(made);
@@ -540,7 +550,12 @@ const answer: Record<string, Answer> = {
   ticket_required_fields: () => world.requiredFields,
   // Jira orders a search (TKT-13); here the list is sorted as Jira would.
   tickets_find: (a) => ({ issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES), more: false }),
-  ticket_priorities: () => PRIORITIES,
+  ticket_priorities: () => (world.settings.tracker === "github" ? [] : PRIORITIES),
+  set_tracker: (a) => {
+    world.settings.tracker_chosen = a.uses as typeof world.settings.tracker;
+    world.settings.tracker = world.settings.tracker_chosen;
+    return null;
+  },
   tickets_by_key: (a) =>
     [...world.issues, ...world.elsewhere].filter((i) => (a.keys as string[]).includes(i.key)),
   start_work_on_ticket: (a) => {

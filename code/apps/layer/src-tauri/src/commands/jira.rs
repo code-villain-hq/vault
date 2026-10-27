@@ -53,7 +53,13 @@ pub(crate) fn stored_or(
     }
 }
 
+/// Jira, while it is the workspace's tracker. Everything that is Jira's own
+/// (transitions, the moves of TKT-8, the `jira_*` tools) asks for it here,
+/// so none of it runs against a Jira the workspace has left (TKT-16).
 pub(crate) fn jira_client(state: &AppState) -> Result<(Jira, JiraConfig)> {
+    if state.config.with(|c| c.tracker_in_use()) != Some(crate::config::TrackerKind::Jira) {
+        return Err(Error::NotConfigured("Jira"));
+    }
     let cfg = state.config.with(|c| c.jira.clone()).ok_or(Error::NotConfigured("Jira"))?;
     let token = secrets::get(secrets::JIRA)?.ok_or(Error::NotConfigured("Jira"))?;
     Ok((Jira::new(&cfg, &token)?, cfg))

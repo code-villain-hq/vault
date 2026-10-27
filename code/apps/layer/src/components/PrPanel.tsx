@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { reportRepoResults } from "../lib/report";
 import { useRunningAgentsOf } from "../lib/panes";
 import { useStore } from "../store";
+import { trackerOfKey } from "../lib/tracker";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
 import { ChevronIcon, ExternalIcon, PlusIcon } from "./icons";
@@ -230,8 +231,8 @@ export function PrPanel({
 
   useEffect(() => {
     setTitle(task.name);
-    setBody(task.issue_url ? `Jira: ${task.issue_url}\n` : "");
-  }, [task.id, task.name, task.issue_url]);
+    setBody(task.issue_url ? `${trackerOfKey(task.issue_key ?? "")}: ${task.issue_url}\n` : "");
+  }, [task.id, task.name, task.issue_url, task.issue_key]);
 
   function openPr(url: string) {
     void openUrl(url).catch(() => fail("Couldn't open the browser. Try again."));

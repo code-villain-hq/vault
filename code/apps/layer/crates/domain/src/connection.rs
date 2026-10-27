@@ -157,13 +157,14 @@ pub struct TrackerSettings {
     pub uses: TrackerKind,
 }
 
-/// The issue trackers a workspace can use. GitHub Issues and Forge join
-/// as each is built.
+/// The issue trackers a workspace can use. Forge joins once it is built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum TrackerKind {
     Jira,
+    /// GitHub Issues, in the workspace's repositories, with Code's token.
+    Github,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

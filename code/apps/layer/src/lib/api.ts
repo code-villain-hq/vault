@@ -71,7 +71,7 @@ import type {
 } from "./types";
 import type { RunLog } from "./types-runs";
 import type { EpicView, Filed, StartedSubTask } from "./types-epic";
-import type { Operation } from "@layer/types";
+import type { Operation, TrackerKind } from "@layer/types";
 import type {
   Elsewhere, ProfileView, ServerSignedIn, ServerWays, SetupApplied, SetupSnapshot, WorkspacePlace,
 } from "./types-profiles";
@@ -299,6 +299,7 @@ export const api = {
   ticketsFind: (text: string, whose: string, includeDone: boolean, types: string[], order: string) =>
     invoke<TicketPage>("tickets_find", { text: text || null, whose, includeDone, types, order }),
   ticketPriorities: () => invoke<string[]>("ticket_priorities"),
+  setTracker: (uses: TrackerKind) => invoke<void>("set_tracker", { uses }),
   ticketsByKey: (keys: string[]) => invoke<Ticket[]>("tickets_by_key", { keys }),
   ticketRequiredFields: (projectKey: string, issueTypeId: string) =>
     invoke<RequiredField[]>("ticket_required_fields", { projectKey, issueTypeId }),

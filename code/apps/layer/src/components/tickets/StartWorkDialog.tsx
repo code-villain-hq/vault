@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
+import { branchStem } from "../../lib/tracker";
 import { useStore } from "../../store";
 import { useSpecs } from "../../lib/specs";
 import type { AgentStatus, Ticket, Project, TaskView } from "../../lib/types";
@@ -219,10 +220,10 @@ export function StartWorkDialog({
 
       <Field
         label="Branch"
-        hint={`Created in every repo you picked, and names the task folder. Leave the suffix blank for just ${issue.key}.`}
+        hint={`Created in every repo you picked, and names the task folder. Leave the suffix blank for just ${branchStem(issue.key, issue.summary)}.`}
       >
         <div className="ui-field branch-compose">
-          <span className="branch-key">{issue.key}</span>
+          <span className="branch-key">{branchStem(issue.key, issue.summary)}</span>
           <span className="branch-dash">-</span>
           <input className="ui-field"
             value={suffix}

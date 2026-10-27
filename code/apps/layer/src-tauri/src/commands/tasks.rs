@@ -58,11 +58,12 @@ pub(crate) fn slugify(s: &str) -> String {
     out.trim_matches('-').chars().take(48).collect()
 }
 
-/// The Jira project a key belongs to: "ACME-123" -> "ACME". Used to remember which
+/// The Jira project a key belongs to: "ACME-123" -> "ACME", or a GitHub
+/// issue's repository: "acme/web#12" -> "acme/web". Used to remember which
 /// repos a team's tickets usually touch.
 pub(crate) fn issue_project(issue_key: Option<&str>) -> String {
     issue_key
-        .and_then(|k| k.split_once('-').map(|(p, _)| p.to_string()))
+        .and_then(|k| k.split_once('#').or_else(|| k.split_once('-')).map(|(p, _)| p.to_string()))
         .unwrap_or_default()
 }
 
@@ -276,7 +277,7 @@ pub(crate) fn suggest_from(
 /// A ticket's branch is its key, optionally with a suffix — `ACME-1234` or
 /// `ACME-1234-some-feature`. The key is used verbatim rather than folded into a
 /// slug of the task name, which would repeat it: task names from Jira already
-/// begin with the key.
+/// begin with the key. A GitHub issue's is its number and its title's slug.
 pub(crate) fn derive_branch(
     explicit: Option<&str>,
     issue_key: Option<&str>,
@@ -287,6 +288,13 @@ pub(crate) fn derive_branch(
         return branch.to_string();
     }
     match issue_key.map(str::trim).filter(|k| !k.is_empty()) {
+        // `owner/repo#12` is no branch name: the number and the title's
+        // slug are, as GitHub's own "Create a branch" makes them (TKT-21).
+        Some(key) if crate::tickets::github::parse_key(key).is_some() => {
+            let number = key.rsplit('#').next().unwrap_or_default();
+            let parts = [Some(number.to_string()), Some(slugify(name.strip_prefix(key).unwrap_or(name))), suffix.map(slugify)];
+            parts.into_iter().flatten().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("-")
+        }
         Some(key) => match suffix.map(slugify).filter(|s| !s.is_empty()) {
             Some(suffix) => format!("{key}-{suffix}"),
             None => key.to_string(),
@@ -647,7 +655,7 @@ pub(crate) fn add_checkout_inner(
     let root = PathBuf::from(&task.root);
     if existing.iter().any(|c| c.path == task.root) {
         let slug = match &task.issue_key {
-            Some(key) => format!("{}-{}", key.to_uppercase(), slugify(&task.name)),
+            Some(key) => format!("{}-{}", key.to_uppercase().replace(['/', '#'], "-"), slugify(&task.name)),
             None => slugify(&task.name),
         };
         let new_root = unique_task_root(&state.config, &slug);

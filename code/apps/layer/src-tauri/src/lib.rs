@@ -330,6 +330,7 @@ pub fn run() {
             commands::ticket_types,
             commands::tickets_find,
             commands::ticket_priorities,
+            commands::set_tracker,
             commands::tickets_by_key,
             commands::jira_transitions,
             commands::jira_sync_status,

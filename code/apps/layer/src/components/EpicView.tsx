@@ -4,6 +4,7 @@ import { taskReview } from "../lib/derive";
 import { useEpicViews } from "../lib/epicState";
 import { specProgress, useSpecs } from "../lib/specs";
 import { useStore } from "../store";
+import { trackerOfKey } from "../lib/tracker";
 import type { TaskView } from "../lib/types";
 import { SpecView } from "./SpecView";
 import { EpicChat } from "./epic/EpicChat";
@@ -51,7 +52,7 @@ export function EpicMain({ epic }: { epic: TaskView }) {
         <div className="spacer" />
         {epic.issue_url && (
           <div className="ws-links">
-            <button className="ui-link" title={`Open ${epic.issue_key} in Jira`} onClick={() => void openUrl(epic.issue_url!)}>
+            <button className="ui-link" title={`Open ${epic.issue_key} in ${trackerOfKey(epic.issue_key ?? "")}`} onClick={() => void openUrl(epic.issue_url!)}>
               {epic.issue_key} ↗
             </button>
             {ticket && <span className={`ui-status status-pill ${statusClass(ticket.status_category)}`}>{ticket.status}</span>}

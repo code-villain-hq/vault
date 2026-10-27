@@ -15,7 +15,8 @@ import { flowOf, mergedTransition } from "./TicketFlow";
  * still in review on the board.
  */
 export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => void }) {
-  const jiraConnected = useStore((s) => s.settings?.jira_connected ?? false);
+  // Only Jira has transitions to offer; a GitHub issue closes with its pull request (TKT-18).
+  const jiraConnected = useStore((s) => s.settings?.tracker === "jira");
   const paneCount = useStore((s) => s.panes.filter((p) => p.task_id === task.id).length);
   const rows = useStore((s) => s.prs[task.id]);
   const selected = useStore((s) => s.selectedTask);

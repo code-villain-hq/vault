@@ -66,7 +66,7 @@ pub async fn finish_call(app: &AppHandle, args: Value, caller: Option<&str>) -> 
 
     let landed = merged_heads(&state, &task.id).await?;
     let wanted = args.get("transition").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
-    let ticket = match (task.issue_key.as_deref(), state.config.with(|c| c.jira.is_some())) {
+    let ticket = match (task.issue_key.as_deref(), state.config.with(|c| c.tracker_in_use() == Some(crate::config::TrackerKind::Jira))) {
         (Some(key), true) => Some((key.to_string(), closing(&state, key, wanted).await?)),
         _ if wanted.is_some() => {
             return Err(Error::Other(format!("{} has no Jira ticket to move; nothing was changed", task.name)));
