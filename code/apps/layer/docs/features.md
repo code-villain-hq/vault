@@ -3019,7 +3019,9 @@ paper.
   orchestrates the sub-tasks: it reads the spec and their state, starts
   them in order, passes messages to their agents, and brings their
   questions to the user; it writes no code and changes no file. A
-  sub-task's agent works in the sub-task, never in the epic's chat.
+  sub-task's agent works in the sub-task, never in the epic's chat. Its
+  column's width is dragged at its edge and remembered, as the browser's
+  beside a task's terminals is (BRW-9).
 - **EPIC-12** The epic's chat MUST have three tools: `epic_subtasks` (each
   sub-task: its title, ticket, task, repositories, steps ticked of the
   total, what it waits for, and its agents, running and needing you),
