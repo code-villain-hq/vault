@@ -38,8 +38,9 @@ learns, one topic at a time. Each topic has a page that keeps short points by th
 beside it. From the topic's name and what it sticks to (which may be empty), write:
 
 - title: one line saying what the topic is about, under 12 words.
-- sticks_to: what talks in this topic stay with, in one or two sentences, so that a question \
-that doesn't belong can be told apart. When they wrote it, return theirs as it is.
+- sticks_to: what talks in this topic stay with, in one or two sentences. The page shows it \
+under the name, so say only what it's about (\"Houseplants and their care: watering, light, \
+repotting.\"), not rules about what doesn't belong. When they wrote it, return theirs as it is.
 - icon: the one icon from the list that fits best.
 - group: a short group for the sidebar, such as Home, Work, Health or Learning. Reuse one of \
 the existing groups when it fits.

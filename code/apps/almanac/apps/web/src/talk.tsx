@@ -8,11 +8,12 @@ import type { Message, Proposal, Reminder, StartTopicRequest, Talk, Topic } from
 import { MoreMenu, messageOf, overlayOpen, UNKNOWN_PROBLEM } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { ago, dueWords, rhythmWords, timeWords } from "./format";
 import { topicIcon } from "./icons";
 import { isOwn, useNewTopic, useTopics } from "./layout";
+import { Prose } from "./prose";
 import { apiUrl, authHeaders, credentialsFor } from "./server";
 import { TopicForm } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
@@ -623,70 +624,5 @@ function Problem({ text }: { text: string }) {
         </Link>
       )}
     </div>
-  );
-}
-
-/**
- * An answer as written: paragraphs and short lists, with **bold** kept.
- * Answers are told to stay short and plain, so this is all they use.
- */
-export function Prose({ text }: { text: string }) {
-  const blocks: ReactNode[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
-  let paragraph: string[] = [];
-  const flush = () => {
-    if (paragraph.length) {
-      blocks.push(<p key={blocks.length}>{inline(paragraph.join(" "))}</p>);
-      paragraph = [];
-    }
-    if (list) {
-      const items = list.items.map((item, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: an answer's lines don't move
-        <li key={i}>{inline(item)}</li>
-      ));
-      blocks.push(
-        list.ordered ? (
-          <ol key={blocks.length} className="list-decimal pl-5">
-            {items}
-          </ol>
-        ) : (
-          <ul key={blocks.length} className="list-disc pl-5">
-            {items}
-          </ul>
-        ),
-      );
-      list = null;
-    }
-  };
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    const bullet = /^[-*•]\s+(.*)$/.exec(line);
-    const numbered = /^\d+[.)]\s+(.*)$/.exec(line);
-    const item = bullet ?? numbered;
-    if (!line) {
-      flush();
-    } else if (item) {
-      if (paragraph.length || (list && list.ordered !== !!numbered)) flush();
-      list ??= { ordered: !!numbered, items: [] };
-      list.items.push(item[1] ?? "");
-    } else {
-      if (list) flush();
-      paragraph.push(line.replace(/^#+\s*/, ""));
-    }
-  }
-  flush();
-  return <div className="flex flex-col gap-2">{blocks}</div>;
-}
-
-function inline(text: string): ReactNode {
-  // Bold parts sit at the odd places the split leaves them.
-  return text.split(/\*\*([^*]+)\*\*/).map((part, i) =>
-    i % 2 === 1 ? (
-      <strong key={`b${part}`} className="font-semibold">
-        {part}
-      </strong>
-    ) : (
-      part
-    ),
   );
 }

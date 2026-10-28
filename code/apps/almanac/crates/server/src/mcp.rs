@@ -725,7 +725,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                  and no topic has it already. One per answer.",
                 json!({
                     "name": string("A short name, one to three words, in their language."),
-                    "sticks_to": string("What talks in it stay with, in one or two sentences, so a question that doesn't belong can be told apart."),
+                    "sticks_to": string("What talks in it stay with, in one or two sentences. The page shows it under the name, so only what it's about (\"Houseplants and their care: watering, light, repotting.\"), not rules about what doesn't belong."),
                     "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
                     "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
                     "shape": { "type": "string", "enum": SHAPES, "description": "cards when it's about a set of things that each get a card (plants, pets, trips, recipes); document when what it keeps grows into one piece of writing with sections (a pitch, research, a plan)." },
@@ -782,7 +782,7 @@ fn tools(mode: Mode) -> Vec<Value> {
             "Sets up the new topic. Call it once, with every field.",
             json!({
                 "title": string("One line saying what the topic is about, under 12 words."),
-                "sticks_to": string("What talks in it stay with, in one or two sentences. When they wrote it, theirs as it is."),
+                "sticks_to": string("What talks in it stay with, in one or two sentences: only what it's about, not rules about what doesn't belong. When they wrote it, theirs as it is."),
                 "icon": { "type": "string", "enum": ICONS },
                 "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
                 "shape": { "type": "string", "enum": SHAPES, "description": "cards for a set of things that each get a card; document for one piece of writing with sections." },
