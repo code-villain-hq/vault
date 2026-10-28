@@ -529,13 +529,16 @@ async fn the_talk(state: &AppState, actor: Actor, talk_id: Uuid) -> Result<Vec<L
 }
 
 /// What they ask, after the talk so far, and the talk's photos in the
-/// order they came. Never starting with a slash, which Claude Code would
-/// take for one of its commands.
+/// order they came. The photos are numbered (`acp.rs` puts "Photo 2"
+/// before each), and each question says which it came with, so an earlier
+/// photo isn't taken for a new one. Never starting with a slash, which
+/// Claude Code would take for one of its commands.
 fn talk_prompt(said: &[Line]) -> (String, Vec<Image>) {
     let Some((last, before)) = said.split_last() else {
         return (String::new(), Vec::new());
     };
     let mut out = String::new();
+    let mut first = 1;
     if before.is_empty() {
         out.push_str("They ask");
     } else {
@@ -546,29 +549,41 @@ fn talk_prompt(said: &[Line]) -> (String, Vec<Image>) {
             } else {
                 "\nYou answered"
             });
-            out.push_str(&with_photos(line.images.len()));
+            out.push_str(&with_photos(first, line.images.len()));
+            first += line.images.len();
             out.push_str(": ");
             out.push_str(&line.text);
             out.push('\n');
         }
         out.push_str("\nNow they ask");
     }
-    out.push_str(&with_photos(last.images.len()));
+    let earlier = first > 1;
+    if last.images.is_empty() && earlier {
+        out.push_str(" (with no new photo)");
+    }
+    out.push_str(&with_photos(first, last.images.len()));
     out.push_str(": ");
     out.push_str(&last.text);
-    let images: Vec<Image> = said.iter().flat_map(|l| l.images.clone()).collect();
-    if !images.is_empty() {
-        out.push_str("\n\nTheir photos follow, in the order they sent them.");
+    if !last.images.is_empty() {
+        out.push_str("\n\nTheir photos follow, numbered as above.");
+    } else if earlier {
+        out.push_str(
+            "\n\nThe photos from earlier in the talk follow, numbered as above, to look back \
+             at. This question came with none.",
+        );
     }
+    let images: Vec<Image> = said.iter().flat_map(|l| l.images.clone()).collect();
     (out, images)
 }
 
-/// " (with 2 photos)" after "They asked", for a question that had some.
-fn with_photos(count: usize) -> String {
+/// " (with photos 2 and 3)" after "They asked", for a question that had
+/// some, numbered from `first` in the talk.
+fn with_photos(first: usize, count: usize) -> String {
     match count {
         0 => String::new(),
-        1 => " (with a photo)".into(),
-        n => format!(" (with {n} photos)"),
+        1 => format!(" (with photo {first})"),
+        2 => format!(" (with photos {first} and {})", first + 1),
+        n => format!(" (with photos {first} to {})", first + n - 1),
     }
 }
 
@@ -782,10 +797,24 @@ mod tests {
             line("you", "Und das hier?", 1),
         ];
         let (prompt, images) = talk_prompt(&said);
-        assert!(prompt.contains("They asked (with 2 photos): Meine Shampoos."));
-        assert!(prompt.contains("Now they ask (with a photo): Und das hier?"));
-        assert!(prompt.ends_with("Their photos follow, in the order they sent them."));
+        assert!(prompt.contains("They asked (with photos 1 and 2): Meine Shampoos."));
+        assert!(prompt.contains("Now they ask (with photo 3): Und das hier?"));
+        assert!(prompt.ends_with("Their photos follow, numbered as above."));
         assert_eq!(images.len(), 3);
+    }
+
+    #[test]
+    fn an_earlier_photo_is_not_taken_for_a_new_one() {
+        let said = [
+            line("you", "Mein Shampoo.", 1),
+            line("almanac", "Head & Shoulders.", 0),
+            line("you", "Trocken oder platt?", 0),
+        ];
+        let (prompt, images) = talk_prompt(&said);
+        assert!(prompt.contains("They asked (with photo 1): Mein Shampoo."));
+        assert!(prompt.contains("Now they ask (with no new photo): Trocken oder platt?"));
+        assert!(prompt.ends_with("This question came with none."));
+        assert_eq!(images.len(), 1);
     }
 
     #[test]

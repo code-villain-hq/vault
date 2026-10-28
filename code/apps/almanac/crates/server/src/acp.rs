@@ -354,14 +354,14 @@ struct Agent {
     tail: Arc<Mutex<String>>,
 }
 
-/// The prompt's content blocks: the text, then each photo.
+/// The prompt's content blocks: the text, then each photo with its number.
 fn prompt(question: &Question<'_>) -> Vec<Value> {
     let mut blocks = vec![json!({ "type": "text", "text": question.prompt })];
-    blocks.extend(
-        question.images.iter().map(
-            |image| json!({ "type": "image", "mimeType": image.media_type, "data": image.data }),
-        ),
-    );
+    // Numbered, as the prompt names them.
+    for (n, image) in question.images.iter().enumerate() {
+        blocks.push(json!({ "type": "text", "text": format!("Photo {}:", n + 1) }));
+        blocks.push(json!({ "type": "image", "mimeType": image.media_type, "data": image.data }));
+    }
     blocks
 }
 

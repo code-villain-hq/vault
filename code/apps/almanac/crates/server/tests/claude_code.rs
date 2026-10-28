@@ -369,7 +369,8 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
     assert_eq!(shown.status, StatusCode::OK);
     assert_eq!(shown.text, "the shampoo");
 
-    // Claude reads the photo after the question, and again with the next.
+    // Claude reads the photo after the question, numbered, and again with
+    // the next, which says it came with none.
     let image = json!({ "type": "image", "mimeType": "image/jpeg", "data": photo });
     let first = prompts(&log).last().cloned().unwrap();
     assert_eq!(first[0]["type"], "text");
@@ -377,9 +378,10 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
         first[0]["text"]
             .as_str()
             .unwrap()
-            .contains("(with a photo)")
+            .contains("(with photo 1)")
     );
-    assert_eq!(first[1], image);
+    assert_eq!(first[1]["text"], "Photo 1:");
+    assert_eq!(first[2], image);
     let talk = question["talk_id"].as_str().unwrap();
     let again = app
         .post(
@@ -390,7 +392,13 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
         .await;
     assert_eq!(again.status, StatusCode::OK, "{}", again.text);
     let next = prompts(&log).last().cloned().unwrap();
-    assert_eq!(next[1], image, "{next}");
+    assert!(
+        next[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("(with no new photo)")
+    );
+    assert_eq!(next[2], image, "{next}");
 
     // The photo goes with its talk.
     let deleted = app
