@@ -12,11 +12,11 @@ use uuid::Uuid;
 
 const TOPIC: &str = "SELECT name, sticks_to, title, shape FROM topics \
      WHERE id = $1 AND workspace_id = $2";
-const POINTS: &str = "SELECT theme, text, source FROM points \
+const POINTS: &str = "SELECT id, theme, text, source FROM points \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const QUESTIONS: &str = "SELECT text FROM questions \
      WHERE topic_id = $1 AND workspace_id = $2 AND status = 'open' ORDER BY created_at";
-const REMINDERS: &str = "SELECT title, due_on, every_days FROM reminders \
+const REMINDERS: &str = "SELECT id, title, due_on, every_days, status FROM reminders \
      WHERE topic_id = $1 AND workspace_id = $2 AND status IN ('on', 'offered') ORDER BY due_on";
 const OTHERS: &str = "SELECT name FROM topics \
      WHERE workspace_id = $2 AND id <> $1 AND kind = 'topic' ORDER BY position";
@@ -27,8 +27,22 @@ const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, t.shape, \
      FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
      ORDER BY t.group_name = '', t.group_name, t.position, t.created_at";
 
-/// A theme and its points: each a text and where it comes from.
-pub type Theme = (String, Vec<(String, Option<String>)>);
+/// A theme and its points: each its id, a text and where it comes from.
+pub type Theme = (String, Vec<(Uuid, String, Option<String>)>);
+
+/// A reminder as the page has it: its id, title, next day, rhythm, and
+/// whether it's `on` or only `offered`.
+pub type PageReminder = (Uuid, String, NaiveDate, Option<i32>, String);
+
+/// The page's points and reminders by the references Claude reads them
+/// with: `p3` is the third point as the page lists them, `r2` the second
+/// reminder.
+#[derive(Debug, Default, Clone)]
+pub struct Refs {
+    pub points: Vec<Uuid>,
+    /// Each with whether it's only offered yet.
+    pub reminders: Vec<(Uuid, bool)>,
+}
 
 pub struct Page {
     pub id: Uuid,
@@ -40,7 +54,7 @@ pub struct Page {
     /// Each theme with its points, in page order.
     pub themes: Vec<Theme>,
     pub questions: Vec<String>,
-    pub reminders: Vec<(String, NaiveDate, Option<i32>)>,
+    pub reminders: Vec<PageReminder>,
     pub others: Vec<String>,
 }
 
@@ -58,16 +72,16 @@ impl Page {
         let Some((name, sticks_to, title, shape)) = topic else {
             return Ok(None);
         };
-        let points: Vec<(String, String, Option<String>)> = sqlx::query_as(POINTS)
+        let points: Vec<(Uuid, String, String, Option<String>)> = sqlx::query_as(POINTS)
             .bind(id)
             .bind(workspace_id)
             .fetch_all(pool)
             .await?;
         let mut themes: Vec<Theme> = Vec::new();
-        for (theme, text, source) in points {
+        for (id, theme, text, source) in points {
             match themes.iter_mut().find(|(t, _)| *t == theme) {
-                Some((_, kept)) => kept.push((text, source)),
-                None => themes.push((theme, vec![(text, source)])),
+                Some((_, kept)) => kept.push((id, text, source)),
+                None => themes.push((theme, vec![(id, text, source)])),
             }
         }
         Ok(Some(Page {
@@ -95,7 +109,24 @@ impl Page {
         }))
     }
 
-    /// The topic and what it has kept, in plain text.
+    /// The references `describe` gives the points and reminders.
+    pub fn refs(&self) -> Refs {
+        Refs {
+            points: self
+                .themes
+                .iter()
+                .flat_map(|(_, points)| points.iter().map(|(id, ..)| *id))
+                .collect(),
+            reminders: self
+                .reminders
+                .iter()
+                .map(|(id, .., status)| (*id, status == "offered"))
+                .collect(),
+        }
+    }
+
+    /// The topic and what it has kept, in plain text, each point and
+    /// reminder with its reference.
     pub fn describe(&self) -> String {
         let mut out = String::new();
         let _ = writeln!(out, "The topic: {}", self.name);
@@ -120,15 +151,17 @@ impl Page {
         if self.themes.is_empty() {
             out.push_str("Nothing yet.\n");
         }
+        let mut n = 0;
         for (theme, points) in &self.themes {
             let _ = writeln!(out, "## {theme}");
-            for (text, source) in points {
+            for (_, text, source) in points {
+                n += 1;
                 match source.as_deref().filter(|s| !s.is_empty()) {
                     Some(source) => {
-                        let _ = writeln!(out, "- {text} ({source})");
+                        let _ = writeln!(out, "- [p{n}] {text} ({source})");
                     }
                     None => {
-                        let _ = writeln!(out, "- {text}");
+                        let _ = writeln!(out, "- [p{n}] {text}");
                     }
                 }
             }
@@ -141,15 +174,17 @@ impl Page {
         }
         if !self.reminders.is_empty() {
             out.push_str("\nReminders on the calendar:\n");
-            for (title, due_on, every) in &self.reminders {
-                match every {
-                    Some(days) => {
-                        let _ = writeln!(out, "- {title}: next on {due_on}, every {days} days");
-                    }
-                    None => {
-                        let _ = writeln!(out, "- {title}: on {due_on}");
-                    }
-                }
+            for (n, (_, title, due_on, every, status)) in self.reminders.iter().enumerate() {
+                let when = match every {
+                    Some(days) => format!("next on {due_on}, every {days} days"),
+                    None => format!("on {due_on}"),
+                };
+                let offered = if status == "offered" {
+                    " (offered, waiting for their yes)"
+                } else {
+                    ""
+                };
+                let _ = writeln!(out, "- [r{}] {title}: {when}{offered}", n + 1);
             }
         }
         out.push_str("\nThe other topics: ");

@@ -7,7 +7,7 @@ import type { ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/t
 import type { SyncClient } from "@code-villain/sync-client";
 import { type Confirmation, ConfirmDialog, MoreMenu, RowAction, useApi } from "@code-villain/web";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { MessagesSquare, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessagesSquare, X } from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
@@ -19,6 +19,7 @@ import {
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
 import {
+  addDays,
   ago,
   dayKey,
   dueWords,
@@ -510,11 +511,39 @@ function Starters({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => voi
 
 /** This week of the topic's reminders, a day each. */
 function WeekStrip({ topic, reminders }: { topic: Topic; reminders: Reminder[] }) {
-  const days = weekOf(today());
   const now = today();
+  const [days, setDays] = useState(() => weekOf(now));
+  const first = days[0] ?? now;
   return (
     <section className="flex flex-col gap-2" aria-label={`${topic.name} this week`}>
-      <h2 className="text-xs font-semibold text-muted">{weekWords(days)}</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-xs font-semibold text-muted">{weekWords(days)}</h2>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setDays(weekOf(addDays(first, -7)))}
+            aria-label="The week before"
+            title="The week before"
+            className="ui-button ui-icon-button"
+          >
+            <ChevronLeft size={15} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDays(weekOf(addDays(first, 7)))}
+            aria-label="The week after"
+            title="The week after"
+            className="ui-button ui-icon-button"
+          >
+            <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+        {!days.includes(now) && (
+          <button type="button" onClick={() => setDays(weekOf(now))} className="ui-button">
+            This week
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-7 gap-1">
         {days.map((day) => {
           const due = reminders.filter((r) => occurrences(r, day, day).length > 0);

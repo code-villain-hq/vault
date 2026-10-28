@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::kept::{Kept, reminder};
+use crate::page::Refs;
 use crate::state::AppState;
 use crate::topics::{SetUp, cut};
 
@@ -81,6 +82,14 @@ impl Asking {
             mode,
             kept: Mutex::new(Kept::default()),
             set_up: Mutex::new(None),
+        }
+    }
+
+    /// Keeping for a page with these points and reminders.
+    pub fn on(self, refs: Refs) -> Self {
+        Asking {
+            kept: Mutex::new(Kept::on(refs)),
+            ..self
         }
     }
 
@@ -171,6 +180,7 @@ pub async fn handle(
                 Ok(text) => (text, false),
                 Err(text) => (text, true),
             };
+            tracing::info!(tool = name, failed, said = %text, "Claude Code called a tool");
             json!({ "content": [{ "type": "text", "text": text }], "isError": failed })
         }
         _ => {
@@ -208,7 +218,13 @@ async fn call(
     match name {
         "keep_point" => {
             let point: PointArgs = read(arguments)?;
-            kept()?.keep_point(&point.theme, &point.text, &point.source, &point.url)?;
+            kept()?.keep_point(
+                &point.theme,
+                &point.text,
+                &point.source,
+                &point.url,
+                &point.replaces,
+            )?;
             Ok("Kept.".into())
         }
         "ask_to_check" => {
@@ -219,7 +235,7 @@ async fn call(
         "offer_reminder" => {
             let r: ReminderArgs = read(arguments)?;
             let reminder = reminder(&r.theme, &r.title, &r.due_on, &r.at, r.every_days)?;
-            kept()?.offer_reminder(reminder)?;
+            kept()?.offer_reminder(reminder, &r.replaces)?;
             Ok("Offered: they add it to the calendar with a click.".into())
         }
         "name_talk" => {
@@ -281,6 +297,8 @@ struct PointArgs {
     source: String,
     #[serde(default)]
     url: String,
+    #[serde(default)]
+    replaces: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -301,6 +319,8 @@ struct ReminderArgs {
     #[serde(default)]
     at: String,
     every_days: Option<i64>,
+    #[serde(default)]
+    replaces: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -656,11 +676,20 @@ fn tools(mode: Mode) -> Vec<Value> {
     };
     let reminder_fields = json!({
         "theme": string("The theme it belongs to, or left out."),
-        "title": string("What to do, as the calendar shows it: \"Water the Monstera\"."),
+        "title": string("What to do in two to four words, as the calendar shows it: \"Water the Monstera\", \"Elvital wash\". The steps go in the page's points, not here."),
         "due_on": string("The next day it's due, as YYYY-MM-DD."),
         "at": string("A time, as HH:MM, or left out for nine in the morning."),
         "every_days": { "type": "integer", "description": "The rhythm in days, or left out for once." },
     });
+    let replaces = |what: &str, like: &str| {
+        json!({
+            "type": "array",
+            "items": { "type": "string" },
+            "description": format!("The page's {what} this one takes the place of, as the page names them ({like}), or left out."),
+        })
+    };
+    let mut offer_fields = reminder_fields.clone();
+    offer_fields["replaces"] = replaces("reminders", "r2");
     let name_talk = tool(
         "name_talk",
         "Names the talk, on its first answer: under six words, in the talk's language.",
@@ -680,9 +709,13 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "keep_point",
                 "Keeps a point on the topic's page: a fact, a decision, or something they told \
                  you about their situation that's worth knowing later; nothing the page has \
-                 already. Usually none to four per answer. On a page of cards each theme is one \
-                 thing the topic is about, named plainly (a plant, a pet, a place), and a point \
-                 is one short sentence, under 25 words. In a document each theme is a section \
+                 already. The page is kept up to date, not added to: when what you'd keep \
+                 changes or corrects points the page has (a wash day moved, a product swapped), \
+                 keep it in place of them with replaces, naming them as the page does (p3), \
+                 and keep one point where two would say the same. Usually none to three per \
+                 answer. On a page of cards each theme is one thing the topic is about, named \
+                 plainly (a plant, a pet, a place), and a point is one short sentence, under 20 \
+                 words. In a document each theme is a section \
                  (such as Problem, Market, Team), and it's read later as writing, so a point \
                  keeps what your answer explained the way you explained it: two to four \
                  sentences on what it is and why it matters, starting with the term it's about \
@@ -693,15 +726,18 @@ fn tools(mode: Mode) -> Vec<Value> {
                     "text": string("The point: on cards one short sentence; in a document two to four sentences that explain."),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                     "url": string("The page it comes from, when you read one. Never a made-up link."),
+                    "replaces": replaces("points", "p3"),
                 }),
                 &["theme", "text", "source"],
             ),
             tool(
                 "ask_to_check",
-                "When your answer rested on a guess about their situation, asks them to check \
-                 it, with the point to keep if they say yes (text \"Does the Monstera stand by \
-                 the north window?\", point \"Stands by the north window.\"). At most two per \
-                 answer, and none the page is already waiting on.",
+                "When your answer rested on a guess about their situation that you didn't ask \
+                 about in the answer, asks them to check it on the page, with the point to keep \
+                 if they say yes (text \"Does the Monstera stand by the north window?\", point \
+                 \"Stands by the north window.\"). A question you ask in your answer waits for \
+                 their reply in the talk: never ask it here too. At most two per answer, and \
+                 none the page is already waiting on.",
                 json!({
                     "theme": string("The theme the point would go under."),
                     "text": string("The question to check."),
@@ -713,9 +749,16 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "offer_reminder",
                 "Offers a reminder, only when the talk settled something recurring or dated \
                  they'd want to be reminded of (watering every 7 days, repotting in March, \
-                 sending the deck on Friday). They add it to the calendar with a click. None \
-                 the calendar has already.",
-                reminder_fields,
+                 sending the deck on Friday). A routine they told you they keep counts \
+                 (washing their hair three times a week): one reminder for each day it comes \
+                 round, so something a few times a week is a reminder per weekday, each every \
+                 7 days; when they didn't say which days, spread them evenly and say which in \
+                 your answer. They add it to the calendar with a click. None the calendar has \
+                 already: when a reminder changes (a wash day moved, another rhythm), offer the \
+                 new one in place of the old with replaces, naming it as the page does (r2). \
+                 One that only goes, with nothing new on its day, is replaced by the reminder \
+                 that takes over from it.",
+                offer_fields,
                 &["title", "due_on"],
             ),
             name_talk,

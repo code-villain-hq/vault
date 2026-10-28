@@ -70,9 +70,11 @@ it fits better in another topic, naming one of the other topics or a new one.
 /// With Claude Code: Almanac's tools keep the page as it answers.
 const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer: keep_point for \
 what's worth knowing later, ask_to_check when your answer rested on a guess about their \
-situation, offer_reminder when the talk settled something recurring or dated, fits_elsewhere \
-when the question belongs in another topic, and name_talk on a talk's first answer. Write only \
-the answer: they don't see the tools, so don't mention them or narrate using them.";
+situation, offer_reminder when the talk settled something recurring or dated, or they told you \
+a routine they keep, fits_elsewhere when the question belongs in another topic, and name_talk \
+on a talk's first answer. The page is kept up to date, not added to: what changes a point or \
+reminder it has replaces that one. Write only the answer: they don't see the tools, so don't mention \
+them or narrate using them.";
 
 const WEB_ON: &str = "You can search the web and read pages. Do it when the answer depends on \
 things that change (prices, laws, opening hours, news) or that you aren't sure of, and keep the \
@@ -119,24 +121,34 @@ learns. After each exchange in a talk, you decide what the page keeps from it. R
 schema's shape.
 
 - points: what's worth knowing later from this exchange: facts, decisions, and what they told you \
-about their situation. Nothing the page already has. Usually none to four. On a page of cards \
+about their situation. Nothing the page already has. Usually none to three. On a page of cards \
 each theme is one thing the topic is about, named plainly (a plant, a pet, a place), and a point \
-is one short sentence, under 25 words. In a document each theme is a section of one piece of \
+is one short sentence, under 20 words. In a document each theme is a section of one piece of \
 writing (such as Problem, Market, Team), and it's read later as writing, so a point keeps what \
 the answer explained the way it explained it: two to four sentences on what it is and why it \
 matters, starting with the term it's about in **bold** when there is one. What they told you \
 stays one sentence. Use an existing theme when one fits.
+- replaces: the page is kept up to date, not added to. When a point changes or corrects points \
+the page has (a wash day moved, a product swapped), it replaces them, named as the page names \
+them ([\"p3\"]); keep one point where two would say the same. [] when it replaces none.
 - source: where the point comes from, in a few words: \"You said\", \"From the talk\", or the \
 book, guide or institution the answer relied on. Never a link.
 - questions: when the answer rested on a guess about their situation, ask to check it, with the \
 point to keep if they say yes (text \"Does the Monstera stand by the north window?\", point \
-\"Stands by the north window.\"). Point is \"\" when there's nothing to keep. At most two, and \
-none the page is already waiting on.
+\"Stands by the north window.\"). Point is \"\" when there's nothing to keep. Only for a guess \
+the answer didn't ask about: a question the answer asked waits for their reply in the talk, so \
+it's never asked here too. At most two, and none the page is already waiting on.
 - reminders: only when the exchange settled something recurring or dated they'd want to be \
-reminded of (watering every 7 days, repotting in March, sending the deck on Friday). title says \
-what to do (\"Water the Monstera\"), due_on is the next day it's due (YYYY-MM-DD), at is a time \
-(\"HH:MM\") or \"\", every_days is the rhythm in days, or 0 for once. None the calendar already \
-has.
+reminded of (watering every 7 days, repotting in March, sending the deck on Friday). A routine \
+they told you they keep counts (washing their hair three times a week): one reminder for each \
+day it comes round, so something a few times a week is a reminder per weekday, each every 7 \
+days; when they didn't say which days, spread them evenly and the answer says which. title says \
+what to do in two to four words (\"Water the Monstera\", \"Elvital wash\"); the steps belong in \
+points. due_on is the next day it's due (YYYY-MM-DD), at is a time \
+(\"HH:MM\") or \"\", every_days is the rhythm in days, or 0 for once. replaces names the reminders \
+it takes the place of, as the page names them ([\"r2\"]): when a reminder changes (a wash day \
+moved, another rhythm), offer the new one in place of the old, and one that only goes is \
+replaced by the reminder that takes over from it; [] for none. None the calendar already has.
 - elsewhere: when the question had nothing to do with this topic, the topic it fits (one of the \
 others, or a short new name); otherwise \"\".
 - talk_title: a title for the talk, under six words.
@@ -157,6 +169,8 @@ struct KeepPoint {
     theme: String,
     text: String,
     source: String,
+    #[serde(default)]
+    replaces: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -173,6 +187,8 @@ struct KeepReminder {
     due_on: String,
     at: String,
     every_days: i64,
+    #[serde(default)]
+    replaces: Vec<String>,
 }
 
 fn keep_schema() -> Value {
@@ -191,7 +207,12 @@ fn keep_schema() -> Value {
     let string = json!({ "type": "string" });
     let list = |item: Value| json!({ "type": "array", "items": item });
     object(json!({
-        "points": list(object(json!({ "theme": string, "text": string, "source": string }))),
+        "points": list(object(json!({
+            "theme": string,
+            "text": string,
+            "source": string,
+            "replaces": list(string.clone()),
+        }))),
         "questions": list(object(json!({ "theme": string, "text": string, "point": string }))),
         "reminders": list(object(json!({
             "theme": string,
@@ -199,6 +220,7 @@ fn keep_schema() -> Value {
             "due_on": string,
             "at": string,
             "every_days": { "type": "integer" },
+            "replaces": list(string.clone()),
         }))),
         "elsewhere": string,
         "talk_title": string,
@@ -394,6 +416,13 @@ async fn answer(
                 // What it kept doesn't fit: the answer still stands.
                 Err(error) => {
                     tracing::warn!(%error, "couldn't keep what the answer kept");
+                    let mut alone = alone;
+                    if let Operation::Create { data, .. } = &mut alone {
+                        data.insert(
+                            "kept".into(),
+                            json!("Almanac couldn't change the page this time. Ask again."),
+                        );
+                    }
                     write(state, actor, vec![alone]).await
                 }
             }
@@ -461,7 +490,9 @@ async fn say_with_claude_code(
         )
     };
     let mode = if own { Mode::Own } else { Mode::Topic };
-    let open = state.questions.open(Asking::new(actor, page.id, mode));
+    let open = state
+        .questions
+        .open(Asking::new(actor, page.id, mode).on(page.refs()));
     let tools = mode.tools();
     let (prompt, images) = talk_prompt(&said);
     let question = Question {
@@ -722,16 +753,22 @@ async fn keep(
         .json(&key, KEEP, &prompt, keep_schema())
         .await
         .map_err(AppError::internal)?;
-    let mut kept = Kept::default();
+    let mut kept = Kept::on(page.refs());
     for point in &from.points {
-        let _ = kept.keep_point(&point.theme, &point.text, &point.source, "");
+        let _ = kept.keep_point(
+            &point.theme,
+            &point.text,
+            &point.source,
+            "",
+            &point.replaces,
+        );
     }
     for question in &from.questions {
         let _ = kept.ask_to_check(&question.theme, &question.text, &question.point);
     }
     for r in &from.reminders {
         if let Ok(reminder) = reminder(&r.theme, &r.title, &r.due_on, &r.at, Some(r.every_days)) {
-            let _ = kept.offer_reminder(reminder);
+            let _ = kept.offer_reminder(reminder, &r.replaces);
         }
     }
     kept.elsewhere = Some(from.elsewhere);
@@ -838,7 +875,13 @@ mod tests {
             schema["properties"]["reminders"]["items"]["required"]
                 .as_array()
                 .map(Vec::len),
-            Some(5)
+            Some(6)
+        );
+        assert_eq!(
+            schema["properties"]["points"]["items"]["required"]
+                .as_array()
+                .map(Vec::len),
+            Some(4)
         );
     }
 }

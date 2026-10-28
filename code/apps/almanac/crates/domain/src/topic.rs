@@ -175,6 +175,8 @@ pub struct PointPatch {
     pub text: Option<String>,
     pub source: Option<String>,
     pub source_url: Option<String>,
+    /// The talk it now comes from, when a talk changed it.
+    pub talk_id: Option<Uuid>,
     pub seen: Option<bool>,
     pub position: Option<i32>,
 }
@@ -201,6 +203,8 @@ pub struct Reminder {
     pub status: String,
     /// The answer that offered it.
     pub message_id: Option<Uuid>,
+    /// The reminders it takes the place of, once it's on.
+    pub replaces: Vec<Uuid>,
     pub last_done_on: Option<NaiveDate>,
     /// The due date the Mac was last told about. Set by the server.
     pub notified_for: Option<NaiveDate>,
@@ -221,6 +225,7 @@ pub struct ReminderCreate {
     pub notify: Option<bool>,
     pub status: Option<String>,
     pub message_id: Option<Uuid>,
+    pub replaces: Option<Vec<Uuid>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]

@@ -169,7 +169,7 @@ pub async fn start(
         }
         // Offered under the answer that proposed them, to add with a click.
         for reminder in &proposal.reminders {
-            operations.push(offer(id, *message_id, reminder));
+            operations.push(offer(id, *message_id, reminder, &[]));
         }
         let mut started = proposal.clone();
         started.topic_id = Some(id);

@@ -568,10 +568,12 @@ function Changes({ message }: { message: Message }) {
   );
 }
 
-/** A reminder an answer offered: on with a yes, gone with a no. */
+/** A reminder an answer offered: on with a yes, gone with a no. A yes also
+ * takes off the reminders it replaces. */
 function Offer({ reminder }: { reminder: Reminder }) {
   const { sync } = useWorkspace();
   const time = timeWords(reminder.at);
+  const replaces = sync.query("Reminder").filter((r) => reminder.replaces.includes(r.id));
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
       <div>
@@ -582,9 +584,19 @@ function Offer({ reminder }: { reminder: Reminder }) {
             : upperFirst(dueWords(reminder.due_on))}
           {time ? ` at ${time}` : ""}. Remind you?
         </p>
+        {replaces.map((old) => (
+          <p key={old.id} className="text-xs text-muted">
+            In place of {old.title}, {rhythmWords(old.every_days)} from {dueWords(old.due_on)}.
+          </p>
+        ))}
       </div>
       <div className="flex gap-2">
-        <Button onClick={() => sync.update("Reminder", reminder.id, { status: "on" })}>
+        <Button
+          onClick={() => {
+            sync.update("Reminder", reminder.id, { status: "on" });
+            for (const old of replaces) sync.delete("Reminder", old.id);
+          }}
+        >
           Remind me
         </Button>
         <Button

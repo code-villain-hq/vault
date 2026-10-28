@@ -123,7 +123,12 @@ What they do:
   offer_reminder, fits_elsewhere, name_talk); through the API one more
   request, with structured output, reads them from the exchange. Either
   way the server writes them with the answer, through the sync engine, so
-  every client sees it.
+  every client sees it. The page Claude reads names each point and
+  reminder (`p3`, `r2`, `page::Refs`), and a point or reminder may
+  `replace` some: a point takes the first one's place (unread again) and
+  the rest go; a reminder offer puts the ones on the calendar in its
+  `replaces`, which the app takes off when it's accepted, and offers not
+  yet taken go at once.
 - **The workspace's own topic** (`own.rs`) reads every topic's name, group
   and what it sticks to, and has other tools: propose_topic and
   change_topic, not keep_point. A proposal waits for Start; a change is

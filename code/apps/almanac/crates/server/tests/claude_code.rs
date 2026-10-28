@@ -4,7 +4,8 @@
 //! starts with a click, and changes one with undo; a topic's talk keeps a
 //! point with its source; a new topic sets itself up; and the web can be
 //! turned off. The workspace's own topic stays, a start that hangs is
-//! tried again, and photos go with the questions of their talk.
+//! tried again, and photos go with the questions of their talk. A moved
+//! wash day replaces its point and reminder instead of adding to them.
 
 mod common;
 
@@ -416,4 +417,43 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
         )
         .await;
     assert_eq!(gone.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Haare" }),
+        )
+        .await;
+    let topic = started.body["id"].as_str().unwrap().to_string();
+    for _ in 0..100 {
+        if !sessions(&log).is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    ask(&app, &ada, &home, &topic, "I wash on Thursday").await;
+    let first = app.synced(&ada, &home, "Reminder").await;
+    assert_eq!(first.len(), 1);
+    let thursday = first[0]["id"].clone();
+
+    let answer = ask(&app, &ada, &home, &topic, "My wash day moved to Friday").await;
+    assert_eq!(answer["kept"], "Updated a point under Wäsche.");
+    let points = app.synced(&ada, &home, "Point").await;
+    assert_eq!(points.len(), 1, "{points:?}");
+    assert_eq!(points[0]["text"], "Washes on Friday.");
+    assert_eq!(points[0]["seen"], false);
+    // The Thursday offer wasn't taken yet, so it goes at once.
+    let reminders = app.synced(&ada, &home, "Reminder").await;
+    assert_eq!(reminders.len(), 1, "{reminders:?}");
+    assert_ne!(reminders[0]["id"], thursday);
+    assert_eq!(reminders[0]["due_on"], "2026-10-30");
+    assert_eq!(reminders[0]["replaces"], json!([]));
 }

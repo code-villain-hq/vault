@@ -93,10 +93,16 @@ topics.
   cards page, a card per plant with a short note for each point; on a
   document page, sections of paragraphs that explain, each with the talk
   it came from. New points carry the unread dot until you leave the topic.
+  The page is kept up to date, not added to: a point that changes one it
+  has takes that one's place.
 - **Almanac asks when it's unsure**: the question waits on the card it's
-  about, with Add it and Leave it out.
-- **Reminders**: when a talk settles something that comes round, Almanac
-  offers a reminder in the talk. A topic with reminders shows its week.
+  about, with Add it and Leave it out. A question it asks in the talk
+  waits for your reply there.
+- **Reminders**: when a talk settles something that comes round, or you
+  tell it a routine you keep, such as your wash days, Almanac offers a
+  reminder in the talk. When a wash day moves, the new reminder replaces
+  the old one once you say yes. A topic with reminders shows its week,
+  with the weeks before and after a click away.
   Calendar shows the workspace's week from every topic, what's still to
   do and what comes later; a bell marks the reminders that notify the
   Mac, and the desktop app sends those notifications.

@@ -73,6 +73,7 @@ export function createSyncClient(options: {
         notify: true,
         status: "on",
         message_id: null,
+        replaces: [],
         last_done_on: null,
         notified_for: null,
         workspace_id: options.workspaceId,

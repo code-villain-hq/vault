@@ -85,6 +85,30 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/moved/i.test(prompt)) {
+    say("Then Friday it is.");
+    await tool("keep_point", {
+      theme: "Wäsche",
+      text: "Washes on Friday.",
+      source: "You said",
+      replaces: ["p1"],
+    });
+    await tool("offer_reminder", {
+      theme: "Wäsche",
+      title: "Elvital wash",
+      due_on: "2026-10-30",
+      every_days: 7,
+      replaces: ["r1"],
+    });
+  } else if (/wash/i.test(prompt)) {
+    say("Thursday, then.");
+    await tool("keep_point", { theme: "Wäsche", text: "Washes on Thursday.", source: "You said" });
+    await tool("offer_reminder", {
+      theme: "Wäsche",
+      title: "Elvital wash",
+      due_on: "2026-10-29",
+      every_days: 7,
+    });
   } else {
     say("Water it every 7 days.");
     await tool("keep_point", {

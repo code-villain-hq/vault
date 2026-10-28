@@ -28,7 +28,11 @@ status: string,
 /**
  * The answer that offered it.
  */
-message_id: string | null, last_done_on: string | null, 
+message_id: string | null, 
+/**
+ * The reminders it takes the place of, once it's on.
+ */
+replaces: Array<string>, last_done_on: string | null, 
 /**
  * The due date the Mac was last told about. Set by the server.
  */
