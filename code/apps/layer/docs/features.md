@@ -2748,7 +2748,11 @@ mention sent while the app is closed is never seen.
   each time the chat opens, put back at launch or restarted too. An agent
   that offers no `auto` mode is left in its own; a chat already open keeps
   the mode it has. After it opens, the mode is the user's to change
-  (ACP-12).
+  (ACP-12). When its first turn starts in any mode but `auto` (the agent
+  offers none, or put it back, as Claude's adapter does for a model
+  without `auto`), the bot MUST say so once in the thread and in the
+  message center, naming the mode it is in, so a chat that will stop to
+  ask is not a surprise.
 - **BOT-13** The owner MAY give the bot a personality in Settings, in their
   own words ("You are Doctor Doom…"), at most 2,000 characters. A chat
   opened for a thread MUST be told it, as the voice its replies to the

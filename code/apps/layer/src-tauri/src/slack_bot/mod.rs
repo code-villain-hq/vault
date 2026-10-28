@@ -56,6 +56,22 @@ pub fn presets_for(config: &crate::config::AppConfig, room: &str) -> Vec<(String
     presets
 }
 
+/// Why a chat that should work without asking will not (BOT-12): the mode
+/// it is in instead, in words. None when it is in `auto`. Read once its
+/// first turn starts, after the launch's settings are set.
+pub fn not_auto(settings: &[crate::acp::Setting]) -> Option<String> {
+    let Some(mode) = settings.iter().find(|s| s.category.as_deref() == Some("mode")) else {
+        return Some("the agent offers no modes to choose from".to_string());
+    };
+    if mode.current == AUTO {
+        None
+    } else if mode.options.iter().any(|o| o.value == AUTO) {
+        Some(format!("the agent put it in `{}` instead, which its model may need", mode.current))
+    } else {
+        Some(format!("the agent offers no `auto` mode, so it is in `{}`; its ACP adapter may be out of date", mode.current))
+    }
+}
+
 /// Where the connection is, for Settings (BOT-10).
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 pub struct Status {
@@ -197,6 +213,24 @@ impl Bot {
         }
     }
 
+    /// A chat that should work without asking will not (BOT-12): said in
+    /// its thread, and in the message center, which opens the chat.
+    async fn warn_not_auto(&self, thread: &SlackThread, pane: &str, why: &str) {
+        let text = format!(":warning: This chat could not start in `auto` mode: {why}. It may stop to ask before running a command; answer here or in Layer.");
+        self.post(thread, vec![text]).await;
+        let Some(app) = self.app.get() else { return };
+        crate::messages::record_all(
+            app,
+            vec![crate::messages::New {
+                kind: crate::messages::Kind::Agent,
+                level: crate::messages::Level::Error,
+                title: format!("The Slack chat in {} will ask before acting", thread.label),
+                body: format!("It could not start in auto mode: {why}."),
+                target: Some(crate::target::Target::Pane { task: crate::commands::CHAT_TASK_ID, pane }.to_string()),
+            }],
+        );
+    }
+
     /// One message in a thread that is changed rather than posted again.
     async fn keep(&self, thread: &SlackThread, ts: Option<String>, shown: &str, blocks: &serde_json::Value, what: &str) -> Option<String> {
         let api = self.api()?;
@@ -270,6 +304,26 @@ mod tests {
         assert_eq!(presets_for(&chosen, "/chat/a"), [preset("mode", "auto"), preset("model", "opus")]);
         assert_eq!(presets_for(&config_with(false, "opus"), "/chat/a"), [preset("model", "opus")]);
         assert!(presets_for(&chosen, "/chat/b").is_empty(), "the owner's own chats keep theirs");
+    }
+
+    fn mode(current: &str, offered: &[&str]) -> crate::acp::Setting {
+        crate::acp::Setting {
+            id: "mode".into(),
+            name: "Mode".into(),
+            category: Some("mode".into()),
+            current: current.into(),
+            options: offered.iter().map(|v| crate::acp::SettingOption { value: (*v).into(), name: (*v).into(), description: None }).collect(),
+        }
+    }
+
+    #[test]
+    fn a_chat_not_in_auto_mode_says_why_in_words() {
+        assert_eq!(not_auto(&[mode("auto", &["default", "auto"])]), None);
+        let fell_back = not_auto(&[mode("acceptEdits", &["default", "acceptEdits", "auto"])]).unwrap();
+        assert!(fell_back.contains("`acceptEdits` instead"), "{fell_back}");
+        let old = not_auto(&[mode("default", &["default", "acceptEdits", "dontAsk"])]).unwrap();
+        assert!(old.contains("no `auto` mode") && old.contains("out of date"), "{old}");
+        assert!(not_auto(&[]).unwrap().contains("no modes"));
     }
 
     #[test]

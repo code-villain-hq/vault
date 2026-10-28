@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 pub use conn::Conn;
 pub use entry::{Body, Changes, Choice, Command, Setting, Usage};
 #[cfg(test)]
-pub use entry::Entry;
+pub use entry::{Entry, SettingOption};
 pub use process::start;
 
 use crate::pty::Activity;

@@ -110,6 +110,9 @@ pub struct Reader {
     asked: BTreeMap<usize, Asked>,
     /// The turn's notes its progress message shows (BOT-6).
     noted: usize,
+    /// The chat should work without asking (BOT-12), until its mode is
+    /// checked once.
+    check_auto: bool,
 }
 
 /// What a read of a conversation has for its thread.
@@ -128,9 +131,16 @@ pub struct Out {
     /// The turn's reply is in `posts`: its card and progress message go
     /// once it is posted (BOT-6).
     pub tidy: bool,
+    /// Why the chat is not in `auto` mode, said once (BOT-12).
+    pub not_auto: Option<String>,
 }
 
 impl Reader {
+    /// A reader for a chat that should, or need not, be in `auto` mode.
+    pub fn new(wants_auto: bool) -> Self {
+        Reader { check_auto: wants_auto, ..Reader::default() }
+    }
+
     /// The revision to ask the conversation for changes after.
     pub fn since(&self) -> Option<u64> {
         self.rev
@@ -148,6 +158,14 @@ impl Reader {
             self.from = Some(view.changes.len);
         }
         let Some(start) = self.from else { return Out::default() };
+        // A turn starts only once the launch's settings are set, so the mode
+        // it starts in is the one the chat got.
+        let not_auto = if self.check_auto && (view.busy || ended) {
+            self.check_auto = false;
+            super::not_auto(&view.settings)
+        } else {
+            None
+        };
         let mut card_changed = false;
         for e in view.changes.entries.into_iter().filter(|e| e.index >= start) {
             if let Body::Question { title, options, answer } = &e.body {
@@ -159,7 +177,7 @@ impl Reader {
             }
             self.kept.insert(e.index, e.body);
         }
-        let mut out = Out { card: card_changed.then(|| self.asked.values().cloned().collect()), ..Out::default() };
+        let mut out = Out { card: card_changed.then(|| self.asked.values().cloned().collect()), not_auto, ..Out::default() };
         let notes = notes(self.kept.values());
         if ended {
             out.posts = posts(&turn(self.kept.values()));
@@ -190,7 +208,8 @@ pub async fn follow(app: AppHandle, pane: String, thread: SlackThread) {
     let state = app.state::<AppState>();
     if let (Ok(mut turns), Ok(mut feed)) = (state.ptys.turns(&pane), state.ptys.feed(&pane)) {
         let mut seen = *turns.borrow_and_update();
-        let mut reader = Reader::default();
+        let wants_auto = super::presets_for(&state.config.read(), &thread.room).iter().any(|(c, v)| c == "mode" && v == super::AUTO);
+        let mut reader = Reader::new(wants_auto);
         // The turn's card and progress message, once posted.
         let mut card: Option<String> = None;
         let mut progress: Option<String> = None;
@@ -203,6 +222,9 @@ pub async fn follow(app: AppHandle, pane: String, thread: SlackThread) {
             let Ok(view) = state.ptys.acp_read(&pane, reader.since()) else { break };
             let exited = view.exited;
             let out = reader.read(view, ended);
+            if let Some(why) = &out.not_auto {
+                state.slack_bot.warn_not_auto(&thread, &pane, why).await;
+            }
             if let Some(asked) = &out.card {
                 card = state.slack_bot.card(&thread, card.take(), asked).await;
             }
@@ -391,6 +413,36 @@ mod tests {
         let out = r.read(view(2, 2, true, vec![(0, user("[Slack] hi")), (1, agent("Hello."))]), true);
         assert_eq!(out.progress, None);
         assert_eq!(out.posts, vec!["Hello.".to_string()]);
+    }
+
+    fn modes(current: &str) -> Vec<acp::Setting> {
+        let option = |v: &str| acp::SettingOption { value: v.into(), name: v.into(), description: None };
+        vec![acp::Setting { id: "mode".into(), name: "Mode".into(), category: Some("mode".into()), current: current.into(), options: vec![option("default"), option("auto")] }]
+    }
+
+    #[test]
+    fn a_chat_that_starts_its_first_turn_out_of_auto_mode_says_so_once() {
+        let mut r = Reader::new(true);
+        let mut opened = view(1, 0, true, vec![]);
+        opened.settings = modes("default");
+        assert_eq!(r.read(opened, false).not_auto, None, "not yet: the mode is set before the first prompt");
+        let mut working = view(2, 1, true, vec![(0, user("[Slack] look"))]);
+        (working.busy, working.settings) = (true, modes("acceptEdits"));
+        assert!(r.read(working, false).not_auto.unwrap().contains("`acceptEdits`"));
+        let mut again = view(3, 1, true, vec![]);
+        (again.busy, again.settings) = (true, modes("acceptEdits"));
+        assert_eq!(r.read(again, true).not_auto, None, "said once");
+    }
+
+    #[test]
+    fn a_chat_in_auto_mode_or_not_meant_to_be_says_nothing() {
+        for (wants, mode) in [(true, "auto"), (false, "default")] {
+            let mut r = Reader::new(wants);
+            r.read(view(1, 0, true, vec![]), false);
+            let mut working = view(2, 1, true, vec![(0, user("[Slack] look"))]);
+            (working.busy, working.settings) = (true, modes(mode));
+            assert_eq!(r.read(working, false).not_auto, None, "{mode}");
+        }
     }
 
     #[test]
