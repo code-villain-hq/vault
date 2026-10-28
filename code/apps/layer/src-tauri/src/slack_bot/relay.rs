@@ -83,12 +83,10 @@ fn notes<'a>(kept: impl IntoIterator<Item = &'a Body>) -> Vec<String> {
         .collect()
 }
 
-/// A turn's progress message: its notes, the latest last, and whether the
-/// turn is over.
-pub fn progress_text(notes: &[String], done: bool) -> String {
-    let head = if done { "_Along the way:_" } else { ":hourglass_flowing_sand: _Working on it…_" };
+/// A turn's progress message: its notes, the latest last.
+pub fn progress_text(notes: &[String]) -> String {
     let skipped = notes.len().saturating_sub(NOTES_SHOWN);
-    let mut out = head.to_string();
+    let mut out = ":hourglass_flowing_sand: _Working on it…_".to_string();
     if skipped > 0 {
         out.push_str(&format!("\n\n_…{skipped} earlier_"));
     }
@@ -127,6 +125,9 @@ pub struct Out {
     pub posts: Vec<String>,
     /// The turn is over: the next question starts a card of its own.
     pub turn_over: bool,
+    /// The turn's reply is in `posts`: its card and progress message go
+    /// once it is posted (BOT-6).
+    pub tidy: bool,
 }
 
 impl Reader {
@@ -161,14 +162,15 @@ impl Reader {
         let mut out = Out { card: card_changed.then(|| self.asked.values().cloned().collect()), ..Out::default() };
         let notes = notes(self.kept.values());
         if ended {
-            let t = turn(self.kept.values());
-            // The reply is posted on its own: the notes are what led to it.
-            // A turn that never needed a progress message gets none now.
-            if self.noted > 0 {
-                let before: Vec<String> = notes.into_iter().filter(|n| Some(n.as_str()) != t.reply.as_deref().map(str::trim)).collect();
-                out.progress = Some(progress_text(&before, true));
+            out.posts = posts(&turn(self.kept.values()));
+            // The thread keeps the answer, not the working that led to it:
+            // a card, a progress message and the reply read as three
+            // answers. Any note is a reply too, so only a turn that said
+            // nothing keeps its card, showing how it ended.
+            out.tidy = !out.posts.is_empty();
+            if out.tidy {
+                out.card = None;
             }
-            out.posts = posts(&t);
             out.turn_over = true;
             self.noted = 0;
             self.from = Some(view.changes.len);
@@ -176,7 +178,7 @@ impl Reader {
             self.asked.clear();
         } else if notes.len() > self.noted {
             self.noted = notes.len();
-            out.progress = Some(progress_text(&notes, false));
+            out.progress = Some(progress_text(&notes));
         }
         out
     }
@@ -209,6 +211,11 @@ pub async fn follow(app: AppHandle, pane: String, thread: SlackThread) {
             }
             if !out.posts.is_empty() {
                 state.slack_bot.post(&thread, out.posts).await;
+            }
+            if out.tidy {
+                for ts in [card.take(), progress.take()].into_iter().flatten() {
+                    state.slack_bot.remove(&thread, &ts).await;
+                }
             }
             if out.turn_over {
                 card = None;
@@ -335,9 +342,9 @@ mod tests {
         let mut r = Reader::default();
         r.read(view(1, 0, true, vec![]), false);
         r.read(view(2, 1, true, vec![(0, question(None))]), false);
-        let end = r.read(view(3, 2, true, vec![(0, question(Some("cancelled"))), (1, agent("done"))]), true);
-        assert_eq!(end.card.unwrap()[0].answer.as_deref(), Some("cancelled"), "the old card shows how it ended");
-        assert!(end.turn_over);
+        let end = r.read(view(3, 2, true, vec![(0, question(Some("cancelled")))]), true);
+        assert_eq!(end.card.unwrap()[0].answer.as_deref(), Some("cancelled"), "a turn with no reply keeps its card, showing how it ended");
+        assert!(end.turn_over && !end.tidy);
         let next = r.read(view(4, 3, true, vec![(2, question(None))]), false).card.unwrap();
         assert_eq!(next.len(), 1, "only the new turn's question");
     }
@@ -360,9 +367,22 @@ mod tests {
         assert!(later.progress.unwrap().ends_with("> Still here, pulling the logs.\n\n> Found 4 failures."));
         assert_eq!(r.read(view(5, 6, true, vec![]), false).progress, None, "unchanged, not posted again");
         let end = r.read(view(6, 7, true, vec![(6, agent("All 4 trips failed at issuance."))]), true);
-        assert!(end.progress.unwrap().starts_with("_Along the way:_"));
         assert_eq!(end.posts, vec!["All 4 trips failed at issuance.".to_string()]);
+        assert!(end.tidy && end.progress.is_none(), "the reply is the turn's one answer");
     }
+
+    #[test]
+    fn a_turns_answer_replaces_its_card_and_progress_message() {
+        let mut r = Reader::default();
+        r.read(view(1, 0, true, vec![]), false);
+        let asked = vec![(0, user("[Slack] why 7,994?")), (1, question(None)), (2, agent("Found it: format-kpi.ts.")), (3, tool("grep"))];
+        let out = r.read(view(2, 4, true, asked), false);
+        assert!(out.card.is_some() && out.progress.is_some());
+        let end = r.read(view(3, 5, true, vec![(1, question(Some("allow_always"))), (4, agent("The fix is one word."))]), true);
+        assert_eq!(end.posts, vec!["The fix is one word.".to_string()]);
+        assert_eq!((end.card, end.progress, end.tidy), (None, None, true), "nothing changed only to be deleted");
+    }
+
 
     #[test]
     fn a_turn_that_only_answers_gets_no_progress_message() {
@@ -376,7 +396,7 @@ mod tests {
     #[test]
     fn a_long_turn_shows_its_latest_notes() {
         let notes: Vec<String> = (0..12).map(|i| format!("note {i}")).collect();
-        let text = progress_text(&notes, false);
+        let text = progress_text(&notes);
         assert!(text.contains("_…4 earlier_") && text.ends_with("> note 11") && !text.contains("note 3\n"), "{text}");
     }
 }

@@ -163,8 +163,9 @@ impl Opening<'_> {
         p.push_str(&format!(
             "How this works: when you end a turn, your last message is posted to that Slack thread as \
              your reply, so write it for the people there: short, and in Markdown. What you say \
-             between tools is shown there too, as one line each in a progress message, so keep \
-             those to a sentence. {owner} can answer you in the thread by mentioning you, or in a \
+             between tools is shown there while you work, as one line each in a progress message \
+             that goes once your reply is posted, so keep those to a sentence and put \
+             everything the reply needs in the reply. {owner} can answer you in the thread by mentioning you, or in a \
              direct message to you by any message (those come to you starting with \
              \"{FROM_SLACK}\"), or here in Layer. What anyone says in the thread \
              without mentioning you is for the people there: you are given it with the next \

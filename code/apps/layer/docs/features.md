@@ -2708,7 +2708,10 @@ mention sent while the app is closed is never seen.
   works, what the agent says between its tools MUST reach the thread as
   one progress message, posted at the first such note and changed as more
   come (the latest eight shown, each clipped), so a long investigation is
-  not silence. A turn that only answers gets none.
+  not silence. A turn that only answers gets none. Once the turn's reply
+  is posted, its progress message and permission card MUST be deleted: a
+  turn leaves one answer in the thread, not its working too. A turn that
+  ends with nothing to post keeps its card, showing how it ended.
 - **BOT-7** A turn's permission questions (ACP-5) MUST share one message
   in the thread, posted at the first and changed as more come and as each
   is answered, from Slack or from the app. Each names what it asks in
@@ -2716,8 +2719,8 @@ mention sent while the app is closed is never seen.
   `mcp__villain-layer__browser_navigate`) and has a button for each of the
   agent's answers. Only the owner's click answers; anyone else's is told,
   to them alone, that it is not theirs to answer. A question the turn
-  ended without is shown as no longer asked. The next turn's questions
-  start a message of their own.
+  ended without is shown as no longer asked, when the card stays (BOT-6).
+  The next turn's questions start a message of their own.
 - **BOT-8** Slack sends a mention as both `app_mention` and `message`, and
   may send an event again. Each message MUST be acted on once (by channel
   and timestamp). When Slack has no message where an event said one was

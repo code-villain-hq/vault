@@ -222,6 +222,11 @@ impl BotApi {
         self.post("chat.update", &body).await.map(drop)
     }
 
+    /// Delete a message the bot posted.
+    pub async fn delete(&self, channel: &str, ts: &str) -> Result<()> {
+        self.post("chat.delete", &json!({ "channel": channel, "ts": ts })).await.map(drop)
+    }
+
     /// A message only `user` sees, in a thread.
     pub async fn ephemeral(&self, channel: &str, user: &str, thread: &str, shown: &str) -> Result<()> {
         let mut body = json!({ "channel": channel, "user": user, "text": shown });

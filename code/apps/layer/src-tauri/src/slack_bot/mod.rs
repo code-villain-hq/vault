@@ -188,6 +188,15 @@ impl Bot {
         self.keep(thread, ts, shown, &blocks, "the agent's progress").await
     }
 
+    /// Delete a turn's card or progress message once its reply is posted
+    /// (BOT-6).
+    async fn remove(&self, thread: &SlackThread, ts: &str) {
+        let Some(api) = self.api() else { return };
+        if let Err(e) = api.delete(&thread.channel, ts).await {
+            self.tell_error(format!("Could not tidy the Slack thread in {}", thread.label), e.to_string());
+        }
+    }
+
     /// One message in a thread that is changed rather than posted again.
     async fn keep(&self, thread: &SlackThread, ts: Option<String>, shown: &str, blocks: &serde_json::Value, what: &str) -> Option<String> {
         let api = self.api()?;
