@@ -7,7 +7,9 @@ import {
   Redirect,
   SearchButton,
   ShortcutsButton,
+  SidebarEdge,
   SyncIndicator,
+  useSidebarWidth,
   useSignOutError,
 } from "@code-villain/web";
 import {
@@ -236,7 +238,7 @@ export function PageHeader({
 export function PageBody({ children }: { children: ReactNode }) {
   return (
     <div className="page-content min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-6">{children}</div>
+      <div className="flex flex-col gap-8 px-6 py-6 sm:px-10">{children}</div>
     </div>
   );
 }
@@ -252,11 +254,13 @@ function Shell() {
   const [starting, setStarting] = useState<string | null>(null);
   const open = useCallback((name?: string) => setStarting(name ?? ""), []);
   useNewTopicKey(open);
+  const sidebar = useSidebarWidth();
   return (
     <NewTopicContext.Provider value={open}>
       <TalksProvider>
-        <div className="app-shell flex h-full bg-bg">
+        <div className="app-shell flex h-full bg-bg" style={sidebar.style}>
           <Sidebar />
+          <SidebarEdge width={sidebar.width} onChange={sidebar.setWidth} />
           <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
             <Outlet />
           </main>
@@ -289,7 +293,7 @@ function Sidebar() {
   if (!inSettings) lastPath = pathname;
   return (
     <aside
-      className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
+      className="app-sidebar flex w-(--sidebar-width) shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
       aria-label="Sidebar"
     >
       <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
@@ -495,7 +499,8 @@ function WorkspaceMenu() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Menu.Popup className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <Menu.Popup className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+          >
             {groups.map(({ first, entries }, index) => (
               <Menu.Group key={first.place.id}>
                 <Menu.GroupLabel

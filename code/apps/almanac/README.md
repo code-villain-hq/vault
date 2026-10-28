@@ -113,7 +113,10 @@ topics.
   and starts a block when you ask for one or none fits ("keep what I need
   to buy"). New points carry the unread dot until you leave the topic.
   The page is kept up to date, not added to: a point that changes one it
-  has takes that one's place, in the same block.
+  has takes that one's place, in the same block. It runs the window's
+  width: cards, steps and tiles take as many columns as fit, and writing,
+  lists and timelines keep a length you can read across. The sidebar's
+  edge drags wider for long topic names, and this Mac keeps the width.
 - **A section opens on its own page**: the page shows a section's first
   paragraph and a card's first four points, with "3 more". The section's
   name opens it where the page was, with the talk still beside it:
@@ -144,9 +147,10 @@ topics.
   the old one once you say yes. The Week block shows them, with the weeks
   before and after a click away; a topic without one gets it with its
   first reminder. A collection's Today lists what comes round that day.
-  Calendar shows the workspace's week from every topic, what's still to
-  do and what comes later; a bell marks the reminders that notify the
-  Mac, and the desktop app sends those notifications.
+  Calendar shows the workspace's week from every topic and what's still
+  to do from before it; what you tick stays on its day, ticked, until you
+  untick it. A bell marks the reminders that notify the Mac, and the
+  desktop app sends those notifications.
 
 On this Mac a topic searches the web when a question needs it, and links
 what it read. A company server's doesn't.
@@ -194,6 +198,9 @@ Open them in a browser. Each shows night and day.
 - [`storyboards/a-timeline-per-section.html`](storyboards/a-timeline-per-section.html):
   Geschichte's timeline as a line per section, Intifada's own, and asking
   from Intifada.
+- [`storyboards/the-page-fills-the-window.html`](storyboards/the-page-fills-the-window.html):
+  Preise finden's cards across the window, Geschichte's lines at their
+  length, and the sidebar dragged wider.
 
 ## Open
 

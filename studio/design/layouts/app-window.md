@@ -23,6 +23,7 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 - A count shows only when it asks for something: unread, waiting in Triage. The page you're on shows no count; its list says it. Empty counts never show.
 - Unread counts carry a live dot in `signal` (see [`components.md`](../components.md#live-dot)).
 - Groups (a team, a project) get a small label in `faint`, `ui-small`. No dividers between groups.
+- It starts 224px wide. Dragging its edge, where it meets the content, sets the width from 180 to 360px, so long names fit; under the pointer the edge shows as a 2px line in `faint`. Double-click puts it back to 224px, and with the edge focused ← and → move it. Each device keeps its own width, for every workspace, unsynced: another screen may want another. It doesn't fold away. `SidebarEdge` in `code/kit/web` is the edge.
 
 ## Top bar
 
@@ -63,6 +64,6 @@ and one task list better than a sidebar of views.
 
 ## Narrow windows
 
-The current fallback under 560px turns the sidebar into a row of items across the top, without the app's name or group labels. The content keeps its 0.5rem inset on both sides. This is not a finished mobile layout; the mobile redesign is deferred. Live sync and help controls must remain visible outside the navigation scroller.
+The current fallback under 560px turns the sidebar into a row of items across the top, without the app's name, group labels or the edge that sets its width. The content keeps its 0.5rem inset on both sides. This is not a finished mobile layout; the mobile redesign is deferred. Live sync and help controls must remain visible outside the navigation scroller.
 
 The [night-and-day page](https://claude.ai/artifact/GWrPzZDeYbkcRKiMW7E9gy) draws this frame in both modes.

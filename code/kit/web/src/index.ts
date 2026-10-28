@@ -70,6 +70,12 @@ export {
   workspaceEntries,
 } from "./session";
 export { type GoTo, openShortcuts, type ShortcutSection, Shortcuts } from "./shortcuts";
-export { SearchButton, ShortcutsButton } from "./sidebar";
+export {
+  SearchButton,
+  ShortcutsButton,
+  SIDEBAR_WIDTH,
+  SidebarEdge,
+  useSidebarWidth,
+} from "./sidebar";
 export { SyncIndicator, type SyncState } from "./sync-indicator";
 export { AppVersion } from "./version";

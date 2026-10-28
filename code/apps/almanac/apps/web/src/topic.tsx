@@ -289,7 +289,7 @@ function TopicView({
             onScroll={(e) => scrolled.current.set(section ?? "", e.currentTarget.scrollTop)}
             className="page-content min-h-0 flex-1 overflow-y-auto"
           >
-            <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-6">
+            <div className="flex flex-col gap-8 px-6 py-6 sm:px-10">
               {isOwn(topic) ? (
                 <OwnPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
               ) : section ? (
@@ -919,7 +919,7 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
           <Starters topic={topic} onAsk={onAsk} />
         </div>
       ) : (
-        <div className="flex flex-col gap-0.5">
+        <div className={`flex flex-col gap-0.5 ${LINES}`}>
           {groups.map(([group, list]) => (
             <section key={group || "-"} aria-label={group || "Topics"} className="flex flex-col">
               <h2 className="px-2.5 pt-3 pb-0.5 text-xs text-faint first:pt-0">
@@ -1096,31 +1096,36 @@ function Week({
 /** The points a card shows on the page; the rest are in its section. */
 const CARD_SHOWS = 4;
 
+/**
+ * The page runs the panel's width. Cards, steps and tiles take as many
+ * columns as fit, each at least 18rem; lines, a list's or a timeline's,
+ * stay short enough to read across, as writing keeps its measure.
+ */
+const FILL = "grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))]";
+const LINES = "max-w-[86ch]";
+
 /** A card per theme: its first points, its reminders, what it waits on. */
 function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
   return (
-    // Two columns only when the page has room, talk open or not.
-    <div className="@container">
-      <div className="grid gap-3 @xl:grid-cols-2">
-        {themes.map((theme) => (
-          <article key={theme.name} className="flex flex-col gap-3 rounded-lg bg-surface p-4">
-            <h2 className="font-semibold">
-              <SectionName name={theme.name} />
-            </h2>
-            {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
-            {theme.points.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                <Points points={theme.points.slice(0, CARD_SHOWS)} />
-                <More section={theme.name} more={theme.points.length - CARD_SHOWS} />
-              </div>
-            )}
-            {theme.questions.map((q) => (
-              <Ask key={q.id} question={q} block={block} />
-            ))}
-            <KeptFrom points={theme.points} />
-          </article>
-        ))}
-      </div>
+    <div className={`grid gap-3 ${FILL}`}>
+      {themes.map((theme) => (
+        <article key={theme.name} className="flex flex-col gap-3 rounded-lg bg-surface p-4">
+          <h2 className="font-semibold">
+            <SectionName name={theme.name} />
+          </h2>
+          {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
+          {theme.points.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <Points points={theme.points.slice(0, CARD_SHOWS)} />
+              <More section={theme.name} more={theme.points.length - CARD_SHOWS} />
+            </div>
+          )}
+          {theme.questions.map((q) => (
+            <Ask key={q.id} question={q} block={block} />
+          ))}
+          <KeptFrom points={theme.points} />
+        </article>
+      ))}
     </div>
   );
 }
@@ -1331,7 +1336,7 @@ function AskBar({
   }, [field]);
   return (
     <form
-      className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-6 pb-4"
+      className="flex w-full flex-col gap-2 px-6 pb-4 sm:px-10"
       onSubmit={(event) => {
         event.preventDefault();
         if (!text.trim() && picking.photos.length === 0) return;
@@ -1488,52 +1493,50 @@ function Today({
   }
   return (
     <BlockFrame {...frame} heading={heading} tools={tools}>
-      <div className="@container">
-        <ol className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
-          {steps.map(({ id, what, how }, n) => {
-            const done = ticked.includes(id);
-            return (
-              <li key={id}>
-                <button
-                  type="button"
-                  aria-pressed={done}
-                  aria-label={`${what}: ${done ? "done" : "to do"}`}
-                  onClick={() => tick(id)}
-                  className="flex w-full items-start gap-3 rounded-lg bg-surface px-4 py-3.5 text-left hover:bg-hover"
+      <ol className={`grid gap-2.5 ${FILL}`}>
+        {steps.map(({ id, what, how }, n) => {
+          const done = ticked.includes(id);
+          return (
+            <li key={id}>
+              <button
+                type="button"
+                aria-pressed={done}
+                aria-label={`${what}: ${done ? "done" : "to do"}`}
+                onClick={() => tick(id)}
+                className="flex w-full items-start gap-3 rounded-lg bg-surface px-4 py-3.5 text-left hover:bg-hover"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`text-title leading-none font-bold ${done ? "text-faint" : "text-muted"}`}
                 >
-                  <span
+                  {n + 1}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className={`font-semibold ${done ? "text-faint line-through" : ""}`}>
+                    {what}
+                  </span>
+                  {how && <span className="text-xs text-muted">{how}</span>}
+                </span>
+                {done ? (
+                  <CircleCheck
+                    size={18}
+                    strokeWidth={1.75}
                     aria-hidden="true"
-                    className={`text-title leading-none font-bold ${done ? "text-faint" : "text-muted"}`}
-                  >
-                    {n + 1}
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className={`font-semibold ${done ? "text-faint line-through" : ""}`}>
-                      {what}
-                    </span>
-                    {how && <span className="text-xs text-muted">{how}</span>}
-                  </span>
-                  {done ? (
-                    <CircleCheck
-                      size={18}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                      className="shrink-0 text-accent"
-                    />
-                  ) : (
-                    <Circle
-                      size={18}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                      className="shrink-0 text-faint"
-                    />
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+                    className="shrink-0 text-accent"
+                  />
+                ) : (
+                  <Circle
+                    size={18}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                    className="shrink-0 text-faint"
+                  />
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
     </BlockFrame>
   );
 }
@@ -1582,18 +1585,16 @@ function Shelf({
 }) {
   const things = byTheme({ points, questions: [], reminders: [] });
   return (
-    <div className="@container">
-      <div className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
-        {things.map((thing) => (
-          <Thing
-            key={thing.name}
-            block={block}
-            thing={thing}
-            days={thingDays(thing.name, routines)}
-            questions={questions.filter((q) => q.theme === thing.name)}
-          />
-        ))}
-      </div>
+    <div className={`grid gap-2.5 ${FILL}`}>
+      {things.map((thing) => (
+        <Thing
+          key={thing.name}
+          block={block}
+          thing={thing}
+          days={thingDays(thing.name, routines)}
+          questions={questions.filter((q) => q.theme === thing.name)}
+        />
+      ))}
     </div>
   );
 }
@@ -1674,7 +1675,7 @@ function List({ points }: { points: Point[] }) {
   const [all, setAll] = useState(false);
   const shown = all ? points : points.slice(-5);
   return (
-    <div className="flex flex-col">
+    <div className={`flex flex-col ${LINES}`}>
       <ul className="flex flex-col">
         {shown.map((point) => (
           <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
@@ -1760,7 +1761,9 @@ function Timeline({ points }: { points: Point[] }) {
 function TimelineRail({ children }: { children: ReactNode }) {
   return (
     <div className="@container">
-      <ol className="grid max-w-[86ch] grid-cols-[minmax(3.5rem,max-content)_0.875rem_1fr] gap-x-3 @lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr]">
+      <ol
+        className={`grid ${LINES} grid-cols-[minmax(3.5rem,max-content)_0.875rem_1fr] gap-x-3 @lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr]`}
+      >
         {children}
       </ol>
     </div>

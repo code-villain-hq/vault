@@ -33,19 +33,38 @@ export function isDue(reminder: Reminder): boolean {
 }
 
 /**
- * Done for now: one that repeats comes back its rhythm from today, one
- * that doesn't is finished.
+ * Done for the day it was due, which keeps it there, ticked: one that
+ * repeats comes back its rhythm after that day, or after today when it was
+ * late; one that doesn't is finished.
  */
-export function markDone(sync: SyncClient<Schema>, reminder: Reminder) {
-  const done = today();
+export function markDone(sync: SyncClient<Schema>, reminder: Reminder, day = reminder.due_on) {
   if (reminder.every_days && reminder.every_days > 0) {
+    const from = daysBetween(today(), day) > 0 ? day : today();
     sync.update("Reminder", reminder.id, {
-      due_on: addDays(done, reminder.every_days),
-      last_done_on: done,
+      due_on: addDays(from, reminder.every_days),
+      last_done_on: day,
     });
   } else {
-    sync.update("Reminder", reminder.id, { status: "done", last_done_on: done });
+    sync.update("Reminder", reminder.id, { status: "done", last_done_on: day });
   }
+}
+
+/**
+ * The day a reminder is ticked for, if it is: the day it was last done for,
+ * while it's done or comes due after it. Unticked, it's due on that day again.
+ */
+export function doneFor(reminder: Reminder): string | undefined {
+  const day = reminder.last_done_on;
+  if (!day) return undefined;
+  if (reminder.status === "done") return day;
+  return reminder.status === "on" && daysBetween(day, reminder.due_on) > 0 ? day : undefined;
+}
+
+/** Not done after all: it's due again on the day it was done for. */
+export function markNotDone(sync: SyncClient<Schema>, reminder: Reminder) {
+  const day = doneFor(reminder);
+  if (!day) return;
+  sync.update("Reminder", reminder.id, { status: "on", due_on: day });
 }
 
 /** The bell on a reminder that reaches the Mac. */

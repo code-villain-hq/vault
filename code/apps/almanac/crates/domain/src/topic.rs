@@ -295,6 +295,8 @@ pub struct Reminder {
     pub message_id: Option<Uuid>,
     /// The reminders it takes the place of, once it's on.
     pub replaces: Vec<Uuid>,
+    /// The day it was last done for: the day it was due. Calendar keeps it
+    /// there, ticked, while it's done or comes due after it.
     pub last_done_on: Option<NaiveDate>,
     /// The due date the Mac was last told about. Set by the server.
     pub notified_for: Option<NaiveDate>,

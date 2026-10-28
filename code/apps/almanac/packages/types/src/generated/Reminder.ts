@@ -32,7 +32,12 @@ message_id: string | null,
 /**
  * The reminders it takes the place of, once it's on.
  */
-replaces: Array<string>, last_done_on: string | null, 
+replaces: Array<string>, 
+/**
+ * The day it was last done for: the day it was due. Calendar keeps it
+ * there, ticked, while it's done or comes due after it.
+ */
+last_done_on: string | null, 
 /**
  * The due date the Mac was last told about. Set by the server.
  */
