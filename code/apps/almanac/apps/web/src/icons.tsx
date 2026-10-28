@@ -33,6 +33,7 @@ import {
   Landmark,
   Languages,
   Leaf,
+  Library,
   Lightbulb,
   type LucideIcon,
   Map as MapIcon,
@@ -66,6 +67,7 @@ import {
 export { Initial, NavIcon } from "@code-villain/web";
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
+  library: Library,
   book: Book,
   "book-open": BookOpen,
   sprout: Sprout,

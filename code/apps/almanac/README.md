@@ -37,7 +37,19 @@ The packaged desktop app runs Almanac on this Mac, on its own Postgres,
 and signs in to nothing. Its data is in
 `~/Library/Application Support/eu.codevillain.almanac`.
 
-Almanac answers with Claude through the API. Set the key in
+On this Mac Almanac answers with Claude Code, as you're signed in to it,
+through its ACP adapter, as Layer's conversations run. There's no key.
+Install the adapter once:
+
+```bash
+npm install -g @agentclientprotocol/claude-agent-acp
+```
+
+Claude Code gets what the topic sticks to, its page and the talk, and
+only Almanac's own tools: not your files, your shell, or your Claude Code
+settings. It may search the web, which Settings → Claude turns off.
+
+A company server answers with Claude through the API. Set the key in
 Settings → Claude: it stays on the server, in a table that never syncs,
 and the page shows only its last four characters. `ANTHROPIC_API_KEY`, or
 `[claude] api_key` in the settings file, stands in for it.
@@ -55,8 +67,15 @@ topics.
 
 ## What works
 
+- **The workspace's own topic, Almanac**: every workspace starts with it,
+  above Calendar, and opens on it. Tell it what you want to keep track
+  of, and it proposes a topic: the name, what it sticks to, how its page
+  looks, and what it already heard from you. Start it with a click (⌘↩),
+  or change it first. Its page is the index of the other topics, by
+  group, with what's new. It also changes a topic you name, says what it
+  changed, and offers Undo. It can be renamed, not deleted.
 - **Starting a topic**: a name, and what it sticks to, which may stay
-  empty. With a key set, Almanac writes the rest in the background: what
+  empty. Once Claude answers, Almanac writes the rest in the background: what
   it sticks to when that was empty, the icon, the group, the page's shape
   (cards or a document) and the first questions. Edit topic changes any
   of it.
@@ -78,7 +97,8 @@ topics.
   do and what comes later; a bell marks the reminders that notify the
   Mac, and the desktop app sends those notifications.
 
-Web search is off.
+On this Mac a topic searches the web when a question needs it, and links
+what it read. A company server's doesn't.
 
 ## Decided, not built
 
@@ -104,6 +124,9 @@ Open them in a browser. Each shows night and day.
   Pflanzen, Haare and Manage up as they open.
 - [`storyboards/dumping.html`](storyboards/dumping.html): a dump, where it
   went, what it asks when it's unsure, and the dump later in its topic.
+- [`storyboards/the-workspaces-own-topic.html`](storyboards/the-workspaces-own-topic.html):
+  a new workspace on its own topic, the topic it proposes, its page as the
+  index, and Settings → Claude with Claude Code.
 
 ## Open
 
@@ -111,4 +134,5 @@ Open them in a browser. Each shows night and day.
   panel shows, the one you used last. Picking by itself could put a
   personal note where colleagues see it.
 - Whether Calendar also shows Work, or only the workspace you're in.
-- Whether a topic searches the web.
+- Whether a company server's topics search the web too.
+- Other agents than Claude Code over ACP, as Layer has them.

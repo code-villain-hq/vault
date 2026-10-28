@@ -1,6 +1,6 @@
 use almanac_domain::{Bootstrap, Transaction, TransactionResult};
 use axum::extract::State;
-use axum::routing::{any, get, patch, post};
+use axum::routing::{any, get, patch, post, put};
 use axum::{Json, Router};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, groups, keys, members, oidc, talks, topics, ws};
+use crate::{accounts, groups, keys, mcp, members, oidc, talks, topics, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -41,12 +41,18 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/topics", post(topics::start))
         .route("/topics/{topic_id}/ask", post(talks::ask))
+        .route("/messages/{message_id}/undo", post(topics::undo))
         .route(
             "/claude",
             get(keys::show).put(keys::set).delete(keys::forget),
-        );
+        )
+        .route("/claude/web", put(keys::set_web));
 
     let mut api = Router::new();
+    if state.claude_code.is_some() {
+        // Claude Code's way to Almanac's tools, by each question's token.
+        api = api.route("/api/mcp", post(mcp::handle));
+    }
     if let Some(token) = &state.scim_token {
         api = api.nest(
             "/api/scim/v2",
@@ -78,6 +84,9 @@ async fn bootstrap(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<Bootstrap>, AppError> {
+    // The company's workspace is made before anyone is in it: its own topic
+    // comes with the first snapshot.
+    crate::own::ensure_alone(&state.pool, member.actor).await;
     Ok(Json(
         almanac_sync::bootstrap(&state.pool, member.actor).await?,
     ))

@@ -5,16 +5,21 @@
 //! [`router`] directly.
 
 pub mod accounts;
+pub mod acp;
 pub mod auth;
 pub mod claude;
 pub mod company;
 pub mod config;
 pub mod error;
 pub mod groups;
+pub mod kept;
 pub mod keys;
 pub mod local;
+mod login_env;
+pub mod mcp;
 pub mod members;
 pub mod oidc;
+pub mod own;
 pub mod page;
 pub mod reminders;
 pub mod routes;

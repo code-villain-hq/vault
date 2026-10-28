@@ -1,9 +1,10 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::model::{Validate, ValidationError};
+use crate::topic::TopicPatch;
 
 /// A talk with a topic, in the panel beside its page. The server starts
 /// it with the first question; you can delete it.
@@ -63,8 +64,68 @@ pub struct Message {
     pub problem: Option<String>,
     /// The topic an off-topic question fits better, by name.
     pub elsewhere: Option<String>,
+    /// A topic the workspace's own topic proposes, to start with a click.
+    pub proposal: Option<Proposal>,
+    /// What the answer changed in topics you named, for Undo.
+    pub changes: Vec<TopicChange>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// A topic Almanac would start: what it's called, what it sticks to, how
+/// its page looks, and what it already heard from you, which the topic
+/// keeps once it's started.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Proposal {
+    pub name: String,
+    pub sticks_to: String,
+    pub icon: String,
+    pub group_name: String,
+    /// `cards` or `document`.
+    pub shape: String,
+    /// For a document, its title.
+    pub title: Option<String>,
+    pub starters: Vec<String>,
+    /// What you told Almanac, kept as the topic's first points.
+    pub points: Vec<ProposedPoint>,
+    /// Reminders it offers once the topic is started.
+    pub reminders: Vec<ProposedReminder>,
+    /// The topic, once it was started.
+    pub topic_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ProposedPoint {
+    pub theme: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ProposedReminder {
+    pub theme: Option<String>,
+    pub title: String,
+    pub due_on: NaiveDate,
+    pub at: Option<NaiveTime>,
+    pub every_days: Option<i32>,
+}
+
+/// One topic an answer changed: what it said it changed, and the fields
+/// before and after.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TopicChange {
+    pub topic_id: Uuid,
+    /// The topic's name after the change.
+    pub name: String,
+    /// What changed, in words: "Moved it to Hobby."
+    pub said: String,
+    pub before: TopicPatch,
+    pub after: TopicPatch,
+    /// Set once Undo put the fields back.
+    pub undone: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -79,6 +140,8 @@ pub struct MessageCreate {
     pub kept: Option<String>,
     pub problem: Option<String>,
     pub elsewhere: Option<String>,
+    pub proposal: Option<Proposal>,
+    pub changes: Option<Vec<TopicChange>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
@@ -87,6 +150,8 @@ pub struct MessageCreate {
 pub struct MessagePatch {
     pub kept: Option<String>,
     pub elsewhere: Option<String>,
+    pub proposal: Option<Proposal>,
+    pub changes: Option<Vec<TopicChange>>,
 }
 
 /// A question in a topic (`POST /api/w/{id}/topics/{topic}/ask`). Without

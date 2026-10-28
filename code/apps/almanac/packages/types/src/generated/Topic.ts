@@ -28,4 +28,9 @@ title: string | null,
 /**
  * First questions, for the empty page.
  */
-starters: Array<string>, position: number, created_at: string, updated_at: string, };
+starters: Array<string>, position: number, 
+/**
+ * `topic`, or `almanac` for the workspace's own topic, which knows
+ * the others and starts new ones. Set by the server.
+ */
+kind: string, created_at: string, updated_at: string, };

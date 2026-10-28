@@ -112,19 +112,27 @@ export function useTopics(): Topic[] {
   return useMemo(() => [...topics].sort((a, b) => a.position - b.position), [topics]);
 }
 
+/** Whether a topic is the workspace's own, Almanac, which knows the others. */
+export function isOwn(topic: Topic) {
+  return topic.kind === "almanac";
+}
+
 /** The topics with points not read yet, by id. */
-function useUnread(): Set<string> {
+export function useUnread(): Set<string> {
   const points = useRecords("Point");
   return useMemo(() => new Set(points.filter((p) => !p.seen).map((p) => p.topic_id)), [points]);
 }
 
-/** `/$workspace`: the first topic; with none yet, the way to start one. */
+/**
+ * `/$workspace`: the workspace's own topic, Almanac; the first topic on a
+ * server from before it had one; with none, the way to start one.
+ */
 export function WorkspaceHome() {
   const { workspace } = useWorkspace();
   const topics = useTopics();
   const { ready } = useSyncStatus();
   if (!ready) return null;
-  const first = topics[0];
+  const first = topics.find(isOwn) ?? topics[0];
   if (!first) return <NoTopics />;
   return (
     <Redirect
@@ -310,7 +318,7 @@ function Sidebar() {
   );
 }
 
-/** Calendar, then the topics by group, then the way to start one. */
+/** Almanac and Calendar, then the topics by group, then the way to start one. */
 function TopicNav() {
   const { workspace } = useWorkspace();
   const guest = useIsGuest();
@@ -318,9 +326,10 @@ function TopicNav() {
   const unread = useUnread();
   const newTopic = useNewTopic();
   const params = { workspace: workspace.url_key };
+  const own = topics.find(isOwn);
   const groups = useMemo(() => {
     const byName = new Map<string, Topic[]>();
-    for (const topic of topics) {
+    for (const topic of topics.filter((t) => !isOwn(t))) {
       const list = byName.get(topic.group_name) ?? [];
       list.push(topic);
       byName.set(topic.group_name, list);
@@ -331,6 +340,16 @@ function TopicNav() {
   return (
     <>
       <nav aria-label="Workspace" className="flex flex-col gap-0.5">
+        {own && (
+          <Link
+            to="/$workspace/topics/$topic"
+            params={{ ...params, topic: own.id }}
+            className={navLink}
+          >
+            <NavIcon icon={topicIcon(own.icon)} />
+            <span className="truncate">{own.name}</span>
+          </Link>
+        )}
         <Link
           to="/$workspace/calendar"
           params={params}

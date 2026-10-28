@@ -23,6 +23,8 @@ const TOPIC_POINTS: &str = "SELECT id FROM points WHERE topic_id = $1 AND worksp
 const TOPIC_MESSAGES: &str = "SELECT id FROM messages WHERE topic_id = $1 AND workspace_id = $2";
 const TOPIC_TALKS: &str = "SELECT id FROM talks WHERE topic_id = $1 AND workspace_id = $2";
 const TALK_MESSAGES: &str = "SELECT id FROM messages WHERE talk_id = $1 AND workspace_id = $2";
+const OWN_TOPIC: &str = "SELECT EXISTS (SELECT 1 FROM topics \
+     WHERE id = $1 AND workspace_id = $2 AND kind = 'almanac')";
 
 impl Rules for Almanac {
     type Model = ModelKind;
@@ -42,8 +44,8 @@ impl Rules for Almanac {
     }
 
     async fn check_allowed(
-        _db: &mut PgConnection,
-        _actor: Actor,
+        db: &mut PgConnection,
+        actor: Actor,
         operation: &Operation,
     ) -> Result<(), SyncError> {
         match operation {
@@ -54,6 +56,23 @@ impl Rules for Almanac {
             } if data.contains_key("notified_for") => Err(SyncError::Forbidden(
                 "Only Almanac says when it told the Mac.".into(),
             )),
+            // The workspace's own topic stays: it's how topics start.
+            Operation::Delete {
+                model: ModelKind::Topic,
+                id,
+            } => {
+                let own: bool = sqlx::query_scalar(OWN_TOPIC)
+                    .bind(id)
+                    .bind(actor.workspace_id)
+                    .fetch_one(&mut *db)
+                    .await?;
+                if own {
+                    return Err(SyncError::Forbidden(
+                        "Almanac's own topic stays. You can rename it.".into(),
+                    ));
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }

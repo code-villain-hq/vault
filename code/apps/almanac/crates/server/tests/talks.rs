@@ -131,14 +131,15 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
         "set up in the background"
     );
     let topics = app.synced(&ada, &home, "Topic").await;
-    assert_eq!(topics[0]["name"], "Pflanzen");
-    assert_eq!(topics[0]["group_name"], "Home");
-    assert_eq!(topics[0]["shape"], "cards");
+    let plants = topics.iter().find(|t| t["name"] == "Pflanzen").unwrap();
+    assert_eq!(plants["kind"], "topic");
+    assert_eq!(plants["group_name"], "Home");
+    assert_eq!(plants["shape"], "cards");
     assert_eq!(
-        topics[0]["sticks_to"],
+        plants["sticks_to"],
         "Die Zimmerpflanzen zu Hause: gießen, düngen, umtopfen."
     );
-    assert_eq!(topics[0]["starters"].as_array().map(Vec::len), Some(2));
+    assert_eq!(plants["starters"].as_array().map(Vec::len), Some(2));
 
     let asked = app
         .post(
@@ -212,7 +213,10 @@ async fn without_a_key_the_talk_says_where_to_add_one(pool: PgPool) {
     assert_eq!(messages.len(), 2, "the question and why there's no answer");
 
     let key = app.get(&format!("/api/w/{home}/claude"), &ada).await;
-    assert_eq!(key.body, json!({ "set": false, "from_settings": false }));
+    assert_eq!(
+        key.body,
+        json!({ "via": "key", "web": false, "set": false, "from_settings": false })
+    );
     let set = app
         .call(
             "PUT",

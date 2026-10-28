@@ -16,9 +16,9 @@ mod topic;
 mod user;
 
 pub use account::{
-    ClaudeKeyInfo, Me, MemberInfo, Role, SetClaudeKeyRequest, UpdateMemberRequest,
-    UpdateProfileRequest, UpdateWorkspaceRequest, UserInfo, WorkspaceInfo, clean_name,
-    normalize_email, url_key_from,
+    ClaudeCodeInfo, ClaudeKeyInfo, Me, MemberInfo, Role, SetClaudeKeyRequest, SetClaudeWebRequest,
+    UpdateMemberRequest, UpdateProfileRequest, UpdateWorkspaceRequest, UserInfo, WorkspaceInfo,
+    clean_name, normalize_email, url_key_from,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{
@@ -26,11 +26,12 @@ pub use protocol::{
     TransactionResult,
 };
 pub use talk::{
-    AskRequest, Message, MessageCreate, MessagePatch, Source, Talk, TalkCreate, TalkPatch,
+    AskRequest, Message, MessageCreate, MessagePatch, Proposal, ProposedPoint, ProposedReminder,
+    Source, Talk, TalkCreate, TalkPatch, TopicChange,
 };
 pub use topic::{
-    ICONS, Point, PointCreate, PointPatch, Question, QuestionCreate, QuestionPatch, Reminder,
-    ReminderCreate, ReminderPatch, SHAPES, StartTopicRequest, StartedTopic, Topic, TopicCreate,
-    TopicPatch,
+    ICONS, KINDS, Point, PointCreate, PointPatch, Question, QuestionCreate, QuestionPatch,
+    Reminder, ReminderCreate, ReminderPatch, SHAPES, StartTopicRequest, StartedTopic, Topic,
+    TopicCreate, TopicPatch,
 };
 pub use user::User;

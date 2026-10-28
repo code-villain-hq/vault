@@ -1,6 +1,8 @@
 //! A topic's page as Claude reads it: what the topic sticks to, the points
 //! it kept by theme, the questions it waits on, its reminders, and the
-//! names of the other topics, for questions that belong there.
+//! names of the other topics, for questions that belong there. For the
+//! workspace's own topic, the workspace: its topics by group, what each
+//! sticks to, and how much it has.
 
 use std::fmt::Write as _;
 
@@ -16,8 +18,14 @@ const QUESTIONS: &str = "SELECT text FROM questions \
      WHERE topic_id = $1 AND workspace_id = $2 AND status = 'open' ORDER BY created_at";
 const REMINDERS: &str = "SELECT title, due_on, every_days FROM reminders \
      WHERE topic_id = $1 AND workspace_id = $2 AND status IN ('on', 'offered') ORDER BY due_on";
-const OTHERS: &str =
-    "SELECT name FROM topics WHERE workspace_id = $2 AND id <> $1 ORDER BY position";
+const OTHERS: &str = "SELECT name FROM topics \
+     WHERE workspace_id = $2 AND id <> $1 AND kind = 'topic' ORDER BY position";
+const WORKSPACE: &str = "SELECT name FROM workspaces WHERE id = $1";
+const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, t.shape, \
+       (SELECT count(*) FROM points p WHERE p.topic_id = t.id), \
+       (SELECT max(k.last_at)::date FROM talks k WHERE k.topic_id = t.id) \
+     FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
+     ORDER BY t.group_name = '', t.group_name, t.position, t.created_at";
 
 /// A theme and its points: each a text and where it comes from.
 pub type Theme = (String, Vec<(String, Option<String>)>);
@@ -150,6 +158,77 @@ impl Page {
         } else {
             out.push_str(&self.others.join(", "));
             out.push('\n');
+        }
+        out
+    }
+}
+
+/// The workspace as its own topic reads it.
+pub struct Workspace {
+    pub name: String,
+    /// Name, group, what it sticks to, shape, how many points, the day of
+    /// its last talk.
+    pub topics: Vec<(String, String, String, String, i64, Option<NaiveDate>)>,
+}
+
+impl Workspace {
+    pub async fn load(pool: &PgPool, workspace_id: Uuid) -> Result<Workspace, sqlx::Error> {
+        Ok(Workspace {
+            name: sqlx::query_scalar(WORKSPACE)
+                .bind(workspace_id)
+                .fetch_one(pool)
+                .await?,
+            topics: sqlx::query_as(TOPICS)
+                .bind(workspace_id)
+                .fetch_all(pool)
+                .await?,
+        })
+    }
+
+    pub fn groups(&self) -> Vec<&str> {
+        let mut groups: Vec<&str> = Vec::new();
+        for (_, group, ..) in &self.topics {
+            if !group.is_empty() && !groups.contains(&group.as_str()) {
+                groups.push(group);
+            }
+        }
+        groups
+    }
+
+    pub fn describe(&self) -> String {
+        let mut out = String::new();
+        let _ = writeln!(out, "The workspace: {}", self.name);
+        if self.topics.is_empty() {
+            out.push_str("It has no topics yet besides this one.\n");
+            return out;
+        }
+        out.push_str("\nIts topics, by group:\n");
+        let mut group = None;
+        for (name, in_group, sticks_to, shape, points, last) in &self.topics {
+            if group != Some(in_group) {
+                let _ = writeln!(
+                    out,
+                    "## {}",
+                    if in_group.is_empty() {
+                        "No group"
+                    } else {
+                        in_group
+                    }
+                );
+                group = Some(in_group);
+            }
+            let sticks_to = match sticks_to.trim() {
+                "" => "not written yet",
+                s => s,
+            };
+            let last = match last {
+                Some(day) => format!(", last talk on {day}"),
+                None => ", no talks yet".into(),
+            };
+            let _ = writeln!(
+                out,
+                "- {name} ({shape}, {points} points{last}). Sticks to: {sticks_to}"
+            );
         }
         out
     }

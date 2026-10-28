@@ -1,6 +1,7 @@
 // A topic's page: what it sticks to, what it kept by theme (a card each,
 // or a document's sections), the questions it waits on, its week, and the
-// talk beside it.
+// talk beside it. The workspace's own topic, Almanac, has the index of the
+// others for its page.
 
 import type { ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
 import type { SyncClient } from "@code-villain/sync-client";
@@ -9,6 +10,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { MessagesSquare, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ago,
   dayKey,
   dueWords,
   rhythmWords,
@@ -18,7 +20,8 @@ import {
   weekOf,
   weekWords,
 } from "./format";
-import { PageHeader } from "./layout";
+import { topicIcon } from "./icons";
+import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
 import { TalkPanel, useAsk, useTalks } from "./talk";
@@ -131,23 +134,28 @@ function TopicView({
             label="More for this topic"
             items={[
               { label: "Edit topic…", onSelect: () => setEditing(true) },
-              {
-                label: "Delete topic…",
-                danger: true,
-                onSelect: () =>
-                  setConfirmation({
-                    title: `Delete ${topic.name}?`,
-                    body: "Its page, its talks and its reminders go with it. This can't be undone.",
-                    action: "Delete topic",
-                    onConfirm: () => {
-                      sync.delete("Topic", topic.id);
-                      void navigate({
-                        to: "/$workspace",
-                        params: { workspace: workspace.url_key },
-                      });
+              // The workspace's own topic stays; you can rename it.
+              ...(isOwn(topic)
+                ? []
+                : [
+                    {
+                      label: "Delete topic…",
+                      danger: true,
+                      onSelect: () =>
+                        setConfirmation({
+                          title: `Delete ${topic.name}?`,
+                          body: "Its page, its talks and its reminders go with it. This can't be undone.",
+                          action: "Delete topic",
+                          onConfirm: () => {
+                            sync.delete("Topic", topic.id);
+                            void navigate({
+                              to: "/$workspace",
+                              params: { workspace: workspace.url_key },
+                            });
+                          },
+                        }),
                     },
-                  }),
-              },
+                  ]),
             ]}
           />
         )}
@@ -156,7 +164,11 @@ function TopicView({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="page-content min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-6">
-              <TopicPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
+              {isOwn(topic) ? (
+                <OwnPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
+              ) : (
+                <TopicPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
+              )}
             </div>
           </div>
           {!panel && <AskBar topic={topic} onAsk={(text) => onAsk(text, null)} />}
@@ -276,11 +288,20 @@ function byTheme({
   return themes;
 }
 
-/** Without a Claude key nothing answers: say so where it's noticed. */
+/**
+ * Without a Claude key nothing answers: say so where it's noticed. On this
+ * Mac Claude Code answers, and a talk says when it can't; asking here would
+ * start it on every page.
+ */
 function NoKey() {
+  const { place } = useWorkspace();
+  return place.kind === "mac" ? null : <NoKeyOnServer />;
+}
+
+function NoKeyOnServer() {
   const { workspace } = useWorkspace();
   const { data } = useApi<ClaudeKeyInfo>(`/api/w/${workspace.id}/claude`);
-  if (!data || data.set || data.from_settings) return null;
+  if (data?.via !== "key" || data.set || data.from_settings) return null;
   return (
     <p className="ui-tint-info rounded-md px-3 py-2">
       Almanac answers with Claude, and has no key yet.{" "}
@@ -296,6 +317,116 @@ function NoKey() {
   );
 }
 
+/**
+ * The workspace's own topic: every other topic by group, as in the sidebar,
+ * with what it sticks to and what's new. Almanac keeps it; nobody writes it.
+ */
+function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
+  const { workspace } = useWorkspace();
+  const topics = useTopics();
+  const Icon = topicIcon(topic.icon);
+  const groups = useMemo(() => {
+    const byName = new Map<string, Topic[]>();
+    for (const other of topics.filter((t) => !isOwn(t))) {
+      const list = byName.get(other.group_name) ?? [];
+      list.push(other);
+      byName.set(other.group_name, list);
+    }
+    return [...byName.entries()].sort(([a], [b]) => (a && b ? a.localeCompare(b) : a ? 1 : -1));
+  }, [topics]);
+
+  return (
+    <>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
+          <p className="text-title font-semibold">{topic.name}</p>
+        </div>
+        <p className="text-muted">
+          Knows what's in {workspace.name}, and starts a topic for whatever you want to keep.
+        </p>
+      </div>
+      <NoKey />
+      {groups.length === 0 ? (
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-1">
+            <p className="font-medium">No topics in {workspace.name} yet.</p>
+            <p className="text-muted">
+              Tell {topic.name} what you want to keep track of. It starts a topic for each, and
+              lists them here.
+            </p>
+          </div>
+          <Starters topic={topic} onAsk={onAsk} />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          {groups.map(([group, list]) => (
+            <section key={group || "-"} aria-label={group || "Topics"} className="flex flex-col">
+              <h2 className="px-2.5 pt-3 pb-0.5 text-xs text-faint first:pt-0">
+                {group || "Topics"}
+              </h2>
+              {list.map((other) => (
+                <IndexRow key={other.id} topic={other} />
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** One topic in the index: its name, what's new, how much it keeps, what it sticks to. */
+function IndexRow({ topic }: { topic: Topic }) {
+  const { workspace } = useWorkspace();
+  const unread = useUnread();
+  const points = useRecords("Point");
+  const talks = useRecords("Talk");
+  const Icon = topicIcon(topic.icon);
+  const kept = points.filter((p) => p.topic_id === topic.id).length;
+  const last = talks
+    .filter((t) => t.topic_id === topic.id)
+    .reduce<string | null>((at, t) => (at && at > t.last_at ? at : t.last_at), null);
+  const detail = [
+    topic.shape === "document"
+      ? "a document"
+      : kept === 0
+        ? "nothing kept yet"
+        : `${kept} ${kept === 1 ? "point" : "points"}`,
+    last ? ago(last) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <Link
+      to="/$workspace/topics/$topic"
+      params={{ workspace: workspace.url_key, topic: topic.id }}
+      className="ui-row flex items-start gap-2.5 rounded-md px-2.5 py-2 hover:bg-hover"
+    >
+      <Icon
+        size={15}
+        strokeWidth={1.75}
+        aria-hidden="true"
+        className="mt-0.5 shrink-0 text-muted"
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-baseline gap-2">
+          <span className="truncate font-semibold">{topic.name}</span>
+          {unread.has(topic.id) && (
+            <span
+              role="img"
+              aria-label="New points"
+              className="size-1.5 shrink-0 self-center rounded-full bg-accent"
+            />
+          )}
+          <span className="ml-auto shrink-0 text-xs text-faint">{detail}</span>
+        </div>
+        {topic.sticks_to && <p className="text-muted">{topic.sticks_to}</p>}
+      </div>
+    </Link>
+  );
+}
+
 function EmptyPage({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
   return (
     <div className="flex flex-col gap-6">
@@ -306,25 +437,31 @@ function EmptyPage({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => vo
           from. Ask below, or tell it what you already know.
         </p>
       </div>
-      {topic.starters.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold text-muted">To start</h2>
-          <ul className="flex flex-col gap-1">
-            {topic.starters.map((starter) => (
-              <li key={starter}>
-                <button
-                  type="button"
-                  onClick={() => onAsk(starter)}
-                  className="ui-row w-full rounded-md px-3 py-2 text-left hover:bg-hover"
-                >
-                  {starter}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <Starters topic={topic} onAsk={onAsk} />
     </div>
+  );
+}
+
+/** The topic's first questions, to ask with a click. */
+function Starters({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
+  if (topic.starters.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-xs font-semibold text-muted">To start</h2>
+      <ul className="flex flex-col gap-1">
+        {topic.starters.map((starter) => (
+          <li key={starter}>
+            <button
+              type="button"
+              onClick={() => onAsk(starter)}
+              className="ui-row w-full rounded-md px-3 py-2 text-left hover:bg-hover"
+            >
+              {starter}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -553,7 +690,11 @@ function AskBar({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void 
         value={text}
         onChange={(e) => setText(e.target.value)}
         aria-label={`Ask ${topic.name}`}
-        placeholder={`Ask ${topic.name}, or tell it something`}
+        placeholder={
+          isOwn(topic)
+            ? `Tell ${topic.name} what you want to keep track of`
+            : `Ask ${topic.name}, or tell it something`
+        }
         className="ui-field h-10 w-full rounded-lg px-4"
       />
     </form>

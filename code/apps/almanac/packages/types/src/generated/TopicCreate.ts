@@ -4,4 +4,8 @@ export type TopicCreate = { name: string, sticks_to?: string, icon?: string, gro
 /**
  * After the last topic when left out.
  */
-position?: number, };
+position?: number, 
+/**
+ * Only the server makes the workspace's own topic.
+ */
+kind?: string, };

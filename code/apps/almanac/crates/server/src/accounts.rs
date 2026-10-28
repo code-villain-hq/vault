@@ -143,8 +143,8 @@ pub async fn load_me(pool: &PgPool, user_id: Uuid) -> Result<Me, AppError> {
     })
 }
 
-/// Creates a workspace with `admin` as its first member. The first
-/// workspace watches Almanac itself. Its URL key comes from the name, with a
+/// Creates a workspace with `admin` as its first member, and its own
+/// topic (`crate::own`). Its URL key comes from the name, with a
 /// number added if the key is taken.
 pub async fn create_workspace(
     db: &mut PgConnection,
@@ -169,6 +169,11 @@ pub async fn create_workspace(
                 .rows_affected();
         if created == 1 {
             add_member(&mut *db, id, admin, Role::Admin).await?;
+            let actor = Actor {
+                user_id: admin,
+                workspace_id: id,
+            };
+            crate::own::ensure(&mut *db, actor).await?;
             return Ok(id);
         }
     }

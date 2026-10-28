@@ -4,7 +4,9 @@ use sqlx::PgPool;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
+use crate::acp::ClaudeCode;
 use crate::claude::Claude;
+use crate::mcp::Questions;
 use crate::oidc::OidcLogin;
 use crate::reminders::Due;
 
@@ -22,8 +24,14 @@ pub struct AppState {
     /// The token the company's account sends its people and groups with
     /// (`scim.token`).
     pub scim_token: Option<String>,
-    /// Claude, for talks and new topics.
+    /// Claude through the Messages API, for talks and new topics on a
+    /// server.
     pub claude: Claude,
+    /// Claude Code on this Mac, which answers instead, as you're signed in
+    /// to it: no key.
+    pub claude_code: Option<ClaudeCode>,
+    /// The questions Claude Code is answering, for Almanac's tools.
+    pub questions: Questions,
     /// Reminders as they come due, for the desktop app to notify.
     pub due: broadcast::Sender<Due>,
     /// The desktop app's own server, for the workspaces on this Mac: nobody
@@ -46,6 +54,8 @@ impl AppState {
             oidc_login: None,
             scim_token: None,
             claude,
+            claude_code: None,
+            questions: Questions::default(),
             due,
             on_this_mac: false,
             extra_origins: Vec::new(),
@@ -55,6 +65,13 @@ impl AppState {
     /// The desktop app's own server: no sign-ins.
     pub fn on_this_mac(mut self) -> Self {
         self.on_this_mac = true;
+        self
+    }
+
+    /// Answers with Claude Code on this Mac, and gives it Almanac's tools
+    /// at `/api/mcp`.
+    pub fn with_claude_code(mut self, claude_code: ClaudeCode) -> Self {
+        self.claude_code = Some(claude_code);
         self
     }
 

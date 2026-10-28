@@ -15,7 +15,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn starting_on_this_mac_makes_an_empty_home(pool: PgPool) {
+async fn starting_on_this_mac_makes_a_home_with_only_almanac_in_it(pool: PgPool) {
     assert_eq!(local::person(&pool).await.unwrap(), None);
     let person = local::start(&pool, "Ada Lovelace", "Home").await.unwrap();
     assert_eq!(local::person(&pool).await.unwrap(), Some(person));
@@ -31,11 +31,11 @@ async fn starting_on_this_mac_makes_an_empty_home(pool: PgPool) {
     let workspaces = me.body["workspaces"].as_array().unwrap();
     assert_eq!(workspaces.len(), 2);
     assert!(workspaces.iter().all(|w| w["role"] == "admin"));
-    assert!(
-        app.synced(&session, &side.to_string(), "Topic")
-            .await
-            .is_empty()
-    );
+    // A new workspace comes with its own topic, Almanac, and no others.
+    let topics = app.synced(&session, &side.to_string(), "Topic").await;
+    assert_eq!(topics.len(), 1);
+    assert_eq!(topics[0]["kind"], "almanac");
+    assert_eq!(topics[0]["name"], "Almanac");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

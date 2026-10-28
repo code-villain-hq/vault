@@ -26,6 +26,9 @@ pub struct Topic {
     /// First questions, for the empty page.
     pub starters: Vec<String>,
     pub position: i32,
+    /// `topic`, or `almanac` for the workspace's own topic, which knows
+    /// the others and starts new ones. Set by the server.
+    pub kind: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -43,9 +46,11 @@ pub struct TopicCreate {
     pub starters: Option<Vec<String>>,
     /// After the last topic when left out.
     pub position: Option<i32>,
+    /// Only the server makes the workspace's own topic.
+    pub kind: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export, optional_fields)]
 pub struct TopicPatch {
@@ -61,6 +66,7 @@ pub struct TopicPatch {
 
 /// The icons a topic can have: Lucide's names, which the web app draws.
 pub const ICONS: &[&str] = &[
+    "library",
     "book",
     "book-open",
     "sprout",
@@ -122,6 +128,8 @@ pub const ICONS: &[&str] = &[
 ];
 
 pub const SHAPES: &[&str] = &["cards", "document"];
+
+pub const KINDS: &[&str] = &["topic", "almanac"];
 
 /// A short point the page keeps, under a theme, with where it comes from.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -274,13 +282,21 @@ pub struct QuestionPatch {
 pub const QUESTION_STATUSES: &[&str] = &["open", "added", "left_out", "answered"];
 
 /// Starts a topic (`POST /api/w/{id}/topics`): a name, and what it sticks
-/// to if you know. Almanac writes the rest.
+/// to if you know. Almanac writes the rest. From a topic Almanac proposed
+/// (`from_message`), it starts with what the proposal says, and any of the
+/// fields here over it.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export, optional_fields)]
 pub struct StartTopicRequest {
     pub name: String,
     pub sticks_to: Option<String>,
+    pub icon: Option<String>,
+    pub group_name: Option<String>,
+    pub shape: Option<String>,
+    pub title: Option<String>,
+    /// The answer whose proposal this starts.
+    pub from_message: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -292,6 +308,7 @@ pub struct StartedTopic {
 impl Validate for TopicCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         name(&self.name)?;
+        one_of(self.kind.as_deref(), KINDS, "kind")?;
         topic_fields(
             self.sticks_to.as_deref(),
             self.icon.as_deref(),
@@ -440,6 +457,7 @@ mod tests {
             title: None,
             starters: None,
             position: None,
+            kind: None,
         };
         assert!(topic("Pflanzen", Some("sprout")).validate().is_ok());
         assert!(topic(" ", None).validate().is_err());

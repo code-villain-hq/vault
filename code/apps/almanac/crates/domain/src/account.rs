@@ -100,16 +100,47 @@ pub struct UpdateMemberRequest {
     pub role: Role,
 }
 
-/// Settings → Claude: whether Almanac has a key to answer with. The key
-/// itself never leaves the server; its last four characters tell it apart.
+/// Settings → Claude: who answers. On this Mac that's Claude Code, as
+/// you're signed in to it; a server answers with a key. The key itself
+/// never leaves the server; its last four characters tell it apart.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, optional_fields)]
 pub struct ClaudeKeyInfo {
+    /// `claude_code` on this Mac, `key` on a server.
+    pub via: String,
+    /// How Claude Code is doing, on this Mac.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claude_code: Option<ClaudeCodeInfo>,
+    /// Whether Claude Code may search the web.
+    pub web: bool,
     pub set: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ends_with: Option<String>,
     /// A key comes from the server's settings, used when none is set here.
     pub from_settings: bool,
+}
+
+/// Whether Claude Code on this Mac can answer: `ready`, `not_installed`
+/// (its ACP adapter isn't), `signed_out`, or `trouble`, with what it said.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, optional_fields)]
+pub struct ClaudeCodeInfo {
+    pub state: String,
+    /// The ACP adapter's version.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// The command that installs the adapter.
+    pub install: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub problem: Option<String>,
+}
+
+/// `PUT /api/w/{id}/claude/web`: whether Claude Code may search the web.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct SetClaudeWebRequest {
+    pub web: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

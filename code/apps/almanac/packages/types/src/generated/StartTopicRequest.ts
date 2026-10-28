@@ -2,6 +2,12 @@
 
 /**
  * Starts a topic (`POST /api/w/{id}/topics`): a name, and what it sticks
- * to if you know. Almanac writes the rest.
+ * to if you know. Almanac writes the rest. From a topic Almanac proposed
+ * (`from_message`), it starts with what the proposal says, and any of the
+ * fields here over it.
  */
-export type StartTopicRequest = { name: string, sticks_to?: string, };
+export type StartTopicRequest = { name: string, sticks_to?: string, icon?: string, group_name?: string, shape?: string, title?: string, 
+/**
+ * The answer whose proposal this starts.
+ */
+from_message?: string, };

@@ -1,0 +1,868 @@
+//! Almanac's tools for Claude Code, over MCP on this Mac's server
+//! (`POST /api/mcp`), as Layer gives its conversations theirs. Each
+//! question opens a token ([`Questions::open`]) that Claude Code sends as
+//! its bearer, so a tool call lands on the question it belongs to and on
+//! nothing else; the token goes when the answer is done. A tool doesn't
+//! write: it collects what the answer keeps ([`Kept`]), and the talk
+//! writes it with the answer, in one transaction.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use almanac_domain::{Actor, ICONS, Proposal, ProposedPoint, SHAPES, TopicChange, TopicPatch};
+use axum::Json;
+use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
+use axum::response::{IntoResponse, Response};
+use serde::Deserialize;
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
+use uuid::Uuid;
+
+use crate::kept::{Kept, reminder};
+use crate::state::AppState;
+use crate::topics::{SetUp, cut};
+
+const PROTOCOL_VERSION: &str = "2025-06-18";
+
+const TOPIC_NAMED: &str = "SELECT id, name, sticks_to, icon, group_name, shape, title, kind \
+     FROM topics WHERE workspace_id = $1 AND lower(name) = lower($2)";
+const TOPIC_BY_ID: &str = "SELECT id, name, sticks_to, icon, group_name, shape, title, kind \
+     FROM topics WHERE workspace_id = $1 AND id = $2";
+const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY position";
+
+/// What a question is for, and so which tools it gets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// A talk in a topic: it keeps points, asks to check, offers reminders.
+    Topic,
+    /// A talk in the workspace's own topic: it proposes and changes topics.
+    Own,
+    /// Setting up a topic that was just started.
+    SetUp,
+}
+
+impl Mode {
+    /// The tools' names, for Claude Code's allowed tools.
+    pub fn tools(self) -> &'static [&'static str] {
+        match self {
+            Mode::Topic => &[
+                "keep_point",
+                "ask_to_check",
+                "offer_reminder",
+                "name_talk",
+                "fits_elsewhere",
+            ],
+            Mode::Own => &[
+                "propose_topic",
+                "change_topic",
+                "name_talk",
+                "fits_elsewhere",
+            ],
+            Mode::SetUp => &["set_up_topic"],
+        }
+    }
+}
+
+/// One question Claude Code is answering, and what its tools collected.
+pub struct Asking {
+    pub actor: Actor,
+    pub topic_id: Uuid,
+    pub mode: Mode,
+    pub kept: Mutex<Kept>,
+    pub set_up: Mutex<Option<SetUp>>,
+}
+
+impl Asking {
+    pub fn new(actor: Actor, topic_id: Uuid, mode: Mode) -> Self {
+        Asking {
+            actor,
+            topic_id,
+            mode,
+            kept: Mutex::new(Kept::default()),
+            set_up: Mutex::new(None),
+        }
+    }
+
+    /// What the tools collected, taken out.
+    pub fn take_kept(&self) -> Kept {
+        self.kept
+            .lock()
+            .map(|mut kept| std::mem::take(&mut *kept))
+            .unwrap_or_default()
+    }
+
+    pub fn take_set_up(&self) -> Option<SetUp> {
+        self.set_up.lock().ok().and_then(|mut s| s.take())
+    }
+}
+
+/// The questions being answered, by their tokens.
+#[derive(Clone, Default)]
+pub struct Questions(Arc<Mutex<HashMap<String, Arc<Asking>>>>);
+
+impl Questions {
+    /// Opens a token for `asking`, which lasts as long as the returned
+    /// [`Open`].
+    pub fn open(&self, asking: Asking) -> Open {
+        let token = crate::auth::new_token();
+        let asking = Arc::new(asking);
+        if let Ok(mut open) = self.0.lock() {
+            open.insert(token.clone(), asking.clone());
+        }
+        Open {
+            token,
+            asking,
+            questions: self.clone(),
+        }
+    }
+
+    fn get(&self, token: &str) -> Option<Arc<Asking>> {
+        self.0.lock().ok()?.get(token).cloned()
+    }
+}
+
+/// A question's token, closed when this is dropped.
+pub struct Open {
+    pub token: String,
+    pub asking: Arc<Asking>,
+    questions: Questions,
+}
+
+impl Drop for Open {
+    fn drop(&mut self) {
+        if let Ok(mut open) = self.questions.0.lock() {
+            open.remove(&self.token);
+        }
+    }
+}
+
+/// `POST /api/mcp`: one JSON-RPC message from Claude Code.
+pub async fn handle(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(message): Json<Value>,
+) -> Response {
+    let asking = headers
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .and_then(|token| state.questions.get(token));
+    let Some(asking) = asking else {
+        return (StatusCode::UNAUTHORIZED, "This question is over.").into_response();
+    };
+    let id = message["id"].clone();
+    if id.is_null() {
+        // A notification, such as `notifications/initialized`.
+        return StatusCode::ACCEPTED.into_response();
+    }
+    let result = match message["method"].as_str().unwrap_or("") {
+        "initialize" => json!({
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": { "tools": { "listChanged": false } },
+            "serverInfo": { "name": "almanac", "version": env!("CARGO_PKG_VERSION") },
+        }),
+        "ping" => json!({}),
+        "tools/list" => json!({ "tools": tools(asking.mode) }),
+        "tools/call" => {
+            let name = message["params"]["name"].as_str().unwrap_or("");
+            let arguments = message["params"]["arguments"].clone();
+            let (text, failed) = match call(&state, &asking, name, arguments).await {
+                Ok(text) => (text, false),
+                Err(text) => (text, true),
+            };
+            json!({ "content": [{ "type": "text", "text": text }], "isError": failed })
+        }
+        _ => {
+            return Json(json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": { "code": -32601, "message": "Almanac doesn't offer that." },
+            }))
+            .into_response();
+        }
+    };
+    Json(json!({ "jsonrpc": "2.0", "id": id, "result": result })).into_response()
+}
+
+/// Runs one tool. What's wrong comes back as its result, in words, so
+/// Claude can fix it and call again.
+async fn call(
+    state: &AppState,
+    asking: &Asking,
+    name: &str,
+    arguments: Value,
+) -> Result<String, String> {
+    if !asking.mode.tools().contains(&name) {
+        return Err(format!("There's no {name} here."));
+    }
+    fn read<T: DeserializeOwned>(arguments: Value) -> Result<T, String> {
+        serde_json::from_value(arguments).map_err(|e| format!("The arguments don't fit: {e}."))
+    }
+    let kept = || {
+        asking
+            .kept
+            .lock()
+            .map_err(|_| "Almanac stumbled.".to_string())
+    };
+    match name {
+        "keep_point" => {
+            let point: PointArgs = read(arguments)?;
+            kept()?.keep_point(&point.theme, &point.text, &point.source, &point.url)?;
+            Ok("Kept.".into())
+        }
+        "ask_to_check" => {
+            let question: QuestionArgs = read(arguments)?;
+            kept()?.ask_to_check(&question.theme, &question.text, &question.point)?;
+            Ok("They'll see it under the answer.".into())
+        }
+        "offer_reminder" => {
+            let r: ReminderArgs = read(arguments)?;
+            let reminder = reminder(&r.theme, &r.title, &r.due_on, &r.at, r.every_days)?;
+            kept()?.offer_reminder(reminder)?;
+            Ok("Offered: they add it to the calendar with a click.".into())
+        }
+        "name_talk" => {
+            let args: NameArgs = read(arguments)?;
+            kept()?.talk_title = Some(cut(&args.title, 80));
+            Ok("Named.".into())
+        }
+        "fits_elsewhere" => {
+            let args: ElsewhereArgs = read(arguments)?;
+            kept()?.elsewhere = Some(cut(&args.topic, 80));
+            Ok("They'll see where it fits.".into())
+        }
+        "propose_topic" => {
+            let proposal = propose(state, asking, read(arguments)?).await?;
+            let replaced = kept()?.proposal.replace(proposal).is_some();
+            Ok(if replaced {
+                "Proposed, in place of the one before."
+            } else {
+                "Proposed. They see it as a card under your answer, with Start and Change. \
+                 It isn't started until they click Start."
+            }
+            .into())
+        }
+        "change_topic" => {
+            let change = change(state, asking, read(arguments)?).await?;
+            let mut guard = kept()?;
+            match guard
+                .changes
+                .iter_mut()
+                .find(|c| c.topic_id == change.topic_id)
+            {
+                Some(earlier) => merge(earlier, change),
+                None => guard.changes.push(change),
+            }
+            Ok(
+                "Changed, once your answer is done. They see what you said, and can undo it."
+                    .into(),
+            )
+        }
+        "set_up_topic" => {
+            let set_up: SetUp = read(arguments)?;
+            if !ICONS.contains(&set_up.icon.as_str()) || !SHAPES.contains(&set_up.shape.as_str()) {
+                return Err("Pick the icon and the shape from their lists.".into());
+            }
+            if let Ok(mut slot) = asking.set_up.lock() {
+                *slot = Some(set_up);
+            }
+            Ok("Set up.".into())
+        }
+        _ => Err(format!("There's no {name} here.")),
+    }
+}
+
+#[derive(Deserialize)]
+struct PointArgs {
+    theme: String,
+    text: String,
+    #[serde(default)]
+    source: String,
+    #[serde(default)]
+    url: String,
+}
+
+#[derive(Deserialize)]
+struct QuestionArgs {
+    #[serde(default)]
+    theme: String,
+    text: String,
+    #[serde(default)]
+    point: String,
+}
+
+#[derive(Deserialize)]
+struct ReminderArgs {
+    #[serde(default)]
+    theme: String,
+    title: String,
+    due_on: String,
+    #[serde(default)]
+    at: String,
+    every_days: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct NameArgs {
+    title: String,
+}
+
+#[derive(Deserialize)]
+struct ElsewhereArgs {
+    topic: String,
+}
+
+#[derive(Deserialize)]
+struct ProposeArgs {
+    name: String,
+    sticks_to: String,
+    icon: String,
+    group: String,
+    shape: String,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    starters: Vec<String>,
+    #[serde(default)]
+    points: Vec<ProposedPointArgs>,
+    #[serde(default)]
+    reminders: Vec<ReminderArgs>,
+}
+
+#[derive(Deserialize)]
+struct ProposedPointArgs {
+    theme: String,
+    text: String,
+}
+
+#[derive(Deserialize)]
+struct ChangeArgs {
+    topic: String,
+    name: Option<String>,
+    sticks_to: Option<String>,
+    icon: Option<String>,
+    group: Option<String>,
+    shape: Option<String>,
+    title: Option<String>,
+    said: String,
+}
+
+type TopicRow = (
+    Uuid,
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+);
+
+async fn names(state: &AppState, asking: &Asking) -> String {
+    let names: Vec<String> = sqlx::query_scalar(NAMES)
+        .bind(asking.actor.workspace_id)
+        .fetch_all(&state.pool)
+        .await
+        .unwrap_or_default();
+    names.join(", ")
+}
+
+async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result<Proposal, String> {
+    let name = cut(&args.name, 80);
+    if name.is_empty() {
+        return Err("A topic needs a name.".into());
+    }
+    let existing: Option<TopicRow> = sqlx::query_as(TOPIC_NAMED)
+        .bind(asking.actor.workspace_id)
+        .bind(&name)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
+    if let Some(existing) = existing {
+        return Err(format!(
+            "There's a topic called {} already. Say so, or change it with change_topic.",
+            existing.1
+        ));
+    }
+    if !ICONS.contains(&args.icon.as_str()) {
+        return Err("Pick the icon from its list.".into());
+    }
+    if !SHAPES.contains(&args.shape.as_str()) {
+        return Err("The shape is cards or document.".into());
+    }
+    let points: Vec<ProposedPoint> = args
+        .points
+        .iter()
+        .map(|p| ProposedPoint {
+            theme: cut(&p.theme, 120),
+            text: cut(&p.text, 2000),
+        })
+        .filter(|p| !p.theme.is_empty() && !p.text.is_empty())
+        .take(8)
+        .collect();
+    let reminders = args
+        .reminders
+        .iter()
+        .take(3)
+        .map(|r| reminder(&r.theme, &r.title, &r.due_on, &r.at, r.every_days))
+        .collect::<Result<Vec<_>, _>>()?;
+    let title = cut(&args.title, 200);
+    Ok(Proposal {
+        name,
+        sticks_to: cut(&args.sticks_to, 1000),
+        icon: args.icon,
+        group_name: cut(&args.group, 40),
+        shape: args.shape,
+        title: (!title.is_empty()).then_some(title),
+        starters: args
+            .starters
+            .iter()
+            .map(|s| cut(s, 200))
+            .filter(|s| !s.is_empty())
+            .take(4)
+            .collect(),
+        points,
+        reminders,
+        topic_id: None,
+    })
+}
+
+async fn change(
+    state: &AppState,
+    asking: &Asking,
+    args: ChangeArgs,
+) -> Result<TopicChange, String> {
+    let named = cut(&args.topic, 80);
+    let earlier = |find: &dyn Fn(&TopicChange) -> bool| {
+        asking
+            .kept
+            .lock()
+            .ok()
+            .and_then(|kept| kept.changes.iter().find(|c| find(c)).cloned())
+    };
+    // A topic this answer renamed already goes by its new name.
+    let renamed = earlier(&|c| {
+        c.after
+            .name
+            .as_deref()
+            .is_some_and(|n| n.eq_ignore_ascii_case(&named))
+    });
+    let row: Option<TopicRow> = match &renamed {
+        Some(change) => sqlx::query_as(TOPIC_BY_ID)
+            .bind(asking.actor.workspace_id)
+            .bind(change.topic_id),
+        None => sqlx::query_as(TOPIC_NAMED)
+            .bind(asking.actor.workspace_id)
+            .bind(&named),
+    }
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
+    let Some((id, mut name, mut sticks_to, mut icon, mut group_name, mut shape, title, kind)) = row
+    else {
+        return Err(format!(
+            "No topic is called {named}. The topics: {}.",
+            names(state, asking).await
+        ));
+    };
+    let mut title = title.unwrap_or_default();
+    // What this answer changed in it already counts as how it is now.
+    if let Some(change) = earlier(&|c| c.topic_id == id) {
+        let now = change.after;
+        for (field, value) in [
+            (&mut name, now.name),
+            (&mut sticks_to, now.sticks_to),
+            (&mut icon, now.icon),
+            (&mut group_name, now.group_name),
+            (&mut shape, now.shape),
+            (&mut title, now.title),
+        ] {
+            if let Some(value) = value {
+                *field = value;
+            }
+        }
+    }
+    let own = kind == "almanac";
+    if own
+        && (args.icon.is_some()
+            || args.group.is_some()
+            || args.shape.is_some()
+            || args.title.is_some())
+    {
+        return Err("This topic can only get another name or say what it sticks to.".into());
+    }
+    let mut before = TopicPatch::default();
+    let mut after = TopicPatch::default();
+    let set = |given: Option<String>,
+               max: usize,
+               now: String,
+               b: &mut Option<String>,
+               a: &mut Option<String>| {
+        if let Some(given) = given.map(|g| cut(&g, max))
+            && given != now
+        {
+            *b = Some(now);
+            *a = Some(given);
+        }
+    };
+    set(
+        args.name,
+        80,
+        name.clone(),
+        &mut before.name,
+        &mut after.name,
+    );
+    set(
+        args.sticks_to,
+        1000,
+        sticks_to,
+        &mut before.sticks_to,
+        &mut after.sticks_to,
+    );
+    set(args.icon, 40, icon, &mut before.icon, &mut after.icon);
+    set(
+        args.group,
+        40,
+        group_name,
+        &mut before.group_name,
+        &mut after.group_name,
+    );
+    set(args.shape, 20, shape, &mut before.shape, &mut after.shape);
+    set(args.title, 200, title, &mut before.title, &mut after.title);
+    if after == TopicPatch::default() {
+        return Err(format!("{name} is like that already."));
+    }
+    if after.name.as_deref() == Some("") {
+        return Err("A topic needs a name.".into());
+    }
+    if after.icon.as_deref().is_some_and(|i| !ICONS.contains(&i)) {
+        return Err("Pick the icon from its list.".into());
+    }
+    if after.shape.as_deref().is_some_and(|s| !SHAPES.contains(&s)) {
+        return Err("The shape is cards or document.".into());
+    }
+    if let Some(new_name) = &after.name
+        && !new_name.eq_ignore_ascii_case(&name)
+    {
+        let taken: Option<TopicRow> = sqlx::query_as(TOPIC_NAMED)
+            .bind(asking.actor.workspace_id)
+            .bind(new_name)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
+        if taken.is_some() {
+            return Err(format!("There's a topic called {new_name} already."));
+        }
+    }
+    let said = cut(&args.said, 200);
+    Ok(TopicChange {
+        topic_id: id,
+        name: after.name.clone().unwrap_or(name),
+        said: if said.is_empty() {
+            "Changed it.".into()
+        } else {
+            said
+        },
+        before,
+        after,
+        undone: false,
+    })
+}
+
+/// A second change to the same topic in one answer: the fields it sets
+/// over the first's, and what was there before the first.
+fn merge(earlier: &mut TopicChange, later: TopicChange) {
+    fn over(
+        b: &mut Option<String>,
+        a: &mut Option<String>,
+        lb: Option<String>,
+        la: Option<String>,
+    ) {
+        if la.is_some() {
+            if b.is_none() {
+                *b = lb;
+            }
+            *a = la;
+        }
+    }
+    let (
+        TopicChange {
+            before,
+            after,
+            said,
+            ..
+        },
+        e,
+    ) = (later, earlier);
+    if said != e.said {
+        e.said = format!("{} {said}", e.said);
+    }
+    over(
+        &mut e.before.name,
+        &mut e.after.name,
+        before.name,
+        after.name,
+    );
+    over(
+        &mut e.before.sticks_to,
+        &mut e.after.sticks_to,
+        before.sticks_to,
+        after.sticks_to,
+    );
+    over(
+        &mut e.before.icon,
+        &mut e.after.icon,
+        before.icon,
+        after.icon,
+    );
+    over(
+        &mut e.before.group_name,
+        &mut e.after.group_name,
+        before.group_name,
+        after.group_name,
+    );
+    over(
+        &mut e.before.shape,
+        &mut e.after.shape,
+        before.shape,
+        after.shape,
+    );
+    over(
+        &mut e.before.title,
+        &mut e.after.title,
+        before.title,
+        after.title,
+    );
+    if let Some(name) = &e.after.name {
+        e.name = name.clone();
+    }
+}
+
+/// The tools a question gets, with what each is for.
+fn tools(mode: Mode) -> Vec<Value> {
+    let string = |description: &str| json!({ "type": "string", "description": description });
+    let tool = |name: &str, description: &str, properties: Value, required: &[&str]| {
+        json!({
+            "name": name,
+            "description": description,
+            "inputSchema": {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+                "additionalProperties": false,
+            },
+        })
+    };
+    let reminder_fields = json!({
+        "theme": string("The theme it belongs to, or left out."),
+        "title": string("What to do, as the calendar shows it: \"Water the Monstera\"."),
+        "due_on": string("The next day it's due, as YYYY-MM-DD."),
+        "at": string("A time, as HH:MM, or left out for nine in the morning."),
+        "every_days": { "type": "integer", "description": "The rhythm in days, or left out for once." },
+    });
+    let name_talk = tool(
+        "name_talk",
+        "Names the talk, on its first answer: under six words, in the talk's language.",
+        json!({ "title": string("The talk's title.") }),
+        &["title"],
+    );
+    let fits_elsewhere = tool(
+        "fits_elsewhere",
+        "When the question has nothing to do with this topic: the topic it fits, one of the \
+         others by name, or a short name for a new one. They see a link to it under the answer.",
+        json!({ "topic": string("The topic's name.") }),
+        &["topic"],
+    );
+    match mode {
+        Mode::Topic => vec![
+            tool(
+                "keep_point",
+                "Keeps a point on the topic's page: a fact, a decision, or something they told \
+                 you about their situation that's worth knowing later. One short sentence, under \
+                 25 words; nothing the page has already. Usually none to four per answer. On a \
+                 page of cards each theme is one thing the topic is about, named plainly (a \
+                 plant, a pet, a place); in a document each theme is a section (such as \
+                 Problem, Market, Team). Use an existing theme when one fits.",
+                json!({
+                    "theme": string("The theme it goes under."),
+                    "text": string("The point, one short sentence."),
+                    "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
+                    "url": string("The page it comes from, when you read one. Never a made-up link."),
+                }),
+                &["theme", "text", "source"],
+            ),
+            tool(
+                "ask_to_check",
+                "When your answer rested on a guess about their situation, asks them to check \
+                 it, with the point to keep if they say yes (text \"Does the Monstera stand by \
+                 the north window?\", point \"Stands by the north window.\"). At most two per \
+                 answer, and none the page is already waiting on.",
+                json!({
+                    "theme": string("The theme the point would go under."),
+                    "text": string("The question to check."),
+                    "point": string("The point to keep when they say yes, or left out."),
+                }),
+                &["text"],
+            ),
+            tool(
+                "offer_reminder",
+                "Offers a reminder, only when the talk settled something recurring or dated \
+                 they'd want to be reminded of (watering every 7 days, repotting in March, \
+                 sending the deck on Friday). They add it to the calendar with a click. None \
+                 the calendar has already.",
+                reminder_fields,
+                &["title", "due_on"],
+            ),
+            name_talk,
+            fits_elsewhere,
+        ],
+        Mode::Own => vec![
+            tool(
+                "propose_topic",
+                "Proposes a new topic, shown under your answer as a card they start with a \
+                 click or change first. Only when they said what they want to keep track of \
+                 and no topic has it already. One per answer.",
+                json!({
+                    "name": string("A short name, one to three words, in their language."),
+                    "sticks_to": string("What talks in it stay with, in one or two sentences, so a question that doesn't belong can be told apart."),
+                    "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
+                    "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
+                    "shape": { "type": "string", "enum": SHAPES, "description": "cards when it's about a set of things that each get a card (plants, pets, trips, recipes); document when what it keeps grows into one piece of writing with sections (a pitch, research, a plan)." },
+                    "title": string("For a document, a title for the writing; otherwise left out."),
+                    "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions they might ask, each under 12 words." },
+                    "points": {
+                        "type": "array",
+                        "description": "Only what they told you, as its first points: never advice or what you know, which the topic's talks keep with its source.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "theme": string("The theme it goes under."),
+                                "text": string("The point, one short sentence."),
+                            },
+                            "required": ["theme", "text"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "description": "Reminders to offer once it's started, only when they asked for one or clearly need it.",
+                        "items": {
+                            "type": "object",
+                            "properties": reminder_fields,
+                            "required": ["title", "due_on"],
+                            "additionalProperties": false,
+                        },
+                    },
+                }),
+                &["name", "sticks_to", "icon", "group", "shape", "starters"],
+            ),
+            tool(
+                "change_topic",
+                "Changes a topic they named: its name, what it sticks to, its icon, its group, \
+                 its shape or its title. Only the fields to change. They see what you said and \
+                 can undo it. This topic itself can only be renamed or say what it sticks to.",
+                json!({
+                    "topic": string("The topic's name now."),
+                    "name": string("Its new name."),
+                    "sticks_to": string("What it sticks to now."),
+                    "icon": { "type": "string", "enum": ICONS },
+                    "group": string("Its group in the sidebar."),
+                    "shape": { "type": "string", "enum": SHAPES },
+                    "title": string("A document's title."),
+                    "said": string("What you changed, in a short sentence for under the answer: \"Moved it to Hobby.\""),
+                }),
+                &["topic", "said"],
+            ),
+            name_talk,
+            fits_elsewhere,
+        ],
+        Mode::SetUp => vec![tool(
+            "set_up_topic",
+            "Sets up the new topic. Call it once, with every field.",
+            json!({
+                "title": string("One line saying what the topic is about, under 12 words."),
+                "sticks_to": string("What talks in it stay with, in one or two sentences. When they wrote it, theirs as it is."),
+                "icon": { "type": "string", "enum": ICONS },
+                "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
+                "shape": { "type": "string", "enum": SHAPES, "description": "cards for a set of things that each get a card; document for one piece of writing with sections." },
+                "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions, each under 12 words." },
+            }),
+            &["title", "sticks_to", "icon", "group", "shape", "starters"],
+        )],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_question_gets_its_own_tools() {
+        assert!(Mode::Topic.tools().contains(&"keep_point"));
+        assert!(!Mode::Topic.tools().contains(&"propose_topic"));
+        assert!(Mode::Own.tools().contains(&"change_topic"));
+        for mode in [Mode::Topic, Mode::Own, Mode::SetUp] {
+            let tools = tools(mode);
+            let described: Vec<&str> = tools
+                .iter()
+                .filter_map(|tool| tool["name"].as_str())
+                .collect();
+            assert_eq!(described, mode.tools());
+        }
+    }
+
+    #[test]
+    fn a_token_closes_with_its_answer() {
+        let questions = Questions::default();
+        let actor = Actor {
+            user_id: Uuid::now_v7(),
+            workspace_id: Uuid::now_v7(),
+        };
+        let open = questions.open(Asking::new(actor, Uuid::now_v7(), Mode::Topic));
+        let token = open.token.clone();
+        assert!(questions.get(&token).is_some());
+        drop(open);
+        assert!(questions.get(&token).is_none());
+    }
+
+    #[test]
+    fn a_second_change_keeps_what_was_there_first() {
+        let id = Uuid::now_v7();
+        let mut first = TopicChange {
+            topic_id: id,
+            name: "Plants".into(),
+            said: "Moved it to Hobby.".into(),
+            before: TopicPatch {
+                group_name: Some("Home".into()),
+                ..TopicPatch::default()
+            },
+            after: TopicPatch {
+                group_name: Some("Hobby".into()),
+                ..TopicPatch::default()
+            },
+            undone: false,
+        };
+        let second = TopicChange {
+            topic_id: id,
+            name: "Garden".into(),
+            said: "Renamed it.".into(),
+            before: TopicPatch {
+                name: Some("Plants".into()),
+                group_name: Some("Hobby".into()),
+                ..TopicPatch::default()
+            },
+            after: TopicPatch {
+                name: Some("Garden".into()),
+                group_name: Some("Outside".into()),
+                ..TopicPatch::default()
+            },
+            undone: false,
+        };
+        merge(&mut first, second);
+        assert_eq!(first.before.group_name.as_deref(), Some("Home"));
+        assert_eq!(first.after.group_name.as_deref(), Some("Outside"));
+        assert_eq!(first.before.name.as_deref(), Some("Plants"));
+        assert_eq!(first.name, "Garden");
+    }
+}

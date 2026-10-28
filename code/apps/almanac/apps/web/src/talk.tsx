@@ -1,17 +1,22 @@
 // A talk in the panel beside a topic's page. Asking posts the question
 // and reads the answer as it's written (server-sent events); the talk,
-// the answer and what the page kept from it then arrive through sync.
+// the answer and what the page kept from it then arrive through sync. In
+// the workspace's own topic, an answer may propose a topic to start, or
+// say what it changed in one, with Undo.
 
-import type { Message, Reminder, Talk, Topic } from "@almanac/types";
+import type { Message, Proposal, Reminder, StartTopicRequest, Talk, Topic } from "@almanac/types";
 import { MoreMenu, messageOf, overlayOpen, UNKNOWN_PROBLEM } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "./api";
 import { ago, dueWords, rhythmWords, timeWords } from "./format";
-import { useNewTopic, useTopics } from "./layout";
+import { topicIcon } from "./icons";
+import { isOwn, useNewTopic, useTopics } from "./layout";
 import { apiUrl, authHeaders, credentialsFor } from "./server";
-import { Button } from "./ui";
-import { useRecords, useWorkspace } from "./workspace";
+import { TopicForm } from "./topic-dialog";
+import { Button, ErrorMessage } from "./ui";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** An answer on its way, until the talk's own records have it. */
 export interface Asking {
@@ -154,6 +159,10 @@ export function TalkPanel({
   const answered = mine?.answerId ? messages.some((m) => m.id === mine.answerId) : false;
   const lastProblem = messages.at(-1)?.problem;
   const showAnswer = mine && !answered && !(mine.problem && lastProblem);
+  const own = isOwn(topic);
+  // ⌘↩ starts the topic the talk last proposed, until it's started.
+  const lastAnswer = messages.findLast((m) => m.role === "almanac");
+  const toStart = lastAnswer?.proposal && !lastAnswer.proposal.topic_id ? lastAnswer.id : null;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -234,8 +243,9 @@ export function TalkPanel({
         <div className="flex flex-col gap-4">
           {messages.length === 0 && !mine && (
             <p className="text-muted">
-              Ask {topic.name} something, or tell it what you know. What's worth keeping goes on the
-              page.
+              {own
+                ? `Tell ${topic.name} what you want to keep track of. It proposes a topic for it, and you start it.`
+                : `Ask ${topic.name} something, or tell it what you know. What's worth keeping goes on the page.`}
             </p>
           )}
           {messages.map((message, index) => (
@@ -245,6 +255,7 @@ export function TalkPanel({
               topic={topic}
               question={before(messages, index)}
               reminders={reminders.filter((r) => r.message_id === message.id)}
+              toStart={message.id === toStart}
             />
           ))}
           {showQuestion && <Question text={mine.question} />}
@@ -274,14 +285,22 @@ export function TalkPanel({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+            // ⌘↩ is for starting a proposed topic, not for sending.
+            const plain = !event.shiftKey && !event.metaKey && !event.ctrlKey;
+            if (event.key === "Enter" && plain && !event.nativeEvent.isComposing) {
               event.preventDefault();
               send();
             }
           }}
           rows={2}
           aria-label={talkId ? "Ask more" : `Ask ${topic.name}`}
-          placeholder={talkId ? "Ask more" : `Ask ${topic.name}, or tell it something`}
+          placeholder={
+            talkId
+              ? "Ask more"
+              : own
+                ? `Tell ${topic.name} what you want to keep track of`
+                : `Ask ${topic.name}, or tell it something`
+          }
           className="ui-field resize-none rounded-md px-3 py-2"
         />
       </form>
@@ -305,11 +324,14 @@ function Said({
   topic,
   question,
   reminders,
+  toStart,
 }: {
   message: Message;
   topic: Topic;
   question: string;
   reminders: Reminder[];
+  /** The proposal ⌘↩ starts. */
+  toStart: boolean;
 }) {
   if (message.role === "you") return <Question text={message.text} />;
   return (
@@ -317,6 +339,10 @@ function Said({
       {message.text && <Prose text={message.text} />}
       {message.problem && <Problem text={message.problem} />}
       {message.kept && <p className="text-xs text-muted">{message.kept}</p>}
+      {message.proposal && (
+        <Proposed message={message} proposal={message.proposal} toStart={toStart} />
+      )}
+      {message.changes.length > 0 && <Changes message={message} />}
       {reminders
         .filter((r) => r.status === "offered")
         .map((reminder) => (
@@ -325,6 +351,188 @@ function Said({
       {message.elsewhere && (
         <Elsewhere name={message.elsewhere} topic={topic} question={question} />
       )}
+    </div>
+  );
+}
+
+/**
+ * A topic the workspace's own topic would start, as a card: Start it as it
+ * is, or change it first. Once started, a line that opens it.
+ */
+function Proposed({
+  message,
+  proposal,
+  toStart,
+}: {
+  message: Message;
+  proposal: Proposal;
+  toStart: boolean;
+}) {
+  const { workspace } = useWorkspace();
+  const guest = useIsGuest();
+  const topics = useTopics();
+  const points = useRecords("Point");
+  const [changing, setChanging] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [problem, setProblem] = useState("");
+
+  const start = useCallback(
+    async (fields: Omit<StartTopicRequest, "from_message">) => {
+      await api("POST", `/api/w/${workspace.id}/topics`, { ...fields, from_message: message.id });
+    },
+    [workspace.id, message.id],
+  );
+  const startAsIs = useCallback(async () => {
+    if (starting) return;
+    setStarting(true);
+    setProblem("");
+    try {
+      await start({ name: proposal.name });
+      // Starting stays on until the proposal's topic arrives through sync.
+    } catch (e) {
+      setProblem(messageOf(e));
+      setStarting(false);
+    }
+  }, [start, starting, proposal.name]);
+
+  useEffect(() => {
+    if (!toStart || guest) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !overlayOpen()) {
+        event.preventDefault();
+        void startAsIs();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toStart, guest, startAsIs]);
+
+  if (proposal.topic_id) {
+    const started = topics.find((t) => t.id === proposal.topic_id);
+    if (!started) return <p className="text-muted">Started {proposal.name}, deleted since.</p>;
+    const Icon = topicIcon(started.icon);
+    const kept = points.filter((p) => p.topic_id === started.id).length;
+    const what =
+      started.shape === "document"
+        ? ", a document"
+        : kept
+          ? `, with ${kept} ${kept === 1 ? "point" : "points"}`
+          : "";
+    return (
+      <div className="flex items-center gap-2 text-muted">
+        <Icon size={14} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+        <p className="min-w-0 flex-1">
+          Started {started.name}
+          {what}.
+        </p>
+        <Link
+          to="/$workspace/topics/$topic"
+          params={{ workspace: workspace.url_key, topic: started.id }}
+          className="ui-link"
+        >
+          Open
+        </Link>
+      </div>
+    );
+  }
+
+  const Icon = topicIcon(proposal.icon);
+  const page =
+    proposal.shape === "document"
+      ? "A document"
+      : proposal.reminders.length > 0
+        ? "Cards, with a week"
+        : "Cards";
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg bg-surface px-4 py-3.5">
+      <div className="flex items-center gap-2">
+        <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+        <p className="min-w-0 truncate font-semibold">{proposal.name}</p>
+        <p className="ml-auto shrink-0 text-xs text-faint">
+          {[proposal.group_name, page].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+      {proposal.sticks_to && <p className="text-muted">{proposal.sticks_to}</p>}
+      {proposal.points.length + proposal.reminders.length > 0 && (
+        <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted">
+          {proposal.points.map((point) => (
+            <li key={`${point.theme}${point.text}`}>
+              {point.theme}: {point.text}
+            </li>
+          ))}
+          {proposal.reminders.map((reminder) => (
+            <li key={reminder.title}>
+              {reminder.title},{" "}
+              {reminder.every_days ? rhythmWords(reminder.every_days) : dueWords(reminder.due_on)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!guest && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            disabled={starting}
+            onClick={() => void startAsIs()}
+            title={toStart ? `Start ${proposal.name} (⌘↩)` : undefined}
+          >
+            Start {proposal.name}
+          </Button>
+          <Button variant="secondary" disabled={starting} onClick={() => setChanging(true)}>
+            Change
+          </Button>
+        </div>
+      )}
+      <ErrorMessage>{problem}</ErrorMessage>
+      {changing && (
+        <TopicForm
+          heading={`Change ${proposal.name}`}
+          action="Start topic"
+          fields={{ ...proposal, title: proposal.title ?? "" }}
+          onSave={(fields) => start({ ...fields, title: fields.title || undefined })}
+          onClose={() => setChanging(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** What an answer changed in topics you named, and Undo, which puts it back. */
+function Changes({ message }: { message: Message }) {
+  const { workspace } = useWorkspace();
+  const guest = useIsGuest();
+  const [undoing, setUndoing] = useState(false);
+  const [problem, setProblem] = useState("");
+  const undone = message.changes.every((c) => c.undone);
+  const undo = async () => {
+    setUndoing(true);
+    setProblem("");
+    try {
+      await api("POST", `/api/w/${workspace.id}/messages/${message.id}/undo`, {});
+    } catch (e) {
+      setProblem(messageOf(e));
+      setUndoing(false);
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
+      {message.changes.map((change) => (
+        <p key={`${change.topic_id}${change.said}`}>
+          <span className="font-medium">{change.name}</span>
+          <span className="text-muted"> · {change.said}</span>
+        </p>
+      ))}
+      {undone ? (
+        <p className="text-xs text-muted">Undone.</p>
+      ) : (
+        !guest && (
+          <div>
+            <Button variant="secondary" disabled={undoing} onClick={() => void undo()}>
+              Undo
+            </Button>
+          </div>
+        )
+      )}
+      <ErrorMessage>{problem}</ErrorMessage>
     </div>
   );
 }

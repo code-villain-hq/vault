@@ -1,13 +1,14 @@
 # Almanac: notes for coding agents
 
 Almanac keeps what you learn by topic. You start a topic with a name and
-what it sticks to; you ask it things in a talk beside its page; the page
-keeps short points with their sources, grouped by theme, and Calendar
-gathers the reminders the talks settled. The README says what works and
-what's decided. It is built the way Glyph and Raven are: a Rust server on
-Postgres with the studio's sync engine (`code/kit/sync`), a React app
-(`apps/web`) that keeps a local copy of the workspace, and a Tauri desktop
-shell (`apps/desktop`). When something here works like Forge, Glyph or
+what it sticks to, or tell the workspace's own topic, Almanac, what you
+want to keep track of and start the topic it proposes; you ask a topic
+things in a talk beside its page; the page keeps short points with their
+sources, grouped by theme, and Calendar gathers the reminders the talks
+settled. The README says what works and what's decided. It is built the
+way Glyph and Raven are: a Rust server on Postgres with the studio's sync
+engine (`code/kit/sync`), a React app (`apps/web`) that keeps a local copy
+of the workspace, and a Tauri desktop shell (`apps/desktop`). When something here works like Forge, Glyph or
 Raven, their code is the reference; keep them alike.
 
 ## Shared design and brand
@@ -53,7 +54,8 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
 To try the pages without spending on Claude, point `claude.url`
 (`ALMANAC_CLAUDE_URL` in `.env`, with any `ALMANAC_CLAUDE_API_KEY`) at a
 stand-in that answers the Messages API's shapes: a streamed answer, and
-JSON in the schema each request sends.
+JSON in the schema each request sends. For Claude Code on this Mac,
+`crates/server/tests/claude-code.ts` stands in for its ACP adapter.
 
 ## What syncs
 
@@ -66,19 +68,41 @@ Forge. Everything a page shows syncs: `Topic`, `Talk`, `Message`, `Point`,
   (`POST /api/w/{id}/topics/{topic}/ask`). Clients may change and delete a
   topic and delete a talk; deleting a topic takes what it kept with it, and
   a talk its messages.
+- Every workspace has one topic of its own, `kind` `almanac` (`own.rs`),
+  which the server makes with the workspace. Clients may rename it and
+  change what it sticks to, not delete it.
+- An answer in it may carry a `proposal`, a topic to start: `POST
+  /api/w/{id}/topics` with `from_message` starts it with the proposal's
+  points and reminders, once. Its `changes` say what it changed in topics
+  you named; `POST /api/w/{id}/messages/{message}/undo` puts them back.
 - Clients write points and reminders, and answer questions (`status`).
 - Only the server sets a reminder's `notified_for`.
 - Guests see no topics: every model but `User` is hidden from them.
 
-The Claude key is not a synced record: it's in `claude_key`, read through
-`GET /api/w/{id}/claude` (its last four characters only) and set or removed
-by admins (`PUT`, `DELETE`).
+Settings → Claude isn't synced. `GET /api/w/{id}/claude` says who answers:
+on this Mac Claude Code (`via` `claude_code`, with whether it's ready),
+and whether it may search the web (`claude_choices`, `PUT .../claude/web`
+by admins); on a server the key, in `claude_key`, its last four characters
+only, set or removed by admins (`PUT`, `DELETE`). On this Mac the check
+starts the adapter, so the pages don't ask it on every load: only
+Settings, and a talk says when Claude Code can't answer.
 
 ## Claude
 
-`claude.rs` speaks Anthropic's Messages API over HTTP (Rust has no SDK):
-`claude-opus-5-5`, adaptive thinking, the server-side refusal fallback,
-web search off.
+Two ways to the same answers, and the same prompts:
+
+- **On this Mac, Claude Code** (`acp.rs`), as Layer's conversations run:
+  for each question Almanac starts `claude-agent-acp` from the login
+  shell's PATH, in an empty folder of its own, with Almanac's prompt, none
+  of the user's Claude Code settings, and none of its tools but WebSearch
+  and WebFetch (when the web is on). Almanac's own tools come over MCP
+  (`mcp.rs`, `POST /api/mcp`), behind a token that lasts as long as the
+  question. It answers as the user is signed in to Claude Code: no key.
+- **On a server, the Messages API** (`claude.rs`, with the key; Rust has no
+  SDK): `claude-opus-5-5`, adaptive thinking, the server-side refusal
+  fallback, web search off.
+
+What they do:
 
 - **A talk** (`talks.rs`): each question sends the fixed prompt, the page
   as `page.rs` writes it (what the topic sticks to, its points by theme,
@@ -86,14 +110,22 @@ web search off.
   current talk. The answer streams back as server-sent events: `talk`,
   then `text` pieces, then `done` or `problem`. A problem is also kept as a
   message, so the talk shows it after a reload.
-- **Keeping**: after the answer, one more request, with structured output,
-  reads the exchange for points, questions, reminder offers, the topic an
-  off-topic question belongs to, and the talk's title. The server writes
-  what comes back through the sync engine, so every client sees it.
+- **Keeping** (`kept.rs`): points, questions, reminder offers, the topic an
+  off-topic question belongs to, and the talk's title. Claude Code hands
+  them over with tools while it answers (keep_point, ask_to_check,
+  offer_reminder, fits_elsewhere, name_talk); through the API one more
+  request, with structured output, reads them from the exchange. Either
+  way the server writes them with the answer, through the sync engine, so
+  every client sees it.
+- **The workspace's own topic** (`own.rs`) reads every topic's name, group
+  and what it sticks to, and has other tools: propose_topic and
+  change_topic, not keep_point. A proposal waits for Start; a change is
+  made at once and kept on the message for Undo.
 - **Starting a topic** (`topics.rs`): in the background, Almanac writes what
   it sticks to when that was empty, picks an icon (`ICONS` in
   `crates/domain`), a group, the shape (`cards` or `document`) and the
-  first questions. Without a key the topic keeps its defaults.
+  first questions (set_up_topic, or structured output). When Claude can't
+  answer, the topic keeps its defaults.
 
 Change the prompts in the same commit as what reads their answers. A
 prompt says what to do and why, in plain sentences; the schema says the
@@ -113,9 +145,10 @@ them into notifications. A server with no Mac listening marks nothing.
   fields only the server sets, and what a topic or talk takes with it.
 - `crates/server`: axum server: HTTP API, WebSocket feed, accounts, the
   company's sign-in (`oidc.rs`) and people (`groups.rs`, `company.rs`),
-  Claude (`claude.rs`, `keys.rs`), topics, talks and the page Claude reads,
-  reminders. Its settings: `config.rs`, and `almanac.example.toml`.
-  `serve.rs` runs it on a listener until told to stop, for the server
+  Claude (`acp.rs` and `mcp.rs` on this Mac, `claude.rs` with a key,
+  `keys.rs`), topics, the workspace's own (`own.rs`), talks, what they keep
+  (`kept.rs`) and the page Claude reads, reminders. Its settings:
+  `config.rs`, and `almanac.example.toml`. `serve.rs` runs it on a listener until told to stop, for the server
   binary and the desktop app alike; `local.rs` is the one person of the
   desktop app's own Almanac, who signs in to nothing.
 - `packages/types`: generated from Rust. Never edit by hand.
@@ -142,6 +175,8 @@ them into notifications. A server with no Mac listening marks nothing.
   extractor, which checks membership. Admin-only ones call
   `require_admin()`, and asking or starting a topic `require_not_guest()`.
 - The key never goes into a synced record, a log or a response.
+- Claude Code gets no tool that reads or writes the Mac: only the web's,
+  and Almanac's own over MCP.
 
 ## One company
 

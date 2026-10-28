@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use almanac_server::acp::ClaudeCode;
 use almanac_server::claude::Claude;
 use almanac_server::{AppState, local};
 use code_villain_desktop::{LocalPostgres, LocalServer};
@@ -151,9 +152,15 @@ async fn start(dir: &Path, app: &AppHandle) -> Result<Running, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    // The key is set in Settings → Claude; ANTHROPIC_API_KEY stands in.
-    let claude = Claude::new(std::env::var("ANTHROPIC_API_KEY").ok());
-    let mut state = AppState::new(pool.clone(), false, claude).on_this_mac();
+    // Claude Code answers, as you're signed in to it, in an empty folder of
+    // its own, with Almanac's tools on this server. No key.
+    let claude_code = ClaudeCode::new(
+        dir.join("claude"),
+        format!("http://127.0.0.1:{SERVER_PORT}/api/mcp"),
+    );
+    let mut state = AppState::new(pool.clone(), false, Claude::new(None))
+        .on_this_mac()
+        .with_claude_code(claude_code);
     notify(app.clone(), &state);
     if cfg!(debug_assertions) {
         // `bun run dev:desktop` shows the web app from Vite.

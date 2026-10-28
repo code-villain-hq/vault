@@ -1,27 +1,34 @@
 //! A talk beside a topic's page. Each question sends Claude a fixed prompt,
 //! what the topic sticks to, what its page has kept, and only this talk;
-//! the answer streams back as it's written. Then Claude reads the exchange
-//! once more for what the page should keep: points under their themes,
-//! questions when the answer rested on a guess, reminders it offers, and
-//! the topic an off-topic question fits better.
+//! the answer streams back as it's written. What the page should keep
+//! (points under their themes, questions when the answer rested on a
+//! guess, reminders it offers, the topic an off-topic question fits better)
+//! Claude Code hands over with Almanac's tools as it answers (`crate::mcp`);
+//! through the Messages API, Claude reads the exchange once more for it.
+//!
+//! In the workspace's own topic Claude reads the workspace instead of a
+//! page, and proposes topics and changes them.
 
 use std::convert::Infallible;
 
-use almanac_domain::{Actor, AskRequest, ModelKind, Operation};
+use almanac_domain::{Actor, AskRequest, ModelKind, Operation, Source};
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
-use chrono::{Local, NaiveDate, NaiveTime, Utc};
+use chrono::{Local, Utc};
 use futures::Stream;
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
+use crate::acp::{ClaudeCode, Failure, Question};
 use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
-use crate::page::Page;
+use crate::kept::{Answering, Kept, fields, reminder};
+use crate::mcp::{Asking, Mode};
+use crate::page::{Page, Workspace};
 use crate::state::AppState;
 use crate::topics::{cut, write};
 
@@ -33,6 +40,8 @@ const TALK: &str = "SELECT role, text FROM ( \
      ORDER BY created_at DESC LIMIT 40) m ORDER BY created_at";
 const ANSWERS_SO_FAR: &str =
     "SELECT count(*) FROM messages WHERE talk_id = $1 AND workspace_id = $2 AND role = 'almanac'";
+const KIND: &str = "SELECT kind FROM topics WHERE id = $1 AND workspace_id = $2";
+const WEB: &str = "SELECT web FROM claude_choices";
 
 const ANSWER: &str = "You are Almanac, a notebook that keeps what someone learns, one topic at a \
 time. You answer in a talk inside one topic; the page beside the talk keeps what's worth knowing \
@@ -45,13 +54,58 @@ reciting it back.
 offers.
 - When the answer depends on something you don't know about their situation (which plant, which \
 light, which audience), say what you assume and ask one question back.
-- Say plainly when you're unsure. You can't search the web: for things that change, such as \
-prices, laws or news, say your knowledge may be out of date.
-- Name where something comes from when it matters: a book, a guide, an institution, or what they \
-told you. Never make up links.
+- Say plainly when you're unsure.
+- Name where something comes from when it matters: a book, a guide, an institution, a site, or \
+what they told you. Never make up links.
 - If the question has nothing to do with this topic, answer it in a sentence or two, then say \
 it fits better in another topic, naming one of the other topics or a new one.
 - Answer in the language they write in.";
+
+/// With Claude Code: Almanac's tools keep the page as it answers.
+const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer: keep_point for \
+what's worth knowing later, ask_to_check when your answer rested on a guess about their \
+situation, offer_reminder when the talk settled something recurring or dated, fits_elsewhere \
+when the question belongs in another topic, and name_talk on a talk's first answer. Write only \
+the answer: they don't see the tools, so don't mention them or narrate using them.";
+
+const WEB_ON: &str = "You can search the web and read pages. Do it when the answer depends on \
+things that change (prices, laws, opening hours, news) or that you aren't sure of, and keep the \
+page's url with what you keep from it.";
+const WEB_OFF: &str = "You can't search the web: for things that change, such as prices, laws \
+or news, say your knowledge may be out of date.";
+
+const OWN: &str = "You are Almanac, a notebook that keeps what someone learns, one topic at a \
+time. Each topic has a page that keeps short points by theme, talks beside it, and reminders on \
+the calendar. This talk is in the workspace's own topic: you know every topic in it, and help \
+start new ones and change them.
+
+How to answer:
+- When it's unclear what a new topic should be about, ask one question back.
+- When a topic for it exists already, name it and say they can ask there.
+- When they ask what's in the workspace, answer from the topics below.
+- About Almanac itself: a topic keeps what you learn about one thing; its talks answer inside \
+it, and its page keeps the points worth knowing later. Reminders a talk settles go on the \
+calendar and come as notifications on the Mac.
+- Be short and concrete: a few sentences. No headings, no preamble, no closing offers.
+- Answer in the language they write in.";
+
+/// With Claude Code: the workspace's own topic proposes and changes topics.
+const OWN_TOOLS: &str = "- When they say what they want to keep track of, and no topic has it, \
+propose one with propose_topic: a short name, what it sticks to, an icon, a group (reuse one \
+that fits), the shape and three or four starters. Its points are only what they told you, such \
+as which plants they have and where; what you know about it, such as care advice, waits for the \
+topic's talks, which keep it with its source. Add a reminder only when they asked for one or \
+clearly need it. Then say in a sentence or two what it will keep, and which reminder it will \
+offer. Never say it's started or set up: they start it with the card under your answer, or \
+change it first.
+- When they ask to change a topic (rename it, move it to another group, change what it sticks \
+to, its icon or its shape), do it with change_topic, then say what you changed. They can undo it.
+- Name the talk with name_talk on its first answer.
+- Write only the answer. They don't see the tools, so don't mention them or narrate using them.";
+
+/// The workspace's own topic through the Messages API: no tools.
+const OWN_WITHOUT_TOOLS: &str = "- Here you can't start or change topics yourself: suggest a \
+name and what it sticks to, and say they start it with New topic in the sidebar.";
 
 const KEEP: &str = "You keep the page of one topic in Almanac, a notebook that keeps what someone \
 learns. After each exchange in a talk, you decide what the page keeps from it. Return JSON in the \
@@ -159,6 +213,11 @@ pub async fn ask(
     let page = Page::load(&state.pool, actor.workspace_id, topic_id)
         .await?
         .ok_or_else(|| AppError::not_found("topic not found"))?;
+    let kind: String = sqlx::query_scalar(KIND)
+        .bind(topic_id)
+        .bind(actor.workspace_id)
+        .fetch_one(&state.pool)
+        .await?;
     let now = json!(Utc::now());
     let (talk_id, mut operations) = match request.talk_id {
         Some(talk_id) => {
@@ -204,10 +263,11 @@ pub async fn ask(
     });
     write(&state, actor, operations).await?;
 
+    let own = kind == "almanac";
     let (events, heard) = mpsc::unbounded_channel::<Event>();
     let _ = events.send(json_event("talk", json!({ "talk_id": talk_id })));
     tokio::spawn(async move {
-        answer(&state, actor, &page, talk_id, &text, events).await;
+        answer(&state, actor, &page, own, talk_id, &text, events).await;
     });
     let stream = futures::stream::unfold(heard, |mut heard| async move {
         heard.recv().await.map(|event| (Ok(event), heard))
@@ -215,17 +275,51 @@ pub async fn ask(
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
 
+/// An answer, the pages it came from, and, from Claude Code, what its
+/// tools kept.
+struct Said {
+    text: String,
+    sources: Vec<Source>,
+    kept: Option<Kept>,
+}
+
 async fn answer(
     state: &AppState,
     actor: Actor,
     page: &Page,
+    own: bool,
     talk_id: Uuid,
     question: &str,
     events: mpsc::UnboundedSender<Event>,
 ) {
     let answer_id = Uuid::now_v7();
-    let answered = match say(state, actor, page, talk_id, &events).await {
-        Ok(text) => text,
+    let answers: i64 = sqlx::query_scalar(ANSWERS_SO_FAR)
+        .bind(talk_id)
+        .bind(actor.workspace_id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(1);
+    let at = Answering {
+        topic_id: page.id,
+        topic_name: page.name.clone(),
+        talk_id,
+        answer_id,
+        first: answers == 0,
+    };
+    let said = match &state.claude_code {
+        Some(claude_code) => {
+            say_with_claude_code(state, claude_code, actor, page, own, talk_id, &events).await
+        }
+        None => say(state, actor, page, own, talk_id, &events)
+            .await
+            .map(|text| Said {
+                text,
+                sources: Vec::new(),
+                kept: None,
+            }),
+    };
+    let said = match said {
+        Ok(said) => said,
         Err(problem) => {
             let saved = write(
                 state,
@@ -250,21 +344,41 @@ async fn answer(
             return;
         }
     };
-    let saved = write(
-        state,
-        actor,
-        vec![Operation::Create {
-            model: ModelKind::Message,
-            id: answer_id,
-            data: fields([
-                ("talk_id", json!(talk_id)),
-                ("topic_id", json!(page.id)),
-                ("role", json!("almanac")),
-                ("text", json!(answered)),
-            ]),
-        }],
-    )
-    .await;
+    let mut message = fields([
+        ("talk_id", json!(talk_id)),
+        ("topic_id", json!(page.id)),
+        ("role", json!("almanac")),
+        ("text", json!(said.text)),
+        ("sources", json!(said.sources)),
+    ]);
+    let alone = Operation::Create {
+        model: ModelKind::Message,
+        id: answer_id,
+        data: message.clone(),
+    };
+    let saved = match &said.kept {
+        Some(kept) => {
+            let (fields, mut operations) = kept.writes(&at);
+            message.extend(fields);
+            operations.insert(
+                0,
+                Operation::Create {
+                    model: ModelKind::Message,
+                    id: answer_id,
+                    data: message,
+                },
+            );
+            match write(state, actor, operations).await {
+                Ok(()) => Ok(()),
+                // What it kept doesn't fit: the answer still stands.
+                Err(error) => {
+                    tracing::warn!(%error, "couldn't keep what the answer kept");
+                    write(state, actor, vec![alone]).await
+                }
+            }
+        }
+        None => write(state, actor, vec![alone]).await,
+    };
     if let Err(error) = saved {
         tracing::warn!(%error, "couldn't save the answer");
         let _ = events.send(json_event(
@@ -275,16 +389,178 @@ async fn answer(
     }
     let _ = events.send(json_event("done", json!({ "message_id": answer_id })));
     drop(events);
-    if let Err(error) = keep(state, actor, page, talk_id, answer_id, question, &answered).await {
+    if said.kept.is_none()
+        && !own
+        && let Err(error) = keep(state, actor, page, &at, question, &said.text).await
+    {
         tracing::warn!(%error, "couldn't keep what the talk said");
     }
 }
 
-/// Claude's answer to the talk's last question, streamed to `events`.
+/// Claude Code's answer to the talk's last question, streamed to `events`,
+/// with what Almanac's tools kept meanwhile.
+async fn say_with_claude_code(
+    state: &AppState,
+    claude_code: &ClaudeCode,
+    actor: Actor,
+    page: &Page,
+    own: bool,
+    talk_id: Uuid,
+    events: &mpsc::UnboundedSender<Event>,
+) -> Result<Said, Problem> {
+    let trouble = |error: sqlx::Error| {
+        tracing::warn!(%error, "couldn't read the talk");
+        Problem("Almanac couldn't read this talk. Ask again.".into())
+    };
+    let said: Vec<(String, String)> = sqlx::query_as(TALK)
+        .bind(talk_id)
+        .bind(actor.workspace_id)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(trouble)?;
+    let web: bool = sqlx::query_scalar(WEB)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(trouble)?
+        .unwrap_or(true);
+    let web_line = if web { WEB_ON } else { WEB_OFF };
+    let system = if own {
+        let workspace = Workspace::load(&state.pool, actor.workspace_id)
+            .await
+            .map_err(trouble)?;
+        format!(
+            "{OWN}\n{OWN_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}\nThe groups so far: {}.\n",
+            today(),
+            workspace.describe(),
+            match workspace.groups() {
+                groups if groups.is_empty() => "none yet".into(),
+                groups => groups.join(", "),
+            }
+        )
+    } else {
+        format!(
+            "{ANSWER}\n\n{ANSWER_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}",
+            today(),
+            page.describe()
+        )
+    };
+    let mode = if own { Mode::Own } else { Mode::Topic };
+    let open = state.questions.open(Asking::new(actor, page.id, mode));
+    let tools = mode.tools();
+    let prompt = talk_prompt(&said);
+    let question = Question {
+        system: &system,
+        prompt: &prompt,
+        web,
+        tools,
+        token: &open.token,
+    };
+    let answer = claude_code
+        .ask(&question, |piece| {
+            let _ = events.send(json_event("text", json!({ "text": piece })));
+        })
+        .await
+        .map_err(problem_of)?;
+    match answer.stop.as_str() {
+        "refusal" => {
+            return Err(Problem(
+                "Claude declined to answer this. Ask it another way.".into(),
+            ));
+        }
+        "cancelled" => {
+            return Err(Problem(
+                "The answer stopped before it finished. Ask again.".into(),
+            ));
+        }
+        _ => {}
+    }
+    let text = answer.text.trim().to_string();
+    if text.is_empty() {
+        return Err(Problem("Claude Code gave no answer. Ask again.".into()));
+    }
+    let kept = open.asking.take_kept();
+    Ok(Said {
+        sources: sources(&answer.read, &kept),
+        text,
+        kept: Some(kept),
+    })
+}
+
+/// What they ask, after the talk so far. Never starting with a slash,
+/// which Claude Code would take for one of its commands.
+fn talk_prompt(said: &[(String, String)]) -> String {
+    let Some(((_, last), before)) = said.split_last() else {
+        return String::new();
+    };
+    if before.is_empty() {
+        return format!("They ask: {last}");
+    }
+    let mut out = String::from("The talk so far:\n");
+    for (role, text) in before {
+        out.push_str(if role == "you" {
+            "\nThey asked: "
+        } else {
+            "\nYou answered: "
+        });
+        out.push_str(text);
+        out.push('\n');
+    }
+    out.push_str("\nNow they ask: ");
+    out.push_str(last);
+    out
+}
+
+/// Why Claude Code gave no answer, in words for the talk.
+fn problem_of(failure: Failure) -> Problem {
+    Problem(match failure {
+        Failure::NotInstalled => "Almanac answers with Claude Code on this Mac, and its ACP \
+             adapter isn't installed. Settings → Claude has the command that installs it; \
+             then ask again."
+            .into(),
+        Failure::SignedOut => "Claude Code isn't signed in on this Mac. Run claude in Terminal \
+             and sign in there, then ask again."
+            .into(),
+        Failure::Trouble(said) => said,
+    })
+}
+
+/// The pages an answer came from: those its points name first, then the
+/// others it read.
+fn sources(read: &[String], kept: &Kept) -> Vec<Source> {
+    let mut urls: Vec<&str> = Vec::new();
+    for url in kept
+        .points
+        .iter()
+        .filter_map(|p| p.url.as_deref())
+        .chain(read.iter().map(String::as_str))
+    {
+        if !urls.contains(&url) {
+            urls.push(url);
+        }
+    }
+    urls.into_iter()
+        .take(8)
+        .map(|url| Source {
+            title: host(url),
+            url: Some(url.to_string()),
+        })
+        .collect()
+}
+
+/// `rhs.org.uk` for `https://www.rhs.org.uk/plants/monstera`.
+fn host(url: &str) -> String {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    host.strip_prefix("www.").unwrap_or(host).to_string()
+}
+
+/// Claude's answer to the talk's last question, through the Messages API,
+/// streamed to `events`.
 async fn say(
     state: &AppState,
     actor: Actor,
     page: &Page,
+    own: bool,
     talk_id: Uuid,
     events: &mpsc::UnboundedSender<Event>,
 ) -> Result<String, Problem> {
@@ -313,7 +589,22 @@ async fn say(
             text,
         })
         .collect();
-    let system = format!("{ANSWER}\n\nToday is {}.\n\n{}", today(), page.describe());
+    let system = if own {
+        let workspace = Workspace::load(&state.pool, actor.workspace_id)
+            .await
+            .map_err(trouble)?;
+        format!(
+            "{OWN}\n{OWN_WITHOUT_TOOLS}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}",
+            today(),
+            workspace.describe()
+        )
+    } else {
+        format!(
+            "{ANSWER}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}",
+            today(),
+            page.describe()
+        )
+    };
     state
         .claude
         .answer(&key, &system, &turns, |piece| {
@@ -322,14 +613,13 @@ async fn say(
         .await
 }
 
-/// What the page keeps from one exchange, and the words for it under the
-/// answer.
+/// What the page keeps from one exchange, read by Claude afterwards, and
+/// the words for it under the answer.
 async fn keep(
     state: &AppState,
     actor: Actor,
     page: &Page,
-    talk_id: Uuid,
-    answer_id: Uuid,
+    at: &Answering,
     question: &str,
     answer: &str,
 ) -> Result<(), AppError> {
@@ -341,141 +631,41 @@ async fn keep(
         today(),
         page.describe(),
     );
-    let kept: Keep = state
+    let from: Keep = state
         .claude
         .json(&key, KEEP, &prompt, keep_schema())
         .await
         .map_err(AppError::internal)?;
-
-    let mut operations = Vec::new();
-    let mut themes: Vec<String> = Vec::new();
-    let mut points = 0;
-    for point in &kept.points {
-        let (theme, text) = (cut(&point.theme, 120), cut(&point.text, 2000));
-        if theme.is_empty() || text.is_empty() {
-            continue;
+    let mut kept = Kept::default();
+    for point in &from.points {
+        let _ = kept.keep_point(&point.theme, &point.text, &point.source, "");
+    }
+    for question in &from.questions {
+        let _ = kept.ask_to_check(&question.theme, &question.text, &question.point);
+    }
+    for r in &from.reminders {
+        if let Ok(reminder) = reminder(&r.theme, &r.title, &r.due_on, &r.at, Some(r.every_days)) {
+            let _ = kept.offer_reminder(reminder);
         }
-        points += 1;
-        if !themes.contains(&theme) {
-            themes.push(theme.clone());
-        }
-        operations.push(Operation::Create {
-            model: ModelKind::Point,
-            id: Uuid::now_v7(),
-            data: fields([
-                ("topic_id", json!(page.id)),
-                ("theme", json!(theme)),
-                ("text", json!(text)),
-                ("source", optional(&point.source, 200)),
-                ("talk_id", json!(talk_id)),
-            ]),
-        });
     }
-    for question in kept.questions.iter().take(2) {
-        let text = cut(&question.text, 2000);
-        if text.is_empty() {
-            continue;
-        }
-        operations.push(Operation::Create {
-            model: ModelKind::Question,
-            id: Uuid::now_v7(),
-            data: fields([
-                ("topic_id", json!(page.id)),
-                ("theme", optional(&question.theme, 120)),
-                ("text", json!(text)),
-                ("point", optional(&question.point, 2000)),
-                ("talk_id", json!(talk_id)),
-            ]),
-        });
-    }
-    for reminder in &kept.reminders {
-        let title = cut(&reminder.title, 200);
-        let Ok(due_on) = NaiveDate::parse_from_str(reminder.due_on.trim(), "%Y-%m-%d") else {
-            continue;
-        };
-        if title.is_empty() {
-            continue;
-        }
-        let at = NaiveTime::parse_from_str(reminder.at.trim(), "%H:%M").ok();
-        let every = (1..=366)
-            .contains(&reminder.every_days)
-            .then_some(reminder.every_days);
-        operations.push(Operation::Create {
-            model: ModelKind::Reminder,
-            id: Uuid::now_v7(),
-            data: fields([
-                ("topic_id", json!(page.id)),
-                ("theme", optional(&reminder.theme, 120)),
-                ("title", json!(title)),
-                ("due_on", json!(due_on)),
-                ("at", json!(at)),
-                ("every_days", json!(every)),
-                ("status", json!("offered")),
-                ("message_id", json!(answer_id)),
-            ]),
-        });
-    }
-    let mut said = Map::new();
-    if points > 0 {
-        said.insert("kept".into(), json!(kept_words(points, &themes)));
-    }
-    let elsewhere = cut(&kept.elsewhere, 80);
-    if !elsewhere.is_empty() && elsewhere != page.name {
-        said.insert("elsewhere".into(), json!(elsewhere));
-    }
+    kept.elsewhere = Some(from.elsewhere);
+    kept.talk_title = Some(from.talk_title);
+    let (said, mut operations) = kept.writes(at);
     if !said.is_empty() {
-        operations.push(Operation::Update {
-            model: ModelKind::Message,
-            id: answer_id,
-            data: said,
-        });
-    }
-    let answers: i64 = sqlx::query_scalar(ANSWERS_SO_FAR)
-        .bind(talk_id)
-        .bind(actor.workspace_id)
-        .fetch_one(&state.pool)
-        .await?;
-    let title = cut(&kept.talk_title, 80);
-    if answers <= 1 && !title.is_empty() {
-        operations.push(Operation::Update {
-            model: ModelKind::Talk,
-            id: talk_id,
-            data: fields([("title", json!(title))]),
-        });
+        operations.insert(
+            0,
+            Operation::Update {
+                model: ModelKind::Message,
+                id: at.answer_id,
+                data: said,
+            },
+        );
     }
     write(state, actor, operations).await
 }
 
-/// "Kept 2 points under Monstera and Basilikum."
-fn kept_words(points: usize, themes: &[String]) -> String {
-    let what = if points == 1 {
-        "a point".to_string()
-    } else {
-        format!("{points} points")
-    };
-    let under = match themes {
-        [] => String::new(),
-        [one] => one.clone(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
-    };
-    format!("Kept {what} under {under}.")
-}
-
 fn today() -> String {
     Local::now().format("%A, %Y-%m-%d").to_string()
-}
-
-fn optional(text: &str, max: usize) -> Value {
-    let text = cut(text, max);
-    if text.is_empty() {
-        Value::Null
-    } else {
-        json!(text)
-    }
-}
-
-fn fields<const N: usize>(pairs: [(&str, Value); N]) -> Map<String, Value> {
-    pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
 fn json_event(name: &str, data: Value) -> Event {
@@ -487,15 +677,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn kept_words_name_the_themes() {
-        assert_eq!(
-            kept_words(1, &["Monstera".into()]),
-            "Kept a point under Monstera."
-        );
-        assert_eq!(
-            kept_words(3, &["Monstera".into(), "Basilikum".into(), "Efeu".into()]),
-            "Kept 3 points under Monstera, Basilikum and Efeu."
-        );
+    fn the_talk_never_starts_with_a_slash() {
+        let said = vec![("you".to_string(), "/clear".to_string())];
+        assert_eq!(talk_prompt(&said), "They ask: /clear");
+        let said = vec![
+            ("you".to_string(), "Wie oft gießen?".to_string()),
+            ("almanac".to_string(), "Alle 7 Tage.".to_string()),
+            ("you".to_string(), "Und im Winter?".to_string()),
+        ];
+        let prompt = talk_prompt(&said);
+        assert!(prompt.starts_with("The talk so far:"));
+        assert!(prompt.ends_with("Now they ask: Und im Winter?"));
+    }
+
+    #[test]
+    fn a_source_is_named_by_its_site() {
+        assert_eq!(host("https://www.rhs.org.uk/plants/monstera"), "rhs.org.uk");
+        assert_eq!(host("http://example.org?q=1"), "example.org");
     }
 
     #[test]
