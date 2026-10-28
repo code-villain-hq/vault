@@ -3,6 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import {
   AppVersion,
   ErrorMessage,
+  focusBackAfterKeys,
   NotAddedYet,
   Redirect,
   SearchButton,
@@ -499,7 +500,9 @@ function WorkspaceMenu() {
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
-          <Menu.Popup className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+          <Menu.Popup
+            finalFocus={focusBackAfterKeys}
+            className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
           >
             {groups.map(({ first, entries }, index) => (
               <Menu.Group key={first.place.id}>

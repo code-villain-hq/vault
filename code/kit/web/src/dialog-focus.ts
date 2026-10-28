@@ -31,3 +31,11 @@ export function useDialogFocus(open: boolean) {
   }, [open]);
   return opener;
 }
+
+/**
+ * Where a menu or select leaves focus as it closes (its popup's
+ * `finalFocus`): back on its trigger after keys, so they go on from there,
+ * and where it was after a click. WebKit, the desktop apps' engine, rings
+ * what script focuses, so a trigger handed focus after a click kept a ring.
+ */
+export const focusBackAfterKeys = (closeType: string) => closeType === "keyboard";

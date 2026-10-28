@@ -24,7 +24,7 @@ export {
   Splash,
   TextField,
 } from "./controls";
-export { useDialogFocus } from "./dialog-focus";
+export { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 export { ago, lasted } from "./format";
 export { GroupSelect, useGroups } from "./groups";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";

@@ -17,6 +17,7 @@ import {
 import { Button } from "./button";
 import { type Confirmation, ConfirmDialog } from "./confirm";
 import { Empty, ErrorMessage, Initial } from "./controls";
+import { focusBackAfterKeys } from "./dialog-focus";
 import { MoreMenu } from "./page-parts";
 import { messageOf } from "./problems";
 import { useSignOutError } from "./session";
@@ -474,7 +475,10 @@ function AccessPicker({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Menu.Popup className="ui-menu max-h-80 min-w-56 overflow-y-auto p-1 outline-none">
+          <Menu.Popup
+            finalFocus={focusBackAfterKeys}
+            className="ui-menu max-h-80 min-w-56 overflow-y-auto p-1 outline-none"
+          >
             <Menu.Group>
               <Menu.GroupLabel className="px-2 pt-1 pb-0.5 text-xs text-faint">
                 {capitalized(access.plural)} {name} is in
@@ -555,7 +559,10 @@ function RoleSelect({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <Select.Popup className="ui-menu min-w-64 p-1 outline-none">
+          <Select.Popup
+            finalFocus={focusBackAfterKeys}
+            className="ui-menu min-w-64 p-1 outline-none"
+          >
             <Select.List>
               {roles.map((role) => (
                 <Select.Item

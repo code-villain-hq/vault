@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { Ellipsis, Plus } from "lucide-react";
 import type { ReactNode } from "react";
-import { useDialogFocus } from "./dialog-focus";
+import { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 
 /** A property chip: quiet until hovered. */
 export const chip =
@@ -73,7 +73,7 @@ export function MoreMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="end">
-          <Menu.Popup className="ui-menu min-w-44 p-1 outline-none">
+          <Menu.Popup finalFocus={focusBackAfterKeys} className="ui-menu min-w-44 p-1 outline-none">
             {items.map((item) => (
               <Menu.Item
                 key={item.label}
