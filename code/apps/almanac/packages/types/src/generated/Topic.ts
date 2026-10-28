@@ -18,7 +18,8 @@ icon: string,
  */
 group_name: string, 
 /**
- * `cards`, a card per theme, or `document`, a document that grows.
+ * `cards`, a card per theme, `document`, a document that grows, or
+ * `routine`, a routine they keep (see [`POINT_KINDS`]).
  */
 shape: string, 
 /**

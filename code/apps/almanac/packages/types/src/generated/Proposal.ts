@@ -9,7 +9,7 @@ import type { ProposedReminder } from "./ProposedReminder";
  */
 export type Proposal = { name: string, sticks_to: string, icon: string, group_name: string, 
 /**
- * `cards` or `document`.
+ * `cards`, `document` or `routine`.
  */
 shape: string, 
 /**

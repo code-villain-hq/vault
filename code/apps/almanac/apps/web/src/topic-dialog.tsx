@@ -144,6 +144,7 @@ export function TopicForm({
                       [
                         ["cards", "Cards"],
                         ["document", "Document"],
+                        ["routine", "Routine"],
                       ] as const
                     ).map(([value, label]) => (
                       <button

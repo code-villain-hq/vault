@@ -85,7 +85,7 @@ pub struct Proposal {
     pub sticks_to: String,
     pub icon: String,
     pub group_name: String,
-    /// `cards` or `document`.
+    /// `cards`, `document` or `routine`.
     pub shape: String,
     /// For a document, its title.
     pub title: Option<String>,
@@ -102,6 +102,10 @@ pub struct Proposal {
 #[ts(export)]
 pub struct ProposedPoint {
     pub theme: String,
+    /// One of [`crate::POINT_KINDS`]; a note when left out.
+    #[serde(default)]
+    #[ts(optional)]
+    pub kind: Option<String>,
     pub text: String,
 }
 

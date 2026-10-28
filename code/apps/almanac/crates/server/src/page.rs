@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 const TOPIC: &str = "SELECT name, sticks_to, title, shape FROM topics \
      WHERE id = $1 AND workspace_id = $2";
-const POINTS: &str = "SELECT id, theme, text, source FROM points \
+const POINTS: &str = "SELECT id, theme, kind, text, source FROM points \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const QUESTIONS: &str = "SELECT text FROM questions \
      WHERE topic_id = $1 AND workspace_id = $2 AND status = 'open' ORDER BY created_at";
@@ -27,8 +27,9 @@ const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, t.shape, \
      FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
      ORDER BY t.group_name = '', t.group_name, t.position, t.created_at";
 
-/// A theme and its points: each its id, a text and where it comes from.
-pub type Theme = (String, Vec<(Uuid, String, Option<String>)>);
+/// A theme and its points: each its id, its kind, a text and where it
+/// comes from.
+pub type Theme = (String, Vec<(Uuid, String, String, Option<String>)>);
 
 /// A reminder as the page has it: its id, title, next day, rhythm, and
 /// whether it's `on` or only `offered`.
@@ -49,7 +50,7 @@ pub struct Page {
     pub name: String,
     pub sticks_to: String,
     pub title: Option<String>,
-    /// `cards` or `document`.
+    /// `cards`, `document` or `routine`.
     pub shape: String,
     /// Each theme with its points, in page order.
     pub themes: Vec<Theme>,
@@ -72,16 +73,17 @@ impl Page {
         let Some((name, sticks_to, title, shape)) = topic else {
             return Ok(None);
         };
-        let points: Vec<(Uuid, String, String, Option<String>)> = sqlx::query_as(POINTS)
+        let points: Vec<(Uuid, String, String, String, Option<String>)> = sqlx::query_as(POINTS)
             .bind(id)
             .bind(workspace_id)
             .fetch_all(pool)
             .await?;
         let mut themes: Vec<Theme> = Vec::new();
-        for (id, theme, text, source) in points {
+        for (id, theme, kind, text, source) in points {
+            let point = (id, kind, text, source);
             match themes.iter_mut().find(|(t, _)| *t == theme) {
-                Some((_, kept)) => kept.push((id, text, source)),
-                None => themes.push((theme, vec![(id, text, source)])),
+                Some((_, kept)) => kept.push(point),
+                None => themes.push((theme, vec![point])),
             }
         }
         Ok(Some(Page {
@@ -141,10 +143,10 @@ impl Page {
         let _ = writeln!(
             out,
             "The page's shape: {}",
-            if self.shape == "document" {
-                "document (each theme is a section of one piece of writing)"
-            } else {
-                "cards (each theme is one thing the topic is about)"
+            match self.shape.as_str() {
+                "document" => "document (each theme is a section of one piece of writing)",
+                "routine" => ROUTINE,
+                _ => "cards (each theme is one thing the topic is about)",
             }
         );
         out.push_str("\nWhat the page has kept, by theme:\n");
@@ -154,14 +156,19 @@ impl Page {
         let mut n = 0;
         for (theme, points) in &self.themes {
             let _ = writeln!(out, "## {theme}");
-            for (_, text, source) in points {
+            for (_, kind, text, source) in points {
                 n += 1;
+                let kind = if kind == "note" {
+                    String::new()
+                } else {
+                    format!("({kind}) ")
+                };
                 match source.as_deref().filter(|s| !s.is_empty()) {
                     Some(source) => {
-                        let _ = writeln!(out, "- [p{n}] {text} ({source})");
+                        let _ = writeln!(out, "- [p{n}] {kind}{text} ({source})");
                     }
                     None => {
-                        let _ = writeln!(out, "- [p{n}] {text}");
+                        let _ = writeln!(out, "- [p{n}] {kind}{text}");
                     }
                 }
             }
@@ -197,6 +204,22 @@ impl Page {
         out
     }
 }
+
+/// How a routine's page is laid out, for Claude to keep its points where
+/// the page shows them.
+const ROUTINE: &str = "routine (a routine they keep). The page shows the day's steps, its \
+days on the calendar, what's true of them, their shelf and advice, so every point has a \
+kind, shown before it: \
+about, a fact about them in a few words (\"Low porosity, by the float test\"), under the \
+theme You; \
+thing, a note on something they use, under the thing's name as its theme (\"Elvital \
+Hyaluron Plump\"): its first point says what it is in two or three words (\"Shampoo and \
+conditioner\"), its second how they use it, any more are notes; \
+step, one step of a routine day, under the routine's name as its theme, the way its \
+reminders are called (\"Elvital wash\"), as what, a colon, then how (\"Elvital shampoo: on \
+the scalp, lukewarm water\"), in the order they're done; \
+tip, advice worth following, with its source, under the theme Advice. \
+A note is a point not sorted yet: keep it again with its kind, in its place.";
 
 /// The workspace as its own topic reads it.
 pub struct Workspace {

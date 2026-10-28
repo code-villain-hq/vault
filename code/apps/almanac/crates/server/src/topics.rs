@@ -46,7 +46,8 @@ repotting.\"), not rules about what doesn't belong. When they wrote it, return t
 the existing groups when it fits.
 - shape: \"cards\" when the topic is about a set of things that each get a card (plants, pets, \
 trips, recipes); \"document\" when what it keeps grows into one piece of writing with sections \
-(a pitch, research, a plan).
+(a pitch, research, a plan); \"routine\" when it's a routine they keep, with steps on certain \
+days and the things they use (a hair or skin routine, a training plan).
 - starters: three or four first questions they might ask to begin, each under 12 words.
 
 Write in the language of the topic's name.";
@@ -162,6 +163,7 @@ pub async fn start(
                 data: fields([
                     ("topic_id", json!(id)),
                     ("theme", json!(point.theme)),
+                    ("kind", json!(point.kind.as_deref().unwrap_or("note"))),
                     ("text", json!(point.text)),
                     ("source", json!("You said")),
                 ]),

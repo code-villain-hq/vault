@@ -7,7 +7,11 @@ export type Point = { id: string, workspace_id: string, topic_id: string,
 /**
  * The card or section it's under: a plant, a part of a document.
  */
-theme: string, text: string, 
+theme: string, 
+/**
+ * One of [`POINT_KINDS`].
+ */
+kind: string, text: string, 
 /**
  * Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
  */

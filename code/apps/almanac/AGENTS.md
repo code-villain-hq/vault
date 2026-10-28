@@ -123,7 +123,12 @@ What they do:
   offer_reminder, fits_elsewhere, name_talk); through the API one more
   request, with structured output, reads them from the exchange. Either
   way the server writes them with the answer, through the sync engine, so
-  every client sees it. The page Claude reads names each point and
+  every client sees it. A point has a kind (`POINT_KINDS`): cards and
+  documents keep notes; a routine's page lays out facts about you
+  (`about`), things on your shelf (`thing`, under the thing's name), steps
+  (`step`, under the routine's name, which its reminders' titles start
+  with) and advice (`tip`), as `page.rs` tells Claude (`ROUTINE`).
+  The page Claude reads names each point and
   reminder (`p3`, `r2`, `page::Refs`), and a point or reminder may
   `replace` some: a point takes the first one's place (unread again) and
   the rest go; a reminder offer puts the ones on the calendar in its
@@ -135,7 +140,7 @@ What they do:
   made at once and kept on the message for Undo.
 - **Starting a topic** (`topics.rs`): in the background, Almanac writes what
   it sticks to when that was empty, picks an icon (`ICONS` in
-  `crates/domain`), a group, the shape (`cards` or `document`) and the
+  `crates/domain`), a group, the shape (`cards`, `document` or `routine`) and the
   first questions (set_up_topic, or structured output). When Claude can't
   answer, the topic keeps its defaults.
 
@@ -183,7 +188,9 @@ them into notifications. A server with no Mac listening marks nothing.
   formatted: the page shows them in the reader's time zone. Days are
   `YYYY-MM-DD`.
 - Change the schema with a new numbered migration; don't edit one that
-  has been committed.
+  has been committed. One that gives a synced model a field ends with
+  `UPDATE workspaces SET sync_epoch = gen_random_uuid();`, as Forge's do:
+  otherwise clients keep the records they have, without it.
 - Every write to a synced model goes through `almanac_sync::apply_transaction`.
 - Workspace endpoints go under `/api/w/{workspace_id}` and take the `Member`
   extractor, which checks membership. Admin-only ones call

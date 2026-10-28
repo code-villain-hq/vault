@@ -456,4 +456,20 @@ async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
     assert_ne!(reminders[0]["id"], thursday);
     assert_eq!(reminders[0]["due_on"], "2026-10-30");
     assert_eq!(reminders[0]["replaces"], json!([]));
+
+    // On a routine's page, sorting keeps the point again with its kind, in
+    // its place.
+    let routine = app
+        .sync(
+            &ada,
+            &home,
+            json!([{ "action": "update", "model": "Topic", "id": topic, "data": { "shape": "routine" } }]),
+        )
+        .await;
+    assert_eq!(routine.status, 200, "{:?}", routine.body);
+    ask(&app, &ada, &home, &topic, "Sort the notes").await;
+    let points = app.synced(&ada, &home, "Point").await;
+    assert_eq!(points.len(), 1, "{points:?}");
+    assert_eq!(points[0]["kind"], "step");
+    assert_eq!(points[0]["theme"], "Elvital wash");
 }

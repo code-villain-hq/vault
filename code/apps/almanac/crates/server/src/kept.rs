@@ -8,7 +8,7 @@
 //! request reads them from the exchange (`crate::talks`). Either way they
 //! are written with the answer, through the sync engine.
 
-use almanac_domain::{ModelKind, Operation, Proposal, ProposedReminder, TopicChange};
+use almanac_domain::{ModelKind, Operation, POINT_KINDS, Proposal, ProposedReminder, TopicChange};
 use chrono::{NaiveDate, NaiveTime};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
@@ -33,6 +33,8 @@ pub struct Kept {
 #[derive(Debug)]
 pub struct KeptPoint {
     pub theme: String,
+    /// One of [`POINT_KINDS`].
+    pub kind: String,
     pub text: String,
     pub source: Option<String>,
     pub url: Option<String>,
@@ -65,8 +67,11 @@ pub struct Answering {
 }
 
 /// How much one answer may keep. A page keeps points; more than this
-/// from one exchange is a list copied in.
+/// from one exchange is a list copied in. Points that take the place of
+/// others count only towards the most it may change at all, which sorting
+/// a page needs.
 const MOST_POINTS: usize = 8;
+const MOST_CHANGED: usize = 40;
 const MOST_QUESTIONS: usize = 2;
 const MOST_REMINDERS: usize = 3;
 
@@ -79,11 +84,13 @@ impl Kept {
         }
     }
 
-    /// Keeps a point for the page, in place of the points it `replaces`
-    /// (`p3`). What's wrong with it comes back in words, for Claude to fix.
+    /// Keeps a point of a `kind` for the page (a note when it's empty), in
+    /// place of the points it `replaces` (`p3`). What's wrong with it comes
+    /// back in words, for Claude to fix.
     pub fn keep_point(
         &mut self,
         theme: &str,
+        kind: &str,
         text: &str,
         source: &str,
         url: &str,
@@ -93,9 +100,24 @@ impl Kept {
         if theme.is_empty() || text.is_empty() {
             return Err("A point needs a theme and a text.".into());
         }
-        if self.points.len() >= MOST_POINTS {
+        let kind = match kind.trim() {
+            "" => "note",
+            kind if POINT_KINDS.contains(&kind) => kind,
+            kind => {
+                return Err(format!(
+                    "There's no kind {kind}: it's one of {POINT_KINDS:?}."
+                ));
+            }
+        };
+        let new = self.points.iter().filter(|p| p.replaces.is_empty()).count();
+        if replaces.is_empty() && new >= MOST_POINTS {
             return Err(format!(
                 "This answer already keeps {MOST_POINTS} points: keep only the ones worth knowing later."
+            ));
+        }
+        if self.points.len() >= MOST_CHANGED {
+            return Err(format!(
+                "This answer already changes {MOST_CHANGED} points: the rest can wait for the next."
             ));
         }
         let replaces = replaces
@@ -105,12 +127,17 @@ impl Kept {
                     .ok_or_else(|| format!("The page has no point {r}: name one like p3."))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        if self.points.iter().any(|p| p.text == text) {
+        if self
+            .points
+            .iter()
+            .any(|p| p.text == text && p.theme == theme)
+        {
             return Ok(());
         }
         let url = cut(url, 2000);
         self.points.push(KeptPoint {
             theme,
+            kind: kind.into(),
             text,
             source: some(cut(source, 200)),
             url: (url.starts_with("https://") || url.starts_with("http://")).then_some(url),
@@ -175,6 +202,7 @@ impl Kept {
             }
             let data = fields([
                 ("theme", json!(point.theme)),
+                ("kind", json!(point.kind)),
                 ("text", json!(point.text)),
                 ("source", json!(point.source)),
                 ("source_url", json!(point.url)),
@@ -445,12 +473,13 @@ mod tests {
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("Wäsche", "x", "", "", &["p3".into()])
+            kept.keep_point("Wäsche", "", "x", "", "", &["p3".into()])
                 .unwrap_err()
                 .contains("no point p3")
         );
         kept.keep_point(
             "Wäsche",
+            "",
             "Washes Wednesday and Friday.",
             "You said",
             "",
@@ -466,6 +495,55 @@ mod tests {
             ] if *a == first && *b == second && data["seen"] == json!(false)
         ));
         assert_eq!(said["kept"], json!("Updated a point under Wäsche."));
+    }
+
+    #[test]
+    fn sorting_a_page_keeps_each_point_with_its_kind() {
+        let ids: Vec<Uuid> = (0..12).map(|_| Uuid::now_v7()).collect();
+        let mut kept = Kept::on(Refs {
+            points: ids.clone(),
+            reminders: vec![],
+        });
+        assert!(
+            kept.keep_point("You", "fact", "Long", "", "", &[])
+                .unwrap_err()
+                .contains("no kind fact")
+        );
+        // More than an answer may add, each in a point's place.
+        for n in 1..=12 {
+            kept.keep_point(
+                "You",
+                "about",
+                &format!("Fact {n}"),
+                "",
+                "",
+                &[format!("p{n}")],
+            )
+            .unwrap();
+        }
+        kept.keep_point(
+            "Elvital wash",
+            "step",
+            "Elvital shampoo: on the scalp",
+            "",
+            "",
+            &[],
+        )
+        .unwrap();
+        let (said, operations) = kept.writes(&answering());
+        assert_eq!(operations.len(), 13);
+        assert!(matches!(
+            &operations[12],
+            Operation::Create { data, .. } if data["kind"] == json!("step")
+        ));
+        assert!(matches!(
+            &operations[0],
+            Operation::Update { id, data, .. } if *id == ids[0] && data["kind"] == json!("about")
+        ));
+        assert_eq!(
+            said["kept"],
+            json!("Kept and updated 13 points under You and Elvital wash.")
+        );
     }
 
     #[test]

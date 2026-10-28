@@ -58,6 +58,7 @@ export function createSyncClient(options: {
     // biome-ignore-start lint/correctness/noComponentHookFactories: named after models, and they make records, not components
     defaults: {
       Point: () => ({
+        kind: "note",
         source: null,
         source_url: null,
         talk_id: null,

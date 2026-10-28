@@ -30,8 +30,8 @@ pub use talk::{
     ProposedReminder, Source, Talk, TalkCreate, TalkPatch, TopicChange,
 };
 pub use topic::{
-    ICONS, KINDS, Point, PointCreate, PointPatch, Question, QuestionCreate, QuestionPatch,
-    Reminder, ReminderCreate, ReminderPatch, SHAPES, StartTopicRequest, StartedTopic, Topic,
-    TopicCreate, TopicPatch,
+    ICONS, KINDS, POINT_KINDS, Point, PointCreate, PointPatch, Question, QuestionCreate,
+    QuestionPatch, Reminder, ReminderCreate, ReminderPatch, SHAPES, StartTopicRequest,
+    StartedTopic, Topic, TopicCreate, TopicPatch,
 };
 pub use user::User;

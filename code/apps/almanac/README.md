@@ -77,7 +77,7 @@ topics.
 - **Starting a topic**: a name, and what it sticks to, which may stay
   empty. Once Claude answers, Almanac writes the rest in the background: what
   it sticks to when that was empty, the icon, the group, the page's shape
-  (cards or a document) and the first questions. Edit topic changes any
+  (cards, a document or a routine) and the first questions. Edit topic changes any
   of it.
 - **An empty topic** says what will be there and offers its first
   questions.
@@ -92,7 +92,10 @@ topics.
 - **The page keeps points with their sources**, grouped by theme: on a
   cards page, a card per plant with a short note for each point; on a
   document page, sections of paragraphs that explain, each with the talk
-  it came from. New points carry the unread dot until you leave the topic.
+  it came from; on a routine page, the day's steps to tick off, its week,
+  what's true of you, your shelf (each thing with when and how you use it)
+  and advice. Notes not sorted into a routine yet wait under it, with Sort
+  them. New points carry the unread dot until you leave the topic.
   The page is kept up to date, not added to: a point that changes one it
   has takes that one's place.
 - **Almanac asks when it's unsure**: the question waits on the card it's
@@ -114,8 +117,7 @@ what it read. A company server's doesn't.
 
 - **Workspaces**, as every Code Villain app has them: Home, and Work for
   what you learn at work. Only Home is made today.
-- **More shapes**: Haare on today's routine as numbered steps, Karl Marx
-  on what you're reading.
+- **More shapes**: Karl Marx on what you're reading.
 - **Dumps:** a shortcut anywhere on the Mac opens one field, with no topic
   to pick. Almanac says where the dump went, with Open and Undo, and
   offers a reminder when there's something to do. When two topics fit, or
@@ -132,6 +134,8 @@ Open them in a browser. Each shows night and day.
   and the Calendar.
 - [`storyboards/opening-a-topic.html`](storyboards/opening-a-topic.html):
   Pflanzen, Haare and Manage up as they open.
+- [`storyboards/the-page.html`](storyboards/the-page.html): Haare's page
+  three ways, and the routine page taken from two of them. Night only.
 - [`storyboards/dumping.html`](storyboards/dumping.html): a dump, where it
   went, what it asks when it's unsure, and the dump later in its topic.
 - [`storyboards/the-workspaces-own-topic.html`](storyboards/the-workspaces-own-topic.html):

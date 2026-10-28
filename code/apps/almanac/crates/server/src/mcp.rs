@@ -9,7 +9,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use almanac_domain::{Actor, ICONS, Proposal, ProposedPoint, SHAPES, TopicChange, TopicPatch};
+use almanac_domain::{
+    Actor, ICONS, POINT_KINDS, Proposal, ProposedPoint, SHAPES, TopicChange, TopicPatch,
+};
 use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, header::AUTHORIZATION};
@@ -220,6 +222,7 @@ async fn call(
             let point: PointArgs = read(arguments)?;
             kept()?.keep_point(
                 &point.theme,
+                &point.kind,
                 &point.text,
                 &point.source,
                 &point.url,
@@ -292,6 +295,8 @@ async fn call(
 #[derive(Deserialize)]
 struct PointArgs {
     theme: String,
+    #[serde(default)]
+    kind: String,
     text: String,
     #[serde(default)]
     source: String,
@@ -353,6 +358,8 @@ struct ProposeArgs {
 #[derive(Deserialize)]
 struct ProposedPointArgs {
     theme: String,
+    #[serde(default)]
+    kind: String,
     text: String,
 }
 
@@ -409,13 +416,17 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
         return Err("Pick the icon from its list.".into());
     }
     if !SHAPES.contains(&args.shape.as_str()) {
-        return Err("The shape is cards or document.".into());
+        return Err("The shape is cards, document or routine.".into());
     }
     let points: Vec<ProposedPoint> = args
         .points
         .iter()
         .map(|p| ProposedPoint {
             theme: cut(&p.theme, 120),
+            kind: POINT_KINDS
+                .contains(&p.kind.as_str())
+                .then(|| p.kind.clone())
+                .filter(|k| k != "note"),
             text: cut(&p.text, 2000),
         })
         .filter(|p| !p.theme.is_empty() && !p.text.is_empty())
@@ -560,7 +571,7 @@ async fn change(
         return Err("Pick the icon from its list.".into());
     }
     if after.shape.as_deref().is_some_and(|s| !SHAPES.contains(&s)) {
-        return Err("The shape is cards or document.".into());
+        return Err("The shape is cards, document or routine.".into());
     }
     if let Some(new_name) = &after.name
         && !new_name.eq_ignore_ascii_case(&name)
@@ -719,11 +730,13 @@ fn tools(mode: Mode) -> Vec<Value> {
                  (such as Problem, Market, Team), and it's read later as writing, so a point \
                  keeps what your answer explained the way you explained it: two to four \
                  sentences on what it is and why it matters, starting with the term it's about \
-                 in **bold** when there is one. What they told you stays one sentence. Use an \
-                 existing theme when one fits.",
+                 in **bold** when there is one. What they told you stays one sentence. On a \
+                 routine's page each point has a kind, and its theme follows from it, as the \
+                 page's shape says. Use an existing theme when one fits.",
                 json!({
                     "theme": string("The theme it goes under."),
-                    "text": string("The point: on cards one short sentence; in a document two to four sentences that explain."),
+                    "kind": { "type": "string", "enum": POINT_KINDS, "description": "On a routine's page what the point is, as the page's shape says; note, or left out, on cards and in a document." },
+                    "text": string("The point: on cards and in a routine one short sentence; in a document two to four sentences that explain."),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                     "url": string("The page it comes from, when you read one. Never a made-up link."),
                     "replaces": replaces("points", "p3"),
@@ -775,7 +788,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                     "sticks_to": string("What talks in it stay with, in one or two sentences. The page shows it under the name, so only what it's about (\"Houseplants and their care: watering, light, repotting.\"), not rules about what doesn't belong."),
                     "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
                     "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
-                    "shape": { "type": "string", "enum": SHAPES, "description": "cards when it's about a set of things that each get a card (plants, pets, trips, recipes); document when what it keeps grows into one piece of writing with sections (a pitch, research, a plan)." },
+                    "shape": { "type": "string", "enum": SHAPES, "description": "cards when it's about a set of things that each get a card (plants, pets, trips, recipes); document when what it keeps grows into one piece of writing with sections (a pitch, research, a plan); routine when it's a routine they keep, with steps on certain days and the things they use (a hair or skin routine, a training plan)." },
                     "title": string("For a document, a title for the writing; otherwise left out."),
                     "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions they might ask, each under 12 words." },
                     "points": {
@@ -785,6 +798,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                             "type": "object",
                             "properties": {
                                 "theme": string("The theme it goes under."),
+                                "kind": { "type": "string", "enum": POINT_KINDS, "description": "For a routine: about (a fact about them, under You), thing (under the thing's name: first what it is, then how they use it), step (under the routine day's name, as what: how) or tip (under Advice). Otherwise note." },
                                 "text": string("The point, one short sentence."),
                             },
                             "required": ["theme", "text"],
@@ -832,7 +846,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "sticks_to": string("What talks in it stay with, in one or two sentences: only what it's about, not rules about what doesn't belong. When they wrote it, theirs as it is."),
                 "icon": { "type": "string", "enum": ICONS },
                 "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
-                "shape": { "type": "string", "enum": SHAPES, "description": "cards for a set of things that each get a card; document for one piece of writing with sections." },
+                "shape": { "type": "string", "enum": SHAPES, "description": "cards for a set of things that each get a card; document for one piece of writing with sections; routine for a routine they keep, with steps on certain days and the things they use." },
                 "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions, each under 12 words." },
             }),
             &["title", "sticks_to", "icon", "group", "shape", "starters"],

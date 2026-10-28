@@ -19,7 +19,8 @@ pub struct Topic {
     pub icon: String,
     /// The sidebar group it sits in, such as "Hobby". Empty for none.
     pub group_name: String,
-    /// `cards`, a card per theme, or `document`, a document that grows.
+    /// `cards`, a card per theme, `document`, a document that grows, or
+    /// `routine`, a routine they keep (see [`POINT_KINDS`]).
     pub shape: String,
     /// For a document, its title.
     pub title: Option<String>,
@@ -127,7 +128,14 @@ pub const ICONS: &[&str] = &[
     "sparkles",
 ];
 
-pub const SHAPES: &[&str] = &["cards", "document"];
+pub const SHAPES: &[&str] = &["cards", "document", "routine"];
+
+/// What a point is. Cards and documents keep `note`s. A routine's page
+/// lays out the rest: `about` is a fact about them, `thing` a note on
+/// something on their shelf (its theme is the thing), `step` one step of a
+/// routine day (its theme is the day's routine, as its reminder is called)
+/// and `tip` advice.
+pub const POINT_KINDS: &[&str] = &["note", "about", "thing", "step", "tip"];
 
 pub const KINDS: &[&str] = &["topic", "almanac"];
 
@@ -140,6 +148,8 @@ pub struct Point {
     pub topic_id: Uuid,
     /// The card or section it's under: a plant, a part of a document.
     pub theme: String,
+    /// One of [`POINT_KINDS`].
+    pub kind: String,
     pub text: String,
     /// Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
     pub source: Option<String>,
@@ -159,6 +169,7 @@ pub struct Point {
 pub struct PointCreate {
     pub topic_id: Uuid,
     pub theme: String,
+    pub kind: Option<String>,
     pub text: String,
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -172,6 +183,7 @@ pub struct PointCreate {
 #[ts(export, optional_fields)]
 pub struct PointPatch {
     pub theme: Option<String>,
+    pub kind: Option<String>,
     pub text: Option<String>,
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -340,7 +352,8 @@ impl Validate for TopicPatch {
 impl Validate for PointCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         words(&self.theme, "A point needs a theme.", 120)?;
-        words(&self.text, "A point needs some words.", 2000)
+        words(&self.text, "A point needs some words.", 2000)?;
+        one_of(self.kind.as_deref(), POINT_KINDS, "kind")
     }
 }
 
@@ -352,7 +365,7 @@ impl Validate for PointPatch {
         if let Some(text) = &self.text {
             words(text, "A point needs some words.", 2000)?;
         }
-        Ok(())
+        one_of(self.kind.as_deref(), POINT_KINDS, "kind")
     }
 }
 

@@ -471,9 +471,11 @@ function Proposed({
   const page =
     proposal.shape === "document"
       ? "A document"
-      : proposal.reminders.length > 0
-        ? "Cards, with a week"
-        : "Cards";
+      : proposal.shape === "routine"
+        ? "A routine, with its week"
+        : proposal.reminders.length > 0
+          ? "Cards, with a week"
+          : "Cards";
   return (
     <div className="flex flex-col gap-2.5 rounded-lg bg-surface px-4 py-3.5">
       <div className="flex items-center gap-2">

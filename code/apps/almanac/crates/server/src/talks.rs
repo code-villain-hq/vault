@@ -14,7 +14,7 @@
 
 use std::convert::Infallible;
 
-use almanac_domain::{Actor, AskRequest, ModelKind, Operation, Source, Transaction};
+use almanac_domain::{Actor, AskRequest, ModelKind, Operation, POINT_KINDS, Source, Transaction};
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -127,7 +127,8 @@ is one short sentence, under 20 words. In a document each theme is a section of 
 writing (such as Problem, Market, Team), and it's read later as writing, so a point keeps what \
 the answer explained the way it explained it: two to four sentences on what it is and why it \
 matters, starting with the term it's about in **bold** when there is one. What they told you \
-stays one sentence. Use an existing theme when one fits.
+stays one sentence. On a routine's page each point has a kind, and its theme follows from it, \
+as the page's shape says; elsewhere kind is \"note\". Use an existing theme when one fits.
 - replaces: the page is kept up to date, not added to. When a point changes or corrects points \
 the page has (a wash day moved, a product swapped), it replaces them, named as the page names \
 them ([\"p3\"]); keep one point where two would say the same. [] when it replaces none.
@@ -167,6 +168,8 @@ struct Keep {
 #[derive(Deserialize)]
 struct KeepPoint {
     theme: String,
+    #[serde(default)]
+    kind: String,
     text: String,
     source: String,
     #[serde(default)]
@@ -209,6 +212,7 @@ fn keep_schema() -> Value {
     object(json!({
         "points": list(object(json!({
             "theme": string,
+            "kind": { "type": "string", "enum": POINT_KINDS },
             "text": string,
             "source": string,
             "replaces": list(string.clone()),
@@ -757,6 +761,7 @@ async fn keep(
     for point in &from.points {
         let _ = kept.keep_point(
             &point.theme,
+            &point.kind,
             &point.text,
             &point.source,
             "",
@@ -881,7 +886,7 @@ mod tests {
             schema["properties"]["points"]["items"]["required"]
                 .as_array()
                 .map(Vec::len),
-            Some(4)
+            Some(5)
         );
     }
 }

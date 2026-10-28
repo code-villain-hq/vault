@@ -85,6 +85,15 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/sort/i.test(prompt)) {
+    say("Sorted.");
+    await tool("keep_point", {
+      theme: "Elvital wash",
+      kind: "step",
+      text: "Elvital shampoo: on the scalp, lukewarm water.",
+      source: "From the talk",
+      replaces: ["p1"],
+    });
   } else if (/moved/i.test(prompt)) {
     say("Then Friday it is.");
     await tool("keep_point", {

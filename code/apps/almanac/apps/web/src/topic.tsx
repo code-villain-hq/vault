@@ -1,13 +1,21 @@
 // A topic's page: what it sticks to, what it kept by theme (a card each,
-// or a document's sections), the questions it waits on, its week, and the
-// talk beside it. The workspace's own topic, Almanac, has the index of the
+// or a document's sections) or, for a routine, by what each point is, the
+// questions it waits on, its week, and the talk beside it. The workspace's own topic, Almanac, has the index of the
 // others for its page.
 
 import type { ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
 import type { SyncClient } from "@code-villain/sync-client";
 import { type Confirmation, ConfirmDialog, MoreMenu, RowAction, useApi } from "@code-villain/web";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, MessagesSquare, X } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  CircleCheck,
+  MessagesSquare,
+  X,
+} from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
@@ -23,6 +31,7 @@ import {
   ago,
   dayKey,
   dueWords,
+  fromKey,
   rhythmWords,
   timeWords,
   today,
@@ -275,6 +284,9 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
   const themes = useMemo(() => byTheme(mine), [mine]);
   const loose = mine.questions.filter((q) => !q.theme);
   const empty = themes.length === 0 && loose.length === 0;
+  if (topic.shape === "routine" && !empty) {
+    return <RoutinePage topic={topic} {...mine} onAsk={onAsk} />;
+  }
 
   return (
     <>
@@ -827,5 +839,399 @@ function AskBar({
         </div>
       </div>
     </form>
+  );
+}
+
+/**
+ * A routine's page, by what each point is: the day's steps, its week, what's
+ * true of you, your shelf and the advice. Notes not sorted yet stay on cards
+ * under them, with a way to have them sorted.
+ */
+function RoutinePage({
+  topic,
+  points,
+  questions,
+  reminders,
+  onAsk,
+}: {
+  topic: Topic;
+  points: Point[];
+  questions: Question[];
+  reminders: Reminder[];
+  onAsk: (text: string) => void;
+}) {
+  const of = (kind: string) => points.filter((p) => p.kind === kind);
+  const shelf = byTheme({ points: of("thing"), questions: [], reminders: [] });
+  const things = new Set(shelf.map((t) => t.name));
+  const notes = byTheme({
+    points: of("note"),
+    questions: questions.filter((q) => q.theme && !things.has(q.theme)),
+    reminders: [],
+  });
+  const routines = routineDays(of("step"), reminders);
+  const loose = questions.filter((q) => !q.theme);
+  return (
+    <>
+      <div className="flex flex-col gap-1">
+        <p className="text-title font-semibold">{topic.name}</p>
+        {topic.sticks_to && <p className="text-muted">{topic.sticks_to}</p>}
+      </div>
+      <NoKey />
+      <Steps topic={topic} routines={routines} />
+      {reminders.length > 0 && <WeekStrip topic={topic} reminders={reminders} />}
+      {loose.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Waiting on you">
+          {loose.map((q) => (
+            <Ask key={q.id} question={q} />
+          ))}
+        </section>
+      )}
+      <AboutYou points={of("about")} />
+      {shelf.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Your shelf">
+          <h2 className="text-xs text-faint">Your shelf</h2>
+          <div className="@container">
+            <div className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
+              {shelf.map((thing) => (
+                <Thing
+                  key={thing.name}
+                  thing={thing}
+                  days={thingDays(thing.name, routines)}
+                  questions={questions.filter((q) => q.theme === thing.name)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+      <Advice points={of("tip")} />
+      {notes.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Not sorted yet">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs text-faint">Not sorted yet</h2>
+            <button
+              type="button"
+              className="ui-button ml-auto"
+              onClick={() => onAsk("Sort the notes that aren't sorted yet into the routine.")}
+            >
+              Sort them
+            </button>
+          </div>
+          <Cards themes={notes} />
+        </section>
+      )}
+    </>
+  );
+}
+
+/** A routine day: its name, its steps in order, and the reminders it comes round with. */
+interface RoutineDay {
+  name: string;
+  steps: Point[];
+  reminders: Reminder[];
+}
+
+/**
+ * The routines the steps make, each with its reminders: the ones called by
+ * its name, or starting with it ("Elvital wash + conditioner").
+ */
+function routineDays(steps: Point[], reminders: Reminder[]): RoutineDay[] {
+  return byTheme({ points: steps, questions: [], reminders: [] }).map(({ name, points }) => {
+    const exact = reminders.filter((r) => r.title === name);
+    const called = name.toLowerCase();
+    return {
+      name,
+      steps: points,
+      reminders: exact.length
+        ? exact
+        : reminders.filter((r) => r.title.toLowerCase().startsWith(called)),
+    };
+  });
+}
+
+/**
+ * The routine due today, or the next one this week, with the day it's on;
+ * without reminders to go by, the first routine, for today.
+ */
+function nextRoutine(
+  routines: RoutineDay[],
+): { day: string; dated: boolean; routine: RoutineDay } | null {
+  const now = today();
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(now, i);
+    const routine = routines.find((r) => r.reminders.some((m) => occurrences(m, day, day).length));
+    if (routine) return { day, dated: true, routine };
+  }
+  const first = routines[0];
+  return first ? { day: now, dated: false, routine: first } : null;
+}
+
+/** "Elvital shampoo: on the scalp" as what and how. */
+function whatAndHow(text: string): [string, string | null] {
+  const at = text.indexOf(": ");
+  if (at <= 0 || at > 60) return [text, null];
+  const how = text.slice(at + 2);
+  return [text.slice(0, at), how.charAt(0).toUpperCase() + how.slice(1)];
+}
+
+/** The day's steps, to tick off as you go. Ticks stay on this device, for that day. */
+function Steps({ topic, routines }: { topic: Topic; routines: RoutineDay[] }) {
+  const { sync } = useWorkspace();
+  const next = nextRoutine(routines);
+  const key = next && `almanac.ticked.${topic.id}.${next.day}`;
+  const [ticked, setTicked] = useState<string[]>([]);
+  useEffect(() => {
+    if (!key) return;
+    try {
+      setTicked(JSON.parse(localStorage.getItem(key) ?? "[]"));
+    } catch {
+      setTicked([]);
+    }
+  }, [key]);
+  if (!next) return null;
+  const { day, dated, routine } = next;
+  const reminder = routine.reminders.find((r) => occurrences(r, day, day).length);
+  const tick = (id: string) => {
+    const now = ticked.includes(id) ? ticked.filter((t) => t !== id) : [...ticked, id];
+    setTicked(now);
+    try {
+      if (key) localStorage.setItem(key, JSON.stringify(now));
+    } catch {}
+  };
+  const when = dueWords(day).replace(/^./, (c) => c.toUpperCase());
+  const heading = dated ? `${when}, ${routine.name}` : routine.name;
+  return (
+    <section className="flex flex-col gap-2" aria-label={heading}>
+      <div className="flex items-center gap-2">
+        <h2 className="font-semibold">{heading}</h2>
+        {reminder && <ReminderMenu sync={sync} reminder={reminder} />}
+      </div>
+      <div className="@container">
+        <ol className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
+          {routine.steps.map((step, n) => {
+            const [what, how] = whatAndHow(step.text);
+            const done = ticked.includes(step.id);
+            return (
+              <li key={step.id}>
+                <button
+                  type="button"
+                  aria-pressed={done}
+                  aria-label={`${whatAndHow(step.text)[0]}: ${done ? "done" : "to do"}`}
+                  onClick={() => tick(step.id)}
+                  className="flex w-full items-start gap-3 rounded-lg bg-surface px-4 py-3.5 text-left hover:bg-hover"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`text-title leading-none font-bold ${done ? "text-faint" : "text-muted"}`}
+                  >
+                    {n + 1}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className={`font-semibold ${done ? "text-faint line-through" : ""}`}>
+                      {what}
+                    </span>
+                    {how && <span className="text-xs text-muted">{how}</span>}
+                  </span>
+                  {done ? (
+                    <CircleCheck
+                      size={18}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                      className="shrink-0 text-accent"
+                    />
+                  ) : (
+                    <Circle
+                      size={18}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                      className="shrink-0 text-faint"
+                    />
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+/** What's true of you, as chips: "Low porosity, by the float test". */
+function AboutYou({ points }: { points: Point[] }) {
+  if (points.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2" aria-label="You">
+      <h2 className="text-xs text-faint">You</h2>
+      <ul className="flex flex-wrap gap-1.5">
+        {points.map((point) => {
+          const at = point.text.indexOf(", ");
+          return (
+            <li
+              key={point.id}
+              title={point.source ?? undefined}
+              className="ui-chip flex items-center gap-1.5 px-2.5 py-1"
+            >
+              {!point.seen && (
+                <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
+              )}
+              {at > 0 ? (
+                <span>
+                  <span className="font-semibold text-fg">{point.text.slice(0, at)}</span>
+                  {point.text.slice(at)}
+                </span>
+              ) : (
+                <span className="text-fg">{point.text}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** The weekdays a thing is used on: those of the routines whose steps name it. */
+function thingDays(name: string, routines: RoutineDay[]): string[] {
+  // A step names the thing by its first word: "Elvital shampoo" for Elvital Hyaluron Plump.
+  const word = name.split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (word.length < 3) return [];
+  const days = weekOf(today());
+  return days.filter((day) =>
+    routines.some(
+      (r) =>
+        r.steps.some((s) => whatAndHow(s.text)[0].toLowerCase().includes(word)) &&
+        r.reminders.some((m) => occurrences(m, day, day).length),
+    ),
+  );
+}
+
+/** "Wed, Fri and Sun". */
+function daysWords(days: string[]): string {
+  const names = days.map((d) => fromKey(d).toLocaleDateString("en", { weekday: "short" }));
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names.join("");
+}
+
+/** A thing on your shelf: what it is, when and how you use it, and its other notes. */
+function Thing({
+  thing,
+  days,
+  questions,
+}: {
+  thing: Theme;
+  days: string[];
+  questions: Question[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [what, how, ...rest] = thing.points;
+  const fresh = thing.points.some((p) => !p.seen);
+  return (
+    <article className="flex flex-col gap-1.5 rounded-lg bg-surface px-4 py-3.5">
+      {what && <p className="text-xs text-faint">{what.text}</p>}
+      <h3 className="flex items-center gap-2 font-semibold">
+        {thing.name}
+        {fresh && <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />}
+      </h3>
+      {days.length > 0 && (
+        <p className="flex items-center gap-1.5 text-xs text-muted">
+          <CalendarDays size={12} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+          {daysWords(days)}
+        </p>
+      )}
+      {how && <p className="text-xs">{inline(how.text)}</p>}
+      {questions.map((q) => (
+        <Ask key={q.id} question={q} />
+      ))}
+      {rest.length > 0 && (
+        <div className="mt-1 flex flex-col gap-2">
+          <button
+            type="button"
+            className="ui-disclosure self-start"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
+            {rest.length} {rest.length === 1 ? "note" : "notes"}
+          </button>
+          {open && <Points points={rest} />}
+        </div>
+      )}
+    </article>
+  );
+}
+
+/** Advice worth following, the newest three, with where it comes from. */
+function Advice({ points }: { points: Point[] }) {
+  const [all, setAll] = useState(false);
+  if (points.length === 0) return null;
+  const shown = all ? points : points.slice(-3);
+  return (
+    <section className="flex flex-col gap-1" aria-label="Advice">
+      <h2 className="text-xs text-faint">Advice</h2>
+      <ul className="flex flex-col">
+        {shown.map((point) => (
+          <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
+            {!point.seen && (
+              <span
+                role="img"
+                aria-label="New"
+                className="size-1.5 shrink-0 self-center rounded-full bg-accent"
+              />
+            )}
+            <p className="min-w-0 flex-1">{inline(point.text)}</p>
+            {point.source && (
+              <span className="shrink-0 text-xs text-faint">
+                {point.source_url ? (
+                  <a href={point.source_url} target="_blank" rel="noreferrer" className="ui-link">
+                    {point.source}
+                  </a>
+                ) : (
+                  point.source
+                )}
+              </span>
+            )}
+            <RemovePoint point={point} />
+          </li>
+        ))}
+      </ul>
+      {points.length > 3 && (
+        <button
+          type="button"
+          className="ui-disclosure self-start px-2.5"
+          aria-expanded={all}
+          onClick={() => setAll(!all)}
+        >
+          <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
+          {all ? "The newest three" : `${points.length - 3} more`}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** Takes a point off the page, once you say so. */
+function RemovePoint({ point }: { point: Point }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  if (guest) return null;
+  return (
+    <>
+      <RowAction
+        label="Remove this point…"
+        onClick={() =>
+          setConfirmation({
+            title: "Remove this point?",
+            body: "It leaves the page for everyone in the workspace. This can't be undone.",
+            action: "Remove point",
+            onConfirm: () => sync.delete("Point", point.id),
+          })
+        }
+        className="self-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        <X size={13} strokeWidth={1.75} aria-hidden="true" />
+      </RowAction>
+      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
+    </>
   );
 }
