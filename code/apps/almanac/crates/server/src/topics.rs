@@ -34,8 +34,8 @@ const CHANGES: &str = "SELECT changes FROM messages WHERE id = $1 AND workspace_
 const STILL_THERE: &str = "SELECT id FROM topics WHERE workspace_id = $1 AND id = ANY($2)";
 
 const SET_UP: &str = "You set up a new topic in Almanac, a notebook that keeps what someone \
-learns, one topic at a time. Each topic has a page that keeps short points by theme, and talks \
-beside it. From the topic's name and what it sticks to (which may be empty), write:
+learns, one topic at a time. Each topic has a page that keeps points by theme, and talks beside \
+it. From the topic's name and what it sticks to (which may be empty), write:
 
 - title: one line saying what the topic is about, under 12 words.
 - sticks_to: what talks in this topic stay with, in one or two sentences. The page shows it \

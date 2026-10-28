@@ -52,7 +52,8 @@ export function Prose({ text }: { text: string }) {
   return <div className="flex flex-col gap-2">{blocks}</div>;
 }
 
-function inline(text: string): ReactNode {
+/** A line as written, with **bold** and *italic* kept: an answer's, or a point's. */
+export function inline(text: string): ReactNode {
   // The marked parts sit at the odd places the split leaves them, marks and
   // all: **bold** and *italic*.
   return text.split(/(\*\*[^*]+\*\*|\*[^*\s](?:[^*]*[^*\s])?\*)/).map((part, i) => {

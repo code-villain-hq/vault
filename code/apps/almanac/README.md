@@ -86,9 +86,10 @@ topics.
   keeps and the current talk, nothing older. A question off the topic gets
   a short answer and an offer to ask it in the topic it belongs to, or to
   start one. Earlier talks are behind the talks icon.
-- **The page keeps short points with their sources**, grouped by theme:
-  a card per plant on a cards page, sections of a document on a document
-  page. New points carry the unread dot until you leave the topic.
+- **The page keeps points with their sources**, grouped by theme: on a
+  cards page, a card per plant with a short note for each point; on a
+  document page, sections of paragraphs that explain, each with the talk
+  it came from. New points carry the unread dot until you leave the topic.
 - **Almanac asks when it's unsure**: the question waits on the card it's
   about, with Add it and Leave it out.
 - **Reminders**: when a talk settles something that comes round, Almanac

@@ -3,7 +3,7 @@
 Almanac keeps what you learn by topic. You start a topic with a name and
 what it sticks to, or tell the workspace's own topic, Almanac, what you
 want to keep track of and start the topic it proposes; you ask a topic
-things in a talk beside its page; the page keeps short points with their
+things in a talk beside its page; the page keeps points with their
 sources, grouped by theme, and Calendar gathers the reminders the talks
 settled. The README says what works and what's decided. It is built the
 way Glyph and Raven are: a Rust server on Postgres with the studio's sync

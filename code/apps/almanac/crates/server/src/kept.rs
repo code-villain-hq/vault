@@ -50,7 +50,7 @@ pub struct Answering {
     pub first: bool,
 }
 
-/// How much one answer may keep. A page is short points; more than this
+/// How much one answer may keep. A page keeps points; more than this
 /// from one exchange is a list copied in.
 const MOST_POINTS: usize = 8;
 const MOST_QUESTIONS: usize = 2;

@@ -56,6 +56,10 @@
   --text-title--line-height: var(--type-title-leading);
   --text-query: var(--type-query-size);
   --text-query--line-height: var(--type-query-leading);
+  /* Reading: a document's paragraphs, at the reading size and measure. */
+  --text-body: var(--type-body-size);
+  --text-body--line-height: var(--type-body-leading);
+  --container-measure: var(--type-body-measure);
   --font-weight-medium: var(--type-control-weight);
   --font-weight-semibold: var(--type-title-weight);
 }

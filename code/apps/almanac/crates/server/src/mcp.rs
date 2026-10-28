@@ -679,14 +679,18 @@ fn tools(mode: Mode) -> Vec<Value> {
             tool(
                 "keep_point",
                 "Keeps a point on the topic's page: a fact, a decision, or something they told \
-                 you about their situation that's worth knowing later. One short sentence, under \
-                 25 words; nothing the page has already. Usually none to four per answer. On a \
-                 page of cards each theme is one thing the topic is about, named plainly (a \
-                 plant, a pet, a place); in a document each theme is a section (such as \
-                 Problem, Market, Team). Use an existing theme when one fits.",
+                 you about their situation that's worth knowing later; nothing the page has \
+                 already. Usually none to four per answer. On a page of cards each theme is one \
+                 thing the topic is about, named plainly (a plant, a pet, a place), and a point \
+                 is one short sentence, under 25 words. In a document each theme is a section \
+                 (such as Problem, Market, Team), and it's read later as writing, so a point \
+                 keeps what your answer explained the way you explained it: two to four \
+                 sentences on what it is and why it matters, starting with the term it's about \
+                 in **bold** when there is one. What they told you stays one sentence. Use an \
+                 existing theme when one fits.",
                 json!({
                     "theme": string("The theme it goes under."),
-                    "text": string("The point, one short sentence."),
+                    "text": string("The point: on cards one short sentence; in a document two to four sentences that explain."),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                     "url": string("The page it comes from, when you read one. Never a made-up link."),
                 }),

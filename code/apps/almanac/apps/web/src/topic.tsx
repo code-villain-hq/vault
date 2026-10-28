@@ -23,6 +23,7 @@ import {
 } from "./format";
 import { topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
+import { inline } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
@@ -445,8 +446,8 @@ function EmptyPage({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => vo
       <div className="flex flex-col gap-1">
         <p className="font-medium">Nothing kept yet.</p>
         <p className="text-muted">
-          What you ask {topic.name} is kept here by theme, as short points with where they come
-          from. Ask below, or tell it what you already know.
+          What you ask {topic.name} is kept here by theme, with where it comes from. Ask below, or
+          tell it what you already know.
         </p>
       </div>
       <Starters topic={topic} onAsk={onAsk} />
@@ -546,7 +547,7 @@ function Document({ topic, themes }: { topic: Topic; themes: Theme[] }) {
         <section key={theme.name} className="flex flex-col gap-2">
           <h3 className="font-semibold">{theme.name}</h3>
           {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
-          {theme.points.length > 0 && <Points points={theme.points} />}
+          {theme.points.length > 0 && <Points points={theme.points} passages />}
           {theme.questions.map((q) => (
             <Ask key={q.id} question={q} />
           ))}
@@ -556,57 +557,87 @@ function Document({ topic, themes }: { topic: Topic; themes: Theme[] }) {
   );
 }
 
-function Points({ points }: { points: Point[] }) {
+/**
+ * A theme's points: on a card, short notes with their source after them; in
+ * a document, passages to read, with their source and their talk under them.
+ */
+function Points({ points, passages = false }: { points: Point[]; passages?: boolean }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
+  const talks = useRecords("Talk");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   return (
-    <ul className="flex flex-col gap-1.5">
+    <ul className={passages ? "flex flex-col gap-4" : "flex flex-col gap-1.5"}>
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
-      {points.map((point) => (
-        <li key={point.id} className="group flex items-start gap-2">
-          {point.seen ? (
-            <span aria-hidden="true" className="mt-2 size-1.5 shrink-0" />
+      {points.map((point) => {
+        const source =
+          point.source &&
+          (point.source_url ? (
+            <a href={point.source_url} target="_blank" rel="noreferrer" className="ui-link">
+              {point.source}
+            </a>
           ) : (
-            <span
-              role="img"
-              aria-label="New"
-              className="mt-2 size-1.5 shrink-0 rounded-full bg-accent"
-            />
-          )}
-          <p className="min-w-0 flex-1">
-            {point.text}
-            {point.source && (
-              <span className="text-xs text-faint">
-                {" "}
-                {point.source_url ? (
-                  <a href={point.source_url} target="_blank" rel="noreferrer" className="ui-link">
-                    {point.source}
-                  </a>
-                ) : (
-                  point.source
-                )}
-              </span>
+            point.source
+          ));
+        const talk = passages ? talks.find((t) => t.id === point.talk_id) : undefined;
+        const dot = passages ? "mt-2.5" : "mt-2";
+        return (
+          <li key={point.id} className="group flex items-start gap-2">
+            {point.seen ? (
+              <span aria-hidden="true" className={`${dot} size-1.5 shrink-0`} />
+            ) : (
+              <span
+                role="img"
+                aria-label="New"
+                className={`${dot} size-1.5 shrink-0 rounded-full bg-accent`}
+              />
             )}
-          </p>
-          {!guest && (
-            <RowAction
-              label="Remove this point…"
-              onClick={() =>
-                setConfirmation({
-                  title: "Remove this point?",
-                  body: "It leaves the page for everyone in the workspace. This can't be undone.",
-                  action: "Remove point",
-                  onConfirm: () => sync.delete("Point", point.id),
-                })
-              }
-              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            >
-              <X size={13} strokeWidth={1.75} aria-hidden="true" />
-            </RowAction>
-          )}
-        </li>
-      ))}
+            {passages ? (
+              <div className="min-w-0 flex-1">
+                <p className="max-w-measure text-body">{inline(point.text)}</p>
+                {(source || talk) && (
+                  <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-faint">
+                    {source}
+                    {source && talk && <span aria-hidden="true">·</span>}
+                    {talk && (
+                      <Link
+                        to="."
+                        search={{ talk: talk.id }}
+                        replace
+                        className="ui-link inline-flex items-center gap-1"
+                      >
+                        <MessagesSquare size={13} strokeWidth={1.75} aria-hidden="true" />
+                        {talk.title || "The talk"}
+                      </Link>
+                    )}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="min-w-0 flex-1">
+                {inline(point.text)}
+                {source && <span className="text-xs text-faint"> {source}</span>}
+              </p>
+            )}
+            {!guest && (
+              <RowAction
+                label="Remove this point…"
+                onClick={() =>
+                  setConfirmation({
+                    title: "Remove this point?",
+                    body: "It leaves the page for everyone in the workspace. This can't be undone.",
+                    action: "Remove point",
+                    onConfirm: () => sync.delete("Point", point.id),
+                  })
+                }
+                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              >
+                <X size={13} strokeWidth={1.75} aria-hidden="true" />
+              </RowAction>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
