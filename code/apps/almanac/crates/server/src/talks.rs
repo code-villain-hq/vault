@@ -512,7 +512,9 @@ fn about_line(about: Option<&str>) -> String {
     match about {
         Some(about) => format!(
             "\nThey ask from the section {about} of the page, which is open in front of them: \
-             what they ask is about it, and what's kept from it goes under {about}.\n"
+             what they ask is about it, and what's kept from it goes under {about}. Asked \
+             there to lay the page out, such as to make a timeline of it, move and draw only \
+             what's under {about}; the rest of the page stays as it is.\n"
         ),
         None => String::new(),
     }

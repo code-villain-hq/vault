@@ -121,7 +121,8 @@ What they do:
   message, so the talk shows it after a reload.
   The talk's photos go with every question in it, after the text. A
   question asked from a section's own page names it (`about`), and the
-  prompt says which section they're looking at.
+  prompt says which section they're looking at: what's kept goes under
+  it, and a layout asked from there moves and draws only what's under it.
 - **Keeping** (`kept.rs`): points, questions, reminder offers, the topic an
   off-topic question belongs to, the talk's title, and a change to the
   topic's brief. Claude Code hands
@@ -138,7 +139,9 @@ What they do:
   `shelf` a tile per thing, `cards` a card per theme, `text` sections,
   `list` lines and `timeline` events, oldest first, each with when it
   `happened` (a year, a span or a day, which the app reads in
-  `timeline.ts`). When none fits, an answer may start up to two blocks, with
+  `timeline.ts`). The topic page's timeline is a line per section, when
+  its events begin and end (`bySection`); a section's page lists its
+  events first. When none fits, an answer may start up to two blocks, with
   a kind and a title; a reminder offer brings a week when the page has
   none. The page Claude reads names each block, point and
   reminder (`b2`, `p3`, `r2`, `page::Refs`), and a point or reminder may

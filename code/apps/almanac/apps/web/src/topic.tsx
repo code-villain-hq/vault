@@ -67,7 +67,7 @@ import { about, inline } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
-import { inOrder } from "./timeline";
+import { bySection, inOrder, type When, when } from "./timeline";
 import { TopicDialog } from "./topic-dialog";
 import { Button, Empty } from "./ui";
 import { useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
@@ -439,7 +439,10 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
   const points = page.points.filter((p) => p.theme === section);
   const questions = page.questions.filter((q) => q.theme === section);
   const reminders = page.reminders.filter((r) => r.theme === section);
-  const blocks = page.blocks.filter((b) => points.some((p) => p.block_id === b.id));
+  // Its events come first, then the rest as the page has them.
+  const blocks = page.blocks
+    .filter((b) => points.some((p) => p.block_id === b.id))
+    .sort((a, b) => Number(b.kind === "timeline") - Number(a.kind === "timeline"));
   // A question's point goes where the section's others are.
   const home = blocks.find((b) => ASKS_IN.includes(b.kind)) ?? keeping(page.blocks);
   // Passages name their talk; the talks of the rest are listed under them.
@@ -483,7 +486,7 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
           >
             {block.title && <h2 className="text-xs text-faint">{block.title}</h2>}
             {block.kind === "timeline" ? (
-              <Timeline points={held} sections={false} />
+              <Timeline points={held} />
             ) : (
               <Points points={held} passages={block.kind === "text"} />
             )}
@@ -520,15 +523,16 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
   );
 }
 
-/** A section's name, which opens it on a page of its own. */
-function SectionName({ name }: { name: string }) {
+/** A section's name, which opens it on a page of its own; `children` go before the arrow. */
+function SectionName({ name, children }: { name: string; children?: ReactNode }) {
   return (
     <Link
       to="."
       search={inSection(name)}
-      className="group/name inline-flex items-center gap-1 hover:text-fg"
+      className="group/name inline-flex min-w-0 items-center gap-1 hover:text-fg"
     >
       {name}
+      {children}
       <ChevronRight
         size={14}
         strokeWidth={1.75}
@@ -594,7 +598,7 @@ const EMPTY: Record<string, string> = {
   cards: "A card for each thing the topic is about, with what the talks find.",
   text: "Sections that explain, written up as the talks go.",
   list: "Things to follow or read, a line each, with where they're from.",
-  timeline: "What happened when, oldest first, a line each, with the section it belongs to.",
+  timeline: "When each section happened, oldest first, a line each, with its events on its page.",
 };
 
 /** One block, laid out by its kind. */
@@ -640,7 +644,7 @@ function BlockView({
     case "timeline":
       return (
         <BlockFrame {...frame} empty={points.length === 0}>
-          <Timeline points={points} />
+          <TimelineBySection points={points} />
         </BlockFrame>
       );
     default: {
@@ -1713,64 +1717,95 @@ function List({ points }: { points: Point[] }) {
 }
 
 /**
- * What happened when, oldest first, a line each: the year, a mark on the
- * rail (longer for a span), the event, and the section it belongs to,
- * which opens it. In a section, its own events, without the section.
+ * The topic page's timeline: a line for each section, oldest first, when
+ * its events begin and end and how many there are. Its name opens it, where
+ * its events are. An event kept under no section is a line of its own.
  */
-function Timeline({ points, sections = true }: { points: Point[]; sections?: boolean }) {
-  // Where the page is narrow (a phone, or the talk open beside it), the
-  // section goes under its event instead of in a column of its own.
-  const section = (point: Point, where: string) =>
-    sections &&
-    point.theme && (
-      <Link
-        to="."
-        search={inSection(point.theme)}
-        className={`text-xs text-faint hover:text-muted ${where}`}
-      >
-        {point.theme}
-      </Link>
-    );
+function TimelineBySection({ points }: { points: Point[] }) {
+  return (
+    <TimelineRail>
+      {bySection(points).map((line) => {
+        if (!line.section) return line.points.map((p) => <TimelineEvent key={p.id} point={p} />);
+        const seen = line.points.every((p) => p.seen);
+        const count = line.points.length;
+        return (
+          <TimelineLine key={line.section} year={line.year} span={line.span} seen={seen}>
+            <p className="flex min-w-0 py-[5px]">
+              {!seen && <span className="sr-only">New: </span>}
+              <SectionName name={line.section}>
+                <span className="ml-1.5 shrink-0 text-xs text-faint">
+                  {count} {count === 1 ? "event" : "events"}
+                </span>
+              </SectionName>
+            </p>
+          </TimelineLine>
+        );
+      })}
+    </TimelineRail>
+  );
+}
+
+/** What happened when, oldest first, a line each: a section's own events. */
+function Timeline({ points }: { points: Point[] }) {
+  return (
+    <TimelineRail>
+      {inOrder(points).map(([point, at]) => (
+        <TimelineEvent key={point.id} point={point} at={at} />
+      ))}
+    </TimelineRail>
+  );
+}
+
+/** A timeline's lines, with the years right-aligned in a column of their own. */
+function TimelineRail({ children }: { children: ReactNode }) {
   return (
     <div className="@container">
-      <ol
-        className={`grid max-w-[86ch] grid-cols-[minmax(3.5rem,max-content)_0.875rem_1fr] gap-x-3 ${
-          sections
-            ? "@lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr_auto]"
-            : "@lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr]"
-        }`}
-      >
-        {inOrder(points).map(([point, at]) => (
-          <li key={point.id} className="group col-span-full grid grid-cols-subgrid">
-            <span className="py-[5px] text-right whitespace-nowrap text-muted tabular-nums">
-              {at.year}
-            </span>
-            <span
-              aria-hidden="true"
-              className={`relative before:absolute before:inset-y-0 before:left-1.5 before:w-[1.5px] before:bg-line group-first:before:top-3.5 group-last:before:bottom-auto group-last:before:h-3.5 group-only:before:hidden after:absolute after:left-[3px] after:w-2 after:rounded-full ${
-                at.span ? "after:top-[9px] after:h-3.5" : "after:top-3 after:h-2"
-              } ${point.seen ? "after:bg-muted" : "after:bg-accent"}`}
-            />
-            <div className="flex min-w-0 items-start gap-2 py-[5px]">
-              <div className="min-w-0 flex-1">
-                <p>
-                  {!point.seen && <span className="sr-only">New: </span>}
-                  {at.day && <span className="text-muted">{at.day}: </span>}
-                  {inline(point.text)}
-                </p>
-                {section(point, "block @lg:hidden")}
-              </div>
-              <RemovePoint point={point} />
-            </div>
-            {sections && (
-              <span className="hidden max-w-40 truncate py-1.5 @lg:block">
-                {section(point, "")}
-              </span>
-            )}
-          </li>
-        ))}
+      <ol className="grid max-w-[86ch] grid-cols-[minmax(3.5rem,max-content)_0.875rem_1fr] gap-x-3 @lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr]">
+        {children}
       </ol>
     </div>
+  );
+}
+
+/** A line on a timeline: the year, a mark on the rail (longer for a span), then what happened. */
+function TimelineLine({
+  year,
+  span,
+  seen,
+  children,
+}: {
+  year: string;
+  span: boolean;
+  seen: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <li className="group col-span-full grid grid-cols-subgrid">
+      <span className="py-[5px] text-right whitespace-nowrap text-muted tabular-nums">{year}</span>
+      <span
+        aria-hidden="true"
+        className={`relative before:absolute before:inset-y-0 before:left-1.5 before:w-[1.5px] before:bg-line group-first:before:top-3.5 group-last:before:bottom-auto group-last:before:h-3.5 group-only:before:hidden after:absolute after:left-[3px] after:w-2 after:rounded-full ${
+          span ? "after:top-[9px] after:h-3.5" : "after:top-3 after:h-2"
+        } ${seen ? "after:bg-muted" : "after:bg-accent"}`}
+      />
+      {children}
+    </li>
+  );
+}
+
+/** One event: a day's date before it, and ✕ on hover to take it off. */
+function TimelineEvent({ point, at = when(point.happened) }: { point: Point; at?: When }) {
+  return (
+    <TimelineLine year={at.year} span={at.span} seen={point.seen}>
+      <div className="flex min-w-0 items-start gap-2 py-[5px]">
+        <p className="min-w-0 flex-1">
+          {!point.seen && <span className="sr-only">New: </span>}
+          {at.day && <span className="text-muted">{at.day}: </span>}
+          {inline(point.text)}
+        </p>
+        <RemovePoint point={point} />
+      </div>
+    </TimelineLine>
   );
 }
 

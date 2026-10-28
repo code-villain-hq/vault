@@ -120,16 +120,20 @@ topics.
   everything kept under it from every block, its events, its open
   questions and the talks it came from. Asking from there asks about
   that section. Esc goes back to where you were on the page.
-- **A timeline**: what happened when, oldest first, a line each, with its
-  section on the right. A span such as 1987–1993 gets a longer mark, and
-  a day such as 11. September 2001 shows before its event. It's a list,
-  not an axis.
+- **A timeline per section**: a section's page starts with what happened
+  when, oldest first, a line each. A span such as 1987–1993 gets a longer
+  mark, and a day such as 11. September 2001 shows before its event. It's
+  a list, not an axis. The topic page's timeline is a line per section,
+  oldest first: when its events begin and end, and how many there are.
+  Its name opens it. Asking from a section's page keeps what happened
+  there on its timeline.
 - **Laying the page out anew**: ask a talk for a better layout, or "Mach
   eine Zeitleiste daraus", and it adds, renames, reorders, removes and
   changes blocks, and moves and rewords points, at once. It never drops a
   point or changes where one came from. The answer lists what moved, with
   one Undo. A timeline made this way is new points; the sections stay as
-  they were. Only Claude Code on this Mac does this; through a key, the
+  they were. Asked from a section's page, it lays out only that section.
+  Only Claude Code on this Mac does this; through a key, the
   answer says how it would lay the page out.
 - **Almanac asks when it's unsure**: the question waits on the card it's
   about, with Add it and Leave it out. A question it asks in the talk
@@ -187,6 +191,9 @@ Open them in a browser. Each shows night and day.
 - [`storyboards/a-better-layout.html`](storyboards/a-better-layout.html):
   asking a talk to lay the page out anew, what moved and its Undo, and a
   timeline made from what's kept.
+- [`storyboards/a-timeline-per-section.html`](storyboards/a-timeline-per-section.html):
+  Geschichte's timeline as a line per section, Intifada's own, and asking
+  from Intifada.
 
 ## Open
 

@@ -43,7 +43,7 @@ export function when(happened: string): When {
   const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return { ...plain, key: key(n(iso[1]), n(iso[2]), n(iso[3])), span: false };
   if (SPAN.test(text)) {
-    const first = text.match(/\d{1,4}/);
+    const first = text.match(/\d{3,4}/) ?? text.match(/\d{1,4}/);
     return { ...plain, key: first ? key(n(first[0]), monthOf(text)) : null, span: true };
   }
   const century = text.match(CENTURY);
@@ -89,4 +89,78 @@ export function inOrder(points: Point[]): [Point, When][] {
     .sort(
       ([, a], [, b]) => (a.key ?? Number.MAX_SAFE_INTEGER) - (b.key ?? Number.MAX_SAFE_INTEGER),
     );
+}
+
+/**
+ * The first and last year an event covers, below 0 before the year 1: the
+ * same year twice unless it's a span. Null when it names no year.
+ */
+export function years(happened: string): [number, number] | null {
+  const at = when(happened);
+  if (at.key === null) return null;
+  // A key's month and day stay under 1232, so its year is the nearest 10000th.
+  const sign = at.key < 0 ? -1 : 1;
+  const from = sign * Math.round(Math.abs(at.key) / 10000);
+  if (!at.span) return [from, from];
+  const last = happened.match(/\d{1,4}/g)?.at(-1) ?? "";
+  const first = String(Math.abs(from));
+  // "1945–46" ends in 1946; a shorter last number that isn't a year's end is a day's.
+  const end =
+    last.length >= first.length
+      ? Number(last)
+      : last.length === 2
+        ? Number(first.slice(0, -2) + last)
+        : Math.abs(from);
+  return [from, Math.max(from, sign * end)];
+}
+
+/** A line of the topic page's timeline: a section's events, or one kept under no section. */
+export interface Line {
+  /** The section, which opens on its own page with its events. */
+  section: string | null;
+  /** Oldest first. */
+  points: Point[];
+  /** When its events begin and end: "1816–1953", or one event's year. */
+  year: string;
+  span: boolean;
+}
+
+/**
+ * The topic page's timeline: a line for each section, oldest first by its
+ * first event, when its events begin and end; an event kept under no
+ * section is a line of its own.
+ */
+export function bySection(points: Point[]): Line[] {
+  const lines: Line[] = [];
+  const sections = new Map<string, Line>();
+  for (const [point, at] of inOrder(points)) {
+    const line = point.theme ? sections.get(point.theme) : undefined;
+    if (line) {
+      line.points.push(point);
+      continue;
+    }
+    const made = { section: point.theme || null, points: [point], year: at.year, span: at.span };
+    if (made.section) sections.set(made.section, made);
+    lines.push(made);
+  }
+  for (const line of sections.values()) {
+    if (line.points.length === 1) continue;
+    const covered = line.points.flatMap((p) => years(p.happened) ?? []);
+    if (covered.length === 0) continue;
+    const from = Math.min(...covered);
+    const to = Math.max(...covered);
+    const era = line.points.map((p) => p.happened.match(BEFORE)?.[0].trim()).find(Boolean);
+    line.year = between(from, to, era ?? "v. Chr.");
+    line.span = from !== to;
+  }
+  return lines;
+}
+
+/** "1816–1953", "500–400 v. Chr.", "44 v. Chr.–14", or one year. */
+function between(from: number, to: number, era: string): string {
+  const year = (y: number) => String(Math.abs(y));
+  if (from === to) return from < 0 ? `${year(from)} ${era}` : year(from);
+  if (to < 0) return `${year(from)}–${year(to)} ${era}`;
+  if (from < 0) return `${year(from)} ${era}–${year(to)}`;
+  return `${from}–${to}`;
 }
