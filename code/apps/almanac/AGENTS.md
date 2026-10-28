@@ -3,9 +3,9 @@
 Almanac keeps what you learn by topic. You start a topic with a name and
 what it sticks to, or tell the workspace's own topic, Almanac, what you
 want to keep track of and start the topic it proposes; you ask a topic
-things in a talk beside its page; the page keeps points with their
-sources, grouped by theme, and Calendar gathers the reminders the talks
-settled. The README says what works and what's decided. It is built the
+things in a talk beside its page; the page is the topic's blocks, which
+keep points with their sources, and Calendar gathers the reminders the
+talks settled. The README says what works and what's decided. It is built the
 way Glyph and Raven are: a Rust server on Postgres with the studio's sync
 engine (`code/kit/sync`), a React app (`apps/web`) that keeps a local copy
 of the workspace, and a Tauri desktop shell (`apps/desktop`). When something here works like Forge, Glyph or
@@ -60,8 +60,8 @@ JSON in the schema each request sends. For Claude Code on this Mac,
 ## What syncs
 
 A workspace is a person's or a team's topics, with members and roles as in
-Forge. Everything a page shows syncs: `Topic`, `Talk`, `Message`, `Point`,
-`Question` and `Reminder`, and the members (`User`). Who writes what
+Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
+`Point`, `Question` and `Reminder`, and the members (`User`). Who writes what
 (`crates/sync/src/rules.rs`):
 
 - The server makes topics (`POST /api/w/{id}/topics`), talks and messages
@@ -75,7 +75,9 @@ Forge. Everything a page shows syncs: `Topic`, `Talk`, `Message`, `Point`,
   /api/w/{id}/topics` with `from_message` starts it with the proposal's
   points and reminders, once. Its `changes` say what it changed in topics
   you named; `POST /api/w/{id}/messages/{message}/undo` puts them back.
-- Clients write points and reminders, and answer questions (`status`).
+- Clients write blocks, points and reminders, and answer questions
+  (`status`). A topic's page is its blocks by `position`; a block takes
+  its points with it.
 - Only the server sets a reminder's `notified_for`.
 - Guests see no topics: every model but `User` is hidden from them.
 - A question's photos come with the ask (`photos`, base64, up to six of
@@ -111,8 +113,9 @@ Two ways to the same answers, and the same prompts:
 What they do:
 
 - **A talk** (`talks.rs`): each question sends the fixed prompt, the page
-  as `page.rs` writes it (what the topic sticks to, its points by theme,
-  its open questions, its reminders, the other topics' names) and only the
+  as `page.rs` writes it (what the topic sticks to, its blocks in order
+  with their points by theme, its open questions, its reminders, the other
+  topics' names) and only the
   current talk. The answer streams back as server-sent events: `talk`,
   then `text` pieces, then `done` or `problem`. A problem is also kept as a
   message, so the talk shows it after a reload.
@@ -123,13 +126,17 @@ What they do:
   offer_reminder, fits_elsewhere, name_talk); through the API one more
   request, with structured output, reads them from the exchange. Either
   way the server writes them with the answer, through the sync engine, so
-  every client sees it. A point has a kind (`POINT_KINDS`): cards and
-  documents keep notes; a routine's page lays out facts about you
-  (`about`), things on your shelf (`thing`, under the thing's name), steps
-  (`step`, under the routine's name, which its reminders' titles start
-  with) and advice (`tip`), as `page.rs` tells Claude (`ROUTINE`).
-  The page Claude reads names each point and
-  reminder (`p3`, `r2`, `page::Refs`), and a point or reminder may
+  every client sees it. A point goes in a block, named by its reference
+  or its title; with none named it stays in the block of the point it
+  replaces. A block's kind (`BLOCK_KINDS`) says how it lays out its
+  points, as `page.rs` tells Claude (`BLOCKS_SAY`): `today` the day's
+  steps (under the routine's name, which its reminders' titles start
+  with), `week` the reminders' days (it keeps no points), `chips` facts,
+  `shelf` a tile per thing, `cards` a card per theme, `text` sections and
+  `list` lines. When none fits, an answer may start up to two blocks, with
+  a kind and a title; a reminder offer brings a week when the page has
+  none. The page Claude reads names each block, point and
+  reminder (`b2`, `p3`, `r2`, `page::Refs`), and a point or reminder may
   `replace` some: a point takes the first one's place (unread again) and
   the rest go; a reminder offer puts the ones on the calendar in its
   `replaces`, which the app takes off when it's accepted, and offers not
@@ -138,11 +145,14 @@ What they do:
   and what it sticks to, and has other tools: propose_topic and
   change_topic, not keep_point. A proposal waits for Start; a change is
   made at once and kept on the message for Undo.
-- **Starting a topic** (`topics.rs`): in the background, Almanac writes what
-  it sticks to when that was empty, picks an icon (`ICONS` in
-  `crates/domain`), a group, the shape (`cards`, `document` or `routine`) and the
-  first questions (set_up_topic, or structured output). When Claude can't
-  answer, the topic keeps its defaults.
+- **Starting a topic** (`topics.rs`): a template (`TEMPLATES` in
+  `crates/domain`: `routine`, `collection`, `study`) names the blocks it
+  starts with; the blocks are the topic's from then on. A picked template
+  lays the page out at once. In the background, Almanac writes what it
+  sticks to when that was empty, picks an icon (`ICONS`), a group, the
+  template when none was picked, a collection's card title, and the first
+  questions (set_up_topic, or structured output). When Claude can't
+  answer, the topic keeps its defaults and starts as a collection.
 
 Change the prompts in the same commit as what reads their answers. A
 prompt says what to do and why, in plain sentences; the schema says the

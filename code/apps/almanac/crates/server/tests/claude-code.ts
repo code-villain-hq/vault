@@ -52,11 +52,11 @@ async function answer(prompt: string) {
   });
   if (allowed.includes("mcp__almanac__set_up_topic")) {
     await tool("set_up_topic", {
-      title: "Plants at home and how to keep them",
       sticks_to: "The houseplants at home: watering, feeding, repotting.",
       icon: "sprout",
       group: "Home",
-      shape: "cards",
+      template: "collection",
+      cards: "Plants",
       starters: ["How often do I water the Monstera?"],
     });
     say("Set up.");
@@ -75,9 +75,10 @@ async function answer(prompt: string) {
         sticks_to: "The houseplants at home: watering, feeding, repotting.",
         icon: "sprout",
         group: "Home",
-        shape: "cards",
+        template: "collection",
+        cards: "Plants",
         starters: ["How often do I water the Monstera?", "When do I repot?"],
-        points: [{ theme: "Monstera", text: "Stands by the north window." }],
+        points: [{ block: "Plants", theme: "Monstera", text: "Stands by the north window." }],
         reminders: [
           { theme: "Monstera", title: "Water the Monstera", due_on: "2026-11-01", every_days: 7 },
         ],
@@ -88,8 +89,8 @@ async function answer(prompt: string) {
   } else if (/sort/i.test(prompt)) {
     say("Sorted.");
     await tool("keep_point", {
+      block: "Today",
       theme: "Elvital wash",
-      kind: "step",
       text: "Elvital shampoo: on the scalp, lukewarm water.",
       source: "From the talk",
       replaces: ["p1"],
@@ -111,7 +112,12 @@ async function answer(prompt: string) {
     });
   } else if (/wash/i.test(prompt)) {
     say("Thursday, then.");
-    await tool("keep_point", { theme: "Wäsche", text: "Washes on Thursday.", source: "You said" });
+    await tool("keep_point", {
+      block: "b3",
+      theme: "Wäsche",
+      text: "Washes on Thursday.",
+      source: "You said",
+    });
     await tool("offer_reminder", {
       theme: "Wäsche",
       title: "Elvital wash",
@@ -121,6 +127,7 @@ async function answer(prompt: string) {
   } else {
     say("Water it every 7 days.");
     await tool("keep_point", {
+      block: "Plants",
       theme: "Monstera",
       text: "Water every 7 days.",
       source: "Royal Horticultural Society",

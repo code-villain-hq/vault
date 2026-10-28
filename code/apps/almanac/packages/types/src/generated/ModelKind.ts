@@ -8,4 +8,4 @@
  * create and patch types; the compiler points at every `match` to extend.
  * See "Adding a synced model" in AGENTS.md.
  */
-export type ModelKind = "Topic" | "Talk" | "Message" | "Point" | "Reminder" | "Question" | "User";
+export type ModelKind = "Topic" | "Block" | "Talk" | "Message" | "Point" | "Reminder" | "Question" | "User";

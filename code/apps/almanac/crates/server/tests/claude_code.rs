@@ -156,6 +156,11 @@ async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points[0]["text"], "Stands by the north window.");
     assert_eq!(points[0]["source"], "You said");
+    let blocks = app.synced(&ada, &home, "Block").await;
+    let cards = blocks.iter().find(|b| b["kind"] == "cards").unwrap();
+    assert_eq!(cards["title"], "Plants");
+    assert_eq!(points[0]["block_id"], cards["id"]);
+    assert_eq!(points[0]["theme"], "Monstera");
     let reminders = app.synced(&ada, &home, "Reminder").await;
     assert_eq!(reminders[0]["status"], "offered");
     assert_eq!(reminders[0]["topic_id"], plants["id"]);
@@ -336,9 +341,13 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
         )
         .await;
     let topic = started.body["id"].as_str().unwrap().to_string();
-    // The set-up has its own prompt; let it be first.
+    // The set-up has its own prompt, and lays out the page: let it be first.
     for _ in 0..100 {
-        if prompts(&log).len() == 1 {
+        let laid_out: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM blocks)")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        if prompts(&log).len() == 1 && laid_out {
             break;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -422,7 +431,7 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (app, _) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let started = app
         .post(
@@ -432,8 +441,13 @@ async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
         )
         .await;
     let topic = started.body["id"].as_str().unwrap().to_string();
+    // The set-up lays out the page the points go in.
     for _ in 0..100 {
-        if !sessions(&log).is_empty() {
+        let laid_out: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM blocks)")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        if laid_out {
             break;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -457,19 +471,12 @@ async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
     assert_eq!(reminders[0]["due_on"], "2026-10-30");
     assert_eq!(reminders[0]["replaces"], json!([]));
 
-    // On a routine's page, sorting keeps the point again with its kind, in
-    // its place.
-    let routine = app
-        .sync(
-            &ada,
-            &home,
-            json!([{ "action": "update", "model": "Topic", "id": topic, "data": { "shape": "routine" } }]),
-        )
-        .await;
-    assert_eq!(routine.status, 200, "{:?}", routine.body);
+    // Sorting keeps the point again in another block, in its place.
     ask(&app, &ada, &home, &topic, "Sort the notes").await;
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points.len(), 1, "{points:?}");
-    assert_eq!(points[0]["kind"], "step");
+    let blocks = app.synced(&ada, &home, "Block").await;
+    let today = blocks.iter().find(|b| b["kind"] == "today").unwrap();
+    assert_eq!(points[0]["block_id"], today["id"]);
     assert_eq!(points[0]["theme"], "Elvital wash");
 }

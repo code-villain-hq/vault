@@ -6,7 +6,11 @@
  * (`from_message`), it starts with what the proposal says, and any of the
  * fields here over it.
  */
-export type StartTopicRequest = { name: string, sticks_to?: string, icon?: string, group_name?: string, shape?: string, title?: string, 
+export type StartTopicRequest = { name: string, sticks_to?: string, icon?: string, group_name?: string, 
+/**
+ * One of [`TEMPLATE_NAMES`]; Almanac picks one when it's left out.
+ */
+template?: string, 
 /**
  * The answer whose proposal this starts.
  */

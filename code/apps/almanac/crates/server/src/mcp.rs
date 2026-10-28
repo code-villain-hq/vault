@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use almanac_domain::{
-    Actor, ICONS, POINT_KINDS, Proposal, ProposedPoint, SHAPES, TopicChange, TopicPatch,
+    Actor, BLOCK_KINDS, ICONS, Proposal, ProposedPoint, TEMPLATE_NAMES, TopicChange, TopicPatch,
 };
 use axum::Json;
 use axum::extract::State;
@@ -28,9 +28,9 @@ use crate::topics::{SetUp, cut};
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
-const TOPIC_NAMED: &str = "SELECT id, name, sticks_to, icon, group_name, shape, title, kind \
+const TOPIC_NAMED: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND lower(name) = lower($2)";
-const TOPIC_BY_ID: &str = "SELECT id, name, sticks_to, icon, group_name, shape, title, kind \
+const TOPIC_BY_ID: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND id = $2";
 const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY position";
 
@@ -221,8 +221,9 @@ async fn call(
         "keep_point" => {
             let point: PointArgs = read(arguments)?;
             kept()?.keep_point(
-                &point.theme,
+                &point.block,
                 &point.kind,
+                &point.theme,
                 &point.text,
                 &point.source,
                 &point.url,
@@ -280,8 +281,10 @@ async fn call(
         }
         "set_up_topic" => {
             let set_up: SetUp = read(arguments)?;
-            if !ICONS.contains(&set_up.icon.as_str()) || !SHAPES.contains(&set_up.shape.as_str()) {
-                return Err("Pick the icon and the shape from their lists.".into());
+            if !ICONS.contains(&set_up.icon.as_str())
+                || !TEMPLATE_NAMES.contains(&set_up.template.as_str())
+            {
+                return Err("Pick the icon and the template from their lists.".into());
             }
             if let Ok(mut slot) = asking.set_up.lock() {
                 *slot = Some(set_up);
@@ -294,9 +297,12 @@ async fn call(
 
 #[derive(Deserialize)]
 struct PointArgs {
-    theme: String,
+    #[serde(default)]
+    block: String,
     #[serde(default)]
     kind: String,
+    #[serde(default)]
+    theme: String,
     text: String,
     #[serde(default)]
     source: String,
@@ -344,9 +350,9 @@ struct ProposeArgs {
     sticks_to: String,
     icon: String,
     group: String,
-    shape: String,
+    template: String,
     #[serde(default)]
-    title: String,
+    cards: String,
     #[serde(default)]
     starters: Vec<String>,
     #[serde(default)]
@@ -357,9 +363,10 @@ struct ProposeArgs {
 
 #[derive(Deserialize)]
 struct ProposedPointArgs {
-    theme: String,
     #[serde(default)]
-    kind: String,
+    block: String,
+    #[serde(default)]
+    theme: String,
     text: String,
 }
 
@@ -370,21 +377,10 @@ struct ChangeArgs {
     sticks_to: Option<String>,
     icon: Option<String>,
     group: Option<String>,
-    shape: Option<String>,
-    title: Option<String>,
     said: String,
 }
 
-type TopicRow = (
-    Uuid,
-    String,
-    String,
-    String,
-    String,
-    String,
-    Option<String>,
-    String,
-);
+type TopicRow = (Uuid, String, String, String, String, String);
 
 async fn names(state: &AppState, asking: &Asking) -> String {
     let names: Vec<String> = sqlx::query_scalar(NAMES)
@@ -415,21 +411,18 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
     if !ICONS.contains(&args.icon.as_str()) {
         return Err("Pick the icon from its list.".into());
     }
-    if !SHAPES.contains(&args.shape.as_str()) {
-        return Err("The shape is cards, document or routine.".into());
+    if !TEMPLATE_NAMES.contains(&args.template.as_str()) {
+        return Err(format!("The template is one of {TEMPLATE_NAMES:?}."));
     }
     let points: Vec<ProposedPoint> = args
         .points
         .iter()
         .map(|p| ProposedPoint {
+            block: Some(cut(&p.block, 60)).filter(|b| !b.is_empty()),
             theme: cut(&p.theme, 120),
-            kind: POINT_KINDS
-                .contains(&p.kind.as_str())
-                .then(|| p.kind.clone())
-                .filter(|k| k != "note"),
             text: cut(&p.text, 2000),
         })
-        .filter(|p| !p.theme.is_empty() && !p.text.is_empty())
+        .filter(|p| !p.text.is_empty())
         .take(8)
         .collect();
     let reminders = args
@@ -438,14 +431,14 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
         .take(3)
         .map(|r| reminder(&r.theme, &r.title, &r.due_on, &r.at, r.every_days))
         .collect::<Result<Vec<_>, _>>()?;
-    let title = cut(&args.title, 200);
+    let cards = cut(&args.cards, 60);
     Ok(Proposal {
         name,
         sticks_to: cut(&args.sticks_to, 1000),
         icon: args.icon,
         group_name: cut(&args.group, 40),
-        shape: args.shape,
-        title: (!title.is_empty()).then_some(title),
+        template: args.template,
+        cards: (!cards.is_empty()).then_some(cards),
         starters: args
             .starters
             .iter()
@@ -490,14 +483,12 @@ async fn change(
     .fetch_optional(&state.pool)
     .await
     .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
-    let Some((id, mut name, mut sticks_to, mut icon, mut group_name, mut shape, title, kind)) = row
-    else {
+    let Some((id, mut name, mut sticks_to, mut icon, mut group_name, kind)) = row else {
         return Err(format!(
             "No topic is called {named}. The topics: {}.",
             names(state, asking).await
         ));
     };
-    let mut title = title.unwrap_or_default();
     // What this answer changed in it already counts as how it is now.
     if let Some(change) = earlier(&|c| c.topic_id == id) {
         let now = change.after;
@@ -506,8 +497,6 @@ async fn change(
             (&mut sticks_to, now.sticks_to),
             (&mut icon, now.icon),
             (&mut group_name, now.group_name),
-            (&mut shape, now.shape),
-            (&mut title, now.title),
         ] {
             if let Some(value) = value {
                 *field = value;
@@ -515,12 +504,7 @@ async fn change(
         }
     }
     let own = kind == "almanac";
-    if own
-        && (args.icon.is_some()
-            || args.group.is_some()
-            || args.shape.is_some()
-            || args.title.is_some())
-    {
+    if own && (args.icon.is_some() || args.group.is_some()) {
         return Err("This topic can only get another name or say what it sticks to.".into());
     }
     let mut before = TopicPatch::default();
@@ -559,8 +543,6 @@ async fn change(
         &mut before.group_name,
         &mut after.group_name,
     );
-    set(args.shape, 20, shape, &mut before.shape, &mut after.shape);
-    set(args.title, 200, title, &mut before.title, &mut after.title);
     if after == TopicPatch::default() {
         return Err(format!("{name} is like that already."));
     }
@@ -569,9 +551,6 @@ async fn change(
     }
     if after.icon.as_deref().is_some_and(|i| !ICONS.contains(&i)) {
         return Err("Pick the icon from its list.".into());
-    }
-    if after.shape.as_deref().is_some_and(|s| !SHAPES.contains(&s)) {
-        return Err("The shape is cards, document or routine.".into());
     }
     if let Some(new_name) = &after.name
         && !new_name.eq_ignore_ascii_case(&name)
@@ -653,22 +632,18 @@ fn merge(earlier: &mut TopicChange, later: TopicChange) {
         before.group_name,
         after.group_name,
     );
-    over(
-        &mut e.before.shape,
-        &mut e.after.shape,
-        before.shape,
-        after.shape,
-    );
-    over(
-        &mut e.before.title,
-        &mut e.after.title,
-        before.title,
-        after.title,
-    );
     if let Some(name) = &e.after.name {
         e.name = name.clone();
     }
 }
+
+/// The templates a topic starts as, for the tools that pick one.
+const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
+keep, with steps on certain days and the things they use (a hair or skin routine, a training \
+plan): Today, the week, You, Your shelf and Advice. collection when it's about a set of things \
+that each get a card (plants, pets, trips, recipes): Today, the week and the cards. study when \
+it's something to learn or write up (a field, a pitch, research): Reading, Terms and What it \
+says. When they picked one, theirs.";
 
 /// The tools a question gets, with what each is for.
 fn tools(mode: Mode) -> Vec<Value> {
@@ -720,28 +695,24 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "keep_point",
                 "Keeps a point on the topic's page: a fact, a decision, or something they told \
                  you about their situation that's worth knowing later; nothing the page has \
-                 already. The page is kept up to date, not added to: when what you'd keep \
-                 changes or corrects points the page has (a wash day moved, a product swapped), \
-                 keep it in place of them with replaces, naming them as the page does (p3), \
-                 and keep one point where two would say the same. Usually none to three per \
-                 answer. On a page of cards each theme is one thing the topic is about, named \
-                 plainly (a plant, a pet, a place), and a point is one short sentence, under 20 \
-                 words. In a document each theme is a section \
-                 (such as Problem, Market, Team), and it's read later as writing, so a point \
-                 keeps what your answer explained the way you explained it: two to four \
-                 sentences on what it is and why it matters, starting with the term it's about \
-                 in **bold** when there is one. What they told you stays one sentence. On a \
-                 routine's page each point has a kind, and its theme follows from it, as the \
-                 page's shape says. Use an existing theme when one fits.",
+                 already. It goes in one of the page's blocks, with the theme and the length \
+                 that block's kind asks for, as the page says. The page is kept up to date, not \
+                 added to: when what you'd keep changes or corrects points the page has (a wash \
+                 day moved, a product swapped), keep it in place of them with replaces, naming \
+                 them as the page does (p3), and keep one point where two would say the same. \
+                 Usually none to three per answer. Only when they ask for a block the page \
+                 lacks (a reading list, the terms), or none fits, start one: block is its short \
+                 title, kind its kind. Use an existing theme when one fits.",
                 json!({
-                    "theme": string("The theme it goes under."),
-                    "kind": { "type": "string", "enum": POINT_KINDS, "description": "On a routine's page what the point is, as the page's shape says; note, or left out, on cards and in a document." },
-                    "text": string("The point: on cards and in a routine one short sentence; in a document two to four sentences that explain."),
+                    "block": string("The block it goes in: as the page names it (b2), or its title. For a new block, its title."),
+                    "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Only for a block the page lacks: the kind it starts as. Left out otherwise." },
+                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf or cards, the section in text. Left out in chips and lists."),
+                    "text": string("The point: in text two to four sentences that explain; elsewhere one short sentence or a few words."),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                     "url": string("The page it comes from, when you read one. Never a made-up link."),
                     "replaces": replaces("points", "p3"),
                 }),
-                &["theme", "text", "source"],
+                &["block", "text", "source"],
             ),
             tool(
                 "ask_to_check",
@@ -788,8 +759,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                     "sticks_to": string("What talks in it stay with, in one or two sentences. The page shows it under the name, so only what it's about (\"Houseplants and their care: watering, light, repotting.\"), not rules about what doesn't belong."),
                     "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
                     "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
-                    "shape": { "type": "string", "enum": SHAPES, "description": "cards when it's about a set of things that each get a card (plants, pets, trips, recipes); document when what it keeps grows into one piece of writing with sections (a pitch, research, a plan); routine when it's a routine they keep, with steps on certain days and the things they use (a hair or skin routine, a training plan)." },
-                    "title": string("For a document, a title for the writing; otherwise left out."),
+                    "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
+                    "cards": string("For a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); otherwise left out."),
                     "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions they might ask, each under 12 words." },
                     "points": {
                         "type": "array",
@@ -797,11 +768,11 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "theme": string("The theme it goes under."),
-                                "kind": { "type": "string", "enum": POINT_KINDS, "description": "For a routine: about (a fact about them, under You), thing (under the thing's name: first what it is, then how they use it), step (under the routine day's name, as what: how) or tip (under Advice). Otherwise note." },
+                                "block": string("The template's block it goes in, by title: in a routine You (a fact about them), Your shelf (a thing they use), Today (a step of what comes round) or Advice; in a collection the cards; in a study Reading, Terms or What it says."),
+                                "theme": string("What it's under in the block: the thing on the shelf or card, what comes round today, the section. Left out for You, Advice, Reading and Terms."),
                                 "text": string("The point, one short sentence."),
                             },
-                            "required": ["theme", "text"],
+                            "required": ["block", "text"],
                             "additionalProperties": false,
                         },
                     },
@@ -816,12 +787,12 @@ fn tools(mode: Mode) -> Vec<Value> {
                         },
                     },
                 }),
-                &["name", "sticks_to", "icon", "group", "shape", "starters"],
+                &["name", "sticks_to", "icon", "group", "template", "starters"],
             ),
             tool(
                 "change_topic",
-                "Changes a topic they named: its name, what it sticks to, its icon, its group, \
-                 its shape or its title. Only the fields to change. They see what you said and \
+                "Changes a topic they named: its name, what it sticks to, its icon or its \
+                 group. Only the fields to change. They see what you said and \
                  can undo it. This topic itself can only be renamed or say what it sticks to.",
                 json!({
                     "topic": string("The topic's name now."),
@@ -829,8 +800,6 @@ fn tools(mode: Mode) -> Vec<Value> {
                     "sticks_to": string("What it sticks to now."),
                     "icon": { "type": "string", "enum": ICONS },
                     "group": string("Its group in the sidebar."),
-                    "shape": { "type": "string", "enum": SHAPES },
-                    "title": string("A document's title."),
                     "said": string("What you changed, in a short sentence for under the answer: \"Moved it to Hobby.\""),
                 }),
                 &["topic", "said"],
@@ -842,14 +811,21 @@ fn tools(mode: Mode) -> Vec<Value> {
             "set_up_topic",
             "Sets up the new topic. Call it once, with every field.",
             json!({
-                "title": string("One line saying what the topic is about, under 12 words."),
                 "sticks_to": string("What talks in it stay with, in one or two sentences: only what it's about, not rules about what doesn't belong. When they wrote it, theirs as it is."),
                 "icon": { "type": "string", "enum": ICONS },
                 "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
-                "shape": { "type": "string", "enum": SHAPES, "description": "cards for a set of things that each get a card; document for one piece of writing with sections; routine for a routine they keep, with steps on certain days and the things they use." },
+                "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
+                "cards": string("For a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); otherwise \"\"."),
                 "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions, each under 12 words." },
             }),
-            &["title", "sticks_to", "icon", "group", "shape", "starters"],
+            &[
+                "sticks_to",
+                "icon",
+                "group",
+                "template",
+                "cards",
+                "starters",
+            ],
         )],
     }
 }

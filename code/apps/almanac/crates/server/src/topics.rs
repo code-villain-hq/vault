@@ -1,13 +1,14 @@
-//! Starting a topic: a name, and what it sticks to, which may be empty.
-//! Almanac makes the topic at once; then Claude writes what it sticks to
-//! (when you left it empty), a line about it, and picks its icon, its group,
-//! its shape and the first questions its empty page offers. They reach the
-//! page through sync. A topic the workspace's own topic proposed starts
-//! with all of that, and keeps what you told it as its first points.
+//! Starting a topic: a name, what it sticks to, which may be empty, and the
+//! template its blocks start from, which Almanac may pick. Almanac makes
+//! the topic at once; then Claude writes what it sticks to (when you left
+//! it empty), and picks its icon, its group, its template and the first
+//! questions its empty page offers. They reach the page through sync. A
+//! topic the workspace's own topic proposed starts with all of that, and
+//! keeps what you told it as its first points.
 
 use almanac_domain::{
-    Actor, ICONS, ModelKind, Operation, Proposal, SHAPES, StartTopicRequest, StartedTopic,
-    TopicChange, Transaction,
+    Actor, ICONS, ModelKind, Operation, Proposal, StartTopicRequest, StartedTopic, TEMPLATE_NAMES,
+    TopicChange, Transaction, template,
 };
 use almanac_sync::Origin;
 use axum::Json;
@@ -34,20 +35,23 @@ const CHANGES: &str = "SELECT changes FROM messages WHERE id = $1 AND workspace_
 const STILL_THERE: &str = "SELECT id FROM topics WHERE workspace_id = $1 AND id = ANY($2)";
 
 const SET_UP: &str = "You set up a new topic in Almanac, a notebook that keeps what someone \
-learns, one topic at a time. Each topic has a page that keeps points by theme, and talks beside \
+learns, one topic at a time. Each topic has a page of blocks that keep points, and talks beside \
 it. From the topic's name and what it sticks to (which may be empty), write:
 
-- title: one line saying what the topic is about, under 12 words.
 - sticks_to: what talks in this topic stay with, in one or two sentences. The page shows it \
 under the name, so say only what it's about (\"Houseplants and their care: watering, light, \
 repotting.\"), not rules about what doesn't belong. When they wrote it, return theirs as it is.
 - icon: the one icon from the list that fits best.
 - group: a short group for the sidebar, such as Home, Work, Health or Learning. Reuse one of \
 the existing groups when it fits.
-- shape: \"cards\" when the topic is about a set of things that each get a card (plants, pets, \
-trips, recipes); \"document\" when what it keeps grows into one piece of writing with sections \
-(a pitch, research, a plan); \"routine\" when it's a routine they keep, with steps on certain \
-days and the things they use (a hair or skin routine, a training plan).
+- template: the blocks its page starts with. \"routine\" when it's a routine they keep, with \
+steps on certain days and the things they use (a hair or skin routine, a training plan): \
+Today, the week, You, Your shelf and Advice. \"collection\" when it's about a set of things \
+that each get a card (plants, pets, trips, recipes): Today, the week and the cards. \"study\" \
+when it's something to learn or write up (a field, a pitch, research): Reading, Terms and What \
+it says. When they picked one, return theirs.
+- cards: for a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); \
+otherwise \"\".
 - starters: three or four first questions they might ask to begin, each under 12 words.
 
 Write in the language of the topic's name.";
@@ -59,11 +63,11 @@ no answer, no questions.";
 /// A new topic as Claude sets it up.
 #[derive(Debug, Deserialize)]
 pub struct SetUp {
-    pub title: String,
     pub sticks_to: String,
     pub icon: String,
     pub group: String,
-    pub shape: String,
+    pub template: String,
+    pub cards: String,
     pub starters: Vec<String>,
 }
 
@@ -71,13 +75,13 @@ fn set_up_schema() -> Value {
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "sticks_to", "icon", "group", "shape", "starters"],
+        "required": ["sticks_to", "icon", "group", "template", "cards", "starters"],
         "properties": {
-            "title": { "type": "string" },
             "sticks_to": { "type": "string" },
             "icon": { "type": "string", "enum": ICONS },
             "group": { "type": "string" },
-            "shape": { "type": "string", "enum": SHAPES },
+            "template": { "type": "string", "enum": TEMPLATE_NAMES },
+            "cards": { "type": "string" },
             "starters": { "type": "array", "items": { "type": "string" } },
         },
     })
@@ -92,6 +96,16 @@ pub async fn start(
     member.require_not_guest()?;
     let actor = member.actor;
     let id = Uuid::now_v7();
+    let picked = request
+        .template
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty());
+    if picked.is_some_and(|t| template(t).is_none()) {
+        return Err(AppError::invalid(format!(
+            "A topic starts as one of {TEMPLATE_NAMES:?}."
+        )));
+    }
     let proposed = match request.from_message {
         Some(message_id) => {
             let proposal: Option<Value> = sqlx::query_scalar(PROPOSAL)
@@ -134,14 +148,6 @@ pub async fn start(
             "group_name",
             mine(&request.group_name, proposal.map(|p| p.group_name.as_str())),
         ),
-        (
-            "shape",
-            mine(&request.shape, proposal.map(|p| p.shape.as_str())),
-        ),
-        (
-            "title",
-            mine(&request.title, proposal.and_then(|p| p.title.as_deref())),
-        ),
     ] {
         if let Some(value) = value.filter(|v| !v.is_empty()) {
             data.insert(field.into(), json!(value));
@@ -156,14 +162,28 @@ pub async fn start(
             id,
             data,
         });
+        let template = picked
+            .or(Some(proposal.template.as_str()))
+            .filter(|t| template(t).is_some())
+            .unwrap_or("collection");
+        let (writes, blocks) = template_blocks(id, template, proposal.cards.as_deref());
+        operations.extend(writes);
         for point in &proposal.points {
+            let Some(block) = block_for(&blocks, point.block.as_deref()) else {
+                continue;
+            };
+            let theme = match block.kind {
+                "chips" | "list" => String::new(),
+                _ if point.theme.trim().is_empty() => block.title.clone(),
+                _ => cut(&point.theme, 120),
+            };
             operations.push(Operation::Create {
                 model: ModelKind::Point,
                 id: Uuid::now_v7(),
                 data: fields([
                     ("topic_id", json!(id)),
-                    ("theme", json!(point.theme)),
-                    ("kind", json!(point.kind.as_deref().unwrap_or("note"))),
+                    ("block_id", json!(block.id)),
+                    ("theme", json!(theme)),
                     ("text", json!(point.text)),
                     ("source", json!("You said")),
                 ]),
@@ -187,10 +207,21 @@ pub async fn start(
             data,
         });
     }
+    // A template you picked lays out the page at once; otherwise its
+    // blocks come with the set-up.
+    let picked = match (&proposed, picked) {
+        (None, Some(name)) => {
+            let (writes, blocks) = template_blocks(id, name, None);
+            operations.extend(writes);
+            let cards = blocks.iter().find(|b| b.kind == "cards").map(|b| b.id);
+            Some((name.to_string(), cards))
+        }
+        _ => None,
+    };
     write(&state, actor, operations).await?;
     if proposed.is_none() {
         tokio::spawn(async move {
-            if let Err(error) = set_up(&state, actor, id, &given).await {
+            if let Err(error) = set_up(&state, actor, id, &given, picked).await {
                 tracing::warn!(%error, topic = %id, "couldn't set up the topic");
             }
         });
@@ -245,24 +276,107 @@ pub async fn undo(
 }
 
 /// Has Claude write the rest of a new topic, leaving what you `given` as
-/// it is. With no Claude the topic keeps what it started with.
-async fn set_up(state: &AppState, actor: Actor, id: Uuid, given: &[&str]) -> Result<(), AppError> {
+/// it is. A template you `picked` laid out its page already, its cards
+/// block named once Claude says what the cards are; otherwise the page
+/// starts as the template Claude picks, or a collection when Claude can't
+/// answer. With no Claude the topic keeps what it started with.
+async fn set_up(
+    state: &AppState,
+    actor: Actor,
+    id: Uuid,
+    given: &[&str],
+    picked: Option<(String, Option<Uuid>)>,
+) -> Result<(), AppError> {
     let (name, sticks_to): (String, String) = sqlx::query_as(TOPIC)
         .bind(id)
         .bind(actor.workspace_id)
         .fetch_one(&state.pool)
         .await?;
+    let set_up = match ask_set_up(state, actor, id, &name, &sticks_to, picked.as_ref()).await {
+        Ok(set_up) => set_up,
+        Err(error) => {
+            tracing::warn!(%error, topic = %id, "Claude didn't set up the topic");
+            None
+        }
+    };
+    let cards = set_up
+        .as_ref()
+        .map(|s| cut(&s.cards, 60))
+        .filter(|c| !c.is_empty());
+    let mut operations = Vec::new();
+    match &picked {
+        Some((_, Some(block))) => {
+            if let Some(cards) = &cards {
+                operations.push(Operation::Update {
+                    model: ModelKind::Block,
+                    id: *block,
+                    data: fields([("title", json!(cards))]),
+                });
+            }
+        }
+        Some((_, None)) => {}
+        None => {
+            let name = set_up
+                .as_ref()
+                .map(|s| s.template.as_str())
+                .filter(|t| template(t).is_some())
+                .unwrap_or("collection");
+            operations.extend(template_blocks(id, name, cards.as_deref()).0);
+        }
+    }
+    if let Some(set_up) = set_up {
+        let mut data = Map::new();
+        let mut set = |field: &str, value: Value| {
+            if !given.contains(&field) {
+                data.insert(field.into(), value);
+            }
+        };
+        if sticks_to.is_empty() {
+            set("sticks_to", json!(cut(&set_up.sticks_to, 1000)));
+        }
+        if ICONS.contains(&set_up.icon.as_str()) {
+            set("icon", json!(set_up.icon));
+        }
+        set("group_name", json!(cut(&set_up.group, 40)));
+        let starters: Vec<String> = set_up
+            .starters
+            .iter()
+            .map(|s| cut(s, 200))
+            .filter(|s| !s.is_empty())
+            .take(4)
+            .collect();
+        set("starters", json!(starters));
+        operations.push(Operation::Update {
+            model: ModelKind::Topic,
+            id,
+            data,
+        });
+    }
+    write(state, actor, operations).await
+}
+
+/// What Claude sets up for a new topic, or nothing when there's no Claude
+/// or it didn't answer.
+async fn ask_set_up(
+    state: &AppState,
+    actor: Actor,
+    id: Uuid,
+    name: &str,
+    sticks_to: &str,
+    picked: Option<&(String, Option<Uuid>)>,
+) -> Result<Option<SetUp>, AppError> {
     let groups: Vec<String> = sqlx::query_scalar(GROUPS)
         .bind(actor.workspace_id)
         .fetch_all(&state.pool)
         .await?;
     let prompt = format!(
-        "The topic's name: {name}\nWhat it sticks to: {}\nThe existing groups: {}\nThe icons: {}",
+        "The topic's name: {name}\nWhat it sticks to: {}\nThe template they picked: {}\nThe existing groups: {}\nThe icons: {}",
         if sticks_to.is_empty() {
             "(empty)"
         } else {
-            &sticks_to
+            sticks_to
         },
+        picked.map_or("none, pick one", |(t, _)| t.as_str()),
         if groups.is_empty() {
             "none yet".into()
         } else {
@@ -270,7 +384,7 @@ async fn set_up(state: &AppState, actor: Actor, id: Uuid, given: &[&str]) -> Res
         },
         ICONS.join(", "),
     );
-    let set_up = match &state.claude_code {
+    match &state.claude_code {
         Some(claude_code) => {
             let open = state.questions.open(Asking::new(actor, id, Mode::SetUp));
             let system = format!("{SET_UP}\n\n{SET_UP_WITH_TOOL}");
@@ -285,59 +399,79 @@ async fn set_up(state: &AppState, actor: Actor, id: Uuid, given: &[&str]) -> Res
             };
             if let Err(failure) = claude_code.ask(&question, |_| {}).await {
                 tracing::info!(?failure, topic = %id, "Claude Code didn't set up the topic");
-                return Ok(());
+                return Ok(None);
             }
-            match open.asking.take_set_up() {
-                Some(set_up) => set_up,
-                None => return Ok(()),
-            }
+            Ok(open.asking.take_set_up())
         }
         None => {
             let Some(key) = state.claude.key(&state.pool).await? else {
-                return Ok(());
+                return Ok(None);
             };
             state
                 .claude
                 .json(&key, SET_UP, &prompt, set_up_schema())
                 .await
-                .map_err(AppError::internal)?
+                .map(Some)
+                .map_err(AppError::internal)
         }
-    };
-    let mut data = Map::new();
-    let mut set = |field: &str, value: Value| {
-        if !given.contains(&field) {
-            data.insert(field.into(), value);
-        }
-    };
-    set("title", json!(cut(&set_up.title, 200)));
-    if sticks_to.is_empty() {
-        set("sticks_to", json!(cut(&set_up.sticks_to, 1000)));
     }
-    if ICONS.contains(&set_up.icon.as_str()) {
-        set("icon", json!(set_up.icon));
-    }
-    set("group_name", json!(cut(&set_up.group, 40)));
-    if SHAPES.contains(&set_up.shape.as_str()) {
-        set("shape", json!(set_up.shape));
-    }
-    let starters: Vec<String> = set_up
-        .starters
+}
+
+/// A block a template starts a topic with.
+pub struct Started {
+    pub id: Uuid,
+    pub kind: &'static str,
+    pub title: String,
+}
+
+/// The writes that give a topic the blocks of a template, its cards
+/// titled `cards` when that's given, and the blocks they make.
+pub fn template_blocks(
+    topic_id: Uuid,
+    name: &str,
+    cards: Option<&str>,
+) -> (Vec<Operation>, Vec<Started>) {
+    let blocks: Vec<Started> = template(name)
+        .unwrap_or_default()
         .iter()
-        .map(|s| cut(s, 200))
-        .filter(|s| !s.is_empty())
-        .take(4)
+        .map(|(kind, title)| Started {
+            id: Uuid::now_v7(),
+            kind,
+            title: match (*kind, cards.map(|c| cut(c, 60))) {
+                ("cards", Some(cards)) if !cards.is_empty() => cards,
+                _ => title.to_string(),
+            },
+        })
         .collect();
-    set("starters", json!(starters));
-    write(
-        state,
-        actor,
-        vec![Operation::Update {
-            model: ModelKind::Topic,
-            id,
-            data,
-        }],
-    )
-    .await
+    let writes = blocks
+        .iter()
+        .enumerate()
+        .map(|(position, block)| Operation::Create {
+            model: ModelKind::Block,
+            id: block.id,
+            data: fields([
+                ("topic_id", json!(topic_id)),
+                ("kind", json!(block.kind)),
+                ("title", json!(block.title)),
+                ("position", json!(position)),
+            ]),
+        })
+        .collect();
+    (writes, blocks)
+}
+
+/// The block a proposed point goes in: the one it names by title, or the
+/// first that keeps points of its kind.
+fn block_for<'a>(blocks: &'a [Started], named: Option<&str>) -> Option<&'a Started> {
+    let named = named.map(|n| n.trim().to_lowercase()).unwrap_or_default();
+    blocks
+        .iter()
+        .find(|b| b.kind != "week" && !named.is_empty() && b.title.to_lowercase() == named)
+        .or_else(|| {
+            ["cards", "text", "chips", "list", "shelf", "today"]
+                .iter()
+                .find_map(|kind| blocks.iter().find(|b| b.kind == *kind))
+        })
 }
 
 /// The server's own writes to synced records, in one transaction.

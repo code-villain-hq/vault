@@ -1,5 +1,6 @@
-// Starting a topic: a name, and what it sticks to if you know. The server
-// makes it at once, and Claude writes the rest while its page opens.
+// Starting a topic: a name, what it sticks to if you know, and the blocks
+// it starts with if you'd pick them. The server makes it at once, and
+// Claude writes the rest while its page opens.
 
 import type { StartedTopic, StartTopicRequest } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
@@ -7,6 +8,7 @@ import { CreateDialog, messageOf, shortcutFree } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { StartsAs } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
 import { useIsGuest, useWorkspace } from "./workspace";
 
@@ -36,7 +38,7 @@ export function useNewTopicKey(open: (name?: string) => void) {
 /** Open while `name` is set: the name it starts with, maybe empty. */
 export function NewTopicDialog({ name, onClose }: { name: string | null; onClose: () => void }) {
   return (
-    <CreateDialog open={name !== null} onClose={onClose} width="32rem">
+    <CreateDialog open={name !== null} onClose={onClose} width="36rem">
       <NewTopicForm first={name ?? ""} onDone={onClose} />
     </CreateDialog>
   );
@@ -47,6 +49,7 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
   const navigate = useNavigate();
   const [name, setName] = useState(first);
   const [sticksTo, setSticksTo] = useState("");
+  const [template, setTemplate] = useState("");
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
 
@@ -57,6 +60,7 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
     try {
       const body: StartTopicRequest = { name: name.trim() };
       if (sticksTo.trim()) body.sticks_to = sticksTo.trim();
+      if (template) body.template = template;
       const { id } = await api<StartedTopic>("POST", `/api/w/${workspace.id}/topics`, body);
       onDone();
       await navigate({
@@ -107,6 +111,7 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
             className="ui-field resize-none rounded-md px-3 py-2"
           />
         </label>
+        <StartsAs value={template} picks onChange={setTemplate} />
         <p className="text-xs text-faint">
           Almanac picks an icon and a group. You can change both later.
         </p>

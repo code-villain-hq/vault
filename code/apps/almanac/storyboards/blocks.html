@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: topics made of blocks</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1040px; margin: 0 auto; display: grid; gap: 64px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 76ch; }
+.page > header .why { margin-top: 14px; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.why { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.why li { padding-left: 14px; position: relative; }
+.why li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.why b { color: var(--fg); font-weight: 600; }
+
+/* The middle of the window: the topic's blocks and its ask bar. */
+.mid { background: var(--panel); border-radius: var(--radius-lg); padding: 28px 40px 18px; display: flex; flex-direction: column; gap: 26px; position: relative; }
+.thead h1 { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); display: flex; gap: 10px; align-items: center; }
+.thead h1 svg { color: var(--muted); }
+.thead p { color: var(--muted); margin-top: 4px; }
+.askbox { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 6px 0 14px; }
+.askbox .ph { color: var(--faint); flex: 1; }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.more { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* A block: its title, the ⋯ on hover, then what it holds. */
+.block { display: grid; gap: 8px; position: relative; }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.btitle .tools { margin-left: auto; display: flex; }
+.btitle .menu-tool { visibility: hidden; }
+.block.hover .btitle .menu-tool { visibility: visible; }
+.btitle.lead { color: var(--fg); font-weight: 700; font-size: var(--type-ui-size); }
+.menu { position: absolute; right: 0; top: 28px; z-index: 2; padding: 4px; display: grid; min-width: 168px; box-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 70%, transparent); }
+.menu .ui-option { padding: 6px 10px; display: flex; gap: 8px; align-items: center; }
+.menu .ui-option svg { color: var(--muted); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+
+/* Today: the steps due, to tick off. */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stepcard { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start; }
+.stepcard .num { font-size: 26px; font-weight: 700; line-height: 1; color: var(--muted); grid-row: 1 / 3; }
+.stepcard .thing { font-weight: 700; }
+.stepcard p { grid-column: 2; color: var(--muted); font-size: var(--type-ui-small-size); }
+.tick { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.75px color-mix(in srgb, var(--fg) 35%, transparent); grid-column: 3; grid-row: 1; }
+
+/* Week. */
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day { border-radius: var(--radius-md); padding: 8px; min-height: 74px; display: flex; flex-direction: column; gap: 6px; }
+.day .dl { color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 2px; }
+.day .dl b { color: var(--muted); font-weight: 600; }
+.day.today { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.day.today .dl, .day.today .dl b { color: var(--fg); font-weight: 700; }
+.ev { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: var(--radius-md); background: var(--surface); font-size: var(--type-ui-small-size); line-height: 1.3; }
+.ev svg { color: var(--muted); flex: none; }
+
+/* Chips. */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.chips .ui-chip b { color: var(--fg); font-weight: 600; }
+
+/* Shelf: a tile per thing, with when and how. */
+.shelf { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tile { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.tile .kind { color: var(--faint); font-size: var(--type-ui-small-size); }
+.tile h4 { font-weight: 700; line-height: 1.3; }
+.tile .when { display: flex; gap: 6px; align-items: center; font-size: var(--type-ui-small-size); color: var(--muted); }
+.tile .when svg { color: var(--faint); }
+.tile .how { font-size: var(--type-ui-small-size); }
+.tile .more { margin-top: auto; }
+
+/* List: one line each. */
+.list { display: grid; gap: 2px; }
+.list .ui-row { display: flex; gap: 16px; align-items: baseline; padding: 5px 10px; }
+.list .ui-row .src { margin-left: auto; white-space: nowrap; }
+.list .done { color: var(--faint); }
+.list .mark { width: 14px; flex: none; color: var(--faint); }
+
+/* Cards: a card per thing, with its notes. */
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-items: start; }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: grid; gap: 8px; }
+.card h4 { font-weight: 700; display: flex; gap: 8px; align-items: center; }
+.card ul { display: grid; gap: 6px; }
+.card li .src { margin-left: 4px; }
+.ask { border-radius: var(--radius-md); padding: 10px 12px; display: grid; gap: 8px; background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.ask .buttons { display: flex; gap: 6px; }
+
+/* Text: sections that explain. */
+.text { display: grid; gap: 18px; max-width: 70ch; }
+.text h3 { font-weight: 700; margin-bottom: 4px; }
+.text p { font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.text p .src { margin-left: 4px; }
+
+/* New. */
+.new { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Starting a topic. */
+.backdrop { border-radius: var(--radius-lg); padding: 48px 0; display: grid; place-items: center; }
+.dialog { width: 620px; padding: 22px 24px 20px; display: grid; gap: 16px; }
+.dialog h3 { font-size: var(--type-title-size); font-weight: 700; }
+.dialog label { display: grid; gap: 6px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.dialog .ui-field { height: 36px; padding: 0 12px; display: flex; align-items: center; color: var(--fg); font-size: var(--type-ui-size); }
+.dialog .ui-field.ph { color: var(--faint); }
+.templates { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.tpl { border-radius: var(--radius-md); padding: 10px 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; box-shadow: inset 0 0 0 1px var(--line); }
+.tpl svg { color: var(--muted); grid-row: 1 / 3; }
+.tpl b { font-weight: 600; color: var(--fg); font-size: var(--type-ui-size); }
+.tpl span { color: var(--faint); font-size: var(--type-ui-small-size); }
+.tpl.on { box-shadow: inset 0 0 0 1.5px var(--fg); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.dialog .foot { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.dialog .foot .ui-kbd { margin-left: 4px; }
+
+/* An empty block says what will be there. */
+.empty { border-radius: var(--radius-lg); padding: 14px 16px; color: var(--faint); box-shadow: inset 0 0 0 1px var(--line); }
+.firstq { display: grid; gap: 2px; }
+.firstq .ui-row { padding: 6px 10px; display: flex; gap: 10px; align-items: center; }
+.firstq .ui-row svg { color: var(--faint); }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Topics made of blocks</h1>
+  <p>No page and no shape to pick: a topic is its blocks, in order. Haare, Pflanzen and Marx below are made of the same few blocks, so each topic gets its own layout and they still look like one app. Only the middle of the window, night only.</p>
+  <ul class="why">
+    <li><b>Seven blocks:</b> Today (steps to tick off), Week, Chips, Shelf, Cards, Text and List. A block's title is the topic's own: Chips are "You" in Haare and "Terms" in Marx.</li>
+    <li><b>A template is the blocks a topic starts with.</b> Almanac picks one when it sets the topic up, or you pick it. After that the blocks are the topic's.</li>
+    <li><b>Claude keeps each point in a block</b>, and adds a block when you ask for one ("keep what I need to buy"), saying so in the talk.</li>
+    <li><b>⋯ beside a block's title</b>, on hover: Move up, Move down, Rename, Remove. Nothing else to arrange.</li>
+  </ul>
+</header>
+
+<!-- 1: Haare -->
+<section class="step">
+  <h2><span class="n">1</span>Haare, from Routine</h2>
+  <ul class="why">
+    <li>The routine page as built today: Today, Week, You, Your shelf, Advice. Nothing is "not sorted yet": every point is kept in its block.</li>
+    <li>"Buy next" is a List Claude added when you said the conditioner is nearly empty. It carries the new dot until you leave.</li>
+    <li>Advice is hovered, with its menu open.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="shower" data-s="18"></i>Haar-Routine</h1><p>Haarpflege-Routine: Produkte, Waschrhythmus, Behandlungen und Pflegetipps.</p></div>
+
+    <div class="block">
+      <div class="btitle lead">Today, Elvital wash<span class="tools"><button class="ui-button ui-icon-button menu-tool" aria-label="Block menu"><i data-i="more"></i></button></span></div>
+      <div class="steps">
+        <div class="stepcard"><span class="num">1</span><span class="thing">Elvital shampoo</span><span class="tick"></span><p>On the scalp, lukewarm water.</p></div>
+        <div class="stepcard"><span class="num">2</span><span class="thing">Elvital conditioner</span><span class="tick"></span><p>From the ears down only.</p></div>
+        <div class="stepcard"><span class="num">3</span><span class="thing">Apoliva Anti-Frizz</span><span class="tick"></span><p>A pea-sized bit, on damp ends.</p></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">Oct 26 – Nov 1<span class="tools"><button class="ui-button ui-icon-button" aria-label="The week before"><i data-i="left"></i></button><button class="ui-button ui-icon-button" aria-label="The week after"><i data-i="right"></i></button><button class="ui-button ui-icon-button menu-tool" aria-label="Block menu"><i data-i="more"></i></button></span></div>
+      <div class="week">
+        <div class="day"><div class="dl">Mon <b>26</b></div></div>
+        <div class="day"><div class="dl">Tue <b>27</b></div></div>
+        <div class="day today"><div class="dl">Wed <b>28</b></div><div class="ev"><i data-i="shower" data-s="12"></i>Elvital</div></div>
+        <div class="day"><div class="dl">Thu <b>29</b></div></div>
+        <div class="day"><div class="dl">Fri <b>30</b></div><div class="ev"><i data-i="shower" data-s="12"></i>Elvital</div></div>
+        <div class="day"><div class="dl">Sat <b>31</b></div></div>
+        <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><i data-i="shower" data-s="12"></i>H&amp;S</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">You<span class="tools"><button class="ui-button ui-icon-button menu-tool" aria-label="Block menu"><i data-i="more"></i></button></span></div>
+      <div class="chips">
+        <span class="ui-chip"><b>Long</b>, never coloured</span>
+        <span class="ui-chip"><b>Flat</b> at the roots</span>
+        <span class="ui-chip"><b>Oily</b> within a day</span>
+        <span class="ui-chip"><b>Low porosity</b>, by the float test</span>
+        <span class="ui-chip"><b>3 washes</b> a week</span>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">Your shelf<span class="tools"><button class="ui-button ui-icon-button menu-tool" aria-label="Block menu"><i data-i="more"></i></button></span></div>
+      <div class="shelf">
+        <div class="tile">
+          <span class="kind">Shampoo and conditioner</span>
+          <h4>Elvital Hyaluron Plump</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>Wed and Fri</span>
+          <p class="how">Conditioner from the ears down only.</p>
+          <span class="more">4 notes</span>
+        </div>
+        <div class="tile">
+          <span class="kind">Anti-dandruff shampoo</span>
+          <h4>Head &amp; Shoulders Pro-Expert 7</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>Sun</span>
+          <p class="how">Wash twice, leave on 2–3 minutes.</p>
+          <span class="more">3 notes</span>
+        </div>
+        <div class="tile">
+          <span class="kind">Leave-in</span>
+          <h4>Apoliva Anti-Frizz</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>After every wash</span>
+          <p class="how">A pea-sized bit, on damp ends.</p>
+          <span class="more">2 notes</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle"><span class="new"><span class="ui-live-dot"></span>Buy next</span><span class="tools"><button class="ui-button ui-icon-button menu-tool" aria-label="Block menu"><i data-i="more"></i></button></span></div>
+      <div class="list">
+        <div class="ui-row">Elvital Hyaluron Plump conditioner, 300 ml<span class="src">Nearly empty, you said</span></div>
+      </div>
+    </div>
+
+    <div class="block hover">
+      <div class="btitle">Advice<span class="tools"><button class="ui-button ui-icon-button menu-tool" aria-label="Block menu"><i data-i="more"></i></button></span></div>
+      <div class="ui-menu menu" role="menu">
+        <div class="ui-option" data-highlighted><i data-i="up"></i>Move up</div>
+        <div class="ui-option"><i data-i="down"></i>Move down</div>
+        <div class="ui-option"><i data-i="pencil"></i>Rename</div>
+        <hr>
+        <div class="ui-option"><i data-i="trash"></i>Remove</div>
+      </div>
+      <div class="list">
+        <div class="ui-row">Washing often doesn't make an oily scalp oilier.<span class="src">Dermatology advice</span></div>
+        <div class="ui-row">If flakes return, swap one Elvital wash for H&amp;S for 2–3 weeks.<span class="src">Dermatology advice</span></div>
+        <div class="ui-row">For root volume, blow-dry the roots upside down.<span class="src">Hair care advice</span></div>
+        <div class="ui-row more">2 more</div>
+      </div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Haar-Routine, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+<!-- 2: Pflanzen -->
+<section class="step">
+  <h2><span class="n">2</span>Pflanzen, from Collection</h2>
+  <ul class="why">
+    <li>Today, Week and Cards: a card per plant. Today lists what's due on any card, so watering is ticked off here, not hunted for.</li>
+    <li>A question Almanac isn't sure of waits on the card it's about, as today.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="sprout" data-s="18"></i>Pflanzen</h1><p>Zimmerpflanzen: Gießen, Licht, Erde und was ihnen fehlt.</p></div>
+
+    <div class="block">
+      <div class="btitle lead">Today</div>
+      <div class="steps">
+        <div class="stepcard"><span class="num">1</span><span class="thing">Calathea</span><span class="tick"></span><p>Water with filtered water, room warm.</p></div>
+        <div class="stepcard"><span class="num">2</span><span class="thing">Monstera</span><span class="tick"></span><p>Feel the top 3 cm; water only if dry.</p></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">Oct 26 – Nov 1<span class="tools"><button class="ui-button ui-icon-button" aria-label="The week before"><i data-i="left"></i></button><button class="ui-button ui-icon-button" aria-label="The week after"><i data-i="right"></i></button></span></div>
+      <div class="week">
+        <div class="day"><div class="dl">Mon <b>26</b></div><div class="ev"><i data-i="droplet" data-s="12"></i>Basilikum</div></div>
+        <div class="day"><div class="dl">Tue <b>27</b></div></div>
+        <div class="day today"><div class="dl">Wed <b>28</b></div><div class="ev"><i data-i="droplet" data-s="12"></i>Calathea</div><div class="ev"><i data-i="droplet" data-s="12"></i>Monstera</div></div>
+        <div class="day"><div class="dl">Thu <b>29</b></div><div class="ev"><i data-i="droplet" data-s="12"></i>Basilikum</div></div>
+        <div class="day"><div class="dl">Fri <b>30</b></div></div>
+        <div class="day"><div class="dl">Sat <b>31</b></div></div>
+        <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><i data-i="droplet" data-s="12"></i>Basilikum</div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">Plants</div>
+      <div class="cards">
+        <div class="card">
+          <h4>Calathea</h4>
+          <ul>
+            <li>Brown leaf edges come from dry air and hard water. <span class="src">Plant care advice</span></li>
+            <li>Every 5–7 days, when the top is just dry. <span class="src">You said</span></li>
+          </ul>
+          <div class="ask">
+            <span>Does it stand by a north window? Then it needs less water in winter.</span>
+            <span class="buttons"><button class="ui-button">Add it</button><button class="ui-button">Leave it out</button></span>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Monstera</h4>
+          <ul>
+            <li>Yellow lower leaves mean too much water, not too little. <span class="src">Plant care advice</span></li>
+            <li>Repotted in March, in chunky aroid soil. <span class="src">You said</span></li>
+            <li>Turn it a quarter each month so it grows straight. <span class="src">From the talk</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Basilikum</h4>
+          <ul>
+            <li>Water from below, every other day, on the kitchen sill. <span class="src">You said</span></li>
+            <li>Pick the tops above a pair of leaves so it bushes out. <span class="src">Gardening advice</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Pflanzen, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+<!-- 3: Marx -->
+<section class="step">
+  <h2><span class="n">3</span>Marx &amp; Engels, from Study</h2>
+  <ul class="why">
+    <li>Text, Chips and List: sections that explain, the terms, what you're reading. No week: nothing comes round.</li>
+    <li>The same Chips as "You" in Haare, titled Terms. A List with a mark for what's read.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="book" data-s="18"></i>Marx &amp; Engels</h1><p>Was Marx und Engels geschrieben haben, und was es heißt.</p></div>
+
+    <div class="block">
+      <div class="btitle">Reading</div>
+      <div class="list">
+        <div class="ui-row done"><span class="mark"><i data-i="check" data-s="13"></i></span>Das Kommunistische Manifest, 1848<span class="src">Read in September</span></div>
+        <div class="ui-row"><span class="mark"></span>Das Kapital, Band 1, Kapitel 1–4<span class="src">Now, at chapter 3</span></div>
+        <div class="ui-row"><span class="mark"></span>Lohnarbeit und Kapital<span class="src">Suggested as a short way in</span></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">Terms</div>
+      <div class="chips">
+        <span class="ui-chip"><b>Mehrwert</b>, what labour makes beyond its wage</span>
+        <span class="ui-chip"><b>Ware</b>, made to be sold</span>
+        <span class="ui-chip"><b>Entfremdung</b></span>
+        <span class="ui-chip"><b>Basis und Überbau</b></span>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="btitle">What it says</div>
+      <div class="text">
+        <div>
+          <h3>Where profit comes from</h3>
+          <p>For Marx, a worker is paid for their labour power, but works longer than it takes to make that wage back. What's made in the rest of the day belongs to the owner: that is surplus value, and profit comes out of it. <span class="src">Das Kapital, Band 1, Kapitel 7</span></p>
+        </div>
+        <div>
+          <h3>Why a coat is worth twenty yards of linen</h3>
+          <p>Chapter 1 sets two goods side by side and asks what they share. Not their use, which differs, but the labour it took on average to make them. Money comes later, as the good every other is measured in. <span class="src">From the talk on Oct 22</span></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Marx &amp; Engels, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+<!-- 4: Starting -->
+<section class="step">
+  <h2><span class="n">4</span>Starting a topic from a template</h2>
+  <ul class="why">
+    <li>New topic: a name, what it sticks to, and how it starts. Almanac picks is chosen, as Almanac picks the shape today; you may pick one yourself.</li>
+    <li>A template only names the blocks a topic starts with; the blocks are the topic's from then on.</li>
+  </ul>
+  <div class="backdrop ui-backdrop">
+    <div class="dialog ui-dialog">
+      <h3>New topic</h3>
+      <label>Name<span class="ui-field">Laufen</span></label>
+      <label>What it sticks to<span class="ui-field ph">Optional: Almanac writes it once you start</span></label>
+      <label>Starts as
+        <div class="templates">
+          <div class="tpl on"><i data-i="sparkles" data-s="16"></i><b>Almanac picks</b><span>From the name and what it sticks to</span></div>
+          <div class="tpl"><i data-i="calendar" data-s="16"></i><b>Routine</b><span>Today · Week · You · Shelf · Advice</span></div>
+          <div class="tpl"><i data-i="sprout" data-s="16"></i><b>Collection</b><span>Today · Week · Cards</span></div>
+          <div class="tpl"><i data-i="book" data-s="16"></i><b>Study</b><span>Reading · Terms · What it says</span></div>
+        </div>
+      </label>
+      <div class="foot"><button class="ui-button">Cancel</button><button class="ui-button ui-button-primary">Start<span class="ui-kbd">⌘↩</span></button></div>
+    </div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">5</span>The new topic, as it starts</h2>
+  <ul class="why">
+    <li>Almanac picked Routine for Laufen. Each empty block says in a line what will be there, and the first questions fill them.</li>
+    <li>A block that stays empty after a few talks goes quietly; ⋯ → Remove does it sooner.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="run" data-s="18"></i>Laufen</h1><p>Running: your runs, your shoes, how to get faster without getting hurt.</p></div>
+    <div class="block"><div class="btitle lead">Today</div><div class="empty">The run due today, step by step, once you tell it your week.</div></div>
+    <div class="block"><div class="btitle">You</div><div class="empty">What's true of you: how far you run, how often, old injuries.</div></div>
+    <div class="block"><div class="btitle">Your shelf</div><div class="empty">Shoes and gear, with when you use each.</div></div>
+    <div class="block">
+      <div class="btitle">Start with</div>
+      <div class="firstq">
+        <div class="ui-row"><i data-i="right" data-s="13"></i>Which days do you run, and how far?</div>
+        <div class="ui-row"><i data-i="right" data-s="13"></i>Which shoes do you run in, and how old are they?</div>
+        <div class="ui-row"><i data-i="right" data-s="13"></i>Anything that hurts after a run?</div>
+      </div>
+    </div>
+    <div class="askbox ui-field"><span class="ph">Ask Laufen, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+</div>
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  shower: '<path d="m4 4 2.5 2.5"/><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7"/><path d="M15 5 5 15"/><path d="M14 17v.01"/><path d="M10 16v.01"/><path d="M13 13v.01"/><path d="M16 10v.01"/><path d="M11 20v.01"/><path d="M17 14v.01"/><path d="M20 11v.01"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  image: '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  up: '<path d="m18 15-6-6-6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  run: '<circle cx="17" cy="4" r="2"/><path d="M15.59 5.41 5.41 15.59"/><path d="M4 22l3-7 4 3 2 4"/><path d="m11 9 4 4 3-1"/>',
+};
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 15;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-//! What one answer keeps: points under their themes, questions to check,
+//! What one answer keeps: points in the page's blocks, questions to check,
 //! reminders it offers, the topic an off-topic question fits, the talk's
 //! title, and, in the workspace's own topic, a topic it proposes and the
 //! topics it changed. A point or reminder may take the place of ones the
@@ -8,18 +8,21 @@
 //! request reads them from the exchange (`crate::talks`). Either way they
 //! are written with the answer, through the sync engine.
 
-use almanac_domain::{ModelKind, Operation, POINT_KINDS, Proposal, ProposedReminder, TopicChange};
+use almanac_domain::{BLOCK_KINDS, ModelKind, Operation, Proposal, ProposedReminder, TopicChange};
 use chrono::{NaiveDate, NaiveTime};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
-use crate::page::Refs;
+use crate::page::{RefBlock, Refs};
 use crate::topics::cut;
 
 #[derive(Debug, Default)]
 pub struct Kept {
-    /// The page's points and reminders, for what replaces them.
+    /// The page's blocks, points and reminders, for where points go and
+    /// what replaces them.
     pub refs: Refs,
+    /// Blocks the answer starts, after the page's.
+    pub blocks: Vec<RefBlock>,
     pub points: Vec<KeptPoint>,
     pub questions: Vec<KeptQuestion>,
     pub reminders: Vec<KeptReminder>,
@@ -32,9 +35,11 @@ pub struct Kept {
 
 #[derive(Debug)]
 pub struct KeptPoint {
+    pub block_id: Uuid,
+    /// Empty in chips and lists.
     pub theme: String,
-    /// One of [`POINT_KINDS`].
-    pub kind: String,
+    /// What the answer says it kept it under: its theme, or its block.
+    pub under: String,
     pub text: String,
     pub source: Option<String>,
     pub url: Option<String>,
@@ -74,6 +79,7 @@ const MOST_POINTS: usize = 8;
 const MOST_CHANGED: usize = 40;
 const MOST_QUESTIONS: usize = 2;
 const MOST_REMINDERS: usize = 3;
+const MOST_BLOCKS: usize = 2;
 
 impl Kept {
     /// Keeping for a page with these points and reminders.
@@ -84,31 +90,25 @@ impl Kept {
         }
     }
 
-    /// Keeps a point of a `kind` for the page (a note when it's empty), in
-    /// place of the points it `replaces` (`p3`). What's wrong with it comes
-    /// back in words, for Claude to fix.
+    /// Keeps a point in a `block` of the page (`b2`, or its title), in
+    /// place of the points it `replaces` (`p3`). A block the page doesn't
+    /// have is started, after the others, when the point gives its `kind`.
+    /// What's wrong with it comes back in words, for Claude to fix.
+    #[allow(clippy::too_many_arguments)]
     pub fn keep_point(
         &mut self,
-        theme: &str,
+        block: &str,
         kind: &str,
+        theme: &str,
         text: &str,
         source: &str,
         url: &str,
         replaces: &[String],
     ) -> Result<(), String> {
-        let (theme, text) = (cut(theme, 120), cut(text, 2000));
-        if theme.is_empty() || text.is_empty() {
-            return Err("A point needs a theme and a text.".into());
+        let text = cut(text, 2000);
+        if text.is_empty() {
+            return Err("A point needs a text.".into());
         }
-        let kind = match kind.trim() {
-            "" => "note",
-            kind if POINT_KINDS.contains(&kind) => kind,
-            kind => {
-                return Err(format!(
-                    "There's no kind {kind}: it's one of {POINT_KINDS:?}."
-                ));
-            }
-        };
         let new = self.points.iter().filter(|p| p.replaces.is_empty()).count();
         if replaces.is_empty() && new >= MOST_POINTS {
             return Err(format!(
@@ -123,27 +123,117 @@ impl Kept {
         let replaces = replaces
             .iter()
             .map(|r| {
-                found(r, 'p', &self.refs.points)
+                found(r, 'p', self.refs.points.len())
+                    .map(|n| self.refs.points[n])
                     .ok_or_else(|| format!("The page has no point {r}: name one like p3."))
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let (placed, starts) = self.place(block, kind, replaces.first().map(|(_, b)| *b))?;
+        let theme = match placed.kind.as_str() {
+            "week" => {
+                return Err(format!(
+                    "{} keeps no points: it shows the days of the reminders, so offer one instead.",
+                    title_of(&placed)
+                ));
+            }
+            "chips" | "list" => String::new(),
+            _ => {
+                let theme = cut(theme, 120);
+                if theme.is_empty() {
+                    return Err(format!(
+                        "A point in {} needs a theme: {}.",
+                        title_of(&placed),
+                        match placed.kind.as_str() {
+                            "today" => "what comes round, named as its reminders are",
+                            "shelf" => "the thing's name",
+                            "text" => "the section's heading",
+                            _ => "the thing the card is about",
+                        }
+                    ));
+                }
+                theme
+            }
+        };
         if self
             .points
             .iter()
-            .any(|p| p.text == text && p.theme == theme)
+            .any(|p| p.block_id == placed.id && p.text == text && p.theme == theme)
         {
             return Ok(());
         }
+        let under = if theme.is_empty() {
+            title_of(&placed).to_string()
+        } else {
+            theme.clone()
+        };
+        let block_id = placed.id;
+        if starts {
+            self.blocks.push(placed);
+        }
         let url = cut(url, 2000);
         self.points.push(KeptPoint {
+            block_id,
             theme,
-            kind: kind.into(),
+            under,
             text,
             source: some(cut(source, 200)),
             url: (url.starts_with("https://") || url.starts_with("http://")).then_some(url),
-            replaces,
+            replaces: replaces.into_iter().map(|(id, _)| id).collect(),
         });
         Ok(())
+    }
+
+    /// The block a point names, and whether the answer starts it. With no
+    /// block named, a point that replaces others stays in their block.
+    fn place(
+        &self,
+        block: &str,
+        kind: &str,
+        replacing: Option<Uuid>,
+    ) -> Result<(RefBlock, bool), String> {
+        let named = block.trim();
+        let all = || self.refs.blocks.iter().chain(&self.blocks);
+        if let Some(n) = found(named, 'b', self.refs.blocks.len()) {
+            return Ok((self.refs.blocks[n].clone(), false));
+        }
+        if !named.is_empty()
+            && let Some(b) = all().find(|b| b.title.to_lowercase() == named.to_lowercase())
+        {
+            return Ok((b.clone(), false));
+        }
+        if named.is_empty()
+            && let Some(b) = replacing.and_then(|id| all().find(|b| b.id == id))
+        {
+            return Ok((b.clone(), false));
+        }
+        let kind = kind.trim();
+        if named.is_empty() {
+            return Err("Name the block the point goes in, like b2.".into());
+        }
+        if kind.is_empty() {
+            return Err(format!(
+                "The page has no block {named}: name one like b2, or give a kind to start it."
+            ));
+        }
+        if !BLOCK_KINDS.contains(&kind) {
+            return Err(format!(
+                "There's no kind of block {kind}: it's one of {BLOCK_KINDS:?}."
+            ));
+        }
+        if self.blocks.len() >= MOST_BLOCKS {
+            return Err(format!(
+                "An answer starts at most {MOST_BLOCKS} blocks: keep the rest in the page's own."
+            ));
+        }
+        let title = cut(named, 60);
+        Ok((
+            RefBlock {
+                id: Uuid::now_v7(),
+                kind: kind.into(),
+                title,
+            },
+            true,
+        ))
     }
 
     /// A question to check a guess the answer rested on, with the point to
@@ -177,11 +267,11 @@ impl Kept {
                 "An answer offers at most {MOST_REMINDERS} reminders."
             ));
         }
-        let ids: Vec<Uuid> = self.refs.reminders.iter().map(|(id, _)| *id).collect();
         let replaces = replaces
             .iter()
             .map(|r| {
-                found(r, 'r', &ids)
+                found(r, 'r', self.refs.reminders.len())
+                    .map(|n| self.refs.reminders[n].0)
                     .ok_or_else(|| format!("The calendar has no reminder {r}: name one like r2."))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -193,16 +283,27 @@ impl Kept {
     /// `changes`), and the writes that come after it.
     pub fn writes(&self, at: &Answering) -> (Map<String, Value>, Vec<Operation>) {
         let mut operations = Vec::new();
+        for block in &self.blocks {
+            operations.push(Operation::Create {
+                model: ModelKind::Block,
+                id: block.id,
+                data: fields([
+                    ("topic_id", json!(at.topic_id)),
+                    ("kind", json!(block.kind)),
+                    ("title", json!(block.title)),
+                ]),
+            });
+        }
         let mut themes: Vec<String> = Vec::new();
         let mut replaced: Vec<Uuid> = Vec::new();
         let mut updated = 0;
         for point in &self.points {
-            if !themes.contains(&point.theme) {
-                themes.push(point.theme.clone());
+            if !themes.contains(&point.under) {
+                themes.push(point.under.clone());
             }
             let data = fields([
+                ("block_id", json!(point.block_id)),
                 ("theme", json!(point.theme)),
-                ("kind", json!(point.kind)),
                 ("text", json!(point.text)),
                 ("source", json!(point.source)),
                 ("source_url", json!(point.url)),
@@ -275,6 +376,20 @@ impl Kept {
                 });
             }
             operations.push(offer(at.topic_id, at.answer_id, &kept.reminder, &on));
+        }
+        // The week shows the days of what the topic offers to remind.
+        let has_week = self
+            .refs
+            .blocks
+            .iter()
+            .chain(&self.blocks)
+            .any(|b| b.kind == "week");
+        if !self.reminders.is_empty() && !has_week {
+            operations.push(Operation::Create {
+                model: ModelKind::Block,
+                id: Uuid::now_v7(),
+                data: fields([("topic_id", json!(at.topic_id)), ("kind", json!("week"))]),
+            });
         }
         for change in &self.changes {
             let Value::Object(data) = patch_fields(&change.after) else {
@@ -360,15 +475,23 @@ fn some(text: String) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-/// What a reference such as `p3` (or `[p3]`) names among `ids`.
-fn found(reference: &str, kind: char, ids: &[Uuid]) -> Option<Uuid> {
+/// Which of `count` a reference such as `p3` (or `[p3]`) names, from 0.
+fn found(reference: &str, kind: char, count: usize) -> Option<usize> {
     let n: usize = reference
         .trim()
         .trim_matches(['[', ']'])
         .strip_prefix(kind)?
         .parse()
         .ok()?;
-    ids.get(n.checked_sub(1)?).copied()
+    n.checked_sub(1).filter(|n| *n < count)
+}
+
+/// A block as a sentence names it.
+fn title_of(block: &RefBlock) -> &str {
+    match block.title.as_str() {
+        "" => "The week",
+        title => title,
+    }
 }
 
 /// A reminder an answer offers, waiting for a yes under it, in place of the
@@ -465,21 +588,33 @@ mod tests {
         }
     }
 
+    fn block(kind: &str, title: &str) -> RefBlock {
+        RefBlock {
+            id: Uuid::now_v7(),
+            kind: kind.into(),
+            title: title.into(),
+        }
+    }
+
     #[test]
     fn a_point_takes_the_place_of_the_ones_it_replaces() {
         let (first, second) = (Uuid::now_v7(), Uuid::now_v7());
+        let notes = block("cards", "Notes");
         let mut kept = Kept::on(Refs {
-            points: vec![first, second],
+            points: vec![(first, notes.id), (second, notes.id)],
+            blocks: vec![notes.clone()],
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("Wäsche", "", "x", "", "", &["p3".into()])
+            kept.keep_point("b1", "", "Wäsche", "x", "", "", &["p3".into()])
                 .unwrap_err()
                 .contains("no point p3")
         );
+        // Named no block, it stays in the one it replaces.
         kept.keep_point(
-            "Wäsche",
             "",
+            "",
+            "Wäsche",
             "Washes Wednesday and Friday.",
             "You said",
             "",
@@ -493,27 +628,37 @@ mod tests {
                 Operation::Update { id: a, data, .. },
                 Operation::Delete { id: b, .. },
             ] if *a == first && *b == second && data["seen"] == json!(false)
+                && data["block_id"] == json!(notes.id)
         ));
         assert_eq!(said["kept"], json!("Updated a point under Wäsche."));
     }
 
     #[test]
-    fn sorting_a_page_keeps_each_point_with_its_kind() {
+    fn sorting_a_page_keeps_each_point_in_its_block() {
+        let (today, you) = (block("today", "Today"), block("chips", "You"));
+        let notes = block("cards", "Notes");
         let ids: Vec<Uuid> = (0..12).map(|_| Uuid::now_v7()).collect();
         let mut kept = Kept::on(Refs {
-            points: ids.clone(),
+            points: ids.iter().map(|id| (*id, notes.id)).collect(),
+            blocks: vec![today.clone(), block("week", ""), you.clone(), notes],
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("You", "fact", "Long", "", "", &[])
+            kept.keep_point("b2", "", "", "Wash on Friday", "", "", &[])
                 .unwrap_err()
-                .contains("no kind fact")
+                .contains("keeps no points")
+        );
+        assert!(
+            kept.keep_point("Today", "", "", "Shampoo", "", "", &[])
+                .unwrap_err()
+                .contains("needs a theme")
         );
         // More than an answer may add, each in a point's place.
         for n in 1..=12 {
             kept.keep_point(
+                "you",
+                "",
                 "You",
-                "about",
                 &format!("Fact {n}"),
                 "",
                 "",
@@ -522,8 +667,9 @@ mod tests {
             .unwrap();
         }
         kept.keep_point(
+            "b1",
+            "",
             "Elvital wash",
-            "step",
             "Elvital shampoo: on the scalp",
             "",
             "",
@@ -534,11 +680,14 @@ mod tests {
         assert_eq!(operations.len(), 13);
         assert!(matches!(
             &operations[12],
-            Operation::Create { data, .. } if data["kind"] == json!("step")
+            Operation::Create { data, .. }
+                if data["block_id"] == json!(today.id) && data["theme"] == json!("Elvital wash")
         ));
+        // A chip has no theme.
         assert!(matches!(
             &operations[0],
-            Operation::Update { id, data, .. } if *id == ids[0] && data["kind"] == json!("about")
+            Operation::Update { id, data, .. }
+                if *id == ids[0] && data["block_id"] == json!(you.id) && data["theme"] == json!("")
         ));
         assert_eq!(
             said["kept"],
@@ -547,9 +696,72 @@ mod tests {
     }
 
     #[test]
+    fn a_point_may_start_a_block_the_page_lacks() {
+        let mut kept = Kept::on(Refs::default());
+        assert!(
+            kept.keep_point("Reading", "", "", "Ward, Plant care", "", "", &[])
+                .unwrap_err()
+                .contains("give a kind")
+        );
+        kept.keep_point("Reading", "list", "", "Ward, Plant care", "", "", &[])
+            .unwrap();
+        // The next one finds it by its title.
+        kept.keep_point("reading", "", "", "Kew, Ferns", "", "", &[])
+            .unwrap();
+        kept.keep_point("Terms", "chips", "", "Epiphyte", "", "", &[])
+            .unwrap();
+        assert!(
+            kept.keep_point("Places", "cards", "Kew", "In London", "", "", &[])
+                .unwrap_err()
+                .contains("at most 2 blocks")
+        );
+        let (said, operations) = kept.writes(&answering());
+        let [
+            Operation::Create {
+                model: ModelKind::Block,
+                id: reading,
+                data,
+            },
+            Operation::Create {
+                model: ModelKind::Block,
+                ..
+            },
+            Operation::Create { data: first, .. },
+            Operation::Create { data: second, .. },
+            Operation::Create { .. },
+        ] = &operations[..]
+        else {
+            panic!("{operations:?}");
+        };
+        assert_eq!(data["kind"], json!("list"));
+        assert_eq!(first["block_id"], json!(reading));
+        assert_eq!(second["block_id"], json!(reading));
+        assert_eq!(
+            said["kept"],
+            json!("Kept 3 points under Reading and Terms.")
+        );
+    }
+
+    #[test]
+    fn a_reminder_brings_the_week_when_the_page_has_none() {
+        let mut kept = Kept::on(Refs::default());
+        let friday = reminder("", "Water the Monstera", "2026-10-30", "", Some(7)).unwrap();
+        kept.offer_reminder(friday, &[]).unwrap();
+        let (_, operations) = kept.writes(&answering());
+        assert!(matches!(
+            &operations[..],
+            [
+                Operation::Create { model: ModelKind::Reminder, .. },
+                Operation::Create { model: ModelKind::Block, data, .. },
+            ] if data["kind"] == json!("week")
+        ));
+    }
+
+    #[test]
     fn a_reminder_replaces_one_on_the_calendar_once_its_taken() {
         let (on, offered) = (Uuid::now_v7(), Uuid::now_v7());
         let mut kept = Kept::on(Refs {
+            blocks: vec![block("week", "")],
             points: vec![],
             reminders: vec![(on, false), (offered, true)],
         });

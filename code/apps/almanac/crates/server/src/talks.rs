@@ -1,7 +1,7 @@
 //! A talk beside a topic's page. Each question sends Claude a fixed prompt,
 //! what the topic sticks to, what its page has kept, and only this talk;
 //! the answer streams back as it's written. What the page should keep
-//! (points under their themes, questions when the answer rested on a
+//! (points in the page's blocks, questions when the answer rested on a
 //! guess, reminders it offers, the topic an off-topic question fits better)
 //! Claude Code hands over with Almanac's tools as it answers (`crate::mcp`);
 //! through the Messages API, Claude reads the exchange once more for it.
@@ -14,7 +14,7 @@
 
 use std::convert::Infallible;
 
-use almanac_domain::{Actor, AskRequest, ModelKind, Operation, POINT_KINDS, Source, Transaction};
+use almanac_domain::{Actor, AskRequest, BLOCK_KINDS, ModelKind, Operation, Source, Transaction};
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -72,7 +72,8 @@ const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer:
 what's worth knowing later, ask_to_check when your answer rested on a guess about their \
 situation, offer_reminder when the talk settled something recurring or dated, or they told you \
 a routine they keep, fits_elsewhere when the question belongs in another topic, and name_talk \
-on a talk's first answer. The page is kept up to date, not added to: what changes a point or \
+on a talk's first answer. Each point goes in the block of the page that shows it; start a block \
+only when they ask for one or none fits. The page is kept up to date, not added to: what changes a point or \
 reminder it has replaces that one. Write only the answer: they don't see the tools, so don't mention \
 them or narrate using them.";
 
@@ -101,14 +102,14 @@ calendar and come as notifications on the Mac.
 /// With Claude Code: the workspace's own topic proposes and changes topics.
 const OWN_TOOLS: &str = "- When they say what they want to keep track of, and no topic has it, \
 propose one with propose_topic: a short name, what it sticks to, an icon, a group (reuse one \
-that fits), the shape and three or four starters. Its points are only what they told you, such \
+that fits), the template it starts as and three or four starters. Its points are only what they told you, such \
 as which plants they have and where; what you know about it, such as care advice, waits for the \
 topic's talks, which keep it with its source. Add a reminder only when they asked for one or \
 clearly need it. Then say in a sentence or two what it will keep, and which reminder it will \
 offer. Never say it's started or set up: they start it with the card under your answer, or \
 change it first.
 - When they ask to change a topic (rename it, move it to another group, change what it sticks \
-to, its icon or its shape), do it with change_topic, then say what you changed. They can undo it.
+to or its icon), do it with change_topic, then say what you changed. They can undo it.
 - Name the talk with name_talk on its first answer.
 - Write only the answer. They don't see the tools, so don't mention them or narrate using them.";
 
@@ -121,14 +122,11 @@ learns. After each exchange in a talk, you decide what the page keeps from it. R
 schema's shape.
 
 - points: what's worth knowing later from this exchange: facts, decisions, and what they told you \
-about their situation. Nothing the page already has. Usually none to three. On a page of cards \
-each theme is one thing the topic is about, named plainly (a plant, a pet, a place), and a point \
-is one short sentence, under 20 words. In a document each theme is a section of one piece of \
-writing (such as Problem, Market, Team), and it's read later as writing, so a point keeps what \
-the answer explained the way it explained it: two to four sentences on what it is and why it \
-matters, starting with the term it's about in **bold** when there is one. What they told you \
-stays one sentence. On a routine's page each point has a kind, and its theme follows from it, \
-as the page's shape says; elsewhere kind is \"note\". Use an existing theme when one fits.
+about their situation. Nothing the page already has. Usually none to three. Each goes in one of \
+the page's blocks (block: its reference, \"b2\", or its title), with the theme and the length that \
+block's kind asks for, as the page says; kind is \"\" then. Only when they asked for a block the \
+page lacks, or none fits, block is a short new title and kind its kind. Use an existing theme \
+when one fits.
 - replaces: the page is kept up to date, not added to. When a point changes or corrects points \
 the page has (a wash day moved, a product swapped), it replaces them, named as the page names \
 them ([\"p3\"]); keep one point where two would say the same. [] when it replaces none.
@@ -167,9 +165,11 @@ struct Keep {
 
 #[derive(Deserialize)]
 struct KeepPoint {
-    theme: String,
+    block: String,
     #[serde(default)]
     kind: String,
+    #[serde(default)]
+    theme: String,
     text: String,
     source: String,
     #[serde(default)]
@@ -209,10 +209,12 @@ fn keep_schema() -> Value {
     };
     let string = json!({ "type": "string" });
     let list = |item: Value| json!({ "type": "array", "items": item });
+    let kinds: Vec<&str> = [""].iter().chain(BLOCK_KINDS).copied().collect();
     object(json!({
         "points": list(object(json!({
+            "block": string,
+            "kind": { "type": "string", "enum": kinds },
             "theme": string,
-            "kind": { "type": "string", "enum": POINT_KINDS },
             "text": string,
             "source": string,
             "replaces": list(string.clone()),
@@ -760,8 +762,9 @@ async fn keep(
     let mut kept = Kept::on(page.refs());
     for point in &from.points {
         let _ = kept.keep_point(
-            &point.theme,
+            &point.block,
             &point.kind,
+            &point.theme,
             &point.text,
             &point.source,
             "",
@@ -886,7 +889,7 @@ mod tests {
             schema["properties"]["points"]["items"]["required"]
                 .as_array()
                 .map(Vec::len),
-            Some(5)
+            Some(6)
         );
     }
 }

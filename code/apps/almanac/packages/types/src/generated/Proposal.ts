@@ -3,19 +3,19 @@ import type { ProposedPoint } from "./ProposedPoint";
 import type { ProposedReminder } from "./ProposedReminder";
 
 /**
- * A topic Almanac would start: what it's called, what it sticks to, how
- * its page looks, and what it already heard from you, which the topic
- * keeps once it's started.
+ * A topic Almanac would start: what it's called, what it sticks to, the
+ * template its blocks start from, and what it already heard from you,
+ * which the topic keeps once it's started.
  */
 export type Proposal = { name: string, sticks_to: string, icon: string, group_name: string, 
 /**
- * `cards`, `document` or `routine`.
+ * One of [`crate::TEMPLATE_NAMES`].
  */
-shape: string, 
+template: string, 
 /**
- * For a document, its title.
+ * For a collection, what its cards are: "Plants".
  */
-title: string | null, starters: Array<string>, 
+cards?: string, starters: Array<string>, 
 /**
  * What you told Almanac, kept as the topic's first points.
  */

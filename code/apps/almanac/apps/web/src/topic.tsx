@@ -1,11 +1,20 @@
-// A topic's page: what it sticks to, what it kept by theme (a card each,
-// or a document's sections) or, for a routine, by what each point is, the
-// questions it waits on, its week, and the talk beside it. The workspace's own topic, Almanac, has the index of the
-// others for its page.
+// A topic's page: what it sticks to, then its blocks in order, each laying
+// out what it keeps one way (the day's steps, the week, chips, a shelf,
+// cards, text or a list), the questions it waits on, and the talk beside
+// it. The workspace's own topic, Almanac, has the index of the others for
+// its page.
 
-import type { ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
+import type { Block, ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
+import { Dialog } from "@base-ui/react/dialog";
 import type { SyncClient } from "@code-villain/sync-client";
-import { type Confirmation, ConfirmDialog, MoreMenu, RowAction, useApi } from "@code-villain/web";
+import {
+  type Confirmation,
+  ConfirmDialog,
+  CreateDialog,
+  MoreMenu,
+  RowAction,
+  useApi,
+} from "@code-villain/web";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import {
   CalendarDays,
@@ -264,14 +273,26 @@ function useSeenOnLeave(sync: SyncClient<Schema>, topicId: string) {
   );
 }
 
+/** What a topic's page holds, for its blocks to lay out. */
+interface PageParts {
+  blocks: Block[];
+  points: Point[];
+  questions: Question[];
+  reminders: Reminder[];
+}
+
 function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
+  const blocks = useRecords("Block");
   const points = useRecords("Point");
   const questions = useRecords("Question");
   const reminders = useRecords("Reminder");
-  const mine = useMemo(() => {
+  const page = useMemo<PageParts>(() => {
     const ofTopic = <T extends { topic_id: string }>(list: T[]) =>
       list.filter((r) => r.topic_id === topic.id);
     return {
+      blocks: ofTopic(blocks).sort(
+        (a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at),
+      ),
       points: ofTopic(points).sort((a, b) => a.position - b.position),
       questions: ofTopic(questions)
         .filter((q) => q.status === "open")
@@ -280,13 +301,17 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
         .filter((r) => r.status === "on")
         .sort((a, b) => a.due_on.localeCompare(b.due_on)),
     };
-  }, [points, questions, reminders, topic.id]);
-  const themes = useMemo(() => byTheme(mine), [mine]);
-  const loose = mine.questions.filter((q) => !q.theme);
-  const empty = themes.length === 0 && loose.length === 0;
-  if (topic.shape === "routine" && !empty) {
-    return <RoutinePage topic={topic} {...mine} onAsk={onAsk} />;
-  }
+  }, [blocks, points, questions, reminders, topic.id]);
+  const homes = useMemo(() => questionHomes(page), [page]);
+  // The shelf's tiles say which days each thing is used on.
+  const routines = useMemo(() => {
+    const steps = new Set(page.blocks.filter((b) => b.kind === "today").map((b) => b.id));
+    return routineDays(
+      page.points.filter((p) => steps.has(p.block_id)),
+      page.reminders,
+    );
+  }, [page]);
+  const loose = page.questions.filter((q) => !homes.has(q.id));
 
   return (
     <>
@@ -295,22 +320,291 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
         {topic.sticks_to && <p className="text-muted">{topic.sticks_to}</p>}
       </div>
       <NoKey />
-      {mine.reminders.length > 0 && <WeekStrip topic={topic} reminders={mine.reminders} />}
       {loose.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
           {loose.map((q) => (
-            <Ask key={q.id} question={q} />
+            <Ask key={q.id} question={q} block={keeping(page.blocks)} />
           ))}
         </section>
       )}
-      {empty ? (
-        <EmptyPage topic={topic} onAsk={onAsk} />
-      ) : topic.shape === "document" ? (
-        <Document topic={topic} themes={themes} />
-      ) : (
-        <Cards themes={themes} />
+      {page.blocks.length === 0 && (
+        <div className="flex flex-col gap-1">
+          <p className="font-medium">Nothing kept yet.</p>
+          <p className="text-muted">
+            What you ask {topic.name} is kept here, with where it comes from. Ask below, or tell it
+            what you already know.
+          </p>
+        </div>
       )}
+      {page.blocks.map((block) => (
+        <BlockView
+          key={block.id}
+          topic={topic}
+          block={block}
+          page={page}
+          questions={page.questions.filter((q) => homes.get(q.id) === block.id)}
+          routines={routines}
+        />
+      ))}
+      {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
+  );
+}
+
+/** The kinds of block that show a question beside what it's about. */
+const ASKS_IN = ["cards", "text", "shelf"];
+
+/**
+ * Where each question waits: in the block whose points share its theme, or
+ * else on a card or section of its own in the first block of cards or text.
+ * The rest wait at the top of the page.
+ */
+function questionHomes({ blocks, points, questions }: PageParts): Map<string, string> {
+  const asks = new Set(blocks.filter((b) => ASKS_IN.includes(b.kind)).map((b) => b.id));
+  const fallback = blocks.find((b) => b.kind === "cards" || b.kind === "text");
+  const homes = new Map<string, string>();
+  for (const question of questions) {
+    if (!question.theme) continue;
+    const home =
+      points.find((p) => p.theme === question.theme && asks.has(p.block_id))?.block_id ??
+      fallback?.id;
+    if (home) homes.set(question.id, home);
+  }
+  return homes;
+}
+
+/** The block a question's point goes in when it's about nothing on the page. */
+function keeping(blocks: Block[]): Block | undefined {
+  return (
+    blocks.find((b) => b.kind === "cards" || b.kind === "text") ??
+    blocks.find((b) => b.kind !== "week" && b.kind !== "today")
+  );
+}
+
+/** A block's name, for its menu and its dialogs. */
+function blockName(block: Block): string {
+  return block.title || (block.kind === "week" ? "The week" : "This block");
+}
+
+/** What an empty block will show, in a line. */
+const EMPTY: Record<string, string> = {
+  today: "What comes round on the day, step by step, to tick off as you go.",
+  week: "The days things come round, once a talk settles a reminder.",
+  chips: "Short facts, a few words each, as the talks bring them up.",
+  shelf: "A tile for each thing you use, with when and how you use it.",
+  cards: "A card for each thing the topic is about, with what the talks find.",
+  text: "Sections that explain, written up as the talks go.",
+  list: "Things to follow or read, a line each, with where they're from.",
+};
+
+/** One block, laid out by its kind. */
+function BlockView({
+  topic,
+  block,
+  page,
+  questions,
+  routines,
+}: {
+  topic: Topic;
+  block: Block;
+  page: PageParts;
+  /** The questions that wait in it. */
+  questions: Question[];
+  routines: RoutineDay[];
+}) {
+  const points = page.points.filter((p) => p.block_id === block.id);
+  const frame = { block, blocks: page.blocks };
+  switch (block.kind) {
+    case "today":
+      return <Today {...frame} topic={topic} points={points} reminders={page.reminders} />;
+    case "week":
+      return <Week {...frame} reminders={page.reminders} />;
+    case "chips":
+      return (
+        <BlockFrame {...frame} empty={points.length === 0}>
+          <Chips points={points} />
+        </BlockFrame>
+      );
+    case "shelf":
+      return (
+        <BlockFrame {...frame} empty={points.length === 0}>
+          <Shelf block={block} points={points} questions={questions} routines={routines} />
+        </BlockFrame>
+      );
+    case "list":
+      return (
+        <BlockFrame {...frame} empty={points.length === 0}>
+          <List points={points} />
+        </BlockFrame>
+      );
+    default: {
+      const themes = themesOf(points, questions, page.reminders);
+      return (
+        <BlockFrame {...frame} empty={themes.length === 0}>
+          {block.kind === "text" ? (
+            <Text block={block} themes={themes} />
+          ) : (
+            <Cards block={block} themes={themes} />
+          )}
+        </BlockFrame>
+      );
+    }
+  }
+}
+
+/**
+ * A block's themes, each with its reminders: those about something the
+ * block already shows.
+ */
+function themesOf(points: Point[], questions: Question[], reminders: Reminder[]): Theme[] {
+  const names = new Set([...points.map((p) => p.theme), ...questions.map((q) => q.theme)]);
+  return byTheme({
+    points,
+    questions,
+    reminders: reminders.filter((r) => r.theme && names.has(r.theme)),
+  });
+}
+
+/**
+ * A block: its title, with ⋯ beside it on hover, then what it holds, or a
+ * line on what will be there while it's empty.
+ */
+function BlockFrame({
+  block,
+  blocks,
+  heading,
+  lead = false,
+  tools,
+  empty = false,
+  children,
+}: {
+  block: Block;
+  blocks: Block[];
+  /** In place of its title: "Today, Elvital wash". */
+  heading?: ReactNode;
+  /** The page's first thing to look at: as loud as a card's name. */
+  lead?: boolean;
+  /** Beside the title, such as the week's arrows. */
+  tools?: ReactNode;
+  empty?: boolean;
+  children?: ReactNode;
+}) {
+  const title = heading ?? block.title;
+  return (
+    <section
+      className="group/block flex flex-col gap-2"
+      aria-label={typeof title === "string" ? title : blockName(block)}
+    >
+      <div className="flex min-h-6 items-center gap-2">
+        {title && <h2 className={lead ? "font-semibold" : "text-xs text-faint"}>{title}</h2>}
+        {tools}
+        <BlockMenu block={block} blocks={blocks} />
+      </div>
+      {empty ? (
+        <p className="rounded-lg px-4 py-3.5 text-faint ring-1 ring-line ring-inset">
+          {EMPTY[block.kind]}
+        </p>
+      ) : (
+        children
+      )}
+    </section>
+  );
+}
+
+/** ⋯ beside a block's title: move it, rename it, or remove it and what it keeps. */
+function BlockMenu({ block, blocks }: { block: Block; blocks: Block[] }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const points = useRecords("Point");
+  const [renaming, setRenaming] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  if (guest) return null;
+  const at = blocks.findIndex((b) => b.id === block.id);
+  const move = (by: number) => {
+    const order = blocks.filter((b) => b.id !== block.id);
+    order.splice(at + by, 0, block);
+    const moved = order.flatMap((b, n) =>
+      b.position === n
+        ? []
+        : [{ action: "update" as const, model: "Block" as const, id: b.id, data: { position: n } }],
+    );
+    if (moved.length) sync.transact(moved);
+  };
+  const kept = points.filter((p) => p.block_id === block.id).length;
+  const name = blockName(block);
+  return (
+    <span className="ml-auto opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100">
+      <MoreMenu
+        label={`More for ${name}`}
+        items={[
+          ...(at > 0 ? [{ label: "Move up", onSelect: () => move(-1) }] : []),
+          ...(at < blocks.length - 1 ? [{ label: "Move down", onSelect: () => move(1) }] : []),
+          // The week is headed by its days.
+          ...(block.kind === "week"
+            ? []
+            : [{ label: "Rename…", onSelect: () => setRenaming(true) }]),
+          {
+            label: "Remove…",
+            danger: true,
+            onSelect: () =>
+              setConfirmation({
+                title: `Remove ${name}?`,
+                body: kept
+                  ? `Its ${kept} ${kept === 1 ? "point goes" : "points go"} with it, for everyone in the workspace. This can't be undone.`
+                  : "It keeps nothing yet. This can't be undone.",
+                action: "Remove block",
+                onConfirm: () => sync.delete("Block", block.id),
+              }),
+          },
+        ]}
+      />
+      {renaming && <RenameBlock block={block} onClose={() => setRenaming(false)} />}
+      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
+    </span>
+  );
+}
+
+/** A block's title is the topic's own: "You" in one, "Terms" in another. */
+function RenameBlock({ block, onClose }: { block: Block; onClose: () => void }) {
+  const { sync } = useWorkspace();
+  const [title, setTitle] = useState(block.title);
+  const save = () => {
+    if (!title.trim()) return;
+    sync.update("Block", block.id, { title: title.trim() });
+    onClose();
+  };
+  return (
+    <CreateDialog open onClose={onClose} width="24rem">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          save();
+        }}
+      >
+        <div className="px-4 pt-4 text-xs text-muted">
+          <Dialog.Title className="font-normal">Rename {blockName(block)}</Dialog.Title>
+        </div>
+        <div className="px-4 py-3">
+          <input
+            // biome-ignore lint/a11y/noAutofocus: the dialog opens to type the title
+            autoFocus
+            aria-label="Title"
+            value={title}
+            maxLength={60}
+            onChange={(e) => setTitle(e.target.value)}
+            className="ui-field h-9 w-full rounded-md px-3"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 px-4 pb-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={!title.trim()}>
+            Rename
+          </Button>
+        </div>
+      </form>
+    </CreateDialog>
   );
 }
 
@@ -444,11 +738,7 @@ function IndexRow({ topic }: { topic: Topic }) {
     .filter((t) => t.topic_id === topic.id)
     .reduce<string | null>((at, t) => (at && at > t.last_at ? at : t.last_at), null);
   const detail = [
-    topic.shape === "document"
-      ? "a document"
-      : kept === 0
-        ? "nothing kept yet"
-        : `${kept} ${kept === 1 ? "point" : "points"}`,
+    kept === 0 ? "nothing kept yet" : `${kept} ${kept === 1 ? "point" : "points"}`,
     last ? ago(last) : null,
   ]
     .filter(Boolean)
@@ -483,35 +773,26 @@ function IndexRow({ topic }: { topic: Topic }) {
   );
 }
 
-function EmptyPage({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <p className="font-medium">Nothing kept yet.</p>
-        <p className="text-muted">
-          What you ask {topic.name} is kept here by theme, with where it comes from. Ask below, or
-          tell it what you already know.
-        </p>
-      </div>
-      <Starters topic={topic} onAsk={onAsk} />
-    </div>
-  );
-}
-
 /** The topic's first questions, to ask with a click. */
 function Starters({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
   if (topic.starters.length === 0) return null;
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-xs font-semibold text-muted">To start</h2>
-      <ul className="flex flex-col gap-1">
+    <section className="flex flex-col gap-2" aria-label="Start with">
+      <h2 className="text-xs text-faint">Start with</h2>
+      <ul className="flex flex-col gap-0.5">
         {topic.starters.map((starter) => (
           <li key={starter}>
             <button
               type="button"
               onClick={() => onAsk(starter)}
-              className="ui-row w-full rounded-md px-3 py-2 text-left hover:bg-hover"
+              className="ui-row flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left hover:bg-hover"
             >
+              <ChevronRight
+                size={13}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className="shrink-0 text-faint"
+              />
               {starter}
             </button>
           </li>
@@ -521,41 +802,58 @@ function Starters({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => voi
   );
 }
 
-/** This week of the topic's reminders, a day each. */
-function WeekStrip({ topic, reminders }: { topic: Topic; reminders: Reminder[] }) {
+/** The week of the topic's reminders, a day each, headed by its days. */
+function Week({
+  block,
+  blocks,
+  reminders,
+}: {
+  block: Block;
+  blocks: Block[];
+  reminders: Reminder[];
+}) {
   const now = today();
   const [days, setDays] = useState(() => weekOf(now));
   const first = days[0] ?? now;
-  return (
-    <section className="flex flex-col gap-2" aria-label={`${topic.name} this week`}>
-      <div className="flex items-center gap-2">
-        <h2 className="text-xs font-semibold text-muted">{weekWords(days)}</h2>
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => setDays(weekOf(addDays(first, -7)))}
-            aria-label="The week before"
-            title="The week before"
-            className="ui-button ui-icon-button"
-          >
-            <ChevronLeft size={15} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDays(weekOf(addDays(first, 7)))}
-            aria-label="The week after"
-            title="The week after"
-            className="ui-button ui-icon-button"
-          >
-            <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        </div>
-        {!days.includes(now) && (
-          <button type="button" onClick={() => setDays(weekOf(now))} className="ui-button">
-            This week
-          </button>
-        )}
+  if (reminders.length === 0) {
+    return <BlockFrame block={block} blocks={blocks} heading={blockName(block)} empty />;
+  }
+  const tools = (
+    <>
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => setDays(weekOf(addDays(first, -7)))}
+          aria-label="The week before"
+          title="The week before"
+          className="ui-button ui-icon-button"
+        >
+          <ChevronLeft size={15} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setDays(weekOf(addDays(first, 7)))}
+          aria-label="The week after"
+          title="The week after"
+          className="ui-button ui-icon-button"
+        >
+          <ChevronRight size={15} strokeWidth={1.75} aria-hidden="true" />
+        </button>
       </div>
+      {!days.includes(now) && (
+        <button type="button" onClick={() => setDays(weekOf(now))} className="ui-button">
+          This week
+        </button>
+      )}
+    </>
+  );
+  return (
+    <BlockFrame
+      block={block}
+      blocks={blocks}
+      heading={block.title || weekWords(days)}
+      tools={tools}
+    >
       <div className="grid grid-cols-7 gap-1">
         {days.map((day) => {
           const due = reminders.filter((r) => occurrences(r, day, day).length > 0);
@@ -581,12 +879,12 @@ function WeekStrip({ topic, reminders }: { topic: Topic; reminders: Reminder[] }
           );
         })}
       </div>
-    </section>
+    </BlockFrame>
   );
 }
 
 /** A card per theme: its points, its reminders, what it waits on. */
-function Cards({ themes }: { themes: Theme[] }) {
+function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
   return (
     // Two columns only when the page has room, talk open or not.
     <div className="@container">
@@ -597,7 +895,7 @@ function Cards({ themes }: { themes: Theme[] }) {
             {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
             {theme.points.length > 0 && <Points points={theme.points} />}
             {theme.questions.map((q) => (
-              <Ask key={q.id} question={q} />
+              <Ask key={q.id} question={q} block={block} />
             ))}
             <KeptFrom points={theme.points} />
           </article>
@@ -607,20 +905,17 @@ function Cards({ themes }: { themes: Theme[] }) {
   );
 }
 
-/** A document that grows: a section per theme. */
-function Document({ topic, themes }: { topic: Topic; themes: Theme[] }) {
+/** Writing that grows: a section per theme. */
+function Text({ block, themes }: { block: Block; themes: Theme[] }) {
   return (
     <article className="flex flex-col gap-6">
-      {topic.title && topic.title !== topic.name && (
-        <h2 className="text-title font-semibold">{topic.title}</h2>
-      )}
       {themes.map((theme) => (
         <section key={theme.name} className="flex flex-col gap-2">
           <h3 className="font-semibold">{theme.name}</h3>
           {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
           {theme.points.length > 0 && <Points points={theme.points} passages />}
           {theme.questions.map((q) => (
-            <Ask key={q.id} question={q} />
+            <Ask key={q.id} question={q} block={block} />
           ))}
         </section>
       ))}
@@ -735,15 +1030,16 @@ function Dates({ reminders }: { reminders: Reminder[] }) {
   );
 }
 
-/** A question Almanac waits on, where it's about. */
-function Ask({ question }: { question: Question }) {
+/** A question Almanac waits on, where it's about; its point goes in `block`. */
+function Ask({ question, block }: { question: Question; block?: Block }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const add = () => {
-    if (question.point) {
+    if (question.point && block) {
       sync.create("Point", {
         topic_id: question.topic_id,
-        theme: question.theme ?? "Notes",
+        block_id: block.id,
+        theme: block.kind === "chips" || block.kind === "list" ? "" : (question.theme ?? "Notes"),
         text: question.point,
         source: question.source ?? "You said",
         talk_id: question.talk_id ?? undefined,
@@ -842,88 +1138,6 @@ function AskBar({
   );
 }
 
-/**
- * A routine's page, by what each point is: the day's steps, its week, what's
- * true of you, your shelf and the advice. Notes not sorted yet stay on cards
- * under them, with a way to have them sorted.
- */
-function RoutinePage({
-  topic,
-  points,
-  questions,
-  reminders,
-  onAsk,
-}: {
-  topic: Topic;
-  points: Point[];
-  questions: Question[];
-  reminders: Reminder[];
-  onAsk: (text: string) => void;
-}) {
-  const of = (kind: string) => points.filter((p) => p.kind === kind);
-  const shelf = byTheme({ points: of("thing"), questions: [], reminders: [] });
-  const things = new Set(shelf.map((t) => t.name));
-  const notes = byTheme({
-    points: of("note"),
-    questions: questions.filter((q) => q.theme && !things.has(q.theme)),
-    reminders: [],
-  });
-  const routines = routineDays(of("step"), reminders);
-  const loose = questions.filter((q) => !q.theme);
-  return (
-    <>
-      <div className="flex flex-col gap-1">
-        <p className="text-title font-semibold">{topic.name}</p>
-        {topic.sticks_to && <p className="text-muted">{topic.sticks_to}</p>}
-      </div>
-      <NoKey />
-      <Steps topic={topic} routines={routines} />
-      {reminders.length > 0 && <WeekStrip topic={topic} reminders={reminders} />}
-      {loose.length > 0 && (
-        <section className="flex flex-col gap-2" aria-label="Waiting on you">
-          {loose.map((q) => (
-            <Ask key={q.id} question={q} />
-          ))}
-        </section>
-      )}
-      <AboutYou points={of("about")} />
-      {shelf.length > 0 && (
-        <section className="flex flex-col gap-2" aria-label="Your shelf">
-          <h2 className="text-xs text-faint">Your shelf</h2>
-          <div className="@container">
-            <div className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
-              {shelf.map((thing) => (
-                <Thing
-                  key={thing.name}
-                  thing={thing}
-                  days={thingDays(thing.name, routines)}
-                  questions={questions.filter((q) => q.theme === thing.name)}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-      <Advice points={of("tip")} />
-      {notes.length > 0 && (
-        <section className="flex flex-col gap-2" aria-label="Not sorted yet">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xs text-faint">Not sorted yet</h2>
-            <button
-              type="button"
-              className="ui-button ml-auto"
-              onClick={() => onAsk("Sort the notes that aren't sorted yet into the routine.")}
-            >
-              Sort them
-            </button>
-          </div>
-          <Cards themes={notes} />
-        </section>
-      )}
-    </>
-  );
-}
-
 /** A routine day: its name, its steps in order, and the reminders it comes round with. */
 interface RoutineDay {
   name: string;
@@ -974,50 +1188,89 @@ function whatAndHow(text: string): [string, string | null] {
   return [text.slice(0, at), how.charAt(0).toUpperCase() + how.slice(1)];
 }
 
-/** The day's steps, to tick off as you go. Ticks stay on this device, for that day. */
-function Steps({ topic, routines }: { topic: Topic; routines: RoutineDay[] }) {
+/**
+ * The day's steps, to tick off as you go: the routine due today, or the
+ * next one this week. Without steps, what comes round today. Ticks stay on
+ * this device, for that day.
+ */
+function Today({
+  topic,
+  block,
+  blocks,
+  points,
+  reminders,
+}: {
+  topic: Topic;
+  block: Block;
+  blocks: Block[];
+  points: Point[];
+  reminders: Reminder[];
+}) {
   const { sync } = useWorkspace();
-  const next = nextRoutine(routines);
-  const key = next && `almanac.ticked.${topic.id}.${next.day}`;
+  const now = today();
+  const next = nextRoutine(routineDays(points, reminders));
+  const day = next?.day ?? now;
+  const key = `almanac.ticked.${topic.id}.${day}`;
   const [ticked, setTicked] = useState<string[]>([]);
   useEffect(() => {
-    if (!key) return;
     try {
       setTicked(JSON.parse(localStorage.getItem(key) ?? "[]"));
     } catch {
       setTicked([]);
     }
   }, [key]);
-  if (!next) return null;
-  const { day, dated, routine } = next;
-  const reminder = routine.reminders.find((r) => occurrences(r, day, day).length);
   const tick = (id: string) => {
     const now = ticked.includes(id) ? ticked.filter((t) => t !== id) : [...ticked, id];
     setTicked(now);
     try {
-      if (key) localStorage.setItem(key, JSON.stringify(now));
+      localStorage.setItem(key, JSON.stringify(now));
     } catch {}
   };
-  const when = dueWords(day).replace(/^./, (c) => c.toUpperCase());
-  const heading = dated ? `${when}, ${routine.name}` : routine.name;
+  const frame = { block, blocks, lead: true };
+  let heading: string = block.title;
+  let tools: ReactNode = null;
+  let steps: { id: string; what: string; how: string | null }[];
+  if (next) {
+    const { dated, routine } = next;
+    const when =
+      dated && day !== now ? dueWords(day).replace(/^./, (c) => c.toUpperCase()) : block.title;
+    heading = when ? `${when}, ${routine.name}` : routine.name;
+    const reminder = routine.reminders.find((r) => occurrences(r, day, day).length);
+    if (reminder) tools = <ReminderMenu sync={sync} reminder={reminder} />;
+    steps = routine.steps.map((step) => {
+      const [what, how] = whatAndHow(step.text);
+      return { id: step.id, what, how };
+    });
+  } else {
+    steps = reminders
+      .filter((r) => occurrences(r, now, now).length)
+      .map((r) => {
+        const time = timeWords(r.at);
+        return { id: r.id, what: r.title, how: time ? `At ${time}` : null };
+      });
+  }
+  if (steps.length === 0) {
+    return points.length + reminders.length === 0 ? (
+      <BlockFrame {...frame} empty />
+    ) : (
+      <BlockFrame {...frame}>
+        <p className="text-muted">Nothing comes round today.</p>
+      </BlockFrame>
+    );
+  }
   return (
-    <section className="flex flex-col gap-2" aria-label={heading}>
-      <div className="flex items-center gap-2">
-        <h2 className="font-semibold">{heading}</h2>
-        {reminder && <ReminderMenu sync={sync} reminder={reminder} />}
-      </div>
+    <BlockFrame {...frame} heading={heading} tools={tools}>
       <div className="@container">
         <ol className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
-          {routine.steps.map((step, n) => {
-            const [what, how] = whatAndHow(step.text);
-            const done = ticked.includes(step.id);
+          {steps.map(({ id, what, how }, n) => {
+            const done = ticked.includes(id);
             return (
-              <li key={step.id}>
+              <li key={id}>
                 <button
                   type="button"
                   aria-pressed={done}
-                  aria-label={`${whatAndHow(step.text)[0]}: ${done ? "done" : "to do"}`}
-                  onClick={() => tick(step.id)}
+                  aria-label={`${what}: ${done ? "done" : "to do"}`}
+                  onClick={() => tick(id)}
                   className="flex w-full items-start gap-3 rounded-lg bg-surface px-4 py-3.5 text-left hover:bg-hover"
                 >
                   <span
@@ -1053,41 +1306,67 @@ function Steps({ topic, routines }: { topic: Topic; routines: RoutineDay[] }) {
           })}
         </ol>
       </div>
-    </section>
+    </BlockFrame>
   );
 }
 
-/** What's true of you, as chips: "Low porosity, by the float test". */
-function AboutYou({ points }: { points: Point[] }) {
-  if (points.length === 0) return null;
+/** Facts in a few words, as chips: "Low porosity, by the float test". */
+function Chips({ points }: { points: Point[] }) {
   return (
-    <section className="flex flex-col gap-2" aria-label="You">
-      <h2 className="text-xs text-faint">You</h2>
-      <ul className="flex flex-wrap gap-1.5">
-        {points.map((point) => {
-          const at = point.text.indexOf(", ");
-          return (
-            <li
-              key={point.id}
-              title={point.source ?? undefined}
-              className="ui-chip flex items-center gap-1.5 px-2.5 py-1"
-            >
-              {!point.seen && (
-                <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
-              )}
-              {at > 0 ? (
-                <span>
-                  <span className="font-semibold text-fg">{point.text.slice(0, at)}</span>
-                  {point.text.slice(at)}
-                </span>
-              ) : (
-                <span className="text-fg">{point.text}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <ul className="flex flex-wrap gap-1.5">
+      {points.map((point) => {
+        const at = point.text.indexOf(", ");
+        return (
+          <li
+            key={point.id}
+            title={point.source ?? undefined}
+            className="ui-chip flex items-center gap-1.5 px-2.5 py-1"
+          >
+            {!point.seen && (
+              <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
+            )}
+            {at > 0 ? (
+              <span>
+                <span className="font-semibold text-fg">{point.text.slice(0, at)}</span>
+                {point.text.slice(at)}
+              </span>
+            ) : (
+              <span className="text-fg">{point.text}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** A tile for each thing on the shelf, with the days it's used on. */
+function Shelf({
+  block,
+  points,
+  questions,
+  routines,
+}: {
+  block: Block;
+  points: Point[];
+  questions: Question[];
+  routines: RoutineDay[];
+}) {
+  const things = byTheme({ points, questions: [], reminders: [] });
+  return (
+    <div className="@container">
+      <div className="grid gap-2.5 @lg:grid-cols-2 @3xl:grid-cols-3">
+        {things.map((thing) => (
+          <Thing
+            key={thing.name}
+            block={block}
+            thing={thing}
+            days={thingDays(thing.name, routines)}
+            questions={questions.filter((q) => q.theme === thing.name)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1114,10 +1393,12 @@ function daysWords(days: string[]): string {
 
 /** A thing on your shelf: what it is, when and how you use it, and its other notes. */
 function Thing({
+  block,
   thing,
   days,
   questions,
 }: {
+  block: Block;
   thing: Theme;
   days: string[];
   questions: Question[];
@@ -1140,7 +1421,7 @@ function Thing({
       )}
       {how && <p className="text-xs">{inline(how.text)}</p>}
       {questions.map((q) => (
-        <Ask key={q.id} question={q} />
+        <Ask key={q.id} question={q} block={block} />
       ))}
       {rest.length > 0 && (
         <div className="mt-1 flex flex-col gap-2">
@@ -1160,14 +1441,12 @@ function Thing({
   );
 }
 
-/** Advice worth following, the newest three, with where it comes from. */
-function Advice({ points }: { points: Point[] }) {
+/** Things to follow or read, a line each with where it comes from: the newest five. */
+function List({ points }: { points: Point[] }) {
   const [all, setAll] = useState(false);
-  if (points.length === 0) return null;
-  const shown = all ? points : points.slice(-3);
+  const shown = all ? points : points.slice(-5);
   return (
-    <section className="flex flex-col gap-1" aria-label="Advice">
-      <h2 className="text-xs text-faint">Advice</h2>
+    <div className="flex flex-col">
       <ul className="flex flex-col">
         {shown.map((point) => (
           <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
@@ -1194,7 +1473,7 @@ function Advice({ points }: { points: Point[] }) {
           </li>
         ))}
       </ul>
-      {points.length > 3 && (
+      {points.length > 5 && (
         <button
           type="button"
           className="ui-disclosure self-start px-2.5"
@@ -1202,10 +1481,10 @@ function Advice({ points }: { points: Point[] }) {
           onClick={() => setAll(!all)}
         >
           <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
-          {all ? "The newest three" : `${points.length - 3} more`}
+          {all ? "The newest five" : `${points.length - 5} more`}
         </button>
       )}
-    </section>
+    </div>
   );
 }
 

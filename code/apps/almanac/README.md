@@ -69,18 +69,26 @@ topics.
 
 - **The workspace's own topic, Almanac**: every workspace starts with it,
   above Calendar, and opens on it. Tell it what you want to keep track
-  of, and it proposes a topic: the name, what it sticks to, how its page
-  looks, and what it already heard from you. Start it with a click (⌘↩),
+  of, and it proposes a topic: the name, what it sticks to, the template
+  its page starts from, and what it already heard from you. Start it with a click (⌘↩),
   or change it first. Its page is the index of the other topics, by
   group, with what's new. It also changes a topic you name, says what it
   changed, and offers Undo. It can be renamed, not deleted.
-- **Starting a topic**: a name, and what it sticks to, which may stay
-  empty. Once Claude answers, Almanac writes the rest in the background: what
-  it sticks to when that was empty, the icon, the group, the page's shape
-  (cards, a document or a routine) and the first questions. Edit topic changes any
-  of it.
-- **An empty topic** says what will be there and offers its first
-  questions.
+- **Starting a topic**: a name, what it sticks to, which may stay empty,
+  and what it starts as: Routine, Collection, Study, or Almanac's pick.
+  Once Claude answers, Almanac writes the rest in the background: what it
+  sticks to when that was empty, the icon, the group, the template when
+  you left it to Almanac, and the first questions. Edit topic changes the
+  name, what it sticks to, the group and the icon.
+- **A topic is its blocks**, in order, with no page shape to pick: Today
+  (the day's steps to tick off), Week, Chips, Shelf, Cards, Text and List,
+  each with a title of the topic's own ("You" in Haare, "Terms" in Marx).
+  A template only names the blocks a topic starts with: Routine has Today,
+  Week, You, Your shelf and Advice; Collection Today, Week and a card per
+  thing; Study Reading, Terms and What it says. ⋯ beside a block's title
+  moves it up or down, renames it or removes it with what it keeps. An
+  empty block says in a line what will be there, and a topic with nothing
+  kept yet offers its first questions.
 - **A talk** opens beside the page and streams its answer. Each question
   sends Almanac's fixed prompt, what the topic sticks to, what the page
   keeps and the current talk, nothing older. A question off the topic gets
@@ -89,23 +97,24 @@ topics.
 - **Photos in a talk**: paste, drop or pick up to six with a question, of a
   shampoo, a plant, a page. Claude reads them with that question and every
   later one in the talk; they stay in the talk, not on the page.
-- **The page keeps points with their sources**, grouped by theme: on a
-  cards page, a card per plant with a short note for each point; on a
-  document page, sections of paragraphs that explain, each with the talk
-  it came from; on a routine page, the day's steps to tick off, its week,
-  what's true of you, your shelf (each thing with when and how you use it)
-  and advice. Notes not sorted into a routine yet wait under it, with Sort
-  them. New points carry the unread dot until you leave the topic.
+- **The page keeps points with their sources**, each in a block: a card
+  per plant with a short note for each point; sections of paragraphs that
+  explain, each with the talk it came from; the day's steps; facts as
+  chips; your shelf, each thing with when and how you use it; a list of
+  advice or reading. Claude keeps each point in the block that shows it,
+  and starts a block when you ask for one or none fits ("keep what I need
+  to buy"). New points carry the unread dot until you leave the topic.
   The page is kept up to date, not added to: a point that changes one it
-  has takes that one's place.
+  has takes that one's place, in the same block.
 - **Almanac asks when it's unsure**: the question waits on the card it's
   about, with Add it and Leave it out. A question it asks in the talk
   waits for your reply there.
 - **Reminders**: when a talk settles something that comes round, or you
   tell it a routine you keep, such as your wash days, Almanac offers a
   reminder in the talk. When a wash day moves, the new reminder replaces
-  the old one once you say yes. A topic with reminders shows its week,
-  with the weeks before and after a click away.
+  the old one once you say yes. The Week block shows them, with the weeks
+  before and after a click away; a topic without one gets it with its
+  first reminder. A collection's Today lists what comes round that day.
   Calendar shows the workspace's week from every topic, what's still to
   do and what comes later; a bell marks the reminders that notify the
   Mac, and the desktop app sends those notifications.
@@ -117,7 +126,9 @@ what it read. A company server's doesn't.
 
 - **Workspaces**, as every Code Villain app has them: Home, and Work for
   what you learn at work. Only Home is made today.
-- **More shapes**: Karl Marx on what you're reading.
+- **Ticking off a list**: Reading with a mark for what you've read.
+- **Blocks that go quietly**: one that stays empty after a few talks.
+- **Adding a block yourself**: today only Claude adds one, when you ask.
 - **Dumps:** a shortcut anywhere on the Mac opens one field, with no topic
   to pick. Almanac says where the dump went, with Open and Undo, and
   offers a reminder when there's something to do. When two topics fit, or
@@ -138,6 +149,9 @@ Open them in a browser. Each shows night and day.
   three ways, and the routine page taken from two of them. Night only.
 - [`storyboards/dumping.html`](storyboards/dumping.html): a dump, where it
   went, what it asks when it's unsure, and the dump later in its topic.
+- [`storyboards/blocks.html`](storyboards/blocks.html): topics made of
+  blocks: Haare from Routine, Pflanzen from Collection, Marx from Study,
+  starting from a template, and a new topic's empty blocks. Night only.
 - [`storyboards/the-workspaces-own-topic.html`](storyboards/the-workspaces-own-topic.html):
   a new workspace on its own topic, the topic it proposes, its page as the
   index, and Settings → Claude with Claude Code.

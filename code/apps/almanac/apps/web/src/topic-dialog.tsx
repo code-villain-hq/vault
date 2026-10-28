@@ -1,10 +1,11 @@
 // Changing what Almanac picked for a topic: its name, what it sticks to,
-// its group, its icon and its page's shape. The same form changes a topic
-// Almanac proposes, before it starts.
+// its group and its icon. The same form changes a topic Almanac proposes,
+// before it starts, and the template its blocks start from.
 
 import type { Topic } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
 import { CreateDialog, messageOf } from "@code-villain/web";
+import { BookOpen, CalendarDays, type LucideIcon, Sparkles, Sprout } from "lucide-react";
 import { useState } from "react";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn } from "./layout";
@@ -17,8 +18,65 @@ export interface TopicFields {
   sticks_to: string;
   group_name: string;
   icon: string;
-  shape: string;
-  title: string;
+  /** For a topic not started yet: the blocks it starts with. */
+  template?: string;
+}
+
+/** What a topic may start as, with the blocks each gives it. */
+const TEMPLATES: { value: string; label: string; blocks: string; Icon: LucideIcon }[] = [
+  {
+    value: "",
+    label: "Almanac picks",
+    blocks: "From the name and what it sticks to",
+    Icon: Sparkles,
+  },
+  {
+    value: "routine",
+    label: "Routine",
+    blocks: "Today · Week · You · Shelf · Advice",
+    Icon: CalendarDays,
+  },
+  { value: "collection", label: "Collection", blocks: "Today · Week · Cards", Icon: Sprout },
+  { value: "study", label: "Study", blocks: "Reading · Terms · What it says", Icon: BookOpen },
+];
+
+/** "Starts as": a template, or Almanac's pick when `picks`. */
+export function StartsAs({
+  value,
+  picks = false,
+  onChange,
+}: {
+  value: string;
+  picks?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="mb-1.5 text-xs font-medium text-muted">Starts as</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {TEMPLATES.filter((t) => picks || t.value).map(({ value: name, label, blocks, Icon }) => (
+          <button
+            key={name || "picks"}
+            type="button"
+            aria-pressed={value === name}
+            onClick={() => onChange(name)}
+            className="flex items-start gap-2.5 rounded-md px-3 py-2 text-left ring-1 ring-line ring-inset hover:bg-hover aria-pressed:bg-selected aria-pressed:ring-fg"
+          >
+            <Icon
+              size={16}
+              strokeWidth={1.75}
+              aria-hidden="true"
+              className="mt-0.5 shrink-0 text-muted"
+            />
+            <span className="flex min-w-0 flex-col">
+              <span className="font-semibold">{label}</span>
+              <span className="text-xs text-faint">{blocks}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 export function TopicDialog({ topic, onClose }: { topic: Topic; onClose: () => void }) {
@@ -29,7 +87,7 @@ export function TopicDialog({ topic, onClose }: { topic: Topic; onClose: () => v
     <TopicForm
       heading={`Edit ${topic.name}`}
       action="Save"
-      fields={{ ...topic, title: topic.title ?? "" }}
+      fields={topic}
       own={own}
       onSave={(fields) =>
         sync.update(
@@ -64,8 +122,7 @@ export function TopicForm({
   const [sticksTo, setSticksTo] = useState(fields.sticks_to);
   const [group, setGroup] = useState(fields.group_name);
   const [icon, setIcon] = useState(fields.icon);
-  const [shape, setShape] = useState(fields.shape);
-  const [title, setTitle] = useState(fields.title);
+  const [template, setTemplate] = useState(fields.template);
   const [problem, setProblem] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -79,8 +136,7 @@ export function TopicForm({
         sticks_to: sticksTo.trim(),
         group_name: group.trim(),
         icon,
-        shape,
-        title: title.trim(),
+        ...(template === undefined ? {} : { template }),
       });
       onClose();
     } catch (e) {
@@ -127,49 +183,16 @@ export function TopicForm({
           </label>
           {!own && (
             <>
-              <div className="flex gap-3">
-                <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted">Group</span>
-                  <input
-                    value={group}
-                    onChange={(e) => setGroup(e.target.value)}
-                    placeholder="Home"
-                    className={`${field} h-9`}
-                  />
-                </label>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted">Page</span>
-                  <fieldset className="ui-segmented" aria-label="Page">
-                    {(
-                      [
-                        ["cards", "Cards"],
-                        ["document", "Document"],
-                        ["routine", "Routine"],
-                      ] as const
-                    ).map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className="ui-segment"
-                        aria-pressed={shape === value}
-                        onClick={() => setShape(value)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </fieldset>
-                </div>
-              </div>
-              {shape === "document" && (
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted">The document's title</span>
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className={`${field} h-9`}
-                  />
-                </label>
-              )}
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted">Group</span>
+                <input
+                  value={group}
+                  onChange={(e) => setGroup(e.target.value)}
+                  placeholder="Home"
+                  className={`${field} h-9`}
+                />
+              </label>
+              {template !== undefined && <StartsAs value={template} onChange={setTemplate} />}
               <fieldset className="flex flex-col gap-1.5">
                 <legend className="mb-1.5 text-xs font-medium text-muted">Icon</legend>
                 <div className="flex flex-wrap gap-1">

@@ -1,4 +1,7 @@
 import type {
+  Block,
+  BlockCreate,
+  BlockPatch,
   Message,
   MessagePatch,
   Point,
@@ -19,11 +22,12 @@ import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-cl
 import { databaseName } from "@code-villain/web";
 import { authHeaders, credentialsFor, type Place, socketProtocols } from "./server";
 
-// Everything a workspace keeps syncs: its topics, what their pages keep,
+// Everything a workspace keeps syncs: its topics, their blocks, what they keep,
 // the talks it was kept from, and its members. The server starts topics
 // and talks and writes the answers; the app reads them from its copy.
 export type Schema = {
   Topic: { record: Topic; create: TopicCreate; patch: TopicPatch };
+  Block: { record: Block; create: BlockCreate; patch: BlockPatch };
   Talk: { record: Talk; create: never; patch: never };
   Message: { record: Message; create: never; patch: MessagePatch };
   Point: { record: Point; create: PointCreate; patch: PointPatch };
@@ -57,8 +61,14 @@ export function createSyncClient(options: {
     // What the server would fill in, so new records look complete at once.
     // biome-ignore-start lint/correctness/noComponentHookFactories: named after models, and they make records, not components
     defaults: {
+      Block: () => ({
+        title: "",
+        position: Number.MAX_SAFE_INTEGER,
+        workspace_id: options.workspaceId,
+        ...timestamps(),
+      }),
       Point: () => ({
-        kind: "note",
+        theme: "",
         source: null,
         source_url: null,
         talk_id: null,

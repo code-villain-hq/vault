@@ -443,12 +443,7 @@ function Proposed({
     if (!started) return <p className="text-muted">Started {proposal.name}, deleted since.</p>;
     const Icon = topicIcon(started.icon);
     const kept = points.filter((p) => p.topic_id === started.id).length;
-    const what =
-      started.shape === "document"
-        ? ", a document"
-        : kept
-          ? `, with ${kept} ${kept === 1 ? "point" : "points"}`
-          : "";
+    const what = kept ? `, with ${kept} ${kept === 1 ? "point" : "points"}` : "";
     return (
       <div className="flex items-center gap-2 text-muted">
         <Icon size={14} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
@@ -469,13 +464,11 @@ function Proposed({
 
   const Icon = topicIcon(proposal.icon);
   const page =
-    proposal.shape === "document"
-      ? "A document"
-      : proposal.shape === "routine"
-        ? "A routine, with its week"
-        : proposal.reminders.length > 0
-          ? "Cards, with a week"
-          : "Cards";
+    proposal.template === "routine"
+      ? "A routine"
+      : proposal.template === "study"
+        ? "A study"
+        : "A collection";
   return (
     <div className="flex flex-col gap-2.5 rounded-lg bg-surface px-4 py-3.5">
       <div className="flex items-center gap-2">
@@ -488,11 +481,14 @@ function Proposed({
       {proposal.sticks_to && <p className="text-muted">{proposal.sticks_to}</p>}
       {proposal.points.length + proposal.reminders.length > 0 && (
         <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted">
-          {proposal.points.map((point) => (
-            <li key={`${point.theme}${point.text}`}>
-              {point.theme}: {point.text}
-            </li>
-          ))}
+          {proposal.points.map((point) => {
+            const under = point.theme || point.block;
+            return (
+              <li key={`${under}${point.text}`}>
+                {under ? `${under}: ${point.text}` : point.text}
+              </li>
+            );
+          })}
           {proposal.reminders.map((reminder) => (
             <li key={reminder.title}>
               {reminder.title},{" "}
@@ -520,8 +516,8 @@ function Proposed({
         <TopicForm
           heading={`Change ${proposal.name}`}
           action="Start topic"
-          fields={{ ...proposal, title: proposal.title ?? "" }}
-          onSave={(fields) => start({ ...fields, title: fields.title || undefined })}
+          fields={proposal}
+          onSave={start}
           onClose={() => setChanging(false)}
         />
       )}

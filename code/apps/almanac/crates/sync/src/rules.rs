@@ -1,6 +1,6 @@
 //! Almanac's rules for the shared sync engine ([`code_villain_sync`]): what
-//! a talk said is the server's, a topic's records go with it, and only the
-//! server marks a reminder as told.
+//! a talk said is the server's, a topic's records go with it, a block's
+//! points with the block, and only the server marks a reminder as told.
 
 use almanac_domain::{Actor, ModelKind, Operation};
 use code_villain_sync::Rules;
@@ -17,6 +17,10 @@ const TOPIC_NEXT: &str =
     "SELECT COALESCE(max(position), 0) + 1 FROM topics WHERE workspace_id = $1";
 const POINT_NEXT: &str = "SELECT COALESCE(max(position), 0) + 1 FROM points \
      WHERE workspace_id = $1 AND topic_id = $2";
+const BLOCK_NEXT: &str = "SELECT COALESCE(max(position), -1) + 1 FROM blocks \
+     WHERE workspace_id = $1 AND topic_id = $2";
+const TOPIC_BLOCKS: &str = "SELECT id FROM blocks WHERE topic_id = $1 AND workspace_id = $2";
+const BLOCK_POINTS: &str = "SELECT id FROM points WHERE block_id = $1 AND workspace_id = $2";
 const TOPIC_REMINDERS: &str = "SELECT id FROM reminders WHERE topic_id = $1 AND workspace_id = $2";
 const TOPIC_QUESTIONS: &str = "SELECT id FROM questions WHERE topic_id = $1 AND workspace_id = $2";
 const TOPIC_POINTS: &str = "SELECT id FROM points WHERE topic_id = $1 AND workspace_id = $2";
@@ -93,7 +97,7 @@ impl Rules for Almanac {
                     .fetch_one(&mut *db)
                     .await?
             }
-            ModelKind::Point => {
+            ModelKind::Block | ModelKind::Point => {
                 let Some(topic) = row
                     .get("topic_id")
                     .and_then(Value::as_str)
@@ -101,7 +105,12 @@ impl Rules for Almanac {
                 else {
                     return Ok(());
                 };
-                sqlx::query_scalar(POINT_NEXT)
+                let next = if model == ModelKind::Block {
+                    BLOCK_NEXT
+                } else {
+                    POINT_NEXT
+                };
+                sqlx::query_scalar(next)
                     .bind(actor.workspace_id)
                     .bind(topic)
                     .fetch_one(&mut *db)
@@ -119,16 +128,19 @@ impl Rules for Almanac {
         model: ModelKind,
         id: Uuid,
     ) -> Result<Vec<Operation>, SyncError> {
-        // What a topic kept goes with it, and a talk's messages with the
-        // talk, logged so every client lets go of them too.
+        // What a topic kept goes with it, a block's points with the block,
+        // and a talk's messages with the talk, logged so every client lets
+        // go of them too.
         let children: &[(ModelKind, &'static str)] = match model {
             ModelKind::Topic => &[
                 (ModelKind::Reminder, TOPIC_REMINDERS),
                 (ModelKind::Question, TOPIC_QUESTIONS),
                 (ModelKind::Point, TOPIC_POINTS),
+                (ModelKind::Block, TOPIC_BLOCKS),
                 (ModelKind::Message, TOPIC_MESSAGES),
                 (ModelKind::Talk, TOPIC_TALKS),
             ],
+            ModelKind::Block => &[(ModelKind::Point, BLOCK_POINTS)],
             ModelKind::Talk => &[(ModelKind::Message, TALK_MESSAGES)],
             ModelKind::User => {
                 return Err(SyncError::Invalid(format!(

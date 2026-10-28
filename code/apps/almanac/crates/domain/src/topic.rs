@@ -5,8 +5,9 @@ use uuid::Uuid;
 
 use crate::model::{Validate, ValidationError};
 
-/// A topic: what it's called, what it sticks to, and how its page opens.
-/// Almanac picks the icon, the group and the shape when it starts.
+/// A topic: what it's called and what it sticks to. Its page is its
+/// [`Block`]s. Almanac picks the icon, the group and the template its
+/// blocks start from when it starts.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Topic {
@@ -19,11 +20,6 @@ pub struct Topic {
     pub icon: String,
     /// The sidebar group it sits in, such as "Hobby". Empty for none.
     pub group_name: String,
-    /// `cards`, a card per theme, `document`, a document that grows, or
-    /// `routine`, a routine they keep (see [`POINT_KINDS`]).
-    pub shape: String,
-    /// For a document, its title.
-    pub title: Option<String>,
     /// First questions, for the empty page.
     pub starters: Vec<String>,
     pub position: i32,
@@ -42,8 +38,6 @@ pub struct TopicCreate {
     pub sticks_to: Option<String>,
     pub icon: Option<String>,
     pub group_name: Option<String>,
-    pub shape: Option<String>,
-    pub title: Option<String>,
     pub starters: Option<Vec<String>>,
     /// After the last topic when left out.
     pub position: Option<i32>,
@@ -59,8 +53,6 @@ pub struct TopicPatch {
     pub sticks_to: Option<String>,
     pub icon: Option<String>,
     pub group_name: Option<String>,
-    pub shape: Option<String>,
-    pub title: Option<String>,
     pub starters: Option<Vec<String>>,
     pub position: Option<i32>,
 }
@@ -128,28 +120,101 @@ pub const ICONS: &[&str] = &[
     "sparkles",
 ];
 
-pub const SHAPES: &[&str] = &["cards", "document", "routine"];
-
-/// What a point is. Cards and documents keep `note`s. A routine's page
-/// lays out the rest: `about` is a fact about them, `thing` a note on
-/// something on their shelf (its theme is the thing), `step` one step of a
-/// routine day (its theme is the day's routine, as its reminder is called)
-/// and `tip` advice.
-pub const POINT_KINDS: &[&str] = &["note", "about", "thing", "step", "tip"];
-
 pub const KINDS: &[&str] = &["topic", "almanac"];
 
-/// A short point the page keeps, under a theme, with where it comes from.
+/// How a block lays out its points. `today` has the steps of what's due,
+/// each under what comes round (its theme, as its reminders are called);
+/// `week` the days of the topic's reminders, and no points; `chips` short
+/// facts; `shelf` a tile per thing they use (its theme); `cards` a card per
+/// theme; `text` a section per theme; `list` one line each.
+pub const BLOCK_KINDS: &[&str] = &["today", "week", "chips", "shelf", "cards", "text", "list"];
+
+/// The blocks a topic starts with, each its kind and title. A collection's
+/// cards are named for what they are ("Plants") when Almanac knows.
+pub const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
+    (
+        "routine",
+        &[
+            ("today", "Today"),
+            ("week", ""),
+            ("chips", "You"),
+            ("shelf", "Your shelf"),
+            ("list", "Advice"),
+        ],
+    ),
+    (
+        "collection",
+        &[("today", "Today"), ("week", ""), ("cards", "Notes")],
+    ),
+    (
+        "study",
+        &[
+            ("list", "Reading"),
+            ("chips", "Terms"),
+            ("text", "What it says"),
+        ],
+    ),
+];
+
+/// The names of [`TEMPLATES`].
+pub const TEMPLATE_NAMES: &[&str] = &["routine", "collection", "study"];
+
+/// The blocks of a template, by its name.
+pub fn template(name: &str) -> Option<&'static [(&'static str, &'static str)]> {
+    TEMPLATES
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, blocks)| *blocks)
+}
+
+/// A part of a topic's page: its kind, one of [`BLOCK_KINDS`], says how it
+/// lays out the points kept in it; its title is the topic's own ("You",
+/// "Terms"). A topic shows its blocks by position.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Block {
+    pub id: Uuid,
+    pub workspace_id: Uuid,
+    pub topic_id: Uuid,
+    pub kind: String,
+    /// Empty for none: the week is headed by its days.
+    pub title: String,
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct BlockCreate {
+    pub topic_id: Uuid,
+    pub kind: String,
+    pub title: Option<String>,
+    /// After the topic's last block when left out.
+    pub position: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct BlockPatch {
+    pub title: Option<String>,
+    pub position: Option<i32>,
+}
+
+/// A short point the page keeps, in a block, under a theme, with where it
+/// comes from.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Point {
     pub id: Uuid,
     pub workspace_id: Uuid,
     pub topic_id: Uuid,
-    /// The card or section it's under: a plant, a part of a document.
+    pub block_id: Uuid,
+    /// The card, tile, section or routine it's under: a plant, a shampoo.
+    /// Empty in chips and lists.
     pub theme: String,
-    /// One of [`POINT_KINDS`].
-    pub kind: String,
     pub text: String,
     /// Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
     pub source: Option<String>,
@@ -168,8 +233,8 @@ pub struct Point {
 #[ts(export, optional_fields)]
 pub struct PointCreate {
     pub topic_id: Uuid,
-    pub theme: String,
-    pub kind: Option<String>,
+    pub block_id: Uuid,
+    pub theme: Option<String>,
     pub text: String,
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -182,8 +247,8 @@ pub struct PointCreate {
 #[serde(deny_unknown_fields)]
 #[ts(export, optional_fields)]
 pub struct PointPatch {
+    pub block_id: Option<Uuid>,
     pub theme: Option<String>,
-    pub kind: Option<String>,
     pub text: Option<String>,
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -310,8 +375,8 @@ pub struct StartTopicRequest {
     pub sticks_to: Option<String>,
     pub icon: Option<String>,
     pub group_name: Option<String>,
-    pub shape: Option<String>,
-    pub title: Option<String>,
+    /// One of [`TEMPLATE_NAMES`]; Almanac picks one when it's left out.
+    pub template: Option<String>,
     /// The answer whose proposal this starts.
     pub from_message: Option<Uuid>,
 }
@@ -330,7 +395,6 @@ impl Validate for TopicCreate {
             self.sticks_to.as_deref(),
             self.icon.as_deref(),
             self.group_name.as_deref(),
-            self.shape.as_deref(),
             self.starters.as_deref(),
         )
     }
@@ -343,29 +407,40 @@ impl Validate for TopicPatch {
             self.sticks_to.as_deref(),
             self.icon.as_deref(),
             self.group_name.as_deref(),
-            self.shape.as_deref(),
             self.starters.as_deref(),
         )
     }
 }
 
+impl Validate for BlockCreate {
+    fn validate(&self) -> Result<(), ValidationError> {
+        one_of(Some(&self.kind), BLOCK_KINDS, "kind")?;
+        self.title.as_deref().map(block_title).transpose()?;
+        Ok(())
+    }
+}
+
+impl Validate for BlockPatch {
+    fn validate(&self) -> Result<(), ValidationError> {
+        self.title.as_deref().map(block_title).transpose()?;
+        Ok(())
+    }
+}
+
 impl Validate for PointCreate {
     fn validate(&self) -> Result<(), ValidationError> {
-        words(&self.theme, "A point needs a theme.", 120)?;
-        words(&self.text, "A point needs some words.", 2000)?;
-        one_of(self.kind.as_deref(), POINT_KINDS, "kind")
+        self.theme.as_deref().map(theme).transpose()?;
+        words(&self.text, "A point needs some words.", 2000)
     }
 }
 
 impl Validate for PointPatch {
     fn validate(&self) -> Result<(), ValidationError> {
-        if let Some(theme) = &self.theme {
-            words(theme, "A point needs a theme.", 120)?;
-        }
+        self.theme.as_deref().map(theme).transpose()?;
         if let Some(text) = &self.text {
             words(text, "A point needs some words.", 2000)?;
         }
-        one_of(self.kind.as_deref(), POINT_KINDS, "kind")
+        Ok(())
     }
 }
 
@@ -423,11 +498,24 @@ fn words(value: &str, empty: &str, max: usize) -> Result<(), ValidationError> {
     Ok(())
 }
 
+fn block_title(value: &str) -> Result<(), ValidationError> {
+    if value.chars().count() > 60 {
+        return invalid("A block's title is at most 60 characters.");
+    }
+    Ok(())
+}
+
+fn theme(value: &str) -> Result<(), ValidationError> {
+    if value.chars().count() > 120 {
+        return invalid("A theme is at most 120 characters.");
+    }
+    Ok(())
+}
+
 fn topic_fields(
     sticks_to: Option<&str>,
     icon: Option<&str>,
     group_name: Option<&str>,
-    shape: Option<&str>,
     starters: Option<&[String]>,
 ) -> Result<(), ValidationError> {
     if sticks_to.is_some_and(|s| s.chars().count() > 1000) {
@@ -439,7 +527,6 @@ fn topic_fields(
     if group_name.is_some_and(|g| g.chars().count() > 40) {
         return invalid("A group's name is at most 40 characters.");
     }
-    one_of(shape, SHAPES, "shape")?;
     if starters.is_some_and(|s| s.len() > 6 || s.iter().any(|q| q.chars().count() > 200)) {
         return invalid("A topic has at most six first questions, each short.");
     }
@@ -471,8 +558,6 @@ mod tests {
             sticks_to: None,
             icon: icon.map(Into::into),
             group_name: None,
-            shape: None,
-            title: None,
             starters: None,
             position: None,
             kind: None,
@@ -480,6 +565,15 @@ mod tests {
         assert!(topic("Pflanzen", Some("sprout")).validate().is_ok());
         assert!(topic(" ", None).validate().is_err());
         assert!(topic("Pflanzen", Some("unicorn")).validate().is_err());
+    }
+
+    #[test]
+    fn every_template_has_known_blocks() {
+        for name in TEMPLATE_NAMES {
+            let blocks = template(name).unwrap();
+            assert!(blocks.iter().all(|(kind, _)| BLOCK_KINDS.contains(kind)));
+        }
+        assert_eq!(TEMPLATES.len(), TEMPLATE_NAMES.len());
     }
 
     #[test]

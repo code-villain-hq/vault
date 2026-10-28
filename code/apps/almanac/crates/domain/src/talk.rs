@@ -75,9 +75,9 @@ pub struct Message {
     pub updated_at: DateTime<Utc>,
 }
 
-/// A topic Almanac would start: what it's called, what it sticks to, how
-/// its page looks, and what it already heard from you, which the topic
-/// keeps once it's started.
+/// A topic Almanac would start: what it's called, what it sticks to, the
+/// template its blocks start from, and what it already heard from you,
+/// which the topic keeps once it's started.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Proposal {
@@ -85,10 +85,12 @@ pub struct Proposal {
     pub sticks_to: String,
     pub icon: String,
     pub group_name: String,
-    /// `cards`, `document` or `routine`.
-    pub shape: String,
-    /// For a document, its title.
-    pub title: Option<String>,
+    /// One of [`crate::TEMPLATE_NAMES`].
+    pub template: String,
+    /// For a collection, what its cards are: "Plants".
+    #[serde(default)]
+    #[ts(optional)]
+    pub cards: Option<String>,
     pub starters: Vec<String>,
     /// What you told Almanac, kept as the topic's first points.
     pub points: Vec<ProposedPoint>,
@@ -101,11 +103,13 @@ pub struct Proposal {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ProposedPoint {
-    pub theme: String,
-    /// One of [`crate::POINT_KINDS`]; a note when left out.
+    /// The template's block it goes in, by title ("You"); the first that
+    /// keeps points when left out.
     #[serde(default)]
     #[ts(optional)]
-    pub kind: Option<String>,
+    pub block: Option<String>,
+    #[serde(default)]
+    pub theme: String,
     pub text: String,
 }
 

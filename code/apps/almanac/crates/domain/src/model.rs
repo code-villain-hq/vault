@@ -7,8 +7,8 @@ pub use code_villain_sync::{Actor, GuestView, ValidationError, Write};
 
 use crate::talk::{MessageCreate, MessagePatch, TalkCreate, TalkPatch};
 use crate::topic::{
-    PointCreate, PointPatch, QuestionCreate, QuestionPatch, ReminderCreate, ReminderPatch,
-    TopicCreate, TopicPatch,
+    BlockCreate, BlockPatch, PointCreate, PointPatch, QuestionCreate, QuestionPatch,
+    ReminderCreate, ReminderPatch, TopicCreate, TopicPatch,
 };
 
 /// Every kind of record that clients sync: a workspace's topics, what each
@@ -21,6 +21,7 @@ use crate::topic::{
 #[ts(export)]
 pub enum ModelKind {
     Topic,
+    Block,
     Talk,
     Message,
     Point,
@@ -32,6 +33,7 @@ pub enum ModelKind {
 impl ModelKind {
     pub const ALL: &[ModelKind] = &[
         ModelKind::Topic,
+        ModelKind::Block,
         ModelKind::Talk,
         ModelKind::Message,
         ModelKind::Point,
@@ -44,6 +46,7 @@ impl ModelKind {
     pub fn table(self) -> &'static str {
         match self {
             ModelKind::Topic => "topics",
+            ModelKind::Block => "blocks",
             ModelKind::Talk => "talks",
             ModelKind::Message => "messages",
             ModelKind::Point => "points",
@@ -57,6 +60,7 @@ impl ModelKind {
     pub fn name(self) -> &'static str {
         match self {
             ModelKind::Topic => "Topic",
+            ModelKind::Block => "Block",
             ModelKind::Talk => "Talk",
             ModelKind::Message => "Message",
             ModelKind::Point => "Point",
@@ -79,7 +83,7 @@ impl ModelKind {
             ModelKind::Topic => write != Write::Create,
             ModelKind::Talk => write == Write::Delete,
             ModelKind::Message | ModelKind::User => false,
-            ModelKind::Point | ModelKind::Reminder => true,
+            ModelKind::Block | ModelKind::Point | ModelKind::Reminder => true,
             ModelKind::Question => write != Write::Create,
         }
     }
@@ -102,6 +106,7 @@ impl ModelKind {
     pub fn validate_create(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         match self {
             ModelKind::Topic => check::<TopicCreate>(data),
+            ModelKind::Block => check::<BlockCreate>(data),
             ModelKind::Talk => check::<TalkCreate>(data),
             ModelKind::Message => check::<MessageCreate>(data),
             ModelKind::Point => check::<PointCreate>(data),
@@ -115,6 +120,7 @@ impl ModelKind {
     pub fn validate_patch(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         match self {
             ModelKind::Topic => check::<TopicPatch>(data),
+            ModelKind::Block => check::<BlockPatch>(data),
             ModelKind::Talk => check::<TalkPatch>(data),
             ModelKind::Message => check::<MessagePatch>(data),
             ModelKind::Point => check::<PointPatch>(data),
@@ -195,7 +201,7 @@ mod tests {
         assert!(!ModelKind::Topic.client_may(Write::Create));
         assert!(ModelKind::Topic.client_may(Write::Update));
         let point = map(
-            json!({ "topic_id": uuid::Uuid::nil(), "theme": "Monstera", "text": "Erst gießen, wenn die Erde trocken ist." }),
+            json!({ "topic_id": uuid::Uuid::nil(), "block_id": uuid::Uuid::nil(), "theme": "Monstera", "text": "Erst gießen, wenn die Erde trocken ist." }),
         );
         assert!(ModelKind::Point.validate_create(&point).is_ok());
     }
