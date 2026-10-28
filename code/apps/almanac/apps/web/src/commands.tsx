@@ -1,15 +1,29 @@
 // What ⌘K offers in Almanac, and the "G" keys, in the shared menus of
-// `code/kit/web`: Calendar, the topics, a new topic, settings, workspaces.
+// `code/kit/web`: Calendar, the topics, a new topic, settings, workspaces,
+// and what the topics keep.
 import { type Command, CommandMenu, type GoTo, matching, Shortcuts } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Plus, Sparkles, UserRound, UsersRound } from "lucide-react";
+import {
+  Bell,
+  CalendarDays,
+  Dot,
+  FileText,
+  type LucideIcon,
+  MessagesSquare,
+  Plus,
+  Sparkles,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import { useMemo } from "react";
 import { NavIcon, topicIcon } from "./icons";
 import { useNewTopic, useTopics } from "./layout";
 import { isDesktop } from "./platform";
+import { plain } from "./prose";
 import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
-import { useIsGuest, useWorkspace } from "./workspace";
+import type { TopicSearch } from "./topic";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** The command menu and the shortcuts list, for the workspace frame. */
 export function AlmanacMenus() {
@@ -28,7 +42,7 @@ export function AlmanacMenus() {
     <>
       <CommandMenu
         useCommands={useAlmanacCommands}
-        placeholder="Type a command, or find a topic…"
+        placeholder="Type a command, or search your topics…"
       />
       <Shortcuts
         goTo={goTo}
@@ -63,6 +77,7 @@ function useAlmanacCommands(query: string): Command[] {
   const navigate = useNavigate();
   const topics = useTopics();
   const newTopic = useNewTopic();
+  const kept = useKept(query);
 
   const commands = useMemo(() => {
     const ws = workspace.url_key;
@@ -143,5 +158,108 @@ function useAlmanacCommands(query: string): Command[] {
     return list;
   }, [workspace, place, session, navigate, topics, guest, newTopic]);
 
-  return matching(commands, query);
+  return useMemo(() => [...matching(commands, query), ...kept], [commands, query, kept]);
+}
+
+/** Something a topic keeps that ⌘K finds: its words, and the page it's on. */
+interface Kept {
+  id: string;
+  icon: LucideIcon;
+  /** What the row shows. */
+  text: string;
+  /** What a query is matched against, lowercased: the text, and a talk's messages. */
+  words: string;
+  open: () => void;
+}
+
+/**
+ * What the topics keep, for ⌘K to find beyond their names: sections,
+ * points, reminders and talks with every word of the query. Up to five a
+ * topic, under its name, in the sidebar's order.
+ */
+function useKept(query: string): Command[] {
+  const { workspace } = useWorkspace();
+  const navigate = useNavigate();
+  const topics = useTopics();
+  const points = useRecords("Point");
+  const reminders = useRecords("Reminder");
+  const talks = useRecords("Talk");
+  const messages = useRecords("Message");
+
+  // Lowercased once per change of the records rather than on every key, as
+  // Forge's menu does: answers are long.
+  const kept = useMemo(() => {
+    const ws = workspace.url_key;
+    const open = (topic: string, search: TopicSearch) => () =>
+      void navigate({ to: "/$workspace/topics/$topic", params: { workspace: ws, topic }, search });
+    const said = new Map<string, string>();
+    for (const m of messages) said.set(m.talk_id, `${said.get(m.talk_id) ?? ""} ${m.text}`);
+    const thing = (
+      id: string,
+      icon: LucideIcon,
+      text: string,
+      open: () => void,
+      more = "",
+    ): Kept => ({ id, icon, text, words: `${text} ${more}`.toLowerCase(), open });
+    return topics.map((topic) => {
+      const own = points.filter((p) => p.topic_id === topic.id);
+      const due = reminders.filter(
+        (r) => r.topic_id === topic.id && (r.status === "on" || r.status === "done"),
+      );
+      const sections = new Set(
+        [...own.map((p) => p.theme), ...due.map((r) => r.theme ?? "")].filter(Boolean),
+      );
+      // A point in a chip or a list is in no section: it opens the page.
+      const at = (theme: string) => open(topic.id, theme ? { section: theme } : {});
+      return {
+        topic,
+        kept: [
+          ...[...sections].map((theme) =>
+            thing(`section-${topic.id}-${theme}`, FileText, theme, at(theme)),
+          ),
+          ...own.map((p) => thing(`point-${p.id}`, Dot, plain(p.text), at(p.theme))),
+          ...due.map((r) => thing(`reminder-${r.id}`, Bell, r.title, at(r.theme ?? ""))),
+          ...talks
+            .filter((t) => t.topic_id === topic.id)
+            .map((t) =>
+              thing(
+                `talk-${t.id}`,
+                MessagesSquare,
+                t.title || "Talk",
+                open(topic.id, { talk: t.id }),
+                said.get(t.id),
+              ),
+            ),
+        ],
+      };
+    });
+  }, [workspace, navigate, topics, points, reminders, talks, messages]);
+
+  return useMemo(() => {
+    const words = query.split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const found: Command[] = [];
+    for (const { topic, kept: things } of kept) {
+      let shown = 0;
+      for (const k of things) {
+        if (!words.every((word) => k.words.includes(word))) continue;
+        found.push({
+          id: k.id,
+          group: `In ${topic.name}`,
+          label: around(k.text, k.text.toLowerCase().indexOf(words[0] ?? "")),
+          icon: <NavIcon icon={k.icon} />,
+          run: k.open,
+        });
+        if (++shown === 5) break;
+      }
+    }
+    return found;
+  }, [kept, query]);
+}
+
+/** The text from a little before `at`, so a match deep in a long point shows. */
+function around(text: string, at: number): string {
+  if (at < 32) return text;
+  const start = text.lastIndexOf(" ", at - 16);
+  return start > 0 ? `…${text.slice(start + 1)}` : text;
 }

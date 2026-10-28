@@ -79,3 +79,8 @@ export function inline(text: string): ReactNode {
     );
   });
 }
+
+/** A point's words without the marks `inline` reads: what a search shows. */
+export function plain(text: string): string {
+  return text.replace(/\*\*([^*]+)\*\*|\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1$2");
+}

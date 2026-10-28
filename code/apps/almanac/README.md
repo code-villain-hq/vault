@@ -138,6 +138,10 @@ topics.
   they were. Asked from a section's page, it lays out only that section.
   Only Claude Code on this Mac does this; through a key, the
   answer says how it would lay the page out.
+- **⌘K searches what the topics keep**: sections, points, reminders and
+  talks, the talks' messages too, with every word you type in any order.
+  Up to five a topic show under its name; a point opens its section's
+  page, and a talk opens beside its topic.
 - **Almanac asks when it's unsure**: the question waits on the card it's
   about, with Add it and Leave it out. A question it asks in the talk
   waits for your reply there.
