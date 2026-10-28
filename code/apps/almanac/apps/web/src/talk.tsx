@@ -2,24 +2,37 @@
 // written (`asking.tsx` reads it); the talk, the answer and what the page
 // kept from it then arrive through sync. In
 // the workspace's own topic, an answer may propose a topic to start, or
-// say what it changed in one, with Undo.
+// say what it changed in one, with Undo. A question may come with photos,
+// pasted, dropped on the talk or picked.
 
-import type { Message, Proposal, Reminder, StartTopicRequest, Talk, Topic } from "@almanac/types";
+import type {
+  Message,
+  Photo,
+  Proposal,
+  Reminder,
+  StartTopicRequest,
+  Talk,
+  Topic,
+} from "@almanac/types";
+import { Dialog } from "@base-ui/react/dialog";
 import {
   type Confirmation,
   ConfirmDialog,
+  CreateDialog,
   MoreMenu,
   messageOf,
   overlayOpen,
 } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import type { Asking } from "./asking";
 import { ago, dueWords, rhythmWords, timeWords } from "./format";
 import { topicIcon } from "./icons";
 import { isOwn, useNewTopic, useTopics } from "./layout";
+import { type Picked, usePhoto } from "./photos";
+import { AddPhoto, DropHint, PickedPhotos, PickingProblem, useDrop, usePicking } from "./picking";
 import { Prose } from "./prose";
 import { TopicForm } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
@@ -52,7 +65,7 @@ export function TalkPanel({
   asking: Asking | null;
   /** A question to start with, such as one moved from another topic. */
   draft: string;
-  onAsk: (text: string, talkId: string | null) => void;
+  onAsk: (text: string, talkId: string | null, photos?: Picked[]) => void;
   onOpen: (talkId: string | null) => void;
   onClose: () => void;
 }) {
@@ -71,8 +84,12 @@ export function TalkPanel({
     [all, talkId],
   );
   const [text, setText] = useState(draft);
+  const [viewing, setViewing] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const picking = usePicking(() => field.current?.focus());
+  const drop = useDrop(picking);
 
   // What's on its way shows until the talk's records have it.
   const mine = asking && (asking.talkId === talkId || (!talkId && !asking.talkId)) ? asking : null;
@@ -103,17 +120,20 @@ export function TalkPanel({
   }, [messages.length, mine?.text, showQuestion]);
 
   const send = () => {
-    if (!text.trim()) return;
-    onAsk(text, talkId);
+    if (!text.trim() && picking.photos.length === 0) return;
+    onAsk(text, talkId, picking.photos);
     setText("");
+    picking.clear();
   };
 
   return (
     <aside
       aria-label="Talk"
-      className="flex w-[min(26rem,45%)] shrink-0 flex-col border-l border-line bg-panel"
+      className="relative flex w-[min(26rem,45%)] shrink-0 flex-col border-l border-line bg-panel"
+      {...drop.handlers}
     >
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
+      <PhotoView url={viewing} onClose={() => setViewing(null)} />
       <div className="flex min-h-12 items-center gap-2 px-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-medium">{talk?.title || "New talk"}</h2>
@@ -185,9 +205,17 @@ export function TalkPanel({
               question={before(messages, index)}
               reminders={reminders.filter((r) => r.message_id === message.id)}
               toStart={message.id === toStart}
+              onView={setViewing}
             />
           ))}
-          {showQuestion && <Question text={mine.question} />}
+          {showQuestion && (
+            <Question
+              text={mine.question}
+              photos={mine.photos.map((p) => (
+                <PhotoThumb key={p.url} url={p.url} photo={p} onView={setViewing} />
+              ))}
+            />
+          )}
           {showAnswer && (
             <div className="flex flex-col gap-2">
               {mine.text ? (
@@ -208,31 +236,41 @@ export function TalkPanel({
           send();
         }}
       >
-        <textarea
-          // biome-ignore lint/a11y/noAutofocus: the panel opens to ask
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(event) => {
-            // ⌘↩ is for starting a proposed topic, not for sending.
-            const plain = !event.shiftKey && !event.metaKey && !event.ctrlKey;
-            if (event.key === "Enter" && plain && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              send();
+        <PickingProblem picking={picking} />
+        <div className="ui-field flex flex-col rounded-md">
+          <PickedPhotos picking={picking} />
+          <textarea
+            ref={field}
+            // biome-ignore lint/a11y/noAutofocus: the panel opens to ask
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={picking.onPaste}
+            onKeyDown={(event) => {
+              // ⌘↩ is for starting a proposed topic, not for sending.
+              const plain = !event.shiftKey && !event.metaKey && !event.ctrlKey;
+              if (event.key === "Enter" && plain && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                send();
+              }
+            }}
+            rows={2}
+            aria-label={talkId ? "Ask more" : `Ask ${topic.name}`}
+            placeholder={
+              talkId
+                ? "Ask more"
+                : own
+                  ? `Tell ${topic.name} what you want to keep track of`
+                  : `Ask ${topic.name}, or tell it something`
             }
-          }}
-          rows={2}
-          aria-label={talkId ? "Ask more" : `Ask ${topic.name}`}
-          placeholder={
-            talkId
-              ? "Ask more"
-              : own
-                ? `Tell ${topic.name} what you want to keep track of`
-                : `Ask ${topic.name}, or tell it something`
-          }
-          className="ui-field resize-none rounded-md px-3 py-2"
-        />
+            className="resize-none bg-transparent px-3 py-2 outline-none placeholder:text-faint"
+          />
+          <div className="flex px-1 pb-1">
+            <AddPhoto picking={picking} />
+          </div>
+        </div>
       </form>
+      {drop.dropping && <DropHint />}
     </aside>
   );
 }
@@ -243,8 +281,61 @@ function before(messages: Message[], index: number): string {
   return asked?.role === "you" ? asked.text : "";
 }
 
-function Question({ text }: { text: string }) {
-  return <p className="ml-8 self-end whitespace-pre-wrap rounded-lg bg-chip px-3 py-2">{text}</p>;
+/** What you asked, with the photos it came with above it. */
+function Question({ text, photos }: { text: string; photos?: ReactNode[] }) {
+  return (
+    <div className="ml-8 flex flex-col items-end gap-1.5 self-end">
+      {photos && photos.length > 0 && (
+        <div className="flex flex-wrap justify-end gap-1.5">{photos}</div>
+      )}
+      {text && <p className="whitespace-pre-wrap rounded-lg bg-chip px-3 py-2">{text}</p>}
+    </div>
+  );
+}
+
+/** A photo in the talk, its room kept until it arrives; a click shows it large. */
+function PhotoThumb({
+  url,
+  photo,
+  onView,
+}: {
+  url: string | null;
+  photo: { width: number; height: number };
+  onView: (url: string) => void;
+}) {
+  const room = { aspectRatio: `${photo.width} / ${photo.height}` };
+  if (!url) return <div className="h-28 max-w-full rounded-md bg-chip" style={room} />;
+  return (
+    <button
+      type="button"
+      onClick={() => onView(url)}
+      aria-label="Show the photo"
+      className="block max-w-full rounded-md"
+    >
+      <img
+        src={url}
+        alt=""
+        className="h-28 w-auto max-w-full rounded-md object-cover"
+        style={room}
+      />
+    </button>
+  );
+}
+
+function SentPhoto({ photo, onView }: { photo: Photo; onView: (url: string) => void }) {
+  const { place, workspace } = useWorkspace();
+  const url = usePhoto(place, workspace.id, photo.id);
+  return <PhotoThumb url={url} photo={photo} onView={onView} />;
+}
+
+/** A photo large, over the page. */
+function PhotoView({ url, onClose }: { url: string | null; onClose: () => void }) {
+  return (
+    <CreateDialog open={url !== null} onClose={onClose} width="56rem">
+      <Dialog.Title className="sr-only">Photo</Dialog.Title>
+      {url && <img src={url} alt="" className="max-h-[76vh] w-full rounded-lg object-contain" />}
+    </CreateDialog>
+  );
 }
 
 /** One thing said in a talk, and for an answer, what came of it. */
@@ -254,6 +345,7 @@ function Said({
   question,
   reminders,
   toStart,
+  onView,
 }: {
   message: Message;
   topic: Topic;
@@ -261,8 +353,18 @@ function Said({
   reminders: Reminder[];
   /** The proposal ⌘↩ starts. */
   toStart: boolean;
+  onView: (url: string) => void;
 }) {
-  if (message.role === "you") return <Question text={message.text} />;
+  if (message.role === "you") {
+    return (
+      <Question
+        text={message.text}
+        photos={message.photos.map((photo) => (
+          <SentPhoto key={photo.id} photo={photo} onView={onView} />
+        ))}
+      />
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       {message.text && <Prose text={message.text} />}

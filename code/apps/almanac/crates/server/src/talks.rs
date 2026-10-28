@@ -8,10 +8,13 @@
 //!
 //! In the workspace's own topic Claude reads the workspace instead of a
 //! page, and proposes topics and changes them.
+//!
+//! A question may come with photos (`crate::photos`); Claude sees the
+//! talk's photos with each question.
 
 use std::convert::Infallible;
 
-use almanac_domain::{Actor, AskRequest, ModelKind, Operation, Source};
+use almanac_domain::{Actor, AskRequest, ModelKind, Operation, Source, Transaction};
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -29,13 +32,14 @@ use crate::error::AppError;
 use crate::kept::{Answering, Kept, fields, reminder};
 use crate::mcp::{Asking, Mode};
 use crate::page::{Page, Workspace};
+use crate::photos::{self, Image};
 use crate::state::AppState;
 use crate::topics::{cut, write};
 
 const TALK_IN_TOPIC: &str =
     "SELECT EXISTS (SELECT 1 FROM talks WHERE id = $1 AND topic_id = $2 AND workspace_id = $3)";
-const TALK: &str = "SELECT role, text FROM ( \
-     SELECT role, text, created_at FROM messages \
+const TALK: &str = "SELECT id, role, text FROM ( \
+     SELECT id, role, text, created_at FROM messages \
      WHERE talk_id = $1 AND workspace_id = $2 AND problem IS NULL \
      ORDER BY created_at DESC LIMIT 40) m ORDER BY created_at";
 const ANSWERS_SO_FAR: &str =
@@ -57,6 +61,8 @@ light, which audience), say what you assume and ask one question back.
 - Say plainly when you're unsure.
 - Name where something comes from when it matters: a book, a guide, an institution, a site, or \
 what they told you. Never make up links.
+- When they send photos, read them closely: names, labels, ingredients, what's in the picture. \
+Say what you read when your answer rests on it.
 - If the question has nothing to do with this topic, answer it in a sentence or two, then say \
 it fits better in another topic, naming one of the other topics or a new one.
 - Answer in the language they write in.";
@@ -81,6 +87,7 @@ start new ones and change them.
 
 How to answer:
 - When it's unclear what a new topic should be about, ask one question back.
+- When they send photos, read what's on them and use it.
 - When a topic for it exists already, name it and say they can ask there.
 - When they ask what's in the workspace, answer from the topics below.
 - About Almanac itself: a topic keeps what you learn about one thing; its talks answer inside \
@@ -210,7 +217,8 @@ pub async fn ask(
     member.require_not_guest()?;
     let actor = member.actor;
     let text = request.text.trim().to_string();
-    if text.is_empty() {
+    let uploads = photos::check(request.photos.as_deref().unwrap_or_default())?;
+    if text.is_empty() && uploads.is_empty() {
         return Err(AppError::invalid("Ask something first."));
     }
     let page = Page::load(&state.pool, actor.workspace_id, topic_id)
@@ -247,24 +255,34 @@ pub async fn ask(
                 id: talk_id,
                 data: fields([
                     ("topic_id", json!(topic_id)),
-                    ("title", json!(cut(&text, 60))),
+                    ("title", json!(title(&text, uploads.len()))),
                     ("last_at", now),
                 ]),
             };
             (talk_id, vec![create])
         }
     };
+    let question_id = Uuid::now_v7();
+    let mut question = fields([
+        ("talk_id", json!(talk_id)),
+        ("topic_id", json!(topic_id)),
+        ("role", json!("you")),
+        ("text", json!(text)),
+    ]);
+    if !uploads.is_empty() {
+        let photos: Vec<_> = uploads.iter().map(|u| &u.photo).collect();
+        question.insert("photos".into(), json!(photos));
+    }
     operations.push(Operation::Create {
         model: ModelKind::Message,
-        id: Uuid::now_v7(),
-        data: fields([
-            ("talk_id", json!(talk_id)),
-            ("topic_id", json!(topic_id)),
-            ("role", json!("you")),
-            ("text", json!(text)),
-        ]),
+        id: question_id,
+        data: question,
     });
-    write(&state, actor, operations).await?;
+    let transaction = Transaction {
+        id: Uuid::now_v7(),
+        operations,
+    };
+    photos::write_with(&state, actor, &transaction, question_id, &uploads).await?;
 
     let own = kind == "almanac";
     let (events, heard) = mpsc::unbounded_channel::<Event>();
@@ -415,12 +433,7 @@ async fn say_with_claude_code(
         tracing::warn!(%error, "couldn't read the talk");
         Problem("Almanac couldn't read this talk. Ask again.".into())
     };
-    let said: Vec<(String, String)> = sqlx::query_as(TALK)
-        .bind(talk_id)
-        .bind(actor.workspace_id)
-        .fetch_all(&state.pool)
-        .await
-        .map_err(trouble)?;
+    let said = the_talk(state, actor, talk_id).await.map_err(trouble)?;
     let web: bool = sqlx::query_scalar(WEB)
         .fetch_optional(&state.pool)
         .await
@@ -450,10 +463,11 @@ async fn say_with_claude_code(
     let mode = if own { Mode::Own } else { Mode::Topic };
     let open = state.questions.open(Asking::new(actor, page.id, mode));
     let tools = mode.tools();
-    let prompt = talk_prompt(&said);
+    let (prompt, images) = talk_prompt(&said);
     let question = Question {
         system: &system,
         prompt: &prompt,
+        images: &images,
         web,
         tools,
         token: &open.token,
@@ -489,28 +503,82 @@ async fn say_with_claude_code(
     })
 }
 
-/// What they ask, after the talk so far. Never starting with a slash,
-/// which Claude Code would take for one of its commands.
-fn talk_prompt(said: &[(String, String)]) -> String {
-    let Some(((_, last), before)) = said.split_last() else {
-        return String::new();
+/// One thing said in a talk, with the photos a question came with.
+struct Line {
+    role: String,
+    text: String,
+    images: Vec<Image>,
+}
+
+/// The talk so far, the last 40 things said, with their photos.
+async fn the_talk(state: &AppState, actor: Actor, talk_id: Uuid) -> Result<Vec<Line>, sqlx::Error> {
+    let said: Vec<(Uuid, String, String)> = sqlx::query_as(TALK)
+        .bind(talk_id)
+        .bind(actor.workspace_id)
+        .fetch_all(&state.pool)
+        .await?;
+    let mut images = photos::of_talk(&state.pool, actor.workspace_id, talk_id).await?;
+    Ok(said
+        .into_iter()
+        .map(|(id, role, text)| Line {
+            images: images.remove(&id).unwrap_or_default(),
+            role,
+            text,
+        })
+        .collect())
+}
+
+/// What they ask, after the talk so far, and the talk's photos in the
+/// order they came. Never starting with a slash, which Claude Code would
+/// take for one of its commands.
+fn talk_prompt(said: &[Line]) -> (String, Vec<Image>) {
+    let Some((last, before)) = said.split_last() else {
+        return (String::new(), Vec::new());
     };
+    let mut out = String::new();
     if before.is_empty() {
-        return format!("They ask: {last}");
+        out.push_str("They ask");
+    } else {
+        out.push_str("The talk so far:\n");
+        for line in before {
+            out.push_str(if line.role == "you" {
+                "\nThey asked"
+            } else {
+                "\nYou answered"
+            });
+            out.push_str(&with_photos(line.images.len()));
+            out.push_str(": ");
+            out.push_str(&line.text);
+            out.push('\n');
+        }
+        out.push_str("\nNow they ask");
     }
-    let mut out = String::from("The talk so far:\n");
-    for (role, text) in before {
-        out.push_str(if role == "you" {
-            "\nThey asked: "
-        } else {
-            "\nYou answered: "
-        });
-        out.push_str(text);
-        out.push('\n');
+    out.push_str(&with_photos(last.images.len()));
+    out.push_str(": ");
+    out.push_str(&last.text);
+    let images: Vec<Image> = said.iter().flat_map(|l| l.images.clone()).collect();
+    if !images.is_empty() {
+        out.push_str("\n\nTheir photos follow, in the order they sent them.");
     }
-    out.push_str("\nNow they ask: ");
-    out.push_str(last);
-    out
+    (out, images)
+}
+
+/// " (with 2 photos)" after "They asked", for a question that had some.
+fn with_photos(count: usize) -> String {
+    match count {
+        0 => String::new(),
+        1 => " (with a photo)".into(),
+        n => format!(" (with {n} photos)"),
+    }
+}
+
+/// A new talk's title: its first question, short, or what it showed.
+fn title(text: &str, photos: usize) -> String {
+    match (text.is_empty(), photos) {
+        (false, _) => cut(text, 60),
+        (true, 1) => "A photo".into(),
+        (true, _) => "Photos".into(),
+    }
 }
 
 /// Why Claude Code gave no answer, in words for the talk.
@@ -579,17 +647,17 @@ async fn say(
         .ok_or_else(|| {
             Problem("Almanac needs a Claude key to answer. Add one in Settings → Claude.".into())
         })?;
-    let said: Vec<(String, String)> = sqlx::query_as(TALK)
-        .bind(talk_id)
-        .bind(actor.workspace_id)
-        .fetch_all(&state.pool)
-        .await
-        .map_err(trouble)?;
+    let said = the_talk(state, actor, talk_id).await.map_err(trouble)?;
     let turns: Vec<Turn> = said
         .into_iter()
-        .map(|(role, text)| Turn {
-            role: if role == "you" { "user" } else { "assistant" },
-            text,
+        .map(|line| Turn {
+            role: if line.role == "you" {
+                "user"
+            } else {
+                "assistant"
+            },
+            text: line.text,
+            images: line.images,
         })
         .collect();
     let system = if own {
@@ -679,18 +747,52 @@ fn json_event(name: &str, data: Value) -> Event {
 mod tests {
     use super::*;
 
+    fn line(role: &str, text: &str, photos: usize) -> Line {
+        let image = Image {
+            media_type: "image/jpeg".into(),
+            data: "AAAA".into(),
+        };
+        Line {
+            role: role.into(),
+            text: text.into(),
+            images: vec![image; photos],
+        }
+    }
+
     #[test]
     fn the_talk_never_starts_with_a_slash() {
-        let said = vec![("you".to_string(), "/clear".to_string())];
-        assert_eq!(talk_prompt(&said), "They ask: /clear");
-        let said = vec![
-            ("you".to_string(), "Wie oft gießen?".to_string()),
-            ("almanac".to_string(), "Alle 7 Tage.".to_string()),
-            ("you".to_string(), "Und im Winter?".to_string()),
+        let (prompt, images) = talk_prompt(&[line("you", "/clear", 0)]);
+        assert_eq!(prompt, "They ask: /clear");
+        assert!(images.is_empty());
+        let said = [
+            line("you", "Wie oft gießen?", 0),
+            line("almanac", "Alle 7 Tage.", 0),
+            line("you", "Und im Winter?", 0),
         ];
-        let prompt = talk_prompt(&said);
+        let (prompt, _) = talk_prompt(&said);
         assert!(prompt.starts_with("The talk so far:"));
         assert!(prompt.ends_with("Now they ask: Und im Winter?"));
+    }
+
+    #[test]
+    fn the_talk_says_which_question_had_photos() {
+        let said = [
+            line("you", "Meine Shampoos.", 2),
+            line("almanac", "Ein mildes und eine Kur.", 0),
+            line("you", "Und das hier?", 1),
+        ];
+        let (prompt, images) = talk_prompt(&said);
+        assert!(prompt.contains("They asked (with 2 photos): Meine Shampoos."));
+        assert!(prompt.contains("Now they ask (with a photo): Und das hier?"));
+        assert!(prompt.ends_with("Their photos follow, in the order they sent them."));
+        assert_eq!(images.len(), 3);
+    }
+
+    #[test]
+    fn a_talk_of_only_photos_is_named_for_them() {
+        assert_eq!(title("", 1), "A photo");
+        assert_eq!(title("", 3), "Photos");
+        assert_eq!(title("Meine Routine", 2), "Meine Routine");
     }
 
     #[test]

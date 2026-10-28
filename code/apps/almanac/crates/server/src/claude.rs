@@ -12,6 +12,8 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
+use crate::photos::Image;
+
 pub const MODEL: &str = "claude-opus-5-5";
 const API_VERSION: &str = "2026-10-21";
 const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
@@ -34,6 +36,8 @@ pub struct Turn {
     /// `user` or `assistant`.
     pub role: &'static str,
     pub text: String,
+    /// The photos a question came with.
+    pub images: Vec<Image>,
 }
 
 #[derive(Clone)]
@@ -188,19 +192,43 @@ impl Claude {
 /// The turns as the API wants them: starting with a question, taking
 /// turns, with what one side said twice in a row joined.
 fn messages(turns: &[Turn]) -> Vec<Value> {
-    let mut out: Vec<(&str, String)> = Vec::new();
-    for turn in turns.iter().filter(|t| !t.text.trim().is_empty()) {
+    let mut out: Vec<(&str, String, Vec<&Image>)> = Vec::new();
+    for turn in turns
+        .iter()
+        .filter(|t| !t.text.trim().is_empty() || !t.images.is_empty())
+    {
         match out.last_mut() {
-            Some((role, text)) if *role == turn.role => {
-                text.push_str("\n\n");
+            Some((role, text, images)) if *role == turn.role => {
+                if !text.is_empty() && !turn.text.is_empty() {
+                    text.push_str("\n\n");
+                }
                 text.push_str(&turn.text);
+                images.extend(&turn.images);
             }
             None if turn.role != "user" => {}
-            _ => out.push((turn.role, turn.text.clone())),
+            _ => out.push((turn.role, turn.text.clone(), turn.images.iter().collect())),
         }
     }
     out.into_iter()
-        .map(|(role, text)| json!({ "role": role, "content": text }))
+        .map(|(role, text, images)| {
+            if images.is_empty() {
+                return json!({ "role": role, "content": text });
+            }
+            // The photos first, then what they asked about them.
+            let mut content: Vec<Value> = images
+                .into_iter()
+                .map(|image| {
+                    json!({
+                        "type": "image",
+                        "source": { "type": "base64", "media_type": image.media_type, "data": image.data },
+                    })
+                })
+                .collect();
+            if !text.is_empty() {
+                content.push(json!({ "type": "text", "text": text }));
+            }
+            json!({ "role": role, "content": content })
+        })
         .collect()
 }
 
@@ -251,6 +279,7 @@ mod tests {
         let turn = |role, text: &str| Turn {
             role,
             text: text.into(),
+            images: Vec::new(),
         };
         let out = messages(&[
             turn("assistant", "Hello"),
@@ -266,6 +295,22 @@ mod tests {
                 json!({ "role": "assistant", "content": "Alle 7 Tage." }),
             ]
         );
+    }
+
+    #[test]
+    fn photos_come_before_the_question() {
+        let image = Image {
+            media_type: "image/png".into(),
+            data: "AAAA".into(),
+        };
+        let out = messages(&[Turn {
+            role: "user",
+            text: "Welches Shampoo ist das?".into(),
+            images: vec![image],
+        }]);
+        assert_eq!(out[0]["content"][0]["type"], "image");
+        assert_eq!(out[0]["content"][0]["source"]["media_type"], "image/png");
+        assert_eq!(out[0]["content"][1]["text"], "Welches Shampoo ist das?");
     }
 
     #[test]

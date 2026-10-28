@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { Picked } from "./photos";
 import { apiUrl, authHeaders, credentialsFor } from "./server";
 import type { TopicSearch } from "./topic";
 import { useWorkspace } from "./workspace";
@@ -21,6 +22,8 @@ import { useWorkspace } from "./workspace";
 export interface Asking {
   talkId: string | null;
   question: string;
+  /** The photos it came with. */
+  photos: Picked[];
   /** How many questions the talk had before this one. */
   asked: number;
   text: string;
@@ -34,7 +37,12 @@ interface Talks {
   /** The talk open in each topic (`new` for a new one), by topic. */
   open: Record<string, string>;
   setOpen: (topicId: string, talk: string | undefined) => void;
-  ask: (topicId: string, question: string, talkId: string | null) => Promise<void>;
+  ask: (
+    topicId: string,
+    question: string,
+    talkId: string | null,
+    photos?: Picked[],
+  ) => Promise<void>;
 }
 
 const TalksContext = createContext<Talks | null>(null);
@@ -56,9 +64,9 @@ export function TalksProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ask = useCallback(
-    async (topicId: string, question: string, talkId: string | null) => {
+    async (topicId: string, question: string, talkId: string | null, photos: Picked[] = []) => {
       const text = question.trim();
-      if (!text) return;
+      if (!text && photos.length === 0) return;
       const asked = talkId
         ? sync.query("Message").filter((m) => m.talk_id === talkId && m.role === "you").length
         : 0;
@@ -72,7 +80,15 @@ export function TalksProvider({ children }: { children: ReactNode }) {
         });
       setAsking((all) => ({
         ...all,
-        [topicId]: { talkId, question: text, asked, text: "", answerId: null, problem: null },
+        [topicId]: {
+          talkId,
+          question: text,
+          photos,
+          asked,
+          text: "",
+          answerId: null,
+          problem: null,
+        },
       }));
       const path = `/api/w/${workspace.id}/topics/${topicId}/ask`;
       let response: Response;
@@ -81,7 +97,20 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           method: "POST",
           credentials: credentialsFor(place),
           headers: { ...authHeaders(place), "content-type": "application/json" },
-          body: JSON.stringify(talkId ? { talk_id: talkId, text } : { text }),
+          body: JSON.stringify({
+            ...(talkId ? { talk_id: talkId } : {}),
+            text,
+            ...(photos.length > 0
+              ? {
+                  photos: photos.map(({ media_type, data, width, height }) => ({
+                    media_type,
+                    data,
+                    width,
+                    height,
+                  })),
+                }
+              : {}),
+          }),
         });
       } catch {
         update({ problem: "Can't reach Almanac. Check your connection, then ask again." });
@@ -150,7 +179,8 @@ export function useTopicTalks(topicId: string) {
     open: open[topicId],
     setOpen: useCallback((talk: string | undefined) => setOpen(topicId, talk), [setOpen, topicId]),
     ask: useCallback(
-      (question: string, talkId: string | null) => ask(topicId, question, talkId),
+      (question: string, talkId: string | null, photos?: Picked[]) =>
+        ask(topicId, question, talkId, photos),
       [ask, topicId],
     ),
   };

@@ -8,7 +8,15 @@ import type { SyncClient } from "@code-villain/sync-client";
 import { type Confirmation, ConfirmDialog, MoreMenu, RowAction, useApi } from "@code-villain/web";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { MessagesSquare, X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type Asking, useTopicTalks } from "./asking";
 import {
   ago,
@@ -23,6 +31,16 @@ import {
 } from "./format";
 import { topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
+import type { Picked } from "./photos";
+import {
+  AddPhoto,
+  DropHint,
+  PickedPhotos,
+  type Picking,
+  PickingProblem,
+  useDrop,
+  usePicking,
+} from "./picking";
 import { inline } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
@@ -94,9 +112,9 @@ export function TopicPage() {
       talkId={talkId}
       draft={search.ask ?? ""}
       asking={asking}
-      onAsk={(text, talk) => {
+      onAsk={(text, talk, photos) => {
         if (talk === null) open(null);
-        void ask(text, talk);
+        void ask(text, talk, photos);
       }}
       onOpen={open}
     />
@@ -117,7 +135,7 @@ function TopicView({
   talkId: string | null;
   draft: string;
   asking: Asking | null;
-  onAsk: (text: string, talkId: string | null) => void;
+  onAsk: (text: string, talkId: string | null, photos?: Picked[]) => void;
   onOpen: (talkId: string | null | undefined) => void;
 }) {
   const { sync } = useWorkspace();
@@ -128,6 +146,10 @@ function TopicView({
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
   useSeenOnLeave(sync, topic.id);
+  // Without the talk, a photo dropped on the page goes in the bar.
+  const bar = useRef<HTMLInputElement>(null);
+  const picking = usePicking(() => bar.current?.focus());
+  const drop = useDrop(picking);
 
   return (
     <>
@@ -174,7 +196,7 @@ function TopicView({
         )}
       </PageHeader>
       <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="relative flex min-w-0 flex-1 flex-col" {...(panel ? {} : drop.handlers)}>
           <div className="page-content min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-6">
               {isOwn(topic) ? (
@@ -184,7 +206,15 @@ function TopicView({
               )}
             </div>
           </div>
-          {!panel && <AskBar topic={topic} onAsk={(text) => onAsk(text, null)} />}
+          {!panel && (
+            <AskBar
+              topic={topic}
+              field={bar}
+              picking={picking}
+              onAsk={(text, photos) => onAsk(text, null, photos)}
+            />
+          )}
+          {!panel && drop.dropping && <DropHint className="bg-bg/80" />}
         </div>
         {panel && (
           <TalkPanel
@@ -711,10 +741,19 @@ function KeptFrom({ points }: { points: Point[] }) {
   return <p className="mt-auto text-xs text-faint">{words}</p>;
 }
 
-/** The bar under the page: a question starts a talk. */
-function AskBar({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
+/** The bar under the page: a question, or photos, start a talk. */
+function AskBar({
+  topic,
+  field,
+  picking,
+  onAsk,
+}: {
+  topic: Topic;
+  field: RefObject<HTMLInputElement | null>;
+  picking: Picking;
+  onAsk: (text: string, photos: Picked[]) => void;
+}) {
   const [text, setText] = useState("");
-  const input = useRef<HTMLInputElement>(null);
   // "/" puts you in the bar, as in a search field.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -722,33 +761,42 @@ function AskBar({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void 
       const target = event.target as HTMLElement | null;
       if (target?.closest("input,textarea,[contenteditable],[role=dialog],[role=menu]")) return;
       event.preventDefault();
-      input.current?.focus();
+      field.current?.focus();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [field]);
   return (
     <form
-      className="mx-auto w-full max-w-4xl px-6 pb-4"
+      className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-6 pb-4"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!text.trim()) return;
-        onAsk(text);
+        if (!text.trim() && picking.photos.length === 0) return;
+        onAsk(text, picking.photos);
         setText("");
+        picking.clear();
       }}
     >
-      <input
-        ref={input}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        aria-label={`Ask ${topic.name}`}
-        placeholder={
-          isOwn(topic)
-            ? `Tell ${topic.name} what you want to keep track of`
-            : `Ask ${topic.name}, or tell it something`
-        }
-        className="ui-field h-10 w-full rounded-lg px-4"
-      />
+      <PickingProblem picking={picking} />
+      <div className="ui-field flex flex-col rounded-lg">
+        <PickedPhotos picking={picking} />
+        <div className="flex items-center pr-1">
+          <input
+            ref={field}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={picking.onPaste}
+            aria-label={`Ask ${topic.name}`}
+            placeholder={
+              isOwn(topic)
+                ? `Tell ${topic.name} what you want to keep track of`
+                : `Ask ${topic.name}, or tell it something`
+            }
+            className="h-10 min-w-0 flex-1 bg-transparent px-4 outline-none placeholder:text-faint"
+          />
+          <AddPhoto picking={picking} />
+        </div>
+      </div>
     </form>
   );
 }

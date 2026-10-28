@@ -3,8 +3,8 @@
 //! way Claude Code does: the workspace's own topic proposes a topic, which
 //! starts with a click, and changes one with undo; a topic's talk keeps a
 //! point with its source; a new topic sets itself up; and the web can be
-//! turned off. The workspace's own topic stays, and a start that hangs is
-//! tried again.
+//! turned off. The workspace's own topic stays, a start that hangs is
+//! tried again, and photos go with the questions of their talk.
 
 mod common;
 
@@ -66,6 +66,11 @@ fn sessions(log: &Path) -> Vec<Value> {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
         .collect()
+}
+
+/// The blocks of each prompt the stand-in was sent.
+fn prompts(log: &Path) -> Vec<Value> {
+    sessions(&log.with_extension("jsonl.prompts"))
 }
 
 async fn topic_named(app: &App, session: &str, workspace: &str, name: &str) -> Value {
@@ -314,4 +319,93 @@ async fn a_start_that_hangs_is_tried_again(pool: PgPool) {
     assert_eq!(answer["text"], "Here's a topic for your plants.");
     assert!(!hang.exists(), "the first start hung");
     assert_eq!(sessions(&log).len(), opened + 1, "the second one opened");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
+    use base64::Engine;
+    let dir = tempfile::tempdir().unwrap();
+    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Haare" }),
+        )
+        .await;
+    let topic = started.body["id"].as_str().unwrap().to_string();
+    // The set-up has its own prompt; let it be first.
+    for _ in 0..100 {
+        if prompts(&log).len() == 1 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    let photo = base64::engine::general_purpose::STANDARD.encode(b"the shampoo");
+    let asked = app
+        .post(
+            &format!("/api/w/{home}/topics/{topic}/ask"),
+            Some(&ada),
+            json!({
+                "text": "Which shampoo is this?",
+                "photos": [{ "media_type": "image/jpeg", "data": photo, "width": 300, "height": 400 }],
+            }),
+        )
+        .await;
+    assert_eq!(asked.status, StatusCode::OK, "{}", asked.text);
+    assert!(asked.text.contains("event: done"), "{}", asked.text);
+    let messages = app.synced(&ada, &home, "Message").await;
+    let question = messages.iter().find(|m| m["role"] == "you").unwrap();
+    let sent = &question["photos"][0];
+    assert_eq!(sent["width"], 300);
+    let shown = app
+        .get(
+            &format!("/api/w/{home}/photos/{}", sent["id"].as_str().unwrap()),
+            &ada,
+        )
+        .await;
+    assert_eq!(shown.status, StatusCode::OK);
+    assert_eq!(shown.text, "the shampoo");
+
+    // Claude reads the photo after the question, and again with the next.
+    let image = json!({ "type": "image", "mimeType": "image/jpeg", "data": photo });
+    let first = prompts(&log).last().cloned().unwrap();
+    assert_eq!(first[0]["type"], "text");
+    assert!(
+        first[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("(with a photo)")
+    );
+    assert_eq!(first[1], image);
+    let talk = question["talk_id"].as_str().unwrap();
+    let again = app
+        .post(
+            &format!("/api/w/{home}/topics/{topic}/ask"),
+            Some(&ada),
+            json!({ "talk_id": talk, "text": "And how often?" }),
+        )
+        .await;
+    assert_eq!(again.status, StatusCode::OK, "{}", again.text);
+    let next = prompts(&log).last().cloned().unwrap();
+    assert_eq!(next[1], image, "{next}");
+
+    // The photo goes with its talk.
+    let deleted = app
+        .sync(
+            &ada,
+            &home,
+            json!([{ "action": "delete", "model": "Talk", "id": talk }]),
+        )
+        .await;
+    assert!(deleted.status.is_success(), "{}", deleted.body);
+    let gone = app
+        .get(
+            &format!("/api/w/{home}/photos/{}", sent["id"].as_str().unwrap()),
+            &ada,
+        )
+        .await;
+    assert_eq!(gone.status, StatusCode::NOT_FOUND);
 }

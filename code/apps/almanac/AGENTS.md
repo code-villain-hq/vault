@@ -78,6 +78,10 @@ Forge. Everything a page shows syncs: `Topic`, `Talk`, `Message`, `Point`,
 - Clients write points and reminders, and answer questions (`status`).
 - Only the server sets a reminder's `notified_for`.
 - Guests see no topics: every model but `User` is hidden from them.
+- A question's photos come with the ask (`photos`, base64, up to six of
+  5 MB) and stay in `photos`, which doesn't sync: the message names them
+  (id and size) and the app fetches each one (`GET
+  /api/w/{id}/photos/{photo}`, `photos.rs`). They go with their message.
 
 Settings → Claude isn't synced. `GET /api/w/{id}/claude` says who answers:
 on this Mac Claude Code (`via` `claude_code`, with whether it's ready),
@@ -112,6 +116,7 @@ What they do:
   current talk. The answer streams back as server-sent events: `talk`,
   then `text` pieces, then `done` or `problem`. A problem is also kept as a
   message, so the talk shows it after a reload.
+  The talk's photos go with every question in it, after the text.
 - **Keeping** (`kept.rs`): points, questions, reminder offers, the topic an
   off-topic question belongs to, and the talk's title. Claude Code hands
   them over with tools while it answers (keep_point, ask_to_check,

@@ -21,6 +21,7 @@ pub mod members;
 pub mod oidc;
 pub mod own;
 pub mod page;
+pub mod photos;
 pub mod reminders;
 pub mod routes;
 mod serve;

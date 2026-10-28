@@ -4,7 +4,8 @@
 // picked by which tools the session allows. Each session's options are
 // appended to the file named first, one JSON line each, for the test to read.
 // While that file's name with `.hang` exists, the next session never opens,
-// as Claude Code's sometimes doesn't, and the file goes.
+// as Claude Code's sometimes doesn't, and the file goes. Each prompt's
+// blocks go to that file's name with `.prompts`, one JSON line each.
 
 import { appendFileSync, existsSync, rmSync } from "node:fs";
 
@@ -125,6 +126,7 @@ for await (const line of console) {
     );
     send({ jsonrpc: "2.0", id, result: { sessionId: "s1" } });
   } else if (method === "session/prompt") {
+    appendFileSync(`${log}.prompts`, `${JSON.stringify(params.prompt)}\n`);
     await answer(params.prompt[0].text);
     send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } });
   }

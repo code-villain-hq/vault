@@ -16,6 +16,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 use crate::login_env;
+use crate::photos::Image;
 
 /// The ACP adapter Almanac runs, looked for on the login shell's PATH.
 pub const ADAPTER: &str = "claude-agent-acp";
@@ -55,6 +56,8 @@ pub struct Question<'a> {
     pub system: &'a str,
     /// What they ask, with the talk so far.
     pub prompt: &'a str,
+    /// The talk's photos, after the prompt.
+    pub images: &'a [Image],
     /// Whether it may search the web and read pages.
     pub web: bool,
     /// Almanac's tools it may use, by their names in [`MCP_NAME`].
@@ -140,6 +143,7 @@ impl ClaudeCode {
             let question = Question {
                 system: "",
                 prompt: "",
+                images: &[],
                 web: false,
                 tools: &[],
                 token: "",
@@ -183,7 +187,7 @@ impl ClaudeCode {
             let mut answer = Answer::default();
             let params = json!({
                 "sessionId": session,
-                "prompt": [{ "type": "text", "text": question.prompt }],
+                "prompt": prompt(question),
             });
             let done = tokio::time::timeout(
                 ANSWER_TIMEOUT,
@@ -348,6 +352,17 @@ struct Agent {
     lines: Lines<BufReader<ChildStdout>>,
     next_id: i64,
     tail: Arc<Mutex<String>>,
+}
+
+/// The prompt's content blocks: the text, then each photo.
+fn prompt(question: &Question<'_>) -> Vec<Value> {
+    let mut blocks = vec![json!({ "type": "text", "text": question.prompt })];
+    blocks.extend(
+        question.images.iter().map(
+            |image| json!({ "type": "image", "mimeType": image.media_type, "data": image.data }),
+        ),
+    );
+    blocks
 }
 
 impl Agent {

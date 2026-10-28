@@ -8,6 +8,8 @@ export type * from "./generated/Message";
 export type * from "./generated/MessageCreate";
 export type * from "./generated/MessagePatch";
 export type * from "./generated/ModelKind";
+export type * from "./generated/Photo";
+export type * from "./generated/PhotoUpload";
 export type * from "./generated/Point";
 export type * from "./generated/PointCreate";
 export type * from "./generated/PointPatch";

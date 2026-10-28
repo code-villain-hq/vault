@@ -276,6 +276,7 @@ async fn set_up(state: &AppState, actor: Actor, id: Uuid, given: &[&str]) -> Res
             let question = Question {
                 system: &system,
                 prompt: &prompt,
+                images: &[],
                 web: false,
                 tools,
                 token: &open.token,

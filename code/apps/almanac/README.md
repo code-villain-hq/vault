@@ -86,6 +86,9 @@ topics.
   keeps and the current talk, nothing older. A question off the topic gets
   a short answer and an offer to ask it in the topic it belongs to, or to
   start one. Earlier talks are behind the talks icon.
+- **Photos in a talk**: paste, drop or pick up to six with a question, of a
+  shampoo, a plant, a page. Claude reads them with that question and every
+  later one in the talk; they stay in the talk, not on the page.
 - **The page keeps points with their sources**, grouped by theme: on a
   cards page, a card per plant with a short note for each point; on a
   document page, sections of paragraphs that explain, each with the talk

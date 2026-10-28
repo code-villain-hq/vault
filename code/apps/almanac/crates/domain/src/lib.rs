@@ -26,8 +26,8 @@ pub use protocol::{
     TransactionResult,
 };
 pub use talk::{
-    AskRequest, Message, MessageCreate, MessagePatch, Proposal, ProposedPoint, ProposedReminder,
-    Source, Talk, TalkCreate, TalkPatch, TopicChange,
+    AskRequest, Message, MessageCreate, MessagePatch, Photo, PhotoUpload, Proposal, ProposedPoint,
+    ProposedReminder, Source, Talk, TalkCreate, TalkPatch, TopicChange,
 };
 pub use topic::{
     ICONS, KINDS, Point, PointCreate, PointPatch, Question, QuestionCreate, QuestionPatch,

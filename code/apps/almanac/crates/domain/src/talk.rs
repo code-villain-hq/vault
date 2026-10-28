@@ -68,6 +68,9 @@ pub struct Message {
     pub proposal: Option<Proposal>,
     /// What the answer changed in topics you named, for Undo.
     pub changes: Vec<TopicChange>,
+    /// The photos a question came with, in order. Their bytes don't sync:
+    /// `GET /api/w/{id}/photos/{photo}` has each one.
+    pub photos: Vec<Photo>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -112,6 +115,28 @@ pub struct ProposedReminder {
     pub every_days: Option<i32>,
 }
 
+/// A photo a question came with, by its id, and its size in pixels, so a
+/// talk can make room for it before it arrives.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Photo {
+    pub id: Uuid,
+    pub width: i32,
+    pub height: i32,
+}
+
+/// A photo sent with a question: its type (`image/jpeg`, `image/png`,
+/// `image/webp` or `image/gif`), its bytes in base64, and its size.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct PhotoUpload {
+    pub media_type: String,
+    pub data: String,
+    pub width: i32,
+    pub height: i32,
+}
+
 /// One topic an answer changed: what it said it changed, and the fields
 /// before and after.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -142,6 +167,7 @@ pub struct MessageCreate {
     pub elsewhere: Option<String>,
     pub proposal: Option<Proposal>,
     pub changes: Option<Vec<TopicChange>>,
+    pub photos: Option<Vec<Photo>>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
@@ -164,6 +190,8 @@ pub struct MessagePatch {
 pub struct AskRequest {
     pub talk_id: Option<Uuid>,
     pub text: String,
+    /// Photos to look at with the question: of a shampoo, a plant, a page.
+    pub photos: Option<Vec<PhotoUpload>>,
 }
 
 impl Validate for TalkCreate {

@@ -1,5 +1,5 @@
 use almanac_domain::{Bootstrap, Transaction, TransactionResult};
-use axum::extract::State;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::routing::{any, get, patch, post, put};
 use axum::{Json, Router};
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, groups, keys, mcp, members, oidc, talks, topics, ws};
+use crate::{accounts, groups, keys, mcp, members, oidc, photos, talks, topics, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -40,7 +40,12 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/topics", post(topics::start))
-        .route("/topics/{topic_id}/ask", post(talks::ask))
+        .route(
+            "/topics/{topic_id}/ask",
+            // A question may come with photos, a few MB each.
+            post(talks::ask).layer(DefaultBodyLimit::max(48 * 1024 * 1024)),
+        )
+        .route("/photos/{photo_id}", get(photos::show))
         .route("/messages/{message_id}/undo", post(topics::undo))
         .route(
             "/claude",
