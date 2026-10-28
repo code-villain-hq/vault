@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: a better layout</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* The window, with a talk beside the page when one is open. */
+.win { display: grid; grid-template-columns: 172px 1fr; grid-template-rows: 44px 1fr; height: 640px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; }
+.win.talking { grid-template-columns: 172px 1fr 360px; height: 760px; }
+.win.talking .top { grid-column: 2 / 4; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+.toprow { height: 44px; display: flex; align-items: center; padding-left: 8px; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.nav { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 8px; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 12px 8px 4px; }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 14px; color: var(--muted); }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; padding: 24px 32px 0; display: flex; flex-direction: column; gap: 24px; position: relative; }
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); margin-bottom: 8px; }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; background: linear-gradient(transparent, var(--panel) 55%); }
+
+/* Chips: a fact each, the words before the comma in bold. */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.chips b { font-weight: 600; }
+
+/* Cards: a card per theme, four points and the rest behind "N more". */
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-items: start; }
+.cards.one { grid-template-columns: 1fr; max-width: 70ch; }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: grid; gap: 10px; }
+.card h4 { font-weight: 600; }
+.card ul { display: grid; gap: 6px; }
+.card li { padding-left: 14px; }
+.card .ui-disclosure { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 2px 6px; }
+.kept { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Timeline, as in a-section-opens.html. */
+.tl { display: grid; grid-template-columns: 76px 14px 1fr; column-gap: 10px; }
+.tl > div { display: contents; }
+.tl .y { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding: 4px 0; white-space: nowrap; }
+.tl .e { padding: 4px 0; }
+.tl .e .s { margin-left: 6px; }
+.rail { position: relative; }
+.rail::before { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 1.5px; background: var(--line); }
+.rail::after { content: ""; position: absolute; left: 3px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.rail.span::after { height: 14px; top: 8px; border-radius: 4px; }
+.tl > div:first-child .rail::before { top: 13px; }
+.text { display: grid; gap: 10px; max-width: 70ch; }
+.text h3 { font-weight: 700; }
+.text p { font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.text p b { font-weight: 700; }
+
+/* A talk beside the page. */
+.talk { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; display: flex; flex-direction: column; overflow: hidden; }
+.thd { display: flex; align-items: center; height: 44px; padding: 0 16px; font-weight: 700; }
+.tbody { flex: 1; padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
+.you { align-self: flex-end; max-width: 88%; padding: 8px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.answer { display: grid; gap: 8px; }
+.changes { display: grid; gap: 8px; padding: 10px 12px 12px; border-radius: var(--radius-lg); background: var(--surface); }
+.changes b { font-weight: 600; }
+.changes > p > span { color: var(--muted); }
+.changes .ui-disclosure { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 2px 6px; }
+.changes .ui-disclosure svg { transform: rotate(90deg); }
+.moves { display: grid; gap: 6px; padding: 2px 0 4px 6px; font-size: var(--type-ui-small-size); }
+.moves li { display: grid; gap: 1px; }
+.moves .k { color: var(--faint); }
+.moves .what { color: var(--muted); }
+.askbox { display: flex; align-items: center; height: 40px; padding: 0 14px; margin: 12px 16px 16px; }
+.askbox .ph { color: var(--faint); }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>A better layout</h1>
+  <p>The import put all 47 things Katzen knows about Lisa on one card, because Grok's notes had no sections. Today a talk can only add points to the page; moving blocks is up to you, one at a time, in the ⋯ menu. Here you ask the topic's talk to lay the page out better, and it does it while you watch. Undo puts everything back.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>You ask, the page changes</h2>
+  <ul class="choices">
+    <li><b>Only when you ask</b>, in the topic's own talk. Almanac never re-lays out a page on its own.</li>
+    <li><b>What it may do:</b> add, rename, reorder and remove blocks, change a block's kind, and move points between blocks and themes.</li>
+    <li><b>It may reword a point to fit its new place</b>, a card line into a chip, and keeps every fact in it. "What moved" says which it reworded.</li>
+    <li><b>It never drops a point</b> and never changes where one came from. A block it empties goes.</li>
+    <li><b>It changes the page at once.</b> The page beside the talk is the preview, so there is no proposal to read first; the Changes box says what moved, and Undo puts every block and point back.</li>
+    <li><b>My choice: one Changes box for the whole layout</b>, not one per move, so one Undo undoes it. The cards show four points each, as in <a class="ui-link" href="a-section-opens.html">a section opens</a>.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, scrolled to Lisa's card</div><div data-theme="night" data-use="katzen-today"></div></div>
+  <div class="mode"><div class="mode-label">Proposed: after asking, night</div><div data-theme="night" data-use="katzen-asked"></div></div>
+  <div class="mode"><div class="mode-label">Proposed: after asking, day</div><div data-theme="day" data-use="katzen-asked"></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>A timeline from what's kept</h2>
+  <ul class="choices">
+    <li><b>The same ask makes a new kind of block.</b> "Mach eine Zeitleiste daraus" reads Geschichte's sections for what happened when, and keeps each as an event with its date and its section, on a new Timeline at the top.</li>
+    <li><b>The sections stay as they are.</b> An event is a new point beside the passage it came from, so Undo removes the events and the block, and nothing else.</li>
+    <li><b>Later talks keep events too</b>, once the page has a timeline: what happened goes into its section and onto the timeline.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="geschichte-asked"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="geschichte-asked"></div></div>
+</section>
+
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="toprow"><div class="lights"><span></span><span></span><span></span></div></div>
+    <div class="nav ui-row"><i data-i="library"></i>Almanac</div>
+    <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+    <div class="group">Lernen</div>
+    <div class="nav ui-row"><i data-i="book"></i>Marx &amp; Engels</div>
+    <div class="nav ui-row"><i data-i="leaf"></i>Tofu &amp; Mehrwert</div>
+    <div class="nav ui-row"><i data-i="globe"></i>Geschichte</div>
+    <div class="group">Zuhause</div>
+    <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+    <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+  </aside>
+</template>
+
+<template id="tools">
+  <span class="tools"><i data-i="talks"></i><i data-i="more"></i></span>
+</template>
+
+<template id="katzen-top">
+  <p class="title">Katzen</p>
+  <div><div class="btitle">Today</div><p class="src">Abend und Nacht, Fellpflege, Fütterung: as it is</p></div>
+  <div><div class="btitle">The week</div><p class="src">Lisa kämmen, die Abendrunde, mehr neues Nassfutter, Lisa wiegen: as it is</p></div>
+</template>
+
+<template id="katzen-today">
+  <div class="win" data-topic="Katzen">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content" data-at=".cards">
+      <slot data-use="katzen-top"></slot>
+      <div><div class="btitle">Katzen</div>
+        <div class="cards one">
+          <article class="card"><h4>Lisa</h4>
+            <ul>
+              <li>Etwa 3½ Jahre alt und etwa 3,4 kg schwer. <span class="src">You said</span></li>
+              <li>Keine Papiere; vermutlich ein Mix aus Norwegischer oder Sibirischer Waldkatze. <span class="src">You said</span></li>
+              <li>Langhaar-Tabby mit dichtem Doppelmantel, Ruff, Ohrenbüscheln und buschigem Schweif. <span class="src">From Grok</span></li>
+              <li>Kam von einer anderen Familie, bei der sie mit einem Kind aufgewachsen ist. <span class="src">You said</span></li>
+              <li>Geimpft, gechipt und kastriert. <span class="src">You said</span></li>
+              <li>Ausgeglichen: legt nie die Ohren an und zieht sich bei Stress zum Schlafen zurück. <span class="src">You said</span></li>
+              <li>Mag enge Verstecke und feste Plätze: Kratzturm, Plastikkiste, unter dem Schreibtisch, Fensterbank. <span class="src">From Grok</span></li>
+              <li>Sitzt gern im Kalten auf dem verglasten Balkon. <span class="src">You said</span></li>
+              <li>Spielt mehrmals täglich: Katzenangel, Verstecken und Pfoten-Angriff von hinten, ohne Krallen. <span class="src">You said</span></li>
+              <li>Schläft bei uns im Zimmer, auf dem Stuhl und im Bett, meist laut schnurrend am Fußende. <span class="src">You said</span></li>
+              <li>Schläft 12–16 Stunden am Tag, an grauen Herbsttagen mehr; Energie kommt in Schüben, meist abends. <span class="src">From Grok</span></li>
+              <li>Tobt manchmal nachts aus Spieltrieb, folgt uns zum Klo und miaut uns zum Spielen an. <span class="src">You said</span></li>
+              <li>Seitlicher Blick auf dem Bett heißt meist ruhiges Beobachten oder „Komm, mach was“: Zeit für die Angel. <span class="src">From Grok</span></li>
+              <li>Kurzes Erschrecken und Weglaufen ohne Grund ist harmlose Spiel-Flucht, keine Angst. <span class="src">From Grok</span></li>
+              <li>Wirft Sachen runter, meidet aber den Küchentisch, weil sie weiß, dass sie nicht darf. <span class="src">You said</span></li>
+              <li>Lässt sich am liebsten auf dem Boden streicheln, nicht auf dem Sofa oder Arm. <span class="src">You said</span></li>
+              <li>Zum Streicheln zu ihr auf den Boden; aufs Sofa mit Decke und Leckerli locken, nie tragen. <span class="src">From Grok</span></li>
+            </ul>
+          </article>
+        </div>
+      </div>
+      <div class="fade"></div>
+    </main>
+  </div>
+</template>
+
+<template id="lisa">
+  <div class="lisa"><div class="btitle">Lisa</div>
+    <div class="chips">
+      <span class="ui-chip"><b>3½ Jahre</b>, etwa 3,4 kg</span>
+      <span class="ui-chip"><b>Waldkatze</b>, vermutlich Norwegisch oder Sibirisch, keine Papiere</span>
+      <span class="ui-chip"><b>Langhaar-Tabby</b>, dichter Doppelmantel, Ruff, Ohrenbüschel, buschiger Schweif</span>
+      <span class="ui-chip"><b>Geimpft</b>, gechipt und kastriert</span>
+      <span class="ui-chip"><b>Aufgewachsen</b> in einer anderen Familie, mit einem Kind</span>
+    </div>
+  </div>
+  <div><div class="btitle">Wie sie ist</div>
+    <div class="cards">
+      <article class="card"><h4>Verhalten</h4>
+        <ul>
+          <li>Ausgeglichen: legt nie die Ohren an und zieht sich bei Stress zum Schlafen zurück. <span class="src">You said</span></li>
+          <li>Mag enge Verstecke und feste Plätze: Kratzturm, Plastikkiste, unter dem Schreibtisch, Fensterbank. <span class="src">From Grok</span></li>
+          <li>Sitzt gern im Kalten auf dem verglasten Balkon. <span class="src">You said</span></li>
+          <li>Spielt mehrmals täglich: Katzenangel, Verstecken und Pfoten-Angriff von hinten, ohne Krallen. <span class="src">You said</span></li>
+        </ul>
+        <button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>6 more</button>
+      </article>
+      <article class="card"><h4>Streicheln</h4>
+        <ul>
+          <li>Lässt sich am liebsten auf dem Boden streicheln, nicht auf dem Sofa oder Arm. <span class="src">You said</span></li>
+          <li>Zum Streicheln zu ihr auf den Boden; aufs Sofa mit Decke und Leckerli locken, nie tragen. <span class="src">From Grok</span></li>
+          <li>Am liebsten an Wangen, Kinn und Kopf streicheln; den Bauch nur, wenn sie ihn deutlich anbietet. <span class="src">From Grok</span></li>
+          <li>Mag keine Katzenminze, aber Baldrian: reibt sich daran und rollt sich. <span class="src">You said</span></li>
+        </ul>
+        <button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>2 more</button>
+      </article>
+      <article class="card"><h4>Mit der Tochter</h4>
+        <ul>
+          <li>Unsere 5-jährige Tochter will sie umarmen und küssen; Lisa geht dann in ihren Turm. <span class="src">You said</span></li>
+          <li>Regel für die Tochter: streicheln nur, wenn Lisa von selbst kommt; nicht hochheben, nicht küssen. <span class="src">From Grok</span></li>
+          <li>Der Kratzturm ist ihr Rückzugsort und für die Tochter tabu. <span class="src">From Grok</span></li>
+          <li>Mit der Tochter klappen Spielen an der Angel und Leckerlis aus der Hand. <span class="src">You said</span></li>
+        </ul>
+      </article>
+      <article class="card"><h4>Draußen</h4>
+        <ul>
+          <li>Will in den Hausflur (4. Stock), geht bis zur Treppe und kommt nach 2–3 Minuten selbst zurück. <span class="src">You said</span></li>
+          <li>Raus nur kontrolliert, Tür im Blick; Treppe, Aufzug und fremde Wohnungen sind Fluchtrisiko. <span class="src">From Grok</span></li>
+          <li>Leine nur mit Geschirr, nie Halsband; erst drinnen üben, dann Balkon, Flur, kurze Runden. <span class="src">From Grok</span></li>
+        </ul>
+      </article>
+    </div>
+  </div>
+  <div><div class="btitle">Futter</div>
+    <div class="cards">
+      <article class="card"><h4>Was sie frisst</h4>
+        <ul>
+          <li>Bekam vorher Whiskas trocken und Felix nass; Felix kennt sie von der Vorbesitzerin. <span class="src">You said</span></li>
+          <li>Mag außer Felix kaum etwas; sie ist auf dessen Geschmack und Konsistenz geprägt. <span class="src">From Grok</span></li>
+          <li>Sortiert Whiskas aus lose gemischtem Trockenfutter heraus. <span class="src">You said</span></li>
+          <li>Mag Gourmet Gold Savoury Cake Rind nicht, auch nicht von der Pfote geleckt. <span class="src">You said</span></li>
+        </ul>
+        <button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>1 more</button>
+      </article>
+      <article class="card"><h4>Umstellen</h4>
+        <ul>
+          <li>Das Trockenfutter soll auf Heavenly Sterilised umgestellt werden, passend dazu, dass sie kastriert ist. <span class="src">You said</span></li>
+          <li>Erst das Nassfutter umstellen, das Trockene danach; immer nur eins auf einmal ändern. <span class="src">From Grok</span></li>
+          <li>Die Umstellung dauert eher Wochen als Tage; solange sie frisst, trinkt und normal aufs Klo geht, ist das okay. <span class="src">From Grok</span></li>
+          <li>Gegen Aussortieren das neue Trockenfutter zerstoßen oder anfeuchten und nur mit kleinem Anteil untermischen. <span class="src">From Grok</span></li>
+        </ul>
+        <button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>2 more</button>
+      </article>
+    </div>
+  </div>
+  <div><div class="btitle">Gesundheit</div>
+    <div class="cards">
+      <article class="card"><h4>So geht es ihr</h4>
+        <ul>
+          <li>Gutes Gewicht: die Rippen sind mit leichtem Druck fühlbar, stehen aber nicht hervor. <span class="src">From Grok</span></li>
+          <li>Kastriert und flauschig: eher schlank halten und das Gewicht alle paar Wochen prüfen. <span class="src">From Grok</span></li>
+          <li>Trinkt genug und geht normal aufs Klo. <span class="src">You said</span></li>
+          <li>Im Fellwechsel, Herbst und Frühling, verliert sie Büschel feiner Unterwolle; das ist normal. <span class="src">From Grok</span></li>
+        </ul>
+      </article>
+      <article class="card"><h4>Wann zum Tierarzt</h4>
+        <ul>
+          <li>Tierarzt bei kahlen Stellen, starkem Kratzen oder geröteter, schuppiger Haut. <span class="src">From Grok</span></li>
+          <li>Tierarzt bei Durchfall oder Erbrechen über 1–2 Tage oder wenn sie nicht pinkelt. <span class="src">From Grok</span></li>
+          <li>Nie länger als etwa 24 Stunden ohne echtes Fressen; dann zurückmischen oder zum Tierarzt. <span class="src">From Grok</span></li>
+          <li>Tierarzt, wenn nächtliche Unruhe anhält und Dauermiauen, weniger Fressen oder Klo-Probleme dazukommen. <span class="src">From Grok</span></li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</template>
+
+<template id="katzen-talk">
+  <aside class="talk">
+    <div class="thd">Die Seite aufteilen</div>
+    <div class="tbody">
+      <div class="you">Lisas Karte ist riesig. Kannst du die Seite besser aufteilen?</div>
+      <div class="answer">
+        <p>Ich habe Lisas 47 Punkte aufgeteilt: oben die festen Fakten als Chips, darunter drei Blöcke mit Karten, Wie sie ist, Futter und Gesundheit. Today und die Woche bleiben, wie sie sind.</p>
+        <div class="changes">
+          <p><b>Katzen</b><span> · Neue Aufteilung: Lisa, Wie sie ist, Futter, Gesundheit. Alle 47 Punkte sind noch da.</span></p>
+          <button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>What moved</button>
+          <ul class="moves">
+            <li><p><b>Lisa</b> <span class="k">· new chips</span></p><span class="what">5 points, reworded to fit a chip</span></li>
+            <li><p><b>Wie sie ist</b> <span class="k">· new cards</span></p><span class="what">Verhalten 10, Streicheln 6, Mit der Tochter 4, Draußen 3</span></li>
+            <li><p><b>Futter</b> <span class="k">· new cards</span></p><span class="what">Was sie frisst 5, Umstellen 6</span></li>
+            <li><p><b>Gesundheit</b> <span class="k">· new cards</span></p><span class="what">So geht es ihr 4, Wann zum Tierarzt 4</span></li>
+            <li><p><b>Katzen</b> <span class="k">· removed</span></p><span class="what">its card was empty</span></li>
+          </ul>
+          <div><button class="ui-button">Undo</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="askbox ui-field"><span class="ph">Reply</span></div>
+  </aside>
+</template>
+
+<template id="katzen-asked">
+  <div class="win talking" data-topic="Katzen">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content" data-at=".lisa">
+      <slot data-use="katzen-top"></slot>
+      <slot data-use="lisa"></slot>
+      <div class="fade"></div>
+    </main>
+    <slot data-use="katzen-talk"></slot>
+  </div>
+</template>
+
+<template id="geschichte-asked">
+  <div class="win talking" data-topic="Geschichte">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <p class="title">Geschichte</p>
+      <div><div class="btitle">Timeline</div>
+        <div class="tl">
+          <div><span class="y">1816</span><span class="rail"></span><span class="e">Nepal verliert im Vertrag von Sugauli Gebiet an die Briten<span class="src s">Nie kolonisiert?</span></span></div>
+          <div><span class="y">1853–1854</span><span class="rail span"></span><span class="e">Perry öffnet Japan mit US-Kriegsschiffen<span class="src s">Nie kolonisiert?</span></span></div>
+          <div><span class="y">1896</span><span class="rail"></span><span class="e">Äthiopien schlägt Italien bei Adua<span class="src s">Nie kolonisiert?</span></span></div>
+          <div><span class="y">1898</span><span class="rail"></span><span class="e">Kuba ist keine spanische Kolonie mehr und wird US-Protektorat<span class="src s">Kuba</span></span></div>
+          <div><span class="y">1936–1941</span><span class="rail span"></span><span class="e">Italien besetzt Äthiopien<span class="src s">Nie kolonisiert?</span></span></div>
+          <div><span class="y">1943</span><span class="rail"></span><span class="e">Aufstand im Warschauer Ghetto gegen die SS<span class="src s">Wer „Terror“ sagt</span></span></div>
+          <div><span class="y">1945–1946</span><span class="rail span"></span><span class="e">Nakam plant, Millionen Deutsche zu vergiften<span class="src s">Antideutsche und Nakam</span></span></div>
+          <div><span class="y">1953</span><span class="rail"></span><span class="e">Die USA und Großbritannien stürzen Mossadegh<span class="src s">Nie kolonisiert?</span></span></div>
+          <div><span class="y">1959</span><span class="rail"></span><span class="e">Die Revolution stürzt Batista<span class="src s">Kuba</span></span></div>
+          <div><span class="y">1967</span><span class="rail"></span><span class="e">Israel besetzt Westjordanland, Gazastreifen und Ostjerusalem<span class="src s">Intifada</span></span></div>
+          <div><span class="y">1973</span><span class="rail"></span><span class="e">Putsch in Chile, mit Hilfe der USA<span class="src s">9/11</span></span></div>
+          <div><span class="y">1987–1993</span><span class="rail span"></span><span class="e">Die Erste Intifada<span class="src s">Intifada</span></span></div>
+          <div><span class="y">1993</span><span class="rail"></span><span class="e">Die Oslo-Abkommen, ohne eigenen Staat<span class="src s">Intifada</span></span></div>
+          <div><span class="y">2000–2005</span><span class="rail span"></span><span class="e">Die Zweite Intifada<span class="src s">Intifada</span></span></div>
+          <div><span class="y">2001</span><span class="rail"></span><span class="e">11. September: knapp 3.000 Tote<span class="src s">9/11</span></span></div>
+          <div><span class="y">2005</span><span class="rail"></span><span class="e">Israel zieht sich aus Gaza zurück<span class="src s">Intifada</span></span></div>
+        </div>
+      </div>
+      <div class="fade"></div>
+    </main>
+    <aside class="talk">
+      <div class="thd">Eine Zeitleiste</div>
+      <div class="tbody">
+        <div class="you">Mach eine Zeitleiste daraus.</div>
+        <div class="answer">
+          <p>Ich habe aus den Abschnitten herausgesucht, was wann geschah, und es als Zeitleiste ganz oben auf die Seite gestellt, das Älteste zuerst. Jedes Ereignis steht bei seinem Abschnitt; die Abschnitte selbst bleiben, wie sie sind.</p>
+          <div class="changes">
+            <p><b>Geschichte</b><span> · Neuer Block Timeline, ganz oben: Ereignisse aus den Abschnitten, je mit Datum. Die Abschnitte bleiben.</span></p>
+            <div><button class="ui-button">Undo</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="askbox ui-field"><span class="ph">Reply</span></div>
+    </aside>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  talks: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+};
+// Fill each placeholder from its template; a <slot> is replaced, so a
+// window's sidebar stays a grid item. Templates may use templates.
+let at;
+while ((at = document.querySelector("[data-use]:not([data-filled])"))) {
+  const part = document.getElementById(at.dataset.use).content.cloneNode(true);
+  if (at.tagName === "SLOT") at.replaceWith(part);
+  else {
+    at.dataset.filled = "";
+    at.append(part);
+  }
+}
+// The window's topic is the one selected in the sidebar.
+for (const win of document.querySelectorAll(".win[data-topic]")) {
+  for (const nav of win.querySelectorAll(".nav")) {
+    nav.classList.toggle("is-selected", nav.textContent.trim() === win.dataset.topic);
+  }
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 15;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+// A window scrolled down to a block: the page above it moves out of view.
+for (const c of document.querySelectorAll(".content[data-at]")) {
+  c.firstElementChild.style.marginTop = `-${c.querySelector(c.dataset.at).offsetTop - 24}px`;
+}
+</script>
+</body>
+</html>

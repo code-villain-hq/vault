@@ -157,8 +157,60 @@ pub struct TopicChange {
     pub said: String,
     pub before: TopicPatch,
     pub after: TopicPatch,
+    /// The page laid out anew, when they asked for that.
+    #[serde(default)]
+    pub layout: Option<PageLayout>,
     /// Set once Undo put the fields back.
     pub undone: bool,
+}
+
+/// A topic's page an answer laid out anew: what moved, block by block, and
+/// the blocks and points as they were, for Undo to put back.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PageLayout {
+    /// A line per block it changed, in the page's new order, then the
+    /// blocks it removed.
+    pub moves: Vec<LayoutMove>,
+    /// The blocks it changed or removed, as they were.
+    pub blocks: Vec<BlockWas>,
+    /// The points it moved or reworded, as they were.
+    pub points: Vec<PointWas>,
+    /// The blocks and points it started, which Undo takes off again.
+    pub made_blocks: Vec<Uuid>,
+    pub made_points: Vec<Uuid>,
+}
+
+/// One block in "What moved": "Wie sie ist · new cards", then what it
+/// holds now, "Verhalten 10, Streicheln 6".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LayoutMove {
+    pub block: String,
+    pub change: String,
+    pub holds: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BlockWas {
+    pub id: Uuid,
+    pub kind: String,
+    pub title: String,
+    pub position: i32,
+    /// Whether the layout removed it.
+    pub removed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PointWas {
+    pub id: Uuid,
+    pub block_id: Uuid,
+    pub theme: String,
+    pub text: String,
+    pub happened: String,
+    pub position: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -200,6 +252,9 @@ pub struct AskRequest {
     pub text: String,
     /// Photos to look at with the question: of a shampoo, a plant, a page.
     pub photos: Option<Vec<PhotoUpload>>,
+    /// The section of the page open in front of them, by its theme
+    /// ("Intifada"): the answer is about it, and keeps what it finds there.
+    pub about: Option<String>,
 }
 
 impl Validate for TalkCreate {

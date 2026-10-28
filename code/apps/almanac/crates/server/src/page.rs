@@ -13,7 +13,7 @@ use uuid::Uuid;
 const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
 const BLOCKS: &str = "SELECT id, kind, title FROM blocks \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
-const POINTS: &str = "SELECT id, block_id, theme, text, source FROM points \
+const POINTS: &str = "SELECT id, block_id, theme, text, happened, source FROM points \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const QUESTIONS: &str = "SELECT text FROM questions \
      WHERE topic_id = $1 AND workspace_id = $2 AND status = 'open' ORDER BY created_at";
@@ -30,8 +30,9 @@ const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, \
      FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
      ORDER BY t.group_name = '', t.group_name, t.position, t.created_at";
 
-/// A point as the page has it: its id, theme, text and where it comes from.
-pub type PagePoint = (Uuid, String, String, Option<String>);
+/// A point as the page has it: its id, theme, text, when it happened (on a
+/// timeline) and where it comes from.
+pub type PagePoint = (Uuid, String, String, String, Option<String>);
 
 /// A reminder as the page has it: its id, title, next day, rhythm, and
 /// whether it's `on` or only `offered`.
@@ -104,14 +105,15 @@ impl Page {
                 points: Vec::new(),
             })
             .collect();
-        let points: Vec<(Uuid, Uuid, String, String, Option<String>)> = sqlx::query_as(POINTS)
-            .bind(id)
-            .bind(workspace_id)
-            .fetch_all(pool)
-            .await?;
-        for (id, block_id, theme, text, source) in points {
+        let points: Vec<(Uuid, Uuid, String, String, String, Option<String>)> =
+            sqlx::query_as(POINTS)
+                .bind(id)
+                .bind(workspace_id)
+                .fetch_all(pool)
+                .await?;
+        for (id, block_id, theme, text, happened, source) in points {
             if let Some(block) = blocks.iter_mut().find(|b| b.id == block_id) {
-                block.points.push((id, theme, text, source));
+                block.points.push((id, theme, text, happened, source));
             }
         }
         Ok(Some(Page {
@@ -188,18 +190,22 @@ impl Page {
                 out.push_str("Nothing yet.\n");
             }
             let mut theme = None;
-            for (_, in_theme, text, source) in &block.points {
+            for (_, in_theme, text, happened, source) in &block.points {
                 if !in_theme.is_empty() && theme != Some(in_theme) {
                     let _ = writeln!(out, "### {in_theme}");
                     theme = Some(in_theme);
                 }
                 n += 1;
+                let when = match happened.as_str() {
+                    "" => String::new(),
+                    happened => format!("{happened}: "),
+                };
                 match source.as_deref().filter(|s| !s.is_empty()) {
                     Some(source) => {
-                        let _ = writeln!(out, "- [p{n}] {text} ({source})");
+                        let _ = writeln!(out, "- [p{n}] {when}{text} ({source})");
                     }
                     None => {
-                        let _ = writeln!(out, "- [p{n}] {text}");
+                        let _ = writeln!(out, "- [p{n}] {when}{text}");
                     }
                 }
             }
@@ -255,7 +261,14 @@ text, sections of one piece of writing, the section's heading as the theme (Prob
 Market, Team): each point keeps what the answer explained the way it explained it, two to \
 four sentences, starting with the term it's about in **bold** when there is one, and what \
 they told you stays one sentence; \
-list, items to follow or read, one line each with its source, with no theme. \
+list, items to follow or read, one line each with its source, with no theme; \
+timeline, what happened when, which the page lists oldest first: the theme is the section of \
+the page it belongs to, named exactly as that section or card is (\"Intifada\"), each point \
+one line on what happened (\"Die Erste Intifada\"), and it says when it happened: a year \
+(1959), a span (1987–1993) or a day (11. September 2001), with \"v. Chr.\" or \"BC\" before \
+the year 1, in the talk's language. When the page has a timeline and a talk explains \
+something that happened at a time, it keeps both: the explanation in its section, and one \
+line with its date on the timeline. \
 When no block fits a point, and only then, it may start a new block after the others, with \
 a kind and a short title.";
 

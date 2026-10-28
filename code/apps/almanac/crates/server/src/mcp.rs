@@ -23,6 +23,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::kept::{Kept, reminder};
+use crate::layout::{LayoutArgs, Now, lay_out};
 use crate::page::Refs;
 use crate::state::AppState;
 use crate::topics::{SetUp, cut};
@@ -56,6 +57,7 @@ impl Mode {
                 "ask_to_check",
                 "offer_reminder",
                 "change_brief",
+                "lay_out_page",
                 "name_talk",
                 "fits_elsewhere",
             ],
@@ -228,6 +230,7 @@ async fn call(
                 &point.kind,
                 &point.theme,
                 &point.text,
+                &point.happened,
                 &point.source,
                 &point.url,
                 &point.replaces,
@@ -259,6 +262,35 @@ async fn call(
                 "Changed, once your answer is done. They see what you said, and can undo it."
                     .into(),
             )
+        }
+        "lay_out_page" => {
+            let args: LayoutArgs = read(arguments)?;
+            let topic: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
+                .bind(asking.actor.workspace_id)
+                .bind(asking.topic_id)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
+            let (id, name, ..) = topic.ok_or("This topic is gone.")?;
+            let now = Now::load(&state.pool, asking.actor.workspace_id, id)
+                .await
+                .map_err(|_| "Almanac couldn't look at the page.".to_string())?;
+            let mut guard = kept()?;
+            if !guard.points.is_empty() {
+                return Err(
+                    "You kept points in this answer already: lay out the page in the next one."
+                        .into(),
+                );
+            }
+            let laid = lay_out(id, &name, &guard.refs, &now, args)?;
+            let again = guard.layout.replace(laid).is_some();
+            Ok(if again {
+                "Laid out, in place of the layout before, once your answer is done."
+            } else {
+                "Laid out, once your answer is done. They see what moved under your answer, \
+                 and can undo it."
+            }
+            .into())
         }
         "name_talk" => {
             let args: NameArgs = read(arguments)?;
@@ -322,6 +354,8 @@ struct PointArgs {
     #[serde(default)]
     theme: String,
     text: String,
+    #[serde(default)]
+    happened: String,
     #[serde(default)]
     source: String,
     #[serde(default)]
@@ -601,6 +635,7 @@ async fn change(
         },
         before,
         after,
+        layout: None,
         undone: false,
     })
 }
@@ -668,6 +703,11 @@ about, in a sentence or two (\"Houseplants and their care: watering, light, repo
 a line each, how it answers: in which language, the tone and the length, what it brings in, what \
 it checks, and what it leaves to other topics. Fit it to the topic, with nothing every topic \
 does anyway: usually 400 to 1,200 characters. The page doesn't show it.";
+
+/// When a timeline's point happened, for the tools that keep one.
+const HAPPENED_SAYS: &str = "Only on a timeline: when it happened, as a year (1959), a span \
+(1987–1993) or a day (11. September 2001), with v. Chr. or BC for the years before year 1. \
+Left out elsewhere.";
 
 /// The templates a topic starts as, for the tools that pick one.
 const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
@@ -738,8 +778,9 @@ fn tools(mode: Mode) -> Vec<Value> {
                 json!({
                     "block": string("The block it goes in: as the page names it (b2), or its title. For a new block, its title."),
                     "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Only for a block the page lacks: the kind it starts as. Left out otherwise." },
-                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf or cards, the section in text. Left out in chips and lists."),
-                    "text": string("The point: in text two to four sentences that explain; elsewhere one short sentence or a few words."),
+                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf or cards, the section in text and on a timeline. Left out in chips and lists."),
+                    "text": string("The point: in text two to four sentences that explain; on a timeline one line on what happened; elsewhere one short sentence or a few words."),
+                    "happened": string(HAPPENED_SAYS),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                     "url": string("The page it comes from, when you read one. Never a made-up link."),
                     "replaces": replaces("points", "p3"),
@@ -792,6 +833,70 @@ fn tools(mode: Mode) -> Vec<Value> {
                     "said": string("What changed, in a short sentence for under the answer, in the talk's language: \"Names when each source was written.\""),
                 }),
                 &["sticks_to", "said"],
+            ),
+            tool(
+                "lay_out_page",
+                "Lays out the topic's page anew, only when they ask for that in this talk \
+                 (\"sort the page better\", \"make a timeline of it\"): never on your own. \
+                 List every block the page keeps, in its new order, with a new kind or title \
+                 where it changes; one you leave out must end up empty, and goes. Move points \
+                 between blocks and themes, naming them as the page does (p3), and reword one \
+                 only to fit its new place, with every fact it had; points no move names stay \
+                 where they are. new_points draws new points from ones the page has, with \
+                 their source: a timeline's events from its sections, which keep theirs. \
+                 Nothing is dropped and no point's source changes; a block the layout empties \
+                 goes. It's done at once, and they see what moved under your answer and can \
+                 undo it. Call it once, with the whole layout: a second call replaces the \
+                 first. Keep no other points in the same answer.",
+                json!({
+                    "blocks": {
+                        "type": "array",
+                        "description": "Every block the page keeps, in its new order.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "block": string("The page's block, as the page names it (b2); left out for a new one."),
+                                "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Its kind: for a new block, or to change one's kind. Left out, it keeps its own." },
+                                "title": string("A new block's short title, or a new title for one the page has. Left out, it keeps its own."),
+                            },
+                            "additionalProperties": false,
+                        },
+                    },
+                    "moves": {
+                        "type": "array",
+                        "description": "The points that move or change, each once.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "point": string("The point, as the page names it (p3)."),
+                                "block": string("The block it goes to: as the page names it (b2), or the title of a new block in blocks. Left out, it stays in its block."),
+                                "theme": string("Its theme in the block it ends in, as that block's kind asks. Left out, it keeps its own; chips and lists have none."),
+                                "text": string("Only when it's reworded to fit its new place: the point, with every fact it had."),
+                                "happened": string(HAPPENED_SAYS),
+                            },
+                            "required": ["point"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "new_points": {
+                        "type": "array",
+                        "description": "New points drawn from ones the page has: a timeline's events from its sections.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "from": string("The page's point it's drawn from (p3): it keeps that one's source."),
+                                "block": string("The block it goes in, as for moves."),
+                                "theme": string("Its theme there: on a timeline, the section it belongs to, named as the page names it."),
+                                "text": string("The point: on a timeline, one line on what happened."),
+                                "happened": string(HAPPENED_SAYS),
+                            },
+                            "required": ["from", "block", "text"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "said": string("What you did, in a short sentence for under the answer, in the talk's language: \"Sorted the cards by what she does.\""),
+                }),
+                &["blocks", "said"],
             ),
             name_talk,
             fits_elsewhere,
@@ -926,6 +1031,7 @@ mod tests {
                 group_name: Some("Hobby".into()),
                 ..TopicPatch::default()
             },
+            layout: None,
             undone: false,
         };
         let second = TopicChange {
@@ -942,6 +1048,7 @@ mod tests {
                 group_name: Some("Outside".into()),
                 ..TopicPatch::default()
             },
+            layout: None,
             undone: false,
         };
         merge(&mut first, second);

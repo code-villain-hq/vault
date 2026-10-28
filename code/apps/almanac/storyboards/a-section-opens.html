@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: a section opens</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* The window. */
+.win { display: grid; grid-template-columns: 172px 1fr; grid-template-rows: 44px 1fr; height: 560px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; }
+.win.tall { height: 720px; }
+.win.taller { height: 860px; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+.toprow { height: 44px; display: flex; align-items: center; padding-left: 8px; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.nav { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 8px; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 12px 8px 4px; }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 14px; color: var(--muted); }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; padding: 24px 40px 0; display: flex; flex-direction: column; gap: 24px; position: relative; }
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); margin-bottom: 8px; }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.list .ui-row { display: flex; gap: 16px; align-items: baseline; padding: 5px 10px; }
+.list .src { margin-left: auto; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.askbox { position: absolute; left: 40px; right: 40px; bottom: 16px; display: flex; align-items: center; height: 42px; padding: 0 14px; }
+.askbox .ph { color: var(--faint); }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; background: linear-gradient(transparent, var(--panel) 55%); }
+
+/* Text: sections that explain, a passage per point. */
+.text { display: grid; gap: 22px; max-width: 70ch; }
+.text section { display: grid; gap: 10px; }
+.text h3 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.text h3 svg { color: var(--faint); }
+.passage { display: grid; gap: 4px; }
+.passage p { font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.passage b { font-weight: 700; }
+.text .ui-disclosure { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 2px 6px; }
+
+/* Timeline: what happened when, oldest first. */
+.tl { display: grid; grid-template-columns: 88px 14px 1fr auto; column-gap: 12px; max-width: 86ch; }
+.tl > div { display: contents; }
+.tl .y { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding: 5px 0; white-space: nowrap; }
+.tl .e { padding: 5px 0; }
+.tl .s { color: var(--faint); font-size: var(--type-ui-small-size); padding: 6px 0; white-space: nowrap; }
+.rail { position: relative; }
+.rail::before { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 1.5px; background: var(--line); }
+.rail::after { content: ""; position: absolute; left: 3px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.rail.span::after { height: 14px; top: 9px; border-radius: 4px; }
+.tl > div:first-child .rail::before { top: 14px; }
+.tl > div:last-child .rail::before { bottom: auto; height: 14px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>A section opens</h1>
+  <p>Geschichte keeps 47 passages in ten sections, and most are about something that happened at a time. On one page they make a wall to scroll. Two changes make it readable: a section opens on its own, and what happened goes on a timeline. The first is for every topic: Lisa's card in Katzen, with 47 points, opens the same way.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>A section opens on its own</h2>
+  <ul class="choices">
+    <li><b>On the page, a section shows its first passage, and a card its first four points.</b> The rest is behind "3 more", which opens the section. The page shows what the topic has at a glance; you read one section at a time.</li>
+    <li><b>Its name opens it too:</b> a section's heading, a card's title, a tile's name. "Almanac › Geschichte › Intifada" leads back.</li>
+    <li><b>It's everything kept under that name, from every block:</b> its events, its passages, its reminders and open questions, and the talks they came from.</li>
+    <li><b>Asking from there asks about it.</b> "Ask about Intifada" starts a talk with the section in view, and what it keeps goes into that section.</li>
+    <li><b>My choice:</b> it opens in the page's place, not in a dialog, so a talk can still open beside it.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, scrolled to What it says</div><div data-theme="night" data-use="page-today"></div></div>
+  <div class="mode"><div class="mode-label">Proposed: the page, scrolled to What it says, night</div><div data-theme="night" data-use="page-new"></div></div>
+  <div class="mode"><div class="mode-label">Proposed: Intifada opened, night</div><div data-theme="night" data-use="section"></div></div>
+  <div class="mode"><div class="mode-label">Proposed: Intifada opened, day</div><div data-theme="day" data-use="section"></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>What happened, on a timeline</h2>
+  <ul class="choices">
+    <li><b>A new kind of block, Timeline:</b> what happened when, oldest first, a line each, with the section it belongs to. Its name opens that section.</li>
+    <li><b>A point gets a when:</b> a year (1959), a span (1987–1993) or a day (11. September 2001), and "v. Chr." before the year 1. A span's mark is longer than a year's.</li>
+    <li><b>An event's section is its theme</b>, as for any point: Intifada's five events are the timeline at the top of Intifada.</li>
+    <li><b>A talk keeps what happened twice:</b> the explanation in its section, and one line with its date on the timeline. For what's kept already, you ask "Mach eine Zeitleiste daraus": <a class="ui-link" href="a-better-layout.html">a better layout</a> shows it.</li>
+    <li><b>My choice: a list, not a drawn axis.</b> From 1816 to 2001 an axis would be mostly empty decades, and a list reads on a phone too.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="page-timeline"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="page-timeline"></div></div>
+</section>
+
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="toprow"><div class="lights"><span></span><span></span><span></span></div></div>
+    <div class="nav ui-row"><i data-i="library"></i>Almanac</div>
+    <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+    <div class="group">Lernen</div>
+    <div class="nav ui-row"><i data-i="book"></i>Marx &amp; Engels</div>
+    <div class="nav ui-row"><i data-i="leaf"></i>Tofu &amp; Mehrwert</div>
+    <div class="nav ui-row is-selected"><i data-i="globe"></i>Geschichte</div>
+    <div class="group">Zuhause</div>
+    <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+    <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+  </aside>
+</template>
+
+<template id="tools">
+  <span class="tools"><i data-i="talks"></i><i data-i="more"></i></span>
+</template>
+
+<template id="reading">
+  <div class="list"><div class="btitle">Reading</div>
+    <div class="ui-row">Costs of War Project: Tote der US-Kriege nach 9/11<span class="src">Brown University</span></div>
+    <div class="ui-row">B’Tselem, israelische Menschenrechtsorganisation: Opferzahlen der Intifadas, Vorwürfe zu Gaza<span class="src">B’Tselem</span></div>
+    <div class="ui-row">Stroop-Bericht (1943): der SS-Bericht über die Niederschlagung des Warschauer Ghettoaufstands<span class="src">Jürgen Stroop</span></div>
+  </div>
+  <div><div class="btitle">Terms</div>
+    <div class="chips"><span class="ui-chip">Intifada: arabisch für „Abschütteln“ oder „Aufstand“</span><span class="ui-chip">Erste Intifada: rund 1.100 Palästinenser getötet, über 200 davon minderjährig, und etwa 160 Israelis</span><span class="ui-chip">Lehnt alle Staaten ab, weder Team NATO noch Team Russland</span><span class="ui-chip">Zählt die USA geschichtlich zu Europa</span></div>
+  </div>
+</template>
+
+<!-- The four passages Intifada keeps. -->
+<template id="intifada-1">
+  <div class="passage"><p><b>Die Erste Intifada</b> (1987 bis etwa 1993) begann nach einem Verkehrsunfall in Gaza, bei dem ein israelischer Lastwagen vier Palästinenser tötete, und richtete sich gegen die Besatzung von Westjordanland, Gazastreifen und Ostjerusalem seit 1967. Sie lief überwiegend ohne Schusswaffen: Massendemonstrationen, Generalstreiks, Steuer- und Warenboykotte, örtliche Komitees und Steinwürfe; es gab aber auch Molotowcocktails, Messerangriffe und die Tötung vermeintlicher Kollaborateure. Am Ende standen die Oslo-Abkommen, die keinen eigenen Staat brachten, und in dieser Zeit wurde die Hamas gegründet.</p><span class="src">From Grok</span></div>
+</template>
+<template id="intifada-rest">
+  <div class="passage"><p><b>Israels Antwort</b> auf die Erste Intifada war volle Härte: scharfe Munition gegen Steinewerfer, Massenverhaftungen ohne Prozess, wochenlange Ausgangssperren, Hausabrisse, Abschiebungen und geschlossene Schulen; Verteidigungsminister Jitzchak Rabin wird die Anweisung zugeschrieben, Demonstranten die Knochen zu brechen. Viele Historiker und Menschenrechtsorganisationen nennen das kollektive Bestrafung, die das Völkerrecht verbietet. Das Ungleichgewicht, eine Besatzungsarmee gegen eine weitgehend unbewaffnete Bevölkerung, veränderte damals selbst in Israel und im Westen die Sicht und führte mit zu Oslo.</p><span class="src">From Grok</span></div>
+  <div class="passage"><p><b>Die Zweite Intifada</b> (2000 bis etwa 2005) begann mit Ariel Scharons Besuch auf dem Tempelberg, dem Haram al-Scharif, nachdem die Gespräche in Camp David gescheitert waren. Sie war viel stärker militarisiert: Selbstmordanschläge auf Zivilisten auf der einen, Panzer, Luftangriffe, gezielte Tötungen und die Rückeroberung der Städte im Westjordanland auf der anderen Seite. Getötet wurden rund 3.000 Palästinenser und etwa 1.000 Israelis; danach folgten der Bau der Sperranlage und 2005 Israels Rückzug aus Gaza.</p><span class="src">From Grok</span></div>
+  <div class="passage"><p><b>Zwei Sichten</b>: Für Palästinenser ist die Intifada Widerstand gegen Besatzung und Siedlungsbau, für viele in Israel und Deutschland steht das Wort vor allem für Terror, wegen der Anschläge der Zweiten Intifada. Beides gehört zur Geschichte: Die Besatzung ist der Rahmen, und Anschläge auf Zivilisten bleiben trotzdem Verbrechen.</p><span class="src">From Grok</span></div>
+</template>
+<template id="kuba-1">
+  <div class="passage"><p><b>Kuba</b> war spanische Kolonie bis 1898. Danach hielten die USA die Insel unter Kontrolle, mit Militärregierung, Platt-Amendment, dem Stützpunkt Guantánamo und Zuckerkonzernen: formal unabhängig, faktisch US-Protektorat. Spanien hat kolonisiert, die USA haben das Erbe übernommen.</p><span class="src">From Grok</span></div>
+</template>
+<template id="nineeleven-1">
+  <div class="passage"><p><b>9/11 in Zahlen</b>: Am 11. September 2001 starben knapp 3.000 Menschen. Die Kriege, die die USA danach in Afghanistan, im Irak, in Pakistan, Syrien und im Jemen führten, kosteten rund 900.000 Menschen direkt das Leben, mit den indirekten Folgen geschätzt 4,5 Millionen. Hiroshima und Nagasaki, Vietnam und Korea waren jeweils um ein Vielfaches tödlicher.</p><span class="src">Costs of War Project, Brown University</span></div>
+</template>
+
+<template id="page-today">
+  <div class="win taller">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content" data-at=".text">
+      <p class="title">Geschichte</p>
+      <slot data-use="reading"></slot>
+      <div class="text"><div class="btitle">What it says</div>
+        <section><h3>Intifada</h3><slot data-use="intifada-1"></slot><slot data-use="intifada-rest"></slot></section>
+      </div>
+      <div class="fade"></div>
+    </main>
+  </div>
+</template>
+
+<template id="page-new">
+  <div class="win taller">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content" data-at=".text">
+      <p class="title">Geschichte</p>
+      <slot data-use="reading"></slot>
+      <div class="text"><div class="btitle">What it says</div>
+        <section><h3>Intifada<i data-i="chevron" data-s="14"></i></h3><slot data-use="intifada-1"></slot><button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>3 more</button></section>
+        <section><h3>Kuba<i data-i="chevron" data-s="14"></i></h3><slot data-use="kuba-1"></slot><button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>2 more</button></section>
+        <section><h3>9/11<i data-i="chevron" data-s="14"></i></h3><slot data-use="nineeleven-1"></slot><button class="ui-disclosure"><i data-i="chevron" data-s="13"></i>3 more</button></section>
+      </div>
+      <div class="fade"></div>
+    </main>
+  </div>
+</template>
+
+<template id="intifada-events">
+  <div class="tl">
+    <div><span class="y">1967</span><span class="rail"></span><span class="e">Israel besetzt Westjordanland, Gazastreifen und Ostjerusalem</span><span></span></div>
+    <div><span class="y">1987–1993</span><span class="rail span"></span><span class="e">Die Erste Intifada, nach einem Verkehrsunfall in Gaza</span><span></span></div>
+    <div><span class="y">1993</span><span class="rail"></span><span class="e">Die Oslo-Abkommen, ohne eigenen Staat</span><span></span></div>
+    <div><span class="y">2000–2005</span><span class="rail span"></span><span class="e">Die Zweite Intifada, nach Scharons Besuch auf dem Tempelberg</span><span></span></div>
+    <div><span class="y">2005</span><span class="rail"></span><span class="e">Israel zieht sich aus Gaza zurück</span><span></span></div>
+  </div>
+</template>
+
+<template id="section">
+  <div class="win tall">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> Geschichte <span>›</span> <b>Intifada</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <p class="title">Intifada</p>
+      <div><div class="btitle">Timeline</div><slot data-use="intifada-events"></slot></div>
+      <div class="text"><div class="btitle">What it says</div>
+        <section><slot data-use="intifada-1"></slot><slot data-use="intifada-rest"></slot></section>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask about Intifada</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="page-timeline">
+  <div class="win tall">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <p class="title">Geschichte</p>
+      <div><div class="btitle">Timeline</div>
+        <div class="tl">
+          <div><span class="y">1816</span><span class="rail"></span><span class="e">Nepal verliert im Vertrag von Sugauli Gebiet an die Briten</span><span class="s">Nie kolonisiert?</span></div>
+          <div><span class="y">1853–1854</span><span class="rail span"></span><span class="e">Perry öffnet Japan mit US-Kriegsschiffen</span><span class="s">Nie kolonisiert?</span></div>
+          <div><span class="y">1896</span><span class="rail"></span><span class="e">Äthiopien schlägt Italien bei Adua</span><span class="s">Nie kolonisiert?</span></div>
+          <div><span class="y">1898</span><span class="rail"></span><span class="e">Kuba ist keine spanische Kolonie mehr und wird US-Protektorat</span><span class="s">Kuba</span></div>
+          <div><span class="y">1936–1941</span><span class="rail span"></span><span class="e">Italien besetzt Äthiopien</span><span class="s">Nie kolonisiert?</span></div>
+          <div><span class="y">1943</span><span class="rail"></span><span class="e">Aufstand im Warschauer Ghetto gegen die SS</span><span class="s">Wer „Terror“ sagt</span></div>
+          <div><span class="y">1945–1946</span><span class="rail span"></span><span class="e">Nakam plant, Millionen Deutsche zu vergiften</span><span class="s">Antideutsche und Nakam</span></div>
+          <div><span class="y">1953</span><span class="rail"></span><span class="e">Die USA und Großbritannien stürzen Mossadegh</span><span class="s">Nie kolonisiert?</span></div>
+          <div><span class="y">1959</span><span class="rail"></span><span class="e">Die Revolution stürzt Batista</span><span class="s">Kuba</span></div>
+          <div><span class="y">1967</span><span class="rail"></span><span class="e">Israel besetzt Westjordanland, Gazastreifen und Ostjerusalem</span><span class="s">Intifada</span></div>
+          <div><span class="y">1973</span><span class="rail"></span><span class="e">Putsch in Chile, mit Hilfe der USA</span><span class="s">9/11</span></div>
+          <div><span class="y">1987–1993</span><span class="rail span"></span><span class="e">Die Erste Intifada</span><span class="s">Intifada</span></div>
+          <div><span class="y">1993</span><span class="rail"></span><span class="e">Die Oslo-Abkommen, ohne eigenen Staat</span><span class="s">Intifada</span></div>
+          <div><span class="y">2000–2005</span><span class="rail span"></span><span class="e">Die Zweite Intifada</span><span class="s">Intifada</span></div>
+          <div><span class="y">2001</span><span class="rail"></span><span class="e">11. September: knapp 3.000 Tote</span><span class="s">9/11</span></div>
+          <div><span class="y">2005</span><span class="rail"></span><span class="e">Israel zieht sich aus Gaza zurück</span><span class="s">Intifada</span></div>
+        </div>
+      </div>
+      <div class="text"><div class="btitle">What it says</div>
+        <section><h3>Intifada<i data-i="chevron" data-s="14"></i></h3><slot data-use="intifada-1"></slot></section>
+      </div>
+      <div class="fade"></div>
+    </main>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  talks: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+};
+// Fill each placeholder from its template; a <slot> is replaced, so a
+// window's sidebar stays a grid item. Templates may use templates.
+let at;
+while ((at = document.querySelector("[data-use]:not([data-filled])"))) {
+  const part = document.getElementById(at.dataset.use).content.cloneNode(true);
+  if (at.tagName === "SLOT") at.replaceWith(part);
+  else {
+    at.dataset.filled = "";
+    at.append(part);
+  }
+}
+// A window scrolled down to a block: the page above it moves out of view.
+for (const c of document.querySelectorAll(".content[data-at]")) {
+  c.firstElementChild.style.marginTop = `-${c.querySelector(c.dataset.at).offsetTop - 64}px`;
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 15;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>

@@ -42,6 +42,7 @@ interface Talks {
     question: string,
     talkId: string | null,
     photos?: Picked[],
+    about?: string,
   ) => Promise<void>;
 }
 
@@ -64,7 +65,13 @@ export function TalksProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ask = useCallback(
-    async (topicId: string, question: string, talkId: string | null, photos: Picked[] = []) => {
+    async (
+      topicId: string,
+      question: string,
+      talkId: string | null,
+      photos: Picked[] = [],
+      about?: string,
+    ) => {
       const text = question.trim();
       if (!text && photos.length === 0) return;
       const asked = talkId
@@ -100,6 +107,7 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             ...(talkId ? { talk_id: talkId } : {}),
             text,
+            ...(about ? { about } : {}),
             ...(photos.length > 0
               ? {
                   photos: photos.map(({ media_type, data, width, height }) => ({
@@ -179,8 +187,8 @@ export function useTopicTalks(topicId: string) {
     open: open[topicId],
     setOpen: useCallback((talk: string | undefined) => setOpen(topicId, talk), [setOpen, topicId]),
     ask: useCallback(
-      (question: string, talkId: string | null, photos?: Picked[]) =>
-        ask(topicId, question, talkId, photos),
+      (question: string, talkId: string | null, photos?: Picked[], about?: string) =>
+        ask(topicId, question, talkId, photos, about),
       [ask, topicId],
     ),
   };

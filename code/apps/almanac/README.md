@@ -84,7 +84,8 @@ topics.
   sentence. Edit topic changes the name, the brief, the group and the
   icon.
 - **A topic is its blocks**, in order, with no page shape to pick: Today
-  (the day's steps to tick off), Week, Chips, Shelf, Cards, Text and List,
+  (the day's steps to tick off), Week, Chips, Shelf, Cards, Text, List and
+  Timeline,
   each with a title of the topic's own ("You" in Haare, "Terms" in Marx).
   A template only names the blocks a topic starts with: Routine has Today,
   Week, You, Your shelf and Advice; Collection Today, Week and a card per
@@ -113,6 +114,23 @@ topics.
   to buy"). New points carry the unread dot until you leave the topic.
   The page is kept up to date, not added to: a point that changes one it
   has takes that one's place, in the same block.
+- **A section opens on its own page**: the page shows a section's first
+  paragraph and a card's first four points, with "3 more". The section's
+  name opens it where the page was, with the talk still beside it:
+  everything kept under it from every block, its events, its open
+  questions and the talks it came from. Asking from there asks about
+  that section. Esc goes back to where you were on the page.
+- **A timeline**: what happened when, oldest first, a line each, with its
+  section on the right. A span such as 1987–1993 gets a longer mark, and
+  a day such as 11. September 2001 shows before its event. It's a list,
+  not an axis.
+- **Laying the page out anew**: ask a talk for a better layout, or "Mach
+  eine Zeitleiste daraus", and it adds, renames, reorders, removes and
+  changes blocks, and moves and rewords points, at once. It never drops a
+  point or changes where one came from. The answer lists what moved, with
+  one Undo. A timeline made this way is new points; the sections stay as
+  they were. Only Claude Code on this Mac does this; through a key, the
+  answer says how it would lay the page out.
 - **Almanac asks when it's unsure**: the question waits on the card it's
   about, with Add it and Leave it out. A question it asks in the talk
   waits for your reply there.
@@ -162,6 +180,13 @@ Open them in a browser. Each shows night and day.
 - [`storyboards/the-workspaces-own-topic.html`](storyboards/the-workspaces-own-topic.html):
   a new workspace on its own topic, the topic it proposes, its page as the
   index, and Settings → Claude with Claude Code.
+- [`storyboards/how-a-topic-answers.html`](storyboards/how-a-topic-answers.html):
+  a topic's brief, how Almanac writes it, and how it learns from its talks.
+- [`storyboards/a-section-opens.html`](storyboards/a-section-opens.html):
+  Geschichte's Intifada section on its own page, and a Timeline block.
+- [`storyboards/a-better-layout.html`](storyboards/a-better-layout.html):
+  asking a talk to lay the page out anew, what moved and its Undo, and a
+  timeline made from what's kept.
 
 ## Open
 

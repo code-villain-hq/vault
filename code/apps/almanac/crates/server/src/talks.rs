@@ -76,7 +76,9 @@ situation, offer_reminder when the talk settled something recurring or dated, or
 a routine they keep, fits_elsewhere when the question belongs in another topic, change_brief \
 when they tell you how this topic should answer from now on or correct the same thing a second \
 time, and name_talk on a talk's first answer. Each point goes in the block of the page that shows it; start a block \
-only when they ask for one or none fits. The page is kept up to date, not added to: what changes a point or \
+only when they ask for one or none fits. Only when they ask you to lay the page out anew (sort \
+it, regroup it, make a timeline of it) do it with lay_out_page, and keep no other points in \
+that answer. The page is kept up to date, not added to: what changes a point or \
 reminder it has replaces that one. Write only the answer: they don't see the tools, so don't mention \
 them or narrate using them.";
 
@@ -116,6 +118,11 @@ to or its icon), do it with change_topic, then say what you changed. They can un
 - Name the talk with name_talk on its first answer.
 - Write only the answer. They don't see the tools, so don't mention them or narrate using them.";
 
+/// A talk through the Messages API: the page keeps what it said
+/// afterwards, but nothing lays it out anew.
+const ANSWER_WITHOUT_LAYOUT: &str = "You can't lay the page out anew from here: when they ask \
+for that, say so, and how you'd lay it out.";
+
 /// The workspace's own topic through the Messages API: no tools.
 const OWN_WITHOUT_TOOLS: &str = "- Here you can't start or change topics yourself: suggest a \
 name and what it sticks to, and say they start it with New topic in the sidebar.";
@@ -133,6 +140,9 @@ when one fits.
 - replaces: the page is kept up to date, not added to. When a point changes or corrects points \
 the page has (a wash day moved, a product swapped), it replaces them, named as the page names \
 them ([\"p3\"]); keep one point where two would say the same. [] when it replaces none.
+- happened: only for a point on a timeline, when it happened: a year (1959), a span \
+(1987–1993) or a day (11. September 2001), with v. Chr. or BC for the years before year 1. \
+\"\" elsewhere.
 - source: where the point comes from, in a few words: \"You said\", \"From the talk\", or the \
 book, guide or institution the answer relied on. Never a link.
 - questions: when the answer rested on a guess about their situation, ask to check it, with the \
@@ -187,6 +197,8 @@ struct KeepPoint {
     #[serde(default)]
     theme: String,
     text: String,
+    #[serde(default)]
+    happened: String,
     source: String,
     #[serde(default)]
     replaces: Vec<String>,
@@ -232,6 +244,7 @@ fn keep_schema() -> Value {
             "kind": { "type": "string", "enum": kinds },
             "theme": string,
             "text": string,
+            "happened": string,
             "source": string,
             "replaces": list(string.clone()),
         }))),
@@ -262,6 +275,11 @@ pub async fn ask(
     member.require_not_guest()?;
     let actor = member.actor;
     let text = request.text.trim().to_string();
+    let about = request
+        .about
+        .as_deref()
+        .map(|a| cut(a, 120))
+        .filter(|a| !a.is_empty());
     let uploads = photos::check(request.photos.as_deref().unwrap_or_default())?;
     if text.is_empty() && uploads.is_empty() {
         return Err(AppError::invalid("Ask something first."));
@@ -333,7 +351,8 @@ pub async fn ask(
     let (events, heard) = mpsc::unbounded_channel::<Event>();
     let _ = events.send(json_event("talk", json!({ "talk_id": talk_id })));
     tokio::spawn(async move {
-        answer(&state, actor, &page, own, talk_id, &text, events).await;
+        let about = about.as_deref().filter(|_| !own);
+        answer(&state, actor, &page, own, talk_id, &text, about, events).await;
     });
     let stream = futures::stream::unfold(heard, |mut heard| async move {
         heard.recv().await.map(|event| (Ok(event), heard))
@@ -349,6 +368,7 @@ struct Said {
     kept: Option<Kept>,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn answer(
     state: &AppState,
     actor: Actor,
@@ -356,6 +376,7 @@ async fn answer(
     own: bool,
     talk_id: Uuid,
     question: &str,
+    about: Option<&str>,
     events: mpsc::UnboundedSender<Event>,
 ) {
     let answer_id = Uuid::now_v7();
@@ -374,9 +395,15 @@ async fn answer(
     };
     let said = match &state.claude_code {
         Some(claude_code) => {
-            say_with_claude_code(state, claude_code, actor, page, own, talk_id, &events).await
+            let asked = Asked {
+                page,
+                own,
+                talk_id,
+                about,
+            };
+            say_with_claude_code(state, claude_code, actor, &asked, &events).await
         }
-        None => say(state, actor, page, own, talk_id, &events)
+        None => say(state, actor, page, own, talk_id, about, &events)
             .await
             .map(|text| Said {
                 text,
@@ -464,9 +491,30 @@ async fn answer(
     drop(events);
     if said.kept.is_none()
         && !own
-        && let Err(error) = keep(state, actor, page, &at, question, &said.text).await
+        && let Err(error) = keep(state, actor, page, &at, question, about, &said.text).await
     {
         tracing::warn!(%error, "couldn't keep what the talk said");
+    }
+}
+
+/// What a question is asked in: the topic's page, or the workspace's own
+/// topic, the talk, and the section open in front of them.
+struct Asked<'a> {
+    page: &'a Page,
+    own: bool,
+    talk_id: Uuid,
+    about: Option<&'a str>,
+}
+
+/// "They ask from the section Intifada…", after the page, when they ask
+/// with a section of it open.
+fn about_line(about: Option<&str>) -> String {
+    match about {
+        Some(about) => format!(
+            "\nThey ask from the section {about} of the page, which is open in front of them: \
+             what they ask is about it, and what's kept from it goes under {about}.\n"
+        ),
+        None => String::new(),
     }
 }
 
@@ -476,11 +524,15 @@ async fn say_with_claude_code(
     state: &AppState,
     claude_code: &ClaudeCode,
     actor: Actor,
-    page: &Page,
-    own: bool,
-    talk_id: Uuid,
+    asked: &Asked<'_>,
     events: &mpsc::UnboundedSender<Event>,
 ) -> Result<Said, Problem> {
+    let Asked {
+        page,
+        own,
+        talk_id,
+        about,
+    } = *asked;
     let trouble = |error: sqlx::Error| {
         tracing::warn!(%error, "couldn't read the talk");
         Problem("Almanac couldn't read this talk. Ask again.".into())
@@ -507,9 +559,10 @@ async fn say_with_claude_code(
         )
     } else {
         format!(
-            "{ANSWER}\n\n{ANSWER_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}",
+            "{ANSWER}\n\n{ANSWER_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}{}",
             today(),
-            page.describe()
+            page.describe(),
+            about_line(about)
         )
     };
     let mode = if own { Mode::Own } else { Mode::Topic };
@@ -696,12 +749,14 @@ fn host(url: &str) -> String {
 
 /// Claude's answer to the talk's last question, through the Messages API,
 /// streamed to `events`.
+#[allow(clippy::too_many_arguments)]
 async fn say(
     state: &AppState,
     actor: Actor,
     page: &Page,
     own: bool,
     talk_id: Uuid,
+    about: Option<&str>,
     events: &mpsc::UnboundedSender<Event>,
 ) -> Result<String, Problem> {
     let trouble = |error: sqlx::Error| {
@@ -740,9 +795,10 @@ async fn say(
         )
     } else {
         format!(
-            "{ANSWER}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}",
+            "{ANSWER}\n\n{ANSWER_WITHOUT_LAYOUT}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}{}",
             today(),
-            page.describe()
+            page.describe(),
+            about_line(about)
         )
     };
     state
@@ -761,15 +817,17 @@ async fn keep(
     page: &Page,
     at: &Answering,
     question: &str,
+    about: Option<&str>,
     answer: &str,
 ) -> Result<(), AppError> {
     let Some(key) = state.claude.key(&state.pool).await? else {
         return Ok(());
     };
     let prompt = format!(
-        "Today is {}.\n\n{}\nThe exchange:\n\nThey asked: {question}\n\nAlmanac answered: {answer}",
+        "Today is {}.\n\n{}{}\nThe exchange:\n\nThey asked: {question}\n\nAlmanac answered: {answer}",
         today(),
         page.describe(),
+        about_line(about),
     );
     let from: Keep = state
         .claude
@@ -783,6 +841,7 @@ async fn keep(
             &point.kind,
             &point.theme,
             &point.text,
+            &point.happened,
             &point.source,
             "",
             &point.replaces,
@@ -921,7 +980,7 @@ mod tests {
             schema["properties"]["points"]["items"]["required"]
                 .as_array()
                 .map(Vec::len),
-            Some(6)
+            Some(7)
         );
     }
 }

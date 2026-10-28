@@ -16,6 +16,7 @@ use chrono::{NaiveDate, NaiveTime};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
+use crate::layout::Laid;
 use crate::page::{RefBlock, Refs};
 use crate::topics::cut;
 
@@ -34,6 +35,8 @@ pub struct Kept {
     pub talk_title: Option<String>,
     pub proposal: Option<Proposal>,
     pub changes: Vec<TopicChange>,
+    /// The page laid out anew, when they asked for that (`crate::layout`).
+    pub layout: Option<Laid>,
 }
 
 #[derive(Debug)]
@@ -44,6 +47,8 @@ pub struct KeptPoint {
     /// What the answer says it kept it under: its theme, or its block.
     pub under: String,
     pub text: String,
+    /// When it happened, on a timeline; empty elsewhere.
+    pub happened: String,
     pub source: Option<String>,
     pub url: Option<String>,
     /// The page's points it takes the place of.
@@ -96,7 +101,8 @@ impl Kept {
     /// Keeps a point in a `block` of the page (`b2`, or its title), in
     /// place of the points it `replaces` (`p3`). A block the page doesn't
     /// have is started, after the others, when the point gives its `kind`.
-    /// What's wrong with it comes back in words, for Claude to fix.
+    /// On a timeline it says when it `happened`. What's wrong with it comes
+    /// back in words, for Claude to fix.
     #[allow(clippy::too_many_arguments)]
     pub fn keep_point(
         &mut self,
@@ -104,10 +110,17 @@ impl Kept {
         kind: &str,
         theme: &str,
         text: &str,
+        happened: &str,
         source: &str,
         url: &str,
         replaces: &[String],
     ) -> Result<(), String> {
+        if self.layout.is_some() {
+            return Err(
+                "You laid out the page in this answer: keep new points in the next one, or draw them with lay_out_page's new_points."
+                    .into(),
+            );
+        }
         let text = cut(text, 2000);
         if text.is_empty() {
             return Err("A point needs a text.".into());
@@ -150,12 +163,25 @@ impl Kept {
                             "today" => "what comes round, named as its reminders are",
                             "shelf" => "the thing's name",
                             "text" => "the section's heading",
+                            "timeline" => "the section it belongs to, named as the page names it",
                             _ => "the thing the card is about",
                         }
                     ));
                 }
                 theme
             }
+        };
+        let happened = if placed.kind == "timeline" {
+            let happened = cut(happened, 60);
+            if !happened.chars().any(|c| c.is_ascii_digit()) {
+                return Err(format!(
+                    "A point on {} says when it happened: a year (1959), a span (1987–1993) or a day (11. September 2001).",
+                    title_of(&placed)
+                ));
+            }
+            happened
+        } else {
+            String::new()
         };
         if self
             .points
@@ -179,6 +205,7 @@ impl Kept {
             theme,
             under,
             text,
+            happened,
             source: some(cut(source, 200)),
             url: (url.starts_with("https://") || url.starts_with("http://")).then_some(url),
             replaces: replaces.into_iter().map(|(id, _)| id).collect(),
@@ -334,6 +361,7 @@ impl Kept {
                     sticks_to: Some(brief),
                     ..TopicPatch::default()
                 },
+                layout: None,
                 undone: false,
             }),
         }
@@ -344,6 +372,22 @@ impl Kept {
     /// `changes`), and the writes that come after it.
     pub fn writes(&self, at: &Answering) -> (Map<String, Value>, Vec<Operation>) {
         let mut operations = Vec::new();
+        // The layout first: it moves what the page has, and its new points
+        // come from this talk.
+        if let Some(laid) = &self.layout {
+            for operation in &laid.operations {
+                let mut operation = operation.clone();
+                if let Operation::Create {
+                    model: ModelKind::Point,
+                    data,
+                    ..
+                } = &mut operation
+                {
+                    data.insert("talk_id".into(), json!(at.talk_id));
+                }
+                operations.push(operation);
+            }
+        }
         for block in &self.blocks {
             operations.push(Operation::Create {
                 model: ModelKind::Block,
@@ -366,6 +410,7 @@ impl Kept {
                 ("block_id", json!(point.block_id)),
                 ("theme", json!(point.theme)),
                 ("text", json!(point.text)),
+                ("happened", json!(point.happened)),
                 ("source", json!(point.source)),
                 ("source_url", json!(point.url)),
                 ("talk_id", json!(at.talk_id)),
@@ -489,8 +534,13 @@ impl Kept {
         if let Some(proposal) = &self.proposal {
             message.insert("proposal".into(), json!(proposal));
         }
-        if !self.changes.is_empty() {
-            message.insert("changes".into(), json!(self.changes));
+        let changes: Vec<&TopicChange> = self
+            .changes
+            .iter()
+            .chain(self.layout.as_ref().map(|laid| &laid.change))
+            .collect();
+        if !changes.is_empty() {
+            message.insert("changes".into(), json!(changes));
         }
         (message, operations)
     }
@@ -537,7 +587,7 @@ fn some(text: String) -> Option<String> {
 }
 
 /// Which of `count` a reference such as `p3` (or `[p3]`) names, from 0.
-fn found(reference: &str, kind: char, count: usize) -> Option<usize> {
+pub fn found(reference: &str, kind: char, count: usize) -> Option<usize> {
     let n: usize = reference
         .trim()
         .trim_matches(['[', ']'])
@@ -657,6 +707,69 @@ mod tests {
     }
 
     #[test]
+    fn a_timeline_point_says_when_it_happened() {
+        let timeline = block("timeline", "Zeitleiste");
+        let mut kept = Kept::on(Refs {
+            blocks: vec![block("text", "Geschichte"), timeline.clone()],
+            ..Refs::default()
+        });
+        let undated = kept
+            .keep_point("b2", "", "Intifada", "Sie beginnt", "", "", "", &[])
+            .unwrap_err();
+        assert!(undated.contains("says when it happened"), "{undated}");
+        kept.keep_point(
+            "Zeitleiste",
+            "",
+            "Intifada",
+            "Die erste Intifada beginnt",
+            "1987–1993",
+            "From the talk",
+            "",
+            &[],
+        )
+        .unwrap();
+        // Elsewhere a point has no date.
+        kept.keep_point(
+            "b1",
+            "",
+            "Intifada",
+            "Ein Aufstand gegen die Besatzung.",
+            "1987",
+            "From the talk",
+            "",
+            &[],
+        )
+        .unwrap();
+        assert_eq!(kept.points[0].block_id, timeline.id);
+        assert_eq!(kept.points[0].happened, "1987–1993");
+        assert_eq!(kept.points[1].happened, "");
+    }
+
+    #[test]
+    fn a_layout_keeps_no_other_points() {
+        let mut kept = Kept {
+            layout: Some(Laid {
+                change: TopicChange {
+                    topic_id: Uuid::now_v7(),
+                    name: "Katzen".into(),
+                    said: "Sorted it.".into(),
+                    before: TopicPatch::default(),
+                    after: TopicPatch::default(),
+                    layout: None,
+                    undone: false,
+                },
+                operations: Vec::new(),
+            }),
+            ..Kept::default()
+        };
+        assert!(
+            kept.keep_point("b1", "", "", "x", "", "", "", &[])
+                .unwrap_err()
+                .contains("laid out the page")
+        );
+    }
+
+    #[test]
     fn a_point_takes_the_place_of_the_ones_it_replaces() {
         let (first, second) = (Uuid::now_v7(), Uuid::now_v7());
         let notes = block("cards", "Notes");
@@ -666,7 +779,7 @@ mod tests {
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("b1", "", "Wäsche", "x", "", "", &["p3".into()])
+            kept.keep_point("b1", "", "Wäsche", "x", "", "", "", &["p3".into()])
                 .unwrap_err()
                 .contains("no point p3")
         );
@@ -676,6 +789,7 @@ mod tests {
             "",
             "Wäsche",
             "Washes Wednesday and Friday.",
+            "",
             "You said",
             "",
             &["p1".into(), "[p2]".into()],
@@ -704,12 +818,12 @@ mod tests {
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("b2", "", "", "Wash on Friday", "", "", &[])
+            kept.keep_point("b2", "", "", "Wash on Friday", "", "", "", &[])
                 .unwrap_err()
                 .contains("keeps no points")
         );
         assert!(
-            kept.keep_point("Today", "", "", "Shampoo", "", "", &[])
+            kept.keep_point("Today", "", "", "Shampoo", "", "", "", &[])
                 .unwrap_err()
                 .contains("needs a theme")
         );
@@ -722,6 +836,7 @@ mod tests {
                 &format!("Fact {n}"),
                 "",
                 "",
+                "",
                 &[format!("p{n}")],
             )
             .unwrap();
@@ -731,6 +846,7 @@ mod tests {
             "",
             "Elvital wash",
             "Elvital shampoo: on the scalp",
+            "",
             "",
             "",
             &[],
@@ -759,19 +875,19 @@ mod tests {
     fn a_point_may_start_a_block_the_page_lacks() {
         let mut kept = Kept::on(Refs::default());
         assert!(
-            kept.keep_point("Reading", "", "", "Ward, Plant care", "", "", &[])
+            kept.keep_point("Reading", "", "", "Ward, Plant care", "", "", "", &[])
                 .unwrap_err()
                 .contains("give a kind")
         );
-        kept.keep_point("Reading", "list", "", "Ward, Plant care", "", "", &[])
+        kept.keep_point("Reading", "list", "", "Ward, Plant care", "", "", "", &[])
             .unwrap();
         // The next one finds it by its title.
-        kept.keep_point("reading", "", "", "Kew, Ferns", "", "", &[])
+        kept.keep_point("reading", "", "", "Kew, Ferns", "", "", "", &[])
             .unwrap();
-        kept.keep_point("Terms", "chips", "", "Epiphyte", "", "", &[])
+        kept.keep_point("Terms", "chips", "", "Epiphyte", "", "", "", &[])
             .unwrap();
         assert!(
-            kept.keep_point("Places", "cards", "Kew", "In London", "", "", &[])
+            kept.keep_point("Places", "cards", "Kew", "In London", "", "", "", &[])
                 .unwrap_err()
                 .contains("at most 2 blocks")
         );

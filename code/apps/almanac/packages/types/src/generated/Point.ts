@@ -11,6 +11,11 @@ export type Point = { id: string, workspace_id: string, topic_id: string, block_
  */
 theme: string, text: string, 
 /**
+ * When it happened, on a timeline: a year ("1959"), a span
+ * ("1987–1993") or a day ("11. September 2001"). Empty elsewhere.
+ */
+happened: string, 
+/**
  * Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
  */
 source: string | null, source_url: string | null, 

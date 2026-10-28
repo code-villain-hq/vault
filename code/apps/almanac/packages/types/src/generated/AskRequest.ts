@@ -11,4 +11,9 @@ export type AskRequest = { talk_id?: string, text: string,
 /**
  * Photos to look at with the question: of a shampoo, a plant, a page.
  */
-photos?: Array<PhotoUpload>, };
+photos?: Array<PhotoUpload>, 
+/**
+ * The section of the page open in front of them, by its theme
+ * ("Intifada"): the answer is about it, and keeps what it finds there.
+ */
+about?: string, };

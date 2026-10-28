@@ -22,6 +22,7 @@ use crate::acp::Question;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::kept::{fields, offer, patch_fields};
+use crate::layout::Now;
 use crate::mcp::{Asking, Mode};
 use crate::state::AppState;
 
@@ -234,7 +235,8 @@ pub async fn start(
 }
 
 /// `POST /api/w/{id}/messages/{message_id}/undo`: puts back what an answer
-/// changed in topics, for those still there.
+/// changed in topics, for those still there, and a page it laid out anew
+/// as it was.
 pub async fn undo(
     State(state): State<AppState>,
     member: Member,
@@ -262,12 +264,25 @@ pub async fn undo(
         if !there.contains(&change.topic_id) {
             continue;
         }
-        if let Value::Object(data) = patch_fields(&change.before) {
+        if let Value::Object(data) = patch_fields(&change.before)
+            && !data.is_empty()
+        {
             operations.push(Operation::Update {
                 model: ModelKind::Topic,
                 id: change.topic_id,
                 data,
             });
+        }
+        if let Some(layout) = &change.layout {
+            let now = Now::load(&state.pool, actor.workspace_id, change.topic_id).await?;
+            let blocks: Vec<Uuid> = now.blocks.iter().map(|b| b.id).collect();
+            let points: Vec<(Uuid, Uuid)> = now.points.iter().map(|p| (p.id, p.block_id)).collect();
+            operations.extend(crate::layout::undo(
+                change.topic_id,
+                layout,
+                &blocks,
+                &points,
+            ));
         }
     }
     operations.push(Operation::Update {

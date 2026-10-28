@@ -119,12 +119,14 @@ What they do:
   current talk. The answer streams back as server-sent events: `talk`,
   then `text` pieces, then `done` or `problem`. A problem is also kept as a
   message, so the talk shows it after a reload.
-  The talk's photos go with every question in it, after the text.
+  The talk's photos go with every question in it, after the text. A
+  question asked from a section's own page names it (`about`), and the
+  prompt says which section they're looking at.
 - **Keeping** (`kept.rs`): points, questions, reminder offers, the topic an
   off-topic question belongs to, the talk's title, and a change to the
   topic's brief. Claude Code hands
   them over with tools while it answers (keep_point, ask_to_check,
-  offer_reminder, change_brief, fits_elsewhere, name_talk); through the API one more
+  offer_reminder, change_brief, lay_out_page, fits_elsewhere, name_talk); through the API one more
   request, with structured output, reads them from the exchange. Either
   way the server writes them with the answer, through the sync engine, so
   every client sees it. A point goes in a block, named by its reference
@@ -133,8 +135,10 @@ What they do:
   points, as `page.rs` tells Claude (`BLOCKS_SAY`): `today` the day's
   steps (under the routine's name, which its reminders' titles start
   with), `week` the reminders' days (it keeps no points), `chips` facts,
-  `shelf` a tile per thing, `cards` a card per theme, `text` sections and
-  `list` lines. When none fits, an answer may start up to two blocks, with
+  `shelf` a tile per thing, `cards` a card per theme, `text` sections,
+  `list` lines and `timeline` events, oldest first, each with when it
+  `happened` (a year, a span or a day, which the app reads in
+  `timeline.ts`). When none fits, an answer may start up to two blocks, with
   a kind and a title; a reminder offer brings a week when the page has
   none. The page Claude reads names each block, point and
   reminder (`b2`, `p3`, `r2`, `page::Refs`), and a point or reminder may
@@ -147,6 +151,15 @@ What they do:
   same thing, and gives it whole (`Kept::change_brief`): the change is
   kept on the message for Undo, as the own topic's are. A talk never
   changes a topic's name, group or icon.
+- **Laying the page out anew** (`layout.rs`), only when asked, and only
+  through Claude Code (lay_out_page; through the API the answer says how
+  it would). It names the page's blocks in their new order, each kept,
+  renamed, of another kind or new, the points that move or are reworded,
+  and new points drawn from ones the page has (a timeline's events from
+  its sections). It never drops a point or changes a point's source; a
+  block it empties goes. It's made at once and kept on the message
+  (`TopicChange.layout`, with what each block and point was), so the same
+  Undo puts it all back; the talk lists what moved.
 - **The workspace's own topic** (`own.rs`) reads every topic's name, group
   and what it sticks to, and has other tools: propose_topic and
   change_topic, not keep_point. A proposal waits for Start; a change is
@@ -181,13 +194,15 @@ them into notifications. A server with no Mac listening marks nothing.
   company's sign-in (`oidc.rs`) and people (`groups.rs`, `company.rs`),
   Claude (`acp.rs` and `mcp.rs` on this Mac, `claude.rs` with a key,
   `keys.rs`), topics, the workspace's own (`own.rs`), talks, what they keep
-  (`kept.rs`) and the page Claude reads, reminders. Its settings:
+  (`kept.rs`), the page Claude reads and lays out (`page.rs`,
+  `layout.rs`), reminders. Its settings:
   `config.rs`, and `almanac.example.toml`. `serve.rs` runs it on a listener until told to stop, for the server
   binary and the desktop app alike; `local.rs` is the one person of the
   desktop app's own Almanac, who signs in to nothing.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `layout.tsx` is the sidebar,
-  `topic.tsx` a topic's page, `talk.tsx` the talk beside it,
+  `topic.tsx` a topic's page, and a section's own (`?section=`, what's
+  kept under that theme from every block), `talk.tsx` the talk beside it,
   `asking.tsx` the answers on their way and each topic's open talk (above
   the pages, so they last while you look elsewhere), `calendar.tsx`
   Calendar, `settings.tsx` Settings → Claude. Its workspaces come from

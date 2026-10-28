@@ -1,8 +1,9 @@
 // A topic's page: what it sticks to, then its blocks in order, each laying
 // out what it keeps one way (the day's steps, the week, chips, a shelf,
-// cards, text or a list), the questions it waits on, and the talk beside
-// it. The workspace's own topic, Almanac, has the index of the others for
-// its page.
+// cards, text, a list or a timeline), the questions it waits on, and the
+// talk beside it. A section opens on a page of its own, in the page's
+// place. The workspace's own topic, Almanac, has the index of the others
+// for its page.
 
 import type { Block, ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
@@ -12,6 +13,7 @@ import {
   ConfirmDialog,
   CreateDialog,
   MoreMenu,
+  overlayOpen,
   RowAction,
   useApi,
 } from "@code-villain/web";
@@ -30,6 +32,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -64,14 +67,36 @@ import { about, inline } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
+import { inOrder } from "./timeline";
 import { TopicDialog } from "./topic-dialog";
 import { Button, Empty } from "./ui";
 import { useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
-/** `?talk=` opens the talk panel (`new` for a new talk); `?ask=` starts it with a question. */
+/**
+ * `?talk=` opens the talk panel (`new` for a new talk); `?ask=` starts it
+ * with a question; `?section=` opens a section, by its theme, in the page's
+ * place.
+ */
 export interface TopicSearch {
   talk?: string;
   ask?: string;
+  section?: string;
+}
+
+/** The search that opens `section` (none: the page), keeping the open talk. */
+function inSection(section: string | undefined) {
+  return (prev: TopicSearch): TopicSearch => ({
+    ...(prev.talk ? { talk: prev.talk } : {}),
+    ...(section ? { section } : {}),
+  });
+}
+
+/** The search that opens a talk beside what's open. */
+function withTalk(talk: string) {
+  return (prev: TopicSearch): TopicSearch => ({
+    ...(prev.section ? { section: prev.section } : {}),
+    talk,
+  });
 }
 
 /** What a theme holds: its points, the questions about it, its reminders. */
@@ -96,7 +121,12 @@ export function TopicPage() {
     (talk: string | null | undefined) => {
       const shown = talk === undefined ? undefined : (talk ?? "new");
       setOpen(shown);
-      void navigate({ to: ".", search: shown === undefined ? {} : { talk: shown }, replace: true });
+      void navigate({
+        to: ".",
+        search: (prev: TopicSearch) =>
+          shown === undefined ? inSection(prev.section)({}) : withTalk(shown)(prev),
+        replace: true,
+      });
     },
     [navigate, setOpen],
   );
@@ -122,18 +152,21 @@ export function TopicPage() {
       : undefined;
   const shown = search.talk ?? left;
   const talkId = shown && shown !== "new" ? shown : null;
+  // Asked with a section open, a question is about it, in the talk too.
+  const section = isOwn(topic) ? undefined : search.section;
   return (
     <TopicView
       // A new topic starts with its own state: what it asked, what it saw.
       key={topic.id}
       topic={topic}
+      section={section}
       panel={shown !== undefined}
       talkId={talkId}
       draft={search.ask ?? ""}
       asking={asking}
       onAsk={(text, talk, photos) => {
         if (talk === null) open(null);
-        void ask(text, talk, photos);
+        void ask(text, talk, photos, section);
       }}
       onOpen={open}
     />
@@ -142,6 +175,7 @@ export function TopicPage() {
 
 function TopicView({
   topic,
+  section,
   panel,
   talkId,
   draft,
@@ -150,6 +184,8 @@ function TopicView({
   onOpen,
 }: {
   topic: Topic;
+  /** The section open in the page's place. */
+  section: string | undefined;
   panel: boolean;
   talkId: string | null;
   draft: string;
@@ -169,10 +205,42 @@ function TopicView({
   const bar = useRef<HTMLInputElement>(null);
   const picking = usePicking(() => bar.current?.focus());
   const drop = useDrop(picking);
+  // The page keeps where it was scrolled to while a section is open.
+  const scroller = useRef<HTMLDivElement>(null);
+  const scrolled = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = scrolled.current.get(section ?? "") ?? 0;
+  }, [section]);
+  // Esc goes back from a section to the page, once the talk is closed.
+  useEffect(() => {
+    if (!section || panel) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || overlayOpen()) return;
+      event.preventDefault();
+      void navigate({ to: ".", search: inSection(undefined) });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [section, panel, navigate]);
 
   return (
     <>
-      <PageHeader title={topic.name}>
+      <PageHeader
+        title={section ?? topic.name}
+        parent={
+          section && (
+            <>
+              {workspace.name}
+              <span aria-hidden="true" className="text-faint">
+                ›
+              </span>
+              <Link to="." search={inSection(undefined)} className="truncate hover:text-fg">
+                {topic.name}
+              </Link>
+            </>
+          )
+        }
+      >
         <button
           type="button"
           onClick={() => (panel ? onOpen(undefined) : onOpen(talks[0]?.id ?? null))}
@@ -216,10 +284,16 @@ function TopicView({
       </PageHeader>
       <div className="flex min-h-0 flex-1">
         <div className="relative flex min-w-0 flex-1 flex-col" {...(panel ? {} : drop.handlers)}>
-          <div className="page-content min-h-0 flex-1 overflow-y-auto">
+          <div
+            ref={scroller}
+            onScroll={(e) => scrolled.current.set(section ?? "", e.currentTarget.scrollTop)}
+            className="page-content min-h-0 flex-1 overflow-y-auto"
+          >
             <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-6">
               {isOwn(topic) ? (
                 <OwnPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
+              ) : section ? (
+                <SectionPageBody topic={topic} section={section} />
               ) : (
                 <TopicPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
               )}
@@ -228,6 +302,7 @@ function TopicView({
           {!panel && (
             <AskBar
               topic={topic}
+              about={section}
               field={bar}
               picking={picking}
               onAsk={(text, photos) => onAsk(text, null, photos)}
@@ -281,12 +356,13 @@ interface PageParts {
   reminders: Reminder[];
 }
 
-function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
+/** The topic's blocks and points in page order, its open questions and its reminders that are on. */
+function usePage(topic: Topic): PageParts {
   const blocks = useRecords("Block");
   const points = useRecords("Point");
   const questions = useRecords("Question");
   const reminders = useRecords("Reminder");
-  const page = useMemo<PageParts>(() => {
+  return useMemo<PageParts>(() => {
     const ofTopic = <T extends { topic_id: string }>(list: T[]) =>
       list.filter((r) => r.topic_id === topic.id);
     return {
@@ -302,6 +378,10 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
         .sort((a, b) => a.due_on.localeCompare(b.due_on)),
     };
   }, [blocks, points, questions, reminders, topic.id]);
+}
+
+function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
+  const page = usePage(topic);
   const homes = useMemo(() => questionHomes(page), [page]);
   // The shelf's tiles say which days each thing is used on.
   const routines = useMemo(() => {
@@ -345,6 +425,128 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
       ))}
       {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
+  );
+}
+
+/**
+ * A section on a page of its own: everything kept under its name, from every
+ * block, as its block lays it out (the events, then the passages), with its
+ * reminders, the questions about it, and the talks it came from.
+ */
+function SectionPageBody({ topic, section }: { topic: Topic; section: string }) {
+  const page = usePage(topic);
+  const talks = useRecords("Talk");
+  const points = page.points.filter((p) => p.theme === section);
+  const questions = page.questions.filter((q) => q.theme === section);
+  const reminders = page.reminders.filter((r) => r.theme === section);
+  const blocks = page.blocks.filter((b) => points.some((p) => p.block_id === b.id));
+  // A question's point goes where the section's others are.
+  const home = blocks.find((b) => ASKS_IN.includes(b.kind)) ?? keeping(page.blocks);
+  // Passages name their talk; the talks of the rest are listed under them.
+  const passages = new Set(blocks.filter((b) => b.kind === "text").map((b) => b.id));
+  const named = new Set(points.filter((p) => passages.has(p.block_id)).map((p) => p.talk_id));
+  const from = talks
+    .filter((t) => !named.has(t.id) && points.some((p) => p.talk_id === t.id))
+    .sort((a, b) => b.last_at.localeCompare(a.last_at));
+
+  if (points.length + questions.length + reminders.length === 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="font-medium">Nothing is kept under {section}.</p>
+        <p className="text-muted">
+          A talk may have renamed it or moved what it kept.{" "}
+          <Link to="." search={inSection(undefined)} className="ui-link">
+            Back to {topic.name}
+          </Link>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <p className="text-title font-semibold">{section}</p>
+      {reminders.length > 0 && <Dates reminders={reminders} />}
+      {questions.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Waiting on you">
+          {questions.map((q) => (
+            <Ask key={q.id} question={q} block={home} />
+          ))}
+        </section>
+      )}
+      {blocks.map((block) => {
+        const held = points.filter((p) => p.block_id === block.id);
+        return (
+          <section
+            key={block.id}
+            className="flex flex-col gap-2"
+            aria-label={block.title || blockName(block)}
+          >
+            {block.title && <h2 className="text-xs text-faint">{block.title}</h2>}
+            {block.kind === "timeline" ? (
+              <Timeline points={held} sections={false} />
+            ) : (
+              <Points points={held} passages={block.kind === "text"} />
+            )}
+          </section>
+        );
+      })}
+      {from.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Talks">
+          <h2 className="text-xs text-faint">Talks</h2>
+          <ul className="flex flex-col gap-0.5">
+            {from.map((talk) => (
+              <li key={talk.id}>
+                <Link
+                  to="."
+                  search={withTalk(talk.id)}
+                  replace
+                  className="ui-row flex items-center gap-2.5 rounded-md px-2.5 py-1.5 hover:bg-hover"
+                >
+                  <MessagesSquare
+                    size={13}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                    className="shrink-0 text-faint"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{talk.title || "The talk"}</span>
+                  <span className="shrink-0 text-xs text-faint">{ago(talk.last_at)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** A section's name, which opens it on a page of its own. */
+function SectionName({ name }: { name: string }) {
+  return (
+    <Link
+      to="."
+      search={inSection(name)}
+      className="group/name inline-flex items-center gap-1 hover:text-fg"
+    >
+      {name}
+      <ChevronRight
+        size={14}
+        strokeWidth={1.75}
+        aria-hidden="true"
+        className="shrink-0 text-faint group-hover/name:text-muted"
+      />
+    </Link>
+  );
+}
+
+/** "3 more": what a section keeps past what the page shows, which opens it. */
+function More({ section, more }: { section: string; more: number }) {
+  if (more <= 0) return null;
+  return (
+    <Link to="." search={inSection(section)} className="ui-disclosure self-start">
+      <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
+      {more} more
+    </Link>
   );
 }
 
@@ -392,6 +594,7 @@ const EMPTY: Record<string, string> = {
   cards: "A card for each thing the topic is about, with what the talks find.",
   text: "Sections that explain, written up as the talks go.",
   list: "Things to follow or read, a line each, with where they're from.",
+  timeline: "What happened when, oldest first, a line each, with the section it belongs to.",
 };
 
 /** One block, laid out by its kind. */
@@ -432,6 +635,12 @@ function BlockView({
       return (
         <BlockFrame {...frame} empty={points.length === 0}>
           <List points={points} />
+        </BlockFrame>
+      );
+    case "timeline":
+      return (
+        <BlockFrame {...frame} empty={points.length === 0}>
+          <Timeline points={points} />
         </BlockFrame>
       );
     default: {
@@ -880,7 +1089,10 @@ function Week({
   );
 }
 
-/** A card per theme: its points, its reminders, what it waits on. */
+/** The points a card shows on the page; the rest are in its section. */
+const CARD_SHOWS = 4;
+
+/** A card per theme: its first points, its reminders, what it waits on. */
 function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
   return (
     // Two columns only when the page has room, talk open or not.
@@ -888,9 +1100,16 @@ function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
       <div className="grid gap-3 @xl:grid-cols-2">
         {themes.map((theme) => (
           <article key={theme.name} className="flex flex-col gap-3 rounded-lg bg-surface p-4">
-            <h2 className="font-semibold">{theme.name}</h2>
+            <h2 className="font-semibold">
+              <SectionName name={theme.name} />
+            </h2>
             {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
-            {theme.points.length > 0 && <Points points={theme.points} />}
+            {theme.points.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <Points points={theme.points.slice(0, CARD_SHOWS)} />
+                <More section={theme.name} more={theme.points.length - CARD_SHOWS} />
+              </div>
+            )}
             {theme.questions.map((q) => (
               <Ask key={q.id} question={q} block={block} />
             ))}
@@ -902,15 +1121,18 @@ function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
   );
 }
 
-/** Writing that grows: a section per theme. */
+/** Writing that grows: a section per theme, its first passage, and the rest in the section. */
 function Text({ block, themes }: { block: Block; themes: Theme[] }) {
   return (
     <article className="flex flex-col gap-6">
       {themes.map((theme) => (
         <section key={theme.name} className="flex flex-col gap-2">
-          <h3 className="font-semibold">{theme.name}</h3>
+          <h3 className="font-semibold">
+            <SectionName name={theme.name} />
+          </h3>
           {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
-          {theme.points.length > 0 && <Points points={theme.points} passages />}
+          {theme.points.length > 0 && <Points points={theme.points.slice(0, 1)} passages />}
+          <More section={theme.name} more={theme.points.length - 1} />
           {theme.questions.map((q) => (
             <Ask key={q.id} question={q} block={block} />
           ))}
@@ -965,7 +1187,7 @@ function Points({ points, passages = false }: { points: Point[]; passages?: bool
                     {talk && (
                       <Link
                         to="."
-                        search={{ talk: talk.id }}
+                        search={withTalk(talk.id)}
                         replace
                         className="ui-link inline-flex items-center gap-1"
                       >
@@ -1078,11 +1300,14 @@ function KeptFrom({ points }: { points: Point[] }) {
 /** The bar under the page: a question, or photos, start a talk. */
 function AskBar({
   topic,
+  about,
   field,
   picking,
   onAsk,
 }: {
   topic: Topic;
+  /** The section open in the page's place, which the question is about. */
+  about?: string;
   field: RefObject<HTMLInputElement | null>;
   picking: Picking;
   onAsk: (text: string, photos: Picked[]) => void;
@@ -1120,11 +1345,13 @@ function AskBar({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onPaste={picking.onPaste}
-            aria-label={`Ask ${topic.name}`}
+            aria-label={about ? `Ask about ${about}` : `Ask ${topic.name}`}
             placeholder={
               isOwn(topic)
                 ? `Tell ${topic.name} what you want to keep track of`
-                : `Ask ${topic.name}, or tell it something`
+                : about
+                  ? `Ask about ${about}`
+                  : `Ask ${topic.name}, or tell it something`
             }
             className="h-10 min-w-0 flex-1 bg-transparent px-4 outline-none placeholder:text-faint"
           />
@@ -1407,7 +1634,7 @@ function Thing({
     <article className="flex flex-col gap-1.5 rounded-lg bg-surface px-4 py-3.5">
       {what && <p className="text-xs text-faint">{what.text}</p>}
       <h3 className="flex items-center gap-2 font-semibold">
-        {thing.name}
+        <SectionName name={thing.name} />
         {fresh && <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />}
       </h3>
       {days.length > 0 && (
@@ -1481,6 +1708,68 @@ function List({ points }: { points: Point[] }) {
           {all ? "The newest five" : `${points.length - 5} more`}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * What happened when, oldest first, a line each: the year, a mark on the
+ * rail (longer for a span), the event, and the section it belongs to,
+ * which opens it. In a section, its own events, without the section.
+ */
+function Timeline({ points, sections = true }: { points: Point[]; sections?: boolean }) {
+  // Where the page is narrow (a phone, or the talk open beside it), the
+  // section goes under its event instead of in a column of its own.
+  const section = (point: Point, where: string) =>
+    sections &&
+    point.theme && (
+      <Link
+        to="."
+        search={inSection(point.theme)}
+        className={`text-xs text-faint hover:text-muted ${where}`}
+      >
+        {point.theme}
+      </Link>
+    );
+  return (
+    <div className="@container">
+      <ol
+        className={`grid max-w-[86ch] grid-cols-[minmax(3.5rem,max-content)_0.875rem_1fr] gap-x-3 ${
+          sections
+            ? "@lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr_auto]"
+            : "@lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr]"
+        }`}
+      >
+        {inOrder(points).map(([point, at]) => (
+          <li key={point.id} className="group col-span-full grid grid-cols-subgrid">
+            <span className="py-[5px] text-right whitespace-nowrap text-muted tabular-nums">
+              {at.year}
+            </span>
+            <span
+              aria-hidden="true"
+              className={`relative before:absolute before:inset-y-0 before:left-1.5 before:w-[1.5px] before:bg-line group-first:before:top-3.5 group-last:before:bottom-auto group-last:before:h-3.5 group-only:before:hidden after:absolute after:left-[3px] after:w-2 after:rounded-full ${
+                at.span ? "after:top-[9px] after:h-3.5" : "after:top-3 after:h-2"
+              } ${point.seen ? "after:bg-muted" : "after:bg-accent"}`}
+            />
+            <div className="flex min-w-0 items-start gap-2 py-[5px]">
+              <div className="min-w-0 flex-1">
+                <p>
+                  {!point.seen && <span className="sr-only">New: </span>}
+                  {at.day && <span className="text-muted">{at.day}: </span>}
+                  {inline(point.text)}
+                </p>
+                {section(point, "block @lg:hidden")}
+              </div>
+              <RemovePoint point={point} />
+            </div>
+            {sections && (
+              <span className="hidden max-w-40 truncate py-1.5 @lg:block">
+                {section(point, "")}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

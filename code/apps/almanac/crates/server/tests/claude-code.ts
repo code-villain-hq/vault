@@ -89,6 +89,18 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/lay out/i.test(prompt)) {
+    await tool("lay_out_page", {
+      blocks: [
+        { block: "b1" },
+        { block: "b2" },
+        { kind: "chips", title: "Facts" },
+        { block: "b3" },
+      ],
+      moves: [{ point: "p1", block: "Facts", text: "Water every 7 days" }],
+      said: "Put the Monstera's watering in Facts.",
+    });
+    say("Laid out.");
   } else if (/from now on/i.test(prompt)) {
     say("I will.");
     await tool("change_brief", {

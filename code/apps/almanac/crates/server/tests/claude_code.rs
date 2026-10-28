@@ -5,7 +5,9 @@
 //! point with its source; a new topic sets itself up; and the web can be
 //! turned off. The workspace's own topic stays, a start that hangs is
 //! tried again, and photos go with the questions of their talk. A moved
-//! wash day replaces its point and reminder instead of adding to them.
+//! wash day replaces its point and reminder instead of adding to them. A
+//! talk lays out its page anew, and undo puts it back; a question from a
+//! section is about it.
 
 mod common;
 
@@ -265,6 +267,106 @@ async fn a_topic_sets_itself_up_and_keeps_a_point_without_the_web(pool: PgPool) 
         last["system"].as_str().unwrap().contains("houseplants"),
         "reads the page"
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Pflanzen" }),
+        )
+        .await;
+    let topic = started.body["id"].as_str().unwrap().to_string();
+    // The set-up picks a collection, whose cards are Plants.
+    for _ in 0..100 {
+        let laid_out: bool =
+            sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM blocks WHERE title = 'Plants')")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        if laid_out {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let titles = |blocks: &[Value]| -> Vec<String> {
+        let mut blocks = blocks.to_vec();
+        blocks.sort_by_key(|b| b["position"].as_i64());
+        blocks
+            .iter()
+            .map(|b| b["title"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let before = app.synced(&ada, &home, "Block").await;
+    assert_eq!(titles(&before), ["Today", "", "Plants"]);
+    let plants = before.iter().find(|b| b["title"] == "Plants").unwrap()["id"].clone();
+
+    // Asked from the Monstera's section, the question is about it.
+    let asked = app
+        .post(
+            &format!("/api/w/{home}/topics/{topic}/ask"),
+            Some(&ada),
+            json!({ "text": "How often do I water the Monstera?", "about": "Monstera" }),
+        )
+        .await;
+    assert!(asked.text.contains("event: done"), "{}", asked.text);
+    let system = sessions(&log).last().unwrap()["system"].clone();
+    assert!(
+        system
+            .as_str()
+            .unwrap()
+            .contains("They ask from the section Monstera of the page"),
+        "{system}"
+    );
+
+    let laid = ask(&app, &ada, &home, &topic, "Lay out the page anew.").await;
+    let change = &laid["changes"][0];
+    assert_eq!(change["said"], "Put the Monstera's watering in Facts.");
+    assert_eq!(
+        change["layout"]["moves"],
+        json!([
+            { "block": "Facts", "change": "new chips", "holds": "a point, all reworded to fit" },
+            { "block": "Plants", "change": "removed", "holds": "nothing was left in it" },
+        ])
+    );
+    let after = app.synced(&ada, &home, "Block").await;
+    assert_eq!(
+        titles(&after),
+        ["Today", "", "Facts"],
+        "the emptied block goes"
+    );
+    let facts = after.iter().find(|b| b["title"] == "Facts").unwrap()["id"].clone();
+    let points = app.synced(&ada, &home, "Point").await;
+    assert_eq!(points.len(), 1, "nothing is dropped");
+    assert_eq!(points[0]["block_id"], facts);
+    assert_eq!(points[0]["theme"], "");
+    assert_eq!(points[0]["text"], "Water every 7 days");
+    assert_eq!(points[0]["source"], "Royal Horticultural Society");
+
+    let undone = app
+        .post(
+            &format!(
+                "/api/w/{home}/messages/{}/undo",
+                laid["id"].as_str().unwrap()
+            ),
+            Some(&ada),
+            json!({}),
+        )
+        .await;
+    assert!(undone.status.is_success(), "{}", undone.body);
+    let back = app.synced(&ada, &home, "Block").await;
+    assert_eq!(titles(&back), ["Today", "", "Plants"]);
+    assert!(back.iter().any(|b| b["id"] == plants), "the same block");
+    let points = app.synced(&ada, &home, "Point").await;
+    assert_eq!(points.len(), 1);
+    assert_eq!(points[0]["block_id"], plants);
+    assert_eq!(points[0]["theme"], "Monstera");
+    assert_eq!(points[0]["text"], "Water every 7 days.");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

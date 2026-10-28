@@ -7,6 +7,7 @@
 
 import type {
   Message,
+  PageLayout,
   Photo,
   Proposal,
   Reminder,
@@ -24,7 +25,7 @@ import {
   overlayOpen,
 } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, X } from "lucide-react";
+import { ChevronRight, Plus, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import type { Asking } from "./asking";
@@ -545,10 +546,13 @@ function Changes({ message }: { message: Message }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
       {message.changes.map((change) => (
-        <p key={`${change.topic_id}${change.said}`}>
-          <span className="font-medium">{change.name}</span>
-          <span className="text-muted"> · {change.said}</span>
-        </p>
+        <div key={`${change.topic_id}${change.said}`} className="flex flex-col gap-2">
+          <p>
+            <span className="font-medium">{change.name}</span>
+            <span className="text-muted"> · {change.said}</span>
+          </p>
+          {change.layout && <WhatMoved layout={change.layout} />}
+        </div>
       ))}
       {undone ? (
         <p className="text-xs text-muted">Undone.</p>
@@ -563,6 +567,41 @@ function Changes({ message }: { message: Message }) {
       )}
       <ErrorMessage>{problem}</ErrorMessage>
     </div>
+  );
+}
+
+/**
+ * A page laid out anew, block by block: what each is now and what it holds.
+ * One block's change is said already, so it shows with two or more.
+ */
+function WhatMoved({ layout }: { layout: PageLayout }) {
+  const [open, setOpen] = useState(false);
+  if (layout.moves.length < 2) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="ui-disclosure self-start"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
+        What moved
+      </button>
+      {open && (
+        <ul className="flex flex-col gap-1.5 pb-1 pl-1.5 text-xs">
+          {layout.moves.map((move) => (
+            <li key={`${move.block}${move.change}`} className="flex flex-col">
+              <p>
+                <span className="font-medium">{move.block}</span>
+                <span className="text-faint"> · {move.change}</span>
+              </p>
+              <span className="text-muted">{move.holds}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

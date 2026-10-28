@@ -14,6 +14,7 @@ pub mod error;
 pub mod groups;
 pub mod kept;
 pub mod keys;
+pub mod layout;
 pub mod local;
 mod login_env;
 pub mod mcp;

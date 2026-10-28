@@ -130,8 +130,11 @@ pub const KINDS: &[&str] = &["topic", "almanac"];
 /// each under what comes round (its theme, as its reminders are called);
 /// `week` the days of the topic's reminders, and no points; `chips` short
 /// facts; `shelf` a tile per thing they use (its theme); `cards` a card per
-/// theme; `text` a section per theme; `list` one line each.
-pub const BLOCK_KINDS: &[&str] = &["today", "week", "chips", "shelf", "cards", "text", "list"];
+/// theme; `text` a section per theme; `list` one line each; `timeline` what
+/// happened when, oldest first, each under the section it belongs to.
+pub const BLOCK_KINDS: &[&str] = &[
+    "today", "week", "chips", "shelf", "cards", "text", "list", "timeline",
+];
 
 /// The blocks a topic starts with, each its kind and title. A collection's
 /// cards are named for what they are ("Plants") when Almanac knows.
@@ -203,6 +206,7 @@ pub struct BlockCreate {
 #[serde(deny_unknown_fields)]
 #[ts(export, optional_fields)]
 pub struct BlockPatch {
+    pub kind: Option<String>,
     pub title: Option<String>,
     pub position: Option<i32>,
 }
@@ -220,6 +224,9 @@ pub struct Point {
     /// Empty in chips and lists.
     pub theme: String,
     pub text: String,
+    /// When it happened, on a timeline: a year ("1959"), a span
+    /// ("1987–1993") or a day ("11. September 2001"). Empty elsewhere.
+    pub happened: String,
     /// Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -240,6 +247,7 @@ pub struct PointCreate {
     pub block_id: Uuid,
     pub theme: Option<String>,
     pub text: String,
+    pub happened: Option<String>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     pub talk_id: Option<Uuid>,
@@ -254,6 +262,7 @@ pub struct PointPatch {
     pub block_id: Option<Uuid>,
     pub theme: Option<String>,
     pub text: Option<String>,
+    pub happened: Option<String>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     /// The talk it now comes from, when a talk changed it.
@@ -426,6 +435,7 @@ impl Validate for BlockCreate {
 
 impl Validate for BlockPatch {
     fn validate(&self) -> Result<(), ValidationError> {
+        one_of(self.kind.as_deref(), BLOCK_KINDS, "kind")?;
         self.title.as_deref().map(block_title).transpose()?;
         Ok(())
     }
@@ -434,6 +444,7 @@ impl Validate for BlockPatch {
 impl Validate for PointCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         self.theme.as_deref().map(theme).transpose()?;
+        self.happened.as_deref().map(happened).transpose()?;
         words(&self.text, "A point needs some words.", 2000)
     }
 }
@@ -441,6 +452,7 @@ impl Validate for PointCreate {
 impl Validate for PointPatch {
     fn validate(&self) -> Result<(), ValidationError> {
         self.theme.as_deref().map(theme).transpose()?;
+        self.happened.as_deref().map(happened).transpose()?;
         if let Some(text) = &self.text {
             words(text, "A point needs some words.", 2000)?;
         }
@@ -512,6 +524,13 @@ fn block_title(value: &str) -> Result<(), ValidationError> {
 fn theme(value: &str) -> Result<(), ValidationError> {
     if value.chars().count() > 120 {
         return invalid("A theme is at most 120 characters.");
+    }
+    Ok(())
+}
+
+fn happened(value: &str) -> Result<(), ValidationError> {
+    if value.chars().count() > 60 {
+        return invalid("When it happened is at most 60 characters.");
     }
     Ok(())
 }
