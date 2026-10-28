@@ -9,10 +9,10 @@ Forge, Glyph, Raven and Layer use it.
 
 - `src/postgres.rs`: `LocalPostgres`. Postgres from the archive compiled
   into the app (`postgresql_embedded`, `bundled`), with its data in a folder
-  the app names (`data`, `password`, `runtime`). Loopback only, a password
-  (0600), the app's preferred port or a free one. A server left running,
-  or a stale pid file, from a run that didn't quit cleanly is dealt with on
-  start.
+  the app names (`data`, `password`, `pgpass`, `runtime`). Loopback only, a
+  password (`password` and initdb's copy `pgpass`, both 0600), the app's
+  preferred port or a free one. A server left running, or a stale pid file,
+  from a run that didn't quit cleanly is dealt with on start.
 - `src/server.rs`: `LocalServer`. Binds `127.0.0.1` (the app's preferred
   port, or a free one), runs the app's `serve(listener, shutdown)` and stops
   it on quit.

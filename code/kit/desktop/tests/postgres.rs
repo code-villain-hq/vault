@@ -2,6 +2,7 @@
 //! two servers never race for the preferred port.
 
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 
 use code_villain_desktop::LocalPostgres;
 use sqlx::{Connection, PgConnection, Row};
@@ -30,6 +31,10 @@ async fn read(postgres: &LocalPostgres) -> Vec<String> {
         .iter()
         .map(|row| row.get(0))
         .collect()
+}
+
+fn mode(file: &Path) -> u32 {
+    std::fs::metadata(file).unwrap().permissions().mode() & 0o777
 }
 
 fn postmaster_pid(postgres: &LocalPostgres) -> String {
@@ -61,14 +66,19 @@ async fn keeps_its_data_to_itself_across_restarts_and_crashes() {
         postgres.port()
     );
     assert!(PgConnection::connect(&wrong).await.is_err());
-    let password = std::fs::metadata(root.path().join("password")).unwrap();
-    assert_eq!(password.permissions().mode() & 0o777, 0o600);
+    // The password, and the copy initdb reads it from.
+    let pgpass = root.path().join("pgpass");
+    assert_eq!(mode(&root.path().join("password")), 0o600);
+    assert_eq!(mode(&pgpass), 0o600);
 
     write(&postgres, "first").await;
     postgres.stop().await.unwrap();
+    // Earlier builds left initdb's copy readable by everyone on the Mac.
+    std::fs::set_permissions(&pgpass, std::fs::Permissions::from_mode(0o644)).unwrap();
 
     // A quit that didn't stop Postgres: it's still running on the data.
     let postgres = LocalPostgres::start(root.path(), 0).await.unwrap();
+    assert_eq!(mode(&pgpass), 0o600);
     assert_eq!(read(&postgres).await, ["first"]);
     write(&postgres, "second").await;
     std::mem::forget(postgres);

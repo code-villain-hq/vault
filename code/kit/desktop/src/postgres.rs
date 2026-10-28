@@ -13,8 +13,8 @@ use crate::Result;
 /// in a folder of the app's own. It listens on loopback only and asks for a
 /// password, kept beside the data where only this user can read it.
 ///
-/// The folder holds `data` (the cluster), `password` and `runtime` (the
-/// unpacked binaries).
+/// The folder holds `data` (the cluster), `password`, `pgpass` (initdb's copy
+/// of it) and `runtime` (the unpacked binaries).
 pub struct LocalPostgres {
     postgres: PostgreSQL,
 }
@@ -26,11 +26,17 @@ impl LocalPostgres {
     /// first, so this one starts on the same data.
     pub async fn start(root: &Path, preferred_port: u16) -> Result<Self> {
         std::fs::create_dir_all(root)?;
+        let password = password(&root.join("password"))?;
+        // initdb reads the password from this file on the first start.
+        // postgresql_embedded would create it with the default mode (0644
+        // under the usual umask): write it first, 0600 like `password`.
+        let password_file = root.join("pgpass");
+        write_private(&password_file, &password)?;
         let mut settings = Settings {
             installation_dir: root.join("runtime"),
             data_dir: root.join("data"),
-            password_file: root.join("pgpass"),
-            password: password(&root.join("password"))?,
+            password_file,
+            password,
             host: Ipv4Addr::LOCALHOST.to_string(),
             port: free_port(preferred_port),
             temporary: false,
@@ -109,6 +115,19 @@ fn password(file: &PathBuf) -> std::io::Result<String> {
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
     options.open(file)?.write_all(password.as_bytes())?;
     Ok(password)
+}
+
+/// Writes `contents` to `file` (0600), closing it to others when an earlier
+/// run left it open: the mode given on open applies only to a new file.
+fn write_private(file: &Path, contents: &str) -> std::io::Result<()> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options.open(file)?;
+    #[cfg(unix)]
+    file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+    file.write_all(contents.as_bytes())
 }
 
 fn free_port(preferred: u16) -> u16 {
