@@ -107,7 +107,7 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
             value={sticksTo}
             onChange={(e) => setSticksTo(e.target.value)}
             rows={3}
-            placeholder="The plants at home: watering, light, repotting. Leave it empty and Almanac writes it."
+            placeholder="The plants at home: watering, light, repotting. Almanac writes the rest."
             className="ui-field resize-none rounded-md px-3 py-2"
           />
         </label>

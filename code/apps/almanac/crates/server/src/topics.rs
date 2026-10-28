@@ -1,14 +1,14 @@
 //! Starting a topic: a name, what it sticks to, which may be empty, and the
 //! template its blocks start from, which Almanac may pick. Almanac makes
-//! the topic at once; then Claude writes what it sticks to (when you left
-//! it empty), and picks its icon, its group, its template and the first
-//! questions its empty page offers. They reach the page through sync. A
+//! the topic at once; then Claude writes what it sticks to, its brief,
+//! around what you wrote, and picks its icon, its group, its template and
+//! the first questions its empty page offers. They reach the page through sync. A
 //! topic the workspace's own topic proposed starts with all of that, and
 //! keeps what you told it as its first points.
 
 use almanac_domain::{
-    Actor, ICONS, ModelKind, Operation, Proposal, StartTopicRequest, StartedTopic, TEMPLATE_NAMES,
-    TopicChange, Transaction, template,
+    Actor, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX, StartTopicRequest, StartedTopic,
+    TEMPLATE_NAMES, TopicChange, Transaction, template,
 };
 use almanac_sync::Origin;
 use axum::Json;
@@ -38,9 +38,13 @@ const SET_UP: &str = "You set up a new topic in Almanac, a notebook that keeps w
 learns, one topic at a time. Each topic has a page of blocks that keep points, and talks beside \
 it. From the topic's name and what it sticks to (which may be empty), write:
 
-- sticks_to: what talks in this topic stay with, in one or two sentences. The page shows it \
-under the name, so say only what it's about (\"Houseplants and their care: watering, light, \
-repotting.\"), not rules about what doesn't belong. When they wrote it, return theirs as it is.
+- sticks_to: the topic's brief, which every talk in it follows. First what it's about, in a \
+sentence or two (\"Houseplants and their care: watering, light, repotting.\"). Then, a line \
+each, how it answers: in which language, the tone and the length, what it brings in (sources, \
+perspectives, what photos show), what it checks before it answers, and what it leaves to other \
+topics. Fit it to this topic, with nothing every topic does anyway. Usually 400 to 1,200 \
+characters, never more than 4,000. The page doesn't show it: it's for the answers. When they \
+wrote some, keep all of theirs, word for word, at the start, and write the rest after it.
 - icon: the one icon from the list that fits best.
 - group: a short group for the sidebar, such as Home, Work, Health or Learning. Reuse one of \
 the existing groups when it fits.
@@ -276,7 +280,7 @@ pub async fn undo(
 }
 
 /// Has Claude write the rest of a new topic, leaving what you `given` as
-/// it is. A template you `picked` laid out its page already, its cards
+/// it is: what it sticks to becomes a brief with all of yours in it. A template you `picked` laid out its page already, its cards
 /// block named once Claude says what the cards are; otherwise the page
 /// starts as the template Claude picks, or a collection when Claude can't
 /// answer. With no Claude the topic keeps what it started with.
@@ -326,14 +330,15 @@ async fn set_up(
     }
     if let Some(set_up) = set_up {
         let mut data = Map::new();
+        let brief = with_theirs(&sticks_to, &set_up.sticks_to);
+        if !brief.is_empty() {
+            data.insert("sticks_to".into(), json!(brief));
+        }
         let mut set = |field: &str, value: Value| {
             if !given.contains(&field) {
                 data.insert(field.into(), value);
             }
         };
-        if sticks_to.is_empty() {
-            set("sticks_to", json!(cut(&set_up.sticks_to, 1000)));
-        }
         if ICONS.contains(&set_up.icon.as_str()) {
             set("icon", json!(set_up.icon));
         }
@@ -353,6 +358,20 @@ async fn set_up(
         });
     }
     write(state, actor, operations).await
+}
+
+/// The brief Claude wrote, with all of what they wrote in it: theirs comes
+/// first when Claude's leaves any of it out.
+fn with_theirs(theirs: &str, written: &str) -> String {
+    let theirs = theirs.trim();
+    let written = cut(written, STICKS_TO_MAX);
+    if theirs.is_empty() || written.contains(theirs) {
+        written
+    } else if written.is_empty() {
+        theirs.to_string()
+    } else {
+        cut(&format!("{theirs}\n{written}"), STICKS_TO_MAX)
+    }
 }
 
 /// What Claude sets up for a new topic, or nothing when there's no Claude
@@ -501,4 +520,24 @@ pub fn cut(text: &str, max: usize) -> String {
         .collect::<String>()
         .trim_end()
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_brief_keeps_what_they_wrote() {
+        let theirs = "Zimmerpflanzen, ich schicke Fotos";
+        let around = "Zimmerpflanzen, ich schicke Fotos: gießen, Licht, umtopfen.\nImmer Deutsch.";
+        assert_eq!(with_theirs(theirs, around), around);
+        assert_eq!(
+            with_theirs(theirs, "Houseplants and their care.\nAnswers in German."),
+            "Zimmerpflanzen, ich schicke Fotos\nHouseplants and their care.\nAnswers in German."
+        );
+        assert_eq!(with_theirs(theirs, " "), theirs);
+        assert_eq!(with_theirs("", "Houseplants."), "Houseplants.");
+        let long = "x".repeat(STICKS_TO_MAX);
+        assert_eq!(with_theirs(theirs, &long).chars().count(), STICKS_TO_MAX);
+    }
 }

@@ -74,12 +74,15 @@ topics.
   or change it first. Its page is the index of the other topics, by
   group, with what's new. It also changes a topic you name, says what it
   changed, and offers Undo. It can be renamed, not deleted.
-- **Starting a topic**: a name, what it sticks to, which may stay empty,
-  and what it starts as: Routine, Collection, Study, or Almanac's pick.
-  Once Claude answers, Almanac writes the rest in the background: what it
-  sticks to when that was empty, the icon, the group, the template when
-  you left it to Almanac, and the first questions. Edit topic changes the
-  name, what it sticks to, the group and the icon.
+- **Starting a topic**: a name, what it sticks to, which may stay short
+  or empty, and what it starts as: Routine, Collection, Study, or
+  Almanac's pick. Once Claude answers, Almanac writes the rest in the
+  background: the brief, what the topic is about and how it answers,
+  after what you wrote, which it keeps word for word; the icon, the
+  group, the template when you left it to Almanac, and the first
+  questions. The page doesn't show the brief, and lists show its first
+  sentence. Edit topic changes the name, the brief, the group and the
+  icon.
 - **A topic is its blocks**, in order, with no page shape to pick: Today
   (the day's steps to tick off), Week, Chips, Shelf, Cards, Text and List,
   each with a title of the topic's own ("You" in Haare, "Terms" in Marx).
@@ -94,6 +97,10 @@ topics.
   keeps and the current talk, nothing older. A question off the topic gets
   a short answer and an offer to ask it in the topic it belongs to, or to
   start one. Earlier talks are behind the talks icon.
+- **A topic learns how to answer**: tell a talk how to answer from now
+  on ("from now on, in English"), or correct the same thing twice, and
+  the topic adds it to its brief. The answer says what it changed, with
+  Undo. A talk never changes the topic's name, group or icon.
 - **Photos in a talk**: paste, drop or pick up to six with a question, of a
   shampoo, a plant, a page. Claude reads them with that question and every
   later one in the talk; they stay in the talk, not on the page.

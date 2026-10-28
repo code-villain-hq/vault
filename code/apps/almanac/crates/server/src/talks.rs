@@ -52,6 +52,8 @@ time. You answer in a talk inside one topic; the page beside the talk keeps what
 later.
 
 How to answer:
+- What the topic sticks to is its brief: what it's about and how its talks answer. Follow it; \
+where it says otherwise than the rules here (another language, longer answers), it wins.
 - Stay inside this topic. Answer in its frame and build on what the page has kept, without \
 reciting it back.
 - Be short and concrete: a few sentences or a short list. No headings, no preamble, no closing \
@@ -71,8 +73,9 @@ it fits better in another topic, naming one of the other topics or a new one.
 const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer: keep_point for \
 what's worth knowing later, ask_to_check when your answer rested on a guess about their \
 situation, offer_reminder when the talk settled something recurring or dated, or they told you \
-a routine they keep, fits_elsewhere when the question belongs in another topic, and name_talk \
-on a talk's first answer. Each point goes in the block of the page that shows it; start a block \
+a routine they keep, fits_elsewhere when the question belongs in another topic, change_brief \
+when they tell you how this topic should answer from now on or correct the same thing a second \
+time, and name_talk on a talk's first answer. Each point goes in the block of the page that shows it; start a block \
 only when they ask for one or none fits. The page is kept up to date, not added to: what changes a point or \
 reminder it has replaces that one. Write only the answer: they don't see the tools, so don't mention \
 them or narrate using them.";
@@ -101,7 +104,7 @@ calendar and come as notifications on the Mac.
 
 /// With Claude Code: the workspace's own topic proposes and changes topics.
 const OWN_TOOLS: &str = "- When they say what they want to keep track of, and no topic has it, \
-propose one with propose_topic: a short name, what it sticks to, an icon, a group (reuse one \
+propose one with propose_topic: a short name, what it sticks to (its brief), an icon, a group (reuse one \
 that fits), the template it starts as and three or four starters. Its points are only what they told you, such \
 as which plants they have and where; what you know about it, such as care advice, waits for the \
 topic's talks, which keep it with its source. Add a reminder only when they asked for one or \
@@ -150,6 +153,11 @@ moved, another rhythm), offer the new one in place of the old, and one that only
 replaced by the reminder that takes over from it; [] for none. None the calendar already has.
 - elsewhere: when the question had nothing to do with this topic, the topic it fits (one of the \
 others, or a short new name); otherwise \"\".
+- brief: only when they told you how this topic should answer from now on (\"always say when a \
+source was written\", \"in English from now on\"), never for a wish about one answer: sticks_to \
+is what the topic sticks to, its brief, whole, as it is from now on: all of it kept, with the rule \
+added or changed where it fits. said is what changed, in a short sentence (\"Names when each \
+source was written.\"). Otherwise both \"\".
 - talk_title: a title for the talk, under six words.
 
 Write in the language of the talk.";
@@ -160,7 +168,15 @@ struct Keep {
     questions: Vec<KeepQuestion>,
     reminders: Vec<KeepReminder>,
     elsewhere: String,
+    #[serde(default)]
+    brief: KeepBrief,
     talk_title: String,
+}
+
+#[derive(Deserialize, Default)]
+struct KeepBrief {
+    sticks_to: String,
+    said: String,
 }
 
 #[derive(Deserialize)]
@@ -229,6 +245,7 @@ fn keep_schema() -> Value {
             "replaces": list(string.clone()),
         }))),
         "elsewhere": string,
+        "brief": object(json!({ "sticks_to": string, "said": string })),
         "talk_title": string,
     }))
 }
@@ -779,6 +796,15 @@ async fn keep(
             let _ = kept.offer_reminder(reminder, &r.replaces);
         }
     }
+    if !from.brief.sticks_to.trim().is_empty() {
+        let _ = kept.change_brief(
+            page.id,
+            &page.name,
+            &page.sticks_to,
+            &from.brief.sticks_to,
+            &from.brief.said,
+        );
+    }
     kept.elsewhere = Some(from.elsewhere);
     kept.talk_title = Some(from.talk_title);
     let (said, mut operations) = kept.writes(at);
@@ -878,7 +904,13 @@ mod tests {
     #[test]
     fn the_keep_schema_requires_every_field() {
         let schema = keep_schema();
-        assert_eq!(schema["required"].as_array().map(Vec::len), Some(5));
+        assert_eq!(schema["required"].as_array().map(Vec::len), Some(6));
+        assert_eq!(
+            schema["properties"]["brief"]["required"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
         assert_eq!(
             schema["properties"]["reminders"]["items"]["required"]
                 .as_array()

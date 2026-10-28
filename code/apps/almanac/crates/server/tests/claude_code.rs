@@ -302,6 +302,60 @@ async fn the_workspaces_own_topic_can_be_renamed_but_stays(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_topic_keeps_what_you_wrote_and_learns_how_to_answer(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, _) = with_claude_code(pool.clone(), dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Pflanzen", "sticks_to": "Zimmerpflanzen, ich schicke Fotos" }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{}", started.body);
+    let topic = started.body["id"].as_str().unwrap().to_string();
+    let mut set_up = false;
+    for _ in 0..100 {
+        set_up = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM topics WHERE icon = 'sprout')")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        if set_up {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(set_up, "set up in the background");
+    // Claude's brief left theirs out, so theirs comes first.
+    let brief =
+        "Zimmerpflanzen, ich schicke Fotos\nThe houseplants at home: watering, feeding, repotting.";
+    let plants = topic_named(&app, &ada, &home, "Pflanzen").await;
+    assert_eq!(plants["sticks_to"], brief);
+
+    let answer = ask(&app, &ada, &home, &topic, "From now on, answer in English.").await;
+    assert_eq!(answer["changes"][0]["name"], "Pflanzen");
+    assert_eq!(answer["changes"][0]["said"], "Answers in English.");
+    assert_eq!(answer["changes"][0]["before"]["sticks_to"], brief);
+    let plants = topic_named(&app, &ada, &home, "Pflanzen").await;
+    assert_eq!(plants["sticks_to"], format!("{brief}\nAnswers in English."));
+    let undone = app
+        .post(
+            &format!(
+                "/api/w/{home}/messages/{}/undo",
+                answer["id"].as_str().unwrap()
+            ),
+            Some(&ada),
+            json!({}),
+        )
+        .await;
+    assert!(undone.status.is_success(), "{}", undone.body);
+    let plants = topic_named(&app, &ada, &home, "Pflanzen").await;
+    assert_eq!(plants["sticks_to"], brief);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_start_that_hangs_is_tried_again(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
     let (app, log) = with_claude_code(pool, dir.path()).await;

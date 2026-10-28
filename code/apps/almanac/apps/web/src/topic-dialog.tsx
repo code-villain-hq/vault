@@ -177,9 +177,15 @@ export function TopicForm({
             <textarea
               value={sticksTo}
               onChange={(e) => setSticksTo(e.target.value)}
-              rows={3}
-              className={`${field} resize-none py-2`}
+              rows={own ? 3 : 10}
+              className={`${field} resize-none py-2 leading-relaxed`}
             />
+            {!own && (
+              <span className="text-xs text-faint">
+                What it's about and how it answers. Almanac adds to it when you tell it how to
+                answer.
+              </span>
+            )}
           </label>
           {!own && (
             <>

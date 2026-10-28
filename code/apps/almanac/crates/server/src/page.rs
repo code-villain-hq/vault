@@ -171,7 +171,7 @@ impl Page {
             "" => "Not written yet. Stay with what the name means.",
             s => s,
         };
-        let _ = writeln!(out, "What it sticks to: {sticks_to}");
+        let _ = writeln!(out, "What it sticks to, its brief: {sticks_to}");
         let _ = writeln!(out, "\nHow the page lays out its points: {BLOCKS_SAY}");
         out.push_str("\nThe page's blocks, in order:\n");
         if self.blocks.is_empty() {

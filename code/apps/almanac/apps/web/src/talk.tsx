@@ -33,7 +33,7 @@ import { topicIcon } from "./icons";
 import { isOwn, useNewTopic, useTopics } from "./layout";
 import { type Picked, usePhoto } from "./photos";
 import { AddPhoto, DropHint, PickedPhotos, PickingProblem, useDrop, usePicking } from "./picking";
-import { Prose } from "./prose";
+import { about, Prose } from "./prose";
 import { TopicForm } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
@@ -478,7 +478,7 @@ function Proposed({
           {[proposal.group_name, page].filter(Boolean).join(" · ")}
         </p>
       </div>
-      {proposal.sticks_to && <p className="text-muted">{proposal.sticks_to}</p>}
+      {about(proposal.sticks_to) && <p className="text-muted">{about(proposal.sticks_to)}</p>}
       {proposal.points.length + proposal.reminders.length > 0 && (
         <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted">
           {proposal.points.map((point) => {

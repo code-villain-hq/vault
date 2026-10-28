@@ -121,9 +121,10 @@ What they do:
   message, so the talk shows it after a reload.
   The talk's photos go with every question in it, after the text.
 - **Keeping** (`kept.rs`): points, questions, reminder offers, the topic an
-  off-topic question belongs to, and the talk's title. Claude Code hands
+  off-topic question belongs to, the talk's title, and a change to the
+  topic's brief. Claude Code hands
   them over with tools while it answers (keep_point, ask_to_check,
-  offer_reminder, fits_elsewhere, name_talk); through the API one more
+  offer_reminder, change_brief, fits_elsewhere, name_talk); through the API one more
   request, with structured output, reads them from the exchange. Either
   way the server writes them with the answer, through the sync engine, so
   every client sees it. A point goes in a block, named by its reference
@@ -140,7 +141,12 @@ What they do:
   `replace` some: a point takes the first one's place (unread again) and
   the rest go; a reminder offer puts the ones on the calendar in its
   `replaces`, which the app takes off when it's accepted, and offers not
-  yet taken go at once.
+  yet taken go at once. What a topic sticks to is its brief: what it's
+  about and how its talks answer (`STICKS_TO_MAX`). A talk changes it
+  only when told how to answer from now on, or corrected twice on the
+  same thing, and gives it whole (`Kept::change_brief`): the change is
+  kept on the message for Undo, as the own topic's are. A talk never
+  changes a topic's name, group or icon.
 - **The workspace's own topic** (`own.rs`) reads every topic's name, group
   and what it sticks to, and has other tools: propose_topic and
   change_topic, not keep_point. A proposal waits for Start; a change is
@@ -148,8 +154,9 @@ What they do:
 - **Starting a topic** (`topics.rs`): a template (`TEMPLATES` in
   `crates/domain`: `routine`, `collection`, `study`) names the blocks it
   starts with; the blocks are the topic's from then on. A picked template
-  lays the page out at once. In the background, Almanac writes what it
-  sticks to when that was empty, picks an icon (`ICONS`), a group, the
+  lays the page out at once. In the background, Almanac writes the
+  brief, with what was written kept word for word at its start
+  (`with_theirs`), picks an icon (`ICONS`), a group, the
   template when none was picked, a collection's card title, and the first
   questions (set_up_topic, or structured output). When Claude can't
   answer, the topic keeps its defaults and starts as a collection.

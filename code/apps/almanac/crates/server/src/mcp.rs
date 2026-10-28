@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use almanac_domain::{
-    Actor, BLOCK_KINDS, ICONS, Proposal, ProposedPoint, TEMPLATE_NAMES, TopicChange, TopicPatch,
+    Actor, BLOCK_KINDS, ICONS, Proposal, ProposedPoint, STICKS_TO_MAX, TEMPLATE_NAMES, TopicChange,
+    TopicPatch,
 };
 use axum::Json;
 use axum::extract::State;
@@ -37,7 +38,8 @@ const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY po
 /// What a question is for, and so which tools it gets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
-    /// A talk in a topic: it keeps points, asks to check, offers reminders.
+    /// A talk in a topic: it keeps points, asks to check, offers reminders,
+    /// and changes how the topic answers.
     Topic,
     /// A talk in the workspace's own topic: it proposes and changes topics.
     Own,
@@ -53,6 +55,7 @@ impl Mode {
                 "keep_point",
                 "ask_to_check",
                 "offer_reminder",
+                "change_brief",
                 "name_talk",
                 "fits_elsewhere",
             ],
@@ -242,6 +245,21 @@ async fn call(
             kept()?.offer_reminder(reminder, &r.replaces)?;
             Ok("Offered: they add it to the calendar with a click.".into())
         }
+        "change_brief" => {
+            let args: BriefArgs = read(arguments)?;
+            let topic: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
+                .bind(asking.actor.workspace_id)
+                .bind(asking.topic_id)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
+            let (id, name, now, ..) = topic.ok_or("This topic is gone.")?;
+            kept()?.change_brief(id, &name, &now, &args.sticks_to, &args.said)?;
+            Ok(
+                "Changed, once your answer is done. They see what you said, and can undo it."
+                    .into(),
+            )
+        }
         "name_talk" => {
             let args: NameArgs = read(arguments)?;
             kept()?.talk_title = Some(cut(&args.title, 80));
@@ -332,6 +350,13 @@ struct ReminderArgs {
     every_days: Option<i64>,
     #[serde(default)]
     replaces: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct BriefArgs {
+    sticks_to: String,
+    #[serde(default)]
+    said: String,
 }
 
 #[derive(Deserialize)]
@@ -434,7 +459,7 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
     let cards = cut(&args.cards, 60);
     Ok(Proposal {
         name,
-        sticks_to: cut(&args.sticks_to, 1000),
+        sticks_to: cut(&args.sticks_to, STICKS_TO_MAX),
         icon: args.icon,
         group_name: cut(&args.group, 40),
         template: args.template,
@@ -530,7 +555,7 @@ async fn change(
     );
     set(
         args.sticks_to,
-        1000,
+        STICKS_TO_MAX,
         sticks_to,
         &mut before.sticks_to,
         &mut after.sticks_to,
@@ -636,6 +661,13 @@ fn merge(earlier: &mut TopicChange, later: TopicChange) {
         e.name = name.clone();
     }
 }
+
+/// What a topic sticks to, for the tools that write it.
+const BRIEF_SAYS: &str = "The topic's brief, which every talk in it follows: first what it's \
+about, in a sentence or two (\"Houseplants and their care: watering, light, repotting.\"), then, \
+a line each, how it answers: in which language, the tone and the length, what it brings in, what \
+it checks, and what it leaves to other topics. Fit it to the topic, with nothing every topic \
+does anyway: usually 400 to 1,200 characters. The page doesn't show it.";
 
 /// The templates a topic starts as, for the tools that pick one.
 const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
@@ -745,6 +777,22 @@ fn tools(mode: Mode) -> Vec<Value> {
                 offer_fields,
                 &["title", "due_on"],
             ),
+            tool(
+                "change_brief",
+                "Changes how this topic answers from now on, in what it sticks to: its brief, \
+                 which the page you read starts with. Only when they tell you how it should \
+                 answer from now on (\"always say when a source was written\", \"in English \
+                 from now on\"), or correct the same thing a second time in this talk (\"too \
+                 long again\"): never for a wish about one answer. Give the brief whole, as it \
+                 is from now on: all of it kept, with the rule added or changed where it fits. \
+                 Never its name, group or icon. They see what you said under the answer, and \
+                 can undo it.",
+                json!({
+                    "sticks_to": string("The whole brief as it is from now on."),
+                    "said": string("What changed, in a short sentence for under the answer, in the talk's language: \"Names when each source was written.\""),
+                }),
+                &["sticks_to", "said"],
+            ),
             name_talk,
             fits_elsewhere,
         ],
@@ -756,7 +804,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                  and no topic has it already. One per answer.",
                 json!({
                     "name": string("A short name, one to three words, in their language."),
-                    "sticks_to": string("What talks in it stay with, in one or two sentences. The page shows it under the name, so only what it's about (\"Houseplants and their care: watering, light, repotting.\"), not rules about what doesn't belong."),
+                    "sticks_to": string(BRIEF_SAYS),
                     "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
                     "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
                     "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
@@ -797,7 +845,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                 json!({
                     "topic": string("The topic's name now."),
                     "name": string("Its new name."),
-                    "sticks_to": string("What it sticks to now."),
+                    "sticks_to": string("What it sticks to now, its brief, whole: all of it kept, with what changes in its place."),
                     "icon": { "type": "string", "enum": ICONS },
                     "group": string("Its group in the sidebar."),
                     "said": string("What you changed, in a short sentence for under the answer: \"Moved it to Hobby.\""),
@@ -811,7 +859,7 @@ fn tools(mode: Mode) -> Vec<Value> {
             "set_up_topic",
             "Sets up the new topic. Call it once, with every field.",
             json!({
-                "sticks_to": string("What talks in it stay with, in one or two sentences: only what it's about, not rules about what doesn't belong. When they wrote it, theirs as it is."),
+                "sticks_to": string(&format!("{BRIEF_SAYS} When they wrote some, all of theirs, word for word, at the start.")),
                 "icon": { "type": "string", "enum": ICONS },
                 "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
                 "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },

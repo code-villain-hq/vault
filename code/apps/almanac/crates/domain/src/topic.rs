@@ -57,6 +57,10 @@ pub struct TopicPatch {
     pub position: Option<i32>,
 }
 
+/// How long what a topic sticks to may be, in characters: its brief, what
+/// it's about and how its talks answer.
+pub const STICKS_TO_MAX: usize = 4000;
+
 /// The icons a topic can have: Lucide's names, which the web app draws.
 pub const ICONS: &[&str] = &[
     "library",
@@ -518,8 +522,8 @@ fn topic_fields(
     group_name: Option<&str>,
     starters: Option<&[String]>,
 ) -> Result<(), ValidationError> {
-    if sticks_to.is_some_and(|s| s.chars().count() > 1000) {
-        return invalid("What it sticks to is longer than 1000 characters.");
+    if sticks_to.is_some_and(|s| s.chars().count() > STICKS_TO_MAX) {
+        return invalid("What it sticks to is longer than 4000 characters.");
     }
     if icon.is_some_and(|i| !ICONS.contains(&i)) {
         return invalid("Almanac doesn't know that icon.");

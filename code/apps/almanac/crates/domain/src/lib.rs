@@ -32,7 +32,7 @@ pub use talk::{
 pub use topic::{
     BLOCK_KINDS, Block, BlockCreate, BlockPatch, ICONS, KINDS, Point, PointCreate, PointPatch,
     Question, QuestionCreate, QuestionPatch, Reminder, ReminderCreate, ReminderPatch,
-    StartTopicRequest, StartedTopic, TEMPLATE_NAMES, TEMPLATES, Topic, TopicCreate, TopicPatch,
-    template,
+    STICKS_TO_MAX, StartTopicRequest, StartedTopic, TEMPLATE_NAMES, TEMPLATES, Topic, TopicCreate,
+    TopicPatch, template,
 };
 pub use user::User;

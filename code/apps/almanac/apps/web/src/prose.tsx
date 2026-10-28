@@ -53,6 +53,16 @@ export function Prose({ text }: { text: string }) {
 }
 
 /** A line as written, with **bold** and *italic* kept: an answer's, or a point's. */
+/**
+ * What a topic is about: the first sentence of what it sticks to. The rest of
+ * that brief says how its talks answer, which nobody needs to read in a list.
+ */
+export function about(brief: string): string {
+  const line = brief.trim().split("\n")[0] ?? "";
+  const [first] = new Intl.Segmenter(undefined, { granularity: "sentence" }).segment(line);
+  return first?.segment.trim() ?? "";
+}
+
 export function inline(text: string): ReactNode {
   // The marked parts sit at the odd places the split leaves them, marks and
   // all: **bold** and *italic*.

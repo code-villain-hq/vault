@@ -1,14 +1,17 @@
 //! What one answer keeps: points in the page's blocks, questions to check,
 //! reminders it offers, the topic an off-topic question fits, the talk's
-//! title, and, in the workspace's own topic, a topic it proposes and the
-//! topics it changed. A point or reminder may take the place of ones the
+//! title, how the topic answers from now on (its brief), and, in the
+//! workspace's own topic, a topic it proposes and the topics it changed. A point or reminder may take the place of ones the
 //! page has, by the references the page gave them (`crate::page::Refs`):
 //! the page is kept up to date, not added to. Claude Code hands them over with Almanac's tools
 //! while it answers (`crate::mcp`); through the Messages API one more
 //! request reads them from the exchange (`crate::talks`). Either way they
 //! are written with the answer, through the sync engine.
 
-use almanac_domain::{BLOCK_KINDS, ModelKind, Operation, Proposal, ProposedReminder, TopicChange};
+use almanac_domain::{
+    BLOCK_KINDS, ModelKind, Operation, Proposal, ProposedReminder, STICKS_TO_MAX, TopicChange,
+    TopicPatch,
+};
 use chrono::{NaiveDate, NaiveTime};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
@@ -276,6 +279,64 @@ impl Kept {
             })
             .collect::<Result<Vec<_>, _>>()?;
         self.reminders.push(KeptReminder { reminder, replaces });
+        Ok(())
+    }
+
+    /// Changes how the topic answers from now on: what it sticks to, its
+    /// brief, given whole, in place of the brief it has `now`. A second
+    /// change in the same answer counts the first as how it is now. They
+    /// see what it `said` under the answer, and can undo it.
+    pub fn change_brief(
+        &mut self,
+        topic_id: Uuid,
+        name: &str,
+        now: &str,
+        brief: &str,
+        said: &str,
+    ) -> Result<(), String> {
+        let brief = cut(brief, STICKS_TO_MAX);
+        let earlier = self.changes.iter().position(|c| c.topic_id == topic_id);
+        let now = earlier
+            .and_then(|n| self.changes[n].after.sticks_to.clone())
+            .unwrap_or_else(|| now.trim().to_string());
+        // A rule on its own would lose the rest of the brief.
+        if brief.chars().count() < now.chars().count() / 2 {
+            return Err(
+                "Give the whole brief as it is from now on: all of it, with the rule added or changed where it fits."
+                    .into(),
+            );
+        }
+        if brief == now {
+            return Err("The brief says that already.".into());
+        }
+        let said = match cut(said, 200) {
+            said if said.is_empty() => "Changed how it answers.".to_string(),
+            said => said,
+        };
+        match earlier {
+            Some(n) => {
+                let change = &mut self.changes[n];
+                change.after.sticks_to = Some(brief);
+                change.before.sticks_to.get_or_insert(now);
+                if change.said != said {
+                    change.said = format!("{} {said}", change.said);
+                }
+            }
+            None => self.changes.push(TopicChange {
+                topic_id,
+                name: name.into(),
+                said,
+                before: TopicPatch {
+                    sticks_to: Some(now),
+                    ..TopicPatch::default()
+                },
+                after: TopicPatch {
+                    sticks_to: Some(brief),
+                    ..TopicPatch::default()
+                },
+                undone: false,
+            }),
+        }
         Ok(())
     }
 
@@ -556,7 +617,6 @@ pub fn fields<const N: usize>(pairs: [(&str, Value); N]) -> Map<String, Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use almanac_domain::TopicPatch;
 
     #[test]
     fn kept_words_name_the_themes() {
@@ -778,6 +838,47 @@ mod tests {
         };
         assert_eq!(*gone, offered);
         assert_eq!(data["replaces"], json!([on]));
+    }
+
+    #[test]
+    fn a_brief_changes_whole_and_says_so() {
+        let topic = Uuid::now_v7();
+        let now = "Geschichte global erklärt.\nImmer Deutsch, klar und knapp.";
+        let mut kept = Kept::default();
+        assert!(
+            kept.change_brief(topic, "Geschichte", now, "Daten nennen.", "")
+                .unwrap_err()
+                .contains("whole brief")
+        );
+        let dated = format!("{now}\nBei Quellen sagen, wann sie geschrieben wurden.");
+        kept.change_brief(
+            topic,
+            "Geschichte",
+            now,
+            &dated,
+            "Nennt, wann eine Quelle geschrieben wurde.",
+        )
+        .unwrap();
+        let shorter = format!("{dated}\nKürzer: drei Sätze.");
+        kept.change_brief(topic, "Geschichte", now, &shorter, "Antwortet kürzer.")
+            .unwrap();
+        let [change] = &kept.changes[..] else {
+            panic!("{:?}", kept.changes);
+        };
+        assert_eq!(change.before.sticks_to.as_deref(), Some(now));
+        assert_eq!(change.after.sticks_to.as_deref(), Some(shorter.as_str()));
+        assert_eq!(
+            change.said,
+            "Nennt, wann eine Quelle geschrieben wurde. Antwortet kürzer."
+        );
+        assert!(change.after.name.is_none(), "only the brief");
+        let (said, operations) = kept.writes(&answering());
+        assert_eq!(said["changes"][0]["name"], json!("Geschichte"));
+        assert!(matches!(
+            &operations[..],
+            [Operation::Update { model: ModelKind::Topic, data, .. }]
+                if data.keys().collect::<Vec<_>>() == ["sticks_to"]
+        ));
     }
 
     #[test]

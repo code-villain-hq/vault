@@ -12,6 +12,9 @@ import { appendFileSync, existsSync, rmSync } from "node:fs";
 type Session = { url: string; authorization: string; system: string; allowed: string[] };
 
 const log = process.argv[2];
+/** The brief a set-up writes around "Zimmerpflanzen, ich schicke Fotos". */
+const BRIEF =
+  "Zimmerpflanzen, ich schicke Fotos\nThe houseplants at home: watering, feeding, repotting.";
 let session: Session | undefined;
 
 function send(message: object) {
@@ -86,6 +89,12 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/from now on/i.test(prompt)) {
+    say("I will.");
+    await tool("change_brief", {
+      sticks_to: `${BRIEF}\nAnswers in English.`,
+      said: "Answers in English.",
+    });
   } else if (/sort/i.test(prompt)) {
     say("Sorted.");
     await tool("keep_point", {

@@ -60,7 +60,7 @@ import {
   useDrop,
   usePicking,
 } from "./picking";
-import { inline } from "./prose";
+import { about, inline } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
@@ -315,10 +315,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
 
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <p className="text-title font-semibold">{topic.name}</p>
-        {topic.sticks_to && <p className="text-muted">{topic.sticks_to}</p>}
-      </div>
+      <p className="text-title font-semibold">{topic.name}</p>
       <NoKey />
       {loose.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
@@ -767,7 +764,7 @@ function IndexRow({ topic }: { topic: Topic }) {
           )}
           <span className="ml-auto shrink-0 text-xs text-faint">{detail}</span>
         </div>
-        {topic.sticks_to && <p className="text-muted">{topic.sticks_to}</p>}
+        {about(topic.sticks_to) && <p className="text-muted">{about(topic.sticks_to)}</p>}
       </div>
     </Link>
   );
