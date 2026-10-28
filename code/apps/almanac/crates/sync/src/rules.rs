@@ -1,0 +1,136 @@
+//! Almanac's rules for the shared sync engine ([`code_villain_sync`]): what
+//! a talk said is the server's, a topic's records go with it, and only the
+//! server marks a reminder as told.
+
+use almanac_domain::{Actor, ModelKind, Operation};
+use code_villain_sync::Rules;
+use serde_json::{Map, Value, json};
+use sqlx::PgConnection;
+use uuid::Uuid;
+
+use crate::{NOTIFY_CHANNEL, SyncError};
+
+/// Almanac, as the sync engine sees it.
+pub struct Almanac;
+
+const TOPIC_NEXT: &str =
+    "SELECT COALESCE(max(position), 0) + 1 FROM topics WHERE workspace_id = $1";
+const POINT_NEXT: &str = "SELECT COALESCE(max(position), 0) + 1 FROM points \
+     WHERE workspace_id = $1 AND topic_id = $2";
+const TOPIC_REMINDERS: &str = "SELECT id FROM reminders WHERE topic_id = $1 AND workspace_id = $2";
+const TOPIC_QUESTIONS: &str = "SELECT id FROM questions WHERE topic_id = $1 AND workspace_id = $2";
+const TOPIC_POINTS: &str = "SELECT id FROM points WHERE topic_id = $1 AND workspace_id = $2";
+const TOPIC_MESSAGES: &str = "SELECT id FROM messages WHERE topic_id = $1 AND workspace_id = $2";
+const TOPIC_TALKS: &str = "SELECT id FROM talks WHERE topic_id = $1 AND workspace_id = $2";
+const TALK_MESSAGES: &str = "SELECT id FROM messages WHERE talk_id = $1 AND workspace_id = $2";
+
+impl Rules for Almanac {
+    type Model = ModelKind;
+    const NOTIFY_CHANNEL: &'static str = NOTIFY_CHANNEL;
+
+    async fn guest_access(db: &mut PgConnection, actor: Actor) -> Result<Option<i64>, SyncError> {
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT role, access_version FROM workspace_members \
+             WHERE workspace_id = $1 AND user_id = $2",
+        )
+        .bind(actor.workspace_id)
+        .bind(actor.user_id)
+        .fetch_optional(&mut *db)
+        .await?;
+        let (role, version) = row.ok_or_else(|| SyncError::NotFound("workspace".into()))?;
+        Ok((role == "guest").then_some(version))
+    }
+
+    async fn check_allowed(
+        _db: &mut PgConnection,
+        _actor: Actor,
+        operation: &Operation,
+    ) -> Result<(), SyncError> {
+        match operation {
+            Operation::Update {
+                model: ModelKind::Reminder,
+                data,
+                ..
+            } if data.contains_key("notified_for") => Err(SyncError::Forbidden(
+                "Only Almanac says when it told the Mac.".into(),
+            )),
+            _ => Ok(()),
+        }
+    }
+
+    async fn prepare_create(
+        db: &mut PgConnection,
+        actor: Actor,
+        model: ModelKind,
+        row: &mut Map<String, Value>,
+    ) -> Result<(), SyncError> {
+        if row.get("position").is_some_and(|p| !p.is_null()) {
+            return Ok(());
+        }
+        let position: i32 = match model {
+            ModelKind::Topic => {
+                sqlx::query_scalar(TOPIC_NEXT)
+                    .bind(actor.workspace_id)
+                    .fetch_one(&mut *db)
+                    .await?
+            }
+            ModelKind::Point => {
+                let Some(topic) = row
+                    .get("topic_id")
+                    .and_then(Value::as_str)
+                    .and_then(|t| t.parse::<Uuid>().ok())
+                else {
+                    return Ok(());
+                };
+                sqlx::query_scalar(POINT_NEXT)
+                    .bind(actor.workspace_id)
+                    .bind(topic)
+                    .fetch_one(&mut *db)
+                    .await?
+            }
+            _ => return Ok(()),
+        };
+        row.insert("position".into(), json!(position));
+        Ok(())
+    }
+
+    async fn cascade(
+        db: &mut PgConnection,
+        actor: Actor,
+        model: ModelKind,
+        id: Uuid,
+    ) -> Result<Vec<Operation>, SyncError> {
+        // What a topic kept goes with it, and a talk's messages with the
+        // talk, logged so every client lets go of them too.
+        let children: &[(ModelKind, &'static str)] = match model {
+            ModelKind::Topic => &[
+                (ModelKind::Reminder, TOPIC_REMINDERS),
+                (ModelKind::Question, TOPIC_QUESTIONS),
+                (ModelKind::Point, TOPIC_POINTS),
+                (ModelKind::Message, TOPIC_MESSAGES),
+                (ModelKind::Talk, TOPIC_TALKS),
+            ],
+            ModelKind::Talk => &[(ModelKind::Message, TALK_MESSAGES)],
+            ModelKind::User => {
+                return Err(SyncError::Invalid(format!(
+                    "{} records can't be deleted this way",
+                    model.name()
+                )));
+            }
+            _ => &[],
+        };
+        let mut operations = Vec::new();
+        for (child, query) in children {
+            let ids: Vec<Uuid> = sqlx::query_scalar(*query)
+                .bind(id)
+                .bind(actor.workspace_id)
+                .fetch_all(&mut *db)
+                .await?;
+            operations.extend(
+                ids.into_iter()
+                    .map(|id| Operation::Delete { model: *child, id }),
+            );
+        }
+        Ok(operations)
+    }
+}

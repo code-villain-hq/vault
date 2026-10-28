@@ -1,0 +1,8 @@
+/target
+node_modules
+dist
+.env
+apps/desktop/src-tauri/gen/
+
+# A company's settings, with its secrets (almanac.example.toml shows them).
+almanac.toml

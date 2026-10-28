@@ -10,19 +10,19 @@ company = "Acme Inc"
 id = "ada"
 name = "Ada Admin"
 email = "ada@acme.test"
-groups = ["forge-admins", "glyph-admins", "raven-admins", "layer-admins"]
+groups = ["forge-admins", "glyph-admins", "raven-admins", "layer-admins", "almanac-admins"]
 
 [[person]]
 id = "max"
 name = "Max Member"
 email = "max@acme.test"
-groups = ["forge-users", "glyph-users", "raven-users", "layer-users"]
+groups = ["forge-users", "glyph-users", "raven-users", "layer-users", "almanac-users"]
 
 [[person]]
 id = "gus"
 name = "Gus Guest"
 email = "gus@acme.test"
-groups = ["forge-guests", "glyph-guests", "raven-guests", "layer-guests"]
+groups = ["forge-guests", "glyph-guests", "raven-guests", "layer-guests", "almanac-guests"]
 
 # In the company, but in none of the apps' groups: signing in tells her to
 # ask Acme's admin.

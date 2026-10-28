@@ -69,6 +69,17 @@
         "dev"
       ],
       "port": 5175
+    },
+    {
+      "name": "almanac-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "run",
+        "--cwd",
+        "code/apps/almanac",
+        "dev"
+      ],
+      "port": 5177
     }
   ]
 }

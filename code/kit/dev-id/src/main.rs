@@ -21,6 +21,7 @@ pub const APPS: &[(&str, &str, &str)] = &[
     ("glyph", "Glyph", "http://127.0.0.1:7480"),
     ("raven", "Raven", "http://127.0.0.1:7580"),
     ("layer", "Layer", "http://127.0.0.1:7680"),
+    ("almanac", "Almanac", "http://127.0.0.1:7780"),
 ];
 
 pub const SECRET: &str = "dev";

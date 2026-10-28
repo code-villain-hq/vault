@@ -1,0 +1,33 @@
+{
+  "name": "almanac",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "../../kit/sync/client",
+    "../../kit/web"
+  ],
+  "scripts": {
+    "design:sync": "bun scripts/sync-design.ts",
+    "db": "docker compose up -d --wait",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "seed": "bun scripts/seed.ts",
+    "dev": "bun scripts/dev.ts",
+    "app": "docker compose --profile app up -d --build --wait",
+    "app:logs": "docker compose --profile app logs -f almanac",
+    "dev:desktop": "bun run --cwd apps/desktop tauri dev",
+    "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
+    "gen:types": "bun scripts/gen-types.ts",
+    "typecheck": "tsc -p apps/web && tsc -p apps/web/tsconfig.test.json && tsc -p ../../kit/sync/client && tsc -p ../../kit/web",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "cargo test --workspace && bun test",
+    "check": "bun scripts/check.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/bun": "1.4.4",
+    "typescript": "7.0.2"
+  }
+}

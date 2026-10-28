@@ -7,11 +7,11 @@ are in `people.toml`.
 
 - Sign-in at http://127.0.0.1:7280, as Pocket ID does it: discovery,
   `/authorize` (a page that asks who you are; `login_hint=<id or email>`
-  skips it), `/token` with PKCE. Clients `forge`, `glyph`, `raven` and
-  `layer`, all with the secret `dev`. ID tokens are HS256 with a known key:
+  skips it), `/token` with PKCE. Clients `forge`, `glyph`, `raven`,
+  `layer` and `almanac`, all with the secret `dev`. ID tokens are HS256 with a known key:
   apps don't check the signature of a token they fetched themselves.
 - SCIM: every five seconds it sends each app at its local port (7380, 7480,
-  7580, 7680) the people in one of its groups (`forge-users`, `-admins`,
+  7580, 7680, 7780) the people in one of its groups (`forge-users`, `-admins`,
   `-guests`) and all their groups, with the token `dev`. An app that isn't
   running is skipped. Edit `people.toml` while it runs; it sends the change.
 - Each app's `bun run dev` starts it, or uses the one already running,

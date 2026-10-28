@@ -10,6 +10,7 @@ The strike. A gothic C and V with a poison bar behind them, cut where the letter
 | [`caster.svg`](caster.svg) | Caster's C, built the same way. |
 | [`glyph.svg`](glyph.svg) | Glyph's G, built the same way. |
 | [`raven.svg`](raven.svg) | Raven's R, built the same way. |
+| [`almanac.svg`](almanac.svg) | Almanac's A, built the same way. |
 | [`logo-night.svg`](logo-night.svg) | “Code Villain” with the strike, for night grounds. |
 | [`logo-day.svg`](logo-day.svg) | The same for day grounds. |
 | [`logo-home.svg`](logo-home.svg) | Homepage variant on night: cropped lettering with an extended strike. |
@@ -51,9 +52,9 @@ This variant is the exception to the standard logo’s clear space at the horizo
 
 ## App icons
 
-Each app's icon is its initial built the same way: Forge is an F, Layer an L, Caster a C, Glyph a G, Raven an R, each on the night tile with the strike behind it.
+Each app's icon is its initial built the same way: Forge is an F, Layer an L, Caster a C, Glyph a G, Raven an R, Almanac an A, each on the night tile with the strike behind it.
 
-`python3 products.py` writes all five from the font with `outline.swift`
+`python3 products.py` writes all six from the font with `outline.swift`
 (Swift and CoreText, nothing to install). Each app keeps a copy and builds
 its native icons from it:
 
@@ -64,6 +65,7 @@ its native icons from it:
 | Caster | `code/apps/caster/Resources/AppIcon.svg` | `make icon` |
 | Glyph | `code/apps/glyph/apps/web/public/icon.svg` | `bun run design:sync` |
 | Raven | `code/apps/raven/apps/web/public/icon.svg` | `bun run design:sync`; desktop: `tauri icon ../web/public/icon.svg` in `apps/desktop` (keep the macOS and Windows sizes) |
+| Almanac | `code/apps/almanac/apps/web/public/icon.svg` | `bun run design:sync`; desktop: `tauri icon ../web/public/icon.svg` in `apps/desktop` (keep the macOS and Windows sizes) |
 
 An app icon is the product mark as drawn: the full tile, the strike edge to edge. The tile is the app's night `bg`, so on a night page it blends in and only the letter and its strike show. That is intended. Never add a border, a gradient, a shadow, or a second colour to lift it.
 
