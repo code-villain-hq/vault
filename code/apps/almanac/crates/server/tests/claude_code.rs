@@ -3,12 +3,14 @@
 //! way Claude Code does: the workspace's own topic proposes a topic, which
 //! starts with a click, and changes one with undo; a topic's talk keeps a
 //! point with its source; a new topic sets itself up; and the web can be
-//! turned off. The workspace's own topic stays.
+//! turned off. The workspace's own topic stays, and a start that hangs is
+//! tried again.
 
 mod common;
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use almanac_server::acp::ClaudeCode;
 use almanac_server::router;
@@ -45,8 +47,11 @@ async fn with_claude_code(pool: PgPool, dir: &Path) -> (App, PathBuf) {
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
-    let claude_code =
-        ClaudeCode::new(dir.join("claude"), format!("http://{address}/api/mcp")).program(adapter);
+    // The stand-in starts in well under a second; one that hangs is tried
+    // again soon.
+    let claude_code = ClaudeCode::new(dir.join("claude"), format!("http://{address}/api/mcp"))
+        .program(adapter)
+        .start_timeout(Duration::from_secs(5));
     let state = common::state(pool)
         .on_this_mac()
         .with_claude_code(claude_code);
@@ -283,4 +288,30 @@ async fn the_workspaces_own_topic_can_be_renamed_but_stays(pool: PgPool) {
     let topics = app.synced(&ada, &home, "Topic").await;
     assert_eq!(topics.len(), 1);
     assert_eq!(topics[0]["name"], "Index");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_start_that_hangs_is_tried_again(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, log) = with_claude_code(pool, dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let claude = app.get(&format!("/api/w/{home}/claude"), &ada).await;
+    assert_eq!(claude.body["claude_code"]["state"], "ready");
+    let opened = sessions(&log).len();
+
+    // The next session the stand-in is asked for never opens.
+    let hang = dir.path().join("sessions.jsonl.hang");
+    std::fs::write(&hang, "").unwrap();
+    let own = topic_named(&app, &ada, &home, "Almanac").await;
+    let answer = ask(
+        &app,
+        &ada,
+        &home,
+        own["id"].as_str().unwrap(),
+        "I want to keep my houseplants alive.",
+    )
+    .await;
+    assert_eq!(answer["text"], "Here's a topic for your plants.");
+    assert!(!hang.exists(), "the first start hung");
+    assert_eq!(sessions(&log).len(), opened + 1, "the second one opened");
 }

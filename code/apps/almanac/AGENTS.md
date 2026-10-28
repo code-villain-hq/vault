@@ -98,6 +98,8 @@ Two ways to the same answers, and the same prompts:
   and WebFetch (when the web is on). Almanac's own tools come over MCP
   (`mcp.rs`, `POST /api/mcp`), behind a token that lasts as long as the
   question. It answers as the user is signed in to Claude Code: no key.
+  A start takes a few seconds; one that hasn't opened a session in 30 is
+  stopped and made again, once, with what it last printed in the log.
 - **On a server, the Messages API** (`claude.rs`, with the key; Rust has no
   SDK): `claude-opus-5-5`, adaptive thinking, the server-side refusal
   fallback, web search off.

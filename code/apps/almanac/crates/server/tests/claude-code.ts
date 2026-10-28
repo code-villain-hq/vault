@@ -3,8 +3,10 @@
 // with Almanac's tools: it calls them over the MCP server the session names,
 // picked by which tools the session allows. Each session's options are
 // appended to the file named first, one JSON line each, for the test to read.
+// While that file's name with `.hang` exists, the next session never opens,
+// as Claude Code's sometimes doesn't, and the file goes.
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, rmSync } from "node:fs";
 
 type Session = { url: string; authorization: string; system: string; allowed: string[] };
 
@@ -104,6 +106,10 @@ for await (const line of console) {
       result: { protocolVersion: 1, agentInfo: { name: "fake", version: "0.0.0-test" } },
     });
   } else if (method === "session/new") {
+    if (existsSync(`${log}.hang`)) {
+      rmSync(`${log}.hang`);
+      continue;
+    }
     const server = params.mcpServers[0];
     const options = params._meta.claudeCode.options;
     session = {

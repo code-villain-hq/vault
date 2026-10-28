@@ -27,8 +27,9 @@ pub const MCP_NAME: &str = "almanac";
 pub const WEB_TOOLS: &[&str] = &["WebSearch", "WebFetch"];
 
 const PROTOCOL_VERSION: i64 = 1;
-/// Starting the adapter and opening a session.
-const START_TIMEOUT: Duration = Duration::from_secs(60);
+/// Starting the adapter and opening a session, which takes a few seconds.
+/// A start that takes longer has hung, and is tried once more.
+const START_TIMEOUT: Duration = Duration::from_secs(30);
 /// One answer, searching included.
 const ANSWER_TIMEOUT: Duration = Duration::from_secs(600);
 /// How much of the end of its stderr is kept, to say why it stopped.
@@ -85,6 +86,8 @@ pub struct ClaudeCode {
     mcp_url: String,
     /// The adapter to run; looked for on the login PATH when not set.
     program: Option<PathBuf>,
+    /// How long a start may take before it's tried again.
+    start_timeout: Duration,
     /// The last check that found it ready.
     ready: Arc<Mutex<Ready>>,
 }
@@ -95,6 +98,7 @@ impl ClaudeCode {
             folder: folder.into(),
             mcp_url: mcp_url.into(),
             program: None,
+            start_timeout: START_TIMEOUT,
             ready: Arc::default(),
         }
     }
@@ -102,6 +106,12 @@ impl ClaudeCode {
     /// Runs `program` instead of the adapter on the PATH, for tests.
     pub fn program(mut self, program: impl Into<PathBuf>) -> Self {
         self.program = Some(program.into());
+        self
+    }
+
+    /// Gives a start `timeout` instead of half a minute, for tests.
+    pub fn start_timeout(mut self, timeout: Duration) -> Self {
+        self.start_timeout = timeout;
         self
     }
 
@@ -125,7 +135,7 @@ impl ClaudeCode {
 
     async fn check_now(&self) -> Result<Option<String>, Failure> {
         let mut agent = self.start().await?;
-        let checked = tokio::time::timeout(START_TIMEOUT, async {
+        let checked = tokio::time::timeout(self.start_timeout, async {
             let version = agent.initialize().await?;
             let question = Question {
                 system: "",
@@ -168,20 +178,8 @@ impl ClaudeCode {
         question: &Question<'_>,
         mut piece: impl FnMut(&str) + Send,
     ) -> Result<Answer, Failure> {
-        let mut agent = self.start().await?;
+        let (mut agent, session) = self.open(question).await?;
         let answered = async {
-            let session = tokio::time::timeout(START_TIMEOUT, async {
-                agent.initialize().await?;
-                agent
-                    .new_session(&self.folder, &self.mcp_url, question, true)
-                    .await
-            })
-            .await
-            .unwrap_or_else(|_| {
-                Err(Failure::Trouble(
-                    "Claude Code took too long to start.".into(),
-                ))
-            })?;
             let mut answer = Answer::default();
             let params = json!({
                 "sessionId": session,
@@ -208,6 +206,40 @@ impl ClaudeCode {
         .await;
         agent.stop().await;
         answered
+    }
+
+    /// Starts the adapter and opens a session for `question`. A start that
+    /// hangs is stopped and made again, once: it has hung while another
+    /// start beside it opened in seconds, so a fresh one is likely to work.
+    async fn open(&self, question: &Question<'_>) -> Result<(Agent, String), Failure> {
+        for attempt in 1..=2 {
+            let mut agent = self.start().await?;
+            let opened = tokio::time::timeout(self.start_timeout, async {
+                agent.initialize().await?;
+                agent
+                    .new_session(&self.folder, &self.mcp_url, question, true)
+                    .await
+            })
+            .await;
+            match opened {
+                Ok(Ok(session)) => return Ok((agent, session)),
+                Ok(Err(failure)) => {
+                    agent.stop().await;
+                    return Err(failure);
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        attempt,
+                        said = agent.last_said(),
+                        "Claude Code didn't open a session in time"
+                    );
+                    agent.stop().await;
+                }
+            }
+        }
+        Err(Failure::Trouble(
+            "Claude Code took too long to start.".into(),
+        ))
     }
 
     async fn start(&self) -> Result<Agent, Failure> {
@@ -437,15 +469,20 @@ impl Agent {
         }
     }
 
-    /// Why the adapter stopped talking, from the end of what it printed.
-    fn ended(&self) -> Failure {
+    /// The last line the adapter printed to stderr, if any.
+    fn last_said(&self) -> String {
         let tail = self.tail.lock().map(|t| t.clone()).unwrap_or_default();
-        let last = tail
-            .lines()
+        tail.lines()
             .rev()
             .find(|line| !line.trim().is_empty())
             .unwrap_or("")
-            .trim();
+            .trim()
+            .to_string()
+    }
+
+    /// Why the adapter stopped talking, from the end of what it printed.
+    fn ended(&self) -> Failure {
+        let last = self.last_said();
         if last.is_empty() {
             Failure::Trouble("Claude Code stopped before it answered.".into())
         } else {
