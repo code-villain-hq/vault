@@ -3,8 +3,9 @@
 
 import type { Reminder } from "@almanac/types";
 import type { SyncClient } from "@code-villain/sync-client";
-import { MoreMenu } from "@code-villain/web";
+import { type Confirmation, ConfirmDialog, MoreMenu } from "@code-villain/web";
 import { Bell } from "lucide-react";
+import { useState } from "react";
 import { addDays, daysBetween, today } from "./format";
 import type { Schema } from "./sync";
 
@@ -63,21 +64,31 @@ export function NotifyBell({ reminder }: { reminder: Reminder }) {
 
 /** Done, the bell, and removing it. */
 export function ReminderMenu({ sync, reminder }: { sync: SyncClient<Schema>; reminder: Reminder }) {
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   return (
-    <MoreMenu
-      label={`More for ${reminder.title}`}
-      items={[
-        { label: "Done", onSelect: () => markDone(sync, reminder) },
-        {
-          label: reminder.notify ? "Don't notify the Mac" : "Notify the Mac",
-          onSelect: () => sync.update("Reminder", reminder.id, { notify: !reminder.notify }),
-        },
-        {
-          label: "Remove reminder",
-          danger: true,
-          onSelect: () => sync.delete("Reminder", reminder.id),
-        },
-      ]}
-    />
+    <>
+      <MoreMenu
+        label={`More for ${reminder.title}`}
+        items={[
+          { label: "Done", onSelect: () => markDone(sync, reminder) },
+          {
+            label: reminder.notify ? "Don't notify the Mac" : "Notify the Mac",
+            onSelect: () => sync.update("Reminder", reminder.id, { notify: !reminder.notify }),
+          },
+          {
+            label: "Remove reminder…",
+            danger: true,
+            onSelect: () =>
+              setConfirmation({
+                title: `Remove "${reminder.title}"?`,
+                body: "It leaves Calendar for everyone in the workspace, and the Mac isn't told again. This can't be undone.",
+                action: "Remove reminder",
+                onConfirm: () => sync.delete("Reminder", reminder.id),
+              }),
+          },
+        ]}
+      />
+      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
+    </>
   );
 }

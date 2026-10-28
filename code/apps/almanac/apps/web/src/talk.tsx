@@ -5,7 +5,14 @@
 // say what it changed in one, with Undo.
 
 import type { Message, Proposal, Reminder, StartTopicRequest, Talk, Topic } from "@almanac/types";
-import { MoreMenu, messageOf, overlayOpen, UNKNOWN_PROBLEM } from "@code-villain/web";
+import {
+  type Confirmation,
+  ConfirmDialog,
+  MoreMenu,
+  messageOf,
+  overlayOpen,
+  UNKNOWN_PROBLEM,
+} from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -151,6 +158,7 @@ export function TalkPanel({
     [all, talkId],
   );
   const [text, setText] = useState(draft);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
   // What's on its way shows until the talk's records have it.
@@ -192,6 +200,7 @@ export function TalkPanel({
       aria-label="Talk"
       className="flex w-[min(26rem,45%)] shrink-0 flex-col border-l border-line bg-panel"
     >
+      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
       <div className="flex min-h-12 items-center gap-2 px-4">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-medium">{talk?.title || "New talk"}</h2>
@@ -219,12 +228,18 @@ export function TalkPanel({
             ...(talk
               ? [
                   {
-                    label: "Delete this talk",
+                    label: "Delete this talk…",
                     danger: true,
-                    onSelect: () => {
-                      sync.delete("Talk", talk.id);
-                      onOpen(null);
-                    },
+                    onSelect: () =>
+                      setConfirmation({
+                        title: `Delete ${talk.title ? `"${talk.title}"` : "this talk"}?`,
+                        body: "Its messages go for everyone in the workspace; what it kept stays on the page. This can't be undone.",
+                        action: "Delete talk",
+                        onConfirm: () => {
+                          sync.delete("Talk", talk.id);
+                          onOpen(null);
+                        },
+                      }),
                   },
                 ]
               : []),

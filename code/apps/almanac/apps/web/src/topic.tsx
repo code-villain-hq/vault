@@ -547,8 +547,10 @@ function Document({ topic, themes }: { topic: Topic; themes: Theme[] }) {
 function Points({ points }: { points: Point[] }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   return (
     <ul className="flex flex-col gap-1.5">
+      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
       {points.map((point) => (
         <li key={point.id} className="group flex items-start gap-2">
           {point.seen ? (
@@ -577,8 +579,15 @@ function Points({ points }: { points: Point[] }) {
           </p>
           {!guest && (
             <RowAction
-              label="Remove this point"
-              onClick={() => sync.delete("Point", point.id)}
+              label="Remove this point…"
+              onClick={() =>
+                setConfirmation({
+                  title: "Remove this point?",
+                  body: "It leaves the page for everyone in the workspace. This can't be undone.",
+                  action: "Remove point",
+                  onConfirm: () => sync.delete("Point", point.id),
+                })
+              }
               className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <X size={13} strokeWidth={1.75} aria-hidden="true" />
