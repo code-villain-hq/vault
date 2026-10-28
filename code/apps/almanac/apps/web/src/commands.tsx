@@ -1,6 +1,7 @@
 // What ⌘K offers in Almanac, and the "G" keys, in the shared menus of
 // `code/kit/web`: Calendar, the topics, a new topic, settings, workspaces,
 // and what the topics keep.
+import type { Point } from "@almanac/types";
 import { type Command, CommandMenu, type GoTo, matching, Shortcuts } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -182,6 +183,7 @@ function useKept(query: string): Command[] {
   const navigate = useNavigate();
   const topics = useTopics();
   const points = useRecords("Point");
+  const blocks = useRecords("Block");
   const reminders = useRecords("Reminder");
   const talks = useRecords("Talk");
   const messages = useRecords("Message");
@@ -192,6 +194,7 @@ function useKept(query: string): Command[] {
     const ws = workspace.url_key;
     const open = (topic: string, search: TopicSearch) => () =>
       void navigate({ to: "/$workspace/topics/$topic", params: { workspace: ws, topic }, search });
+    const you = new Set(blocks.filter((b) => b.kind === "you").map((b) => b.id));
     const said = new Map<string, string>();
     for (const m of messages) said.set(m.talk_id, `${said.get(m.talk_id) ?? ""} ${m.text}`);
     const thing = (
@@ -209,15 +212,18 @@ function useKept(query: string): Command[] {
       const sections = new Set(
         [...own.map((p) => p.theme), ...due.map((r) => r.theme ?? "")].filter(Boolean),
       );
-      // A point in a chip or a list is in no section: it opens the page.
+      // A point in a chip or a list is in no section: it opens the page;
+      // what the topic knows about you opens its About.
       const at = (theme: string) => open(topic.id, theme ? { section: theme } : {});
+      const of = (p: Point) =>
+        you.has(p.block_id) ? open(topic.id, { about: true }) : at(p.theme);
       return {
         topic,
         kept: [
           ...[...sections].map((theme) =>
             thing(`section-${topic.id}-${theme}`, FileText, theme, at(theme)),
           ),
-          ...own.map((p) => thing(`point-${p.id}`, Dot, plain(p.text), at(p.theme))),
+          ...own.map((p) => thing(`point-${p.id}`, Dot, plain(p.text), of(p))),
           ...due.map((r) => thing(`reminder-${r.id}`, Bell, r.title, at(r.theme ?? ""))),
           ...talks
             .filter((t) => t.topic_id === topic.id)
@@ -233,7 +239,7 @@ function useKept(query: string): Command[] {
         ],
       };
     });
-  }, [workspace, navigate, topics, points, reminders, talks, messages]);
+  }, [workspace, navigate, topics, points, blocks, reminders, talks, messages]);
 
   return useMemo(() => {
     const words = query.split(/\s+/).filter(Boolean);

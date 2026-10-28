@@ -81,15 +81,22 @@ topics.
   after what you wrote, which it keeps word for word; the icon, the
   group, the template when you left it to Almanac, and the first
   questions. The page doesn't show the brief, and lists show its first
-  sentence. Edit topic changes the name, the brief, the group and the
-  icon.
+  sentence.
+- **A topic's About**: the name at the top of its page opens it, as does
+  About in ⋯. The name, icon and group change where they are, with
+  nothing to save. What it sticks to shows whole, and changes in place:
+  ⌘↩ or clicking away keeps it, Esc drops it. What it knows about you is
+  a line per fact, with the talk it came from, and × takes one out: the
+  page doesn't show these. On the page lists the blocks, with ⋯ as on the
+  page; a block's name opens the page at it. The workspace's own topic
+  has only its name and what it sticks to.
 - **A topic is its blocks**, in order, with no page shape to pick: Today
   (the day's steps to tick off), Week, Chips, Shelf, Cards, Text, List and
-  Timeline,
-  each with a title of the topic's own ("You" in Haare, "Terms" in Marx).
+  Timeline, each with a title of the topic's own ("Advice" in Haare,
+  "Terms" in Marx), and You, what it knows about you, which About shows.
   A template only names the blocks a topic starts with: Routine has Today,
-  Week, You, Your shelf and Advice; Collection Today, Week and a card per
-  thing; Study Reading, Terms and What it says. ⋯ beside a block's title
+  Week, Your shelf and Advice; Collection Today, Week and a card per
+  thing; Study Reading, Terms and What it says; each has You. ⋯ beside a block's title
   moves it up or down, renames it or removes it with what it keeps. An
   empty block says in a line what will be there, and a topic with nothing
   kept yet offers its first questions.
@@ -122,7 +129,8 @@ topics.
   name opens it where the page was, with the talk still beside it:
   everything kept under it from every block, its events, its open
   questions and the talks it came from. Asking from there asks about
-  that section. Esc goes back to where you were on the page.
+  that section. A button above its title goes back to the topic, as do
+  the breadcrumb and Esc, to where you were on the page.
 - **A timeline per section**: a section's page starts with what happened
   when, oldest first, a line each. A span such as 1987–1993 gets a longer
   mark, and a day such as 11. September 2001 shows before its event. It's
@@ -141,7 +149,8 @@ topics.
 - **⌘K searches what the topics keep**: sections, points, reminders and
   talks, the talks' messages too, with every word you type in any order.
   Up to five a topic show under its name; a point opens its section's
-  page, and a talk opens beside its topic.
+  page, a fact about you the topic's About, and a talk opens beside its
+  topic.
 - **Almanac asks when it's unsure**: the question waits on the card it's
   about, with Add it and Leave it out. A question it asks in the talk
   waits for your reply there.
@@ -205,6 +214,9 @@ Open them in a browser. Each shows night and day.
 - [`storyboards/the-page-fills-the-window.html`](storyboards/the-page-fills-the-window.html):
   Preise finden's cards across the window, Geschichte's lines at their
   length, and the sidebar dragged wider.
+- [`storyboards/a-topics-about.html`](storyboards/a-topics-about.html):
+  Haar-Routine without You on its page, its About, and the button back
+  from a section.
 
 ## Open
 

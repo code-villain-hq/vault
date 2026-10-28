@@ -131,27 +131,35 @@ pub const KINDS: &[&str] = &["topic", "almanac"];
 /// `week` the days of the topic's reminders, and no points; `chips` short
 /// facts; `shelf` a tile per thing they use (its theme); `cards` a card per
 /// theme; `text` a section per theme; `list` one line each; `timeline` what
-/// happened when, oldest first, each under the section it belongs to.
+/// happened when, oldest first, each under the section it belongs to; `you`
+/// what the topic knows about them, a fact each, which the topic's About
+/// shows and its page doesn't.
 pub const BLOCK_KINDS: &[&str] = &[
-    "today", "week", "chips", "shelf", "cards", "text", "list", "timeline",
+    "today", "week", "chips", "shelf", "cards", "text", "list", "timeline", "you",
 ];
 
 /// The blocks a topic starts with, each its kind and title. A collection's
-/// cards are named for what they are ("Plants") when Almanac knows.
+/// cards are named for what they are ("Plants") when Almanac knows. Each
+/// ends with You, for what it learns about them, which only About shows.
 pub const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
     (
         "routine",
         &[
             ("today", "Today"),
             ("week", ""),
-            ("chips", "You"),
             ("shelf", "Your shelf"),
             ("list", "Advice"),
+            ("you", "You"),
         ],
     ),
     (
         "collection",
-        &[("today", "Today"), ("week", ""), ("cards", "Notes")],
+        &[
+            ("today", "Today"),
+            ("week", ""),
+            ("cards", "Notes"),
+            ("you", "You"),
+        ],
     ),
     (
         "study",
@@ -159,6 +167,7 @@ pub const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
             ("list", "Reading"),
             ("chips", "Terms"),
             ("text", "What it says"),
+            ("you", "You"),
         ],
     ),
 ];
@@ -221,7 +230,7 @@ pub struct Point {
     pub topic_id: Uuid,
     pub block_id: Uuid,
     /// The card, tile, section or routine it's under: a plant, a shampoo.
-    /// Empty in chips and lists.
+    /// Empty in chips, lists and you.
     pub theme: String,
     pub text: String,
     /// When it happened, on a timeline: a year ("1959"), a span

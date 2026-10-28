@@ -152,7 +152,7 @@ impl Kept {
                     title_of(&placed)
                 ));
             }
-            "chips" | "list" => String::new(),
+            "chips" | "list" | "you" => String::new(),
             _ => {
                 let theme = cut(theme, 120);
                 if theme.is_empty() {
@@ -809,7 +809,7 @@ mod tests {
 
     #[test]
     fn sorting_a_page_keeps_each_point_in_its_block() {
-        let (today, you) = (block("today", "Today"), block("chips", "You"));
+        let (today, you) = (block("today", "Today"), block("you", "You"));
         let notes = block("cards", "Notes");
         let ids: Vec<Uuid> = (0..12).map(|_| Uuid::now_v7()).collect();
         let mut kept = Kept::on(Refs {
@@ -859,7 +859,7 @@ mod tests {
             Operation::Create { data, .. }
                 if data["block_id"] == json!(today.id) && data["theme"] == json!("Elvital wash")
         ));
-        // A chip has no theme.
+        // A fact about them has no theme.
         assert!(matches!(
             &operations[0],
             Operation::Update { id, data, .. }

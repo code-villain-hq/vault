@@ -1,16 +1,13 @@
-// Changing what Almanac picked for a topic: its name, what it sticks to,
-// its group and its icon. The same form changes a topic Almanac proposes,
-// before it starts, and the template its blocks start from.
+// Changing a topic Almanac proposes, before it starts: its name, what it
+// sticks to, its group, its icon and the template its blocks start from. A
+// topic that has started changes on its About.
 
-import type { Topic } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
 import { CreateDialog, messageOf } from "@code-villain/web";
 import { BookOpen, CalendarDays, type LucideIcon, Sparkles, Sprout } from "lucide-react";
 import { useState } from "react";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
-import { isOwn } from "./layout";
 import { Button, ErrorMessage } from "./ui";
-import { useWorkspace } from "./workspace";
 
 /** What the form changes. */
 export interface TopicFields {
@@ -33,7 +30,7 @@ const TEMPLATES: { value: string; label: string; blocks: string; Icon: LucideIco
   {
     value: "routine",
     label: "Routine",
-    blocks: "Today · Week · You · Shelf · Advice",
+    blocks: "Today · Week · Shelf · Advice",
     Icon: CalendarDays,
   },
   { value: "collection", label: "Collection", blocks: "Today · Week · Cards", Icon: Sprout },
@@ -79,41 +76,16 @@ export function StartsAs({
   );
 }
 
-export function TopicDialog({ topic, onClose }: { topic: Topic; onClose: () => void }) {
-  const { sync } = useWorkspace();
-  // The workspace's own topic keeps its icon and its place above Calendar.
-  const own = isOwn(topic);
-  return (
-    <TopicForm
-      heading={`Edit ${topic.name}`}
-      action="Save"
-      fields={topic}
-      own={own}
-      onSave={(fields) =>
-        sync.update(
-          "Topic",
-          topic.id,
-          own ? { name: fields.name, sticks_to: fields.sticks_to } : fields,
-        )
-      }
-      onClose={onClose}
-    />
-  );
-}
-
 export function TopicForm({
   heading,
   action,
   fields,
-  own = false,
   onSave,
   onClose,
 }: {
   heading: string;
   action: string;
   fields: TopicFields;
-  /** Only the name and what it sticks to. */
-  own?: boolean;
   /** Saves the fields, trimmed; what it throws is shown. */
   onSave: (fields: TopicFields) => unknown;
   onClose: () => void;
@@ -177,51 +149,44 @@ export function TopicForm({
             <textarea
               value={sticksTo}
               onChange={(e) => setSticksTo(e.target.value)}
-              rows={own ? 3 : 10}
+              rows={10}
               className={`${field} resize-none py-2 leading-relaxed`}
             />
-            {!own && (
-              <span className="text-xs text-faint">
-                What it's about and how it answers. Almanac adds to it when you tell it how to
-                answer.
-              </span>
-            )}
+            <span className="text-xs text-faint">
+              What it's about and how it answers. Almanac adds to it when you tell it how to answer.
+            </span>
           </label>
-          {!own && (
-            <>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted">Group</span>
-                <input
-                  value={group}
-                  onChange={(e) => setGroup(e.target.value)}
-                  placeholder="Home"
-                  className={`${field} h-9`}
-                />
-              </label>
-              {template !== undefined && <StartsAs value={template} onChange={setTemplate} />}
-              <fieldset className="flex flex-col gap-1.5">
-                <legend className="mb-1.5 text-xs font-medium text-muted">Icon</legend>
-                <div className="flex flex-wrap gap-1">
-                  {TOPIC_ICON_NAMES.map((name) => {
-                    const Icon = topicIcon(name);
-                    return (
-                      <button
-                        key={name}
-                        type="button"
-                        aria-label={name}
-                        title={name}
-                        aria-pressed={icon === name}
-                        onClick={() => setIcon(name)}
-                        className="ui-button ui-icon-button aria-pressed:bg-selected"
-                      >
-                        <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            </>
-          )}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted">Group</span>
+            <input
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              placeholder="Home"
+              className={`${field} h-9`}
+            />
+          </label>
+          {template !== undefined && <StartsAs value={template} onChange={setTemplate} />}
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-xs font-medium text-muted">Icon</legend>
+            <div className="flex flex-wrap gap-1">
+              {TOPIC_ICON_NAMES.map((name) => {
+                const Icon = topicIcon(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-label={name}
+                    title={name}
+                    aria-pressed={icon === name}
+                    onClick={() => setIcon(name)}
+                    className="ui-button ui-icon-button aria-pressed:bg-selected"
+                  >
+                    <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
           <ErrorMessage>{problem}</ErrorMessage>
         </div>
         <div className="flex items-center justify-end gap-2 px-4 pb-4">

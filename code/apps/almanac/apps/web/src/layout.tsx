@@ -121,10 +121,17 @@ export function isOwn(topic: Topic) {
   return topic.kind === "almanac";
 }
 
-/** The topics with points not read yet, by id. */
+/**
+ * The topics with points not read yet, by id: on their page, not what they
+ * learn about you, which About shows.
+ */
 export function useUnread(): Set<string> {
   const points = useRecords("Point");
-  return useMemo(() => new Set(points.filter((p) => !p.seen).map((p) => p.topic_id)), [points]);
+  const blocks = useRecords("Block");
+  return useMemo(() => {
+    const you = new Set(blocks.filter((b) => b.kind === "you").map((b) => b.id));
+    return new Set(points.filter((p) => !p.seen && !you.has(p.block_id)).map((p) => p.topic_id));
+  }, [points, blocks]);
 }
 
 /**

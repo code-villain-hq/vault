@@ -702,7 +702,8 @@ const BRIEF_SAYS: &str = "The topic's brief, which every talk in it follows: fir
 about, in a sentence or two (\"Houseplants and their care: watering, light, repotting.\"), then, \
 a line each, how it answers: in which language, the tone and the length, what it brings in, what \
 it checks, and what it leaves to other topics. Fit it to the topic, with nothing every topic \
-does anyway: usually 400 to 1,200 characters. The page doesn't show it.";
+does anyway: usually 400 to 1,200 characters. The page doesn't show it, only the topic's \
+About.";
 
 /// When a timeline's point happened, for the tools that keep one.
 const HAPPENED_SAYS: &str = "Only on a timeline: when it happened, as a year (1959), a span \
@@ -712,10 +713,11 @@ Left out elsewhere.";
 /// The templates a topic starts as, for the tools that pick one.
 const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
 keep, with steps on certain days and the things they use (a hair or skin routine, a training \
-plan): Today, the week, You, Your shelf and Advice. collection when it's about a set of things \
+plan): Today, the week, Your shelf and Advice. collection when it's about a set of things \
 that each get a card (plants, pets, trips, recipes): Today, the week and the cards. study when \
 it's something to learn or write up (a field, a pitch, research): Reading, Terms and What it \
-says. When they picked one, theirs.";
+says. Each also has You, for what it learns about them, which only its About shows. When they \
+picked one, theirs.";
 
 /// The tools a question gets, with what each is for.
 fn tools(mode: Mode) -> Vec<Value> {
@@ -778,7 +780,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                 json!({
                     "block": string("The block it goes in: as the page names it (b2), or its title. For a new block, its title."),
                     "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Only for a block the page lacks: the kind it starts as. Left out otherwise." },
-                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf or cards, the section in text and on a timeline. Left out in chips and lists."),
+                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf or cards, the section in text and on a timeline. Left out in chips, lists and you."),
                     "text": string("The point: in text two to four sentences that explain; on a timeline one line on what happened; elsewhere one short sentence or a few words."),
                     "happened": string(HAPPENED_SAYS),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
@@ -870,7 +872,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                             "properties": {
                                 "point": string("The point, as the page names it (p3)."),
                                 "block": string("The block it goes to: as the page names it (b2), or the title of a new block in blocks. Left out, it stays in its block."),
-                                "theme": string("Its theme in the block it ends in, as that block's kind asks. Left out, it keeps its own; chips and lists have none."),
+                                "theme": string("Its theme in the block it ends in, as that block's kind asks. Left out, it keeps its own; chips, lists and you have none."),
                                 "text": string("Only when it's reworded to fit its new place: the point, with every fact it had."),
                                 "happened": string(HAPPENED_SAYS),
                             },
@@ -921,7 +923,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "block": string("The template's block it goes in, by title: in a routine You (a fact about them), Your shelf (a thing they use), Today (a step of what comes round) or Advice; in a collection the cards; in a study Reading, Terms or What it says."),
+                                "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Your shelf (a thing they use), Today (a step of what comes round) or Advice; in a collection the cards; in a study Reading, Terms or What it says."),
                                 "theme": string("What it's under in the block: the thing on the shelf or card, what comes round today, the section. Left out for You, Advice, Reading and Terms."),
                                 "text": string("The point, one short sentence."),
                             },

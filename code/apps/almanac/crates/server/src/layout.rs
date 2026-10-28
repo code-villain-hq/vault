@@ -229,6 +229,16 @@ pub fn lay_out(
             return Err(format!("{named} is in blocks twice."));
         }
         let block = &now.blocks[was];
+        // What they told you about themselves stays off the page, on About.
+        if !kind.is_empty() && (kind == "you") != (block.kind == "you") {
+            return Err(if block.kind == "you" {
+                format!(
+                    "{named} is what they told you about themselves, on the topic's About: it stays a you block."
+                )
+            } else {
+                format!("{named} is on the page: move what's about them to the you block instead.")
+            });
+        }
         placed.push(Placed {
             id,
             kind: if kind.is_empty() {
@@ -243,6 +253,18 @@ pub fn lay_out(
             },
             was: Some(was),
         });
+    }
+    // What they told you about themselves isn't on the page: a layout that
+    // leaves it out keeps it as it is, last.
+    for (was, block) in now.blocks.iter().enumerate() {
+        if block.kind == "you" && !placed.iter().any(|p| p.id == block.id) {
+            placed.push(Placed {
+                id: block.id,
+                kind: block.kind.clone(),
+                title: block.title.clone(),
+                was: Some(was),
+            });
+        }
     }
 
     let target = |named: &str| -> Result<Uuid, String> {
@@ -363,7 +385,7 @@ pub fn lay_out(
                     point.name
                 ));
             }
-            "chips" | "list" => {
+            "chips" | "list" | "you" => {
                 point.theme.clear();
                 point.happened.clear();
             }
@@ -674,7 +696,7 @@ fn holds(kind: &str, points: &[&Moving]) -> String {
     let count = points.len();
     let mut said = match kind {
         "week" => "the days of its reminders".to_string(),
-        "chips" | "list" => match count {
+        "chips" | "list" | "you" => match count {
             1 => "a point".into(),
             n => format!("{n} points"),
         },
@@ -1136,6 +1158,42 @@ mod tests {
             _ => None,
         });
         assert_eq!(theme, Some(&json!("")));
+    }
+
+    #[test]
+    fn what_they_told_about_themselves_stays_on_about() {
+        let (now, refs) = page(&[
+            ("chips", "Terms", &[]),
+            ("you", "You", &[("", "Low porosity")]),
+        ]);
+        let lay = |blocks| {
+            lay_out(
+                Uuid::now_v7(),
+                "Haare",
+                &refs,
+                &now,
+                args(blocks, Vec::new()),
+            )
+        };
+        let kept = lay(vec![block("b2", "chips", ""), block("b1", "", "")]).unwrap_err();
+        assert!(kept.contains("stays a you block"), "{kept}");
+        let moved = lay(vec![block("b1", "you", ""), block("b2", "", "")]).unwrap_err();
+        assert!(moved.contains("move what's about them"), "{moved}");
+        assert!(lay(vec![block("b2", "", "Du"), block("b1", "", "")]).is_ok());
+
+        // Left out, it stays, with what it keeps.
+        let laid = lay(vec![block("b1", "", "Begriffe")]).unwrap();
+        let you = now.blocks[1].id;
+        assert!(!laid.operations.iter().any(|o| matches!(
+            o,
+            Operation::Delete { model: ModelKind::Block, id } if *id == you
+        )));
+        let moved: Vec<&str> = layout_of(&laid)
+            .moves
+            .iter()
+            .map(|m| m.block.as_str())
+            .collect();
+        assert_eq!(moved, vec!["Begriffe"]);
     }
 
     #[test]

@@ -44,17 +44,19 @@ sentence or two (\"Houseplants and their care: watering, light, repotting.\"). T
 each, how it answers: in which language, the tone and the length, what it brings in (sources, \
 perspectives, what photos show), what it checks before it answers, and what it leaves to other \
 topics. Fit it to this topic, with nothing every topic does anyway. Usually 400 to 1,200 \
-characters, never more than 4,000. The page doesn't show it: it's for the answers. When they \
-wrote some, keep all of theirs, word for word, at the start, and write the rest after it.
+characters, never more than 4,000. It's for the answers: the page doesn't show it, only the \
+topic's About. When they wrote some, keep all of theirs, word for word, at the start, and \
+write the rest after it.
 - icon: the one icon from the list that fits best.
 - group: a short group for the sidebar, such as Home, Work, Health or Learning. Reuse one of \
 the existing groups when it fits.
 - template: the blocks its page starts with. \"routine\" when it's a routine they keep, with \
 steps on certain days and the things they use (a hair or skin routine, a training plan): \
-Today, the week, You, Your shelf and Advice. \"collection\" when it's about a set of things \
+Today, the week, Your shelf and Advice. \"collection\" when it's about a set of things \
 that each get a card (plants, pets, trips, recipes): Today, the week and the cards. \"study\" \
 when it's something to learn or write up (a field, a pitch, research): Reading, Terms and What \
-it says. When they picked one, return theirs.
+it says. Each also has You, for what it learns about them, which only its About shows. When \
+they picked one, return theirs.
 - cards: for a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); \
 otherwise \"\".
 - starters: three or four first questions they might ask to begin, each under 12 words.
@@ -178,7 +180,7 @@ pub async fn start(
                 continue;
             };
             let theme = match block.kind {
-                "chips" | "list" => String::new(),
+                "chips" | "list" | "you" => String::new(),
                 _ if point.theme.trim().is_empty() => block.title.clone(),
                 _ => cut(&point.theme, 120),
             };
@@ -502,7 +504,7 @@ fn block_for<'a>(blocks: &'a [Started], named: Option<&str>) -> Option<&'a Start
         .iter()
         .find(|b| b.kind != "week" && !named.is_empty() && b.title.to_lowercase() == named)
         .or_else(|| {
-            ["cards", "text", "chips", "list", "shelf", "today"]
+            ["cards", "text", "you", "chips", "list", "shelf", "today"]
                 .iter()
                 .find_map(|kind| blocks.iter().find(|b| b.kind == *kind))
         })

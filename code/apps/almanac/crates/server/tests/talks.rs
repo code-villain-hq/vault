@@ -134,7 +134,8 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     let plants = topics.iter().find(|t| t["name"] == "Pflanzen").unwrap();
     assert_eq!(plants["kind"], "topic");
     assert_eq!(plants["group_name"], "Home");
-    // Its page starts as the template Claude picked, the cards named.
+    // Its page starts as the template Claude picked, the cards named, and
+    // You for About.
     let blocks = app.synced(&ada, &home, "Block").await;
     let mut blocks: Vec<_> = blocks
         .iter()
@@ -147,7 +148,12 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
         .collect();
     assert_eq!(
         laid_out,
-        [("today", "Today"), ("week", ""), ("cards", "Pflanzen")]
+        [
+            ("today", "Today"),
+            ("week", ""),
+            ("cards", "Pflanzen"),
+            ("you", "You")
+        ]
     );
     assert_eq!(
         plants["sticks_to"],

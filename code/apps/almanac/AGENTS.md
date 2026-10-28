@@ -139,7 +139,9 @@ What they do:
   `shelf` a tile per thing, `cards` a card per theme, `text` sections,
   `list` lines and `timeline` events, oldest first, each with when it
   `happened` (a year, a span or a day, which the app reads in
-  `timeline.ts`). The topic page's timeline is a line per section, when
+  `timeline.ts`); `you` what they told about themselves, which the
+  topic's About shows and its page doesn't. A layout never turns a block
+  into `you` or out of it. The topic page's timeline is a line per section, when
   its events begin and end (`bySection`); a section's page lists its
   events first. When none fits, an answer may start up to two blocks, with
   a kind and a title; a reminder offer brings a week when the page has
@@ -204,8 +206,8 @@ them into notifications. A server with no Mac listening marks nothing.
   desktop app's own Almanac, who signs in to nothing.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `layout.tsx` is the sidebar,
-  `topic.tsx` a topic's page, and a section's own (`?section=`, what's
-  kept under that theme from every block), `talk.tsx` the talk beside it,
+  `topic.tsx` a topic's page, a section's own (`?section=`, what's
+  kept under that theme from every block) and its About (`?about`), `talk.tsx` the talk beside it,
   `asking.tsx` the answers on their way and each topic's open talk (above
   the pages, so they last while you look elsewhere), `calendar.tsx`
   Calendar, `settings.tsx` Settings → Claude. Its workspaces come from

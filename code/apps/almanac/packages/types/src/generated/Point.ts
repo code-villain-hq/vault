@@ -7,7 +7,7 @@
 export type Point = { id: string, workspace_id: string, topic_id: string, block_id: string, 
 /**
  * The card, tile, section or routine it's under: a plant, a shampoo.
- * Empty in chips and lists.
+ * Empty in chips, lists and you.
  */
 theme: string, text: string, 
 /**

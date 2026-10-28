@@ -303,7 +303,7 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
             .collect()
     };
     let before = app.synced(&ada, &home, "Block").await;
-    assert_eq!(titles(&before), ["Today", "", "Plants"]);
+    assert_eq!(titles(&before), ["Today", "", "Plants", "You"]);
     let plants = before.iter().find(|b| b["title"] == "Plants").unwrap()["id"].clone();
 
     // Asked from the Monstera's section, the question is about it.
@@ -337,8 +337,8 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
     let after = app.synced(&ada, &home, "Block").await;
     assert_eq!(
         titles(&after),
-        ["Today", "", "Facts"],
-        "the emptied block goes"
+        ["Today", "", "Facts", "You"],
+        "the emptied block goes, and You, left out, stays"
     );
     let facts = after.iter().find(|b| b["title"] == "Facts").unwrap()["id"].clone();
     let points = app.synced(&ada, &home, "Point").await;
@@ -360,7 +360,7 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
         .await;
     assert!(undone.status.is_success(), "{}", undone.body);
     let back = app.synced(&ada, &home, "Block").await;
-    assert_eq!(titles(&back), ["Today", "", "Plants"]);
+    assert_eq!(titles(&back), ["Today", "", "Plants", "You"]);
     assert!(back.iter().any(|b| b["id"] == plants), "the same block");
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points.len(), 1);

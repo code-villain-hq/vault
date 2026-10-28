@@ -251,7 +251,12 @@ today, the steps of what comes round on the day: the theme is what comes round, 
 its reminders are (\"Elvital wash\"), and each point says what, a colon, then how (\"Elvital \
 shampoo: on the scalp, lukewarm water\"), in the order they're done; \
 week, the days of the topic's reminders, which keeps no points: offer a reminder instead; \
-chips, facts in a few words (\"Low porosity, by the float test\"), with no theme; \
+chips, facts about what the topic is about, in a few words (\"Epiphyte: grows on other \
+plants\"), with no theme; \
+you, what they told you about themselves that your answers go by (\"Low porosity, by the \
+float test\", \"The balcony faces north\"), a fact each in a few words, with no theme: it \
+isn't on the page but on the topic's About, so keep there what you learn about them, not \
+on the page, and a layout leaves it a you block; \
 shelf, a tile for each thing they use, the thing's name as the theme (\"Elvital Hyaluron \
 Plump\"): its first point says what it is in two or three words (\"Shampoo and \
 conditioner\"), its second how they use it, any more are notes; \

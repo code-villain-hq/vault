@@ -1,25 +1,31 @@
-// A topic's page: what it sticks to, then its blocks in order, each laying
-// out what it keeps one way (the day's steps, the week, chips, a shelf,
-// cards, text, a list or a timeline), the questions it waits on, and the
-// talk beside it. A section opens on a page of its own, in the page's
-// place. The workspace's own topic, Almanac, has the index of the others
+// A topic's page: its blocks in order, each laying out what it keeps one
+// way (the day's steps, the week, chips, a shelf, cards, text, a list or a
+// timeline), the questions it waits on, and the talk beside it. A section
+// opens on a page of its own, in the page's place, and so does the topic's
+// About: its name, what it sticks to, what it knows about you and its
+// blocks. The workspace's own topic, Almanac, has the index of the others
 // for its page.
 
 import type { Block, ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
+import { Menu } from "@base-ui/react/menu";
+import { Popover } from "@base-ui/react/popover";
 import type { SyncClient } from "@code-villain/sync-client";
 import {
   type Confirmation,
   ConfirmDialog,
   CreateDialog,
+  focusBackAfterKeys,
   MoreMenu,
   overlayOpen,
   RowAction,
   useApi,
 } from "@code-villain/web";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -41,6 +47,7 @@ import { type Asking, useTopicTalks } from "./asking";
 import {
   addDays,
   ago,
+  dateWords,
   dayKey,
   dueWords,
   fromKey,
@@ -51,7 +58,7 @@ import {
   weekOf,
   weekWords,
 } from "./format";
-import { topicIcon } from "./icons";
+import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
 import type { Picked } from "./photos";
 import {
@@ -68,19 +75,24 @@ import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
 import { bySection, inOrder, type When, when } from "./timeline";
-import { TopicDialog } from "./topic-dialog";
 import { Button, Empty } from "./ui";
 import { useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
  * `?talk=` opens the talk panel (`new` for a new talk); `?ask=` starts it
  * with a question; `?section=` opens a section, by its theme, in the page's
- * place.
+ * place, and `?about` the topic's About.
  */
 export interface TopicSearch {
   talk?: string;
   ask?: string;
   section?: string;
+  about?: true;
+}
+
+/** What's open in the page's place: a section, About, or the page. */
+function placeOf(search: TopicSearch): TopicSearch {
+  return search.section ? { section: search.section } : search.about ? { about: true } : {};
 }
 
 /** The search that opens `section` (none: the page), keeping the open talk. */
@@ -91,12 +103,14 @@ function inSection(section: string | undefined) {
   });
 }
 
+/** The search that opens the topic's About, keeping the open talk. */
+function inAbout(prev: TopicSearch): TopicSearch {
+  return { ...(prev.talk ? { talk: prev.talk } : {}), about: true };
+}
+
 /** The search that opens a talk beside what's open. */
 function withTalk(talk: string) {
-  return (prev: TopicSearch): TopicSearch => ({
-    ...(prev.section ? { section: prev.section } : {}),
-    talk,
-  });
+  return (prev: TopicSearch): TopicSearch => ({ ...placeOf(prev), talk });
 }
 
 /** What a theme holds: its points, the questions about it, its reminders. */
@@ -124,7 +138,7 @@ export function TopicPage() {
       void navigate({
         to: ".",
         search: (prev: TopicSearch) =>
-          shown === undefined ? inSection(prev.section)({}) : withTalk(shown)(prev),
+          shown === undefined ? placeOf(prev) : withTalk(shown)(prev),
         replace: true,
       });
     },
@@ -160,6 +174,7 @@ export function TopicPage() {
       key={topic.id}
       topic={topic}
       section={section}
+      about={!section && search.about === true}
       panel={shown !== undefined}
       talkId={talkId}
       draft={search.ask ?? ""}
@@ -176,6 +191,7 @@ export function TopicPage() {
 function TopicView({
   topic,
   section,
+  about,
   panel,
   talkId,
   draft,
@@ -186,6 +202,8 @@ function TopicView({
   topic: Topic;
   /** The section open in the page's place. */
   section: string | undefined;
+  /** The topic's About, in the page's place. */
+  about: boolean;
   panel: boolean;
   talkId: string | null;
   draft: string;
@@ -196,7 +214,6 @@ function TopicView({
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const talks = useTalks(topic.id);
-  const [editing, setEditing] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
@@ -205,30 +222,34 @@ function TopicView({
   const bar = useRef<HTMLInputElement>(null);
   const picking = usePicking(() => bar.current?.focus());
   const drop = useDrop(picking);
-  // The page keeps where it was scrolled to while a section is open.
+  // The page keeps where it was scrolled to while a section or About is
+  // open; About's blocks open it at one (`#block-…`).
+  const place = section ? `section ${section}` : about ? "about" : "page";
+  const { hash } = useLocation();
   const scroller = useRef<HTMLDivElement>(null);
   const scrolled = useRef(new Map<string, number>());
   useLayoutEffect(() => {
-    if (scroller.current) scroller.current.scrollTop = scrolled.current.get(section ?? "") ?? 0;
-  }, [section]);
-  // Esc goes back from a section to the page, once the talk is closed.
+    if (scroller.current) scroller.current.scrollTop = scrolled.current.get(place) ?? 0;
+    if (hash) document.getElementById(hash)?.scrollIntoView({ block: "start" });
+  }, [place, hash]);
+  // Esc goes back from a section or About to the page, once the talk is closed.
   useEffect(() => {
-    if (!section || panel) return;
+    if (place === "page" || panel) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || overlayOpen()) return;
+      if (event.key !== "Escape" || event.defaultPrevented || overlayOpen()) return;
       event.preventDefault();
       void navigate({ to: ".", search: inSection(undefined) });
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [section, panel, navigate]);
+  }, [place, panel, navigate]);
 
   return (
     <>
       <PageHeader
-        title={section ?? topic.name}
+        title={section ?? (about ? "About" : topic.name)}
         parent={
-          section && (
+          (section || about) && (
             <>
               {workspace.name}
               <span aria-hidden="true" className="text-faint">
@@ -255,7 +276,14 @@ function TopicView({
           <MoreMenu
             label="More for this topic"
             items={[
-              { label: "Edit topic…", onSelect: () => setEditing(true) },
+              ...(about
+                ? []
+                : [
+                    {
+                      label: `About ${topic.name}`,
+                      onSelect: () => void navigate({ to: ".", search: inAbout }),
+                    },
+                  ]),
               // The workspace's own topic stays; you can rename it.
               ...(isOwn(topic)
                 ? []
@@ -286,11 +314,13 @@ function TopicView({
         <div className="relative flex min-w-0 flex-1 flex-col" {...(panel ? {} : drop.handlers)}>
           <div
             ref={scroller}
-            onScroll={(e) => scrolled.current.set(section ?? "", e.currentTarget.scrollTop)}
+            onScroll={(e) => scrolled.current.set(place, e.currentTarget.scrollTop)}
             className="page-content min-h-0 flex-1 overflow-y-auto"
           >
             <div className="flex flex-col gap-8 px-6 py-6 sm:px-10">
-              {isOwn(topic) ? (
+              {about ? (
+                <AboutPageBody topic={topic} />
+              ) : isOwn(topic) ? (
                 <OwnPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
               ) : section ? (
                 <SectionPageBody topic={topic} section={section} />
@@ -323,7 +353,6 @@ function TopicView({
           />
         )}
       </div>
-      {editing && <TopicDialog topic={topic} onClose={() => setEditing(false)} />}
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </>
   );
@@ -380,8 +409,16 @@ function usePage(topic: Topic): PageParts {
   }, [blocks, points, questions, reminders, topic.id]);
 }
 
+/** What the page shows: all but what it knows about you, which About shows. */
+function onThePage(page: PageParts): PageParts {
+  const shown = page.blocks.filter((b) => b.kind !== "you");
+  const ids = new Set(shown.map((b) => b.id));
+  return { ...page, blocks: shown, points: page.points.filter((p) => ids.has(p.block_id)) };
+}
+
 function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
-  const page = usePage(topic);
+  const all = usePage(topic);
+  const page = useMemo(() => onThePage(all), [all]);
   const homes = useMemo(() => questionHomes(page), [page]);
   // The shelf's tiles say which days each thing is used on.
   const routines = useMemo(() => {
@@ -395,7 +432,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
 
   return (
     <>
-      <p className="text-title font-semibold">{topic.name}</p>
+      <TitleToAbout topic={topic} />
       <NoKey />
       {loose.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
@@ -425,6 +462,40 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
       ))}
       {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
+  );
+}
+
+/** The page's title, the topic's name, which opens its About. */
+function TitleToAbout({ topic }: { topic: Topic }) {
+  return (
+    <Link
+      to="."
+      search={inAbout}
+      title={`About ${topic.name}`}
+      className="group/name inline-flex min-w-0 items-center gap-1 self-start text-title font-semibold"
+    >
+      {topic.name}
+      <ChevronRight
+        size={18}
+        strokeWidth={1.75}
+        aria-hidden="true"
+        className="shrink-0 text-faint group-hover/name:text-muted"
+      />
+    </Link>
+  );
+}
+
+/** Back to the topic's page, above the title of a section's page and of About. */
+function BackTo({ topic }: { topic: Topic }) {
+  return (
+    <Link
+      to="."
+      search={inSection(undefined)}
+      className="ui-button -mb-5 -ml-2 gap-1.5 self-start px-2 text-xs text-muted"
+    >
+      <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+      {topic.name}
+    </Link>
   );
 }
 
@@ -467,6 +538,7 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
   }
   return (
     <>
+      <BackTo topic={topic} />
       <p className="text-title font-semibold">{section}</p>
       {reminders.length > 0 && <Dates reminders={reminders} />}
       {questions.length > 0 && (
@@ -520,6 +592,460 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
         </section>
       )}
     </>
+  );
+}
+
+/**
+ * A topic's About: what makes it answer as it does. Its name, icon and
+ * group, each changed where it is; what it sticks to, whole; what it knows
+ * about you, a fact a line with the talk it came from; and its page's
+ * blocks. The workspace's own topic has only its name and what it sticks to.
+ */
+function AboutPageBody({ topic }: { topic: Topic }) {
+  const own = isOwn(topic);
+  const page = usePage(topic);
+  const talks = useTalks(topic.id);
+  const blocks = page.blocks.filter((b) => b.kind !== "you");
+  const you = new Set(page.blocks.filter((b) => b.kind === "you").map((b) => b.id));
+  const facts = page.points.filter((p) => you.has(p.block_id));
+  const points = page.points.length;
+  return (
+    <>
+      <BackTo topic={topic} />
+      {own ? (
+        <TopicName topic={topic} />
+      ) : (
+        <div className="flex items-center gap-3">
+          <TopicIcon topic={topic} />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <TopicName topic={topic} />
+            <div className="flex items-center gap-2.5">
+              <TopicGroup topic={topic} />
+              <span className="text-xs text-faint">
+                Started {onDay(topic.created_at)} · {points} {points === 1 ? "point" : "points"} ·{" "}
+                {talks.length} {talks.length === 1 ? "talk" : "talks"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      <Brief topic={topic} />
+      {!own && <Facts topic={topic} facts={facts} />}
+      {!own && blocks.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="On the page">
+          <h2 className="text-xs text-faint">On the page</h2>
+          <ul className={`flex flex-col ${LINES}`}>
+            {blocks.map((block) => (
+              <li
+                key={block.id}
+                className="group/row flex min-h-8 items-center gap-4 rounded-md px-2.5 py-0.5 hover:bg-hover"
+              >
+                <Link
+                  to="."
+                  search={inSection(undefined)}
+                  hash={`block-${block.id}`}
+                  className="min-w-0 truncate"
+                >
+                  {blockName(block)}
+                </Link>
+                <span className="ml-auto shrink-0 text-xs text-faint">{holds(block, page)}</span>
+                <BlockMenu
+                  block={block}
+                  blocks={blocks}
+                  className="-mr-1.5 group-hover/row:opacity-100"
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** "Oct 3": the day of an ISO time, in the reader's time zone. */
+function onDay(at: string): string {
+  return dateWords(dayKey(new Date(at)));
+}
+
+/** How About names a block's kind, and what it counts: one, many. */
+const HOLDS: Record<string, [kind: string, one: string, many: string]> = {
+  today: ["Today", "step", "steps"],
+  week: ["", "reminder", "reminders"],
+  chips: ["Chips", "point", "points"],
+  shelf: ["Shelf", "thing", "things"],
+  cards: ["Cards", "card", "cards"],
+  text: ["Text", "section", "sections"],
+  list: ["List", "point", "points"],
+  timeline: ["Timeline", "event", "events"],
+};
+
+/** What a block holds, for its line on About: "Shelf · 3 things", "3 reminders". */
+function holds(block: Block, page: PageParts): string {
+  const points = page.points.filter((p) => p.block_id === block.id);
+  const [kind, one, many] = HOLDS[block.kind] ?? ["", "point", "points"];
+  // The week counts its reminders; cards and text, their themes.
+  const count =
+    block.kind === "week"
+      ? page.reminders.length
+      : block.kind === "cards" || block.kind === "text"
+        ? new Set(points.map((p) => p.theme)).size
+        : points.length;
+  const amount = count ? `${count} ${count === 1 ? one : many}` : "nothing yet";
+  // A block titled by its kind says it once.
+  return kind && kind !== blockName(block) ? `${kind} · ${amount}` : amount;
+}
+
+/** The topic's name, changed where it is: Enter or clicking away keeps it, Esc drops it. */
+function TopicName({ topic }: { topic: Topic }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const [draft, setDraft] = useState<string | null>(null);
+  const keep = () => {
+    const name = draft?.trim();
+    if (name && name !== topic.name) sync.update("Topic", topic.id, { name });
+    setDraft(null);
+  };
+  const look = "-ml-1.5 rounded-md px-1.5 text-left text-title font-semibold";
+  if (guest) return <p className="text-title font-semibold">{topic.name}</p>;
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        title="Rename it"
+        onClick={() => setDraft(topic.name)}
+        className={`${look} self-start hover:bg-hover`}
+      >
+        {topic.name}
+      </button>
+    );
+  }
+  return (
+    <input
+      // biome-ignore lint/a11y/noAutofocus: it opens to type the name
+      autoFocus
+      aria-label="Name"
+      value={draft}
+      maxLength={80}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={keep}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") keep();
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setDraft(null);
+        }
+      }}
+      className={`ui-field ${look} w-full max-w-measure`}
+    />
+  );
+}
+
+/** The topic's icon, which opens the others to pick from. */
+function TopicIcon({ topic }: { topic: Topic }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const [open, setOpen] = useState(false);
+  const Icon = topicIcon(topic.icon);
+  const look = "size-10 rounded-lg px-0 text-muted";
+  if (guest) {
+    return (
+      <span className={`ui-chip grid place-items-center ${look}`}>
+        <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+      </span>
+    );
+  }
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger
+        aria-label="Icon"
+        title="Pick another icon"
+        className={`ui-button ${look} data-popup-open:bg-hover`}
+      >
+        <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner className="z-50 outline-none" sideOffset={4} align="start">
+          <Popover.Popup
+            finalFocus={focusBackAfterKeys}
+            className="ui-menu grid grid-cols-8 gap-1 p-1.5 outline-none"
+          >
+            {TOPIC_ICON_NAMES.map((name) => {
+              const Pick = topicIcon(name);
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  aria-label={name}
+                  title={name}
+                  aria-pressed={topic.icon === name}
+                  onClick={() => {
+                    if (name !== topic.icon) sync.update("Topic", topic.id, { icon: name });
+                    setOpen(false);
+                  }}
+                  className="ui-button ui-icon-button aria-pressed:bg-selected"
+                >
+                  <Pick size={15} strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** The sidebar group the topic is in: another of the workspace's, a new one, or none. */
+function TopicGroup({ topic }: { topic: Topic }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const topics = useTopics();
+  const [naming, setNaming] = useState<string | null>(null);
+  const others = [...new Set(topics.filter((t) => !isOwn(t)).map((t) => t.group_name))]
+    .filter((g) => g && g !== topic.group_name)
+    .sort((a, b) => a.localeCompare(b));
+  const move = (group_name: string) => {
+    if (group_name !== topic.group_name) sync.update("Topic", topic.id, { group_name });
+  };
+  const look = "-ml-1.5 h-6 gap-1 px-1.5 text-xs";
+  if (guest) return <span className="text-xs text-faint">{topic.group_name}</span>;
+  if (naming !== null) {
+    const keep = () => {
+      if (naming.trim()) move(naming.trim());
+      setNaming(null);
+    };
+    return (
+      <input
+        // biome-ignore lint/a11y/noAutofocus: it opens to type the group
+        autoFocus
+        aria-label="New group"
+        placeholder="New group"
+        value={naming}
+        maxLength={40}
+        onChange={(e) => setNaming(e.target.value)}
+        onBlur={keep}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") keep();
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setNaming(null);
+          }
+        }}
+        className={`ui-field ${look} w-40 rounded-md`}
+      />
+    );
+  }
+  const item = "ui-option flex cursor-default items-center px-2 py-1.5 outline-none select-none";
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        title="Move it to another group"
+        className={`ui-button ${look} data-popup-open:bg-hover`}
+      >
+        {topic.group_name || "No group"}
+        <ChevronDown size={12} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
+          <Menu.Popup finalFocus={focusBackAfterKeys} className="ui-menu min-w-44 p-1 outline-none">
+            {others.map((group) => (
+              <Menu.Item key={group} className={item} onClick={() => move(group)}>
+                {group}
+              </Menu.Item>
+            ))}
+            {others.length > 0 && <Menu.Separator className="my-1 h-px bg-line" />}
+            <Menu.Item className={item} onClick={() => setNaming("")}>
+              New group…
+            </Menu.Item>
+            {topic.group_name && (
+              <Menu.Item className={item} onClick={() => move("")}>
+                No group
+              </Menu.Item>
+            )}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+/**
+ * What the topic sticks to, whole, changed where it is: ⌘↩ or clicking
+ * away keeps it, Esc drops it. Under it, when it was written and when a
+ * talk last changed it.
+ */
+function Brief({ topic }: { topic: Topic }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const messages = useRecords("Message");
+  const [draft, setDraft] = useState<string | null>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  // The field grows with what it holds, as the words it took the place of did.
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!el || draft === null) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
+  const changed = messages
+    .filter((m) =>
+      m.changes.some(
+        (c) => c.topic_id === topic.id && !c.undone && c.after.sticks_to !== undefined,
+      ),
+    )
+    .reduce<string | undefined>(
+      (last, m) => (last && last > m.created_at ? last : m.created_at),
+      undefined,
+    );
+  const keep = () => {
+    if (draft !== null && draft.trim() !== topic.sticks_to) {
+      sync.update("Topic", topic.id, { sticks_to: draft.trim() });
+    }
+    setDraft(null);
+  };
+  const look = "-mx-2.5 rounded-md px-2.5 py-2 text-body max-w-measure";
+  const lines = topic.sticks_to.split(/\n+/).filter((line) => line.trim());
+  return (
+    <section className="flex flex-col gap-2" aria-label="What it sticks to">
+      <h2 className="text-xs text-faint">What it sticks to</h2>
+      {draft !== null ? (
+        <textarea
+          ref={field}
+          // biome-ignore lint/a11y/noAutofocus: it opens to change the brief
+          autoFocus
+          aria-label="What it sticks to"
+          value={draft}
+          maxLength={4000}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={(e) => e.currentTarget.setSelectionRange(draft.length, draft.length)}
+          onBlur={keep}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setDraft(null);
+            }
+          }}
+          className={`${look} resize-none bg-surface outline-none ring-1 ring-accent ring-inset`}
+        />
+      ) : guest ? (
+        <div className={`${look} flex flex-col gap-2`}>
+          {lines.map((line, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a brief's lines don't move
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      ) : (
+        <button
+          type="button"
+          title="Change what it sticks to"
+          onClick={() => setDraft(topic.sticks_to)}
+          className={`${look} flex flex-col gap-2 text-left hover:bg-hover`}
+        >
+          {lines.length ? (
+            lines.map((line, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a brief's lines don't move
+              <span key={i}>{line}</span>
+            ))
+          ) : (
+            <span className="text-faint">
+              Nothing yet. Say what it's about, and how it should answer.
+            </span>
+          )}
+        </button>
+      )}
+      <div className="flex max-w-measure items-center gap-2 text-xs text-faint">
+        <span>
+          Written {onDay(topic.created_at)}
+          {changed && ` · A talk changed it, ${onDay(changed)}`}
+        </span>
+        {draft !== null && (
+          <span className="ml-auto flex gap-2.5">
+            <span>
+              <span className="ui-kbd mr-1">⌘↩</span>Keep
+            </span>
+            <span>
+              <span className="ui-kbd mr-1">esc</span>Drop
+            </span>
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * What the topic knows about you: a fact a line, with the talk it came
+ * from, which opens beside the page, and × to take one out.
+ */
+function Facts({ topic, facts }: { topic: Topic; facts: Point[] }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const talks = useRecords("Talk");
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  return (
+    <section className="flex flex-col gap-2" aria-label="What it knows about you">
+      <h2 className="text-xs text-faint">What it knows about you</h2>
+      {facts.length === 0 ? (
+        <p className="max-w-measure text-muted">
+          Nothing yet. What you tell {topic.name} about yourself in a talk is kept here, and its
+          answers go by it.
+        </p>
+      ) : (
+        <ul className={`flex flex-col ${LINES}`}>
+          {facts.map((fact) => {
+            const talk = talks.find((t) => t.id === fact.talk_id);
+            return (
+              <li
+                key={fact.id}
+                className="group/row flex min-h-8 items-center gap-4 rounded-md px-2.5 py-0.5 hover:bg-hover"
+              >
+                {!fact.seen && (
+                  <span
+                    role="img"
+                    aria-label="New"
+                    className="-mr-2 size-1.5 shrink-0 rounded-full bg-accent"
+                  />
+                )}
+                <p className="min-w-0 flex-1">{inline(fact.text)}</p>
+                <span className="shrink-0 text-xs text-faint">
+                  {talk ? (
+                    <Link to="." search={withTalk(talk.id)} replace className="ui-link">
+                      {talk.title || "The talk"}
+                    </Link>
+                  ) : (
+                    fact.source
+                  )}
+                  {(talk || fact.source) && ", "}
+                  {onDay(fact.created_at)}
+                </span>
+                {!guest && (
+                  <RowAction
+                    label="Take it out…"
+                    onClick={() =>
+                      setConfirmation({
+                        title: "Take this out?",
+                        body: `${topic.name} stops going by it, for everyone in the workspace. This can't be undone.`,
+                        action: "Take it out",
+                        onConfirm: () => sync.delete("Point", fact.id),
+                      })
+                    }
+                    className="-mr-1.5 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
+                  >
+                    <X size={13} strokeWidth={1.75} aria-hidden="true" />
+                  </RowAction>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
+    </section>
   );
 }
 
@@ -599,6 +1125,7 @@ const EMPTY: Record<string, string> = {
   text: "Sections that explain, written up as the talks go.",
   list: "Things to follow or read, a line each, with where they're from.",
   timeline: "When each section happened, oldest first, a line each, with its events on its page.",
+  you: "What you tell it about yourself, a line each, which its answers go by.",
 };
 
 /** One block, laid out by its kind. */
@@ -702,7 +1229,8 @@ function BlockFrame({
   const title = heading ?? block.title;
   return (
     <section
-      className="group/block flex flex-col gap-2"
+      id={`block-${block.id}`}
+      className="group/block flex scroll-mt-6 flex-col gap-2"
       aria-label={typeof title === "string" ? title : blockName(block)}
     >
       <div className="flex min-h-6 items-center gap-2">
@@ -721,8 +1249,20 @@ function BlockFrame({
   );
 }
 
-/** ⋯ beside a block's title: move it, rename it, or remove it and what it keeps. */
-function BlockMenu({ block, blocks }: { block: Block; blocks: Block[] }) {
+/**
+ * ⋯ beside a block's title, or its line on About: move it, rename it, or
+ * remove it and what it keeps. It shows while `className`'s hover holds.
+ */
+function BlockMenu({
+  block,
+  blocks,
+  className = "ml-auto group-hover/block:opacity-100",
+}: {
+  block: Block;
+  /** The page's blocks, in order, which it moves among. */
+  blocks: Block[];
+  className?: string;
+}) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const points = useRecords("Point");
@@ -743,7 +1283,9 @@ function BlockMenu({ block, blocks }: { block: Block; blocks: Block[] }) {
   const kept = points.filter((p) => p.block_id === block.id).length;
   const name = blockName(block);
   return (
-    <span className="ml-auto opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100">
+    <span
+      className={`opacity-0 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100 ${className}`}
+    >
       <MoreMenu
         label={`More for ${name}`}
         items={[
@@ -774,7 +1316,7 @@ function BlockMenu({ block, blocks }: { block: Block; blocks: Block[] }) {
   );
 }
 
-/** A block's title is the topic's own: "You" in one, "Terms" in another. */
+/** A block's title is the topic's own: "Advice" in one, "Terms" in another. */
 function RenameBlock({ block, onClose }: { block: Block; onClose: () => void }) {
   const { sync } = useWorkspace();
   const [title, setTitle] = useState(block.title);
@@ -900,7 +1442,7 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
-          <p className="text-title font-semibold">{topic.name}</p>
+          <TitleToAbout topic={topic} />
         </div>
         <p className="text-muted">
           Knows what's in {workspace.name}, and starts a topic for whatever you want to keep.

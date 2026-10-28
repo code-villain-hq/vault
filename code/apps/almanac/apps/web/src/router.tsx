@@ -79,6 +79,8 @@ const topic = createRoute({
   validateSearch: (search: Record<string, unknown>): TopicSearch => ({
     talk: text(search.talk),
     ask: text(search.ask),
+    section: text(search.section),
+    about: search.about === true || search.about === "true" ? true : undefined,
   }),
   component: TopicPage,
 });
