@@ -154,9 +154,11 @@ them into notifications. A server with no Mac listening marks nothing.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `layout.tsx` is the sidebar,
   `topic.tsx` a topic's page, `talk.tsx` the talk beside it,
-  `calendar.tsx` Calendar, `settings.tsx` Settings → Claude. Its
-  workspaces come from places (`server.ts`): this Mac, the server it came
-  from, or servers the desktop app signed in to.
+  `asking.tsx` the answers on their way and each topic's open talk (above
+  the pages, so they last while you look elsewhere), `calendar.tsx`
+  Calendar, `settings.tsx` Settings → Claude. Its workspaces come from
+  places (`server.ts`): this Mac, the server it came from, or servers the
+  desktop app signed in to.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Almanac on Postgres for
   the workspaces on this Mac, with `code/kit/desktop`, and shows due
   reminders as notifications.

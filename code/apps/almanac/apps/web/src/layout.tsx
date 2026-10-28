@@ -29,6 +29,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { TalksProvider } from "./asking";
 import { AlmanacMenus } from "./commands";
 import { Initial, NavIcon, topicIcon } from "./icons";
 import { NewTopicDialog, useNewTopicKey } from "./new-topic";
@@ -253,12 +254,14 @@ function Shell() {
   useNewTopicKey(open);
   return (
     <NewTopicContext.Provider value={open}>
-      <div className="app-shell flex h-full bg-bg">
-        <Sidebar />
-        <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
-          <Outlet />
-        </main>
-      </div>
+      <TalksProvider>
+        <div className="app-shell flex h-full bg-bg">
+          <Sidebar />
+          <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
+            <Outlet />
+          </main>
+        </div>
+      </TalksProvider>
       <AlmanacMenus />
       <NewTopicDialog name={starting} onClose={() => setStarting(null)} />
     </NewTopicContext.Provider>

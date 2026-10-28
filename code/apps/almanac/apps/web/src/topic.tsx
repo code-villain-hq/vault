@@ -9,6 +9,7 @@ import { type Confirmation, ConfirmDialog, MoreMenu, RowAction, useApi } from "@
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { MessagesSquare, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Asking, useTopicTalks } from "./asking";
 import {
   ago,
   dayKey,
@@ -24,7 +25,7 @@ import { topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import type { Schema } from "./sync";
-import { TalkPanel, useAsk, useTalks } from "./talk";
+import { TalkPanel, useTalks } from "./talk";
 import { TopicDialog } from "./topic-dialog";
 import { Button, Empty } from "./ui";
 import { useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
@@ -50,17 +51,21 @@ export function TopicPage() {
   const { ready } = useSyncStatus();
   const topics = useRecords("Topic");
   const topic = topics.find((t) => t.id === id);
+  const talks = useTalks(id);
+  const { asking, ask, open: kept, setOpen } = useTopicTalks(id);
 
   const open = useCallback(
-    (talk: string | null | undefined) =>
-      void navigate({
-        to: ".",
-        search: talk === undefined ? {} : { talk: talk ?? "new" },
-        replace: true,
-      }),
-    [navigate],
+    (talk: string | null | undefined) => {
+      const shown = talk === undefined ? undefined : (talk ?? "new");
+      setOpen(shown);
+      void navigate({ to: ".", search: shown === undefined ? {} : { talk: shown }, replace: true });
+    },
+    [navigate, setOpen],
   );
-  const { asking, ask } = useAsk(id, (talk) => open(talk));
+  // A link that names the talk is where the topic now is.
+  useEffect(() => {
+    if (search.talk !== undefined) setOpen(search.talk);
+  }, [search.talk, setOpen]);
 
   if (!topic) {
     if (!ready) return null;
@@ -71,13 +76,20 @@ export function TopicPage() {
       </>
     );
   }
-  const talkId = search.talk && search.talk !== "new" ? search.talk : null;
+  // A link without one (the sidebar's) opens the talk the topic was left on,
+  // while it's there.
+  const left =
+    kept === "new" || talks.some((t) => t.id === kept) || (kept && asking?.talkId === kept)
+      ? kept
+      : undefined;
+  const shown = search.talk ?? left;
+  const talkId = shown && shown !== "new" ? shown : null;
   return (
     <TopicView
       // A new topic starts with its own state: what it asked, what it saw.
       key={topic.id}
       topic={topic}
-      panel={search.talk !== undefined}
+      panel={shown !== undefined}
       talkId={talkId}
       draft={search.ask ?? ""}
       asking={asking}
@@ -103,7 +115,7 @@ function TopicView({
   panel: boolean;
   talkId: string | null;
   draft: string;
-  asking: ReturnType<typeof useAsk>["asking"];
+  asking: Asking | null;
   onAsk: (text: string, talkId: string | null) => void;
   onOpen: (talkId: string | null | undefined) => void;
 }) {

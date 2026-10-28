@@ -1,6 +1,6 @@
-// A talk in the panel beside a topic's page. Asking posts the question
-// and reads the answer as it's written (server-sent events); the talk,
-// the answer and what the page kept from it then arrive through sync. In
+// A talk in the panel beside a topic's page. The answer shows as it's
+// written (`asking.tsx` reads it); the talk, the answer and what the page
+// kept from it then arrive through sync. In
 // the workspace's own topic, an answer may propose a topic to start, or
 // say what it changed in one, with Undo.
 
@@ -11,106 +11,19 @@ import {
   MoreMenu,
   messageOf,
   overlayOpen,
-  UNKNOWN_PROBLEM,
 } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
+import type { Asking } from "./asking";
 import { ago, dueWords, rhythmWords, timeWords } from "./format";
 import { topicIcon } from "./icons";
 import { isOwn, useNewTopic, useTopics } from "./layout";
 import { Prose } from "./prose";
-import { apiUrl, authHeaders, credentialsFor } from "./server";
 import { TopicForm } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
-
-/** An answer on its way, until the talk's own records have it. */
-export interface Asking {
-  talkId: string | null;
-  question: string;
-  /** How many questions the talk had before this one. */
-  asked: number;
-  text: string;
-  answerId: string | null;
-  problem: string | null;
-}
-
-/** Asks in a topic, and what's on its way. */
-export function useAsk(topicId: string, onTalk: (talkId: string) => void) {
-  const { workspace, place, sync } = useWorkspace();
-  const [asking, setAsking] = useState<Asking | null>(null);
-  const latest = useRef(onTalk);
-  latest.current = onTalk;
-
-  const ask = useCallback(
-    async (question: string, talkId: string | null) => {
-      const text = question.trim();
-      if (!text) return;
-      const asked = talkId
-        ? sync.query("Message").filter((m) => m.talk_id === talkId && m.role === "you").length
-        : 0;
-      const update = (change: Partial<Asking>) =>
-        setAsking((a) => (a && a.question === text ? { ...a, ...change } : a));
-      setAsking({ talkId, question: text, asked, text: "", answerId: null, problem: null });
-      const path = `/api/w/${workspace.id}/topics/${topicId}/ask`;
-      let response: Response;
-      try {
-        response = await fetch(apiUrl(path, place), {
-          method: "POST",
-          credentials: credentialsFor(place),
-          headers: { ...authHeaders(place), "content-type": "application/json" },
-          body: JSON.stringify(talkId ? { talk_id: talkId, text } : { text }),
-        });
-      } catch {
-        update({ problem: "Can't reach Almanac. Check your connection, then ask again." });
-        return;
-      }
-      if (!response.ok || !response.body) {
-        const error = (await response.json().catch(() => null)) as { message?: string } | null;
-        update({ problem: messageOf(new Error(error?.message ?? UNKNOWN_PROBLEM)) });
-        return;
-      }
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buffer = "";
-      let said = "";
-      for (;;) {
-        const { value, done } = await reader.read().catch(() => ({ value: "", done: true }));
-        if (done) break;
-        buffer += value;
-        let end = buffer.indexOf("\n\n");
-        while (end >= 0) {
-          const block = buffer.slice(0, end);
-          buffer = buffer.slice(end + 2);
-          end = buffer.indexOf("\n\n");
-          const event = /^event: (.*)$/m.exec(block)?.[1];
-          const data = block
-            .split("\n")
-            .filter((line) => line.startsWith("data: "))
-            .map((line) => line.slice(6))
-            .join("\n");
-          if (!event || !data) continue;
-          const body = JSON.parse(data) as { talk_id?: string; text?: string; message_id?: string };
-          if (event === "talk" && body.talk_id) {
-            update({ talkId: body.talk_id });
-            latest.current(body.talk_id);
-          } else if (event === "text") {
-            said += body.text ?? "";
-            update({ text: said });
-          } else if (event === "done") {
-            update({ answerId: body.message_id ?? null });
-          } else if (event === "problem") {
-            update({ problem: body.text ?? UNKNOWN_PROBLEM });
-          }
-        }
-      }
-    },
-    [workspace.id, place, sync, topicId],
-  );
-
-  return { asking, ask };
-}
 
 /** The talks of a topic, the latest first. */
 export function useTalks(topicId: string): Talk[] {
