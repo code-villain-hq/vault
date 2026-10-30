@@ -69,7 +69,10 @@ Each step leaves the app working, and is tried before it's committed.
 
 1. **The page draws the set.** Blocks of the seven kinds and collections
    with fields, beside today's kinds, which stay as they are. Tried on
-   Acme's pages.
+   Acme's pages. _Built:_ Text is the kind `paragraph` while today's
+   `text` stays. A board can also be drawn from a choice, with no step
+   from open to done. A checklist item doesn't repeat or ring yet; that
+   comes with step 2, with the tools that make one.
 2. **Claude files into the set.** The tools above, and the page Claude
    reads in the new shape. Keeping a point and laying out a page go. New
    blocks are the new kinds; today's stay until step 3.

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -155,16 +157,74 @@ pub const BLOCK_KINDS: &[&str] = &[
     "parts",
 ];
 
+/// The one set of blocks every page is made of, beside [`BLOCK_KINDS`]
+/// until today's pages move into it. A `heading` is its title; a
+/// `paragraph` has a point a paragraph; `bullets` and a `checklist` a point
+/// a line, done once ticked; a `toggle` a line per theme, which opens on its
+/// points; a `callout` a point set apart, with its look; a `collection` rows
+/// with its [`Field`]s, a point a row: its text the row's name, its cells
+/// the rest. The app picks a collection's picture from its fields.
+pub const SET_KINDS: &[&str] = &[
+    "heading",
+    "paragraph",
+    "bullets",
+    "checklist",
+    "toggle",
+    "callout",
+    "collection",
+];
+
 /// How wide a block is, of the page's twelve columns: a quarter, a third,
 /// a half, two thirds, three quarters or the whole. Empty is its kind's own
 /// ([`width_of`]).
 pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
 
 /// How a person asked a block to be drawn, with View as: a table, cards, a
-/// list (`lines` when it isn't steps to tick) or a timeline. Empty is the
-/// app's own pick from what the block keeps. Only a person sets it; a
-/// talk's layout never does.
-pub const BLOCK_VIEWS: &[&str] = &["", "table", "cards", "list", "lines", "timeline"];
+/// list (`lines` when it isn't steps to tick) or a timeline, and for a
+/// collection a line, a board, a week or bars too. Empty is the app's own
+/// pick from what the block keeps. Only a person sets it; a talk's layout
+/// never does.
+pub const BLOCK_VIEWS: &[&str] = &[
+    "", "table", "cards", "list", "lines", "timeline", "line", "board", "week", "bars",
+];
+
+/// What a collection's field holds: a few words, a number (with its unit
+/// and a goal when there is one), a day or a span of days or years, one of
+/// a few words the collection uses (a choice), where a row stands (a
+/// status), yes or no (a check), a photo from a talk (its id) or a web page.
+pub const FIELD_KINDS: &[&str] = &[
+    "text", "number", "day", "choice", "status", "check", "photo", "link",
+];
+
+/// How many fields a collection has, besides each row's name.
+pub const MOST_FIELDS: usize = 8;
+
+/// A field every row of a collection has, such as Gewicht or Status.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Field {
+    pub name: String,
+    /// One of [`FIELD_KINDS`].
+    pub kind: String,
+    /// A number's unit: "kg", "€". Empty for none.
+    pub unit: String,
+    /// The mark a number aims at.
+    pub goal: Option<f64>,
+    /// A choice's or a status's words, in order: a board's lanes, the last
+    /// one done. Empty for those its rows use.
+    pub options: Vec<String>,
+}
+
+/// What a row has in a field: a number, yes or no, or words (a day as
+/// `YYYY-MM-DD` or a span, a photo's id, a link).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+#[ts(export)]
+pub enum Cell {
+    Check(bool),
+    Number(f64),
+    Text(String),
+}
 
 /// The width a block of `kind` has when it names none: a third for what
 /// reads at a glance, a half for what reads as a column, the whole for the
@@ -274,8 +334,8 @@ pub fn template(name: &str) -> Option<&'static [(&'static str, &'static str)]> {
         .map(|(_, blocks)| *blocks)
 }
 
-/// A part of a topic's page: its kind, one of [`BLOCK_KINDS`], says how it
-/// lays out the points kept in it; its title is the topic's own ("You",
+/// A part of a topic's page: its kind, one of [`BLOCK_KINDS`] or
+/// [`SET_KINDS`], says how it lays out the points kept in it; its title is the topic's own ("You",
 /// "Terms"). A topic shows its blocks by position.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -289,6 +349,8 @@ pub struct Block {
     /// For cards and tables: the facts every card has, a line each on its
     /// face, or a table's columns.
     pub facets: Vec<Facet>,
+    /// For a collection: the fields every row has, besides its name.
+    pub fields: Vec<Field>,
     /// One of [`BLOCK_WIDTHS`].
     pub width: String,
     /// One of [`BLOCK_VIEWS`].
@@ -306,6 +368,7 @@ pub struct BlockCreate {
     pub kind: String,
     pub title: Option<String>,
     pub facets: Option<Vec<Facet>>,
+    pub fields: Option<Vec<Field>>,
     pub width: Option<String>,
     pub view: Option<String>,
     /// After the topic's last block when left out.
@@ -319,6 +382,7 @@ pub struct BlockPatch {
     pub kind: Option<String>,
     pub title: Option<String>,
     pub facets: Option<Vec<Facet>>,
+    pub fields: Option<Vec<Field>>,
     pub width: Option<String>,
     pub view: Option<String>,
     pub position: Option<i32>,
@@ -351,6 +415,9 @@ pub struct Point {
     pub note: String,
     /// Ticked: a list's item done, a question practised.
     pub done: bool,
+    /// In a collection: what the row has in each of its block's fields, by
+    /// the field's name. Its text is its name.
+    pub cells: BTreeMap<String, Cell>,
     /// Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -377,6 +444,7 @@ pub struct PointCreate {
     pub amount: Option<f64>,
     pub note: Option<String>,
     pub done: Option<bool>,
+    pub cells: Option<BTreeMap<String, Cell>>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     pub talk_id: Option<Uuid>,
@@ -398,6 +466,7 @@ pub struct PointPatch {
     pub amount: Option<f64>,
     pub note: Option<String>,
     pub done: Option<bool>,
+    pub cells: Option<BTreeMap<String, Cell>>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     /// The talk it now comes from, when a talk changed it.
@@ -564,22 +633,24 @@ impl Validate for TopicPatch {
 
 impl Validate for BlockCreate {
     fn validate(&self) -> Result<(), ValidationError> {
-        one_of(Some(&self.kind), BLOCK_KINDS, "kind")?;
+        block_kind(Some(&self.kind))?;
         one_of(self.width.as_deref(), BLOCK_WIDTHS, "width")?;
         one_of(self.view.as_deref(), BLOCK_VIEWS, "view")?;
         self.title.as_deref().map(block_title).transpose()?;
         self.facets.as_deref().map(facets).transpose()?;
+        self.fields.as_deref().map(fields).transpose()?;
         Ok(())
     }
 }
 
 impl Validate for BlockPatch {
     fn validate(&self) -> Result<(), ValidationError> {
-        one_of(self.kind.as_deref(), BLOCK_KINDS, "kind")?;
+        block_kind(self.kind.as_deref())?;
         one_of(self.width.as_deref(), BLOCK_WIDTHS, "width")?;
         one_of(self.view.as_deref(), BLOCK_VIEWS, "view")?;
         self.title.as_deref().map(block_title).transpose()?;
         self.facets.as_deref().map(facets).transpose()?;
+        self.fields.as_deref().map(fields).transpose()?;
         Ok(())
     }
 }
@@ -594,6 +665,7 @@ impl Validate for PointCreate {
             self.amount,
             self.note.as_deref(),
         )?;
+        self.cells.as_ref().map(cells).transpose()?;
         words(&self.text, "A point needs some words.", 2000)
     }
 }
@@ -608,6 +680,7 @@ impl Validate for PointPatch {
             self.amount,
             self.note.as_deref(),
         )?;
+        self.cells.as_ref().map(cells).transpose()?;
         if let Some(text) = &self.text {
             words(text, "A point needs some words.", 2000)?;
         }
@@ -686,6 +759,61 @@ fn facets(facets: &[Facet]) -> Result<(), ValidationError> {
         }
         if !FACET_ICONS.contains(&facet.icon.as_str()) {
             return invalid("Almanac doesn't know that facet's icon.");
+        }
+    }
+    Ok(())
+}
+
+fn block_kind(kind: Option<&str>) -> Result<(), ValidationError> {
+    match kind {
+        Some(k) if !BLOCK_KINDS.contains(&k) && !SET_KINDS.contains(&k) => {
+            invalid(format!("Unknown kind: {k}."))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn fields(fields: &[Field]) -> Result<(), ValidationError> {
+    if fields.len() > MOST_FIELDS {
+        return invalid(format!(
+            "A collection has at most {MOST_FIELDS} fields besides each row's name."
+        ));
+    }
+    for (n, field) in fields.iter().enumerate() {
+        if field.name.trim().is_empty() || field.name.chars().count() > 40 {
+            return invalid("A field's name has a word or two, at most 40 characters.");
+        }
+        if fields[..n].iter().any(|f| f.name == field.name) {
+            return invalid(format!("A collection has one field named {}.", field.name));
+        }
+        one_of(Some(&field.kind), FIELD_KINDS, "kind of field")?;
+        if field.unit.chars().count() > 12 {
+            return invalid("A unit is at most 12 characters.");
+        }
+        if field.goal.is_some_and(|g| !g.is_finite()) {
+            return invalid("A goal is a number.");
+        }
+        if field.options.len() > 12 || field.options.iter().any(|o| o.chars().count() > 40) {
+            return invalid("A field has at most 12 words to choose from, each short.");
+        }
+    }
+    Ok(())
+}
+
+fn cells(cells: &BTreeMap<String, Cell>) -> Result<(), ValidationError> {
+    if cells.len() > MOST_FIELDS {
+        return invalid(format!("A row has at most {MOST_FIELDS} cells."));
+    }
+    for (name, cell) in cells {
+        if name.trim().is_empty() || name.chars().count() > 40 {
+            return invalid("A cell is named by its field, at most 40 characters.");
+        }
+        match cell {
+            Cell::Number(n) if !n.is_finite() => return invalid("A number cell is a number."),
+            Cell::Text(t) if t.chars().count() > 500 => {
+                return invalid("A cell is at most 500 characters.");
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -787,6 +915,29 @@ mod tests {
             assert!(blocks.iter().all(|(kind, _)| BLOCK_KINDS.contains(kind)));
         }
         assert_eq!(TEMPLATES.len(), TEMPLATE_NAMES.len());
+    }
+
+    #[test]
+    fn a_row_keeps_numbers_checks_and_words_by_field() {
+        let row: BTreeMap<String, Cell> =
+            serde_json::from_str(r#"{"Gewicht": 3.4, "Gechipt": true, "Tag": "2026-10-30"}"#)
+                .unwrap();
+        assert_eq!(row["Gewicht"], Cell::Number(3.4));
+        assert_eq!(row["Gechipt"], Cell::Check(true));
+        assert_eq!(row["Tag"], Cell::Text("2026-10-30".into()));
+        assert!(cells(&row).is_ok());
+        let field = |name: &str, kind: &str| Field {
+            name: name.into(),
+            kind: kind.into(),
+            unit: String::new(),
+            goal: None,
+            options: vec![],
+        };
+        assert!(fields(&[field("Gewicht", "number"), field("Tag", "day")]).is_ok());
+        assert!(fields(&[field("Tag", "day"), field("Tag", "day")]).is_err());
+        assert!(fields(&[field("Farbe", "colour")]).is_err());
+        assert!(block_kind(Some("collection")).is_ok());
+        assert!(block_kind(Some("database")).is_err());
     }
 
     #[test]

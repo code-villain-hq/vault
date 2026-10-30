@@ -186,11 +186,31 @@ What they do:
   a `width` (`BLOCK_WIDTHS`, `width_of`), which the page doesn't read.
 
   View as on a block's title sets its `view` (`BLOCK_VIEWS`: `table`,
-  `cards`, `list`, `lines`, `timeline`; migration 0014). `viewsFor`
+  `cards`, `list`, `lines`, `timeline`, migration 0014; a collection's
+  pictures, 0015). `viewsFor`
   offers the views that can draw its points, the app's pick among them,
   and `shownAs` draws with the person's while it's one of those. Picking
   the app's own empties it. Only a person sets it: a layout never writes
   `view`, and its Undo brings a removed block back with the view it had.
+
+  The one set of blocks (`SET_KINDS`, migration 0015,
+  `proposals/one-set-of-blocks.md`) is the page's future: `heading`,
+  `paragraph`, `bullets`, `checklist`, `toggle`, `callout` and
+  `collection`, beside today's kinds until pages move into it. Step 1
+  is built: the page draws them (`set.tsx`), but only a client or SQL
+  makes them; talks, layouts and `page.rs` don't know them yet. A
+  collection names its `fields` (`FIELD_KINDS`: text, number with its
+  unit and goal, day, choice, status with its words in order, check,
+  photo, link; eight at most), and its points are its rows: a row's
+  text is its name and its `cells` the rest, by field name (a number, a
+  yes or no, or words; a day is `YYYY-MM-DD`, or a span or a year as a
+  timeline reads it). The fields pick its picture by the first rule that
+  fits (`pictureOf` in `collection.ts`): a day with a number a line, a
+  status a board, a photo cards, past days a timeline, days to come a
+  week, a number bars, a name and two fields or more a table, the rest a
+  list. Only fields its rows fill count. View as offers the others its
+  fields allow (`picturesFor`). A toggle opens a line per theme on its
+  points; a callout is a warning when a point's `look` is `warn`.
 
   The topic page's timeline is a line per section, when
   its events begin and end (`bySection`); a section's page lists its
@@ -267,7 +287,8 @@ them into notifications. A server with no Mac listening marks nothing.
   desktop app's own Almanac, who signs in to nothing.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `layout.tsx` is the sidebar,
-  `topic.tsx` a topic's page, a section's own (`?section=`, what's
+  `topic.tsx` a topic's page (the one set's blocks and pictures in
+  `set.tsx`, the rules for a collection's picture in `collection.ts`), a section's own (`?section=`, what's
   kept under that theme from every block) and its About (`?about`), `talk.tsx` the talk beside it,
   `asking.tsx` the answers on their way and each topic's open talk (above
   the pages, so they last while you look elsewhere), `calendar.tsx`

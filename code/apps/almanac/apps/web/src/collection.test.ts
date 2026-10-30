@@ -1,0 +1,170 @@
+import { describe, expect, test } from "bun:test";
+import type { Block, Cell, Field, Point } from "@almanac/types";
+import { byDay, cellWords, lanesOf, pictureOf, picturesFor, pictureWidth } from "./collection";
+
+const field = (name: string, kind: string, more: Partial<Field> = {}): Field => ({
+  name,
+  kind,
+  unit: "",
+  goal: null,
+  options: [],
+  ...more,
+});
+
+const collection = (...fields: Field[]): Block => ({
+  id: "b1",
+  workspace_id: "w",
+  topic_id: "t",
+  kind: "collection",
+  title: "Rows",
+  facets: [],
+  fields,
+  width: "",
+  view: "",
+  position: 0,
+  created_at: "",
+  updated_at: "",
+});
+
+let n = 0;
+const row = (text: string, cells: Record<string, Cell> = {}): Point => ({
+  id: `p${++n}`,
+  workspace_id: "w",
+  topic_id: "t",
+  block_id: "b1",
+  theme: "",
+  text,
+  happened: "",
+  facet: "",
+  look: "",
+  amount: null,
+  note: "",
+  done: false,
+  cells,
+  source: null,
+  source_url: null,
+  talk_id: null,
+  seen: true,
+  position: n,
+  created_at: "",
+  updated_at: "",
+});
+
+const ON = "2026-10-30";
+
+describe("pictureOf", () => {
+  test("draws days with numbers as a line, Lisa's weight", () => {
+    const weight = collection(field("Tag", "day"), field("Gewicht", "number", { unit: "kg" }));
+    const rows = [row("Wiegen", { Tag: "2026-06-12", Gewicht: 3.6 })];
+    expect(pictureOf(weight, rows, ON)).toBe("line");
+  });
+
+  test("draws a status as a board, before anything else it has", () => {
+    const repairs = collection(field("Raum", "text"), field("Status", "status"));
+    expect(pictureOf(repairs, [row("Abfluss", { Raum: "Bad", Status: "Offen" })], ON)).toBe(
+      "board",
+    );
+  });
+
+  test("draws a photo as cards", () => {
+    const cats = collection(field("Foto", "photo"), field("Alter", "text"));
+    expect(pictureOf(cats, [row("Lisa", { Foto: "ph1", Alter: "3½ Jahre" })], ON)).toBe("cards");
+  });
+
+  test("draws days and spans that are past as a timeline, and days to come as a week", () => {
+    const themes = collection(field("Zeitraum", "day"));
+    expect(pictureOf(themes, [row("Kuba", { Zeitraum: "1898–1962" })], ON)).toBe("timeline");
+    expect(pictureOf(themes, [row("Termin", { Zeitraum: "2026-10-01" })], ON)).toBe("timeline");
+    expect(pictureOf(themes, [row("Hausmeister", { Zeitraum: "2026-11-03" })], ON)).toBe("week");
+    expect(pictureOf(themes, [row("Heute", { Zeitraum: ON })], ON)).toBe("week");
+  });
+
+  test("draws a name and a number as bars", () => {
+    const offers = collection(field("Preis", "number", { unit: "€" }));
+    expect(pictureOf(offers, [row("Spirale", { Preis: 15 })], ON)).toBe("bars");
+  });
+
+  test("draws three fields or more as a table, and fewer as a list", () => {
+    const food = collection(field("Art", "choice"), field("Bei Lisa", "text"));
+    expect(pictureOf(food, [row("Felix", { Art: "Nass", "Bei Lisa": "Mag sie" })], ON)).toBe(
+      "table",
+    );
+    const terms = collection(field("Heißt", "text"));
+    expect(pictureOf(terms, [row("Intifada", { Heißt: "Aufstand" })], ON)).toBe("list");
+  });
+
+  test("counts only the fields its rows fill", () => {
+    const food = collection(
+      field("Art", "choice"),
+      field("Bei Lisa", "text"),
+      field("Foto", "photo"),
+    );
+    expect(pictureOf(food, [row("Felix", { Art: "Nass", "Bei Lisa": "" })], ON)).toBe("list");
+  });
+
+  test("has no picture with no rows, so the page leaves it out", () => {
+    expect(pictureOf(collection(field("Preis", "number")), [], ON)).toBe("");
+  });
+});
+
+describe("picturesFor", () => {
+  test("offers what the fields can draw, the app's pick among them", () => {
+    const weight = collection(field("Tag", "day"), field("Gewicht", "number"));
+    const rows = [row("Wiegen", { Tag: "2026-06-12", Gewicht: 3.6 })];
+    expect(picturesFor(weight, rows, ON)).toEqual([
+      "line",
+      "cards",
+      "timeline",
+      "week",
+      "bars",
+      "table",
+      "list",
+    ]);
+  });
+
+  test("offers a board for a choice, but no line without days", () => {
+    const food = collection(field("Art", "choice"));
+    expect(picturesFor(food, [row("Felix", { Art: "Nass" })], ON)).toEqual([
+      "board",
+      "cards",
+      "table",
+      "list",
+    ]);
+  });
+
+  test("offers nothing with no rows", () => {
+    expect(picturesFor(collection(field("Art", "choice")), [], ON)).toEqual([]);
+  });
+});
+
+test("a board's lanes are the status's words, then any others its rows use", () => {
+  const status = field("Status", "status", { options: ["Offen", "Bestellt", "Erledigt"] });
+  expect(
+    lanesOf(status, [row("a", { Status: "Erledigt" }), row("b", { Status: "Warten" })]),
+  ).toEqual(["Offen", "Bestellt", "Erledigt", "Warten"]);
+  expect(lanesOf(field("Status", "status"), [row("a", { Status: "Neu" })])).toEqual(["Neu"]);
+});
+
+test("a cell reads as words: a number with its unit, a day, a link's site", () => {
+  expect(cellWords(field("Preis", "number", { unit: "€" }), 89)).toMatch(/^89 €$/);
+  expect(cellWords(field("Tag", "day"), "2026-11-03")).toBe("Nov 3");
+  expect(cellWords(field("Zeitraum", "day"), "1898–1962")).toBe("1898–1962");
+  expect(cellWords(field("Seite", "link"), "https://www.btselem.org/stats")).toBe("btselem.org");
+  expect(cellWords(field("Geimpft", "check"), true)).toBe("");
+});
+
+test("rows go by their day or span, oldest first, those with none last", () => {
+  const span = field("Zeitraum", "day");
+  const rows = [
+    row("Ohne"),
+    row("Kuba", { Zeitraum: "1898–1962" }),
+    row("Europa", { Zeitraum: "1500" }),
+  ];
+  expect(byDay(rows, span).map((r) => r.text)).toEqual(["Europa", "Kuba", "Ohne"]);
+});
+
+test("a board, a week and a timeline take the whole row; a line half", () => {
+  const block = collection(field("Status", "status"));
+  expect(pictureWidth("board", block, [])).toBe("whole");
+  expect(pictureWidth("line", block, [])).toBe("1/2");
+});

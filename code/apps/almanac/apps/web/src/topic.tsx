@@ -72,7 +72,7 @@ import {
 } from "./format";
 import { facetIcon, TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
-import { type Picked, usePhoto } from "./photos";
+import type { Picked } from "./photos";
 import {
   AddPhoto,
   DropHint,
@@ -85,12 +85,27 @@ import {
 import { about, inline, lead } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
 import { samples } from "./samples";
+import {
+  Bullets,
+  Callout,
+  Checklist,
+  Collection,
+  LINES,
+  named,
+  Paragraphs,
+  Photo,
+  RemovePoint,
+  Tick,
+  TimelineLine,
+  TimelineRail,
+  Toggles,
+} from "./set";
 import type { Schema } from "./sync";
 import { Table } from "./table";
 import { TalkPanel, useTalks } from "./talk";
 import { bySection, inOrder, type When, when } from "./timeline";
 import { Button, Empty } from "./ui";
-import { shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
+import { SET_KINDS, shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
@@ -432,11 +447,17 @@ function usePage(topic: Topic): PageParts {
   }, [blocks, points, questions, reminders, topic.id]);
 }
 
-/** A block as the page draws it: its kind the view, its width the view's. */
+/**
+ * A block as the page draws it: its kind the view, its width the view's.
+ * A block of the set keeps its kind, and a collection its picture as its
+ * view; one with nothing to show has no kind, and stays off the page.
+ */
 function drawn(block: Block, points: Point[]): Block {
   const held = points.filter((p) => p.block_id === block.id);
   const view = shownAs(block, held);
-  return { ...block, kind: view, width: widthOf(view, block, held) };
+  const width = widthOf(view, block, held);
+  if (SET_KINDS.has(block.kind)) return { ...block, kind: view && block.kind, view, width };
+  return { ...block, kind: view, width };
 }
 
 /**
@@ -1220,6 +1241,13 @@ const EMPTY: Record<string, string> = {
   table: "Things to compare across the same facts, a row each, a column per fact.",
   trend: "A number each time it's measured, as a line over the days, with the mark it aims at.",
   parts: "A whole and the parts it's made of, as a ring, with each part's share.",
+  heading: "A title for the blocks under it.",
+  paragraph: "Writing that explains, a paragraph a point.",
+  bullets: "Short lines, a point each, in their order.",
+  checklist: "Things to do, a line each to tick.",
+  toggle: "A line for each part, which opens on what it keeps.",
+  callout: "What to keep in mind, in a box that stands out.",
+  collection: "Rows with fields, drawn as the picture the fields pick.",
 };
 
 /**
@@ -1237,7 +1265,11 @@ export function BlockGallery() {
           questions: [],
           reminders: sample.reminders,
         };
-        const width = widthOf(sample.block.kind, sample.block, sample.points);
+        // A block of the set is drawn as a page draws it; the others are their view.
+        const block = SET_KINDS.has(sample.block.kind)
+          ? drawn(sample.block, sample.points)
+          : { ...sample.block, width: widthOf(sample.block.kind, sample.block, sample.points) };
+        const width = block.width;
         return (
           <section key={sample.block.id} aria-label={sample.name} className="flex flex-col gap-3">
             <div className="flex flex-col gap-0.5">
@@ -1252,8 +1284,8 @@ export function BlockGallery() {
                 <div data-width={width} data-narrow={NARROW.has(width) || undefined}>
                   <BlockView
                     topic={sample.topic}
-                    block={sample.block}
-                    page={page}
+                    block={block}
+                    page={{ ...page, blocks: [block] }}
                     questions={[]}
                     routines={[]}
                     onAsk={() => {}}
@@ -1290,6 +1322,53 @@ function BlockView({
   const points = page.points.filter((p) => p.block_id === block.id);
   const frame = { block, blocks: page.blocks };
   switch (block.kind) {
+    case "heading":
+      return <BlockFrame {...frame} lead />;
+    case "paragraph":
+      return (
+        <BlockFrame {...frame}>
+          <Paragraphs points={points} />
+        </BlockFrame>
+      );
+    case "bullets":
+      return (
+        <BlockFrame {...frame}>
+          <Bullets points={points} />
+        </BlockFrame>
+      );
+    case "checklist": {
+      const done = points.filter((p) => p.done).length;
+      return (
+        <BlockFrame
+          {...frame}
+          aside={
+            <span className="text-xs text-faint">
+              {done} of {points.length} done
+            </span>
+          }
+        >
+          <Checklist points={points} />
+        </BlockFrame>
+      );
+    }
+    case "toggle":
+      return (
+        <BlockFrame {...frame}>
+          <Toggles points={points} />
+        </BlockFrame>
+      );
+    case "callout":
+      return (
+        <BlockFrame {...frame}>
+          <Callout points={points} />
+        </BlockFrame>
+      );
+    case "collection":
+      return (
+        <BlockFrame {...frame}>
+          <Collection block={block} rows={points} />
+        </BlockFrame>
+      );
     case "today":
       return <Today {...frame} topic={topic} points={points} reminders={page.reminders} />;
     case "week":
@@ -1940,7 +2019,6 @@ const CARD_SHOWS = 4;
 const FILL = "grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))]";
 /** A section's tile is a little wider than a card, for its first sentence. */
 const TILES = "grid-cols-[repeat(auto-fill,minmax(min(19rem,100%),1fr))]";
-const LINES = "max-w-[86ch]";
 
 /**
  * A card per theme. A block that names its facets gives each card a face:
@@ -2021,16 +2099,6 @@ function Pic({ topic, photo, large = false }: { topic: Topic; photo?: string; la
     >
       <Icon size={large ? 28 : 20} strokeWidth={1.75} />
     </span>
-  );
-}
-
-function Photo({ id, className }: { id: string; className: string }) {
-  const { place, workspace } = useWorkspace();
-  const url = usePhoto(place, workspace.id, id);
-  return url ? (
-    <img src={url} alt="" className={`shrink-0 object-cover ${className}`} />
-  ) : (
-    <span aria-hidden="true" className={`shrink-0 bg-chip ${className}`} />
   );
 }
 
@@ -2304,15 +2372,6 @@ function Text({
       })}
     </div>
   );
-}
-
-/**
- * Where a point comes from, if the page shows it: a name or a link. "From
- * Grok" and "From the talk" say only which talk, which a section's own
- * page shows, so the page keeps them for a tooltip.
- */
-function named(point: Point): boolean {
-  return !!point.source && (!!point.source_url || !/^from\b/i.test(point.source));
 }
 
 /**
@@ -2916,57 +2975,6 @@ function List({ points, ticks = true }: { points: Point[]; ticks?: boolean }) {
   );
 }
 
-/**
- * A box to tick: done once all of `points` are. A list's line has one
- * point; a question, the points of its answer. Guests see it, not tick it.
- */
-function Tick({
-  points,
-  label,
-  className = "",
-}: {
-  points: Point[];
-  label: string;
-  className?: string;
-}) {
-  const { sync } = useWorkspace();
-  const guest = useIsGuest();
-  const done = points.length > 0 && points.every((p) => p.done);
-  const Icon = done ? CircleCheck : Circle;
-  const look = `shrink-0 ${done ? "text-accent" : "text-faint"}`;
-  if (guest) {
-    return (
-      <Icon
-        size={18}
-        strokeWidth={1.75}
-        role="img"
-        aria-label={done ? "Done" : "Not done"}
-        className={`${look} ${className}`}
-      />
-    );
-  }
-  return (
-    <button
-      type="button"
-      aria-pressed={done}
-      aria-label={`${label}: ${done ? "done" : "to do"}`}
-      onClick={() =>
-        sync.transact(
-          points.map((p) => ({
-            action: "update" as const,
-            model: "Point" as const,
-            id: p.id,
-            data: { done: !done },
-          })),
-        )
-      }
-      className={`grid place-items-center rounded-full hover:text-muted ${look} ${className}`}
-    >
-      <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
-    </button>
-  );
-}
-
 /** Bars: a set per theme, which names it, each on its own scale. */
 function Bars({ themes }: { themes: Theme[] }) {
   return (
@@ -3171,45 +3179,6 @@ function Timeline({ points }: { points: Point[] }) {
   );
 }
 
-/** A timeline's lines, with the years right-aligned in a column of their own. */
-function TimelineRail({ children }: { children: ReactNode }) {
-  return (
-    <div className="@container">
-      <ol
-        className={`grid ${LINES} grid-cols-[minmax(3.5rem,max-content)_0.875rem_1fr] gap-x-3 @lg:grid-cols-[minmax(5.5rem,max-content)_0.875rem_1fr]`}
-      >
-        {children}
-      </ol>
-    </div>
-  );
-}
-
-/** A line on a timeline: the year, a mark on the rail (longer for a span), then what happened. */
-function TimelineLine({
-  year,
-  span,
-  seen,
-  children,
-}: {
-  year: string;
-  span: boolean;
-  seen: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <li className="group col-span-full grid grid-cols-subgrid">
-      <span className="py-[5px] text-right whitespace-nowrap text-muted tabular-nums">{year}</span>
-      <span
-        aria-hidden="true"
-        className={`relative before:absolute before:inset-y-0 before:left-1.5 before:w-[1.5px] before:bg-line group-first:before:top-3.5 group-last:before:bottom-auto group-last:before:h-3.5 group-only:before:hidden after:absolute after:left-[3px] after:w-2 after:rounded-full ${
-          span ? "after:top-[9px] after:h-3.5" : "after:top-3 after:h-2"
-        } ${seen ? "after:bg-muted" : "after:bg-accent"}`}
-      />
-      {children}
-    </li>
-  );
-}
-
 /** One event: a day's date before it, and ✕ on hover to take it off. */
 function TimelineEvent({ point, at = when(point.happened) }: { point: Point; at?: When }) {
   return (
@@ -3223,32 +3192,5 @@ function TimelineEvent({ point, at = when(point.happened) }: { point: Point; at?
         <RemovePoint point={point} />
       </div>
     </TimelineLine>
-  );
-}
-
-/** Takes a point off the page, once you say so. */
-function RemovePoint({ point }: { point: Point }) {
-  const { sync } = useWorkspace();
-  const guest = useIsGuest();
-  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  if (guest) return null;
-  return (
-    <>
-      <RowAction
-        label="Remove this point…"
-        onClick={() =>
-          setConfirmation({
-            title: "Remove this point?",
-            body: "It leaves the page for everyone in the workspace. This can't be undone.",
-            action: "Remove point",
-            onConfirm: () => sync.delete("Point", point.id),
-          })
-        }
-        className="self-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <X size={13} strokeWidth={1.75} aria-hidden="true" />
-      </RowAction>
-      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
-    </>
   );
 }

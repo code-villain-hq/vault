@@ -225,7 +225,9 @@ what it read. A company server's doesn't.
   a day and a number make a line, a status a board. You say things;
   Claude files them through tools and never picks the look. It follows
   from "Claude writes, code draws"; the app already draws each block from
-  what it keeps.
+  what it keeps. The page draws the set, beside today's kinds, and
+  Settings → Blocks shows each block and picture; talks can't file into
+  it yet.
   [`proposals/one-set-of-blocks.md`](proposals/one-set-of-blocks.md) has
   the set and the order of work.
 - **Workspaces**, as every Code Villain app has them: Home, and Work for

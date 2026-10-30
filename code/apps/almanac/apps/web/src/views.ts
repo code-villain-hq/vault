@@ -1,4 +1,5 @@
 import type { Block, Point } from "@almanac/types";
+import { pictureOf, picturesFor, pictureWidth } from "./collection";
 
 /**
  * How the page draws a block: from the shape of what it keeps, the same way
@@ -15,9 +16,13 @@ import type { Block, Point } from "@almanac/types";
  * - short facts are chips, other sentences lines;
  * - and sentences about a thing, or about several, are a card each.
  *
+ * A block of the set is drawn as its kind, and a collection as the picture
+ * its fields pick (`pictureOf`).
+ *
  * A block that keeps nothing has no view ("") and the page leaves it out.
  */
 export function viewOf(block: Block, points: Point[]): string {
+  if (SET_KINDS.has(block.kind)) return setViewOf(block, points);
   if (OWN.has(block.kind)) return block.kind;
   if (points.length === 0) return "";
   if (SAYS.has(block.kind)) return block.kind;
@@ -38,6 +43,7 @@ export function viewOf(block: Block, points: Point[]): string {
  * its view needs. The row's blocks grow to fill it.
  */
 export function widthOf(view: string, block: Block, points: Point[]): string {
+  if (SET_KINDS.has(block.kind)) return setWidthOf(view, block, points);
   switch (view) {
     case "chips":
       return points.length > 8 ? "1/2" : "1/3";
@@ -79,6 +85,11 @@ export function shownAs(block: Block, points: Point[]): string {
  * only the one.
  */
 export function viewsFor(block: Block, points: Point[]): string[] {
+  if (block.kind === "collection") {
+    const pictures = picturesFor(block, points);
+    return pictures.length > 1 ? pictures : [];
+  }
+  if (SET_KINDS.has(block.kind)) return [];
   const pick = viewOf(block, points);
   if (!pick || OWN.has(pick)) return [];
   const things = themesIn(block, points);
@@ -104,7 +115,41 @@ export const VIEW_NAMES: Record<string, string> = {
   timeline: "Timeline",
   list: "List",
   lines: "List",
+  line: "Line",
+  board: "Board",
+  week: "Week",
 };
+
+/**
+ * The one set of blocks every page is made of, beside today's kinds until
+ * pages move into it: a heading, a paragraph, bullets, a checklist, a
+ * toggle, a callout, and a collection, rows with fields.
+ */
+export const SET_KINDS = new Set([
+  "heading",
+  "paragraph",
+  "bullets",
+  "checklist",
+  "toggle",
+  "callout",
+  "collection",
+]);
+
+/** A block of the set: a heading by its title, the rest by what they keep. */
+function setViewOf(block: Block, points: Point[]): string {
+  if (block.kind === "heading") return block.title.trim() ? "heading" : "";
+  if (block.kind === "collection") return pictureOf(block, points);
+  return points.length > 0 ? block.kind : "";
+}
+
+/**
+ * A block of the set takes half a row, as writing keeps its measure; a
+ * heading and a callout the whole, and a collection what its picture needs.
+ */
+function setWidthOf(view: string, block: Block, points: Point[]): string {
+  if (block.kind === "collection") return pictureWidth(view, block, points);
+  return block.kind === "heading" || block.kind === "callout" ? "whole" : "1/2";
+}
 
 /** The page's own blocks, drawn as they are. */
 const OWN = new Set(["today", "week", "you"]);
