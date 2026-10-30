@@ -208,6 +208,18 @@ what it read. A company server's doesn't.
 
 ## Decided, not built
 
+- **Claude writes, code draws.** Claude keeps what's true and where it
+  goes: sections, the things in them and their fields, steps in order,
+  days, numbers, what's done and what needs a look. It never picks a
+  block's kind, width or icon. The app draws each block from the shape
+  of what it keeps, the same way every time: things with the same
+  fields are cards, or a table past eight; steps in order a checklist;
+  short facts chips; sentences a list; days a timeline, and days with
+  numbers a trend. It fills the rows itself. View as on a block's title
+  switches it, and the choice stays: Claude never changes it. Asking a
+  talk to tidy up merges, splits, renames and moves; it never changes
+  the look. [`proposals/shaping-pages.md`](proposals/shaping-pages.md)
+  has the order of work.
 - **Workspaces**, as every Code Villain app has them: Home, and Work for
   what you learn at work. Only Home is made today.
 - **Ticking off a list**: Reading with a mark for what you've read.
@@ -261,6 +273,10 @@ Open them in a browser. Each shows night and day.
 - [`storyboards/charts-tables-and-a-grid.html`](storyboards/charts-tables-and-a-grid.html):
   Preise finden as a table, Lisa's weight as a trend, where Karriere's
   ads are as parts, and the page as a grid of twelve columns.
+- [`storyboards/claude-writes-code-draws.html`](storyboards/claude-writes-code-draws.html):
+  Karriere's job ads and Code Villain's Marke und Launch as they are,
+  then what Claude writes and what the app draws from it, and who
+  decides what. Night only.
 
 ## Open
 

@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<title>Almanac: Claude writes, code draws</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-mono.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px 16px 80px; }
+  ol, ul { list-style: none; }
+}
+.page { max-width: 1180px; margin: 0 auto; display: grid; gap: 64px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 8px; max-width: 70ch; }
+.step { display: grid; gap: 20px; }
+.step > h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step > h2 .n { color: var(--faint); font-weight: 400; }
+.label { color: var(--faint); font-size: var(--type-ui-small-size); margin-bottom: 8px; }
+.label b { color: var(--fg); font-weight: 600; }
+.why { color: var(--muted); margin-top: 10px; display: grid; gap: 2px; }
+.why li { padding-left: 14px; position: relative; }
+.why li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+
+/* The page as Almanac draws it. */
+.frame { background: var(--panel); border-radius: var(--radius-lg); padding: 22px 28px 26px; display: grid; gap: 28px; }
+.btitle { font-weight: 700; display: flex; align-items: center; gap: 10px; min-height: 26px; }
+.btitle .aside { margin-left: auto; display: flex; align-items: center; gap: 8px; font-weight: 400; color: var(--faint); font-size: var(--type-ui-small-size); }
+.block { display: grid; gap: 10px; align-content: start; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; color: var(--fg); }
+.chips .ui-chip.more { color: var(--faint); }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: -1px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 25%, transparent); }
+.cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.card h4 { font-weight: 700; }
+.card p { color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card .meta { margin-top: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+.rows2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 40px; }
+.list { display: grid; gap: 2px; }
+.list li { padding: 5px 0 5px 16px; position: relative; }
+.list li::before { content: ""; position: absolute; left: 2px; top: 0.85em; width: 5px; height: 5px; border-radius: 50%; background: var(--faint); }
+.steps { display: grid; gap: 6px; }
+.steps li { display: grid; grid-template-columns: 22px 1fr 20px; gap: 10px; align-items: start; background: var(--surface); border-radius: var(--radius-md); padding: 9px 12px; }
+.steps .num { color: var(--muted); font-weight: 700; }
+.steps small { display: block; color: var(--muted); font-size: var(--type-ui-small-size); }
+.tick { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1.75px color-mix(in srgb, var(--fg) 35%, transparent); margin-top: 1px; }
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; color: var(--faint); font-weight: 400; font-size: var(--type-ui-small-size); padding: 6px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.table td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.table td:first-child, .table th:first-child { padding-left: 0; }
+.table td:first-child { font-weight: 700; white-space: nowrap; }
+.table td.dim { color: var(--muted); }
+.table tfoot td { border: 0; color: var(--faint); font-weight: 400; font-size: var(--type-ui-small-size); padding-top: 10px; }
+.look { display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-ui-small-size); font-weight: 400; margin-left: 8px; }
+.look::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.look.info { color: var(--status-info-ink); }
+.look.warn { color: var(--status-warn-ink); }
+
+/* What Claude hands over: plain, no look at all. */
+.flow { display: grid; grid-template-columns: minmax(0, 27rem) minmax(0, 1fr); gap: 20px; align-items: start; }
+.stack { display: grid; gap: 28px; align-content: start; }
+.whole { grid-column: 1 / -1; }
+.whole .list { grid-template-columns: 1fr 1fr; column-gap: 40px; }
+.outline { background: var(--surface); border-radius: var(--radius-lg); padding: 16px 18px; font-family: var(--font-mono); font-size: var(--type-ui-code-size); line-height: 1.75; }
+.outline div { display: flex; gap: 10px; white-space: nowrap; }
+.outline .k { color: var(--faint); min-width: 6.5em; }
+.outline .v { overflow: hidden; text-overflow: ellipsis; }
+.outline .t { margin-left: auto; color: var(--faint); padding-left: 12px; }
+.outline .sec { font-weight: 700; margin-top: 10px; }
+.outline .sec:first-child { margin-top: 0; }
+.outline .thing { font-weight: 700; padding-left: 2ch; margin-top: 6px; }
+.outline .f { padding-left: 4ch; }
+.outline .i { padding-left: 2ch; }
+.outline .more { color: var(--faint); padding-left: 2ch; margin-top: 6px; }
+.rule { color: var(--faint); font-size: var(--type-ui-small-size); margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.rule span { color: var(--fg); }
+
+/* Who decides what. */
+.who { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.who > div { background: var(--panel); border-radius: var(--radius-lg); padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
+.who h3 { font-weight: 700; }
+.who ul { display: grid; gap: 6px; color: var(--muted); }
+.who li { padding-left: 14px; position: relative; }
+.who li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.who li b { color: var(--fg); font-weight: 600; }
+
+@media (max-width: 860px) {
+  .flow, .rows2, .who { grid-template-columns: 1fr; }
+  .table-wrap { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+<header>
+  <h1>Claude writes, code draws</h1>
+  <p>A sketch, night only, with two of your real pages. Today Claude picks how a block looks every time it keeps something. Here it only says what's true and where it goes. Code picks the look, the same way every time, and you can switch it.</p>
+</header>
+
+<!-- 1. Karriere -->
+<section class="step">
+  <h2><span class="n">1</span> Karriere: the job ads</h2>
+
+  <div>
+    <div class="label"><b>Today.</b> Claude picked cards and made a card per category.</div>
+    <div class="frame">
+      <div class="block">
+        <div class="btitle">Signale aus Anzeigen</div>
+        <div class="cards">
+          <div class="card"><h4>AI und Agents</h4><p>TV4 Agentic Platform: interne Agent-Plattform mit MCP, Coding-Agents, Eval und Observability, auf Englisch.</p><div class="meta">8 points</div></div>
+          <div class="card"><h4>Arbeitsmodell und Gehalt</h4><p>Mentimeter auf LinkedIn on-site, nur interessant, wenn Hybrid geklärt ist.</p><div class="meta">8 points</div></div>
+          <div class="card"><h4>Offen</h4><p>Ashby ist klarer Top-Fit; ein kleines Postgres-plus-GraphQL-Projekt würde direkt darauf einzahlen.</p><div class="meta">2 points</div></div>
+          <div class="card"><h4>Ownership und Betrieb</h4><p>TV4 Senior Product Engineer, Content Delivery: TS/Node, Next.js, Postgres, Queues, OpenTelemetry, Claude Code, MCP.</p><div class="meta">4 points</div></div>
+          <div class="card"><h4>Stack</h4><p>Mentimeter Stockholm, Product Engineer: TS, React, Next.js, Ownership statt Ticket-Abarbeiten, English-first ohne Schwedisch.</p><div class="meta">6 points</div></div>
+        </div>
+      </div>
+    </div>
+    <ul class="why">
+      <li>The things here are the job ads, not the categories. Ashby's pay, stack and fit sit in three different cards.</li>
+      <li>You can't compare two ads without opening every card.</li>
+    </ul>
+  </div>
+
+  <div class="flow">
+    <div>
+      <div class="label"><b>Claude writes.</b> What's true, about which thing. No kind, no width, no icon.</div>
+      <div class="outline">
+        <div class="sec"><span class="v">Stellen</span><span class="t">section</span></div>
+        <div class="thing"><span class="v">Ashby</span><span class="t">thing</span></div>
+        <div class="f"><span class="k">Rolle</span><span class="v">Senior, Product Engineering</span></div>
+        <div class="f"><span class="k">Arbeit</span><span class="v">remote EU</span></div>
+        <div class="f"><span class="k">Gehalt</span><span class="v">€108–145k + Equity</span></div>
+        <div class="f"><span class="k">Stack</span><span class="v">TS, React, GraphQL, Postgres</span></div>
+        <div class="f"><span class="k">Notiz</span><span class="v">Top-Fit</span><span class="t">look: info</span></div>
+        <div class="thing"><span class="v">halcy</span></div>
+        <div class="f"><span class="k">Rolle</span><span class="v">Senior Engineer</span></div>
+        <div class="f"><span class="k">Arbeit</span><span class="v">hybrid Stockholm</span></div>
+        <div class="f"><span class="k">Gehalt</span><span class="v">€80–150k + Equity</span></div>
+        <div class="f"><span class="k">Stack</span><span class="v">TS, React, Node or Deno</span></div>
+        <div class="f"><span class="k">Notiz</span><span class="v">Anschreiben offen</span><span class="t">look: warn</span></div>
+        <div class="thing"><span class="v">TV4</span></div>
+        <div class="f"><span class="k">Rolle</span><span class="v">Senior Product Engineer</span></div>
+        <div class="f"><span class="k">Arbeit</span><span class="v">office-first, 4 Tage</span></div>
+        <div class="f"><span class="k">Stack</span><span class="v">TS/Node, Next.js, Postgres</span></div>
+        <div class="more">… 19 more ads</div>
+      </div>
+    </div>
+    <div>
+      <div class="rule">Code sees <span>22 things with the same fields</span> → a table (cards up to 8)</div>
+      <div class="frame">
+        <div class="block">
+          <div class="btitle">Stellen
+            <div class="aside">View as
+              <div class="ui-segmented" role="group" aria-label="View as">
+                <button type="button" class="ui-segment" aria-pressed="true">Table</button>
+                <button type="button" class="ui-segment" aria-pressed="false">Cards</button>
+                <button type="button" class="ui-segment" aria-pressed="false">List</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th></th><th>Rolle</th><th>Arbeit</th><th>Gehalt</th><th>Stack</th></tr></thead>
+            <tbody>
+              <tr><td>Ashby<span class="look info">Top-Fit</span></td><td>Senior, Product Engineering</td><td class="dim">remote EU</td><td>€108–145k + Equity</td><td class="dim">TS, React, GraphQL, Postgres</td></tr>
+              <tr><td>Ashby</td><td>Staff, Product Engineering</td><td class="dim">remote, auch Stockholm</td><td>€154–250k + Equity</td><td class="dim">TS, React, GraphQL, Postgres</td></tr>
+              <tr><td>halcy<span class="look warn">Anschreiben offen</span></td><td>Senior Engineer</td><td class="dim">hybrid Stockholm</td><td>€80–150k + Equity</td><td class="dim">TS, React, Node/Deno</td></tr>
+              <tr><td>Sinch</td><td>Senior Full-Stack</td><td class="dim">hybrid Stockholm</td><td>745k–1,11M SEK</td><td class="dim">React, Node, TS, Postgres</td></tr>
+              <tr><td>Henosia</td><td>Founding Product Engineer</td><td class="dim">remote</td><td>60–70k DKK / Monat</td><td class="dim"></td></tr>
+              <tr><td>TV4</td><td>Senior Product Engineer</td><td class="dim">office-first, 4 Tage</td><td></td><td class="dim">TS/Node, Next.js, Postgres</td></tr>
+              <tr><td>Tibber</td><td>Fullstack</td><td class="dim">hybrid Stockholm/Berlin</td><td></td><td class="dim">React, Next.js, Node, AWS</td></tr>
+              <tr><td>Viaplay</td><td>Senior Fullstack AI Engineer</td><td class="dim">3+ Bürotage</td><td></td><td class="dim">React, Node/TS</td></tr>
+            </tbody>
+            <tfoot><tr><td colspan="5">14 more</td></tr></tfoot>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Code Villain -->
+<section class="step">
+  <h2><span class="n">2</span> Code Villain: Marke und Launch</h2>
+
+  <div>
+    <div class="label"><b>Today.</b> Claude filed 23 sentences as chips, because a chips block was there.</div>
+    <div class="frame">
+      <div class="block">
+        <div class="btitle">Marke und Launch</div>
+        <div class="chips">
+          <span class="ui-chip">Ziel: Portfolio für den Job-Markt (Senior Frontend, Product/AI, Tools)</span>
+          <span class="ui-chip">Reihenfolge: villain-layer, dann Org-Profil und Pins, dann Caster, zuletzt Launch</span>
+          <span class="ui-chip">Launch (LinkedIn, Show HN) erst, wenn README und Demo greifen</span>
+          <span class="ui-chip">Villain kommt von Doctor Doom und MF Doom: Maske, Craft, Storytelling</span>
+          <span class="ui-chip">Doom-Stil in Lila: Maske, Metall, Gewicht, Theater statt clean SaaS</span>
+          <span class="ui-chip">Markenfarbe #a78bfa (--accent aus Layer); Hintergrund #0c0c11 ist Bühne, nicht Marke</span>
+          <span class="ui-chip">Palette: Accent-dim #6d5ba8, Panel #12121a/#171722, Border #23232f, Text #dcdce6</span>
+          <span class="ui-chip">Signalfarben: Success #4ade80, Warn #fbbf24, Danger #f87171, Info #60a5fa</span>
+          <span class="ui-chip">Schrift-Richtung, nicht final: Archivo Black, Space Grotesk, JetBrains Mono</span>
+          <span class="ui-chip">Verworfen: Inter (zu clean, SaaS), Syne (wirkt gequetscht)</span>
+          <span class="ui-chip">Maske nicht im Zentrum, nur als kleines Mark, nie doppelt</span>
+          <span class="ui-chip">Neue Farben nur mit Begründung und Vorschau</span>
+          <span class="ui-chip">Glatte Gradients und eine gerenderte Maske wirken nach AI</span>
+          <span class="ui-chip">Website live auf codevillain.eu, vorher war dort nur Forgejo</span>
+          <span class="ui-chip more">9 more</span>
+        </div>
+      </div>
+    </div>
+    <ul class="why">
+      <li>Colours, fonts, the launch order and rules are all in one pile.</li>
+      <li>Nothing tells Claude a chip is too long until a layout refuses it.</li>
+    </ul>
+  </div>
+
+  <div class="flow">
+    <div>
+      <div class="label"><b>Claude writes.</b> Sections, lines, and what each line is: a step in order, a fact.</div>
+      <div class="outline">
+        <div class="sec"><span class="v">Launch</span><span class="t">steps, in order</span></div>
+        <div class="i"><span class="v">villain-layer</span></div>
+        <div class="i"><span class="v">Org-Profil und Pins</span></div>
+        <div class="i"><span class="v">Caster</span></div>
+        <div class="i"><span class="v">LinkedIn, Show HN</span><span class="t">after: README, Demo</span></div>
+        <div class="sec"><span class="v">Farben</span></div>
+        <div class="i"><span class="k">Accent</span><span class="v">#a78bfa</span></div>
+        <div class="i"><span class="k">Hintergrund</span><span class="v">#0c0c11, Bühne</span></div>
+        <div class="i"><span class="k">Panel</span><span class="v">#12121a</span></div>
+        <div class="i"><span class="k">Text</span><span class="v">#dcdce6</span></div>
+        <div class="i"><span class="k">Success</span><span class="v">#4ade80</span></div>
+        <div class="more">… 3 more</div>
+        <div class="sec"><span class="v">Schrift</span></div>
+        <div class="i"><span class="v">Archivo Black, Space Grotesk, JetBrains Mono</span></div>
+        <div class="i"><span class="v">Verworfen: Inter, Syne</span></div>
+        <div class="sec"><span class="v">Regeln</span></div>
+        <div class="i"><span class="v">Maske nur als kleines Mark, nie doppelt</span></div>
+        <div class="more">… 3 more</div>
+      </div>
+    </div>
+    <div>
+      <div class="rule">Code sees <span>steps in order</span> → a checklist · <span>short facts</span> → chips, a colour code gets its swatch · <span>sentences</span> → a list · and fills the rows</div>
+      <div class="frame">
+        <div class="rows2">
+          <div class="block">
+            <div class="btitle">Launch</div>
+            <ol class="steps">
+              <li><span class="num">1</span><span>villain-layer</span><span class="tick"></span></li>
+              <li><span class="num">2</span><span>Org-Profil und Pins</span><span class="tick"></span></li>
+              <li><span class="num">3</span><span>Caster</span><span class="tick"></span></li>
+              <li><span class="num">4</span><span>LinkedIn, Show HN<small>Erst, wenn README und Demo greifen</small></span><span class="tick"></span></li>
+            </ol>
+          </div>
+          <div class="stack">
+          <div class="block">
+            <div class="btitle">Farben</div>
+            <div class="chips">
+              <span class="ui-chip"><span class="swatch" style="background:#a78bfa"></span>Accent</span>
+              <span class="ui-chip"><span class="swatch" style="background:#0c0c11"></span>Hintergrund</span>
+              <span class="ui-chip"><span class="swatch" style="background:#12121a"></span>Panel</span>
+              <span class="ui-chip"><span class="swatch" style="background:#dcdce6"></span>Text</span>
+              <span class="ui-chip"><span class="swatch" style="background:#4ade80"></span>Success</span>
+              <span class="ui-chip"><span class="swatch" style="background:#fbbf24"></span>Warn</span>
+              <span class="ui-chip"><span class="swatch" style="background:#f87171"></span>Danger</span>
+              <span class="ui-chip"><span class="swatch" style="background:#60a5fa"></span>Info</span>
+            </div>
+          </div>
+          <div class="block">
+            <div class="btitle">Schrift</div>
+            <ul class="list">
+              <li>Archivo Black, Space Grotesk, JetBrains Mono, nicht final</li>
+              <li>Verworfen: Inter (zu clean), Syne (gequetscht)</li>
+            </ul>
+          </div>
+          </div>
+          <div class="block whole">
+            <div class="btitle">Regeln</div>
+            <ul class="list">
+              <li>Maske nur als kleines Mark, nie doppelt</li>
+              <li>Neue Farben nur mit Begründung und Vorschau</li>
+              <li>Kein flaches Lila auf Schwarz: schlecht für a11y</li>
+              <li>Keine glatten Gradients, keine gerenderte Maske</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Who decides what -->
+<section class="step">
+  <h2><span class="n">3</span> Who decides what</h2>
+  <div class="who">
+    <div>
+      <h3>Claude</h3>
+      <ul>
+        <li><b>What's true</b>, with its source, as now.</li>
+        <li><b>Where it goes</b>: which section, which thing.</li>
+        <li><b>What a line is</b>: a field of a thing, a step in order, a day, a number, done, needs a look.</li>
+        <li>When you ask to tidy up: merge, split, rename, move. Never the look.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Code</h3>
+      <ul>
+        <li><b>The view</b>, by fixed rules: things with the same fields are cards or a table, steps a checklist, short facts chips, sentences a list, days a timeline, days with numbers a trend.</li>
+        <li><b>The widths</b>: it fills the rows.</li>
+        <li><b>The order</b>: what's due and what needs a look first.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>You</h3>
+      <ul>
+        <li><b>View as</b> on any section: table, cards, list, timeline.</li>
+        <li>Your choice stays. Claude never changes it.</li>
+        <li>Nothing else to keep tidy.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+</body>
+</html>
