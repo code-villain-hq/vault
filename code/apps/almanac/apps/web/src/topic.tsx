@@ -90,7 +90,7 @@ import { Table } from "./table";
 import { TalkPanel, useTalks } from "./talk";
 import { bySection, inOrder, type When, when } from "./timeline";
 import { Button, Empty } from "./ui";
-import { viewOf, widthOf } from "./views";
+import { shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
@@ -405,7 +405,7 @@ interface PageParts {
 
 /**
  * The topic's blocks in page order, each with the view and width the app
- * draws it at (`viewOf`), its points, its open questions and its reminders
+ * draws it at (`shownAs`), its points, its open questions and its reminders
  * that are on.
  */
 function usePage(topic: Topic): PageParts {
@@ -435,7 +435,7 @@ function usePage(topic: Topic): PageParts {
 /** A block as the page draws it: its kind the view, its width the view's. */
 function drawn(block: Block, points: Point[]): Block {
   const held = points.filter((p) => p.block_id === block.id);
-  const view = viewOf(block, held);
+  const view = shownAs(block, held);
   return { ...block, kind: view, width: widthOf(view, block, held) };
 }
 
@@ -1488,12 +1488,11 @@ function BlockFrame({
       <div className="flex min-h-6 items-center gap-2">
         {title && <h2 className={lead ? "font-semibold" : "text-xs text-faint"}>{title}</h2>}
         {tools}
-        {aside && <span className="ml-auto flex items-center gap-3">{aside}</span>}
-        <BlockMenu
-          block={block}
-          blocks={blocks}
-          className={aside ? "group-hover/block:opacity-100" : undefined}
-        />
+        <span className="ml-auto flex items-center gap-3">
+          {aside}
+          <ViewAs block={block} />
+          <BlockMenu block={block} blocks={blocks} className="group-hover/block:opacity-100" />
+        </span>
       </div>
       {empty ? (
         <p className="rounded-lg px-4 py-3.5 text-faint ring-1 ring-line ring-inset">
@@ -1503,6 +1502,44 @@ function BlockFrame({
         children
       )}
     </section>
+  );
+}
+
+/**
+ * View as, beside a block's title on hover: the views that can draw what
+ * it keeps, the one it's drawn with pressed. A person's pick stays until
+ * they pick another, for everyone in the workspace, and a talk never
+ * changes it; the app's own pick leaves the view to the app again.
+ */
+function ViewAs({ block }: { block: Block }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const blocks = useRecords("Block");
+  const points = useRecords("Point");
+  // The block as kept, not as drawn: its kind is the talk's.
+  const kept = blocks.find((b) => b.id === block.id);
+  if (guest || !kept) return null;
+  const held = points.filter((p) => p.block_id === block.id);
+  const views = viewsFor(kept, held);
+  if (views.length === 0) return null;
+  const pick = viewOf(kept, held);
+  return (
+    <span className="flex items-center gap-2 text-xs text-faint opacity-0 group-hover/block:opacity-100 focus-within:opacity-100">
+      <span aria-hidden="true">View as</span>
+      <fieldset aria-label={`View ${blockName(block)} as`} className="ui-segmented -my-0.5">
+        {views.map((view) => (
+          <button
+            key={view}
+            type="button"
+            className="ui-segment"
+            aria-pressed={view === block.kind}
+            onClick={() => sync.update("Block", block.id, { view: view === pick ? "" : view })}
+          >
+            {VIEW_NAMES[view]}
+          </button>
+        ))}
+      </fieldset>
+    </span>
   );
 }
 

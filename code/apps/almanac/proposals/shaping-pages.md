@@ -77,12 +77,13 @@ better, the rest follow.
 ## In what order
 
 1. The app picks each block's view and width from what it keeps today.
-   A block's kind becomes the view you pinned, empty for the app's
-   pick. Before and after with real pages. Built October 30 in the web
-   app alone (`views.ts`): the data is as it was, and turning a kind
-   into a pinned view goes with step 2. A list, questions and a shelf
-   keep their kind until step 3.
-2. View as on a block's title.
+   Before and after with real pages. Built October 30 in the web app
+   alone (`views.ts`): the data is as it was. A list, questions and a
+   shelf keep their kind until step 3.
+2. View as on a block's title. Built October 30: the view you pick is a
+   block's `view`, empty for the app's pick, beside its kind, which
+   stays the talk's until step 3 takes it away. Picking the app's own
+   empties it again.
 3. What Claude is told: what each point is, not how it looks. Laying
    out anew becomes tidying up, in small steps.
 4. One topic imported again, beside the old page. Then the others.
@@ -97,7 +98,8 @@ better, the rest follow.
 ## Open
 
 - Today's blocks: do they start on the app's pick, or keep the kind
-  Claude gave them as if you had pinned it? Proposed: the app's pick.
+  Claude gave them as if you had pinned it? Proposed: the app's pick,
+  and step 2 built it that way: every block's `view` starts empty.
 - A field's icon (Licht, Wasser): from a fixed list by its name, or
   none?
 - A topic imported again: does it replace the imported points, or sit

@@ -19,4 +19,8 @@ facets: Array<Facet>,
 /**
  * One of [`BLOCK_WIDTHS`].
  */
-width: string, position: number, created_at: string, updated_at: string, };
+width: string, 
+/**
+ * One of [`BLOCK_VIEWS`].
+ */
+view: string, position: number, created_at: string, updated_at: string, };

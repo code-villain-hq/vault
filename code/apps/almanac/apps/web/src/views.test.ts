@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { Block, Point } from "@almanac/types";
-import { viewOf, widthOf } from "./views";
+import { shownAs, viewOf, viewsFor, widthOf } from "./views";
 
-const block = (kind: string, title = "Notes", facets: string[] = []): Block => ({
+const block = (kind: string, title = "Notes", facets: string[] = [], view = ""): Block => ({
   id: "b1",
   workspace_id: "w",
   topic_id: "t",
@@ -10,6 +10,7 @@ const block = (kind: string, title = "Notes", facets: string[] = []): Block => (
   title,
   facets: facets.map((name) => ({ name, icon: "" })),
   width: "",
+  view,
   position: 0,
   created_at: "",
   updated_at: "",
@@ -136,5 +137,50 @@ describe("widthOf", () => {
   test("gives a profile the row", () => {
     const lisa = [point("Lisa", "Kurzhaar", { facet: "Fell" })];
     expect(widthOf("cards", block("cards", "Lisa", ["Fell"]), lisa)).toBe("whole");
+  });
+});
+
+describe("viewsFor", () => {
+  const shoes = [
+    point("Schuh 1", "89 €", { facet: "Preis" }),
+    point("Schuh 2", "Seit 2024", { facet: "Preis", happened: "2024" }),
+  ];
+
+  test("offers what can draw the points, the app's pick among them", () => {
+    expect(viewsFor(block("cards", "Schuhe", ["Preis"]), shoes)).toEqual([
+      "table",
+      "cards",
+      "timeline",
+      "lines",
+    ]);
+    const cities = [point("", "Wien"), point("", "Graz"), point("", "Linz", { happened: "1490" })];
+    expect(viewsFor(block("chips"), cities)).toEqual(["chips", "timeline", "lines"]);
+  });
+
+  test("offers ticks only for steps", () => {
+    expect(viewsFor(block("list"), [point("Morgens", "Leine anlegen")])).toEqual(["cards", "list"]);
+  });
+
+  test("offers nothing for the page's own blocks, or with only one to pick", () => {
+    expect(viewsFor(block("today"), [point("", "Gießen")])).toEqual([]);
+    expect(viewsFor(block("you"), [point("", "Lebt in Berlin")])).toEqual([]);
+    expect(viewsFor(block("chips"), [point("", sentence)])).toEqual([]);
+    expect(viewsFor(block("cards"), [])).toEqual([]);
+  });
+});
+
+describe("shownAs", () => {
+  test("draws a block as a person picked it", () => {
+    const things = Array.from({ length: 9 }, (_, i) =>
+      point(`Schuh ${i}`, "89 €", { facet: "Preis" }),
+    );
+    expect(shownAs(block("cards", "Schuhe", ["Preis"]), things)).toBe("table");
+    expect(shownAs(block("cards", "Schuhe", ["Preis"], "cards"), things)).toBe("cards");
+  });
+
+  test("goes back to the app's pick while the picked view can't draw the points", () => {
+    const facts = [point("", "Wien"), point("", "Graz")];
+    expect(shownAs(block("chips", "Notes", [], "timeline"), facts)).toBe("chips");
+    expect(shownAs(block("chips", "Notes", [], "table"), facts)).toBe("chips");
   });
 });

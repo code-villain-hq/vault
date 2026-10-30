@@ -142,6 +142,12 @@ topics.
   chips, other sentences lines; sentences about a thing a card each.
   Steps, questions and a shelf stay as the talk kept them, and so do
   Today, the week and You. A colour code shows its colour.
+- **View as** beside a block's title, on hover, switches its view: a
+  table when it has facets, cards when it's about things, a timeline when
+  it has days, a list always, and the app's own pick among them. The
+  choice stays for everyone in the workspace while the view can draw what
+  the block keeps, and a talk never changes it; picking the app's own
+  leaves it to the app again.
 - **The page is a grid** of twelve columns, and a block is as wide as its
   view needs: ⅓ for Chips, Trend and Parts; ½ for Bars, Questions, Steps,
   Lines and Timeline; cards and tiles ⅓, ½ or the whole, by how many; the
@@ -217,8 +223,7 @@ what it read. A company server's doesn't.
   what it keeps. Next, Claude keeps only what's true and where it goes:
   sections, the things in them and their fields, steps in order, days,
   numbers, what's done and what needs a look. It never picks a block's
-  kind, width or icon. View as on a block's title switches a view, and
-  the choice stays: Claude never changes it. Asking a
+  kind, width or icon; View as is already the person's alone. Asking a
   talk to tidy up merges, splits, renames and moves; it never changes
   the look. [`proposals/shaping-pages.md`](proposals/shaping-pages.md)
   has the order of work.

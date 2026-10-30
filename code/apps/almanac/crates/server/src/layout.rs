@@ -21,7 +21,7 @@ use crate::kept::{Shape, facets, fields, found, when};
 use crate::page::Refs;
 use crate::topics::cut;
 
-const BLOCKS: &str = "SELECT id, kind, title, facets, width, position FROM blocks \
+const BLOCKS: &str = "SELECT id, kind, title, facets, width, view, position FROM blocks \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, look, amount, note, \
      position, source, source_url \
@@ -50,6 +50,7 @@ pub struct BlockNow {
     pub title: String,
     pub facets: Json<Vec<Facet>>,
     pub width: String,
+    pub view: String,
     pub position: i32,
 }
 
@@ -975,6 +976,7 @@ fn block_was(block: &BlockNow, removed: bool) -> BlockWas {
         title: block.title.clone(),
         facets: block.facets.0.clone(),
         width: block.width.clone(),
+        view: block.view.clone(),
         position: block.position,
         removed,
     }
@@ -1003,8 +1005,10 @@ pub fn undo(
             ("position", json!(block.position)),
         ]);
         if block.removed && !blocks.contains(&block.id) {
+            // A person's view comes back with the block; a layout never sets one.
             let mut data = data;
             data.insert("topic_id".into(), json!(topic_id));
+            data.insert("view".into(), json!(block.view));
             operations.push(Operation::Create {
                 model: ModelKind::Block,
                 id: block.id,
@@ -1086,6 +1090,7 @@ mod tests {
                 title: title.to_string(),
                 facets: Json(Vec::new()),
                 width: String::new(),
+                view: String::new(),
                 position: n as i32,
             });
             refs.blocks.push(RefBlock {
@@ -1514,7 +1519,7 @@ mod tests {
 
     #[test]
     fn a_block_it_empties_goes_and_undo_brings_it_back() {
-        let (now, refs) = page(&[
+        let (mut now, refs) = page(&[
             (
                 "chips",
                 "Lisa",
@@ -1522,6 +1527,8 @@ mod tests {
             ),
             ("cards", "Wie sie ist", &[("Verhalten", "Schläft viel")]),
         ]);
+        // Someone views Lisa as a list.
+        now.blocks[0].view = "lines".into();
         let layout = args(
             vec![block("b2", "", "")],
             vec![
@@ -1553,13 +1560,14 @@ mod tests {
             Operation::Delete { model: ModelKind::Block, id } if *id == lisa
         )));
 
-        // Undo, after it: Lisa is back, with her points as they were.
+        // Undo, after it: Lisa is back as a list, with her points as they were.
         let cards = now.blocks[1].id;
         let points: Vec<(Uuid, Uuid)> = now.points.iter().map(|p| (p.id, cards)).collect();
         let undo = undo(topic, made, &[cards], &points);
         assert!(undo.iter().any(|o| matches!(
             o,
-            Operation::Create { model: ModelKind::Block, id, .. } if *id == lisa
+            Operation::Create { model: ModelKind::Block, id, data }
+                if *id == lisa && data["view"] == json!("lines")
         )));
         let back: Vec<&Value> = undo
             .iter()

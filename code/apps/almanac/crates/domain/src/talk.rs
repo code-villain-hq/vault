@@ -201,6 +201,9 @@ pub struct BlockWas {
     pub facets: Vec<Facet>,
     #[serde(default)]
     pub width: String,
+    /// The view a person picked, which undo brings back with the block.
+    #[serde(default)]
+    pub view: String,
     pub position: i32,
     /// Whether the layout removed it.
     pub removed: bool,

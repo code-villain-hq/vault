@@ -160,6 +160,12 @@ pub const BLOCK_KINDS: &[&str] = &[
 /// ([`width_of`]).
 pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
 
+/// How a person asked a block to be drawn, with View as: a table, cards, a
+/// list (`lines` when it isn't steps to tick) or a timeline. Empty is the
+/// app's own pick from what the block keeps. Only a person sets it; a
+/// talk's layout never does.
+pub const BLOCK_VIEWS: &[&str] = &["", "table", "cards", "list", "lines", "timeline"];
+
 /// The width a block of `kind` has when it names none: a third for what
 /// reads at a glance, a half for what reads as a column, the whole for the
 /// rest.
@@ -285,6 +291,8 @@ pub struct Block {
     pub facets: Vec<Facet>,
     /// One of [`BLOCK_WIDTHS`].
     pub width: String,
+    /// One of [`BLOCK_VIEWS`].
+    pub view: String,
     pub position: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -299,6 +307,7 @@ pub struct BlockCreate {
     pub title: Option<String>,
     pub facets: Option<Vec<Facet>>,
     pub width: Option<String>,
+    pub view: Option<String>,
     /// After the topic's last block when left out.
     pub position: Option<i32>,
 }
@@ -311,6 +320,7 @@ pub struct BlockPatch {
     pub title: Option<String>,
     pub facets: Option<Vec<Facet>>,
     pub width: Option<String>,
+    pub view: Option<String>,
     pub position: Option<i32>,
 }
 
@@ -556,6 +566,7 @@ impl Validate for BlockCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         one_of(Some(&self.kind), BLOCK_KINDS, "kind")?;
         one_of(self.width.as_deref(), BLOCK_WIDTHS, "width")?;
+        one_of(self.view.as_deref(), BLOCK_VIEWS, "view")?;
         self.title.as_deref().map(block_title).transpose()?;
         self.facets.as_deref().map(facets).transpose()?;
         Ok(())
@@ -566,6 +577,7 @@ impl Validate for BlockPatch {
     fn validate(&self) -> Result<(), ValidationError> {
         one_of(self.kind.as_deref(), BLOCK_KINDS, "kind")?;
         one_of(self.width.as_deref(), BLOCK_WIDTHS, "width")?;
+        one_of(self.view.as_deref(), BLOCK_VIEWS, "view")?;
         self.title.as_deref().map(block_title).transpose()?;
         self.facets.as_deref().map(facets).transpose()?;
         Ok(())

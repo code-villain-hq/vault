@@ -185,6 +185,13 @@ What they do:
   share of a row its view needs. A layout still gives blocks a kind and
   a `width` (`BLOCK_WIDTHS`, `width_of`), which the page doesn't read.
 
+  View as on a block's title sets its `view` (`BLOCK_VIEWS`: `table`,
+  `cards`, `list`, `lines`, `timeline`; migration 0014). `viewsFor`
+  offers the views that can draw its points, the app's pick among them,
+  and `shownAs` draws with the person's while it's one of those. Picking
+  the app's own empties it. Only a person sets it: a layout never writes
+  `view`, and its Undo brings a removed block back with the view it had.
+
   The topic page's timeline is a line per section, when
   its events begin and end (`bySection`); a section's page lists its
   events first. When none fits, an answer may start up to two blocks, with

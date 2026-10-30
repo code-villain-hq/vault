@@ -63,6 +63,49 @@ export function widthOf(view: string, block: Block, points: Point[]): string {
   }
 }
 
+/**
+ * The view a block is drawn with: the one a person picked with View as,
+ * while it can still draw what the block keeps, or else the app's own.
+ */
+export function shownAs(block: Block, points: Point[]): string {
+  return viewsFor(block, points).includes(block.view) ? block.view : viewOf(block, points);
+}
+
+/**
+ * What View as offers for a block, the app's own pick among them: the
+ * views that can draw what it keeps. A table needs its columns, cards
+ * things to be about and a timeline days; a list draws anything, with
+ * ticks only for steps. None for the page's own blocks, or when there's
+ * only the one.
+ */
+export function viewsFor(block: Block, points: Point[]): string[] {
+  const pick = viewOf(block, points);
+  if (!pick || OWN.has(pick)) return [];
+  const things = themesIn(block, points);
+  const fits = new Set([pick, block.kind === "list" ? "list" : "lines"]);
+  if (block.facets.length > 0) fits.add("table");
+  if (block.facets.length > 0 || things > 0) fits.add("cards");
+  if (points.some((p) => p.happened)) fits.add("timeline");
+  const views = Object.keys(VIEW_NAMES).filter((view) => fits.has(view));
+  return views.length > 1 ? views : [];
+}
+
+/** Each view's name in View as, in the order it offers them. */
+export const VIEW_NAMES: Record<string, string> = {
+  table: "Table",
+  cards: "Cards",
+  text: "Text",
+  shelf: "Shelf",
+  questions: "Questions",
+  chips: "Chips",
+  bars: "Bars",
+  trend: "Trend",
+  parts: "Parts",
+  timeline: "Timeline",
+  list: "List",
+  lines: "List",
+};
+
 /** The page's own blocks, drawn as they are. */
 const OWN = new Set(["today", "week", "you"]);
 /** Kinds that say what their points are. */

@@ -62,6 +62,7 @@ export function samples(): Sample[] {
       title,
       facets,
       width,
+      view: "",
       position: 0,
     };
     const point = (theme: string, text: string, more: Partial<Point> = {}): Point => ({

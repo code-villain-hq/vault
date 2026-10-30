@@ -31,9 +31,9 @@ pub use talk::{
     TalkPatch, TopicChange,
 };
 pub use topic::{
-    BLOCK_KINDS, BLOCK_WIDTHS, Block, BlockCreate, BlockPatch, FACET_ICONS, Facet, ICONS, KINDS,
-    LOOKS, MOST_FACETS, Point, PointCreate, PointPatch, Question, QuestionCreate, QuestionPatch,
-    Reminder, ReminderCreate, ReminderPatch, STICKS_TO_MAX, StartTopicRequest, StartedTopic,
-    TEMPLATE_NAMES, TEMPLATES, Topic, TopicCreate, TopicPatch, template, width_of,
+    BLOCK_KINDS, BLOCK_VIEWS, BLOCK_WIDTHS, Block, BlockCreate, BlockPatch, FACET_ICONS, Facet,
+    ICONS, KINDS, LOOKS, MOST_FACETS, Point, PointCreate, PointPatch, Question, QuestionCreate,
+    QuestionPatch, Reminder, ReminderCreate, ReminderPatch, STICKS_TO_MAX, StartTopicRequest,
+    StartedTopic, TEMPLATE_NAMES, TEMPLATES, Topic, TopicCreate, TopicPatch, template, width_of,
 };
 pub use user::User;
