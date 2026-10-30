@@ -16,6 +16,27 @@ theme: string, text: string,
  */
 happened: string, 
 /**
+ * On a card: the facet it's about, one of its block's ("Wasser").
+ */
+facet: string, 
+/**
+ * Whether it needs a look, one of [`LOOKS`]: a card's problem, a gap.
+ */
+look: string, 
+/**
+ * In bars: the number its bar shows.
+ */
+amount: number | null, 
+/**
+ * A few words beside it: by a bar ("getötet"), or who asked a
+ * question, on its first point.
+ */
+note: string, 
+/**
+ * Ticked: a list's item done, a question practised.
+ */
+done: boolean, 
+/**
  * Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
  */
 source: string | null, source_url: string | null, 

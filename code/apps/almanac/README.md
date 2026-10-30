@@ -91,13 +91,15 @@ topics.
   page; a block's name opens the page at it. The workspace's own topic
   has only its name and what it sticks to.
 - **A topic is its blocks**, in order, with no page shape to pick: Today
-  (the day's steps to tick off), Week, Chips, Shelf, Cards, Text, List and
-  Timeline, each with a title of the topic's own ("Advice" in Haare,
-  "Terms" in Marx), and You, what it knows about you, which About shows.
+  (the day's steps to tick off), Week, Chips, Shelf, Cards, Table, Text,
+  List, Bars, Trend, Parts, Questions and Timeline, each with a title of the topic's own
+  ("Advice" in Haare, "Terms" in Marx), and You, what it knows about you,
+  which About shows. Settings → Blocks shows every kind with sample points.
   A template only names the blocks a topic starts with: Routine has Today,
   Week, Your shelf and Advice; Collection Today, Week and a card per
   thing; Study Reading, Terms and What it says; each has You. ⋯ beside a block's title
-  moves it up or down, renames it or removes it with what it keeps. An
+  moves it up or down, sets its width, shows cards as a table and back,
+  renames it or removes it with what it keeps. An
   empty block says in a line what will be there, and a topic with nothing
   kept yet offers its first questions.
 - **A talk** opens beside the page and streams its answer. Each question
@@ -124,8 +126,39 @@ topics.
   width: cards, steps and tiles take as many columns as fit, and writing,
   lists and timelines keep a length you can read across. The sidebar's
   edge drags wider for long topic names, and this Mac keeps the width.
+- **The page is for a glance**, a section's own page for reading. A text
+  section is a tile with its first sentence, and a source shows once,
+  under its block. A card has a face: a line per facet with its icon
+  (Licht, Wasser), what needs a look in warn or info, "N points", and the
+  newest photo from a talk about it. A block with one card, one cat, is a
+  profile: the picture, chips, and a tile per facet. Bars compare numbers
+  on one scale, with a gap in warn. Questions are for rehearsing: the
+  answer folds open, a tick once practised, and Quiz me starts a talk
+  that asks them one at a time. A list's ticked items go last, faint.
+  Pages from before get facets when you ask a talk to lay them out anew.
+- **The page is a grid** of twelve columns. A block takes a share of a
+  row: ¼, ⅓, ½, ⅔, ¾ or the whole, its kind's own until a layout or its
+  ⋯ menu gives it another (⅓ for Chips, Trend and Parts; ½ for Bars,
+  Questions, List and Timeline; the whole for the rest). A row's blocks
+  grow to fill it, and one that would get too narrow to read takes a row
+  of its own, as every block does on a phone.
+- **A table compares things across the same facts**: a row per thing, a
+  column per facet, light like a sheet. A header sorts by its column,
+  again the other way, with empty cells last; a column of numbers lines
+  up on the right. A cell changes where it is: Enter or leaving keeps it,
+  Esc goes back, Tab goes on, the arrows move between cells, and an
+  emptied cell's point goes. New row names a thing, then its cells. A
+  table keeps the same points as cards, so ⋯ shows one as the other.
+- **A trend is a number kept each time it's measured**: the latest to
+  read at a glance, how it moved since the first, and a line by day, with
+  the mark it aims at dashed and the reminder to measure again under it.
+  Pointing at a day shows its number and what was said with it.
+- **Parts are a whole and what it's made of**: a ring with the total in
+  its middle and a line per part with its count and share, largest
+  first, five at most, in steps of the ink. Numbers that don't add up to
+  a whole stay bars.
 - **A section opens on its own page**: the page shows a section's first
-  paragraph and a card's first four points, with "3 more". The section's
+  sentence and a card's face. The section's
   name opens it where the page was, with the talk still beside it:
   everything kept under it from every block, its events, its open
   questions and the talks it came from. Asking from there asks about
@@ -140,8 +173,13 @@ topics.
   there on its timeline.
 - **Laying the page out anew**: ask a talk for a better layout, or "Mach
   eine Zeitleiste daraus", and it adds, renames, reorders, removes and
-  changes blocks, and moves and rewords points, at once. It never drops a
-  point or changes where one came from. The answer lists what moved, with
+  changes blocks, and moves and rewords points, at once. It gives each
+  block the kind its points fit (a table, a trend, bars), keeps what's
+  about one thing together, sets widths so the rows are full, and says
+  which kind has to wait for more (a second weighing for a trend). Chips
+  and table cells get a few words; what else a point said stays as a
+  point of its own. It never drops a point or changes where one came
+  from. The answer lists what moved, with
   one Undo. A timeline made this way is new points; the sections stay as
   they were. Asked from a section's page, it lays out only that section.
   Only Claude Code on this Mac does this; through a key, the
@@ -217,6 +255,12 @@ Open them in a browser. Each shows night and day.
 - [`storyboards/a-topics-about.html`](storyboards/a-topics-about.html):
   Haar-Routine without You on its page, its About, and the button back
   from a section.
+- [`storyboards/the-page-at-a-glance.html`](storyboards/the-page-at-a-glance.html):
+  Geschichte as tiles, Pflanzen's card faces, Katzen's one cat as a
+  profile, and Karriere's bars, questions and ticked list.
+- [`storyboards/charts-tables-and-a-grid.html`](storyboards/charts-tables-and-a-grid.html):
+  Preise finden as a table, Lisa's weight as a trend, where Karriere's
+  ads are as parts, and the page as a grid of twelve columns.
 
 ## Open
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { about, Prose } from "./prose";
+import { about, lead, Prose } from "./prose";
 
 const html = (text: string) => renderToStaticMarkup(Prose({ text }));
 
@@ -28,4 +28,21 @@ test("a topic is about the first sentence of its brief", () => {
     "Zimmerpflanzen, ich schicke Fotos",
   );
   expect(about("  ")).toBe("");
+});
+
+test("a section's tile shows its first sentence", () => {
+  expect(lead("**Kuba** war spanische Kolonie bis 1898. Danach hielten die USA die Insel.")).toBe(
+    "Kuba war spanische Kolonie bis 1898.",
+  );
+  expect(
+    lead("**9/11 in Zahlen**: Am 11. September 2001 starben knapp 3.000 Menschen. Die Kriege"),
+  ).toBe("9/11 in Zahlen: Am 11. September 2001 starben knapp 3.000 Menschen.");
+  expect(lead("Rohstoffe, z. B. Kupfer. Und mehr.")).toBe("Rohstoffe, z. B. Kupfer.");
+  expect(lead("Will in den Hausflur (4. Stock), geht bis zur Treppe. Kommt zurück.")).toBe(
+    "Will in den Hausflur (4. Stock), geht bis zur Treppe.",
+  );
+  expect(lead("**Wer kauft die Ware?** Kapital verkauft an andere. Entlassene nicht.")).toBe(
+    "Wer kauft die Ware? Kapital verkauft an andere.",
+  );
+  expect(lead("Ein Satz ohne Punkt")).toBe("Ein Satz ohne Punkt");
 });

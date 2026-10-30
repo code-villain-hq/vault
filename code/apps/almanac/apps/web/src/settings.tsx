@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "./api";
 import { PageBody, PageHeader } from "./layout";
 import { loadSession, signedIn, signOut } from "./session";
+import { BlockGallery } from "./topic";
 import { Button, ErrorMessage, Section } from "./ui";
 import { useIsAdmin, useWorkspace } from "./workspace";
 
@@ -44,6 +45,25 @@ export function ClaudePage() {
         ) : (
           <TheKey data={data} path={path} reload={reload} />
         )}
+      </PageBody>
+    </>
+  );
+}
+
+/**
+ * Settings → Blocks: the kinds of block a topic's page can have, each drawn
+ * with sample points. A talk picks among them as it lays a page out.
+ */
+export function BlocksPage() {
+  return (
+    <>
+      <PageHeader title="Blocks" parent="Settings" />
+      <PageBody>
+        <p className="max-w-measure text-muted">
+          What a topic's page can be made of, each with sample points. Ask a talk to lay a page out
+          anew and it picks from these.
+        </p>
+        <BlockGallery />
       </PageBody>
     </>
   );

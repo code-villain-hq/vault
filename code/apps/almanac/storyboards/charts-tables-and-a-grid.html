@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: charts, tables and a grid</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* A 1600-wide window, drawn at its real size and scaled to the page. */
+.scaled { zoom: 0.7375; }
+.win { display: grid; grid-template-columns: 224px 1fr; grid-template-rows: 48px 1fr; width: 1600px; height: 900px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; position: relative; }
+.win.fit { height: auto; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.toprow { height: 48px; display: flex; align-items: center; padding-left: 8px; flex: none; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.ws { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; margin-bottom: 10px; font-weight: 600; }
+.ws .av { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; white-space: nowrap; overflow: hidden; }
+.nav span { overflow: hidden; text-overflow: ellipsis; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 14px 8px 4px; }
+.foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.foot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 16px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 16px; color: var(--muted); }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; position: relative; }
+.col { display: flex; flex-direction: column; gap: 32px; padding: 24px 40px 0; }
+.askbox { position: absolute; bottom: 16px; left: 40px; right: 40px; display: flex; align-items: center; height: 46px; padding: 0 16px; }
+.askbox .ph { color: var(--faint); }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 110px; background: linear-gradient(transparent, var(--panel) 55%); }
+
+/* What the page has today. */
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); display: flex; align-items: center; gap: 4px; }
+.title > svg { color: var(--faint); }
+.block { display: grid; gap: 8px; position: relative; }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.btitle.lead { color: var(--fg); font-weight: 700; font-size: var(--type-ui-size); }
+.btitle .aside { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.btitle .ui-button { height: 26px; padding: 0 10px; color: var(--fg); font-size: var(--type-ui-small-size); }
+.fill { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.stepcard { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start; }
+.stepcard .num { font-size: 26px; font-weight: 700; line-height: 1; color: var(--muted); grid-row: 1 / 3; }
+.stepcard .thing { font-weight: 700; }
+.stepcard p { grid-column: 2; color: var(--muted); font-size: var(--type-ui-small-size); }
+.tick { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.75px color-mix(in srgb, var(--fg) 35%, transparent); flex: none; display: grid; place-items: center; }
+.stepcard .tick { grid-column: 3; grid-row: 1; }
+.tick.done { background: var(--muted); box-shadow: none; color: var(--panel); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day { border-radius: var(--radius-md); padding: 8px; min-height: 74px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.day .dl { color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 2px; }
+.day .dl b { color: var(--muted); font-weight: 600; }
+.day.today { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.day.today .dl, .day.today .dl b { color: var(--fg); font-weight: 700; }
+.ev { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: var(--radius-md); background: var(--surface); font-size: var(--type-ui-small-size); line-height: 1.3; min-width: 0; }
+.ev span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev svg { color: var(--muted); flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.chips b { font-weight: 700; color: var(--fg); }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.list { display: flex; flex-direction: column; max-width: 86ch; }
+.list .ui-row { display: flex; gap: 12px; align-items: center; padding: 5px 10px; min-height: 32px; }
+.list .src { margin-left: auto; white-space: nowrap; }
+.list .done .txt { color: var(--faint); }
+.list .tick { width: 18px; height: 18px; }
+.text { display: grid; gap: 22px; max-width: 70ch; }
+.text section { display: grid; gap: 8px; }
+.text h3 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.text h3 svg, .tl svg { color: var(--faint); }
+.text p { font-size: var(--type-body-size); line-height: var(--type-body-leading); padding-left: 18px; }
+.text b { font-weight: 700; }
+.text .src { padding-left: 18px; margin-top: -4px; }
+.text .ui-disclosure { padding-left: 4px; }
+.pts { display: grid; gap: 10px; }
+.pts li { padding-left: 18px; position: relative; }
+.pts li::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.pts .src { margin-left: 4px; }
+.oldcard { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+.oldcard h4 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.oldcard h4 svg { color: var(--faint); }
+.oldcard .last { margin-top: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+.oldcard .ui-disclosure { align-self: start; }
+.tl { display: grid; grid-template-columns: 88px 14px 1fr; column-gap: 12px; max-width: 86ch; }
+.tl > div { display: contents; }
+.tl .y { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding: 5px 0; white-space: nowrap; }
+.tl .e { padding: 5px 0; display: flex; align-items: center; gap: 4px; }
+.tl .c { color: var(--faint); font-size: var(--type-ui-small-size); margin-left: 6px; }
+.rail { position: relative; }
+.rail::before { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 1.5px; background: var(--line); }
+.rail::after { content: ""; position: absolute; left: 3px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.rail.span::after { height: 14px; top: 9px; border-radius: 4px; }
+.tl > div:first-child .rail::before { top: 14px; }
+.tl > div:last-child .rail::before { bottom: auto; height: 14px; }
+
+/* Proposed: a section is a tile, its first sentence and how much it keeps. */
+.sections { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); }
+.sec { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.sec h4 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.sec h4 svg { color: var(--faint); }
+.sec p { color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sec .meta { margin-top: auto; padding-top: 4px; color: var(--faint); font-size: var(--type-ui-small-size); }
+.sec ul { display: grid; gap: 4px; }
+.sec li { padding-left: 12px; position: relative; }
+.sec li::before { content: "·"; position: absolute; left: 1px; color: var(--faint); }
+
+/* Proposed: Bars, a number per thing. A row opens what it counted. */
+.barsets { display: grid; grid-template-columns: repeat(auto-fill, minmax(34rem, 1fr)); gap: 12px 48px; max-width: 1180px; }
+.barset { display: grid; gap: 6px; align-content: start; }
+.barset .cap { color: var(--muted); font-size: var(--type-ui-small-size); }
+.bars { display: grid; grid-template-columns: max-content minmax(0, 1fr) 5.5em max-content; column-gap: 14px; max-width: 980px; }
+.bars > .r { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: 4px 10px; margin: 0 -10px; border-radius: var(--radius-md); min-height: 30px; }
+.bars > .r.hover { background: var(--hover); }
+.track { display: block; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.bar { display: block; height: 100%; border-radius: 5px; background: color-mix(in srgb, var(--fg) 38%, transparent); min-width: 3px; }
+.bars .val { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.bars .note { color: var(--faint); font-size: var(--type-ui-small-size); white-space: nowrap; }
+.bars .note.gap { color: var(--status-warn-ink); font-weight: 600; }
+.bars .note.none { visibility: hidden; }
+
+/* Proposed: Questions, to rehearse. One opens on its answer. */
+.qs { display: grid; gap: 2px; max-width: 980px; }
+.q { display: grid; grid-template-columns: 20px 1fr auto; gap: 2px 12px; padding: 8px 10px; margin: 0 -10px; border-radius: var(--radius-md); align-items: center; }
+.q .qt { font-weight: 600; }
+.q .who { grid-column: 2; color: var(--faint); font-size: var(--type-ui-small-size); }
+.q > svg { color: var(--faint); grid-row: 1; grid-column: 3; }
+.q.open { background: var(--surface); }
+.q.open > svg { rotate: 90deg; }
+.q .ans { grid-column: 2; display: grid; gap: 6px; margin-top: 8px; max-width: 70ch; }
+.q .ans li { padding-left: 14px; position: relative; font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.q .ans li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.q .ans .src { padding-left: 14px; }
+.q .missing { color: var(--muted); }
+
+/* Proposed: a card's face, a short line per fact, the state only when it needs a look. */
+.cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.card .ch { display: flex; gap: 12px; align-items: center; }
+.pic { width: 40px; height: 40px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); display: grid; place-items: center; color: var(--muted); flex: none; }
+.card h4 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.card h4 svg { color: var(--faint); }
+.card .kind { color: var(--faint); font-size: var(--type-ui-small-size); }
+.card .note { border-radius: var(--radius-md); padding: 6px 10px; font-size: var(--type-ui-small-size); font-weight: 600; }
+.facets { display: grid; gap: 7px; }
+.facets li { display: grid; grid-template-columns: 16px 1fr; gap: 10px; align-items: start; }
+.facets li > svg { color: var(--faint); margin-top: 2px; }
+.facets .when { color: var(--faint); }
+.card .count { margin-top: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Proposed: one card is a profile. */
+.profile { display: grid; gap: 16px; }
+.profile .ph { display: flex; gap: 16px; align-items: center; }
+.profile .pic { width: 64px; height: 64px; border-radius: var(--radius-lg); }
+.profile h3 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 4px; line-height: 1.2; }
+.profile h3 svg { color: var(--faint); }
+.profile .who { display: grid; gap: 8px; }
+.profile > .ev { justify-self: start; }
+
+/* Proposed: the page is a grid of twelve columns. A block takes ¼, ⅓, ½, ⅔, ¾ or the whole width;
+   a row's blocks grow to fill it, and a block narrower than its kind reads at takes its own row. */
+.grid { display: flex; flex-wrap: wrap; gap: 32px 40px; align-items: stretch; }
+.grid > .block { --w: 1; --min: 18rem; flex: 1 1 calc(100% * var(--w) - 40px * (1 - var(--w))); min-width: min(var(--min), 100%); display: flex; flex-direction: column; }
+.grid > .w14 { --w: 0.25; }
+.grid > .w13 { --w: 0.3333; }
+.grid > .w12 { --w: 0.5; --min: 28rem; }
+.grid > .w23 { --w: 0.6667; --min: 28rem; }
+.grid > .w34 { --w: 0.75; --min: 28rem; }
+
+/* Proposed: Table, light like a sheet. A row per thing, a column per facet. */
+.sheet { border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; font-variant-numeric: tabular-nums; }
+.sheet table { border-collapse: collapse; width: 100%; }
+.sheet th, .sheet td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0 12px; height: 34px; text-align: left; white-space: nowrap; }
+.sheet th:last-child, .sheet td:last-child { border-right: 0; }
+.sheet th { background: var(--surface); color: var(--muted); font-weight: 600; font-size: var(--type-ui-small-size); height: 32px; }
+.sheet th .h { display: flex; align-items: center; gap: 6px; }
+.sheet th.num .h { justify-content: flex-end; }
+.sheet th svg { color: var(--faint); }
+.sheet th.sorted { color: var(--fg); }
+.sheet th.sorted .arrow { color: var(--fg); }
+.sheet .num { text-align: right; }
+.sheet td:first-child { font-weight: 600; }
+.sheet td:first-child .h { display: flex; align-items: center; gap: 4px; }
+.sheet td:first-child svg { color: var(--faint); visibility: hidden; }
+.sheet tr.hover td { background: var(--hover); }
+.sheet tr.hover td:first-child svg { visibility: visible; }
+.sheet .was { color: var(--faint); }
+.sheet .soft { color: var(--muted); }
+.sheet .none { color: var(--faint); }
+.sheet td.warn { color: var(--status-warn-ink); font-weight: 600; }
+.sheet td.edit { box-shadow: inset 0 0 0 2px var(--accent); background: var(--field); }
+.sheet td.edit .caret { display: inline-block; width: 1.5px; height: 16px; background: var(--fg); vertical-align: -3px; margin-left: 1px; }
+.sheet tr:last-child td { border-bottom: 0; }
+.sheet tr.add td { color: var(--muted); font-weight: 400; }
+.sheet tr.add .h { display: flex; align-items: center; gap: 6px; }
+.sheet tr.add svg { visibility: visible; color: var(--muted); }
+.keys { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Proposed: Trend, a number over time: the latest, how it moved, a line. */
+.trend .now { display: flex; align-items: baseline; gap: 10px; }
+.trend .big { font-size: 30px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.trend .chg { color: var(--muted); font-size: var(--type-ui-small-size); }
+.chart { position: relative; margin-top: 6px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .gl { stroke: var(--line); stroke-width: 1; }
+.chart .goal { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.chart .ln { stroke: var(--fg); stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dot { fill: var(--fg); stroke: var(--panel); stroke-width: 2; }
+.chart .cross { stroke: var(--faint); stroke-width: 1; }
+.chart text { fill: var(--faint); font-size: 12px; font-family: var(--font-reading); }
+.chart text.end { text-anchor: end; }
+.chart .tip { position: absolute; padding: 8px 12px; font-size: var(--type-ui-small-size); line-height: 1.35; white-space: nowrap; pointer-events: none; }
+.chart .tip b { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .tip span { color: var(--muted); }
+.trend .ev { justify-self: start; align-self: flex-start; margin-top: 10px; }
+
+/* Proposed: Parts, a whole and what it's made of. */
+.parts { display: flex; gap: 28px; align-items: center; }
+.donut { position: relative; width: 148px; height: 148px; flex: none; }
+.donut svg { display: block; }
+.donut circle { fill: none; stroke-width: 20; }
+.donut .mid { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.donut .mid b { font-size: 28px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.donut .mid span { color: var(--faint); font-size: var(--type-ui-small-size); }
+.legend { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.legend li { display: grid; grid-template-columns: 10px 1fr auto 3.2em; gap: 10px; align-items: center; padding: 4px 8px; margin: 0 -8px; border-radius: var(--radius-md); }
+.legend li.hover { background: var(--hover); }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.legend .n { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.legend .pc { color: var(--faint); font-variant-numeric: tabular-nums; text-align: right; }
+.s1 { stroke: color-mix(in srgb, var(--fg) 74%, transparent); background: color-mix(in srgb, var(--fg) 74%, transparent); }
+.s2 { stroke: color-mix(in srgb, var(--fg) 44%, transparent); background: color-mix(in srgb, var(--fg) 44%, transparent); }
+.s3 { stroke: color-mix(in srgb, var(--fg) 20%, transparent); background: color-mix(in srgb, var(--fg) 20%, transparent); }
+.dim { opacity: 0.35; }
+
+/* The twelve columns, drawn plain. */
+.ruler { background: var(--panel); border-radius: 12px; padding: 20px 24px 24px; display: grid; gap: 10px; }
+.ruler .cols { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; color: var(--faint); font-size: var(--type-ui-small-size); text-align: center; }
+.ruler .cols span { border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
+.ruler .row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; }
+.ruler .row > div { background: var(--surface); border-radius: var(--radius-md); padding: 10px 12px; display: grid; gap: 2px; min-height: 58px; align-content: start; }
+.ruler .row b { font-weight: 700; }
+.ruler .row span { color: var(--muted); font-size: var(--type-ui-small-size); }
+.c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c6 { grid-column: span 6; } .c8 { grid-column: span 8; } .c9 { grid-column: span 9; } .c12 { grid-column: span 12; }
+
+/* The block's menu, with its width. */
+.menus { display: flex; gap: 40px; align-items: start; }
+.menu { width: 300px; padding: 4px; display: grid; gap: 1px; color: var(--fg); }
+.menu .it { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: var(--radius-md); }
+.menu .it.on { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.menu .it.danger { color: var(--status-danger-ink); }
+.menu .it .k { margin-left: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+.menu .sep { height: 1px; background: var(--line); margin: 4px 0; }
+.menu .wd { display: grid; gap: 6px; padding: 6px 10px 8px; }
+.menu .wd .lb { color: var(--faint); font-size: var(--type-ui-small-size); }
+.menu .ui-segment { padding: 0 0.55rem; }
+.mini { display: grid; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Charts, tables and a grid</h1>
+  <p>Almanac draws what it keeps as text, chips, bars and cards, every block the window's width. Three kinds are missing: a table to compare things across the same facts, a line for a number that changes, and a whole split into its parts. And a block should take the width it needs, so a small chart sits beside a list instead of under it.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>Preise finden: Table, light like a sheet</h2>
+  <ul class="choices">
+    <li><b>A row per shoe, a column per fact:</b> Preis, Normal, Wo, Wasserdicht, Vegan, Größe. They're the block's facets, as a card's lines are, so Cards and Table keep the same points; ⋯ → Show as table flips it, and back.</li>
+    <li><b>Numbers stand right, in even figures,</b> and a header sorts by its column: here by Preis, cheapest first. A click again turns it round.</li>
+    <li><b>A cell edits in place:</b> click or Enter to change it, Enter or leaving saves, Esc goes back, Tab moves to the next cell, the arrows move between cells. New row at the foot asks a name, then the cells.</li>
+    <li><b>What needs a look is in warn:</b> the ECCO isn't vegan, Will's and the Saola are over the 1.150 kr you set. An empty cell is a dash: nobody's said yet.</li>
+    <li><b>The shoe's name opens its page</b>, with the sentences the cells came from. No totals row: nothing here adds up.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="preise-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night, the pointer on the Exani and its size being changed</div><div class="scaled"><div data-theme="night" data-use="preise-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="preise-proposed-plain"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>Katzen: Trend, a number over time</h2>
+  <ul class="choices">
+    <li><b>Lisa's weight, as a line:</b> the latest in large, how far it moved since the first, and a point each time she's weighed. Her Ziel is a dashed line, so the eye goes to how far off she is.</li>
+    <li><b>The pointer shows a weighing:</b> its day and weight. A point opens what was said then.</li>
+    <li><b>Her reminder moves under it</b>, from the profile. When Lisa wiegen comes round and you say what she weighed, the talk keeps it as the next point.</li>
+    <li><b>One line per thing</b>: a second cat gets her own small chart beside it, on the same scale, not a second line in one.</li>
+    <li><b>It takes a third of the width</b>, beside Gesundheit, which keeps what a good weight is.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="katzen-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night, the pointer on the September weighing</div><div class="scaled"><div data-theme="night" data-use="katzen-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="katzen-proposed-plain"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">3</span>Karriere: Parts, and the page as a grid</h2>
+  <ul class="choices">
+    <li><b>Parts, a whole and its parts:</b> how the 28 ads split by where you'd work. The total in the middle, a legend with each part's count and share, the largest first, in steps of the ink: no colours to learn.</li>
+    <li><b>Five parts at most;</b> the rest folds into Andere. Parts that don't add up to a whole (an ad asks for many skills) stay Bars.</li>
+    <li><b>The page as a grid:</b> the questions and what the market wants share a row, half each; the ads' split takes a third beside the gaps to close.</li>
+    <li><b>Rows keep the order</b> of the blocks, left to right, top to bottom: no columns of uneven height that hide what comes next.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="karriere-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night, the pointer on Remote</div><div class="scaled"><div data-theme="night" data-use="karriere-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="karriere-proposed-plain"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">4</span>The grid: twelve columns</h2>
+  <ul class="choices">
+    <li><b>Twelve columns, as most design systems have them,</b> because twelve halves, thirds and quarters. A block takes ¼, ⅓, ½, ⅔, ¾ or the whole width; ⅔ and ¾ are there to sit beside a ⅓ or a ¼.</li>
+    <li><b>Each kind has a width it starts at:</b> ⅓ for Parts, Trend and Chips; ½ for Bars, Questions, List and Timeline; whole for Cards, Text, Shelf, Table, Week and Today. A layout can give it another; so can you, in the block's ⋯ menu.</li>
+    <li><b>A row never ends in a hole:</b> its blocks grow to fill it, so a ⅓ alone on its row takes the whole.</li>
+    <li><b>Each kind has a narrowest it reads at</b> (about 18rem for a chart, 28rem for bars, questions and lists). A narrower window puts a block that would get narrower on its own row: at 1100 px Karriere is one column again, a phone always.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">The widths, and what usually sits in them</div>
+    <div class="ruler" data-theme="night">
+      <div class="cols"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+      <div class="row"><div class="c3"><b>¼</b><span>Parts</span></div><div class="c3"><b>¼</b><span>Trend</span></div><div class="c3"><b>¼</b><span>Trend</span></div><div class="c3"><b>¼</b><span>Chips</span></div></div>
+      <div class="row"><div class="c4"><b>⅓</b><span>Trend: Lisa's weight</span></div><div class="c8"><b>⅔</b><span>Text tiles: Gesundheit</span></div></div>
+      <div class="row"><div class="c6"><b>½</b><span>Questions</span></div><div class="c6"><b>½</b><span>Bars</span></div></div>
+      <div class="row"><div class="c4"><b>⅓</b><span>Parts: where the ads are</span></div><div class="c8"><b>⅔</b><span>List: gaps to close</span></div></div>
+      <div class="row"><div class="c3"><b>¼</b><span>Chips: what you look for</span></div><div class="c9"><b>¾</b><span>Timeline</span></div></div>
+      <div class="row"><div class="c12"><b>Whole</b><span>Table, Cards, Text tiles, Shelf, Today</span></div></div>
+    </div>
+  </div>
+  <div class="mode"><div class="mode-label">The block's ⋯ menu, night and day</div>
+    <div class="menus">
+      <div class="ui-menu menu" data-theme="night">
+        <div class="it">Move up</div>
+        <div class="it">Move down</div>
+        <div class="sep"></div>
+        <div class="wd"><span class="lb">Width</span><div class="ui-segmented"><button class="ui-segment">¼</button><button class="ui-segment" aria-pressed="true">⅓</button><button class="ui-segment">½</button><button class="ui-segment">⅔</button><button class="ui-segment">¾</button><button class="ui-segment">Whole</button></div></div>
+        <div class="sep"></div>
+        <div class="it">Rename…</div>
+        <div class="it danger">Remove…</div>
+      </div>
+      <div class="ui-menu menu" data-theme="day">
+        <div class="it">Move up</div>
+        <div class="it">Move down</div>
+        <div class="sep"></div>
+        <div class="wd"><span class="lb">Width</span><div class="ui-segmented"><button class="ui-segment">¼</button><button class="ui-segment">⅓</button><button class="ui-segment">½</button><button class="ui-segment">⅔</button><button class="ui-segment">¾</button><button class="ui-segment" aria-pressed="true">Whole</button></div></div>
+        <div class="it on">Show as cards</div>
+        <div class="sep"></div>
+        <div class="it">Rename…</div>
+        <div class="it danger">Remove…</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">5</span>What changes for Claude</h2>
+  <ul class="choices">
+    <li><b>Three new kinds, each said to the layout as what it's for:</b> Table, things to compare across the same facts; Trend, a number kept each time it's measured; Parts, a whole split into parts that add up.</li>
+    <li><b>Table uses what Cards has:</b> a row is a thing, a column a facet, a cell the point with that facet. A number cell has its amount.</li>
+    <li><b>Trend and Parts use what Bars has:</b> a point's amount, and for Trend the day it happened.</li>
+    <li><b>A block has a width,</b> which a layout sets and the ⋯ menu changes; empty is the kind's own.</li>
+    <li><b>My order to build:</b> the grid and widths (4), Table (1), then Trend and Parts (2, 3), each in Settings → Blocks.</li>
+  </ul>
+</section>
+
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="toprow"><div class="lights"><span></span><span></span><span></span></div></div>
+    <div class="ws"><span class="av">H</span>Home</div>
+    <div class="nav ui-row"><i data-i="library"></i><span>Almanac</span></div>
+    <div class="nav ui-row"><i data-i="calendar"></i><span>Calendar</span></div>
+    <div class="group">Arbeit</div>
+    <div class="nav ui-row"><i data-i="code"></i><span>Code Villain</span></div>
+    <div class="nav ui-row" data-sel="karriere"><i data-i="briefcase"></i><span>Karriere</span></div>
+    <div class="group">Einkaufen</div>
+    <div class="nav ui-row" data-sel="preise"><i data-i="wallet"></i><span>Preise finden</span></div>
+    <div class="nav ui-row"><i data-i="salad"></i><span>Vegan</span></div>
+    <div class="group">Lernen</div>
+    <div class="nav ui-row"><i data-i="globe"></i><span>Geschichte</span></div>
+    <div class="nav ui-row"><i data-i="cap"></i><span>Lernen</span></div>
+    <div class="nav ui-row"><i data-i="book"></i><span>Marx &amp; Engels</span></div>
+    <div class="nav ui-row"><i data-i="leaf"></i><span>Tofu &amp; Mehrwert</span></div>
+    <div class="group">Pflege</div>
+    <div class="nav ui-row"><i data-i="shower"></i><span>Haar-Routine</span></div>
+    <div class="group">Zuhause</div>
+    <div class="nav ui-row" data-sel="katzen"><i data-i="cat"></i><span>Katzen</span></div>
+    <div class="nav ui-row"><i data-i="sprout"></i><span>Pflanzen</span></div>
+    <div class="nav ui-row"><i data-i="wrench"></i><span>Wohnung reparieren</span></div>
+    <div class="foot"><span class="dot"></span>Synced</div>
+  </aside>
+</template>
+
+<template id="tools">
+  <span class="tools"><i data-i="talks"></i><i data-i="more"></i></span>
+</template>
+
+<!-- Preise finden -->
+
+<template id="p-chips">
+  <div class="block">
+    <div class="btitle">Größen und Versand</div>
+    <div class="chips">
+      <span class="ui-chip"><b>Schuhgröße EU 43–44</b></span>
+      <span class="ui-chip"><b>Budget um 1.150 kr</b> oder weniger</span>
+      <span class="ui-chip"><b>Wasserdicht und abwischbar</b>, kein Mesh</span>
+      <span class="ui-chip"><b>Vegan</b>: nichts Tierisches, kein Siegel nötig</span>
+      <span class="ui-chip"><b>Für Alltag und Büro</b>, nicht nach Trekking aussehend</span>
+      <span class="ui-chip"><b>Lieferbar nach Stockholm</b>, mit einfacher Rückgabe</span>
+    </div>
+  </div>
+</template>
+
+<template id="preise-today">
+  <div class="win" data-select="preise">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Preise finden</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Preise finden<i data-i="chevron" data-s="18"></i></p>
+        <div class="block">
+          <div class="btitle">Produkte</div>
+          <div class="fill">
+            <div class="oldcard"><h4>Exani Axio M<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Beste Wahl: wasserdichte, atmende Membran und glattes schwarzes Kunstleder, das sich abwischen lässt.</li><li>709 kr bei Footway (statt 1.499 kr), 679 kr bei Sportamore und Heppo, je 365 Tage Rückgabe.</li><li>Die Metallplatte unter dem Fußgewölbe ist ein ausklappbarer Eisgrip.</li></ul><button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>2 more</button><span class="last">5 points</span></div>
+            <div class="oldcard"><h4>Will's Vegan Shoes Waterproof Derbys<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Bester Schuh für Herbst und Frühling: wasserdicht, atmend, ungefüttert, glattes veganes Leder.</li><li>Ca. 1.525 kr inklusive Versand (€126 plus €11) aus den Niederlanden, ohne Zoll; über Budget.</li><li>Schwarz in 44, Walnut in 43 und 44; 365 Tage Gratis-Rückgabe.</li></ul><span class="last">3 points</span></div>
+            <div class="oldcard"><h4>Tretorn Alto Hybrid<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>709 kr bei Footway in EU 44: wasserdichtes Gummi, laut Tretorn vegan, Reißverschluss statt Schnürung.</li><li>Sehr leicht zu reinigen, aber im Büro schwitziger als der Axio.</li></ul><span class="last">2 points</span></div>
+            <div class="oldcard"><h4>ECCO Track 25 GTX Boot<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Nicht vegan: Obermaterial Nubukleder, und die Innensohle „vegetable tanned“ ist ebenfalls Leder.</li><li>1.800 kr statt 2.599 kr; „Quality: 2“ auf dem Etikett heißt meist zweite Wahl.</li><li>ECCO hat keine Vegan-Linie.</li></ul><span class="last">3 points</span></div>
+          </div>
+        </div>
+        <div class="block"><div class="btitle">20 more cards</div></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Preise finden, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="p-table">
+  <div class="block">
+    <div class="btitle">Schuhe<span class="aside">13 shoes</span></div>
+    <div class="sheet">
+      <table>
+        <thead><tr>
+          <th><span class="h">Name</span></th>
+          <th class="num sorted"><span class="h"><i data-i="tag" data-s="14"></i>Preis<i class="arrow" data-i="up" data-s="12"></i></span></th>
+          <th class="num"><span class="h">Normal</span></th>
+          <th><span class="h"><i data-i="store" data-s="14"></i>Wo</span></th>
+          <th><span class="h"><i data-i="droplet" data-s="14"></i>Wasserdicht</span></th>
+          <th><span class="h"><i data-i="leaf" data-s="14"></i>Vegan</span></th>
+          <th><span class="h"><i data-i="ruler" data-s="14"></i>Größe</span></th>
+        </tr></thead>
+        <tbody>
+          <tr><td><span class="h">Polecat Waterproof Warm Lined<i data-i="chevron" data-s="14"></i></span></td><td class="num">469 kr</td><td class="num was">879 kr</td><td>Footway</td><td>Ja, gefüttert</td><td class="none">–</td><td>44</td></tr>
+          <tr><td><span class="h">Stormberg Malmö Winterboot WP<i data-i="chevron" data-s="14"></i></span></td><td class="num">499 kr</td><td class="num none">–</td><td>XXL</td><td>Ja, gefüttert</td><td class="none">–</td><td class="none">–</td></tr>
+          <tr><td><span class="h">Everest U Geryon Boot<i data-i="chevron" data-s="14"></i></span></td><td class="num">599 kr</td><td class="num none">–</td><td>Stadium</td><td>Ja</td><td>Ja</td><td>44</td></tr>
+          <tr><td><span class="h">Halti Felis Mid DX<i data-i="chevron" data-s="14"></i></span></td><td class="num">699 kr</td><td class="num was">1.399 kr</td><td>Sportamore</td><td>Ja</td><td>Textil</td><td>nur 43</td></tr>
+          <tr><td><span class="h">Everest M Shield Mid<i data-i="chevron" data-s="14"></i></span></td><td class="num">699 kr</td><td class="num none">–</td><td>Stadium</td><td>Ja</td><td class="none">–</td><td class="none">–</td></tr>
+          <tr data-hover><td><span class="h">Exani Axio M<i data-i="chevron" data-s="14"></i></span></td><td class="num">709 kr</td><td class="num was">1.499 kr</td><td>Footway</td><td>Ja</td><td>Ja</td><td data-edit>43, 44</td></tr>
+          <tr><td><span class="h">Tretorn Alto Hybrid<i data-i="chevron" data-s="14"></i></span></td><td class="num">709 kr</td><td class="num none">–</td><td>Footway</td><td>Ja</td><td>Ja</td><td>44</td></tr>
+          <tr><td><span class="h">Skechers BOBS Rainy Edge<i data-i="chevron" data-s="14"></i></span></td><td class="num">979 kr</td><td class="num none">–</td><td>Im Laden</td><td class="none">–</td><td>Ja</td><td class="none">–</td></tr>
+          <tr><td><span class="h">Puma Desierto V3 PureTex<i data-i="chevron" data-s="14"></i></span></td><td class="num">1.009 kr</td><td class="num none">–</td><td>Zalando</td><td class="soft">Nur abweisend</td><td class="none">–</td><td class="none">–</td></tr>
+          <tr><td><span class="h">Palladium Pampa SP20 Cuff WP+<i data-i="chevron" data-s="14"></i></span></td><td class="num">1.150 kr</td><td class="num none">–</td><td>Zalando</td><td>Ja</td><td>Ja</td><td>43, 44</td></tr>
+          <tr><td><span class="h">Will's Vegan Waterproof Derbys<i data-i="chevron" data-s="14"></i></span></td><td class="num warn">1.525 kr</td><td class="num none">–</td><td>Will's, Niederlande</td><td>Ja</td><td>Ja</td><td>43, 44</td></tr>
+          <tr><td><span class="h">Saola Quito Mid Waterproof<i data-i="chevron" data-s="14"></i></span></td><td class="num warn">1.790 kr</td><td class="num none">–</td><td>Bergfreunde</td><td>Ja</td><td>Ja</td><td>44</td></tr>
+          <tr><td><span class="h">ECCO Track 25 GTX Boot<i data-i="chevron" data-s="14"></i></span></td><td class="num">1.800 kr</td><td class="num was">2.599 kr</td><td class="none">–</td><td>Ja</td><td class="warn">Nein, Nubukleder</td><td class="none">–</td></tr>
+          <tr class="add"><td><span class="h"><i data-i="plus" data-s="14"></i>New row</span></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <span class="keys" data-keys>Enter saves · Esc goes back · Tab, the next cell</span>
+  </div>
+</template>
+
+<template id="preise-proposed">
+  <div class="win fit" data-select="preise" data-live>
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Preise finden</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Preise finden<i data-i="chevron" data-s="18"></i></p>
+        <div class="grid"><slot data-use="p-table"></slot><slot data-use="p-chips"></slot></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Preise finden, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="preise-proposed-plain">
+  <div class="win fit" data-select="preise">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Preise finden</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Preise finden<i data-i="chevron" data-s="18"></i></p>
+        <div class="grid"><slot data-use="p-table"></slot><slot data-use="p-chips"></slot></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Preise finden, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<!-- Katzen -->
+
+<template id="k-week">
+  <div class="block">
+    <div class="btitle">Oct 26 – Nov 1</div>
+    <div class="week">
+      <div class="day"><div class="dl">Mon <b>26</b></div></div>
+      <div class="day"><div class="dl">Tue <b>27</b></div></div>
+      <div class="day today"><div class="dl">Wed <b>28</b></div></div>
+      <div class="day"><div class="dl">Thu <b>29</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Fri <b>30</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Sat <b>31</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+    </div>
+  </div>
+</template>
+
+<template id="k-profile">
+  <div class="block profile">
+    <div class="ph">
+      <span class="pic"><i data-i="cat" data-s="28"></i></span>
+      <div class="who">
+        <h3>Lisa<i data-i="chevron" data-s="16"></i></h3>
+        <div class="chips">
+          <span class="ui-chip"><b>3½ Jahre</b></span>
+          <span class="ui-chip"><b>3,4 kg</b></span>
+          <span class="ui-chip"><b>Waldkatzen-Mix</b>, ohne Papiere</span>
+          <span class="ui-chip"><b>Langhaar-Tabby</b>, Ruff und Ohrenbüschel</span>
+          <span class="ui-chip"><b>Geimpft, gechipt, kastriert</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="ev" data-reminder><i data-i="bell" data-s="12"></i><span>Lisa wiegen, Ziel etwa 3,4 kg · Nov 25</span></div>
+    <div class="sections">
+      <div class="sec"><h4>Futter<i data-i="chevron" data-s="14"></i></h4><ul><li>Kennt Felix nass; trocken kommt Heavenly Sterilised statt Whiskas</li><li>Erst das Nasse umstellen, dann das Trockene, eins auf einmal</li><li>Mag Gourmet Gold nicht; sortiert Whiskas aus</li></ul><span class="meta">11 points</span></div>
+      <div class="sec"><h4>Spielen und Schlafen<i data-i="chevron" data-s="14"></i></h4><ul><li>Mehrmals täglich: Angel, Verstecken, Pfoten-Angriff von hinten</li><li>Schläft 12–16 Stunden; Energie kommt abends</li><li>Baldrian ja, sparsam; Katzenminze nein</li></ul><span class="meta">7 points</span></div>
+      <div class="sec"><h4>Streicheln<i data-i="chevron" data-s="14"></i></h4><ul><li>Am liebsten auf dem Boden, an Wangen, Kinn und Kopf</li><li>Nie tragen; aufs Sofa mit Decke und Leckerli locken</li></ul><span class="meta">4 points</span></div>
+      <div class="sec"><h4>Mit der Tochter<i data-i="chevron" data-s="14"></i></h4><ul><li>Streicheln nur, wenn Lisa von selbst kommt</li><li>Der Kratzturm ist ihr Rückzugsort und tabu</li><li>Angel und Leckerli aus der Hand klappen</li></ul><span class="meta">4 points</span></div>
+      <div class="sec"><h4>Draußen<i data-i="chevron" data-s="14"></i></h4><ul><li>Geht im Hausflur bis zur Treppe, kommt nach 2–3 Minuten zurück</li><li>Leine nur mit Geschirr, erst drinnen üben</li></ul><span class="meta">3 points</span></div>
+      <div class="sec"><h4>Gesundheit<i data-i="chevron" data-s="14"></i></h4><ul><li>Rippen fühlbar, nicht sichtbar: eher schlank halten</li><li>Tierarzt bei Durchfall oder Erbrechen über 1–2 Tage</li><li>Nie länger als 24 Stunden ohne echtes Fressen</li></ul><span class="meta">8 points</span></div>
+      <div class="sec"><h4>Wesen<i data-i="chevron" data-s="14"></i></h4><ul><li>Ausgeglichen; zieht sich bei Stress zum Schlafen zurück</li><li>Mag enge Verstecke und feste Plätze</li><li>Schläft bei euch, laut schnurrend am Fußende</li></ul><span class="meta">5 points</span></div>
+    </div>
+  </div>
+</template>
+
+<!-- Lisa, weighed from June to October: 3,6 · 3,6 · 3,5 · 3,5 · 3,4 kg, on a 3,3–3,7 scale. -->
+<template id="k-trend">
+  <div class="block w13 trend">
+    <div class="btitle">Gewicht</div>
+    <div class="now"><span class="big">3,4 kg</span><span class="chg">−0,2 kg since Jun 12</span></div>
+    <div class="chart">
+      <svg viewBox="0 0 412 140" aria-label="Lisa's weight, five weighings from June to October">
+        <line class="gl" x1="36" x2="404" y1="35" y2="35"/>
+        <line class="gl" x1="36" x2="404" y1="110" y2="110"/>
+        <line class="goal" x1="36" x2="404" y1="85" y2="85"/>
+        <text class="end" x="28" y="39">3,6</text>
+        <text class="end" x="28" y="89">3,4</text>
+        <text x="42" y="80">Ziel</text>
+        <text x="36" y="132">Jun</text>
+        <text x="171" y="132" text-anchor="middle">Aug</text>
+        <text x="336" y="132" text-anchor="middle">Oct</text>
+        <line class="cross" data-tip x1="317" x2="317" y1="10" y2="110"/>
+        <path class="ln" d="M36 35 L111.8 35 L206.5 60 L317.4 60 L404 85"/>
+        <circle class="dot" cx="36" cy="35" r="4"/>
+        <circle class="dot" cx="111.8" cy="35" r="4"/>
+        <circle class="dot" cx="206.5" cy="60" r="4"/>
+        <circle class="dot" cx="317.4" cy="60" r="5" data-tip/>
+        <circle class="dot" cx="404" cy="85" r="4"/>
+      </svg>
+      <div class="tip ui-menu" data-tip style="left: 222px; top: -6px"><b>3,5 kg</b><span>Sep 24</span></div>
+    </div>
+    <div class="ev"><i data-i="bell" data-s="12"></i><span>Lisa wiegen · Nov 25</span></div>
+  </div>
+</template>
+
+<template id="k-health">
+  <div class="block w23">
+    <div class="btitle">Gesundheit</div>
+    <div class="sections">
+      <div class="sec"><h4>Gewicht<i data-i="chevron" data-s="14"></i></h4><p>Gutes Gewicht: die Rippen sind mit leichtem Druck fühlbar, stehen aber nicht hervor.</p><span class="meta">2 points</span></div>
+      <div class="sec"><h4>Wann zum Tierarzt<i data-i="chevron" data-s="14"></i></h4><p>Bei Durchfall oder Erbrechen über 1–2 Tage, oder wenn sie nicht pinkelt.</p><span class="meta">4 points</span></div>
+      <div class="sec"><h4>Was normal ist<i data-i="chevron" data-s="14"></i></h4><p>Trinkt genug und geht normal aufs Klo.</p><span class="meta">2 points</span></div>
+    </div>
+  </div>
+</template>
+
+<template id="katzen-today">
+  <div class="win fit" data-select="katzen">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Katzen<i data-i="chevron" data-s="18"></i></p>
+        <slot data-use="k-week"></slot>
+        <slot data-use="k-profile"></slot>
+        <slot data-use="k-health"></slot>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Katzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="katzen-proposed">
+  <div class="win fit" data-select="katzen" data-live data-trend>
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Katzen<i data-i="chevron" data-s="18"></i></p>
+        <div class="grid"><slot data-use="k-week"></slot><slot data-use="k-profile"></slot><slot data-use="k-trend"></slot><slot data-use="k-health"></slot></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Katzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="katzen-proposed-plain">
+  <div class="win fit" data-select="katzen" data-trend>
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Katzen<i data-i="chevron" data-s="18"></i></p>
+        <div class="grid"><slot data-use="k-week"></slot><slot data-use="k-profile"></slot><slot data-use="k-trend"></slot><slot data-use="k-health"></slot></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Katzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<!-- Karriere -->
+
+<template id="c-questions">
+  <div class="block w12">
+    <div class="btitle">Interview-Fragen<span class="aside">2 of 4 practised<button class="ui-button">Frag mich ab</button></span></div>
+    <div class="qs">
+      <div class="q open">
+        <span class="tick done"><i data-i="check" data-s="12"></i></span><span class="qt">Wie prüfst du AI-Ergebnisse?</span><i data-i="chevron" data-s="14"></i>
+        <span class="who">Viaplay, Senior Fullstack AI Engineer</span>
+        <ul class="ans">
+          <li>Nach jedem Agent-Run prüft das Tool selbst, ob das Ergebnis taugt: Tests, Lint und Typecheck, grün oder rot.</li>
+          <li>In villain-layer: das Verify-Command pro Repo und der Loop-Button. Fertig ist ein Run erst, wenn die Checks grün sind.</li>
+        </ul>
+      </div>
+      <div class="q"><span class="tick"></span><span class="qt">Wie misst man, ob LLM-Output gut genug ist?</span><i data-i="chevron" data-s="14"></i><span class="who">Schibsted, Lead Engineer im Product Lab</span></div>
+      <div class="q"><span class="tick"></span><span class="qt">Erklär einen Trade-off, den du getroffen hast.</span><i data-i="chevron" data-s="14"></i><span class="who">Neko Health · <span class="missing">no answer yet</span></span></div>
+      <div class="q"><span class="tick done"><i data-i="check" data-s="12"></i></span><span class="qt">Was ist ACP, und warum nutzt villain-layer es?</span><i data-i="chevron" data-s="14"></i><span class="who">From your notes</span></div>
+    </div>
+  </div>
+</template>
+
+<template id="c-bars">
+  <div class="block w12">
+    <div class="btitle">Was der Markt will<span class="aside">in 28 ads</span></div>
+    <div class="bars">
+      <div class="r"><span>AI/LLM</span><span class="track"><span class="bar" style="width: 89%"></span></span><span class="val">25</span><span class="note">da, sichtbarer machen</span></div>
+      <div class="r"><span>TypeScript</span><span class="track"><span class="bar" style="width: 75%"></span></span><span class="val">21</span><span class="note">im CV</span></div>
+      <div class="r"><span>Ownership</span><span class="track"><span class="bar" style="width: 71%"></span></span><span class="val">20</span><span class="note">da, sichtbarer machen</span></div>
+      <div class="r"><span>React</span><span class="track"><span class="bar" style="width: 64%"></span></span><span class="val">18</span><span class="note">im CV</span></div>
+      <div class="r"><span>System Design</span><span class="track"><span class="bar" style="width: 50%"></span></span><span class="val">14</span><span class="note gap">Lücke: Notifications</span></div>
+      <div class="r"><span>Testing</span><span class="track"><span class="bar" style="width: 50%"></span></span><span class="val">14</span><span class="note">1200+ E2E-Tests</span></div>
+      <div class="r"><span>Performance</span><span class="track"><span class="bar" style="width: 46%"></span></span><span class="val">13</span><span class="note none">·</span></div>
+    </div>
+  </div>
+</template>
+
+<!-- How the 28 ads split by where you'd work: 12 · 11 · 5. Circumference 2π·64 ≈ 402.1; 2 px gaps. -->
+<template id="c-parts">
+  <div class="block w13">
+    <div class="btitle">Wo man arbeitet<span class="aside">in 28 ads</span></div>
+    <div class="parts">
+      <div class="donut">
+        <svg width="148" height="148" viewBox="0 0 148 148" aria-label="12 hybrid in Stockholm, 11 remote, 5 in the office">
+          <circle class="s1" data-part="1" cx="74" cy="74" r="64" stroke-dasharray="170.3 402.1" stroke-dashoffset="-1" transform="rotate(-90 74 74)"/>
+          <circle class="s2" data-part="2" cx="74" cy="74" r="64" stroke-dasharray="156.0 402.1" stroke-dashoffset="-173.3" transform="rotate(-90 74 74)"/>
+          <circle class="s3" data-part="3" cx="74" cy="74" r="64" stroke-dasharray="69.8 402.1" stroke-dashoffset="-331.3" transform="rotate(-90 74 74)"/>
+        </svg>
+        <div class="mid"><b>28</b><span>ads</span></div>
+      </div>
+      <ul class="legend">
+        <li data-part="1"><span class="sw s1"></span><span>Hybrid, Stockholm</span><span class="n">12</span><span class="pc">43 %</span></li>
+        <li data-part="2"><span class="sw s2"></span><span>Remote</span><span class="n">11</span><span class="pc">39 %</span></li>
+        <li data-part="3"><span class="sw s3"></span><span>Im Büro</span><span class="n">5</span><span class="pc">18 %</span></li>
+      </ul>
+    </div>
+  </div>
+</template>
+
+<template id="c-list">
+  <div class="block w23">
+    <div class="btitle">Lücken schließen<span class="aside">1 of 7 done</span></div>
+    <div class="list">
+      <div class="ui-row"><span class="tick"></span><span class="txt">Eine Story zu einer selbst getroffenen Produktentscheidung</span><span class="src">Lücken im CV</span></div>
+      <div class="ui-row"><span class="tick"></span><span class="txt">Ein Bullet von der Problemstellung bis zur Messung</span><span class="src">Lücken im CV</span></div>
+      <div class="ui-row"><span class="tick"></span><span class="txt">Das Innenleben des Notifications-Service</span><span class="src">Lücken im CV</span></div>
+      <div class="ui-row"><span class="tick"></span><span class="txt">Flaggschiff-Repo: README mit Problem, Demo, Stack</span><span class="src">Portfolio aufstellen</span></div>
+      <div class="ui-row"><span class="tick"></span><span class="txt">Mini-Eval mit etwa 20 echten Tickets</span><span class="src">villain-layer</span></div>
+      <div class="ui-row done"><span class="tick done"><i data-i="check" data-s="12"></i></span><span class="txt">Code Villain als eigenes Projekt im CV</span><span class="src">Code Villain im CV</span></div>
+    </div>
+  </div>
+</template>
+
+<template id="c-tiles">
+  <div class="block">
+    <div class="btitle">Markt und CV</div>
+    <div class="sections">
+      <div class="sec"><h4>Agents in der Delivery<i data-i="chevron" data-s="14"></i></h4><p>AI ist in den Anzeigen Arbeitsalltag: Agents beim Planen, Testen, Reviewen und Verifizieren.</p><span class="meta">1 point</span></div>
+      <div class="sec"><h4>TypeScript im Backend<i data-i="chevron" data-s="14"></i></h4><p>Reicht für einen großen Teil der Zielrollen: Ashby, duvo.ai, Sinch, Viaplay, Tibber, Mentimeter.</p><span class="meta">1 point</span></div>
+      <div class="sec"><h4>Tech-CVs 2026<i data-i="chevron" data-s="14"></i></h4><p>Der CV ist ein Filter, kein Beweis; austauschbare Texte fallen durch.</p><span class="meta">1 point</span></div>
+      <div class="sec"><h4>Stand des CV<i data-i="chevron" data-s="14"></i></h4><p>Zwei Seiten A4, schlicht und ATS-tauglich, als Senior Product Engineer.</p><span class="meta">2 points</span></div>
+    </div>
+  </div>
+</template>
+
+<template id="karriere-today">
+  <div class="win fit" data-select="karriere">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Karriere</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Karriere<i data-i="chevron" data-s="18"></i></p>
+        <slot data-use="c-questions"></slot>
+        <slot data-use="c-bars"></slot>
+        <slot data-use="c-list"></slot>
+        <slot data-use="c-tiles"></slot>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Karriere, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="karriere-proposed">
+  <div class="win fit" data-select="karriere" data-live>
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Karriere</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Karriere<i data-i="chevron" data-s="18"></i></p>
+        <div class="grid"><slot data-use="c-questions"></slot><slot data-use="c-bars"></slot><slot data-use="c-parts"></slot><slot data-use="c-list"></slot><slot data-use="c-tiles"></slot></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Karriere, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="karriere-proposed-plain">
+  <div class="win fit" data-select="karriere">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Karriere</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Karriere<i data-i="chevron" data-s="18"></i></p>
+        <div class="grid"><slot data-use="c-questions"></slot><slot data-use="c-bars"></slot><slot data-use="c-parts"></slot><slot data-use="c-list"></slot><slot data-use="c-tiles"></slot></div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Karriere, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+  briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  salad: '<path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1"/><path d="m13 12 4-4"/><path d="M10.9 7.25A3.99 3.99 0 0 0 4 10c0 .73.2 1.41.54 2"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  cap: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  shower: '<path d="m4 4 2.5 2.5"/><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7"/><path d="M15 5 5 15"/><path d="M14 17v.01"/><path d="M10 16v.01"/><path d="M13 13v.01"/><path d="M16 10v.01"/><path d="M11 20v.01"/><path d="M17 14v.01"/><path d="M20 11v.01"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+  store: '<path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/>',
+  ruler: '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
+  up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  talks: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+};
+// Fill each placeholder from its template; a <slot> is replaced, so a
+// window's sidebar stays a grid item. Templates may use templates.
+let at;
+while ((at = document.querySelector("[data-use]:not([data-filled])"))) {
+  const part = document.getElementById(at.dataset.use).content.cloneNode(true);
+  if (at.tagName === "SLOT") at.replaceWith(part);
+  else {
+    at.dataset.filled = "";
+    at.append(part);
+  }
+}
+for (const win of document.querySelectorAll(".win[data-select]")) {
+  win.querySelector(`[data-sel="${win.dataset.select}"]`)?.classList.add("is-selected");
+  const live = win.hasAttribute("data-live");
+  // Only the night window shows the pointer, the edited cell and the tooltip.
+  for (const row of win.querySelectorAll("tr[data-hover]")) row.classList.toggle("hover", live);
+  for (const cell of win.querySelectorAll("td[data-edit]")) {
+    if (live) {
+      cell.classList.add("edit");
+      cell.innerHTML = `${cell.textContent}<span class="caret"></span>`;
+    }
+  }
+  if (!live) for (const k of win.querySelectorAll("[data-keys], [data-tip]")) k.remove();
+  if (live) {
+    for (const li of win.querySelectorAll('.legend li[data-part="2"]')) li.classList.add("hover");
+    for (const c of win.querySelectorAll('.donut circle:not([data-part="2"])')) c.classList.add("dim");
+  }
+  // With a Trend, the weighing reminder is the chart's.
+  if (win.hasAttribute("data-trend")) for (const k of win.querySelectorAll(".profile [data-reminder]")) k.remove();
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 16;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+// A tall window ends where its page does, with room for the ask box.
+for (const win of document.querySelectorAll(".win.fit")) {
+  win.style.height = `${48 + win.querySelector(".col").scrollHeight + 104}px`;
+}
+</script>
+</body>
+</html>

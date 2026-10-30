@@ -6,6 +6,7 @@ export type * from "./generated/BlockPatch";
 export type * from "./generated/BlockWas";
 export type * from "./generated/ClaudeCodeInfo";
 export type * from "./generated/ClaudeKeyInfo";
+export type * from "./generated/Facet";
 export type * from "./generated/LayoutMove";
 export type * from "./generated/Me";
 export type * from "./generated/MemberInfo";

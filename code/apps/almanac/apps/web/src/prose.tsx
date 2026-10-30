@@ -84,3 +84,33 @@ export function inline(text: string): ReactNode {
 export function plain(text: string): string {
   return text.replace(/\*\*([^*]+)\*\*|\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1$2");
 }
+
+/**
+ * A passage's first sentence, without its marks: what a section's tile
+ * shows. A bold lead that is a sentence of its own ("**Wer kauft die
+ * Ware?**") takes the one after it too.
+ */
+export function lead(text: string): string {
+  const [first, next] = sentences(plain(text.trim().split("\n")[0] ?? ""));
+  const bold = text.match(/^\*\*([^*]+)\*\*/)?.[1]?.trim();
+  return first === bold && next ? `${first} ${next}` : (first ?? "");
+}
+
+/**
+ * A line's sentences. One ends at a stop before a capital, but not after a
+ * number ("Am 11. September", "(4. Stock)") or a short word ("z. B. Kuba"),
+ * which German writes with a stop.
+ */
+function sentences(line: string): string[] {
+  const found: string[] = [];
+  let start = 0;
+  for (const stop of line.matchAll(/[.!?…]["“”»)]*\s+(?=[\p{Lu}„"«(\d])/gu)) {
+    const word = line.slice(0, stop.index + 1).match(/\S+$/)?.[0] ?? "";
+    if (/^[(„"«]*(?:\d{1,2}|\p{L}{1,3})\.$/u.test(word)) continue;
+    const end = stop.index + stop[0].length;
+    found.push(line.slice(start, end).trim());
+    start = end;
+  }
+  if (start < line.length) found.push(line.slice(start).trim());
+  return found;
+}

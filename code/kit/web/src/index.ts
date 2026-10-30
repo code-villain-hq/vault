@@ -28,7 +28,14 @@ export { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 export { ago, lasted } from "./format";
 export { GroupSelect, useGroups } from "./groups";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";
-export { CreateDialog, chip, MoreMenu, NewButton, RowAction } from "./page-parts";
+export {
+  CreateDialog,
+  chip,
+  MoreMenu,
+  type MoreMenuItem,
+  NewButton,
+  RowAction,
+} from "./page-parts";
 export {
   type AppConfig,
   apiUrl,

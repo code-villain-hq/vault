@@ -8,27 +8,34 @@
 //! and point back ([`undo`]).
 
 use almanac_domain::{
-    BLOCK_KINDS, BlockWas, LayoutMove, ModelKind, Operation, PageLayout, PointWas, TopicChange,
-    TopicPatch,
+    BLOCK_KINDS, BLOCK_WIDTHS, BlockWas, Facet, LayoutMove, ModelKind, Operation, PageLayout,
+    PointWas, TopicChange, TopicPatch,
 };
 use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgPool;
+use sqlx::types::Json;
 use uuid::Uuid;
 
-use crate::kept::{fields, found};
+use crate::kept::{Shape, facets, fields, found, when};
 use crate::page::Refs;
 use crate::topics::cut;
 
-const BLOCKS: &str = "SELECT id, kind, title, position FROM blocks \
+const BLOCKS: &str = "SELECT id, kind, title, facets, width, position FROM blocks \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
-const POINTS: &str = "SELECT id, block_id, theme, text, happened, position, source, source_url \
+const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, look, amount, note, \
+     position, source, source_url \
      FROM points WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 
 /// How much one layout may do.
 const MOST_BLOCKS: usize = 24;
 const MOST_MOVES: usize = 400;
 const MOST_NEW: usize = 80;
+
+/// How long a chip and a table's cell may be, for the page to read at a
+/// glance: what the page's chips and cells show before they wrap or cut.
+pub const CHIP_FITS: usize = 48;
+pub const CELL_FITS: usize = 36;
 
 /// The page as it is, in the order it shows.
 pub struct Now {
@@ -41,6 +48,8 @@ pub struct BlockNow {
     pub id: Uuid,
     pub kind: String,
     pub title: String,
+    pub facets: Json<Vec<Facet>>,
+    pub width: String,
     pub position: i32,
 }
 
@@ -51,9 +60,24 @@ pub struct PointNow {
     pub theme: String,
     pub text: String,
     pub happened: String,
+    pub facet: String,
+    pub look: String,
+    pub amount: Option<f64>,
+    pub note: String,
     pub position: i32,
     pub source: Option<String>,
     pub source_url: Option<String>,
+}
+
+impl PointNow {
+    fn shape(&self) -> Shape {
+        Shape {
+            facet: self.facet.clone(),
+            look: self.look.clone(),
+            amount: self.amount,
+            note: self.note.clone(),
+        }
+    }
 }
 
 impl Now {
@@ -90,7 +114,7 @@ pub struct LayoutArgs {
     pub said: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct BlockArgs {
     #[serde(default)]
     pub block: String,
@@ -98,9 +122,16 @@ pub struct BlockArgs {
     pub kind: String,
     #[serde(default)]
     pub title: String,
+    /// For cards and tables; none keeps the block's own.
+    #[serde(default)]
+    pub facets: Option<Vec<Facet>>,
+    /// Of the page's twelve columns; none keeps the block's own, and empty
+    /// is its kind's.
+    #[serde(default)]
+    pub width: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct MoveArgs {
     pub point: String,
     #[serde(default)]
@@ -111,6 +142,8 @@ pub struct MoveArgs {
     pub text: String,
     #[serde(default)]
     pub happened: String,
+    #[serde(flatten)]
+    pub shape: ShapeArgs,
 }
 
 #[derive(Deserialize)]
@@ -122,6 +155,37 @@ pub struct NewPointArgs {
     pub text: String,
     #[serde(default)]
     pub happened: String,
+    #[serde(flatten)]
+    pub shape: ShapeArgs,
+}
+
+/// A point's shape as a move gives it: what it leaves out stays as it is.
+#[derive(Deserialize, Default, Clone)]
+pub struct ShapeArgs {
+    #[serde(default)]
+    pub facet: Option<String>,
+    #[serde(default)]
+    pub look: Option<String>,
+    #[serde(default)]
+    pub amount: Option<f64>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+impl ShapeArgs {
+    /// `shape` with what this gives over it, and whether it named a facet.
+    fn over(&self, shape: Shape) -> (Shape, bool) {
+        let named = self.facet.as_deref().is_some_and(|f| !f.trim().is_empty());
+        (
+            Shape {
+                facet: self.facet.clone().unwrap_or(shape.facet),
+                look: self.look.clone().unwrap_or(shape.look),
+                amount: self.amount.or(shape.amount),
+                note: self.note.clone().unwrap_or(shape.note),
+            },
+            named,
+        )
+    }
 }
 
 /// A layout, ready to write with the answer: the change it shows under the
@@ -137,6 +201,8 @@ struct Placed {
     id: Uuid,
     kind: String,
     title: String,
+    facets: Vec<Facet>,
+    width: String,
     /// Where it was on the page, for one the page has.
     was: Option<usize>,
 }
@@ -149,6 +215,9 @@ struct Moving {
     theme: String,
     text: String,
     happened: String,
+    shape: Shape,
+    /// Whether the layout named its facet, which its block must have.
+    faceted: bool,
     /// The move that named it, in order; none for one that stays.
     moved: Option<usize>,
     reworded: bool,
@@ -190,6 +259,13 @@ pub fn lay_out(
             ));
         }
         let title = cut(&b.title, 60);
+        let given = b.facets.as_deref().map(facets).transpose()?;
+        let width = b.width.as_deref().map(str::trim);
+        if let Some(width) = width.filter(|w| !BLOCK_WIDTHS.contains(w)) {
+            return Err(format!(
+                "There's no width {width}: it's one of {BLOCK_WIDTHS:?}, empty for the kind's own."
+            ));
+        }
         if named.is_empty() {
             if kind.is_empty() {
                 return Err(format!(
@@ -203,6 +279,8 @@ pub fn lay_out(
                 id: Uuid::now_v7(),
                 kind: kind.into(),
                 title,
+                facets: given.unwrap_or_default(),
+                width: width.unwrap_or_default().into(),
                 was: None,
             });
             continue;
@@ -251,6 +329,8 @@ pub fn lay_out(
             } else {
                 title
             },
+            facets: given.unwrap_or_else(|| block.facets.0.clone()),
+            width: width.map_or_else(|| block.width.clone(), Into::into),
             was: Some(was),
         });
     }
@@ -262,9 +342,35 @@ pub fn lay_out(
                 id: block.id,
                 kind: block.kind.clone(),
                 title: block.title.clone(),
+                facets: block.facets.0.clone(),
+                width: block.width.clone(),
                 was: Some(was),
             });
         }
+    }
+    // A week's seven days need the page's width to be read.
+    if let Some(week) = placed
+        .iter()
+        .find(|b| b.kind == "week" && !b.width.is_empty() && b.width != "whole")
+    {
+        return Err(format!(
+            "{} needs the whole width for its seven days: give it \"whole\", and the blocks \
+             beside it rows of their own.",
+            shown(&week.title)
+        ));
+    }
+    // A table shows its columns side by side, and three of them beside the
+    // names fit only the page's width.
+    if let Some(table) = placed.iter().find(|b| {
+        b.kind == "table" && b.facets.len() >= 3 && !b.width.is_empty() && b.width != "whole"
+    }) {
+        return Err(format!(
+            "{} has {} columns beside its names, more than {} shows: give it the whole width \
+             and keep every column, with the blocks beside it in rows of their own.",
+            shown(&table.title),
+            table.facets.len(),
+            table.width
+        ));
     }
 
     let target = |named: &str| -> Result<Uuid, String> {
@@ -309,6 +415,8 @@ pub fn lay_out(
             theme: p.theme.clone(),
             text: p.text.clone(),
             happened: p.happened.clone(),
+            shape: p.shape(),
+            faceted: false,
             moved: None,
             reworded: false,
             now: n,
@@ -347,6 +455,7 @@ pub fn lay_out(
         if !happened.is_empty() {
             point.happened = happened;
         }
+        (point.shape, point.faceted) = m.shape.over(std::mem::take(&mut point.shape));
     }
     for (order, p) in args.new_points.iter().enumerate() {
         let from = named_point(&p.from)?;
@@ -354,12 +463,15 @@ pub fn lay_out(
         if text.is_empty() {
             return Err("A new point needs a text.".into());
         }
+        let (shape, faceted) = p.shape.over(Shape::default());
         points.push(Moving {
             name: format!("the new point from {}", p.from.trim()),
             block: target(&p.block)?,
             theme: cut(&p.theme, 120),
             text,
             happened: cut(&p.happened, 60),
+            shape,
+            faceted,
             moved: Some(args.moves.len() + order),
             reworded: false,
             now: from,
@@ -377,6 +489,14 @@ pub fn lay_out(
                 point.name
             ));
         };
+        point.shape = std::mem::take(&mut point.shape)
+            .fit(
+                &block.kind,
+                &block.facets,
+                shown(&block.title),
+                point.faceted,
+            )
+            .map_err(|e| format!("{}: {e}", point.name))?;
         match block.kind.as_str() {
             "week" => {
                 return Err(format!(
@@ -400,21 +520,17 @@ pub fn lay_out(
                             "today" => "what comes round",
                             "shelf" => "the thing's name",
                             "text" => "the section's heading",
+                            "bars" => "the set's caption",
+                            "questions" => "the question, as it would be asked",
+                            "table" => "the thing its row is about",
+                            "trend" => "what's measured (Lisas Gewicht)",
+                            "parts" => "the whole's caption",
                             _ => "the thing the card is about",
                         }
                     ));
                 }
-                if kind == "timeline" {
-                    if !point.happened.chars().any(|c| c.is_ascii_digit()) {
-                        return Err(format!(
-                            "{} on {} says when it happened: a year (1959), a span (1987–1993) or a day (11. September 2001).",
-                            point.name,
-                            shown(&block.title)
-                        ));
-                    }
-                } else {
-                    point.happened.clear();
-                }
+                point.happened = when(kind, &point.happened, shown(&block.title))
+                    .map_err(|e| format!("{}: {e}", point.name))?;
             }
         }
     }
@@ -429,6 +545,46 @@ pub fn lay_out(
                 shown(&block.title)
             ));
         }
+    }
+    // A trend draws its measurements, so a theme with none would show nothing.
+    for block in placed.iter().filter(|b| b.kind == "trend") {
+        let held: Vec<&Moving> = points.iter().filter(|p| p.block == block.id).collect();
+        let measured = |theme: &str| {
+            held.iter()
+                .any(|p| p.theme == theme && !p.happened.is_empty() && p.shape.amount.is_some())
+        };
+        if let Some(bare) = held.iter().find(|p| !measured(&p.theme)) {
+            return Err(format!(
+                "{} in {} has no measurement with its day, so there's no line to draw: keep \
+                 a number told without its day where it is, until it's measured again.",
+                bare.theme,
+                shown(&block.title)
+            ));
+        }
+    }
+    // Chips and a table's cells are read at a glance: a few words each.
+    let long: Vec<String> = points
+        .iter()
+        .filter_map(|p| {
+            let block = placed.iter().find(|b| b.id == p.block)?;
+            let fits = glance(block, &points, p)?;
+            let length = p.text.replace('*', "").chars().count();
+            (length > fits).then(|| {
+                format!(
+                    "{} in {} ({length} characters, {fits} fit)",
+                    p.name,
+                    shown(&block.title)
+                )
+            })
+        })
+        .collect();
+    if !long.is_empty() {
+        return Err(format!(
+            "Too long to read at a glance: {}. Give each a few words there (\"Waldkatzen-Mix, \
+             ohne Papiere\") and draw what else it said as a new point from it where sentences \
+             read, a facet's tile or a list; or move it there whole.",
+            long.join("; ")
+        ));
     }
     let kept: Vec<Placed> = placed
         .into_iter()
@@ -466,6 +622,8 @@ pub fn lay_out(
                         ("topic_id", json!(topic_id)),
                         ("kind", json!(block.kind)),
                         ("title", json!(block.title)),
+                        ("facets", json!(block.facets)),
+                        ("width", json!(block.width)),
                         ("position", json!(position)),
                     ]),
                 });
@@ -478,6 +636,12 @@ pub fn lay_out(
                 }
                 if was.title != block.title {
                     data.insert("title".into(), json!(block.title));
+                }
+                if was.facets.0 != block.facets {
+                    data.insert("facets".into(), json!(block.facets));
+                }
+                if was.width != block.width {
+                    data.insert("width".into(), json!(block.width));
                 }
                 if was.position != position {
                     data.insert("position".into(), json!(position));
@@ -510,6 +674,10 @@ pub fn lay_out(
                     ("theme", json!(point.theme)),
                     ("text", json!(point.text)),
                     ("happened", json!(point.happened)),
+                    ("facet", json!(point.shape.facet)),
+                    ("look", json!(point.shape.look)),
+                    ("amount", json!(point.shape.amount)),
+                    ("note", json!(point.shape.note)),
                     ("source", json!(was.source)),
                     ("source_url", json!(was.source_url)),
                     ("position", json!(position)),
@@ -530,6 +698,19 @@ pub fn lay_out(
         if was.happened != point.happened {
             data.insert("happened".into(), json!(point.happened));
         }
+        let shape = &point.shape;
+        if was.facet != shape.facet {
+            data.insert("facet".into(), json!(shape.facet));
+        }
+        if was.look != shape.look {
+            data.insert("look".into(), json!(shape.look));
+        }
+        if was.amount != shape.amount {
+            data.insert("amount".into(), json!(shape.amount));
+        }
+        if was.note != shape.note {
+            data.insert("note".into(), json!(shape.note));
+        }
         if was.position != position {
             data.insert("position".into(), json!(position));
         }
@@ -540,6 +721,10 @@ pub fn lay_out(
                 theme: was.theme.clone(),
                 text: was.text.clone(),
                 happened: was.happened.clone(),
+                facet: was.facet.clone(),
+                look: was.look.clone(),
+                amount: was.amount,
+                note: was.note.clone(),
                 position: was.position,
             });
             operations.push(Operation::Update {
@@ -620,6 +805,27 @@ fn moves(
         if was.title != block.title {
             change.push(format!("renamed from {}", shown(&was.title)));
         }
+        if was.facets.0 != block.facets {
+            change.push(match block.facets.len() {
+                0 => "no facets".to_string(),
+                _ => format!(
+                    "facets {}",
+                    block
+                        .facets
+                        .iter()
+                        .map(|f| f.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            });
+        }
+        if was.width != block.width {
+            change.push(match block.width.as_str() {
+                "" => "its kind's width".to_string(),
+                "whole" => "the whole width".to_string(),
+                width => format!("{width} wide"),
+            });
+        }
         if !in_place.contains(&n) {
             change.push("moved".to_string());
         }
@@ -629,6 +835,7 @@ fn moves(
                 || now.points[p.now].block_id != block.id
                 || now.points[p.now].theme != p.theme
                 || now.points[p.now].happened != p.happened
+                || now.points[p.now].shape() != p.shape
         });
         let went = now
             .points
@@ -696,7 +903,7 @@ fn holds(kind: &str, points: &[&Moving]) -> String {
     let count = points.len();
     let mut said = match kind {
         "week" => "the days of its reminders".to_string(),
-        "chips" | "list" | "you" => match count {
+        "chips" | "list" | "you" | "bars" => match count {
             1 => "a point".into(),
             n => format!("{n} points"),
         },
@@ -732,6 +939,28 @@ fn holds(kind: &str, points: &[&Moving]) -> String {
     said
 }
 
+/// How many characters `point` may have where it ends: a chip, a table's
+/// cell, or a chip of a profile (a cards block with one card); none
+/// elsewhere.
+fn glance(block: &Placed, points: &[Moving], point: &Moving) -> Option<usize> {
+    let plain = point.shape.facet.is_empty() && point.shape.look.is_empty();
+    match block.kind.as_str() {
+        "chips" => Some(CHIP_FITS),
+        "table" if !point.shape.facet.is_empty() => Some(CELL_FITS),
+        "cards"
+            if plain
+                && !block.facets.is_empty()
+                && points
+                    .iter()
+                    .filter(|p| p.block == block.id)
+                    .all(|p| p.theme == point.theme) =>
+        {
+            Some(CHIP_FITS)
+        }
+        _ => None,
+    }
+}
+
 fn shown(title: &str) -> &str {
     match title {
         "" => "The week",
@@ -744,6 +973,8 @@ fn block_was(block: &BlockNow, removed: bool) -> BlockWas {
         id: block.id,
         kind: block.kind.clone(),
         title: block.title.clone(),
+        facets: block.facets.0.clone(),
+        width: block.width.clone(),
         position: block.position,
         removed,
     }
@@ -767,6 +998,8 @@ pub fn undo(
         let data = fields([
             ("kind", json!(block.kind)),
             ("title", json!(block.title)),
+            ("facets", json!(block.facets)),
+            ("width", json!(block.width)),
             ("position", json!(block.position)),
         ]);
         if block.removed && !blocks.contains(&block.id) {
@@ -797,6 +1030,10 @@ pub fn undo(
                     ("theme", json!(point.theme)),
                     ("text", json!(point.text)),
                     ("happened", json!(point.happened)),
+                    ("facet", json!(point.facet)),
+                    ("look", json!(point.look)),
+                    ("amount", json!(point.amount)),
+                    ("note", json!(point.note)),
                     ("position", json!(point.position)),
                 ]),
             });
@@ -847,12 +1084,15 @@ mod tests {
                 id,
                 kind: kind.to_string(),
                 title: title.to_string(),
+                facets: Json(Vec::new()),
+                width: String::new(),
                 position: n as i32,
             });
             refs.blocks.push(RefBlock {
                 id,
                 kind: kind.to_string(),
                 title: title.to_string(),
+                facets: Vec::new(),
             });
             for (theme, text) in points.iter() {
                 let point = Uuid::now_v7();
@@ -862,6 +1102,10 @@ mod tests {
                     theme: theme.to_string(),
                     text: text.to_string(),
                     happened: String::new(),
+                    facet: String::new(),
+                    look: String::new(),
+                    amount: None,
+                    note: String::new(),
                     position: now.points.len() as i32 + 1,
                     source: Some(format!("Source of {text}")),
                     source_url: None,
@@ -877,6 +1121,8 @@ mod tests {
             block: block.into(),
             kind: kind.into(),
             title: title.into(),
+            facets: None,
+            width: None,
         }
     }
 
@@ -887,6 +1133,7 @@ mod tests {
             theme: theme.into(),
             text: text.into(),
             happened: String::new(),
+            shape: ShapeArgs::default(),
         }
     }
 
@@ -901,6 +1148,272 @@ mod tests {
 
     fn layout_of(laid: &Laid) -> &PageLayout {
         laid.change.layout.as_ref().unwrap()
+    }
+
+    #[test]
+    fn a_layout_gives_cards_facets_and_undo_takes_them_back() {
+        let (now, refs) = page(&[(
+            "cards",
+            "Pflanzen",
+            &[
+                ("Monstera", "Ein Aronstabgewächs"),
+                ("Monstera", "Gießen, wenn die oberen 3 cm trocken sind"),
+            ],
+        )]);
+        let water = Facet {
+            name: "Wasser".into(),
+            icon: "droplet".into(),
+        };
+        let mut faceted = block("b1", "", "");
+        faceted.facets = Some(vec![water.clone()]);
+        let mut wet = moving("p2", "", "", "Wenn die oberen 3 cm trocken sind");
+        wet.shape.facet = Some("Erde".into());
+        let wrong = lay_out(
+            Uuid::now_v7(),
+            "Pflanzen",
+            &refs,
+            &now,
+            args(vec![faceted], vec![wet]),
+        )
+        .unwrap_err();
+        assert!(wrong.contains("p2: Pflanzen has no facet Erde"), "{wrong}");
+
+        let mut faceted = block("b1", "", "");
+        faceted.facets = Some(vec![water.clone()]);
+        let mut wet = moving("p2", "", "", "Wenn die oberen 3 cm trocken sind");
+        wet.shape.facet = Some("wasser".into());
+        let topic = Uuid::now_v7();
+        let laid = lay_out(
+            topic,
+            "Pflanzen",
+            &refs,
+            &now,
+            args(vec![faceted], vec![wet]),
+        )
+        .unwrap();
+        let [
+            Operation::Update { data: block, .. },
+            Operation::Update { data: point, .. },
+        ] = &laid.operations[..]
+        else {
+            panic!("{:?}", laid.operations);
+        };
+        assert_eq!(block["facets"], json!([water]));
+        assert_eq!(point["facet"], json!("Wasser"));
+        assert_eq!(layout_of(&laid).moves[0].change, "facets Wasser");
+
+        let blocks: Vec<Uuid> = now.blocks.iter().map(|b| b.id).collect();
+        let points: Vec<(Uuid, Uuid)> = now.points.iter().map(|p| (p.id, p.block_id)).collect();
+        let back = undo(topic, layout_of(&laid), &blocks, &points);
+        assert!(matches!(
+            &back[..],
+            [Operation::Update { data: block, .. }, Operation::Update { data: point, .. }]
+                if block["facets"] == json!([]) && point["facet"] == json!("")
+        ));
+    }
+
+    #[test]
+    fn a_layout_sets_widths_and_undo_takes_them_back() {
+        let (now, refs) = page(&[
+            (
+                "text",
+                "Gesundheit",
+                &[("Gewicht", "Rippen fühlbar, nicht sichtbar.")],
+            ),
+            ("cards", "Schuhe", &[("Exani Axio M", "Wasserdicht")]),
+        ]);
+        let mut narrow = block("b1", "", "");
+        narrow.width = Some("2/5".into());
+        let wrong = lay_out(
+            Uuid::now_v7(),
+            "Katzen",
+            &refs,
+            &now,
+            args(vec![narrow, block("b2", "", "")], Vec::new()),
+        )
+        .unwrap_err();
+        assert!(wrong.contains("no width 2/5"), "{wrong}");
+
+        let mut narrow = block("b1", "", "");
+        narrow.width = Some("2/3".into());
+        let topic = Uuid::now_v7();
+        let laid = lay_out(
+            topic,
+            "Katzen",
+            &refs,
+            &now,
+            args(vec![narrow, block("b2", "table", "")], Vec::new()),
+        )
+        .unwrap();
+        let [
+            Operation::Update { data: text, .. },
+            Operation::Update { data: table, .. },
+        ] = &laid.operations[..]
+        else {
+            panic!("{:?}", laid.operations);
+        };
+        assert_eq!(text["width"], json!("2/3"));
+        assert_eq!(table["kind"], json!("table"));
+        let moves = &layout_of(&laid).moves;
+        assert_eq!(moves[0].change, "2/3 wide");
+        assert_eq!(moves[1].change, "now table");
+
+        let blocks: Vec<Uuid> = now.blocks.iter().map(|b| b.id).collect();
+        let back = undo(topic, layout_of(&laid), &blocks, &[]);
+        assert!(matches!(
+            &back[..],
+            [Operation::Update { data: text, .. }, Operation::Update { data: table, .. }]
+                if text["width"] == json!("") && table["kind"] == json!("cards")
+        ));
+    }
+
+    #[test]
+    fn a_week_takes_the_whole_width() {
+        let (now, refs) = page(&[("text", "Gesundheit", &[("Gewicht", "3,4 kg")])]);
+        let week = |width: &str| BlockArgs {
+            width: Some(width.into()),
+            ..block("", "week", "")
+        };
+        let layout = args(vec![week("1/2"), block("b1", "", "")], Vec::new());
+        let wrong = lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap_err();
+        assert!(wrong.contains("The week needs the whole width"), "{wrong}");
+
+        for width in ["whole", ""] {
+            let layout = args(vec![week(width), block("b1", "", "")], Vec::new());
+            lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_wide_table_takes_the_whole_width() {
+        let (now, refs) = page(&[("table", "Futter", &[("Felix", "Nassfutter")])]);
+        let table = |columns: &[&str], width: &str| BlockArgs {
+            facets: Some(
+                columns
+                    .iter()
+                    .map(|name| Facet {
+                        name: name.to_string(),
+                        icon: "tag".into(),
+                    })
+                    .collect(),
+            ),
+            width: Some(width.into()),
+            ..block("b1", "", "")
+        };
+        let three = ["Art", "Reaktion", "Stand"];
+        let layout = args(vec![table(&three, "2/3")], Vec::new());
+        let wrong = lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap_err();
+        assert!(wrong.contains("Futter has 3 columns"), "{wrong}");
+
+        for (columns, width) in [
+            (&three[..], "whole"),
+            (&three[..], ""),
+            (&three[..2], "2/3"),
+        ] {
+            let layout = args(vec![table(columns, width)], Vec::new());
+            lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap();
+        }
+    }
+
+    #[test]
+    fn chips_and_cells_read_at_a_glance() {
+        let long = "Keine Papiere; vermutlich ein Mix aus Norwegischer oder Sibirischer Waldkatze.";
+        let (now, refs) = page(&[
+            ("text", "Gesundheit", &[("Normal", long)]),
+            ("cards", "Lisa", &[("Lisa", long), ("Lisa", "Ruhig")]),
+        ]);
+        let food = Facet {
+            name: "Art".into(),
+            icon: "utensils".into(),
+        };
+        let mut lisa = block("b2", "", "");
+        lisa.facets = Some(vec![food.clone()]);
+        let mut table = block("", "table", "Futter");
+        table.facets = Some(vec![food]);
+        let mut cell = moving("p3", "Futter", "Felix", long);
+        cell.shape.facet = Some("Art".into());
+        let layout = |chip: &str, plain: &str, cell: MoveArgs| {
+            args(
+                vec![block("b1", "chips", ""), lisa.clone(), table.clone()],
+                vec![
+                    moving("p1", "", "", chip),
+                    moving("p2", "", "", plain),
+                    cell,
+                ],
+            )
+        };
+        let wrong = lay_out(
+            Uuid::now_v7(),
+            "Katzen",
+            &refs,
+            &now,
+            layout(long, long, cell.clone()),
+        )
+        .unwrap_err();
+        assert!(wrong.contains("Too long to read at a glance"), "{wrong}");
+        for named in ["p1 in Gesundheit", "p2 in Lisa", "p3 in Futter"] {
+            assert!(wrong.contains(named), "{named}: {wrong}");
+        }
+
+        let mut short = cell.clone();
+        short.text = "Nassfutter".into();
+        lay_out(
+            Uuid::now_v7(),
+            "Katzen",
+            &refs,
+            &now,
+            layout(
+                "Normal: trinkt genug",
+                "Waldkatzen-Mix, ohne Papiere",
+                short,
+            ),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_trend_measures_on_a_day() {
+        let (now, refs) = page(&[("text", "Gesundheit", &[("Gewicht", "3,4 kg")])]);
+        let mut layout = args(
+            vec![block("b1", "", ""), block("", "trend", "Gewicht")],
+            Vec::new(),
+        );
+        let weighed = |happened: &str| NewPointArgs {
+            from: "p1".into(),
+            block: "Gewicht".into(),
+            theme: "Lisas Gewicht".into(),
+            text: "Gewogen".into(),
+            happened: happened.into(),
+            shape: ShapeArgs {
+                amount: Some(3.4),
+                note: Some("kg".into()),
+                ..ShapeArgs::default()
+            },
+        };
+        layout.new_points = vec![weighed("im Herbst")];
+        let wrong = lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap_err();
+        assert!(wrong.contains("as 2026-09-24"), "{wrong}");
+
+        // A number with no day is a mark it aims at, and alone draws no line.
+        let mut layout = args(
+            vec![block("b1", "", ""), block("", "trend", "Gewicht")],
+            Vec::new(),
+        );
+        layout.new_points = vec![weighed("")];
+        let wrong = lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap_err();
+        assert!(wrong.contains("no measurement"), "{wrong}");
+
+        let mut layout = args(
+            vec![block("b1", "", ""), block("", "trend", "Gewicht")],
+            Vec::new(),
+        );
+        layout.new_points = vec![weighed("2026-10-28")];
+        let laid = lay_out(Uuid::now_v7(), "Katzen", &refs, &now, layout).unwrap();
+        assert!(laid.operations.iter().any(|o| matches!(
+            o,
+            Operation::Create { model: ModelKind::Point, data, .. }
+                if data["happened"] == json!("2026-10-28") && data["amount"] == json!(3.4)
+        )));
     }
 
     #[test]
@@ -924,6 +1437,7 @@ mod tests {
                 theme: "Intifada".into(),
                 text: "Die erste Intifada beginnt".into(),
                 happened: "1987–1993".into(),
+                shape: ShapeArgs::default(),
             },
             NewPointArgs {
                 from: "p2".into(),
@@ -931,6 +1445,7 @@ mod tests {
                 theme: "Oslo".into(),
                 text: "Oslo I wird unterzeichnet".into(),
                 happened: "13. September 1993".into(),
+                shape: ShapeArgs::default(),
             },
         ];
         let topic = Uuid::now_v7();
@@ -991,6 +1506,7 @@ mod tests {
             theme: "Intifada".into(),
             text: "Die erste Intifada beginnt".into(),
             happened: "damals".into(),
+            shape: ShapeArgs::default(),
         }];
         let wrong = lay_out(Uuid::now_v7(), "Israel", &refs, &now, layout).unwrap_err();
         assert!(wrong.contains("says when it happened"), "{wrong}");

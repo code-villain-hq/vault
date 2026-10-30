@@ -133,10 +133,95 @@ pub const KINDS: &[&str] = &["topic", "almanac"];
 /// theme; `text` a section per theme; `list` one line each; `timeline` what
 /// happened when, oldest first, each under the section it belongs to; `you`
 /// what the topic knows about them, a fact each, which the topic's About
-/// shows and its page doesn't.
+/// shows and its page doesn't; `bars` numbers to compare, a bar each, a
+/// set per theme; `questions` questions they'd be asked, each a theme with
+/// its answer as points, to rehearse; `table` a row per theme and a column
+/// per facet, as cards are; `trend` a number kept each time it's measured,
+/// a line per theme; `parts` a whole split into its parts, a ring per theme.
 pub const BLOCK_KINDS: &[&str] = &[
-    "today", "week", "chips", "shelf", "cards", "text", "list", "timeline", "you",
+    "today",
+    "week",
+    "chips",
+    "shelf",
+    "cards",
+    "text",
+    "list",
+    "timeline",
+    "you",
+    "bars",
+    "questions",
+    "table",
+    "trend",
+    "parts",
 ];
+
+/// How wide a block is, of the page's twelve columns: a quarter, a third,
+/// a half, two thirds, three quarters or the whole. Empty is its kind's own
+/// ([`width_of`]).
+pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
+
+/// The width a block of `kind` has when it names none: a third for what
+/// reads at a glance, a half for what reads as a column, the whole for the
+/// rest.
+pub fn width_of(kind: &str) -> &'static str {
+    match kind {
+        "chips" | "trend" | "parts" => "1/3",
+        "bars" | "questions" | "list" | "timeline" => "1/2",
+        _ => "whole",
+    }
+}
+
+/// How a point asks for a look: `warn` for a problem or a gap, `info` for
+/// something ready (a cutting to pot); empty when it needs none.
+pub const LOOKS: &[&str] = &["", "warn", "info"];
+
+/// The icons a facet can have: Lucide's names, which the web app draws.
+pub const FACET_ICONS: &[&str] = &[
+    "sun",
+    "droplet",
+    "map-pin",
+    "scissors",
+    "thermometer",
+    "sprout",
+    "leaf",
+    "flower",
+    "bug",
+    "wind",
+    "utensils",
+    "heart-pulse",
+    "pill",
+    "paw-print",
+    "moon",
+    "home",
+    "users",
+    "calendar",
+    "clock",
+    "ruler",
+    "scale",
+    "tag",
+    "star",
+    "sparkles",
+    "shield",
+    "info",
+    "book",
+    "briefcase",
+    "wallet",
+    "map",
+    "car",
+    "dumbbell",
+];
+
+/// How many facets a block of cards names: a card's face shows a line each.
+pub const MOST_FACETS: usize = 6;
+
+/// A fact every card in a block has, such as Licht or Wasser: a line on
+/// each card's face with its icon, one of [`FACET_ICONS`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Facet {
+    pub name: String,
+    pub icon: String,
+}
 
 /// The blocks a topic starts with, each its kind and title. A collection's
 /// cards are named for what they are ("Plants") when Almanac knows. Each
@@ -195,6 +280,11 @@ pub struct Block {
     pub kind: String,
     /// Empty for none: the week is headed by its days.
     pub title: String,
+    /// For cards and tables: the facts every card has, a line each on its
+    /// face, or a table's columns.
+    pub facets: Vec<Facet>,
+    /// One of [`BLOCK_WIDTHS`].
+    pub width: String,
     pub position: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -207,6 +297,8 @@ pub struct BlockCreate {
     pub topic_id: Uuid,
     pub kind: String,
     pub title: Option<String>,
+    pub facets: Option<Vec<Facet>>,
+    pub width: Option<String>,
     /// After the topic's last block when left out.
     pub position: Option<i32>,
 }
@@ -217,6 +309,8 @@ pub struct BlockCreate {
 pub struct BlockPatch {
     pub kind: Option<String>,
     pub title: Option<String>,
+    pub facets: Option<Vec<Facet>>,
+    pub width: Option<String>,
     pub position: Option<i32>,
 }
 
@@ -236,6 +330,17 @@ pub struct Point {
     /// When it happened, on a timeline: a year ("1959"), a span
     /// ("1987–1993") or a day ("11. September 2001"). Empty elsewhere.
     pub happened: String,
+    /// On a card: the facet it's about, one of its block's ("Wasser").
+    pub facet: String,
+    /// Whether it needs a look, one of [`LOOKS`]: a card's problem, a gap.
+    pub look: String,
+    /// In bars: the number its bar shows.
+    pub amount: Option<f64>,
+    /// A few words beside it: by a bar ("getötet"), or who asked a
+    /// question, on its first point.
+    pub note: String,
+    /// Ticked: a list's item done, a question practised.
+    pub done: bool,
     /// Where it's from, in words: "Engels, Zur Wohnungsfrage, 1872".
     pub source: Option<String>,
     pub source_url: Option<String>,
@@ -257,6 +362,11 @@ pub struct PointCreate {
     pub theme: Option<String>,
     pub text: String,
     pub happened: Option<String>,
+    pub facet: Option<String>,
+    pub look: Option<String>,
+    pub amount: Option<f64>,
+    pub note: Option<String>,
+    pub done: Option<bool>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     pub talk_id: Option<Uuid>,
@@ -272,6 +382,12 @@ pub struct PointPatch {
     pub theme: Option<String>,
     pub text: Option<String>,
     pub happened: Option<String>,
+    pub facet: Option<String>,
+    pub look: Option<String>,
+    /// Null takes the number away.
+    pub amount: Option<f64>,
+    pub note: Option<String>,
+    pub done: Option<bool>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     /// The talk it now comes from, when a talk changed it.
@@ -439,7 +555,9 @@ impl Validate for TopicPatch {
 impl Validate for BlockCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         one_of(Some(&self.kind), BLOCK_KINDS, "kind")?;
+        one_of(self.width.as_deref(), BLOCK_WIDTHS, "width")?;
         self.title.as_deref().map(block_title).transpose()?;
+        self.facets.as_deref().map(facets).transpose()?;
         Ok(())
     }
 }
@@ -447,7 +565,9 @@ impl Validate for BlockCreate {
 impl Validate for BlockPatch {
     fn validate(&self) -> Result<(), ValidationError> {
         one_of(self.kind.as_deref(), BLOCK_KINDS, "kind")?;
+        one_of(self.width.as_deref(), BLOCK_WIDTHS, "width")?;
         self.title.as_deref().map(block_title).transpose()?;
+        self.facets.as_deref().map(facets).transpose()?;
         Ok(())
     }
 }
@@ -456,6 +576,12 @@ impl Validate for PointCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         self.theme.as_deref().map(theme).transpose()?;
         self.happened.as_deref().map(happened).transpose()?;
+        shape(
+            self.facet.as_deref(),
+            self.look.as_deref(),
+            self.amount,
+            self.note.as_deref(),
+        )?;
         words(&self.text, "A point needs some words.", 2000)
     }
 }
@@ -464,6 +590,12 @@ impl Validate for PointPatch {
     fn validate(&self) -> Result<(), ValidationError> {
         self.theme.as_deref().map(theme).transpose()?;
         self.happened.as_deref().map(happened).transpose()?;
+        shape(
+            self.facet.as_deref(),
+            self.look.as_deref(),
+            self.amount,
+            self.note.as_deref(),
+        )?;
         if let Some(text) = &self.text {
             words(text, "A point needs some words.", 2000)?;
         }
@@ -528,6 +660,41 @@ fn words(value: &str, empty: &str, max: usize) -> Result<(), ValidationError> {
 fn block_title(value: &str) -> Result<(), ValidationError> {
     if value.chars().count() > 60 {
         return invalid("A block's title is at most 60 characters.");
+    }
+    Ok(())
+}
+
+fn facets(facets: &[Facet]) -> Result<(), ValidationError> {
+    if facets.len() > MOST_FACETS {
+        return invalid(format!("A block names at most {MOST_FACETS} facets."));
+    }
+    for facet in facets {
+        if facet.name.trim().is_empty() || facet.name.chars().count() > 40 {
+            return invalid("A facet's name has a word or two, at most 40 characters.");
+        }
+        if !FACET_ICONS.contains(&facet.icon.as_str()) {
+            return invalid("Almanac doesn't know that facet's icon.");
+        }
+    }
+    Ok(())
+}
+
+/// What a card's face, a bar or a question shows besides a point's text.
+fn shape(
+    facet: Option<&str>,
+    look: Option<&str>,
+    amount: Option<f64>,
+    note: Option<&str>,
+) -> Result<(), ValidationError> {
+    if facet.is_some_and(|f| f.chars().count() > 40) {
+        return invalid("A facet is at most 40 characters.");
+    }
+    one_of(look, LOOKS, "look")?;
+    if amount.is_some_and(|a| !a.is_finite()) {
+        return invalid("A bar's number is a number.");
+    }
+    if note.is_some_and(|n| n.chars().count() > 80) {
+        return invalid("What's beside a point is at most 80 characters.");
     }
     Ok(())
 }

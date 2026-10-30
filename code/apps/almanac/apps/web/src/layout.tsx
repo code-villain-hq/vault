@@ -26,6 +26,7 @@ import {
   CalendarDays,
   Check,
   ChevronsUpDown,
+  LayoutGrid,
   Plus,
   Sparkles,
   UserRound,
@@ -245,7 +246,7 @@ export function PageHeader({
 /** The page's body, scrolling under the header. */
 export function PageBody({ children }: { children: ReactNode }) {
   return (
-    <div className="page-content min-h-0 flex-1 overflow-y-auto">
+    <div className="page-content relative min-h-0 flex-1 overflow-y-auto">
       <div className="flex flex-col gap-8 px-6 py-6 sm:px-10">{children}</div>
     </div>
   );
@@ -450,6 +451,10 @@ function SettingsNav() {
           <Link to="/$workspace/settings/members" params={params} className={navLink}>
             <NavIcon icon={UsersRound} />
             Members
+          </Link>
+          <Link to="/$workspace/settings/blocks" params={params} className={navLink}>
+            <NavIcon icon={LayoutGrid} />
+            Blocks
           </Link>
         </nav>
       )}

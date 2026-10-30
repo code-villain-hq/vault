@@ -14,7 +14,9 @@
 
 use std::convert::Infallible;
 
-use almanac_domain::{Actor, AskRequest, BLOCK_KINDS, ModelKind, Operation, Source, Transaction};
+use almanac_domain::{
+    Actor, AskRequest, BLOCK_KINDS, LOOKS, ModelKind, Operation, Source, Transaction,
+};
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -29,7 +31,7 @@ use crate::acp::{ClaudeCode, Failure, Question};
 use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
-use crate::kept::{Answering, Kept, fields, reminder};
+use crate::kept::{Answering, Handed, Kept, fields, reminder};
 use crate::mcp::{Asking, Mode};
 use crate::page::{Page, Workspace};
 use crate::photos::{self, Image};
@@ -71,7 +73,8 @@ it fits better in another topic, naming one of the other topics or a new one.
 
 /// With Claude Code: Almanac's tools keep the page as it answers.
 const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer: keep_point for \
-what's worth knowing later, ask_to_check when your answer rested on a guess about their \
+what's worth knowing later, tick_points when they did a list's item or answered a question \
+well, ask_to_check when your answer rested on a guess about their \
 situation, offer_reminder when the talk settled something recurring or dated, or they told you \
 a routine they keep, fits_elsewhere when the question belongs in another topic, change_brief \
 when they tell you how this topic should answer from now on or correct the same thing a second \
@@ -141,10 +144,23 @@ when one fits.
 the page has (a wash day moved, a product swapped), it replaces them, named as the page names \
 them ([\"p3\"]); keep one point where two would say the same. [] when it replaces none.
 - happened: only for a point on a timeline, when it happened: a year (1959), a span \
-(1987–1993) or a day (11. September 2001), with v. Chr. or BC for the years before year 1. \
+(1987–1993) or a day (11. September 2001), with v. Chr. or BC for the years before year 1; in \
+a trend the day it was measured (\"2026-09-24\"), \"\" only for a mark they said they aim at. \
 \"\" elsewhere.
+- facet: only for a point in cards or a table whose block names facets, the facet it's about, \
+one of the block's (Wasser); \"\" for what the thing is, and elsewhere.
+- look: only in cards, tables, bars and questions: \"warn\" when it needs a look (brown edges, \
+over budget, a gap, no answer yet), \"info\" when it's ready for something (a cutting to pot); \
+\"\" otherwise.
+- amount: in bars, trends and parts always, the number, plain (\"900000\", \"3.4\"); in a \
+table a number cell's (\"709\" for 709 kr), so it sorts; \"\" elsewhere.
+- note: only in bars, questions, trends and parts, a few words beside it: a bar's unit or what \
+it counts (\"getötet\"), a trend's unit (\"kg\"), what a part counts (\"Anzeigen\"), who asks a \
+question (on its first point); \"\" elsewhere.
 - source: where the point comes from, in a few words: \"You said\", \"From the talk\", or the \
 book, guide or institution the answer relied on. Never a link.
+- ticks: the page's points the exchange says are done, named as the page names them ([\"p3\"]): \
+a list's item they did or read, every point of a question they answered well. [] for none.
 - questions: when the answer rested on a guess about their situation, ask to check it, with the \
 point to keep if they say yes (text \"Does the Monstera stand by the north window?\", point \
 \"Stands by the north window.\"). Point is \"\" when there's nothing to keep. Only for a guess \
@@ -175,6 +191,8 @@ Write in the language of the talk.";
 #[derive(Deserialize)]
 struct Keep {
     points: Vec<KeepPoint>,
+    #[serde(default)]
+    ticks: Vec<String>,
     questions: Vec<KeepQuestion>,
     reminders: Vec<KeepReminder>,
     elsewhere: String,
@@ -199,6 +217,15 @@ struct KeepPoint {
     text: String,
     #[serde(default)]
     happened: String,
+    #[serde(default)]
+    facet: String,
+    #[serde(default)]
+    look: String,
+    /// A string, as every field the schema asks for is required.
+    #[serde(default)]
+    amount: String,
+    #[serde(default)]
+    note: String,
     source: String,
     #[serde(default)]
     replaces: Vec<String>,
@@ -245,9 +272,14 @@ fn keep_schema() -> Value {
             "theme": string,
             "text": string,
             "happened": string,
+            "facet": string,
+            "look": { "type": "string", "enum": LOOKS },
+            "amount": string,
+            "note": string,
             "source": string,
             "replaces": list(string.clone()),
         }))),
+        "ticks": list(string.clone()),
         "questions": list(object(json!({ "theme": string, "text": string, "point": string }))),
         "reminders": list(object(json!({
             "theme": string,
@@ -837,17 +869,24 @@ async fn keep(
         .await
         .map_err(AppError::internal)?;
     let mut kept = Kept::on(page.refs());
-    for point in &from.points {
-        let _ = kept.keep_point(
-            &point.block,
-            &point.kind,
-            &point.theme,
-            &point.text,
-            &point.happened,
-            &point.source,
-            "",
-            &point.replaces,
-        );
+    for point in from.points {
+        let _ = kept.keep_point(Handed {
+            block: point.block,
+            kind: point.kind,
+            theme: point.theme,
+            text: point.text,
+            happened: point.happened,
+            facet: point.facet,
+            look: point.look,
+            amount: point.amount.trim().parse().ok(),
+            note: point.note,
+            source: point.source,
+            url: String::new(),
+            replaces: point.replaces,
+        });
+    }
+    if !from.ticks.is_empty() {
+        let _ = kept.tick_points(&from.ticks, true);
     }
     for question in &from.questions {
         let _ = kept.ask_to_check(&question.theme, &question.text, &question.point);
@@ -965,7 +1004,7 @@ mod tests {
     #[test]
     fn the_keep_schema_requires_every_field() {
         let schema = keep_schema();
-        assert_eq!(schema["required"].as_array().map(Vec::len), Some(6));
+        assert_eq!(schema["required"].as_array().map(Vec::len), Some(7));
         assert_eq!(
             schema["properties"]["brief"]["required"]
                 .as_array()
@@ -982,7 +1021,7 @@ mod tests {
             schema["properties"]["points"]["items"]["required"]
                 .as_array()
                 .map(Vec::len),
-            Some(7)
+            Some(11)
         );
     }
 }

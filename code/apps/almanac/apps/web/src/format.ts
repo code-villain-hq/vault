@@ -86,3 +86,11 @@ export function timeWords(at: string | null): string | null {
   const [h, m] = at.split(":");
   return `${Number(h)}:${m}`;
 }
+
+/** "1,2 Mio.", "900": an amount in the reader's numbers, short past a million. */
+export function amountWords(amount: number): string {
+  return new Intl.NumberFormat(undefined, {
+    notation: Math.abs(amount) >= 1e6 ? "compact" : "standard",
+    maximumFractionDigits: 1,
+  }).format(amount);
+}

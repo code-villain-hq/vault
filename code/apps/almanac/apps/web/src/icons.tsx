@@ -1,6 +1,6 @@
-// The icons a topic can have: the same names as `ICONS` in the domain
-// crate, which Claude picks from. Named one by one, so the bundle carries
-// only these.
+// The icons a topic can have, and a card's facets: the same names as
+// `ICONS` and `FACET_ICONS` in the domain crate, which Claude picks from.
+// Named one by one, so the bundle carries only these.
 import {
   Baby,
   Bike,
@@ -9,16 +9,19 @@ import {
   BookOpen,
   Briefcase,
   Brush,
+  Bug,
   Building,
   Calendar,
   Camera,
   Car,
   Cat,
   ChefHat,
+  Clock,
   Code,
   Coffee,
   Cpu,
   Dog,
+  Droplet,
   Dumbbell,
   Film,
   Fish,
@@ -30,6 +33,7 @@ import {
   Hammer,
   HeartPulse,
   Home,
+  Info,
   Landmark,
   Languages,
   Leaf,
@@ -37,6 +41,7 @@ import {
   Lightbulb,
   type LucideIcon,
   Map as MapIcon,
+  MapPin,
   Moon,
   Mountain,
   Music,
@@ -47,20 +52,25 @@ import {
   Pill,
   Plane,
   Presentation,
+  Ruler,
   Salad,
   Scale,
   Scissors,
+  Shield,
   ShowerHead,
   Sparkles,
   Sprout,
   Star,
   Sun,
+  Tag,
   Telescope,
   Tent,
+  Thermometer,
   Trees,
   Users,
   Utensils,
   Wallet,
+  Wind,
   Wrench,
 } from "lucide-react";
 
@@ -135,3 +145,46 @@ export function topicIcon(name: string): LucideIcon {
 
 /** The names a topic's icon can have, in the server's order. */
 export const TOPIC_ICON_NAMES = Object.keys(TOPIC_ICONS);
+
+const FACET_ICONS: Record<string, LucideIcon> = {
+  sun: Sun,
+  droplet: Droplet,
+  "map-pin": MapPin,
+  scissors: Scissors,
+  thermometer: Thermometer,
+  sprout: Sprout,
+  leaf: Leaf,
+  flower: Flower,
+  bug: Bug,
+  wind: Wind,
+  utensils: Utensils,
+  "heart-pulse": HeartPulse,
+  pill: Pill,
+  "paw-print": PawPrint,
+  moon: Moon,
+  home: Home,
+  users: Users,
+  calendar: Calendar,
+  clock: Clock,
+  ruler: Ruler,
+  scale: Scale,
+  tag: Tag,
+  star: Star,
+  sparkles: Sparkles,
+  shield: Shield,
+  info: Info,
+  book: Book,
+  briefcase: Briefcase,
+  wallet: Wallet,
+  map: MapIcon,
+  car: Car,
+  dumbbell: Dumbbell,
+};
+
+/** A facet's icon on a card's face; a tag for one the app doesn't know. */
+export function facetIcon(name: string): LucideIcon {
+  return FACET_ICONS[name] ?? Tag;
+}
+
+/** The names a facet's icon can have, in the server's order. */
+export const FACET_ICON_NAMES = Object.keys(FACET_ICONS);

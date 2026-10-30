@@ -4,7 +4,7 @@ use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::model::{Validate, ValidationError};
-use crate::topic::TopicPatch;
+use crate::topic::{Facet, TopicPatch};
 
 /// A talk with a topic, in the panel beside its page. The server starts
 /// it with the first question; you can delete it.
@@ -197,6 +197,10 @@ pub struct BlockWas {
     pub id: Uuid,
     pub kind: String,
     pub title: String,
+    #[serde(default)]
+    pub facets: Vec<Facet>,
+    #[serde(default)]
+    pub width: String,
     pub position: i32,
     /// Whether the layout removed it.
     pub removed: bool,
@@ -210,6 +214,14 @@ pub struct PointWas {
     pub theme: String,
     pub text: String,
     pub happened: String,
+    #[serde(default)]
+    pub facet: String,
+    #[serde(default)]
+    pub look: String,
+    #[serde(default)]
+    pub amount: Option<f64>,
+    #[serde(default)]
+    pub note: String,
     pub position: i32,
 }
 

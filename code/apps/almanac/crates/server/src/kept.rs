@@ -9,10 +9,11 @@
 //! are written with the answer, through the sync engine.
 
 use almanac_domain::{
-    BLOCK_KINDS, ModelKind, Operation, Proposal, ProposedReminder, STICKS_TO_MAX, TopicChange,
-    TopicPatch,
+    BLOCK_KINDS, FACET_ICONS, Facet, LOOKS, MOST_FACETS, ModelKind, Operation, Proposal,
+    ProposedReminder, STICKS_TO_MAX, TopicChange, TopicPatch,
 };
 use chrono::{NaiveDate, NaiveTime};
+use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
@@ -30,6 +31,8 @@ pub struct Kept {
     pub points: Vec<KeptPoint>,
     pub questions: Vec<KeptQuestion>,
     pub reminders: Vec<KeptReminder>,
+    /// Points ticked done, or not, in a list or questions.
+    pub ticks: Vec<(Uuid, bool)>,
     /// The topic an off-topic question fits better, by name.
     pub elsewhere: Option<String>,
     pub talk_title: Option<String>,
@@ -49,10 +52,182 @@ pub struct KeptPoint {
     pub text: String,
     /// When it happened, on a timeline; empty elsewhere.
     pub happened: String,
+    pub shape: Shape,
     pub source: Option<String>,
     pub url: Option<String>,
     /// The page's points it takes the place of.
     pub replaces: Vec<Uuid>,
+}
+
+/// A point as Claude hands it over (`crate::mcp`, `crate::talks`): the
+/// `block` it goes in (`b2`, or its title), the `kind` that starts one the
+/// page lacks, what it `replaces` (`p3`), and the point itself.
+#[derive(Debug, Default, Deserialize)]
+pub struct Handed {
+    #[serde(default)]
+    pub block: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub theme: String,
+    pub text: String,
+    #[serde(default)]
+    pub happened: String,
+    #[serde(default)]
+    pub facet: String,
+    #[serde(default)]
+    pub look: String,
+    #[serde(default)]
+    pub amount: Option<f64>,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub replaces: Vec<String>,
+}
+
+/// What a point carries besides its text, as its block's kind shows it:
+/// the facet of a card it's about, whether it needs a look, a bar's
+/// number and the few words beside a bar or a question.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Shape {
+    pub facet: String,
+    pub look: String,
+    pub amount: Option<f64>,
+    pub note: String,
+}
+
+impl Shape {
+    /// The shape as a block of `kind` with these `facets` takes it, called
+    /// `title` in what's wrong. A facet the block doesn't name is wrong when
+    /// Claude gave it (`named`), and goes quietly when a point only moved.
+    pub fn fit(
+        self,
+        kind: &str,
+        facets: &[Facet],
+        title: &str,
+        named: bool,
+    ) -> Result<Shape, String> {
+        let facet = match (kind, self.facet.trim()) {
+            (_, "") => String::new(),
+            ("cards" | "table", facet) => match facets
+                .iter()
+                .find(|f| f.name.to_lowercase() == facet.to_lowercase())
+            {
+                Some(f) => f.name.clone(),
+                None if !named => String::new(),
+                None if facets.is_empty() => {
+                    return Err(format!(
+                        "{title} names no facets: leave facet out, or lay out the page to give the block some."
+                    ));
+                }
+                None => {
+                    let names: Vec<&str> = facets.iter().map(|f| f.name.as_str()).collect();
+                    return Err(format!(
+                        "{title} has no facet {facet}: it's one of {}, or none.",
+                        names.join(", ")
+                    ));
+                }
+            },
+            _ => String::new(),
+        };
+        let look = match kind {
+            "cards" | "table" | "bars" | "questions" => {
+                let look = self.look.trim().to_lowercase();
+                if !LOOKS.contains(&look.as_str()) {
+                    return Err(format!(
+                        "A point's look is warn (it needs a look), info (it's ready for something) or none, not {look}."
+                    ));
+                }
+                look
+            }
+            _ => String::new(),
+        };
+        let amount = match kind {
+            "bars" | "trend" | "parts" => match self.amount {
+                Some(amount) if amount.is_finite() => Some(amount),
+                _ => {
+                    return Err(format!(
+                        "{} in {title} needs its amount: {}.",
+                        match kind {
+                            "bars" => "A bar",
+                            "trend" => "A measurement",
+                            _ => "A part",
+                        },
+                        match kind {
+                            "parts" => "how many, plain (12)",
+                            "trend" => "the number it measured, plain (3.4)",
+                            _ => "the number, plain (900000)",
+                        }
+                    ));
+                }
+            },
+            "table" => self.amount.filter(|a| a.is_finite()),
+            _ => None,
+        };
+        let note = match kind {
+            "bars" | "questions" | "trend" | "parts" => cut(&self.note, 80),
+            _ => String::new(),
+        };
+        Ok(Shape {
+            facet,
+            look,
+            amount,
+            note,
+        })
+    }
+}
+
+/// When a point in a block of `kind`, called `title` in what's wrong,
+/// happened: on a timeline a year, a span or a day; in a trend the day it
+/// was measured, or none for the mark it aims at; nothing elsewhere.
+pub fn when(kind: &str, happened: &str, title: &str) -> Result<String, String> {
+    let happened = cut(happened, 60);
+    match kind {
+        "timeline" if !happened.chars().any(|c| c.is_ascii_digit()) => Err(format!(
+            "A point on {title} says when it happened: a year (1959), a span (1987–1993) or a day (11. September 2001)."
+        )),
+        "timeline" => Ok(happened),
+        "trend" if happened.is_empty() || happened.parse::<NaiveDate>().is_ok() => Ok(happened),
+        "trend" => Err(format!(
+            "A measurement in {title} says the day it was taken, as 2026-09-24, or none for the mark it aims at."
+        )),
+        _ => Ok(String::new()),
+    }
+}
+
+/// The facets a block of cards names, tidied: a name each, an icon Almanac
+/// has, none twice.
+pub fn facets(given: &[Facet]) -> Result<Vec<Facet>, String> {
+    if given.len() > MOST_FACETS {
+        return Err(format!(
+            "A block names at most {MOST_FACETS} facets: the facts every card has."
+        ));
+    }
+    let mut facets: Vec<Facet> = Vec::new();
+    for facet in given {
+        let name = cut(&facet.name, 40);
+        if name.is_empty() {
+            return Err("A facet needs a name: a word or two (Licht, Wasser).".into());
+        }
+        let icon = facet.icon.trim().to_lowercase();
+        if !FACET_ICONS.contains(&icon.as_str()) {
+            return Err(format!(
+                "There's no icon {icon} for {name}: it's one of {FACET_ICONS:?}."
+            ));
+        }
+        if facets
+            .iter()
+            .any(|f| f.name.to_lowercase() == name.to_lowercase())
+        {
+            return Err(format!("{name} is in facets twice."));
+        }
+        facets.push(Facet { name, icon });
+    }
+    Ok(facets)
 }
 
 #[derive(Debug)]
@@ -88,6 +263,7 @@ const MOST_CHANGED: usize = 40;
 const MOST_QUESTIONS: usize = 2;
 const MOST_REMINDERS: usize = 3;
 const MOST_BLOCKS: usize = 2;
+const MOST_TICKS: usize = 40;
 
 impl Kept {
     /// Keeping for a page with these points and reminders.
@@ -101,27 +277,31 @@ impl Kept {
     /// Keeps a point in a `block` of the page (`b2`, or its title), in
     /// place of the points it `replaces` (`p3`). A block the page doesn't
     /// have is started, after the others, when the point gives its `kind`.
-    /// On a timeline it says when it `happened`. What's wrong with it comes
-    /// back in words, for Claude to fix.
-    #[allow(clippy::too_many_arguments)]
-    pub fn keep_point(
-        &mut self,
-        block: &str,
-        kind: &str,
-        theme: &str,
-        text: &str,
-        happened: &str,
-        source: &str,
-        url: &str,
-        replaces: &[String],
-    ) -> Result<(), String> {
+    /// On a timeline it says when it `happened`; in cards, bars and
+    /// questions it has a [`Shape`]. What's wrong with it comes back in
+    /// words, for Claude to fix.
+    pub fn keep_point(&mut self, point: Handed) -> Result<(), String> {
+        let Handed {
+            block,
+            kind,
+            theme,
+            text,
+            happened,
+            facet,
+            look,
+            amount,
+            note,
+            source,
+            url,
+            replaces,
+        } = point;
         if self.layout.is_some() {
             return Err(
                 "You laid out the page in this answer: keep new points in the next one, or draw them with lay_out_page's new_points."
                     .into(),
             );
         }
-        let text = cut(text, 2000);
+        let text = cut(&text, 2000);
         if text.is_empty() {
             return Err("A point needs a text.".into());
         }
@@ -144,7 +324,7 @@ impl Kept {
                     .ok_or_else(|| format!("The page has no point {r}: name one like p3."))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let (placed, starts) = self.place(block, kind, replaces.first().map(|(_, b)| *b))?;
+        let (placed, starts) = self.place(&block, &kind, replaces.first().map(|(_, b)| *b))?;
         let theme = match placed.kind.as_str() {
             "week" => {
                 return Err(format!(
@@ -154,7 +334,7 @@ impl Kept {
             }
             "chips" | "list" | "you" => String::new(),
             _ => {
-                let theme = cut(theme, 120);
+                let theme = cut(&theme, 120);
                 if theme.is_empty() {
                     return Err(format!(
                         "A point in {} needs a theme: {}.",
@@ -164,6 +344,11 @@ impl Kept {
                             "shelf" => "the thing's name",
                             "text" => "the section's heading",
                             "timeline" => "the section it belongs to, named as the page names it",
+                            "bars" => "the set's caption",
+                            "questions" => "the question, as it would be asked",
+                            "table" => "the thing its row is about",
+                            "trend" => "what's measured (Lisas Gewicht)",
+                            "parts" => "the whole's caption",
                             _ => "the thing the card is about",
                         }
                     ));
@@ -171,18 +356,14 @@ impl Kept {
                 theme
             }
         };
-        let happened = if placed.kind == "timeline" {
-            let happened = cut(happened, 60);
-            if !happened.chars().any(|c| c.is_ascii_digit()) {
-                return Err(format!(
-                    "A point on {} says when it happened: a year (1959), a span (1987–1993) or a day (11. September 2001).",
-                    title_of(&placed)
-                ));
-            }
-            happened
-        } else {
-            String::new()
-        };
+        let happened = when(&placed.kind, &happened, title_of(&placed))?;
+        let shape = Shape {
+            facet,
+            look,
+            amount,
+            note,
+        }
+        .fit(&placed.kind, &placed.facets, title_of(&placed), true)?;
         if self
             .points
             .iter()
@@ -199,14 +380,15 @@ impl Kept {
         if starts {
             self.blocks.push(placed);
         }
-        let url = cut(url, 2000);
+        let url = cut(&url, 2000);
         self.points.push(KeptPoint {
             block_id,
             theme,
             under,
             text,
             happened,
-            source: some(cut(source, 200)),
+            shape,
+            source: some(cut(&source, 200)),
             url: (url.starts_with("https://") || url.starts_with("http://")).then_some(url),
             replaces: replaces.into_iter().map(|(id, _)| id).collect(),
         });
@@ -261,9 +443,41 @@ impl Kept {
                 id: Uuid::now_v7(),
                 kind: kind.into(),
                 title,
+                facets: Vec::new(),
             },
             true,
         ))
+    }
+
+    /// Ticks the page's `points` (`p3`) done, or not: a list's items, a
+    /// question they answered well.
+    pub fn tick_points(&mut self, points: &[String], done: bool) -> Result<(), String> {
+        if points.is_empty() {
+            return Err("Name the points to tick, like p3.".into());
+        }
+        for reference in points {
+            let (id, block) = found(reference, 'p', self.refs.points.len())
+                .map(|n| self.refs.points[n])
+                .ok_or_else(|| format!("The page has no point {reference}: name one like p3."))?;
+            let kind = self
+                .refs
+                .blocks
+                .iter()
+                .find(|b| b.id == block)
+                .map_or("", |b| b.kind.as_str());
+            if kind != "list" && kind != "questions" {
+                return Err(format!(
+                    "{} is in a {kind} block: only a list's items and questions are ticked.",
+                    reference.trim()
+                ));
+            }
+            self.ticks.retain(|(t, _)| *t != id);
+            if self.ticks.len() >= MOST_TICKS {
+                return Err(format!("An answer ticks at most {MOST_TICKS} points."));
+            }
+            self.ticks.push((id, done));
+        }
+        Ok(())
     }
 
     /// A question to check a guess the answer rested on, with the point to
@@ -396,6 +610,7 @@ impl Kept {
                     ("topic_id", json!(at.topic_id)),
                     ("kind", json!(block.kind)),
                     ("title", json!(block.title)),
+                    ("facets", json!(block.facets)),
                 ]),
             });
         }
@@ -411,6 +626,10 @@ impl Kept {
                 ("theme", json!(point.theme)),
                 ("text", json!(point.text)),
                 ("happened", json!(point.happened)),
+                ("facet", json!(point.shape.facet)),
+                ("look", json!(point.shape.look)),
+                ("amount", json!(point.shape.amount)),
+                ("note", json!(point.shape.note)),
                 ("source", json!(point.source)),
                 ("source_url", json!(point.url)),
                 ("talk_id", json!(at.talk_id)),
@@ -451,6 +670,15 @@ impl Kept {
                     id,
                 });
                 replaced.push(id);
+            }
+        }
+        for &(id, done) in &self.ticks {
+            if !replaced.contains(&id) {
+                operations.push(Operation::Update {
+                    model: ModelKind::Point,
+                    id,
+                    data: fields([("done", json!(done))]),
+                });
             }
         }
         for question in self.questions.iter().take(2) {
@@ -519,11 +747,15 @@ impl Kept {
         }
 
         let mut message = Map::new();
-        if !self.points.is_empty() {
-            message.insert(
-                "kept".into(),
-                json!(kept_words(self.points.len(), updated, &themes)),
-            );
+        let kept: Vec<String> = [
+            (!self.points.is_empty()).then(|| kept_words(self.points.len(), updated, &themes)),
+            ticked_words(&self.ticks),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if !kept.is_empty() {
+            message.insert("kept".into(), json!(kept.join(" ")));
         }
         if let Some(elsewhere) = self.elsewhere.as_deref().map(|e| cut(e, 80))
             && !elsewhere.is_empty()
@@ -660,6 +892,21 @@ pub fn kept_words(points: usize, updated: usize, themes: &[String]) -> String {
     format!("{verb} {what} under {under}.")
 }
 
+/// "Ticked 2 points off.", "Ticked a point on again."
+fn ticked_words(ticks: &[(Uuid, bool)]) -> Option<String> {
+    let words = |n: usize, how: &str| match n {
+        0 => None,
+        1 => Some(format!("Ticked a point {how}.")),
+        n => Some(format!("Ticked {n} points {how}.")),
+    };
+    let done = ticks.iter().filter(|(_, d)| *d).count();
+    let said: Vec<String> = [words(done, "off"), words(ticks.len() - done, "on again")]
+        .into_iter()
+        .flatten()
+        .collect();
+    (!said.is_empty()).then(|| said.join(" "))
+}
+
 pub fn fields<const N: usize>(pairs: [(&str, Value); N]) -> Map<String, Value> {
     pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
@@ -703,6 +950,18 @@ mod tests {
             id: Uuid::now_v7(),
             kind: kind.into(),
             title: title.into(),
+            facets: Vec::new(),
+        }
+    }
+
+    /// A point for `block`, starting one of `kind` when there's none.
+    fn point(block: &str, kind: &str, theme: &str, text: &str) -> Handed {
+        Handed {
+            block: block.into(),
+            kind: kind.into(),
+            theme: theme.into(),
+            text: text.into(),
+            ..Handed::default()
         }
     }
 
@@ -714,31 +973,21 @@ mod tests {
             ..Refs::default()
         });
         let undated = kept
-            .keep_point("b2", "", "Intifada", "Sie beginnt", "", "", "", &[])
+            .keep_point(point("b2", "", "Intifada", "Sie beginnt"))
             .unwrap_err();
         assert!(undated.contains("says when it happened"), "{undated}");
-        kept.keep_point(
-            "Zeitleiste",
-            "",
-            "Intifada",
-            "Die erste Intifada beginnt",
-            "1987–1993",
-            "From the talk",
-            "",
-            &[],
-        )
+        kept.keep_point(Handed {
+            happened: "1987–1993".into(),
+            source: "From the talk".into(),
+            ..point("Zeitleiste", "", "Intifada", "Die erste Intifada beginnt")
+        })
         .unwrap();
         // Elsewhere a point has no date.
-        kept.keep_point(
-            "b1",
-            "",
-            "Intifada",
-            "Ein Aufstand gegen die Besatzung.",
-            "1987",
-            "From the talk",
-            "",
-            &[],
-        )
+        kept.keep_point(Handed {
+            happened: "1987".into(),
+            source: "From the talk".into(),
+            ..point("b1", "", "Intifada", "Ein Aufstand gegen die Besatzung.")
+        })
         .unwrap();
         assert_eq!(kept.points[0].block_id, timeline.id);
         assert_eq!(kept.points[0].happened, "1987–1993");
@@ -763,7 +1012,7 @@ mod tests {
             ..Kept::default()
         };
         assert!(
-            kept.keep_point("b1", "", "", "x", "", "", "", &[])
+            kept.keep_point(point("b1", "", "", "x"))
                 .unwrap_err()
                 .contains("laid out the page")
         );
@@ -779,21 +1028,19 @@ mod tests {
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("b1", "", "Wäsche", "x", "", "", "", &["p3".into()])
-                .unwrap_err()
-                .contains("no point p3")
+            kept.keep_point(Handed {
+                replaces: vec!["p3".into()],
+                ..point("b1", "", "Wäsche", "x")
+            })
+            .unwrap_err()
+            .contains("no point p3")
         );
         // Named no block, it stays in the one it replaces.
-        kept.keep_point(
-            "",
-            "",
-            "Wäsche",
-            "Washes Wednesday and Friday.",
-            "",
-            "You said",
-            "",
-            &["p1".into(), "[p2]".into()],
-        )
+        kept.keep_point(Handed {
+            source: "You said".into(),
+            replaces: vec!["p1".into(), "[p2]".into()],
+            ..point("", "", "Wäsche", "Washes Wednesday and Friday.")
+        })
         .unwrap();
         let (said, operations) = kept.writes(&answering());
         assert!(matches!(
@@ -818,39 +1065,29 @@ mod tests {
             reminders: vec![],
         });
         assert!(
-            kept.keep_point("b2", "", "", "Wash on Friday", "", "", "", &[])
+            kept.keep_point(point("b2", "", "", "Wash on Friday"))
                 .unwrap_err()
                 .contains("keeps no points")
         );
         assert!(
-            kept.keep_point("Today", "", "", "Shampoo", "", "", "", &[])
+            kept.keep_point(point("Today", "", "", "Shampoo"))
                 .unwrap_err()
                 .contains("needs a theme")
         );
         // More than an answer may add, each in a point's place.
         for n in 1..=12 {
-            kept.keep_point(
-                "you",
-                "",
-                "You",
-                &format!("Fact {n}"),
-                "",
-                "",
-                "",
-                &[format!("p{n}")],
-            )
+            kept.keep_point(Handed {
+                replaces: vec![format!("p{n}")],
+                ..point("you", "", "You", &format!("Fact {n}"))
+            })
             .unwrap();
         }
-        kept.keep_point(
+        kept.keep_point(point(
             "b1",
             "",
             "Elvital wash",
             "Elvital shampoo: on the scalp",
-            "",
-            "",
-            "",
-            &[],
-        )
+        ))
         .unwrap();
         let (said, operations) = kept.writes(&answering());
         assert_eq!(operations.len(), 13);
@@ -875,19 +1112,19 @@ mod tests {
     fn a_point_may_start_a_block_the_page_lacks() {
         let mut kept = Kept::on(Refs::default());
         assert!(
-            kept.keep_point("Reading", "", "", "Ward, Plant care", "", "", "", &[])
+            kept.keep_point(point("Reading", "", "", "Ward, Plant care"))
                 .unwrap_err()
                 .contains("give a kind")
         );
-        kept.keep_point("Reading", "list", "", "Ward, Plant care", "", "", "", &[])
+        kept.keep_point(point("Reading", "list", "", "Ward, Plant care"))
             .unwrap();
         // The next one finds it by its title.
-        kept.keep_point("reading", "", "", "Kew, Ferns", "", "", "", &[])
+        kept.keep_point(point("reading", "", "", "Kew, Ferns"))
             .unwrap();
-        kept.keep_point("Terms", "chips", "", "Epiphyte", "", "", "", &[])
+        kept.keep_point(point("Terms", "chips", "", "Epiphyte"))
             .unwrap();
         assert!(
-            kept.keep_point("Places", "cards", "Kew", "In London", "", "", "", &[])
+            kept.keep_point(point("Places", "cards", "Kew", "In London"))
                 .unwrap_err()
                 .contains("at most 2 blocks")
         );
@@ -915,6 +1152,196 @@ mod tests {
         assert_eq!(
             said["kept"],
             json!("Kept 3 points under Reading and Terms.")
+        );
+    }
+
+    #[test]
+    fn a_card_point_names_one_of_its_blocks_facets() {
+        let mut plants = block("cards", "Pflanzen");
+        plants.facets = vec![
+            Facet {
+                name: "Licht".into(),
+                icon: "sun".into(),
+            },
+            Facet {
+                name: "Wasser".into(),
+                icon: "droplet".into(),
+            },
+        ];
+        let mut kept = Kept::on(Refs {
+            blocks: vec![plants, block("list", "Lesen")],
+            ..Refs::default()
+        });
+        let unknown = kept
+            .keep_point(Handed {
+                facet: "Erde".into(),
+                ..point("b1", "", "Monstera", "Torffrei")
+            })
+            .unwrap_err();
+        assert!(unknown.contains("one of Licht, Wasser"), "{unknown}");
+        kept.keep_point(Handed {
+            facet: "wasser".into(),
+            look: "Warn".into(),
+            ..point("b1", "", "Monstera", "Braune Ränder: zu wenig")
+        })
+        .unwrap();
+        // A list has no facets or looks: they go quietly.
+        kept.keep_point(Handed {
+            facet: "Wasser".into(),
+            look: "warn".into(),
+            ..point("b2", "", "", "Ward, Plant care")
+        })
+        .unwrap();
+        assert_eq!(kept.points[0].shape.facet, "Wasser");
+        assert_eq!(kept.points[0].shape.look, "warn");
+        assert_eq!(kept.points[1].shape, Shape::default());
+    }
+
+    #[test]
+    fn a_bar_has_an_amount() {
+        let mut kept = Kept::on(Refs {
+            blocks: vec![block("bars", "In Zahlen")],
+            ..Refs::default()
+        });
+        assert!(
+            kept.keep_point(point("b1", "", "9/11", "Am 11. September"))
+                .unwrap_err()
+                .contains("needs its amount")
+        );
+        kept.keep_point(Handed {
+            amount: Some(2977.0),
+            note: "getötet".into(),
+            ..point("b1", "", "9/11", "Am 11. September")
+        })
+        .unwrap();
+        let (_, operations) = kept.writes(&answering());
+        assert!(matches!(
+            &operations[..],
+            [Operation::Create { data, .. }]
+                if data["amount"] == json!(2977.0) && data["note"] == json!("getötet")
+        ));
+    }
+
+    #[test]
+    fn a_trend_keeps_a_number_on_a_day() {
+        let mut kept = Kept::on(Refs {
+            blocks: vec![block("trend", "Gewicht")],
+            ..Refs::default()
+        });
+        let weighed = |happened: &str, amount: Option<f64>| Handed {
+            happened: happened.into(),
+            amount,
+            note: "kg".into(),
+            source: "You said".into(),
+            ..point("b1", "", "Lisas Gewicht", "Gewogen")
+        };
+        assert!(
+            kept.keep_point(weighed("2026-09-24", None))
+                .unwrap_err()
+                .contains("needs its amount")
+        );
+        assert!(
+            kept.keep_point(weighed("24. September", Some(3.5)))
+                .unwrap_err()
+                .contains("as 2026-09-24")
+        );
+        kept.keep_point(weighed("2026-09-24", Some(3.5))).unwrap();
+        // With no day it's the mark it aims at.
+        kept.keep_point(Handed {
+            text: "Ziel".into(),
+            ..weighed("", Some(3.4))
+        })
+        .unwrap();
+        assert_eq!(kept.points[0].happened, "2026-09-24");
+        assert_eq!(kept.points[0].shape.note, "kg");
+        assert_eq!(kept.points[1].happened, "");
+    }
+
+    #[test]
+    fn a_table_cell_is_a_point_with_its_column() {
+        let mut shoes = block("table", "Schuhe");
+        shoes.facets = vec![Facet {
+            name: "Preis".into(),
+            icon: "tag".into(),
+        }];
+        let mut kept = Kept::on(Refs {
+            blocks: vec![shoes, block("parts", "Wo man arbeitet")],
+            ..Refs::default()
+        });
+        assert!(
+            kept.keep_point(Handed {
+                facet: "Größe".into(),
+                ..point("b1", "", "Exani Axio M", "43, 44")
+            })
+            .unwrap_err()
+            .contains("no facet Größe")
+        );
+        kept.keep_point(Handed {
+            facet: "preis".into(),
+            amount: Some(709.0),
+            look: "warn".into(),
+            ..point("b1", "", "Exani Axio M", "709 kr")
+        })
+        .unwrap();
+        assert_eq!(
+            kept.points[0].shape,
+            Shape {
+                facet: "Preis".into(),
+                look: "warn".into(),
+                amount: Some(709.0),
+                note: String::new(),
+            }
+        );
+        // A part needs how many.
+        assert!(
+            kept.keep_point(point("b2", "", "28 Anzeigen", "Remote"))
+                .unwrap_err()
+                .contains("A part in Wo man arbeitet needs its amount")
+        );
+    }
+
+    #[test]
+    fn ticks_are_for_lists_and_questions() {
+        let (read, cards) = (block("list", "Lesen"), block("cards", "Pflanzen"));
+        let (book, plant) = (Uuid::now_v7(), Uuid::now_v7());
+        let mut kept = Kept::on(Refs {
+            points: vec![(book, read.id), (plant, cards.id)],
+            blocks: vec![read, cards],
+            reminders: vec![],
+        });
+        assert!(
+            kept.tick_points(&["p2".into()], true)
+                .unwrap_err()
+                .contains("only a list's items and questions")
+        );
+        kept.tick_points(&["p1".into()], true).unwrap();
+        let (said, operations) = kept.writes(&answering());
+        assert!(matches!(
+            &operations[..],
+            [Operation::Update { id, data, .. }] if *id == book && data["done"] == json!(true)
+        ));
+        assert_eq!(said["kept"], json!("Ticked a point off."));
+    }
+
+    #[test]
+    fn facets_have_an_icon_almanac_has() {
+        let facet = |name: &str, icon: &str| Facet {
+            name: name.into(),
+            icon: icon.into(),
+        };
+        assert!(
+            facets(&[facet("Licht", "lamp")])
+                .unwrap_err()
+                .contains("no icon lamp")
+        );
+        assert!(
+            facets(&[facet("Licht", "sun"), facet("licht", "sun")])
+                .unwrap_err()
+                .contains("twice")
+        );
+        assert_eq!(
+            facets(&[facet(" Licht ", "Sun")]).unwrap(),
+            [facet("Licht", "sun")]
         );
     }
 

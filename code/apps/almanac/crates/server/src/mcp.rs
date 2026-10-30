@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use almanac_domain::{
-    Actor, BLOCK_KINDS, ICONS, Proposal, ProposedPoint, STICKS_TO_MAX, TEMPLATE_NAMES, TopicChange,
-    TopicPatch,
+    Actor, BLOCK_KINDS, BLOCK_WIDTHS, FACET_ICONS, ICONS, LOOKS, Proposal, ProposedPoint,
+    STICKS_TO_MAX, TEMPLATE_NAMES, TopicChange, TopicPatch,
 };
 use axum::Json;
 use axum::extract::State;
@@ -23,7 +23,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::kept::{Kept, reminder};
-use crate::layout::{LayoutArgs, Now, lay_out};
+use crate::layout::{CELL_FITS, CHIP_FITS, LayoutArgs, Now, lay_out};
 use crate::page::Refs;
 use crate::state::AppState;
 use crate::topics::{SetUp, cut};
@@ -54,6 +54,7 @@ impl Mode {
         match self {
             Mode::Topic => &[
                 "keep_point",
+                "tick_points",
                 "ask_to_check",
                 "offer_reminder",
                 "change_brief",
@@ -224,18 +225,18 @@ async fn call(
     };
     match name {
         "keep_point" => {
-            let point: PointArgs = read(arguments)?;
-            kept()?.keep_point(
-                &point.block,
-                &point.kind,
-                &point.theme,
-                &point.text,
-                &point.happened,
-                &point.source,
-                &point.url,
-                &point.replaces,
-            )?;
+            kept()?.keep_point(read(arguments)?)?;
             Ok("Kept.".into())
+        }
+        "tick_points" => {
+            let ticks: TickArgs = read(arguments)?;
+            kept()?.tick_points(&ticks.points, ticks.done)?;
+            Ok(if ticks.done {
+                "Ticked off."
+            } else {
+                "Ticked on again."
+            }
+            .into())
         }
         "ask_to_check" => {
             let question: QuestionArgs = read(arguments)?;
@@ -346,22 +347,14 @@ async fn call(
 }
 
 #[derive(Deserialize)]
-struct PointArgs {
-    #[serde(default)]
-    block: String,
-    #[serde(default)]
-    kind: String,
-    #[serde(default)]
-    theme: String,
-    text: String,
-    #[serde(default)]
-    happened: String,
-    #[serde(default)]
-    source: String,
-    #[serde(default)]
-    url: String,
-    #[serde(default)]
-    replaces: Vec<String>,
+struct TickArgs {
+    points: Vec<String>,
+    #[serde(default = "yes")]
+    done: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Deserialize)]
@@ -705,10 +698,52 @@ it checks, and what it leaves to other topics. Fit it to the topic, with nothing
 does anyway: usually 400 to 1,200 characters. The page doesn't show it, only the topic's \
 About.";
 
-/// When a timeline's point happened, for the tools that keep one.
-const HAPPENED_SAYS: &str = "Only on a timeline: when it happened, as a year (1959), a span \
-(1987–1993) or a day (11. September 2001), with v. Chr. or BC for the years before year 1. \
-Left out elsewhere.";
+/// When a timeline's point happened, or a trend's was measured, for the
+/// tools that keep one.
+const HAPPENED_SAYS: &str = "Only on a timeline and in a trend. On a timeline when it \
+happened, as a year (1959), a span (1987–1993) or a day (11. September 2001), with v. Chr. or \
+BC for the years before year 1; in a trend the day it was measured, as 2026-09-24, and left \
+out only for a mark they said they aim at (Ziel), never for a number they told you without its \
+day. Left out elsewhere.";
+
+/// What a point carries in cards, tables, bars, questions, trends and
+/// parts, for the tools that keep or move one.
+const FACET_SAYS: &str = "Only in cards and tables whose block names facets: the facet it's \
+about, one of the block's, as the page names them (Wasser): a card's line, a table's column. \
+Left out for what the thing is, and for the rest.";
+const LOOK_SAYS: &str = "Only in cards, tables, bars and questions: warn when it needs a look \
+(brown edges, over budget, a gap, no answer yet), info when it's ready for something (a cutting \
+to pot). Left out otherwise.";
+const AMOUNT_SAYS: &str = "In bars, trends and parts always, the number, plain (900000, 3.4, \
+12): a bar's, a measurement's, a part's. In a table, a number cell's, so it sorts (709 for \
+\"709 kr\"). Left out elsewhere.";
+const NOTE_SAYS: &str = "Only in bars, questions, trends and parts: a few words beside it, \
+under 80 characters: a bar's unit or what it counts (\"getötet\", \"im CV\"), a trend's unit \
+(\"kg\"), what a part counts (\"Anzeigen\"), who asks a question (on its first point).";
+
+/// What a page laid out anew should be, for lay_out_page: the page's
+/// design, not only where its points go.
+const LAYING_OUT_SAYS: &str = "Lay it out to read at a glance: change kinds, order and widths \
+wherever that reads better, not only add blocks. Give each block the kind its points' shape \
+asks for: things that share the same facts are cards with facets, or a table when comparing \
+them matters more; numbers of one measure to compare are bars (the shoes' prices), never \
+different measures side by side (hours of sleep beside a day without food); a number measured \
+on two days or more is a trend; a whole and what it's made of is parts; what to do or read is \
+a list; questions to practise are questions; facts of a few words are chips; only what reads \
+as prose stays text. A kind whose shape the points don't have yet waits, and your answer says \
+what it needs (a second weighing for a trend). Never make up a number or a day to fill a kind, \
+even when they ask for every kind: a span (12–16 Stunden) isn't one number, a goal isn't a \
+measurement, and a day nobody named isn't its day. Fewer, fuller blocks read better than many \
+thin ones: what's about one thing stays together (a profile's facets, one table), and a block \
+of two or three points joins the one it belongs with. First what they come back for (today, \
+what needs a look), then what they compare, then what they read. Fill the rows: blocks side by \
+side add up to the whole (1/2 and 1/2, 2/3 and 1/3), a short block sits beside another and a \
+long one takes the whole; blocks side by side are about as long, and the week takes the whole. \
+Only chips, trends and parts read at 1/3 or 1/4; a table takes 2/3 with two columns beside its \
+names, the whole with more, and keeps every column; the rest need 1/2 or more. A block's title says what its themes \
+share, never one theme again (\"Messwerte\" over Lisas Gewicht, not \"Lisas Gewicht\"). Your \
+answer is short: a line or two on what changed shape, not every block, and what a kind still \
+waits for, asked as a question.";
 
 /// The templates a topic starts as, for the tools that pick one.
 const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
@@ -780,14 +815,29 @@ fn tools(mode: Mode) -> Vec<Value> {
                 json!({
                     "block": string("The block it goes in: as the page names it (b2), or its title. For a new block, its title."),
                     "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Only for a block the page lacks: the kind it starts as. Left out otherwise." },
-                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf or cards, the section in text and on a timeline. Left out in chips, lists and you."),
+                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf, cards or a table, the section in text and on a timeline, what's measured in a trend, the whole in parts. Left out in chips, lists and you."),
                     "text": string("The point: in text two to four sentences that explain; on a timeline one line on what happened; elsewhere one short sentence or a few words."),
                     "happened": string(HAPPENED_SAYS),
+                    "facet": string(FACET_SAYS),
+                    "look": { "type": "string", "enum": LOOKS, "description": LOOK_SAYS },
+                    "amount": { "type": "number", "description": AMOUNT_SAYS },
+                    "note": string(NOTE_SAYS),
                     "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                     "url": string("The page it comes from, when you read one. Never a made-up link."),
                     "replaces": replaces("points", "p3"),
                 }),
                 &["block", "text", "source"],
+            ),
+            tool(
+                "tick_points",
+                "Ticks points done: a list's items they did or read, a question they answered \
+                 well when they practised it (every point of the question). Only when they \
+                 told you, or answered it in this talk. done false ticks them on again.",
+                json!({
+                    "points": { "type": "array", "items": { "type": "string" }, "description": "The points, as the page names them (p3)." },
+                    "done": { "type": "boolean", "description": "Whether they're done; left out, they are." },
+                }),
+                &["points"],
             ),
             tool(
                 "ask_to_check",
@@ -838,18 +888,23 @@ fn tools(mode: Mode) -> Vec<Value> {
             ),
             tool(
                 "lay_out_page",
-                "Lays out the topic's page anew, only when they ask for that in this talk \
+                &format!(
+                    "Lays out the topic's page anew, only when they ask for that in this talk \
                  (\"sort the page better\", \"make a timeline of it\"): never on your own. \
                  List every block the page keeps, in its new order, with a new kind or title \
                  where it changes; one you leave out must end up empty, and goes. Move points \
                  between blocks and themes, naming them as the page does (p3), and reword one \
                  only to fit its new place, with every fact it had; points no move names stay \
-                 where they are. new_points draws new points from ones the page has, with \
+                 where they are. A chip holds {CHIP_FITS} characters and a table's cell \
+                 {CELL_FITS}, chips of a profile too: one that says more gets a few words there \
+                 (\"Waldkatzen-Mix, ohne Papiere\"), and what else it said is a new point drawn \
+                 from it where sentences read, a facet's tile or a list. new_points draws new points from ones the page has, with \
                  their source: a timeline's events from its sections, which keep theirs. \
                  Nothing is dropped and no point's source changes; a block the layout empties \
                  goes. It's done at once, and they see what moved under your answer and can \
                  undo it. Call it once, with the whole layout: a second call replaces the \
-                 first. Keep no other points in the same answer.",
+                 first. Keep no other points in the same answer. {LAYING_OUT_SAYS}"
+                ),
                 json!({
                     "blocks": {
                         "type": "array",
@@ -860,6 +915,20 @@ fn tools(mode: Mode) -> Vec<Value> {
                                 "block": string("The page's block, as the page names it (b2); left out for a new one."),
                                 "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Its kind: for a new block, or to change one's kind. Left out, it keeps its own." },
                                 "title": string("A new block's short title, or a new title for one the page has. Left out, it keeps its own."),
+                                "width": { "type": "string", "enum": BLOCK_WIDTHS, "description": "How wide it is, of the page's twelve columns: 1/4, 1/3, 1/2, 2/3, 3/4 or whole, so a small block sits beside another (a trend at 1/3 beside text at 2/3). \"\" for its kind's own. Left out, it keeps its own." },
+                                "facets": {
+                                    "type": "array",
+                                    "description": "For cards and tables: the facts every thing has, which each card's face shows a line of, or a table's columns, in order. Left out, it keeps its own; [] for none.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": string("A word or two, in the page's language (Licht, Wasser, Platz)."),
+                                            "icon": { "type": "string", "enum": FACET_ICONS },
+                                        },
+                                        "required": ["name", "icon"],
+                                        "additionalProperties": false,
+                                    },
+                                },
                             },
                             "additionalProperties": false,
                         },
@@ -875,6 +944,10 @@ fn tools(mode: Mode) -> Vec<Value> {
                                 "theme": string("Its theme in the block it ends in, as that block's kind asks. Left out, it keeps its own; chips, lists and you have none."),
                                 "text": string("Only when it's reworded to fit its new place: the point, with every fact it had."),
                                 "happened": string(HAPPENED_SAYS),
+                                "facet": string(FACET_SAYS),
+                                "look": { "type": "string", "enum": LOOKS, "description": LOOK_SAYS },
+                                "amount": { "type": "number", "description": AMOUNT_SAYS },
+                                "note": string(NOTE_SAYS),
                             },
                             "required": ["point"],
                             "additionalProperties": false,
@@ -891,6 +964,10 @@ fn tools(mode: Mode) -> Vec<Value> {
                                 "theme": string("Its theme there: on a timeline, the section it belongs to, named as the page names it."),
                                 "text": string("The point: on a timeline, one line on what happened."),
                                 "happened": string(HAPPENED_SAYS),
+                                "facet": string(FACET_SAYS),
+                                "look": { "type": "string", "enum": LOOKS, "description": LOOK_SAYS },
+                                "amount": { "type": "number", "description": AMOUNT_SAYS },
+                                "note": string(NOTE_SAYS),
                             },
                             "required": ["from", "block", "text"],
                             "additionalProperties": false,

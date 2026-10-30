@@ -2,7 +2,7 @@ import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/re
 import { LoginPage, SignedInPage, StartPage } from "./auth";
 import { CalendarPage } from "./calendar";
 import { Home, NotFound, WorkspaceHome, WorkspaceLayout } from "./layout";
-import { AccountPage, ClaudePage, MembersPage } from "./settings";
+import { AccountPage, BlocksPage, ClaudePage, MembersPage } from "./settings";
 import { TopicPage, type TopicSearch } from "./topic";
 
 const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
@@ -60,6 +60,11 @@ const members = createRoute({
   path: "/settings/members",
   component: MembersPage,
 });
+const blocks = createRoute({
+  getParentRoute: () => workspace,
+  path: "/settings/blocks",
+  component: BlocksPage,
+});
 const account = createRoute({
   getParentRoute: () => workspace,
   path: "/settings/account",
@@ -90,7 +95,7 @@ const routeTree = root.addChildren([
   login,
   start,
   signedIn,
-  workspace.addChildren([workspaceHome, calendar, topic, claude, members, account]),
+  workspace.addChildren([workspaceHome, calendar, topic, claude, members, blocks, account]),
 ]);
 
 export const router = createRouter({ routeTree });

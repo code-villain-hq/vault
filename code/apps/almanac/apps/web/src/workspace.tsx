@@ -103,6 +103,19 @@ export function useIsGuest(): boolean {
   return isGuest(useWorkspace().workspace.role);
 }
 
+/**
+ * Its children as a guest sees them: to look at, with nothing to tick,
+ * move or remove. Settings → Blocks draws its samples so.
+ */
+export function LookOnly({ children }: { children: ReactNode }) {
+  const context = useWorkspace();
+  const value = useMemo(
+    () => ({ ...context, workspace: { ...context.workspace, role: "guest" as const } }),
+    [context],
+  );
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
 function useSyncStore<T>(read: (sync: SyncClient<Schema>) => T): T {
   const { sync } = useWorkspace();
   const subscribe = useCallback((listener: () => void) => sync.subscribe(listener), [sync]);

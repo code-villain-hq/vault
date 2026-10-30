@@ -168,6 +168,47 @@
   }
 }
 
+/*
+ * A topic's page is a grid of twelve columns. A block takes a share of a
+ * row (data-width), a row's blocks grow to fill it, and a block that would
+ * get narrower than its kind reads at (--min) takes a row of its own.
+ */
+.page-grid {
+  --gap: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem var(--gap);
+}
+.page-grid > * {
+  --w: 1;
+  --min: 28rem;
+  flex: 1 1 calc(100% * var(--w) - var(--gap) * (1 - var(--w)));
+  min-width: min(var(--min), 100%);
+}
+.page-grid > [data-width="1/4"] {
+  --w: calc(1 / 4);
+}
+.page-grid > [data-width="1/3"] {
+  --w: calc(1 / 3);
+}
+.page-grid > [data-width="1/2"] {
+  --w: calc(1 / 2);
+}
+.page-grid > [data-width="2/3"] {
+  --w: calc(2 / 3);
+}
+.page-grid > [data-width="3/4"] {
+  --w: calc(3 / 4);
+}
+/* A chart reads at a glance, so it holds out narrower. */
+.page-grid > [data-narrow] {
+  --min: 18rem;
+}
+/* A block on its own, as Settings → Blocks shows it: just its share. */
+.page-grid[data-alone] > * {
+  flex-grow: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
   .animate-breathe {

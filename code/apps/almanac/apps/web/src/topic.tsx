@@ -1,12 +1,22 @@
-// A topic's page: its blocks in order, each laying out what it keeps one
-// way (the day's steps, the week, chips, a shelf, cards, text, a list or a
-// timeline), the questions it waits on, and the talk beside it. A section
+// A topic's page: its blocks in order, on a grid of twelve columns, each
+// laying out what it keeps one way (the day's steps, the week, chips, a
+// shelf, cards, a table, text, a list, a timeline, bars, a trend, parts or
+// questions), the questions it waits on, and the talk beside it. A section
 // opens on a page of its own, in the page's place, and so does the topic's
 // About: its name, what it sticks to, what it knows about you and its
 // blocks. The workspace's own topic, Almanac, has the index of the others
 // for its page.
 
-import type { Block, ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
+import type {
+  Block,
+  ClaudeKeyInfo,
+  Facet,
+  Message,
+  Point,
+  Question,
+  Reminder,
+  Topic,
+} from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
@@ -44,9 +54,11 @@ import {
   useState,
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
+import { measured, PartsSet, partsOf, TrendSet } from "./charts";
 import {
   addDays,
   ago,
+  amountWords,
   dateWords,
   dayKey,
   dueWords,
@@ -58,9 +70,9 @@ import {
   weekOf,
   weekWords,
 } from "./format";
-import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
+import { facetIcon, TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
-import type { Picked } from "./photos";
+import { type Picked, usePhoto } from "./photos";
 import {
   AddPhoto,
   DropHint,
@@ -70,13 +82,15 @@ import {
   useDrop,
   usePicking,
 } from "./picking";
-import { about, inline } from "./prose";
+import { about, inline, lead } from "./prose";
 import { NotifyBell, occurrences, ReminderMenu } from "./reminders";
+import { samples } from "./samples";
 import type { Schema } from "./sync";
+import { Table } from "./table";
 import { TalkPanel, useTalks } from "./talk";
 import { bySection, inOrder, type When, when } from "./timeline";
 import { Button, Empty } from "./ui";
-import { useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
+import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
  * `?talk=` opens the talk panel (`new` for a new talk); `?ask=` starts it
@@ -120,6 +134,9 @@ interface Theme {
   questions: Question[];
   reminders: Reminder[];
 }
+
+/** A theme that holds nothing yet, to fill. */
+const THEME: Theme = { name: "", points: [], questions: [], reminders: [] };
 
 export function TopicPage() {
   const { topic: id } = useParams({ strict: false }) as { topic: string };
@@ -315,7 +332,7 @@ function TopicView({
           <div
             ref={scroller}
             onScroll={(e) => scrolled.current.set(place, e.currentTarget.scrollTop)}
-            className="page-content min-h-0 flex-1 overflow-y-auto"
+            className="page-content relative min-h-0 flex-1 overflow-y-auto"
           >
             <div className="flex flex-col gap-8 px-6 py-6 sm:px-10">
               {about ? (
@@ -450,16 +467,26 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
           </p>
         </div>
       )}
-      {page.blocks.map((block) => (
-        <BlockView
-          key={block.id}
-          topic={topic}
-          block={block}
-          page={page}
-          questions={page.questions.filter((q) => homes.get(q.id) === block.id)}
-          routines={routines}
-        />
-      ))}
+      {page.blocks.length > 0 && (
+        <div className="page-grid">
+          {page.blocks.map((block) => (
+            <div
+              key={block.id}
+              data-width={widthOf(block)}
+              data-narrow={NARROW.has(block.kind) || undefined}
+            >
+              <BlockView
+                topic={topic}
+                block={block}
+                page={page}
+                questions={page.questions.filter((q) => homes.get(q.id) === block.id)}
+                routines={routines}
+                onAsk={onAsk}
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
   );
@@ -559,6 +586,26 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
             {block.title && <h2 className="text-xs text-faint">{block.title}</h2>}
             {block.kind === "timeline" ? (
               <Timeline points={held} />
+            ) : block.kind === "bars" ? (
+              <BarSet theme={{ ...THEME, name: section, points: held }} heading={false} />
+            ) : block.kind === "questions" ? (
+              <ul className={`flex flex-col ${LINES}`}>
+                <QuestionRow theme={{ ...THEME, name: section, points: held }} opened />
+              </ul>
+            ) : block.kind === "trend" && measured(held).measurements.length > 0 ? (
+              <TrendSet
+                name={section}
+                points={held}
+                listed={(point) => <RemovePoint point={point} />}
+              />
+            ) : block.kind === "parts" && partsOf(held).length > 0 ? (
+              <PartsSet
+                name={section}
+                points={held}
+                remove={(point) => <RemovePoint point={point} />}
+              />
+            ) : (block.kind === "cards" || block.kind === "table") && block.facets.length > 0 ? (
+              <ByFacet block={block} points={held} />
             ) : (
               <Points points={held} passages={block.kind === "text"} />
             )}
@@ -678,17 +725,22 @@ const HOLDS: Record<string, [kind: string, one: string, many: string]> = {
   text: ["Text", "section", "sections"],
   list: ["List", "point", "points"],
   timeline: ["Timeline", "event", "events"],
+  bars: ["Bars", "bar", "bars"],
+  questions: ["Questions", "question", "questions"],
+  table: ["Table", "row", "rows"],
+  trend: ["Trend", "measurement", "measurements"],
+  parts: ["Parts", "part", "parts"],
 };
 
 /** What a block holds, for its line on About: "Shelf · 3 things", "3 reminders". */
 function holds(block: Block, page: PageParts): string {
   const points = page.points.filter((p) => p.block_id === block.id);
   const [kind, one, many] = HOLDS[block.kind] ?? ["", "point", "points"];
-  // The week counts its reminders; cards and text, their themes.
+  // The week counts its reminders; cards, text and questions, their themes.
   const count =
     block.kind === "week"
       ? page.reminders.length
-      : block.kind === "cards" || block.kind === "text"
+      : ["cards", "table", "text", "questions"].includes(block.kind)
         ? new Set(points.map((p) => p.theme)).size
         : points.length;
   const amount = count ? `${count} ${count === 1 ? one : many}` : "nothing yet";
@@ -1049,15 +1101,29 @@ function Facts({ topic, facts }: { topic: Topic; facts: Point[] }) {
   );
 }
 
-/** A section's name, which opens it on a page of its own; `children` go before the arrow. */
-function SectionName({ name, children }: { name: string; children?: ReactNode }) {
+/**
+ * A section's name, which opens it on a page of its own, at `hash` if given;
+ * `label` shows in its place, and `children` go before the arrow.
+ */
+function SectionName({
+  name,
+  label,
+  hash,
+  children,
+}: {
+  name: string;
+  label?: ReactNode;
+  hash?: string;
+  children?: ReactNode;
+}) {
   return (
     <Link
       to="."
       search={inSection(name)}
+      hash={hash}
       className="group/name inline-flex min-w-0 items-center gap-1 hover:text-fg"
     >
-      {name}
+      {label ?? name}
       {children}
       <ChevronRight
         size={14}
@@ -1110,6 +1176,46 @@ function keeping(blocks: Block[]): Block | undefined {
   );
 }
 
+/**
+ * How wide a block of the page's twelve columns is: its own, or its kind's
+ * when it names none, as the server has them (`width_of`).
+ */
+function widthOf(block: Block): string {
+  if (block.width) return block.width;
+  switch (block.kind) {
+    case "chips":
+    case "trend":
+    case "parts":
+      return "1/3";
+    case "bars":
+    case "questions":
+    case "list":
+    case "timeline":
+      return "1/2";
+    default:
+      return "whole";
+  }
+}
+
+/** The kinds that read at a glance, and so hold out narrower. */
+const NARROW = new Set(["chips", "trend", "parts"]);
+
+/** The widths a block can take, for its ⋯ menu. */
+const WIDTHS = [
+  { value: "1/4", label: "¼", title: "A quarter" },
+  { value: "1/3", label: "⅓", title: "A third" },
+  { value: "1/2", label: "½", title: "Half" },
+  { value: "2/3", label: "⅔", title: "Two thirds" },
+  { value: "3/4", label: "¾", title: "Three quarters" },
+  { value: "whole", label: "Whole", title: "The whole width" },
+];
+
+/** Kinds that show the same points another way: cards as a table, and back. */
+const SHOWN_AS: Record<string, [kind: string, label: string]> = {
+  cards: ["table", "Show as table"],
+  table: ["cards", "Show as cards"],
+};
+
 /** A block's name, for its menu and its dialogs. */
 function blockName(block: Block): string {
   return block.title || (block.kind === "week" ? "The week" : "This block");
@@ -1126,7 +1232,60 @@ const EMPTY: Record<string, string> = {
   list: "Things to follow or read, a line each, with where they're from.",
   timeline: "When each section happened, oldest first, a line each, with its events on its page.",
   you: "What you tell it about yourself, a line each, which its answers go by.",
+  bars: "Numbers to compare, a bar each, on one scale per set, with where they're from.",
+  questions: "Questions you'd be asked, a row each, with the answer the page keeps, to practise.",
+  table: "Things to compare across the same facts, a row each, a column per fact.",
+  trend: "A number each time it's measured, as a line over the days, with the mark it aims at.",
+  parts: "A whole and the parts it's made of, as a ring, with each part's share.",
 };
+
+/**
+ * Settings → Blocks: every kind of block a page can have, with sample
+ * points, drawn as a page draws it. Only to look at: it changes nothing.
+ */
+export function BlockGallery() {
+  const all = useMemo(() => samples(), []);
+  return (
+    <LookOnly>
+      {all.map((sample) => {
+        const page: PageParts = {
+          blocks: [sample.block],
+          points: sample.points,
+          questions: [],
+          reminders: sample.reminders,
+        };
+        return (
+          <section key={sample.block.id} aria-label={sample.name} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="font-semibold">{sample.name}</h2>
+              <p className="max-w-measure text-muted">{sample.says}</p>
+            </div>
+            {sample.block.kind === "you" ? (
+              <Facts topic={sample.topic} facts={sample.points} />
+            ) : (
+              // At its kind's width, as a page lays it out.
+              <div className="page-grid" data-alone>
+                <div
+                  data-width={widthOf(sample.block)}
+                  data-narrow={NARROW.has(sample.block.kind) || undefined}
+                >
+                  <BlockView
+                    topic={sample.topic}
+                    block={sample.block}
+                    page={page}
+                    questions={[]}
+                    routines={[]}
+                    onAsk={() => {}}
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </LookOnly>
+  );
+}
 
 /** One block, laid out by its kind. */
 function BlockView({
@@ -1135,6 +1294,7 @@ function BlockView({
   page,
   questions,
   routines,
+  onAsk,
 }: {
   topic: Topic;
   block: Block;
@@ -1142,7 +1302,10 @@ function BlockView({
   /** The questions that wait in it. */
   questions: Question[];
   routines: RoutineDay[];
+  /** Starts a talk with a question, as Questions' Quiz me does. */
+  onAsk: (text: string) => void;
 }) {
+  const guest = useIsGuest();
   const points = page.points.filter((p) => p.block_id === block.id);
   const frame = { block, blocks: page.blocks };
   switch (block.kind) {
@@ -1162,31 +1325,130 @@ function BlockView({
           <Shelf block={block} points={points} questions={questions} routines={routines} />
         </BlockFrame>
       );
-    case "list":
+    case "list": {
+      const done = points.filter((p) => p.done).length;
       return (
-        <BlockFrame {...frame} empty={points.length === 0}>
+        <BlockFrame
+          {...frame}
+          empty={points.length === 0}
+          aside={
+            done > 0 && (
+              <span className="text-xs text-faint">
+                {done} of {points.length} done
+              </span>
+            )
+          }
+        >
           <List points={points} />
         </BlockFrame>
       );
+    }
+    case "bars":
+      return (
+        <BlockFrame {...frame} empty={points.length === 0}>
+          <Bars themes={byTheme({ points, questions: [], reminders: [] })} />
+        </BlockFrame>
+      );
+    case "questions": {
+      const themes = byTheme({ points, questions: [], reminders: [] });
+      const practised = themes.filter((t) => t.points.every((p) => p.done)).length;
+      return (
+        <BlockFrame
+          {...frame}
+          empty={themes.length === 0}
+          aside={
+            themes.length > 0 && (
+              <>
+                <span className="text-xs text-faint">
+                  {practised} of {themes.length} practised
+                </span>
+                <QuizMe block={block} onAsk={onAsk} />
+              </>
+            )
+          }
+        >
+          <Questions themes={themes} />
+        </BlockFrame>
+      );
+    }
     case "timeline":
       return (
         <BlockFrame {...frame} empty={points.length === 0}>
           <TimelineBySection points={points} />
         </BlockFrame>
       );
+    case "table":
+      return (
+        // With its columns named, an empty table still has New row.
+        <BlockFrame {...frame} empty={points.length === 0 && (guest || block.facets.length === 0)}>
+          <Table block={block} points={points} rowName={(name) => <SectionName name={name} />} />
+        </BlockFrame>
+      );
+    case "trend": {
+      // A reminder under what's measured, such as weighing her, goes under its line.
+      const themes = byTheme({
+        points,
+        questions: [],
+        reminders: page.reminders.filter((r) => points.some((p) => p.theme === r.theme)),
+      }).filter((t) => measured(t.points).measurements.length > 0);
+      return (
+        <BlockFrame {...frame} empty={themes.length === 0}>
+          <div className="flex flex-col gap-6">
+            {themes.map((theme) => (
+              <TrendSet
+                key={theme.name}
+                name={theme.name}
+                points={theme.points}
+                heading={<SectionName name={theme.name} />}
+                below={theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
+              />
+            ))}
+          </div>
+        </BlockFrame>
+      );
+    }
+    case "parts": {
+      const themes = byTheme({ points, questions: [], reminders: [] }).filter(
+        (t) => partsOf(t.points).length > 0,
+      );
+      return (
+        <BlockFrame {...frame} empty={themes.length === 0}>
+          <div className="flex flex-col gap-6">
+            {themes.map((theme) => (
+              <PartsSet
+                key={theme.name}
+                name={theme.name}
+                points={theme.points}
+                heading={<SectionName name={theme.name} />}
+              />
+            ))}
+          </div>
+        </BlockFrame>
+      );
+    }
     default: {
       const themes = themesOf(points, questions, page.reminders);
       return (
         <BlockFrame {...frame} empty={themes.length === 0}>
           {block.kind === "text" ? (
-            <Text block={block} themes={themes} />
+            <Text block={block} themes={themes} spans={spans(page)} />
           ) : (
-            <Cards block={block} themes={themes} />
+            <Cards topic={topic} block={block} themes={themes} />
           )}
         </BlockFrame>
       );
     }
   }
+}
+
+/** When each section happened, from the page's timelines: "1816–1953". */
+function spans({ blocks, points }: PageParts): Map<string, string> {
+  const timelines = new Set(blocks.filter((b) => b.kind === "timeline").map((b) => b.id));
+  return new Map(
+    bySection(points.filter((p) => timelines.has(p.block_id))).flatMap((line) =>
+      line.section ? [[line.section, line.year] as const] : [],
+    ),
+  );
 }
 
 /**
@@ -1212,6 +1474,7 @@ function BlockFrame({
   heading,
   lead = false,
   tools,
+  aside,
   empty = false,
   children,
 }: {
@@ -1223,6 +1486,8 @@ function BlockFrame({
   lead?: boolean;
   /** Beside the title, such as the week's arrows. */
   tools?: ReactNode;
+  /** At the end of the title's line, such as what's done of a list. */
+  aside?: ReactNode;
   empty?: boolean;
   children?: ReactNode;
 }) {
@@ -1236,7 +1501,12 @@ function BlockFrame({
       <div className="flex min-h-6 items-center gap-2">
         {title && <h2 className={lead ? "font-semibold" : "text-xs text-faint"}>{title}</h2>}
         {tools}
-        <BlockMenu block={block} blocks={blocks} />
+        {aside && <span className="ml-auto flex items-center gap-3">{aside}</span>}
+        <BlockMenu
+          block={block}
+          blocks={blocks}
+          className={aside ? "group-hover/block:opacity-100" : undefined}
+        />
       </div>
       {empty ? (
         <p className="rounded-lg px-4 py-3.5 text-faint ring-1 ring-line ring-inset">
@@ -1282,6 +1552,13 @@ function BlockMenu({
   };
   const kept = points.filter((p) => p.block_id === block.id).length;
   const name = blockName(block);
+  // The kind's own width is kept as none, so it follows the kind.
+  const width = (chosen: string) => {
+    const own = widthOf({ ...block, width: "" });
+    const next = chosen === own ? "" : chosen;
+    if (next !== block.width) sync.update("Block", block.id, { width: next });
+  };
+  const shownAs = SHOWN_AS[block.kind];
   return (
     <span
       className={`opacity-0 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100 ${className}`}
@@ -1291,6 +1568,18 @@ function BlockMenu({
         items={[
           ...(at > 0 ? [{ label: "Move up", onSelect: () => move(-1) }] : []),
           ...(at < blocks.length - 1 ? [{ label: "Move down", onSelect: () => move(1) }] : []),
+          // You is on About, where nothing sits beside it.
+          ...(block.kind === "you"
+            ? []
+            : [{ label: "Width", choices: WIDTHS, value: widthOf(block), onChoose: width }]),
+          ...(shownAs
+            ? [
+                {
+                  label: shownAs[1],
+                  onSelect: () => sync.update("Block", block.id, { kind: shownAs[0] }),
+                },
+              ]
+            : []),
           // The week is headed by its days.
           ...(block.kind === "week"
             ? []
@@ -1644,10 +1933,32 @@ const CARD_SHOWS = 4;
  * stay short enough to read across, as writing keeps its measure.
  */
 const FILL = "grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))]";
+/** A section's tile is a little wider than a card, for its first sentence. */
+const TILES = "grid-cols-[repeat(auto-fill,minmax(min(19rem,100%),1fr))]";
 const LINES = "max-w-[86ch]";
 
-/** A card per theme: its first points, its reminders, what it waits on. */
-function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
+/**
+ * A card per theme. A block that names its facets gives each card a face:
+ * its picture, what it is, what needs a look, and a line per facet; and one
+ * card is a profile. Without facets a card shows its first points.
+ */
+function Cards({ topic, block, themes }: { topic: Topic; block: Block; themes: Theme[] }) {
+  const messages = useRecords("Message");
+  const points = themes.flatMap((t) => t.points);
+  if (block.facets.length > 0) {
+    const photo = (theme: Theme) => photoOf(theme.name, points, messages);
+    const [only] = themes;
+    if (only && themes.length === 1) {
+      return <Profile topic={topic} block={block} theme={only} photo={photo(only)} />;
+    }
+    return (
+      <div className={`grid gap-2.5 ${FILL}`}>
+        {themes.map((theme) => (
+          <Face key={theme.name} topic={topic} block={block} theme={theme} photo={photo(theme)} />
+        ))}
+      </div>
+    );
+  }
   return (
     <div className={`grid gap-3 ${FILL}`}>
       {themes.map((theme) => (
@@ -1658,7 +1969,7 @@ function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
           {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
           {theme.points.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <Points points={theme.points.slice(0, CARD_SHOWS)} />
+              <Points points={theme.points.slice(0, CARD_SHOWS)} glance />
               <More section={theme.name} more={theme.points.length - CARD_SHOWS} />
             </div>
           )}
@@ -1672,32 +1983,348 @@ function Cards({ block, themes }: { block: Block; themes: Theme[] }) {
   );
 }
 
-/** Writing that grows: a section per theme, its first passage, and the rest in the section. */
-function Text({ block, themes }: { block: Block; themes: Theme[] }) {
+/**
+ * A card's photo: the newest from a talk about it alone, one whose points
+ * in the block are all under its theme. A talk about two plants has no
+ * photo of either.
+ */
+function photoOf(theme: string, points: Point[], messages: Message[]): string | undefined {
+  const talks = new Set<string>();
+  const others = new Set<string>();
+  for (const point of points) {
+    if (point.talk_id) (point.theme === theme ? talks : others).add(point.talk_id);
+  }
+  let newest: Message | undefined;
+  for (const message of messages) {
+    if (!message.photos.length || !talks.has(message.talk_id) || others.has(message.talk_id)) {
+      continue;
+    }
+    if (!newest || message.created_at > newest.created_at) newest = message;
+  }
+  return newest?.photos[0]?.id;
+}
+
+/** A card's picture: its photo once a talk has one, or the topic's icon. */
+function Pic({ topic, photo, large = false }: { topic: Topic; photo?: string; large?: boolean }) {
+  const look = large ? "size-16 rounded-lg" : "size-10 rounded-md";
+  if (photo) return <Photo id={photo} className={look} />;
+  const Icon = topicIcon(topic.icon);
   return (
-    <article className="flex flex-col gap-6">
-      {themes.map((theme) => (
-        <section key={theme.name} className="flex flex-col gap-2">
-          <h3 className="font-semibold">
+    <span
+      aria-hidden="true"
+      className={`grid shrink-0 place-items-center bg-chip text-muted ${look}`}
+    >
+      <Icon size={large ? 28 : 20} strokeWidth={1.75} />
+    </span>
+  );
+}
+
+function Photo({ id, className }: { id: string; className: string }) {
+  const { place, workspace } = useWorkspace();
+  const url = usePhoto(place, workspace.id, id);
+  return url ? (
+    <img src={url} alt="" className={`shrink-0 object-cover ${className}`} />
+  ) : (
+    <span aria-hidden="true" className={`shrink-0 bg-chip ${className}`} />
+  );
+}
+
+/** What a theme's points say at a glance: what it is, what needs a look, and the rest by facet. */
+function faceOf(theme: Theme, facets: Facet[]) {
+  const looks = theme.points.filter((p) => p.look);
+  const plain = theme.points.filter((p) => !p.facet && !p.look);
+  const byFacet = facets.flatMap((facet) => {
+    const points = theme.points.filter((p) => p.facet === facet.name && !p.look);
+    return points.length ? [{ facet, points }] : [];
+  });
+  return { looks, plain, byFacet };
+}
+
+/** What needs a look, in warn or info: "Braune Ränder: eher das Leitungswasser". */
+function Looks({ points }: { points: Point[] }) {
+  return points.map((point) => (
+    <p
+      key={point.id}
+      className={`${point.look === "warn" ? "ui-tint-warn" : "ui-tint-info"} rounded-md px-2.5 py-1.5 text-xs font-semibold`}
+    >
+      {inline(point.text)}
+    </p>
+  ));
+}
+
+/** "7 points", at a card's or tile's foot. */
+function Count({ points }: { points: Point[] }) {
+  const count = points.length;
+  return (
+    <p className="mt-auto pt-1 text-xs text-faint">
+      {count} {count === 1 ? "point" : "points"}
+    </p>
+  );
+}
+
+/**
+ * A card's face: its picture and name, what it is in a line, what needs a
+ * look, then a line per facet with its icon. The rest is on its page.
+ */
+function Face({
+  topic,
+  block,
+  theme,
+  photo,
+}: {
+  topic: Topic;
+  block: Block;
+  theme: Theme;
+  photo?: string;
+}) {
+  const { looks, plain, byFacet } = faceOf(theme, block.facets);
+  const [kind] = plain;
+  return (
+    <article className="flex flex-col gap-3 rounded-lg bg-surface px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <Pic topic={topic} photo={photo} />
+        <div className="flex min-w-0 flex-col">
+          <h3 className="flex items-center gap-2 font-semibold">
             <SectionName name={theme.name} />
+            {theme.points.some((p) => !p.seen) && (
+              <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
+            )}
           </h3>
-          {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
-          {theme.points.length > 0 && <Points points={theme.points.slice(0, 1)} passages />}
-          <More section={theme.name} more={theme.points.length - 1} />
-          {theme.questions.map((q) => (
-            <Ask key={q.id} question={q} block={block} />
-          ))}
-        </section>
+          {kind && <p className="line-clamp-1 text-xs text-faint">{inline(kind.text)}</p>}
+        </div>
+      </div>
+      <Looks points={looks} />
+      {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
+      {byFacet.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {byFacet.map(({ facet, points: [point] }) => {
+            const Icon = facetIcon(facet.icon);
+            return (
+              <li
+                key={facet.name}
+                title={facet.name}
+                className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2.5"
+              >
+                <Icon
+                  size={14}
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                  className="mt-0.5 text-faint"
+                />
+                <p className="line-clamp-2">
+                  <span className="sr-only">{facet.name}: </span>
+                  {point && inline(point.text)}
+                  {point && named(point) && <span className="text-faint"> · {point.source}</span>}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {theme.questions.map((q) => (
+        <Ask key={q.id} question={q} block={block} />
       ))}
+      <Count points={theme.points} />
+    </article>
+  );
+}
+
+/** How many of a facet's lines a profile's tile shows; its page has the rest. */
+const TILE_SHOWS = 3;
+
+/**
+ * The block's one card, as a profile: a bigger picture, its name, what you'd
+ * say first as chips, and a tile per facet with its first lines.
+ */
+function Profile({
+  topic,
+  block,
+  theme,
+  photo,
+}: {
+  topic: Topic;
+  block: Block;
+  theme: Theme;
+  photo?: string;
+}) {
+  const { looks, plain, byFacet } = faceOf(theme, block.facets);
+  return (
+    <article className="flex flex-col gap-4">
+      <div className="flex items-center gap-4">
+        <Pic topic={topic} photo={photo} large />
+        <div className="flex min-w-0 flex-col gap-2">
+          <h3 className="flex items-center gap-2 text-title font-semibold">
+            <SectionName name={theme.name} />
+            {theme.points.some((p) => !p.seen) && (
+              <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
+            )}
+          </h3>
+          {plain.length > 0 && <Chips points={plain} />}
+        </div>
+      </div>
+      <Looks points={looks} />
+      {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
+      {theme.questions.map((q) => (
+        <Ask key={q.id} question={q} block={block} />
+      ))}
+      {byFacet.length > 0 && (
+        <div className={`grid gap-2.5 ${TILES}`}>
+          {byFacet.map(({ facet, points }) => {
+            const Icon = facetIcon(facet.icon);
+            return (
+              <section
+                key={facet.name}
+                aria-label={facet.name}
+                className="flex flex-col gap-1.5 rounded-lg bg-surface px-4 py-3.5"
+              >
+                <h4 className="font-semibold">
+                  <SectionName
+                    name={theme.name}
+                    hash={facetId(block, facet)}
+                    label={
+                      <>
+                        <Icon
+                          size={14}
+                          strokeWidth={1.75}
+                          aria-hidden="true"
+                          className="mr-1 shrink-0 text-faint"
+                        />
+                        {facet.name}
+                      </>
+                    }
+                  />
+                </h4>
+                <ul className="flex flex-col gap-1 text-muted">
+                  {points.slice(0, TILE_SHOWS).map((point) => (
+                    <li key={point.id} className="flex gap-2">
+                      <span aria-hidden="true" className="text-faint">
+                        ·
+                      </span>
+                      <span className="line-clamp-2 min-w-0">{inline(point.text)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Count points={points} />
+              </section>
+            );
+          })}
+        </div>
+      )}
     </article>
   );
 }
 
 /**
+ * A card's points on its own page, by facet, each under its icon: what it
+ * is and what fits none first.
+ */
+function ByFacet({ block, points }: { block: Block; points: Point[] }) {
+  const plain = points.filter((p) => !block.facets.some((f) => f.name === p.facet));
+  return (
+    <div className="flex flex-col gap-5">
+      {plain.length > 0 && <Points points={plain} />}
+      {block.facets.map((facet) => {
+        const held = points.filter((p) => p.facet === facet.name);
+        if (held.length === 0) return null;
+        const Icon = facetIcon(facet.icon);
+        return (
+          <section
+            key={facet.name}
+            id={facetId(block, facet)}
+            aria-label={facet.name}
+            className="flex scroll-mt-6 flex-col gap-2"
+          >
+            <h3 className="flex items-center gap-2 font-semibold">
+              <Icon size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+              {facet.name}
+            </h3>
+            <Points points={held} />
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Where a facet starts on its section's page. */
+function facetId(block: Block, facet: Facet): string {
+  return `facet-${block.id}-${block.facets.findIndex((f) => f.name === facet.name)}`;
+}
+
+/**
+ * Writing that grows, at a glance: a tile per section, with its first
+ * sentence, when it happened and how much it keeps. Its name opens the
+ * passages.
+ */
+function Text({
+  block,
+  themes,
+  spans,
+}: {
+  block: Block;
+  themes: Theme[];
+  /** When each section happened, by the page's timeline: "1816–1953". */
+  spans: Map<string, string>;
+}) {
+  return (
+    <div className={`grid gap-2.5 ${TILES}`}>
+      {themes.map((theme) => {
+        const first = theme.points[0];
+        const count = theme.points.length;
+        const span = spans.get(theme.name);
+        return (
+          <article
+            key={theme.name}
+            className="flex flex-col gap-1.5 rounded-lg bg-surface px-4 py-3.5"
+          >
+            <h3 className="flex items-center gap-2 font-semibold">
+              <SectionName name={theme.name} />
+              {theme.points.some((p) => !p.seen) && (
+                <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
+              )}
+            </h3>
+            {theme.reminders.length > 0 && <Dates reminders={theme.reminders} />}
+            {first && <p className="line-clamp-2 text-muted">{lead(first.text)}</p>}
+            {theme.questions.map((q) => (
+              <Ask key={q.id} question={q} block={block} />
+            ))}
+            {count > 0 && (
+              <p className="mt-auto pt-1 text-xs text-faint">
+                {span && `${span} · `}
+                {count} {count === 1 ? "point" : "points"}
+              </p>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Where a point comes from, if the page shows it: a name or a link. "From
+ * Grok" and "From the talk" say only which talk, which a section's own
+ * page shows, so the page keeps them for a tooltip.
+ */
+function named(point: Point): boolean {
+  return !!point.source && (!!point.source_url || !/^from\b/i.test(point.source));
+}
+
+/**
  * A theme's points: on a card, short notes with their source after them; in
  * a document, passages to read, with their source and their talk under them.
+ * On the topic's page a note shows only a named source.
  */
-function Points({ points, passages = false }: { points: Point[]; passages?: boolean }) {
+function Points({
+  points,
+  passages = false,
+  glance = false,
+}: {
+  points: Point[];
+  passages?: boolean;
+  /** On the topic's page, not a section's own. */
+  glance?: boolean;
+}) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const talks = useRecords("Talk");
@@ -1708,6 +2335,7 @@ function Points({ points, passages = false }: { points: Point[]; passages?: bool
       {points.map((point) => {
         const source =
           point.source &&
+          (!glance || named(point)) &&
           (point.source_url ? (
             <a href={point.source_url} target="_blank" rel="noreferrer" className="ui-link">
               {point.source}
@@ -1718,7 +2346,11 @@ function Points({ points, passages = false }: { points: Point[]; passages?: bool
         const talk = passages ? talks.find((t) => t.id === point.talk_id) : undefined;
         const dot = passages ? "mt-2.5" : "mt-2";
         return (
-          <li key={point.id} className="group flex items-start gap-2">
+          <li
+            key={point.id}
+            title={source ? undefined : point.source || undefined}
+            className="group flex items-start gap-2"
+          >
             {point.seen ? (
               <span aria-hidden="true" className={`${dot} size-1.5 shrink-0`} />
             ) : (
@@ -1781,6 +2413,7 @@ function Points({ points, passages = false }: { points: Point[]; passages?: bool
 /** A theme's reminders: what, how often, when next. */
 function Dates({ reminders }: { reminders: Reminder[] }) {
   const { sync } = useWorkspace();
+  const guest = useIsGuest();
   return (
     <ul className="flex flex-col gap-1">
       {reminders.map((reminder) => {
@@ -1792,7 +2425,7 @@ function Dates({ reminders }: { reminders: Reminder[] }) {
               {reminder.title}, {rhythmWords(reminder.every_days)}: next {dueWords(reminder.due_on)}
               {time ? ` at ${time}` : ""}
             </span>
-            <ReminderMenu sync={sync} reminder={reminder} />
+            {!guest && <ReminderMenu sync={sync} reminder={reminder} />}
           </li>
         );
       })}
@@ -1982,6 +2615,7 @@ function Today({
   reminders: Reminder[];
 }) {
   const { sync } = useWorkspace();
+  const guest = useIsGuest();
   const now = today();
   const next = nextRoutine(routineDays(points, reminders));
   const day = next?.day ?? now;
@@ -2011,7 +2645,7 @@ function Today({
       dated && day !== now ? dueWords(day).replace(/^./, (c) => c.toUpperCase()) : block.title;
     heading = when ? `${when}, ${routine.name}` : routine.name;
     const reminder = routine.reminders.find((r) => occurrences(r, day, day).length);
-    if (reminder) tools = <ReminderMenu sync={sync} reminder={reminder} />;
+    if (reminder && !guest) tools = <ReminderMenu sync={sync} reminder={reminder} />;
     steps = routine.steps.map((step) => {
       const [what, how] = whatAndHow(step.text);
       return { id: step.id, what, how };
@@ -2205,22 +2839,37 @@ function Thing({
             <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
             {rest.length} {rest.length === 1 ? "note" : "notes"}
           </button>
-          {open && <Points points={rest} />}
+          {open && <Points points={rest} glance />}
         </div>
       )}
     </article>
   );
 }
 
-/** Things to follow or read, a line each with where it comes from: the newest five. */
+/** How many lines a list shows until it's opened. */
+const LIST_SHOWS = 5;
+
+/**
+ * Things to follow or read, a line each with where it comes from, to tick
+ * off: the newest five not done, then what's done, faint, last.
+ */
 function List({ points }: { points: Point[] }) {
   const [all, setAll] = useState(false);
-  const shown = all ? points : points.slice(-5);
+  const open = points.filter((p) => !p.done);
+  const done = points.filter((p) => p.done);
+  const first = open.slice(-LIST_SHOWS);
+  const room = LIST_SHOWS - first.length;
+  const shown = all ? [...open, ...done] : [...first, ...(room > 0 ? done.slice(-room) : [])];
   return (
     <div className={`flex flex-col ${LINES}`}>
       <ul className="flex flex-col">
         {shown.map((point) => (
-          <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
+          <li
+            key={point.id}
+            title={named(point) ? undefined : point.source || undefined}
+            className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5"
+          >
+            <Tick points={[point]} label={point.text} className="self-center" />
             {!point.seen && (
               <span
                 role="img"
@@ -2228,8 +2877,10 @@ function List({ points }: { points: Point[] }) {
                 className="size-1.5 shrink-0 self-center rounded-full bg-accent"
               />
             )}
-            <p className="min-w-0 flex-1">{inline(point.text)}</p>
-            {point.source && (
+            <p className={`min-w-0 flex-1 ${point.done ? "text-faint" : ""}`}>
+              {inline(point.text)}
+            </p>
+            {named(point) && (
               <span className="shrink-0 text-xs text-faint">
                 {point.source_url ? (
                   <a href={point.source_url} target="_blank" rel="noreferrer" className="ui-link">
@@ -2244,7 +2895,7 @@ function List({ points }: { points: Point[] }) {
           </li>
         ))}
       </ul>
-      {points.length > 5 && (
+      {points.length > LIST_SHOWS && (
         <button
           type="button"
           className="ui-disclosure self-start px-2.5"
@@ -2252,10 +2903,225 @@ function List({ points }: { points: Point[] }) {
           onClick={() => setAll(!all)}
         >
           <ChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
-          {all ? "The newest five" : `${points.length - 5} more`}
+          {all ? `The newest ${LIST_SHOWS}` : `${points.length - shown.length} more`}
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * A box to tick: done once all of `points` are. A list's line has one
+ * point; a question, the points of its answer. Guests see it, not tick it.
+ */
+function Tick({
+  points,
+  label,
+  className = "",
+}: {
+  points: Point[];
+  label: string;
+  className?: string;
+}) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const done = points.length > 0 && points.every((p) => p.done);
+  const Icon = done ? CircleCheck : Circle;
+  const look = `shrink-0 ${done ? "text-accent" : "text-faint"}`;
+  if (guest) {
+    return (
+      <Icon
+        size={18}
+        strokeWidth={1.75}
+        role="img"
+        aria-label={done ? "Done" : "Not done"}
+        className={`${look} ${className}`}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-pressed={done}
+      aria-label={`${label}: ${done ? "done" : "to do"}`}
+      onClick={() =>
+        sync.transact(
+          points.map((p) => ({
+            action: "update" as const,
+            model: "Point" as const,
+            id: p.id,
+            data: { done: !done },
+          })),
+        )
+      }
+      className={`grid place-items-center rounded-full hover:text-muted ${look} ${className}`}
+    >
+      <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+    </button>
+  );
+}
+
+/** Bars: a set per theme, which names it, each on its own scale. */
+function Bars({ themes }: { themes: Theme[] }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(34rem,100%),1fr))] gap-x-12 gap-y-4">
+      {themes.map((theme) => (
+        <BarSet key={theme.name} theme={theme} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A set of bars: its name, then a bar per point, its label, its amount and
+ * the few words beside it (a gap in warn), on the set's largest; under it,
+ * where the numbers come from, once.
+ */
+function BarSet({ theme, heading = true }: { theme: Theme; heading?: boolean }) {
+  const bars = theme.points.filter((p) => p.amount !== null);
+  const most = Math.max(...bars.map((p) => Math.abs(p.amount ?? 0)), 0);
+  const sources = [...new Set(bars.filter(named).map((p) => p.source))];
+  return (
+    <section className="flex flex-col gap-1.5" aria-label={theme.name}>
+      {heading && (
+        <h3 className="text-xs text-muted">
+          <SectionName name={theme.name} />
+        </h3>
+      )}
+      <ul className="grid max-w-5xl grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content_minmax(0,max-content)] gap-x-3.5">
+        {bars.map((point) => {
+          const amount = point.amount ?? 0;
+          return (
+            <li
+              key={point.id}
+              className="group col-span-full -mx-2.5 grid min-h-7.5 grid-cols-subgrid items-center rounded-md px-2.5 py-1 hover:bg-hover"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                {!point.seen && (
+                  <span
+                    role="img"
+                    aria-label="New"
+                    className="size-1.5 shrink-0 rounded-full bg-accent"
+                  />
+                )}
+                <span className="line-clamp-2 min-w-0">{inline(point.text)}</span>
+              </span>
+              <span aria-hidden="true" className="block h-2.5 rounded-full bg-chip">
+                <span
+                  className="block h-full min-w-[3px] rounded-full bg-fg/40"
+                  style={{ width: `${most ? (Math.abs(amount) / most) * 100 : 0}%` }}
+                />
+              </span>
+              <span className="text-right font-semibold tabular-nums">{amountWords(amount)}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className={`line-clamp-2 min-w-0 flex-1 text-xs ${point.look === "warn" ? "font-semibold text-warn-ink" : "text-faint"}`}
+                >
+                  {point.note}
+                </span>
+                <RemovePoint point={point} />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {sources.length > 0 && <p className="text-xs text-faint">{sources.join(" · ")}</p>}
+    </section>
+  );
+}
+
+/**
+ * Questions to rehearse, a row each: the question, who asks it, and a tick
+ * once it's practised. A row opens on its answer, from what the page keeps;
+ * one with none yet says so.
+ */
+function Questions({ themes }: { themes: Theme[] }) {
+  return (
+    <ul className={`flex flex-col gap-0.5 ${LINES}`}>
+      {themes.map((theme) => (
+        <QuestionRow key={theme.name} theme={theme} />
+      ))}
+    </ul>
+  );
+}
+
+function QuestionRow({ theme, opened = false }: { theme: Theme; opened?: boolean }) {
+  const [open, setOpen] = useState(opened);
+  const answer = theme.points.filter((p) => p.look !== "warn");
+  const gaps = theme.points.filter((p) => p.look === "warn");
+  const who = theme.points[0]?.note;
+  const sources = [...new Set(answer.filter(named).map((p) => p.source))];
+  return (
+    <li
+      className={`-mx-2.5 grid grid-cols-[1.125rem_minmax(0,1fr)] gap-x-3 rounded-md px-2.5 py-2 ${open ? "bg-surface" : "hover:bg-hover"}`}
+    >
+      <Tick points={theme.points} label={theme.name} className="mt-0.5 self-start" />
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex min-w-0 flex-col items-start gap-0.5 text-left"
+      >
+        <span className="flex w-full items-start gap-3">
+          <span className="min-w-0 flex-1 font-semibold">
+            {theme.points.some((p) => !p.seen) && <span className="sr-only">New: </span>}
+            {theme.name}
+          </span>
+          <ChevronRight
+            size={14}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className={`mt-1 shrink-0 text-faint ${open ? "rotate-90" : ""}`}
+          />
+        </span>
+        {(who || answer.length === 0) && (
+          <span className="text-xs text-faint">
+            {who}
+            {who && answer.length === 0 && " · "}
+            {answer.length === 0 && <span className="text-warn-ink">no answer yet</span>}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="col-start-2 mt-2 flex max-w-measure flex-col gap-1.5">
+          <Looks points={gaps} />
+          {answer.length > 0 && (
+            <ul className="flex flex-col gap-1.5 text-body">
+              {answer.map((point) => (
+                <li key={point.id} className="group flex gap-2">
+                  <span aria-hidden="true" className="text-faint">
+                    ·
+                  </span>
+                  <span className="min-w-0 flex-1">{inline(point.text)}</span>
+                  <RemovePoint point={point} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {sources.length > 0 && <p className="text-xs text-faint">{sources.join(" · ")}</p>}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Starts a talk that asks the block's questions one by one and ticks what you answer well. */
+function QuizMe({ block, onAsk }: { block: Block; onAsk: (text: string) => void }) {
+  const guest = useIsGuest();
+  if (guest) return null;
+  const which = block.title ? `the questions in ${block.title}` : "these questions";
+  return (
+    <Button
+      variant="secondary"
+      className="h-6.5 px-2.5 text-xs"
+      onClick={() =>
+        onAsk(
+          `Quiz me on ${which}: ask one at a time, wait for my answer, then tell me what was missing and tick off the ones I answered well.`,
+        )
+      }
+    >
+      Quiz me
+    </Button>
   );
 }
 
