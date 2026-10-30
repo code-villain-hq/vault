@@ -24,6 +24,22 @@ enum WindowManager {
         return true
     }
 
+    enum Half { case left, right }
+
+    /// Fills the left or right half of the display the window is on,
+    /// under the menu bar.
+    @discardableResult
+    static func snapFocusedWindow(to half: Half) -> Bool {
+        guard ensureAccessibility() else { return false }
+        guard let window = focusedWindow(), let axFrame = frame(of: window) else { return false }
+        guard let screen = screenContaining(axFrame: axFrame) else { return false }
+        var rect = maximizeRect(for: screen)
+        rect.size.width = (rect.width / 2).rounded(.down)
+        if half == .right { rect.origin.x = maximizeRect(for: screen).maxX - rect.width }
+        setFrame(rect, on: window)
+        return true
+    }
+
     /// Moves the window to the next display, keeping its size (clamped) and
     /// relative position within the screen.
     @discardableResult

@@ -23,6 +23,7 @@ Type `help` (or `?`) in the launcher for this list in-app.
 | `g` / `yt` / `gh` + query | Web search — Google, YouTube, GitHub |
 | `work email` | Snippets — copy your emails/phone/address; set values via menu bar icon → Settings… |
 | `maximize` | Resize the focused window to the monitor minus the menu bar¹ |
+| `left half` / `right half` | Fill the left or right half of the screen, under the menu bar¹ |
 | `move window` | Send focused window to next display (only with 2+ monitors)¹ |
 | `sleep` / `lock` / `trash` / `dark` | Sleep Mac, lock screen¹, empty trash², toggle dark mode² |
 | `quit` | Quit Caster |
@@ -102,7 +103,7 @@ Settings… and Quit.
 
 | Permission | Used for |
 |------------|----------|
-| Accessibility | `maximize`, `move window`, `lock` |
+| Accessibility | `maximize`, `left half`, `right half`, `move window`, `lock` |
 | Automation → Finder | `trash`, reopening Finder windows |
 | Automation → System Events | `dark` |
 | Screen Recording (optional) | ⌘S screenshots with the desktop behind |
