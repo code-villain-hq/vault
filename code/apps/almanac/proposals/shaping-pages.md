@@ -1,7 +1,9 @@
 # Shaping a topic's page
 
 _Proposed October 29, 2026. Decided October 30: Claude writes, code
-draws ([`storyboards/claude-writes-code-draws.html`](../storyboards/claude-writes-code-draws.html))._
+draws ([`storyboards/claude-writes-code-draws.html`](../storyboards/claude-writes-code-draws.html)).
+Steps 1 and 2 are built; [`one-set-of-blocks.md`](one-set-of-blocks.md)
+takes the place of steps 3 and 4._
 
 A topic's page should read at a glance: a table where things are
 compared, a line where something is measured, chips for short facts.

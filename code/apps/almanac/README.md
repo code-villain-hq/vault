@@ -219,17 +219,17 @@ what it read. A company server's doesn't.
 
 ## Decided, not built
 
-- **Claude writes, code draws.** The app already draws each block from
-  what it keeps. Next, Claude keeps only what's true and where it goes:
-  sections, the things in them and their fields, steps in order, days,
-  numbers, what's done and what needs a look. It never picks a block's
-  kind, width or icon; View as is already the person's alone. Asking a
-  talk to tidy up merges, splits, renames and moves; it never changes
-  the look. [`proposals/shaping-pages.md`](proposals/shaping-pages.md)
-  has the order of work.
+- **One set of blocks.** Every page is made of seven blocks (Heading,
+  Text, Bullets, Checklist, Toggle, Callout, Collection), and a
+  collection's fields pick its picture by the same rules on every page:
+  a day and a number make a line, a status a board. You say things;
+  Claude files them through tools and never picks the look. It follows
+  from "Claude writes, code draws"; the app already draws each block from
+  what it keeps.
+  [`proposals/one-set-of-blocks.md`](proposals/one-set-of-blocks.md) has
+  the set and the order of work.
 - **Workspaces**, as every Code Villain app has them: Home, and Work for
   what you learn at work. Only Home is made today.
-- **Ticking off a list**: Reading with a mark for what you've read.
 - **Blocks that go quietly**: one that stays empty after a few talks.
 - **Adding a block yourself**: today only Claude adds one, when you ask.
 - **Dumps:** a shortcut anywhere on the Mac opens one field, with no topic
@@ -284,6 +284,9 @@ Open them in a browser. Each shows night and day.
   Karriere's job ads and Code Villain's Marke und Launch as they are,
   then what Claude writes and what the app draws from it, and who
   decides what. Night only.
+- [`storyboards/one-set-of-blocks.html`](storyboards/one-set-of-blocks.html):
+  the seven blocks and eight pictures, Katzen, Wohnung reparieren and
+  Geschichte made from them, and a talk filing Lisa's weight.
 
 ## Open
 
