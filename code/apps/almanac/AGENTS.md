@@ -175,10 +175,15 @@ What they do:
   - A `list` item and a question are `done` once ticked, by them on the
     page or by a talk (tick_points); done goes last.
 
-  The page is a grid of twelve columns: a block's `width`
-  (`BLOCK_WIDTHS`) is its share of a row, empty for its kind's own
-  (`width_of`, which `widthOf` in `topic.tsx` mirrors). A layout may give
-  each block one, and so may its ⋯ menu.
+  The app draws a block by the shape of what it keeps, not by the kind
+  or width a talk gave it (`views.ts`: `viewOf` and `widthOf`, the rules
+  in its comment). Only `today`, `week` and `you` keep their kind, and
+  `list`, `questions` and `shelf`, which say what their points are until
+  a talk can say it in what it keeps; `lines` is a view of its own,
+  sentences with nothing to tick. A block that keeps nothing stays off
+  the page. The page is a grid of twelve columns, and a block takes the
+  share of a row its view needs. A layout still gives blocks a kind and
+  a `width` (`BLOCK_WIDTHS`, `width_of`), which the page doesn't read.
 
   The topic page's timeline is a line per section, when
   its events begin and end (`bySection`); a section's page lists its
@@ -261,7 +266,7 @@ them into notifications. A server with no Mac listening marks nothing.
   the pages, so they last while you look elsewhere), `calendar.tsx`
   Calendar, `settings.tsx` Settings → Claude and Blocks, every kind drawn
   look-only with the page's own components from `samples.ts`. Keep
-  `samples.ts` up to date with the kinds. Its workspaces come from
+  `samples.ts` up to date with the kinds and views. Its workspaces come from
   places (`server.ts`): this Mac, the server it came from, or servers the
   desktop app signed in to.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Almanac on Postgres for

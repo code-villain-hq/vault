@@ -46,3 +46,9 @@ test("a section's tile shows its first sentence", () => {
   );
   expect(lead("Ein Satz ohne Punkt")).toBe("Ein Satz ohne Punkt");
 });
+
+test("shows a colour code's colour before it", () => {
+  expect(html("Accent #a78bfa, not *#fff*.")).toBe(
+    '<div class="flex flex-col gap-2"><p>Accent <span class="whitespace-nowrap"><span aria-hidden="true" class="mr-1 inline-block size-2.5 rounded-sm ring-1 ring-line" style="background:#a78bfa"></span>#a78bfa</span>, not <em>#fff</em>.</p></div>',
+  );
+});

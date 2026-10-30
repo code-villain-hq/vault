@@ -67,7 +67,7 @@ export function inline(text: string): ReactNode {
   // The marked parts sit at the odd places the split leaves them, marks and
   // all: **bold** and *italic*.
   return text.split(/(\*\*[^*]+\*\*|\*[^*\s](?:[^*]*[^*\s])?\*)/).map((part, i) => {
-    if (i % 2 === 0) return part;
+    if (i % 2 === 0) return swatched(part, i);
     return part.startsWith("**") ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
       <strong key={i} className="font-semibold">
@@ -78,6 +78,27 @@ export function inline(text: string): ReactNode {
       <em key={i}>{part.slice(1, -1)}</em>
     );
   });
+}
+
+/** Colour codes with their colour before them: "#a78bfa". */
+function swatched(text: string, at: number): ReactNode {
+  const parts = text.split(/(#[0-9a-f]{6}\b)/i);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    i % 2 === 0 ? (
+      part
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: a point's words don't move
+      <span key={`${at}-${i}`} className="whitespace-nowrap">
+        <span
+          aria-hidden="true"
+          className="mr-1 inline-block size-2.5 rounded-sm ring-1 ring-line"
+          style={{ background: part }}
+        />
+        {part}
+      </span>
+    ),
+  );
 }
 
 /** A point's words without the marks `inline` reads: what a search shows. */

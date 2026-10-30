@@ -78,7 +78,10 @@ better, the rest follow.
 
 1. The app picks each block's view and width from what it keeps today.
    A block's kind becomes the view you pinned, empty for the app's
-   pick. Before and after with real pages.
+   pick. Before and after with real pages. Built October 30 in the web
+   app alone (`views.ts`): the data is as it was, and turning a kind
+   into a pinned view goes with step 2. A list, questions and a shelf
+   keep their kind until step 3.
 2. View as on a block's title.
 3. What Claude is told: what each point is, not how it looks. Laying
    out anew becomes tidying up, in small steps.

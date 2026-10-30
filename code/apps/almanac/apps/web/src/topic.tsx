@@ -90,6 +90,7 @@ import { Table } from "./table";
 import { TalkPanel, useTalks } from "./talk";
 import { bySection, inOrder, type When, when } from "./timeline";
 import { Button, Empty } from "./ui";
+import { viewOf, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
@@ -402,7 +403,11 @@ interface PageParts {
   reminders: Reminder[];
 }
 
-/** The topic's blocks and points in page order, its open questions and its reminders that are on. */
+/**
+ * The topic's blocks in page order, each with the view and width the app
+ * draws it at (`viewOf`), its points, its open questions and its reminders
+ * that are on.
+ */
 function usePage(topic: Topic): PageParts {
   const blocks = useRecords("Block");
   const points = useRecords("Point");
@@ -411,11 +416,12 @@ function usePage(topic: Topic): PageParts {
   return useMemo<PageParts>(() => {
     const ofTopic = <T extends { topic_id: string }>(list: T[]) =>
       list.filter((r) => r.topic_id === topic.id);
+    const kept = ofTopic(points).sort((a, b) => a.position - b.position);
     return {
-      blocks: ofTopic(blocks).sort(
-        (a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at),
-      ),
-      points: ofTopic(points).sort((a, b) => a.position - b.position),
+      blocks: ofTopic(blocks)
+        .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+        .map((block) => drawn(block, kept)),
+      points: kept,
       questions: ofTopic(questions)
         .filter((q) => q.status === "open")
         .sort((a, b) => a.created_at.localeCompare(b.created_at)),
@@ -426,9 +432,19 @@ function usePage(topic: Topic): PageParts {
   }, [blocks, points, questions, reminders, topic.id]);
 }
 
-/** What the page shows: all but what it knows about you, which About shows. */
+/** A block as the page draws it: its kind the view, its width the view's. */
+function drawn(block: Block, points: Point[]): Block {
+  const held = points.filter((p) => p.block_id === block.id);
+  const view = viewOf(block, held);
+  return { ...block, kind: view, width: widthOf(view, block, held) };
+}
+
+/**
+ * What the page shows: the blocks that keep something, but not what it
+ * knows about you, which About shows.
+ */
 function onThePage(page: PageParts): PageParts {
-  const shown = page.blocks.filter((b) => b.kind !== "you");
+  const shown = page.blocks.filter((b) => b.kind && b.kind !== "you");
   const ids = new Set(shown.map((b) => b.id));
   return { ...page, blocks: shown, points: page.points.filter((p) => ids.has(p.block_id)) };
 }
@@ -446,6 +462,8 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
     );
   }, [page]);
   const loose = page.questions.filter((q) => !homes.has(q.id));
+  // An answer may go in a block the page leaves out, which keeps nothing yet.
+  const home = keeping(all.blocks.filter((b) => b.kind !== "you"));
 
   return (
     <>
@@ -454,7 +472,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
       {loose.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
           {loose.map((q) => (
-            <Ask key={q.id} question={q} block={keeping(page.blocks)} />
+            <Ask key={q.id} question={q} block={home} />
           ))}
         </section>
       )}
@@ -472,8 +490,8 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
           {page.blocks.map((block) => (
             <div
               key={block.id}
-              data-width={widthOf(block)}
-              data-narrow={NARROW.has(block.kind) || undefined}
+              data-width={block.width}
+              data-narrow={NARROW.has(block.width) || undefined}
             >
               <BlockView
                 topic={topic}
@@ -724,6 +742,7 @@ const HOLDS: Record<string, [kind: string, one: string, many: string]> = {
   cards: ["Cards", "card", "cards"],
   text: ["Text", "section", "sections"],
   list: ["List", "point", "points"],
+  lines: ["Lines", "line", "lines"],
   timeline: ["Timeline", "event", "events"],
   bars: ["Bars", "bar", "bars"],
   questions: ["Questions", "question", "questions"],
@@ -1176,45 +1195,8 @@ function keeping(blocks: Block[]): Block | undefined {
   );
 }
 
-/**
- * How wide a block of the page's twelve columns is: its own, or its kind's
- * when it names none, as the server has them (`width_of`).
- */
-function widthOf(block: Block): string {
-  if (block.width) return block.width;
-  switch (block.kind) {
-    case "chips":
-    case "trend":
-    case "parts":
-      return "1/3";
-    case "bars":
-    case "questions":
-    case "list":
-    case "timeline":
-      return "1/2";
-    default:
-      return "whole";
-  }
-}
-
-/** The kinds that read at a glance, and so hold out narrower. */
-const NARROW = new Set(["chips", "trend", "parts"]);
-
-/** The widths a block can take, for its ⋯ menu. */
-const WIDTHS = [
-  { value: "1/4", label: "¼", title: "A quarter" },
-  { value: "1/3", label: "⅓", title: "A third" },
-  { value: "1/2", label: "½", title: "Half" },
-  { value: "2/3", label: "⅔", title: "Two thirds" },
-  { value: "3/4", label: "¾", title: "Three quarters" },
-  { value: "whole", label: "Whole", title: "The whole width" },
-];
-
-/** Kinds that show the same points another way: cards as a table, and back. */
-const SHOWN_AS: Record<string, [kind: string, label: string]> = {
-  cards: ["table", "Show as table"],
-  table: ["cards", "Show as cards"],
-};
+/** The widths that read at a glance, and so hold out narrower. */
+const NARROW = new Set(["1/4", "1/3"]);
 
 /** A block's name, for its menu and its dialogs. */
 function blockName(block: Block): string {
@@ -1230,6 +1212,7 @@ const EMPTY: Record<string, string> = {
   cards: "A card for each thing the topic is about, with what the talks find.",
   text: "Sections that explain, written up as the talks go.",
   list: "Things to follow or read, a line each, with where they're from.",
+  lines: "What the talks find, a sentence a line, with where it's from.",
   timeline: "When each section happened, oldest first, a line each, with its events on its page.",
   you: "What you tell it about yourself, a line each, which its answers go by.",
   bars: "Numbers to compare, a bar each, on one scale per set, with where they're from.",
@@ -1254,6 +1237,7 @@ export function BlockGallery() {
           questions: [],
           reminders: sample.reminders,
         };
+        const width = widthOf(sample.block.kind, sample.block, sample.points);
         return (
           <section key={sample.block.id} aria-label={sample.name} className="flex flex-col gap-3">
             <div className="flex flex-col gap-0.5">
@@ -1263,12 +1247,9 @@ export function BlockGallery() {
             {sample.block.kind === "you" ? (
               <Facts topic={sample.topic} facts={sample.points} />
             ) : (
-              // At its kind's width, as a page lays it out.
+              // At its view's width, as a page lays it out.
               <div className="page-grid" data-alone>
-                <div
-                  data-width={widthOf(sample.block)}
-                  data-narrow={NARROW.has(sample.block.kind) || undefined}
-                >
+                <div data-width={width} data-narrow={NARROW.has(width) || undefined}>
                   <BlockView
                     topic={sample.topic}
                     block={sample.block}
@@ -1287,7 +1268,7 @@ export function BlockGallery() {
   );
 }
 
-/** One block, laid out by its kind. */
+/** One block, laid out by its view. */
 function BlockView({
   topic,
   block,
@@ -1343,6 +1324,12 @@ function BlockView({
         </BlockFrame>
       );
     }
+    case "lines":
+      return (
+        <BlockFrame {...frame} empty={points.length === 0}>
+          <List points={points} ticks={false} />
+        </BlockFrame>
+      );
     case "bars":
       return (
         <BlockFrame {...frame} empty={points.length === 0}>
@@ -1552,13 +1539,6 @@ function BlockMenu({
   };
   const kept = points.filter((p) => p.block_id === block.id).length;
   const name = blockName(block);
-  // The kind's own width is kept as none, so it follows the kind.
-  const width = (chosen: string) => {
-    const own = widthOf({ ...block, width: "" });
-    const next = chosen === own ? "" : chosen;
-    if (next !== block.width) sync.update("Block", block.id, { width: next });
-  };
-  const shownAs = SHOWN_AS[block.kind];
   return (
     <span
       className={`opacity-0 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100 ${className}`}
@@ -1568,18 +1548,6 @@ function BlockMenu({
         items={[
           ...(at > 0 ? [{ label: "Move up", onSelect: () => move(-1) }] : []),
           ...(at < blocks.length - 1 ? [{ label: "Move down", onSelect: () => move(1) }] : []),
-          // You is on About, where nothing sits beside it.
-          ...(block.kind === "you"
-            ? []
-            : [{ label: "Width", choices: WIDTHS, value: widthOf(block), onChoose: width }]),
-          ...(shownAs
-            ? [
-                {
-                  label: shownAs[1],
-                  onSelect: () => sync.update("Block", block.id, { kind: shownAs[0] }),
-                },
-              ]
-            : []),
           // The week is headed by its days.
           ...(block.kind === "week"
             ? []
@@ -2442,7 +2410,7 @@ function Ask({ question, block }: { question: Question; block?: Block }) {
       sync.create("Point", {
         topic_id: question.topic_id,
         block_id: block.id,
-        theme: block.kind === "chips" || block.kind === "list" ? "" : (question.theme ?? "Notes"),
+        theme: ["chips", "list", "lines"].includes(block.kind) ? "" : (question.theme ?? "Notes"),
         text: question.point,
         source: question.source ?? "You said",
         talk_id: question.talk_id ?? undefined,
@@ -2734,11 +2702,11 @@ function Chips({ points }: { points: Point[] }) {
             )}
             {at > 0 ? (
               <span>
-                <span className="font-semibold text-fg">{point.text.slice(0, at)}</span>
-                {point.text.slice(at)}
+                <span className="font-semibold text-fg">{inline(point.text.slice(0, at))}</span>
+                {inline(point.text.slice(at))}
               </span>
             ) : (
-              <span className="text-fg">{point.text}</span>
+              <span className="text-fg">{inline(point.text)}</span>
             )}
           </li>
         );
@@ -2851,9 +2819,10 @@ const LIST_SHOWS = 5;
 
 /**
  * Things to follow or read, a line each with where it comes from, to tick
- * off: the newest five not done, then what's done, faint, last.
+ * off: the newest five not done, then what's done, faint, last. Lines that
+ * aren't steps have nothing to tick.
  */
-function List({ points }: { points: Point[] }) {
+function List({ points, ticks = true }: { points: Point[]; ticks?: boolean }) {
   const [all, setAll] = useState(false);
   const open = points.filter((p) => !p.done);
   const done = points.filter((p) => p.done);
@@ -2869,7 +2838,7 @@ function List({ points }: { points: Point[] }) {
             title={named(point) ? undefined : point.source || undefined}
             className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5"
           >
-            <Tick points={[point]} label={point.text} className="self-center" />
+            {ticks && <Tick points={[point]} label={point.text} className="self-center" />}
             {!point.seen && (
               <span
                 role="img"

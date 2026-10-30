@@ -98,9 +98,8 @@ topics.
   A template only names the blocks a topic starts with: Routine has Today,
   Week, Your shelf and Advice; Collection Today, Week and a card per
   thing; Study Reading, Terms and What it says; each has You. ⋯ beside a block's title
-  moves it up or down, sets its width, shows cards as a table and back,
-  renames it or removes it with what it keeps. An
-  empty block says in a line what will be there, and a topic with nothing
+  moves it up or down, renames it or removes it with what it keeps. A
+  block that keeps nothing stays off the page, and a topic with nothing
   kept yet offers its first questions.
 - **A talk** opens beside the page and streams its answer. Each question
   sends Almanac's fixed prompt, what the topic sticks to, what the page
@@ -136,19 +135,25 @@ topics.
   answer folds open, a tick once practised, and Quiz me starts a talk
   that asks them one at a time. A list's ticked items go last, faint.
   Pages from before get facets when you ask a talk to lay them out anew.
-- **The page is a grid** of twelve columns. A block takes a share of a
-  row: ¼, ⅓, ½, ⅔, ¾ or the whole, its kind's own until a layout or its
-  ⋯ menu gives it another (⅓ for Chips, Trend and Parts; ½ for Bars,
-  Questions, List and Timeline; the whole for the rest). A row's blocks
-  grow to fill it, and one that would get too narrow to read takes a row
-  of its own, as every block does on a phone.
+- **The page draws each block from what it keeps**, the same way every
+  time, whatever look a talk gave it: things with the same facets are
+  cards, or a table past eight; days a timeline, and days with numbers
+  a trend; numbers bars; paragraphs a tile per section; short facts
+  chips, other sentences lines; sentences about a thing a card each.
+  Steps, questions and a shelf stay as the talk kept them, and so do
+  Today, the week and You. A colour code shows its colour.
+- **The page is a grid** of twelve columns, and a block is as wide as its
+  view needs: ⅓ for Chips, Trend and Parts; ½ for Bars, Questions, Steps,
+  Lines and Timeline; cards and tiles ⅓, ½ or the whole, by how many; the
+  whole for the rest. A row's blocks grow to fill it, and one that would
+  get too narrow to read takes a row of its own, as every block does on
+  a phone.
 - **A table compares things across the same facts**: a row per thing, a
   column per facet, light like a sheet. A header sorts by its column,
   again the other way, with empty cells last; a column of numbers lines
   up on the right. A cell changes where it is: Enter or leaving keeps it,
   Esc goes back, Tab goes on, the arrows move between cells, and an
-  emptied cell's point goes. New row names a thing, then its cells. A
-  table keeps the same points as cards, so ⋯ shows one as the other.
+  emptied cell's point goes. New row names a thing, then its cells.
 - **A trend is a number kept each time it's measured**: the latest to
   read at a glance, how it moved since the first, and a line by day, with
   the mark it aims at dashed and the reminder to measure again under it.
@@ -175,7 +180,7 @@ topics.
   eine Zeitleiste daraus", and it adds, renames, reorders, removes and
   changes blocks, and moves and rewords points, at once. It gives each
   block the kind its points fit (a table, a trend, bars), keeps what's
-  about one thing together, sets widths so the rows are full, and says
+  about one thing together, and says
   which kind has to wait for more (a second weighing for a trend). Chips
   and table cells get a few words; what else a point said stays as a
   point of its own. It never drops a point or changes where one came
@@ -208,15 +213,12 @@ what it read. A company server's doesn't.
 
 ## Decided, not built
 
-- **Claude writes, code draws.** Claude keeps what's true and where it
-  goes: sections, the things in them and their fields, steps in order,
-  days, numbers, what's done and what needs a look. It never picks a
-  block's kind, width or icon. The app draws each block from the shape
-  of what it keeps, the same way every time: things with the same
-  fields are cards, or a table past eight; steps in order a checklist;
-  short facts chips; sentences a list; days a timeline, and days with
-  numbers a trend. It fills the rows itself. View as on a block's title
-  switches it, and the choice stays: Claude never changes it. Asking a
+- **Claude writes, code draws.** The app already draws each block from
+  what it keeps. Next, Claude keeps only what's true and where it goes:
+  sections, the things in them and their fields, steps in order, days,
+  numbers, what's done and what needs a look. It never picks a block's
+  kind, width or icon. View as on a block's title switches a view, and
+  the choice stays: Claude never changes it. Asking a
   talk to tidy up merges, splits, renames and moves; it never changes
   the look. [`proposals/shaping-pages.md`](proposals/shaping-pages.md)
   has the order of work.

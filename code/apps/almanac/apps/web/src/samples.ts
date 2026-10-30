@@ -110,6 +110,7 @@ export function samples(): Sample[] {
   const history = topic("History", "globe");
   const career = topic("Career", "briefcase");
   const spanish = topic("Spanish", "languages");
+  const brand = topic("Brand", "palette");
   const run = reminder(running, "Morning run", 0, 2);
 
   return [
@@ -141,6 +142,20 @@ export function samples(): Sample[] {
       p("", "Por, for the way through"),
       p("", "Para, for where it's going"),
     ]),
+    sample(
+      "Lines",
+      "Sentences that aren't steps, a line each, with where they're from. A colour code shows its colour.",
+      brand,
+      "lines",
+      "Brand",
+      (p) => [
+        p("", "The accent is #a78bfa, for what you act on, never for surfaces"),
+        p("", "Warn is #fbbf24 and danger #f87171, each only where something needs a look"),
+        p("", "Headings stay in the text colour; weight sets them apart, not colour", {
+          source: "Style guide",
+        }),
+      ],
+    ),
     sample(
       "Shelf",
       "A tile per thing you use: what it is, how you use it, and its notes.",
