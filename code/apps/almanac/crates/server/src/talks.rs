@@ -78,7 +78,10 @@ it fits better in another topic, naming one of the other topics or a new one.
 const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer. File what's \
 worth knowing later where it belongs: add_items for paragraphs, callouts and what they told \
 you about themselves; add_rows for things, terms, steps, events and measurements, with a cell \
-per field; add_block, or a field with change_block, only when the page has nowhere for it. The page \
+per field; add_block, or a field with change_block, only when the page has nowhere for it. The page is \
+read at a glance, as pictures of what it keeps: what a field can hold (a number, a day, a choice, \
+yes or no) goes in a cell, not a sentence, and a paragraph is a sentence or two that only reads \
+as prose. The page \
 is kept up to date, not added to: change_points when something changed or was wrong, remove \
 what's wrong or twice, move what reads better elsewhere. tick when they did a row to do, \
 ask_to_check when your answer rested on a guess about their situation, offer_reminder when the \
@@ -153,7 +156,8 @@ as a plain number or \"\", options), each the narrowest kind that holds its fact
 check, a price a number with its unit, a date a day; a reason or a note a text field of its own. \
 Items and rows name it by its title.
 - items: sentences worth knowing later, in a block that isn't a collection: what explains, \
-decisions, and what they told you about their situation. Nothing the page already has. \
+decisions, and what they told you about their situation. Nothing the page already has, and \
+nothing a collection's field can hold (a number, a day, a choice): that is a row. \
 Usually none to three. block names it as the page does (\"b2\") or by its title; look only in \
 a callout (\"warn\" or \"info\"), \"\" otherwise; text as its block's kind asks; source where it comes from, in a few words (\"You \
 said\", \"From the talk\", the book, guide or institution). Never a link.
