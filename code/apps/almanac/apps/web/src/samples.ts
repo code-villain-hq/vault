@@ -26,6 +26,7 @@ function topic(name: string, icon: string): Topic {
     icon,
     group_name: "",
     parent_id: null,
+    cover: null,
     starters: [],
     position: 0,
     kind: "topic",

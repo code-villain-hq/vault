@@ -96,8 +96,8 @@ or a day with words around it is tidied too: change its kind with change_block, 
 its cell, and the words around it a text field of its own. Tidy in small steps: one collection's \
 sentences an answer, which they see as its picture under your answer and can undo; then say in \
 a sentence what's left to tidy, and do the next when they say so. Never pick a colour, a width \
-or a picture: the app draws the page from what it keeps; only when they ask for another picture \
-of a collection, pick one its fields allow. Write only the answer, once: they read \
+or a collection's picture: the app draws the page from what it keeps; only when they ask for \
+another picture of a collection, pick one its fields allow. Write only the answer, once: they read \
 every word you write between tools as one answer, so keep the page first and answer after, and \
 never say it again in other words. They don't see the tools, so don't mention them or narrate \
 using them. What you keep in a collection shows under your answer \
@@ -106,7 +106,9 @@ a sentence or two what they mean for them, and what to do next.";
 
 const WEB_ON: &str = "You can search the web and read pages. Do it when the answer depends on \
 things that change (prices, laws, opening hours, news) or that you aren't sure of, and keep the \
-page's url with what you keep from it.";
+page's url with what you keep from it. The page reads best with pictures: rows of things you \
+can see (products, plants, dishes, places, gear) get a photo field and each its picture, which \
+fetch_picture keeps from the page you found the thing on.";
 const WEB_OFF: &str = "You can't search the web: for things that change, such as prices, laws \
 or news, say your knowledge may be out of date.";
 

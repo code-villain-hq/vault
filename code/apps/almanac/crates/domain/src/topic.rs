@@ -26,6 +26,8 @@ pub struct Topic {
     /// a tile, and this one's talks keep to its brief too. A parent that's
     /// gone counts as none.
     pub parent_id: Option<Uuid>,
+    /// The photo its page opens with and its tile shows, by its id.
+    pub cover: Option<Uuid>,
     /// First questions, for the empty page.
     pub starters: Vec<String>,
     pub position: i32,
@@ -63,6 +65,9 @@ pub struct TopicPatch {
     /// Null takes it out from under its parent.
     #[ts(optional = nullable)]
     pub parent_id: Option<Uuid>,
+    /// Null takes the cover off.
+    #[ts(optional = nullable)]
+    pub cover: Option<Uuid>,
     pub starters: Option<Vec<String>>,
     pub position: Option<i32>,
 }

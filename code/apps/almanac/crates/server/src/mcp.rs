@@ -62,6 +62,8 @@ impl Mode {
                 "ask_to_check",
                 "offer_reminder",
                 "change_brief",
+                "fetch_picture",
+                "set_cover",
                 "name_talk",
                 "fits_elsewhere",
             ],
@@ -327,6 +329,23 @@ async fn call(
                     .into(),
             )
         }
+        "fetch_picture" => {
+            let args: PictureArgs = read(arguments)?;
+            let id = crate::photos::from_web(&state.pool, asking.actor.workspace_id, &args.address)
+                .await?;
+            let mut guard = kept()?;
+            guard.photos.push(id);
+            Ok(format!(
+                "Kept it as photo {}: put it in a photo cell as \"photo {}\", or make it the cover.",
+                guard.photos.len(),
+                guard.photos.len()
+            ))
+        }
+        "set_cover" => {
+            let args: CoverArgs = read(arguments)?;
+            kept()?.set_cover(&args.photo)?;
+            Ok("The page opens with it, once your answer is done.".into())
+        }
         "name_talk" => {
             let args: NameArgs = read(arguments)?;
             kept()?.talk_title = Some(cut(&args.title, 80));
@@ -469,6 +488,16 @@ struct BriefArgs {
     sticks_to: String,
     #[serde(default)]
     said: String,
+}
+
+#[derive(Deserialize)]
+struct PictureArgs {
+    address: String,
+}
+
+#[derive(Deserialize)]
+struct CoverArgs {
+    photo: String,
 }
 
 #[derive(Deserialize)]
@@ -879,6 +908,23 @@ fn tools(mode: Mode) -> Vec<Value> {
     offer_fields["title"] = string(
         "What to do in two to four words, as the calendar shows it: \"Water the Monstera\". Left out for an item's reminder, which takes the item's words.",
     );
+    let fetch_picture = tool(
+        "fetch_picture",
+        "Keeps a picture from the web for the page: a product's, a plant's, a place's. Give the \
+         picture's address, or the address of a page about that one thing (a shop's product \
+         page), whose own picture it takes. It answers with the photo's number, which a photo \
+         cell or set_cover takes.",
+        json!({ "address": string("The picture's https address, or its page's.") }),
+        &["address"],
+    );
+    let set_cover = tool(
+        "set_cover",
+        "Makes a photo the picture the topic's page opens with and its tile shows: one that \
+         shows what the topic is about. Only when they ask for one, or the page has none and a \
+         photo they sent shows it.",
+        json!({ "photo": string("The photo, as \"photo 2\".") }),
+        &["photo"],
+    );
     let name_talk = tool(
         "name_talk",
         "Names the talk while it has no name: under six words, in the talk's language.",
@@ -1083,6 +1129,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                 }),
                 &["sticks_to", "said"],
             ),
+            fetch_picture,
+            set_cover,
             name_talk,
             fits_elsewhere,
         ],

@@ -45,6 +45,10 @@ pub fn router(state: AppState) -> Router {
             // A question may come with photos, a few MB each.
             post(talks::ask).layer(DefaultBodyLimit::max(48 * 1024 * 1024)),
         )
+        .route(
+            "/photos",
+            post(photos::upload).layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
+        )
         .route("/photos/{photo_id}", get(photos::show))
         .route("/messages/{message_id}/undo", post(topics::undo))
         .route(

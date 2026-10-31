@@ -4,4 +4,8 @@ export type TopicPatch = { name?: string, sticks_to?: string, icon?: string, gro
 /**
  * Null takes it out from under its parent.
  */
-parent_id?: string | null, starters?: Array<string>, position?: number, };
+parent_id?: string | null, 
+/**
+ * Null takes the cover off.
+ */
+cover?: string | null, starters?: Array<string>, position?: number, };

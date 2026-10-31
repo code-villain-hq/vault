@@ -14,7 +14,7 @@ use sqlx::PgPool;
 use sqlx::types::Json;
 use uuid::Uuid;
 
-const TOPIC: &str = "SELECT t.name, t.sticks_to, p.name, p.sticks_to FROM topics t \
+const TOPIC: &str = "SELECT t.name, t.sticks_to, p.name, p.sticks_to, t.cover IS NOT NULL FROM topics t \
      LEFT JOIN topics p ON p.id = t.parent_id AND p.workspace_id = t.workspace_id \
      WHERE t.id = $1 AND t.workspace_id = $2";
 const CHILDREN: &str = "SELECT name FROM topics \
@@ -124,6 +124,9 @@ pub struct Refs {
     pub reminders: Vec<PageReminder>,
 }
 
+/// A topic's name and brief, its parent's, and whether it has a cover.
+type TopicRow = (String, String, Option<String>, Option<String>, bool);
+
 pub struct Page {
     pub id: Uuid,
     pub name: String,
@@ -132,6 +135,8 @@ pub struct Page {
     pub parent: Option<(String, String)>,
     /// The names of the topics under it.
     pub children: Vec<String>,
+    /// Whether its page opens with a cover photo.
+    pub covered: bool,
     pub blocks: Vec<PageBlock>,
     pub questions: Vec<String>,
     pub reminders: Vec<PageReminder>,
@@ -144,12 +149,12 @@ impl Page {
         workspace_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Page>, sqlx::Error> {
-        let topic: Option<(String, String, Option<String>, Option<String>)> = sqlx::query_as(TOPIC)
+        let topic: Option<TopicRow> = sqlx::query_as(TOPIC)
             .bind(id)
             .bind(workspace_id)
             .fetch_optional(pool)
             .await?;
-        let Some((name, sticks_to, parent, parent_sticks_to)) = topic else {
+        let Some((name, sticks_to, parent, parent_sticks_to, covered)) = topic else {
             return Ok(None);
         };
         let blocks: Vec<RefBlock> = sqlx::query_as(BLOCKS)
@@ -180,6 +185,7 @@ impl Page {
             name,
             sticks_to,
             parent: parent.zip(parent_sticks_to),
+            covered,
             children: sqlx::query_scalar(CHILDREN)
                 .bind(id)
                 .bind(workspace_id)
@@ -251,6 +257,9 @@ impl Page {
                     s => s,
                 }
             );
+        }
+        if self.covered {
+            let _ = writeln!(out, "Its page opens with a cover photo.");
         }
         if !self.children.is_empty() {
             let _ = writeln!(

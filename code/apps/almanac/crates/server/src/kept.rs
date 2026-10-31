@@ -48,8 +48,11 @@ pub struct Kept {
     checked: Vec<(Uuid, bool)>,
     /// Reminders an item's tick ticks, with what changes on them.
     rung: Vec<(Uuid, Map<String, Value>)>,
-    /// The photos of the talk, in order, which a photo cell names by number.
+    /// The photos of the talk, in order, which a photo cell names by number,
+    /// then the pictures it fetched from the web.
     pub photos: Vec<Uuid>,
+    /// The photo the topic's page opens with from now on.
+    cover: Option<Uuid>,
     /// For when a ticked reminder comes round again.
     pub today: NaiveDate,
     pub questions: Vec<KeptQuestion>,
@@ -180,6 +183,7 @@ impl Kept {
             checked: Vec::new(),
             rung: Vec::new(),
             photos: Vec::new(),
+            cover: None,
             today: Local::now().date_naive(),
             questions: Vec::new(),
             reminders: Vec::new(),
@@ -789,6 +793,22 @@ impl Kept {
         Ok(())
     }
 
+    /// Makes one of the talk's photos, "photo 2", the topic's cover.
+    pub fn set_cover(&mut self, photo: &str) -> Result<(), String> {
+        let n: usize = photo
+            .trim()
+            .trim_start_matches("photo")
+            .trim()
+            .parse()
+            .map_err(|_| "Name the photo by its number: photo 1.".to_string())?;
+        let id = n
+            .checked_sub(1)
+            .and_then(|n| self.photos.get(n))
+            .ok_or_else(|| format!("The talk has no photo {n}."))?;
+        self.cover = Some(*id);
+        Ok(())
+    }
+
     /// The answer's own fields (`kept`, `elsewhere`, `proposal`,
     /// `changes`), and the writes that come after it.
     pub fn writes(&self, at: &Answering) -> (Map<String, Value>, Vec<Operation>) {
@@ -1039,6 +1059,13 @@ impl Kept {
                 kept.point_id,
             ));
         }
+        if let Some(cover) = self.cover {
+            operations.push(Operation::Update {
+                model: ModelKind::Topic,
+                id: at.topic_id,
+                data: fields([("cover", json!(cover))]),
+            });
+        }
         for change in &self.changes {
             let Value::Object(data) = patch_fields(&change.after) else {
                 continue;
@@ -1075,6 +1102,7 @@ impl Kept {
         }
         let mut changes = self.changes.clone();
         let said: Vec<String> = [
+            self.cover.map(|_| "Gave the page a cover.".to_string()),
             (added > 0).then(|| kept_words(added, &unders)),
             rows_words(&rows_made),
             change_words(
@@ -1186,7 +1214,10 @@ impl Kept {
         let block = &self.blocks[n];
         let row = || {
             let id = block.row_id?;
-            self.points.iter().find(|p| p.id == id).map(|p| p.text.as_str())
+            self.points
+                .iter()
+                .find(|p| p.id == id)
+                .map(|p| p.text.as_str())
         };
         match block.title.as_str() {
             "" => row().unwrap_or("the untitled block"),

@@ -25,6 +25,10 @@ group_name: string,
  */
 parent_id: string | null, 
 /**
+ * The photo its page opens with and its tile shows, by its id.
+ */
+cover: string | null, 
+/**
  * First questions, for the empty page.
  */
 starters: Array<string>, position: number, 

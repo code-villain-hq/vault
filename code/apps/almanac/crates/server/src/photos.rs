@@ -5,11 +5,16 @@
 //!
 //! Claude sees a talk's photos with each question in it, so a later
 //! question can ask about an earlier photo.
+//!
+//! A photo may also belong to no message: one dropped on a topic's cover or
+//! a row (`POST /api/w/{id}/photos`), or one a talk fetched from the web
+//! for a row or the cover ([`from_web`]).
 
 use std::collections::HashMap;
 
 use almanac_domain::{Actor, Photo, PhotoUpload, Transaction};
 use almanac_sync::Origin;
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
@@ -29,6 +34,8 @@ const TYPES: &[&str] = &["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 const SAVE: &str = "INSERT INTO photos (id, workspace_id, message_id, position, media_type, data) \
      VALUES ($1, $2, $3, $4, $5, $6)";
+const SAVE_ALONE: &str = "INSERT INTO photos (id, workspace_id, position, media_type, data) \
+     VALUES ($1, $2, 0, $3, $4)";
 const ONE: &str = "SELECT media_type, data FROM photos WHERE id = $1 AND workspace_id = $2";
 const OF_TALK: &str = "SELECT p.id, p.message_id, p.media_type, p.data FROM photos p \
      JOIN messages m ON m.id = p.message_id \
@@ -140,6 +147,193 @@ pub async fn of_talk(
     Ok(out)
 }
 
+/// `POST /api/w/{id}/photos`: keeps a photo that belongs to no question,
+/// for a topic's cover or a row's photo cell, which the app then sets.
+pub async fn upload(
+    State(state): State<AppState>,
+    member: Member,
+    Json(upload): Json<PhotoUpload>,
+) -> Result<Json<Photo>, AppError> {
+    member.require_not_guest()?;
+    let [checked] = <[Upload; 1]>::try_from(check(std::slice::from_ref(&upload))?)
+        .map_err(|_| AppError::invalid("Add one photo."))?;
+    sqlx::query(SAVE_ALONE)
+        .bind(checked.photo.id)
+        .bind(member.actor.workspace_id)
+        .bind(&checked.media_type)
+        .bind(&checked.bytes)
+        .execute(&state.pool)
+        .await?;
+    Ok(Json(checked.photo))
+}
+
+/// How long fetching a picture from the web may take.
+const FETCH_FOR: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// Fetches a picture from the web and keeps it, for a talk: `address` is
+/// the picture's, or a page's whose picture (its `og:image`) it is. Only
+/// public https addresses, a known type, up to 5 MB. What goes wrong comes
+/// back in words for Claude.
+pub async fn from_web(
+    pool: &sqlx::PgPool,
+    workspace_id: Uuid,
+    address: &str,
+) -> Result<Uuid, String> {
+    let client = reqwest::Client::builder()
+        .timeout(FETCH_FOR)
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) Almanac")
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() > 5 || !public(attempt.url()) {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+        .map_err(|_| "Almanac can't fetch pictures right now.".to_string())?;
+    let url = reqwest::Url::parse(address.trim())
+        .map_err(|_| format!("{address} isn't a web address."))?;
+    let (media_type, bytes) = match fetch(&client, &url).await? {
+        Fetched::Picture(media_type, bytes) => (media_type, bytes),
+        Fetched::Page(html) => {
+            let picture = picture_of(&html, &url).ok_or_else(|| {
+                format!("{url} names no picture of its own. Give the picture's address.")
+            })?;
+            match fetch(&client, &picture).await? {
+                Fetched::Picture(media_type, bytes) => (media_type, bytes),
+                Fetched::Page(_) => return Err(format!("{picture} isn't a picture.")),
+            }
+        }
+    };
+    let id = Uuid::now_v7();
+    sqlx::query(SAVE_ALONE)
+        .bind(id)
+        .bind(workspace_id)
+        .bind(&media_type)
+        .bind(&bytes)
+        .execute(pool)
+        .await
+        .map_err(|_| "Almanac couldn't keep the picture.".to_string())?;
+    Ok(id)
+}
+
+enum Fetched {
+    Picture(String, Vec<u8>),
+    Page(String),
+}
+
+/// A public https address: no other scheme, no name or address of this
+/// Mac or a private network.
+fn public(url: &reqwest::Url) -> bool {
+    use std::net::IpAddr;
+    if url.scheme() != "https" {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let host = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_ascii_lowercase();
+    match host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(ip)) => {
+            !(ip.is_loopback() || ip.is_unspecified() || ip.is_private() || ip.is_link_local())
+        }
+        Ok(IpAddr::V6(ip)) => !(ip.is_loopback() || ip.is_unspecified()),
+        Err(_) => {
+            !(host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local"))
+        }
+    }
+}
+
+async fn fetch(client: &reqwest::Client, url: &reqwest::Url) -> Result<Fetched, String> {
+    if !public(url) {
+        return Err(format!("{url} isn't a public https address."));
+    }
+    let mut response = client
+        .get(url.clone())
+        .send()
+        .await
+        .map_err(|_| format!("{url} didn't answer."))?;
+    if !response.status().is_success() {
+        return Err(format!("{url} answered {}.", response.status().as_u16()));
+    }
+    let media_type = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    let page = media_type == "text/html" || media_type == "application/xhtml+xml";
+    if !page && !TYPES.contains(&media_type.as_str()) {
+        return Err(format!(
+            "{url} is {media_type}: Almanac keeps JPEG, PNG, WebP and GIF pictures."
+        ));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| format!("{url} stopped answering."))?
+    {
+        bytes.extend_from_slice(&chunk);
+        if bytes.len() > LARGEST {
+            if page {
+                break;
+            }
+            return Err(format!("{url} is larger than 5 MB."));
+        }
+    }
+    if page {
+        return Ok(Fetched::Page(String::from_utf8_lossy(&bytes).into_owned()));
+    }
+    if bytes.is_empty() {
+        return Err(format!("{url} came empty."));
+    }
+    Ok(Fetched::Picture(media_type, bytes))
+}
+
+/// The picture a page names for itself: its `og:image`, or else its
+/// `twitter:image`, as an address from the page's.
+fn picture_of(html: &str, page: &reqwest::Url) -> Option<reqwest::Url> {
+    let lower = html.to_ascii_lowercase();
+    ["og:image:secure_url", "og:image", "twitter:image"]
+        .iter()
+        .find_map(|name| {
+            let mut from = 0;
+            while let Some(at) = lower[from..].find("<meta") {
+                let start = from + at;
+                let end = start + lower[start..].find('>')?;
+                let tag = &lower[start..end];
+                from = end;
+                let names = [
+                    format!("property=\"{name}\""),
+                    format!("name=\"{name}\""),
+                    format!("property='{name}'"),
+                    format!("name='{name}'"),
+                ];
+                if !names.iter().any(|n| tag.contains(n.as_str())) {
+                    continue;
+                }
+                let content = tag.find("content=")? + "content=".len();
+                let quote = tag[content..].chars().next()?;
+                if quote != '"' && quote != '\'' {
+                    continue;
+                }
+                let value = &html[start + content + 1..end];
+                let value = &value[..value.find(quote)?];
+                let value = value.trim().replace("&amp;", "&");
+                if let Ok(url) = page.join(&value) {
+                    return Some(url);
+                }
+            }
+            None
+        })
+}
+
 /// `GET /api/w/{id}/photos/{photo_id}`: the photo itself. It never
 /// changes, so the app may keep it.
 pub async fn show(
@@ -188,6 +382,29 @@ mod tests {
         assert!(check(&[upload("image/heic", &photo)]).is_err());
         assert!(check(&[upload("image/png", "not base64!")]).is_err());
         assert!(check(&[upload("image/png", "")]).is_err());
+    }
+
+    #[test]
+    fn a_page_names_its_picture() {
+        let page = reqwest::Url::parse("https://shop.example/p/felix").unwrap();
+        let html = r#"<head><meta name="description" content="Felix">
+            <meta property="og:image" content="/img/felix.jpg?w=800&amp;h=600"></head>"#;
+        assert_eq!(
+            picture_of(html, &page).map(|u| u.to_string()).as_deref(),
+            Some("https://shop.example/img/felix.jpg?w=800&h=600")
+        );
+        assert!(picture_of("<meta name=\"x\" content=\"y\">", &page).is_none());
+    }
+
+    #[test]
+    fn only_public_https_addresses_are_fetched() {
+        let ok = |a: &str| public(&reqwest::Url::parse(a).unwrap());
+        assert!(ok("https://www.zooplus.de/felix.jpg"));
+        assert!(!ok("http://www.zooplus.de/felix.jpg"));
+        assert!(!ok("https://localhost/x.png"));
+        assert!(!ok("https://127.0.0.1:7785/api"));
+        assert!(!ok("https://192.168.1.4/x.png"));
+        assert!(!ok("https://[::1]/x.png"));
     }
 
     #[test]
