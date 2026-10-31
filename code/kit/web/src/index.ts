@@ -82,7 +82,10 @@ export {
   ShortcutsButton,
   SIDEBAR_WIDTH,
   SidebarEdge,
+  useKeptWidth,
   useSidebarWidth,
+  WidthEdge,
+  type Widths,
 } from "./sidebar";
 export { SyncIndicator, type SyncState } from "./sync-indicator";
 export { AppVersion } from "./version";

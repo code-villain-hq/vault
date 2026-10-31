@@ -23,7 +23,7 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 - A count shows only when it asks for something: unread, waiting in Triage. The page you're on shows no count; its list says it. Empty counts never show.
 - Unread counts carry a live dot in `signal` (see [`components.md`](../components.md#live-dot)).
 - Groups (a team, a project) get a small label in `faint`, `ui-small`. No dividers between groups.
-- It starts 224px wide. Dragging its edge, where it meets the content, sets the width from 180 to 360px, so long names fit; under the pointer the edge shows as a 2px line in `faint`. Double-click puts it back to 224px, and with the edge focused ← and → move it. Each device keeps its own width, for every workspace, unsynced: another screen may want another. It doesn't fold away. `SidebarEdge` in `code/kit/web` is the edge.
+- It starts 224px wide. Dragging its edge, where it meets the content, sets the width from 180 to 360px, so long names fit; under the pointer the edge shows as a 2px line in `faint`. Double-click puts it back to 224px, and with the edge focused ← and → move it. Each device keeps its own width, for every workspace, unsynced: another screen may want another. It doesn't fold away. `SidebarEdge` in `code/kit/web` is the edge; a panel on the right, like Almanac's talk, takes the same edge as `WidthEdge` (`side="end"`), and grows as it moves left.
 
 ## Top bar
 

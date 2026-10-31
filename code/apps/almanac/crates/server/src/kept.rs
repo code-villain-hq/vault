@@ -734,6 +734,7 @@ impl Kept {
             made_blocks: Vec::new(),
             made_points: Vec::new(),
             collections: Vec::new(),
+            rows: Vec::new(),
         };
         let mut shown: Vec<Uuid> = Vec::new();
         let (mut changed_blocks, mut moved_blocks, mut removed_blocks) = (0, 0, Vec::new());
@@ -819,6 +820,9 @@ impl Kept {
                     });
                     layout.made_points.push(point.id);
                     shown.push(point.block_id);
+                    if self.kind_of(point.block_id) == "collection" {
+                        layout.rows.push(point.id);
+                    }
                     added += 1;
                     let under = match point.theme.as_str() {
                         "" => self.title_of(point.block_id).to_string(),
@@ -872,6 +876,11 @@ impl Kept {
             }
             if point.position != was.position {
                 data.insert("position".into(), json!(point.position));
+            }
+            if (reworded || data.contains_key("block_id"))
+                && self.kind_of(point.block_id) == "collection"
+            {
+                layout.rows.push(point.id);
             }
             if into_rows {
                 let title = self.title_of(point.block_id).to_string();
@@ -2073,6 +2082,7 @@ mod tests {
         let change = &said["changes"][0];
         assert_eq!(change["said"], json!("Made a sentence a row in Gewicht."));
         assert_eq!(change["layout"]["collections"], json!([weight.id]));
+        assert_eq!(change["layout"]["rows"], json!([fact.id]));
         let layout: PageLayout = serde_json::from_value(change["layout"].clone()).unwrap();
         assert!(layout.points.iter().any(|p| p.id == fact.id && !p.removed));
     }

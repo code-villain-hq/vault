@@ -24,6 +24,8 @@ import {
   MoreMenu,
   messageOf,
   overlayOpen,
+  useKeptWidth,
+  WidthEdge,
 } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, Plus, X } from "lucide-react";
@@ -54,6 +56,9 @@ export function useTalks(topicId: string): Talk[] {
     [talks, topicId],
   );
 }
+
+/** How wide the talk starts, and how narrow and wide its edge sets it; never more than 60% of the page. */
+const TALK_WIDTH = { start: 416, min: 320, max: 900 };
 
 export function TalkPanel({
   topic,
@@ -124,6 +129,8 @@ export function TalkPanel({
     end.current?.scrollIntoView({ block: "end" });
   }, [messages.length, mine?.text, showQuestion]);
 
+  const width = useKeptWidth("talk", TALK_WIDTH);
+
   const send = () => {
     if (!text.trim() && picking.photos.length === 0) return;
     onAsk(text, talkId, picking.photos);
@@ -132,151 +139,161 @@ export function TalkPanel({
   };
 
   return (
-    <aside
-      aria-label="Talk"
-      className="relative flex w-[min(26rem,45%)] shrink-0 flex-col border-l border-line bg-panel"
-      {...drop.handlers}
-    >
-      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
-      <PhotoView url={viewing} onClose={() => setViewing(null)} />
-      <div className="flex min-h-12 items-center gap-2 px-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate font-medium">{talk?.title || "New talk"}</h2>
-          {talk && <p className="text-xs text-faint">Talk {ago(talk.last_at)}</p>}
-        </div>
-        <button
-          type="button"
-          onClick={() => onOpen(null)}
-          aria-label="New talk"
-          title="New talk"
-          className="ui-button ui-icon-button"
-        >
-          <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-        <MoreMenu
-          label="Talks"
-          items={[
-            ...talks
-              .filter((t) => t.id !== talkId)
-              .slice(0, 12)
-              .map((t) => ({
-                label: `${t.title || "Talk"}, ${ago(t.last_at)}`,
-                onSelect: () => onOpen(t.id),
-              })),
-            ...(talk
-              ? [
-                  {
-                    label: "Delete this talk…",
-                    danger: true,
-                    onSelect: () =>
-                      setConfirmation({
-                        title: `Delete ${talk.title ? `"${talk.title}"` : "this talk"}?`,
-                        body: "Its messages go for everyone in the workspace; what it kept stays on the page. This can't be undone.",
-                        action: "Delete talk",
-                        onConfirm: () => {
-                          sync.delete("Talk", talk.id);
-                          onOpen(null);
-                        },
-                      }),
-                  },
-                ]
-              : []),
-          ]}
-        />
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close the talk"
-          title="Close (esc)"
-          className="ui-button ui-icon-button"
-        >
-          <X size={15} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="flex flex-col gap-4">
-          {messages.length === 0 && !mine && (
-            <p className="text-muted">
-              {own
-                ? `Tell ${topic.name} what you want to keep track of. It proposes a topic for it, and you start it.`
-                : `Ask ${topic.name} something, or tell it what you know. What's worth keeping goes on the page.`}
-            </p>
-          )}
-          {messages.map((message, index) => (
-            <Said
-              key={message.id}
-              message={message}
-              topic={topic}
-              question={before(messages, index)}
-              reminders={reminders.filter((r) => r.message_id === message.id)}
-              toStart={message.id === toStart}
-              onView={setViewing}
-            />
-          ))}
-          {showQuestion && (
-            <Question
-              text={mine.question}
-              photos={mine.photos.map((p) => (
-                <PhotoThumb key={p.url} url={p.url} photo={p} onView={setViewing} />
-              ))}
-            />
-          )}
-          {showAnswer && (
-            <div className="flex flex-col gap-2">
-              {mine.text ? (
-                <Prose text={mine.text} />
-              ) : (
-                !mine.problem && <p className="text-faint">Almanac is thinking…</p>
-              )}
-              {mine.problem && <Problem text={mine.problem} />}
-            </div>
-          )}
-          <div ref={end} />
-        </div>
-      </div>
-      <form
-        className="flex flex-col gap-2 p-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          send();
-        }}
+    <>
+      <WidthEdge
+        width={width.width}
+        onChange={width.setWidth}
+        widths={TALK_WIDTH}
+        label="Talk width"
+        side="end"
+      />
+      <aside
+        aria-label="Talk"
+        style={{ width: `min(${width.width}px, 60%)` }}
+        className="relative flex shrink-0 flex-col border-l border-line bg-panel"
+        {...drop.handlers}
       >
-        <PickingProblem picking={picking} />
-        <div className="ui-field flex flex-col rounded-md">
-          <PickedPhotos picking={picking} />
-          <textarea
-            ref={field}
-            // biome-ignore lint/a11y/noAutofocus: the panel opens to ask
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onPaste={picking.onPaste}
-            onKeyDown={(event) => {
-              // ⌘↩ is for starting a proposed topic, not for sending.
-              const plain = !event.shiftKey && !event.metaKey && !event.ctrlKey;
-              if (event.key === "Enter" && plain && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                send();
-              }
-            }}
-            rows={2}
-            aria-label={talkId ? "Ask more" : `Ask ${topic.name}`}
-            placeholder={
-              talkId
-                ? "Ask more"
-                : own
-                  ? `Tell ${topic.name} what you want to keep track of`
-                  : `Ask ${topic.name}, or tell it something`
-            }
-            className="resize-none bg-transparent px-3 py-2 outline-none placeholder:text-faint"
+        <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
+        <PhotoView url={viewing} onClose={() => setViewing(null)} />
+        <div className="flex min-h-12 items-center gap-2 px-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate font-medium">{talk?.title || "New talk"}</h2>
+            {talk && <p className="text-xs text-faint">Talk {ago(talk.last_at)}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpen(null)}
+            aria-label="New talk"
+            title="New talk"
+            className="ui-button ui-icon-button"
+          >
+            <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          <MoreMenu
+            label="Talks"
+            items={[
+              ...talks
+                .filter((t) => t.id !== talkId)
+                .slice(0, 12)
+                .map((t) => ({
+                  label: `${t.title || "Talk"}, ${ago(t.last_at)}`,
+                  onSelect: () => onOpen(t.id),
+                })),
+              ...(talk
+                ? [
+                    {
+                      label: "Delete this talk…",
+                      danger: true,
+                      onSelect: () =>
+                        setConfirmation({
+                          title: `Delete ${talk.title ? `"${talk.title}"` : "this talk"}?`,
+                          body: "Its messages go for everyone in the workspace; what it kept stays on the page. This can't be undone.",
+                          action: "Delete talk",
+                          onConfirm: () => {
+                            sync.delete("Talk", talk.id);
+                            onOpen(null);
+                          },
+                        }),
+                    },
+                  ]
+                : []),
+            ]}
           />
-          <div className="flex px-1 pb-1">
-            <AddPhoto picking={picking} />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close the talk"
+            title="Close (esc)"
+            className="ui-button ui-icon-button"
+          >
+            <X size={15} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="flex flex-col gap-4">
+            {messages.length === 0 && !mine && (
+              <p className="text-muted">
+                {own
+                  ? `Tell ${topic.name} what you want to keep track of. It proposes a topic for it, and you start it.`
+                  : `Ask ${topic.name} something, or tell it what you know. What's worth keeping goes on the page.`}
+              </p>
+            )}
+            {messages.map((message, index) => (
+              <Said
+                key={message.id}
+                message={message}
+                topic={topic}
+                question={before(messages, index)}
+                reminders={reminders.filter((r) => r.message_id === message.id)}
+                toStart={message.id === toStart}
+                onView={setViewing}
+              />
+            ))}
+            {showQuestion && (
+              <Question
+                text={mine.question}
+                photos={mine.photos.map((p) => (
+                  <PhotoThumb key={p.url} url={p.url} photo={p} onView={setViewing} />
+                ))}
+              />
+            )}
+            {showAnswer && (
+              <div className="flex flex-col gap-2">
+                {mine.text ? (
+                  <Prose text={mine.text} />
+                ) : (
+                  !mine.problem && <p className="text-faint">Almanac is thinking…</p>
+                )}
+                {mine.problem && <Problem text={mine.problem} />}
+              </div>
+            )}
+            <div ref={end} />
           </div>
         </div>
-      </form>
-      {drop.dropping && <DropHint />}
-    </aside>
+        <form
+          className="flex flex-col gap-2 p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            send();
+          }}
+        >
+          <PickingProblem picking={picking} />
+          <div className="ui-field flex flex-col rounded-md">
+            <PickedPhotos picking={picking} />
+            <textarea
+              ref={field}
+              // biome-ignore lint/a11y/noAutofocus: the panel opens to ask
+              autoFocus
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onPaste={picking.onPaste}
+              onKeyDown={(event) => {
+                // ⌘↩ is for starting a proposed topic, not for sending.
+                const plain = !event.shiftKey && !event.metaKey && !event.ctrlKey;
+                if (event.key === "Enter" && plain && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  send();
+                }
+              }}
+              rows={2}
+              aria-label={talkId ? "Ask more" : `Ask ${topic.name}`}
+              placeholder={
+                talkId
+                  ? "Ask more"
+                  : own
+                    ? `Tell ${topic.name} what you want to keep track of`
+                    : `Ask ${topic.name}, or tell it something`
+              }
+              className="resize-none bg-transparent px-3 py-2 outline-none placeholder:text-faint"
+            />
+            <div className="flex px-1 pb-1">
+              <AddPhoto picking={picking} />
+            </div>
+          </div>
+        </form>
+        {drop.dropping && <DropHint />}
+      </aside>
+    </>
   );
 }
 
@@ -570,7 +587,12 @@ function Changes({ message, here }: { message: Message; here: string }) {
           )}
           {change.layout && <WhatMoved layout={change.layout} />}
           {/* Answers from before the pictures have no collections. */}
-          {change.layout && !undone && <Changed collections={change.layout.collections ?? []} />}
+          {change.layout && !undone && (
+            <Changed
+              collections={change.layout.collections ?? []}
+              rows={change.layout.rows ?? []}
+            />
+          )}
         </div>
       ))}
       {undone ? (
@@ -589,8 +611,12 @@ function Changes({ message, here }: { message: Message; here: string }) {
   );
 }
 
-/** The collections an answer changed, each as the page draws it now. */
-function Changed({ collections }: { collections: string[] }) {
+/**
+ * The collections an answer changed, each as the page draws it now, with
+ * only the rows it made, changed or moved in: on a row's page, one row.
+ * Older answers name no rows and show them all.
+ */
+function Changed({ collections, rows: touched }: { collections: string[]; rows: string[] }) {
   const blocks = useRecords("Block");
   const points = useRecords("Point");
   return collections.map((id) => {
@@ -601,10 +627,11 @@ function Changed({ collections }: { collections: string[] }) {
       .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
     const view = shownAs(block, rows);
     if (!view) return null;
+    const changed = rows.filter((p) => touched.includes(p.id));
     return (
       <figure key={id} className="flex flex-col gap-1.5 overflow-x-auto rounded-md bg-bg p-2.5">
         {block.title && <figcaption className="text-xs font-medium">{block.title}</figcaption>}
-        <Collection block={{ ...block, view }} rows={rows} />
+        <Collection block={{ ...block, view }} rows={changed.length ? changed : rows} />
       </figure>
     );
   });

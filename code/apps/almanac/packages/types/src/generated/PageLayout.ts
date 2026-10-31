@@ -29,4 +29,9 @@ made_blocks: Array<string>, made_points: Array<string>,
  * The collections whose rows or fields it changed, in the page's
  * order, which the answer shows as their pictures.
  */
-collections: Array<string>, };
+collections: Array<string>, 
+/**
+ * The rows in them it made, changed or moved in, which the pictures
+ * show alone; none, and they show every row.
+ */
+rows: Array<string>, };

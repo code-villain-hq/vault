@@ -123,7 +123,8 @@ topics.
   has takes that one's place, in the same block. It runs the window's
   width: cards take as many columns as fit, and writing and lists keep a
   length you can read across. The sidebar's
-  edge drags wider for long topic names, and this Mac keeps the width.
+  edge drags wider for long topic names, the talk's edge wider for long
+  answers, and this Mac keeps both widths.
 - **A collection draws the picture its fields pick**, the same rules on
   every page: a day and a number a line, a status a board, a photo cards,
   days past a timeline and days to come a week, a number bars, three
@@ -162,7 +163,8 @@ topics.
   width.
 - **The answer shows what changed**: what it kept, changed, moved or
   removed, and where, with one Undo. A collection it changed shows under
-  it as its picture, Lisa's weight as its line, until it's undone.
+  it as its picture, Lisa's weight as its line, until it's undone: only
+  the rows it made or changed, so on one shoe's page it's that shoe.
 - **Tidying up turns sentences into rows** when you ask: "Lisa wiegt
   etwa 3,4 kg" becomes Lisa's row in Gewicht, with its source. One
   collection an answer, shown as its picture with Undo ("Made a sentence

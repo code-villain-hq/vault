@@ -192,6 +192,10 @@ pub struct PageLayout {
     /// order, which the answer shows as their pictures.
     #[serde(default)]
     pub collections: Vec<Uuid>,
+    /// The rows in them it made, changed or moved in, which the pictures
+    /// show alone; none, and they show every row.
+    #[serde(default)]
+    pub rows: Vec<Uuid>,
 }
 
 /// One block in "What moved": "Wie sie ist · new cards", then what it

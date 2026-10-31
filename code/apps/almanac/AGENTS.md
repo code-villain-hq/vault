@@ -143,7 +143,9 @@ What they do:
   blocks and points back and takes off what it started ("Kept a point
   under Gewicht. Changed a point and removed Plants."); only ticks are
   the message's `kept` words. The layout names the collections it
-  changed (`collections`), which the answer draws as their pictures.
+  changed (`collections`), which the answer draws as their pictures, and
+  the rows in them it made, changed or moved in (`rows`), which those
+  pictures show alone (older answers have none, and show every row).
   Asked to tidy up, a talk moves sentences into a collection and gives
   them a name and cells (the API: a row and the sentence removed), one
   collection an answer; a sentence moved into a collection reads "Made
