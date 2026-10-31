@@ -1180,11 +1180,17 @@ impl Kept {
         self.blocks.iter().position(|b| b.id == id).unwrap_or(0)
     }
 
-    /// A block as a sentence names it.
+    /// A block as a sentence names it: an untitled one on a row's own
+    /// page by the row's name.
     fn title(&self, n: usize) -> &str {
-        match (self.blocks[n].title.as_str(), self.blocks[n].kind.as_str()) {
-            ("", _) => "the untitled block",
-            (title, _) => title,
+        let block = &self.blocks[n];
+        let row = || {
+            let id = block.row_id?;
+            self.points.iter().find(|p| p.id == id).map(|p| p.text.as_str())
+        };
+        match block.title.as_str() {
+            "" => row().unwrap_or("the untitled block"),
+            title => title,
         }
     }
 

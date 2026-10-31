@@ -396,10 +396,9 @@ export function Callout({ points }: { points: Point[] }) {
 /** A row's other cells, in words: "Bad · Offen · ✓ Geimpft". */
 function rest(fields: Field[], row: Point): string {
   return fields
-    .filter((field) => !TOLD_BY_TONE.has(field.kind))
+    .filter((field) => !TOLD_BY_TONE.has(field.kind) && field.kind !== "check")
     .flatMap((field) => {
       const cell = cellOf(row, field);
-      if (field.kind === "check") return cell === true ? [`✓ ${field.name}`] : [];
       const words = cellWords(field, cell);
       return words ? [words] : [];
     })
@@ -453,10 +452,42 @@ export function Pill({ field, value }: { field: Field; value: string }) {
   );
 }
 
-/** A row's statuses and choices, a pill each. */
+/** Words that say yes or no, as a status's or a choice's options. */
+const YES = new Set(["ja", "yes", "oui", "sí", "si", "true"]);
+const NO = new Set(["nein", "no", "non", "false"]);
+
+/**
+ * A cell that says yes or no: a check's, or a status's or choice's whose
+ * only options are yes and no. Null for any other.
+ */
+function yesOrNo(field: Field, cell: unknown): boolean | null {
+  if (field.kind === "check") return typeof cell === "boolean" ? cell : null;
+  if (!TOLD_BY_TONE.has(field.kind) || typeof cell !== "string") return null;
+  const words = field.options.map((o) => o.toLowerCase());
+  if (words.length !== 2 || !words.some((w) => YES.has(w)) || !words.some((w) => NO.has(w)))
+    return null;
+  const word = cell.toLowerCase();
+  return YES.has(word) ? true : NO.has(word) ? false : null;
+}
+
+/** A yes as the field's name, "Vegan"; a no as the name crossed out. */
+function NamePill({ name, yes }: { name: string; yes: boolean }) {
+  return (
+    <span
+      title={`${name}: ${yes ? "yes" : "no"}`}
+      className={`inline-flex max-w-full shrink-0 items-center truncate rounded-full px-2 py-px font-medium text-xs ${yes ? "bg-ok/15 text-ok-ink" : "bg-chip text-faint line-through"}`}
+    >
+      {name}
+    </span>
+  );
+}
+
+/** A row's statuses, choices and checks, a pill each. */
 function Pills({ fields, row }: { fields: Field[]; row: Point }) {
   const pills = fields.flatMap((field) => {
     const cell = cellOf(row, field);
+    const yes = yesOrNo(field, cell);
+    if (yes !== null) return [<NamePill key={field.name} name={field.name} yes={yes} />];
     return TOLD_BY_TONE.has(field.kind) && typeof cell === "string"
       ? [<Pill key={field.name} field={field} value={cell} />]
       : [];
