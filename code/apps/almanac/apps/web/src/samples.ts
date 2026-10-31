@@ -148,6 +148,24 @@ export function samples(): Sample[] {
       ],
     ),
     sample(
+      "Paragraph: leads",
+      "When each paragraph opens with a bold lead, they're cards: the lead, a few lines, and More opens one across.",
+      history,
+      "paragraph",
+      "How it held",
+      (p) => [
+        p(
+          "",
+          "**Borders** drawn in Vienna held, more or less, for a century: no great power left the table wanting another war, and the small ones were told where they stood.",
+        ),
+        p("", "**Talks** came before fights: the powers met again whenever a crisis came up."),
+        p(
+          "",
+          "**Revolutions** in 1848 shook it, but the order held until the unification of Germany and Italy redrew the map.",
+        ),
+      ],
+    ),
+    sample(
       "Callout",
       "What to keep in mind, in a box that stands out, with a warning sign when it's one.",
       cat,

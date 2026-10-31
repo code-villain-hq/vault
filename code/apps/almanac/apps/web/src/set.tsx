@@ -256,8 +256,13 @@ function Sources({ points }: { points: Point[] }) {
   );
 }
 
-/** Paragraphs: a point each, at a reading measure. */
+/**
+ * Paragraphs: a point each, at a reading measure. When each opens with a
+ * bold lead, they're cards instead: the lead, and a few lines under it
+ * that open across the row on More, so the page reads at a glance.
+ */
 export function Paragraphs({ points }: { points: Point[] }) {
+  if (points.length >= 2 && points.every((p) => ledBy(p.text))) return <Leads points={points} />;
   return (
     <div className="flex max-w-measure flex-col gap-2">
       {points.map((point) => (
@@ -267,6 +272,63 @@ export function Paragraphs({ points }: { points: Point[] }) {
           <RemovePoint point={point} />
         </p>
       ))}
+      <Sources points={points} />
+    </div>
+  );
+}
+
+/** A point's bold lead and what follows it: "**Zwei Sichten**: Für …", "**Nakam**, eine …". */
+export function ledBy(text: string): [string, string] | null {
+  const found = /^\*\*([^*]+)\*\*[:.,]?\s+([\s\S]+)$/.exec(text.trim());
+  return found?.[1] && found[2] ? [found[1].trim(), found[2]] : null;
+}
+
+/** Past this a card's words are cut to three lines, with More. */
+const CUT_AT = 110;
+
+/** Paragraphs that each open with a bold lead, as a card each. */
+function Leads({ points }: { points: Point[] }) {
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((was) => {
+      const now = new Set(was);
+      if (!now.delete(id)) now.add(id);
+      return now;
+    });
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(16rem,100%),1fr))] items-start gap-3">
+        {points.map((point) => {
+          const [title, words] = ledBy(point.text) ?? ["", point.text];
+          const long = words.length > CUT_AT;
+          const shown = !long || open.has(point.id);
+          return (
+            <article
+              key={point.id}
+              className={`group flex flex-col gap-1.5 rounded-lg bg-surface p-3 ${long && shown ? "col-span-full" : ""}`}
+            >
+              <h3 className="flex items-start gap-2 font-semibold leading-snug">
+                <NewDot point={point} className="mt-1.5" />
+                <span className="min-w-0 flex-1">{title}</span>
+                <RemovePoint point={point} />
+              </h3>
+              <p className={`max-w-measure text-muted ${shown ? "" : "line-clamp-3"}`}>
+                {inline(words)}
+              </p>
+              {long && (
+                <button
+                  type="button"
+                  aria-expanded={shown}
+                  onClick={() => toggle(point.id)}
+                  className="self-start text-xs text-faint hover:text-fg"
+                >
+                  {shown ? "Less" : "More"}
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
       <Sources points={points} />
     </div>
   );
@@ -357,6 +419,12 @@ const CHOICE_DOTS = ["bg-info", "bg-accent", "bg-warn", "bg-signal", "bg-ok", "b
  * (its first option), done at its last and under way between, as a
  * board's lanes; a choice's options a dot each.
  */
+/** The colour of a choice's word, its dot: by its place among the options. */
+export function choiceDot(field: Field, value: string): string {
+  const at = field.options.indexOf(value);
+  return at >= 0 ? (CHOICE_DOTS[at % CHOICE_DOTS.length] ?? "bg-faint") : "bg-faint";
+}
+
 export function Pill({ field, value }: { field: Field; value: string }) {
   const at = field.options.indexOf(value);
   if (field.kind === "status") {
@@ -374,7 +442,7 @@ export function Pill({ field, value }: { field: Field; value: string }) {
       </span>
     );
   }
-  const dot = at >= 0 ? CHOICE_DOTS[at % CHOICE_DOTS.length] : "bg-faint";
+  const dot = choiceDot(field, value);
   return (
     <span className="inline-flex max-w-full shrink-0 items-center gap-1.5 truncate rounded-full bg-chip px-2 py-px text-xs">
       <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dot}`} />

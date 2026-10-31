@@ -56,13 +56,13 @@ import {
   Callout,
   ChecklistCount,
   Collection,
+  choiceDot,
   itemDone,
   LINES,
   named,
   Opens,
   type PageTo,
   Paragraphs,
-  Pill,
   useItemReminders,
 } from "./set";
 import type { Schema } from "./sync";
@@ -587,8 +587,18 @@ function FieldValue({ field, row, rows }: { field: Field; row: Point; rows: Poin
     const at = lanes.indexOf(cell);
     return (
       <>
-        <span>
-          <Pill field={field} value={cell} />
+        <span className="flex items-baseline gap-2">
+          {field.kind === "choice" && (
+            <span
+              aria-hidden="true"
+              className={`size-2.5 shrink-0 rounded-full ${choiceDot(field, cell)}`}
+            />
+          )}
+          <span
+            className={`break-words font-semibold leading-tight ${[...cell].length > 12 ? "text-lg" : "text-2xl"}`}
+          >
+            {cell}
+          </span>
         </span>
         {field.kind === "status" && lanes.length > 1 && (
           <span
