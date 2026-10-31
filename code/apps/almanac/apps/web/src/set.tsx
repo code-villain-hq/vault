@@ -952,7 +952,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                   >
                     <NewDot point={row} className="mt-2" />
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <RowName row={row} className="truncate" />
+                      <RowName row={row} className="line-clamp-2 break-words" />
                       {words && <span className="truncate text-xs text-faint">{words}</span>}
                     </div>
                     <Pills fields={fields} row={row} />
