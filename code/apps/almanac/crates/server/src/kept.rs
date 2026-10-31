@@ -12,7 +12,7 @@
 //! one change in the answer's Changes, which Undo puts back
 //! (`crate::layout::undo`).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use almanac_domain::{
     BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation, PageLayout,
@@ -191,16 +191,18 @@ impl Kept {
         }
     }
 
-    /// Starts a block of the set, `after` the one it names ("" for the
-    /// top; the end when left out), with a collection's fields. It answers
-    /// with the block's reference. A block like it the page has already is
-    /// the one it answers with.
+    /// Starts a block of the set, on the topic's page or on a `row`'s own
+    /// (`p3`), `after` the one it names ("" for the top; the end when left
+    /// out), with a collection's fields. It answers with the block's
+    /// reference. A block like it the page has already is the one it
+    /// answers with.
     pub fn add_block(
         &mut self,
         kind: &str,
         title: &str,
         after: Option<&str>,
         fields: &[FieldArg],
+        row: Option<&str>,
     ) -> Result<String, String> {
         let kind = kind.trim().to_lowercase();
         if !SET_KINDS.contains(&kind.as_str()) {
@@ -217,9 +219,26 @@ impl Kept {
             return Err("Only a collection has fields.".into());
         }
         let (fields, _) = fields_of(fields, &[])?;
+        let row_id = match row.map(str::trim).filter(|r| !r.is_empty()) {
+            Some(reference) => {
+                let i = self.point_at(reference)?;
+                let b = self.block_of(i);
+                if self.blocks[b].kind != "collection" {
+                    return Err(format!(
+                        "{} isn't a row: only a collection's rows have pages of their own.",
+                        reference.trim()
+                    ));
+                }
+                Some(self.points[i].id)
+            }
+            None => None,
+        };
         if let Some(n) = (0..self.blocks.len()).find(|&n| {
             let b = &self.blocks[n];
-            !self.is_gone(b.id) && b.kind == kind && b.title.to_lowercase() == title.to_lowercase()
+            !self.is_gone(b.id)
+                && b.row_id == row_id
+                && b.kind == kind
+                && b.title.to_lowercase() == title.to_lowercase()
         }) {
             return Ok(format!("b{}", n + 1));
         }
@@ -229,6 +248,14 @@ impl Kept {
             ));
         }
         let at = self.block_at_place(after)?;
+        if let At::After(a) = at
+            && self.blocks[a].row_id != row_id
+        {
+            return Err(format!(
+                "{} is on another page: name a block on the same page, or leave after out.",
+                after.unwrap_or_default().trim()
+            ));
+        }
         self.blocks.push(RefBlock {
             id: Uuid::now_v7(),
             kind,
@@ -237,6 +264,7 @@ impl Kept {
             fields: Json(fields),
             width: String::new(),
             view: String::new(),
+            row_id,
             position: 0,
         });
         let n = self.blocks.len() - 1;
@@ -535,6 +563,14 @@ impl Kept {
         if matches!(at, At::After(a) if a == n) {
             return Err("A block can't go after itself.".into());
         }
+        if let At::After(a) = at
+            && self.blocks[a].row_id != self.blocks[n].row_id
+        {
+            return Err(format!(
+                "{} is on another page: a block moves among those on its own page.",
+                after.trim()
+            ));
+        }
         let id = self.blocks[n].id;
         self.touch(id)?;
         self.moved.push(id);
@@ -614,9 +650,33 @@ impl Kept {
                 self.points[self.point_at(named)?].id
             };
             self.touch(id)?;
-            self.gone.push(id);
+            self.take_off(id);
         }
         Ok(())
+    }
+
+    /// Takes a block or point off the copy, and with a row the blocks on
+    /// its page, and theirs.
+    fn take_off(&mut self, id: Uuid) {
+        if self.is_gone(id) {
+            return;
+        }
+        self.gone.push(id);
+        let on_page: Vec<Uuid> = self
+            .blocks
+            .iter()
+            .filter(|b| b.row_id == Some(id))
+            .map(|b| b.id)
+            .collect();
+        let held: Vec<Uuid> = self
+            .points
+            .iter()
+            .filter(|p| p.block_id == id)
+            .map(|p| p.id)
+            .collect();
+        for id in on_page.into_iter().chain(held) {
+            self.take_off(id);
+        }
     }
 
     /// The words of the checklist item (`p3`) a reminder rings for, for the
@@ -784,6 +844,7 @@ impl Kept {
                             ("title", json!(block.title)),
                             ("fields", json!(block.fields.0)),
                             ("view", json!(block.view)),
+                            ("row_id", json!(block.row_id)),
                             ("position", json!(block.position)),
                         ]),
                     });
@@ -1251,11 +1312,12 @@ impl Kept {
         Ok(format!("p{}", i + 1))
     }
 
-    /// Puts block `n` where `at` says: at the end past the others, or
-    /// between them, which numbers them all anew.
+    /// Puts block `n` where `at` says among the blocks of its page: at the
+    /// end past the others, or between them, which numbers them all anew.
     fn put_block(&mut self, n: usize, at: At) {
+        let row = self.blocks[n].row_id;
         let mut order: Vec<usize> = (0..self.blocks.len())
-            .filter(|&b| b != n && !self.is_gone(self.blocks[b].id))
+            .filter(|&b| b != n && !self.is_gone(self.blocks[b].id) && self.blocks[b].row_id == row)
             .collect();
         order.sort_by_key(|&b| (self.blocks[b].position, b));
         match at {
@@ -1559,17 +1621,35 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
         matches!(row.cells.get(&field.name), Some(Cell::Number(_)))
     };
     let (day, number) = (of("day"), of("number"));
+    // One measurement a day, or one a day for each name measured again.
     let line = day.zip(number).is_some_and(|(d, n)| {
-        rows.iter()
-            .any(|r| day_of(r, d).is_some() && number_of(r, n))
+        let measured: Vec<(&str, NaiveDate)> = rows
+            .iter()
+            .filter(|r| number_of(r, n))
+            .filter_map(|r| day_of(r, d).map(|day| (r.text.as_str(), day)))
+            .collect();
+        let days: HashSet<NaiveDate> = measured.iter().map(|(_, d)| *d).collect();
+        let named: HashSet<&(&str, NaiveDate)> = measured.iter().collect();
+        let names: HashSet<&str> = measured.iter().map(|(n, _)| *n).collect();
+        !measured.is_empty()
+            && (days.len() == measured.len()
+                || named.len() == measured.len() && names.len() < measured.len())
     });
+    // A day every row shares only says when they were all seen.
+    let apart = |day: &Field| {
+        let days: HashSet<String> = rows
+            .iter()
+            .filter_map(|r| r.cells.get(&day.name).map(cell_key))
+            .collect();
+        rows.len() < 2 || days.len() > 1 || rows.iter().any(|r| !r.cells.contains_key(&day.name))
+    };
     let pick = if line {
         "line"
     } else if of("status").is_some() {
         "board"
     } else if of("photo").is_some() {
         "cards"
-    } else if let Some(day) = day {
+    } else if let Some(day) = day.filter(|d| apart(d)) {
         if rows
             .iter()
             .any(|r| day_of(r, day).is_some_and(|d| d >= today))
@@ -1578,7 +1658,7 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
         } else {
             "timeline"
         }
-    } else if number.is_some() {
+    } else if number.is_some() && filled.len() <= 2 {
         "bars"
     } else if filled.len() + 1 >= 3 {
         "table"
@@ -1609,6 +1689,15 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
     .collect()
 }
 
+/// A cell as a key to tell cells apart by.
+fn cell_key(cell: &Cell) -> String {
+    match cell {
+        Cell::Check(yes) => yes.to_string(),
+        Cell::Number(n) => n.to_string(),
+        Cell::Text(text) => text.clone(),
+    }
+}
+
 /// What changes on a reminder ticked for its day `due_on`: one that comes
 /// round is due again a rhythm on, from today when it was overdue; one
 /// that doesn't is done.
@@ -1634,6 +1723,7 @@ fn block_was(block: &RefBlock, removed: bool) -> BlockWas {
         width: block.width.clone(),
         view: block.view.clone(),
         fields: block.fields.0.clone(),
+        row_id: block.row_id,
         position: block.position,
         removed,
     }
@@ -1867,6 +1957,7 @@ mod tests {
             fields: Json(Vec::new()),
             width: String::new(),
             view: String::new(),
+            row_id: None,
             position,
         }
     }
@@ -1914,6 +2005,44 @@ mod tests {
     }
 
     #[test]
+    fn offers_draw_as_a_line_only_once_a_shop_has_two_days() {
+        let fields: Vec<Field> = ["Preis:number", "Tag:day", "Link:link"]
+            .iter()
+            .map(|f| {
+                let (name, kind) = f.split_once(':').unwrap();
+                Field {
+                    name: name.into(),
+                    kind: kind.into(),
+                    unit: String::new(),
+                    goal: None,
+                    options: Vec::new(),
+                }
+            })
+            .collect();
+        let offers = block("collection", "Angebote", 0);
+        let offer = |shop: &str, cells: Value| PagePoint {
+            cells: Json(serde_json::from_value(cells).unwrap()),
+            ..point(&offers, "", shop, 0)
+        };
+        let today = NaiveDate::from_ymd_opt(2026, 10, 30).unwrap();
+        let first = [
+            offer(
+                "Scorett",
+                json!({"Preis": 1599, "Tag": "2026-10-30", "Link": "https://example.com/a"}),
+            ),
+            offer(
+                "Skocenter",
+                json!({"Preis": 1799, "Tag": "2026-10-30", "Link": "https://example.com/b"}),
+            ),
+        ];
+        let rows: Vec<&PagePoint> = first.iter().collect();
+        assert!(!pictures(&fields, &rows, today).contains(&"line"));
+        let again = offer("Scorett", json!({"Preis": 1499, "Tag": "2026-11-02"}));
+        let rows: Vec<&PagePoint> = first.iter().chain([&again]).collect();
+        assert!(pictures(&fields, &rows, today).contains(&"line"));
+    }
+
+    #[test]
     fn a_weighing_is_a_row_with_typed_cells() {
         let mut kept = Kept::on(Refs {
             blocks: vec![block("bullets", "Notes", 0)],
@@ -1932,6 +2061,7 @@ mod tests {
                         ..field("Gewicht", "number")
                     },
                 ],
+                None,
             )
             .unwrap();
         assert_eq!(weight, "b2");
@@ -2075,6 +2205,99 @@ mod tests {
                 .any(|p| p.id == monstera.id && p.removed)
         );
         assert!(layout.blocks.iter().any(|b| b.id == old.id && b.removed));
+    }
+
+    #[test]
+    fn a_row_has_a_page_of_blocks_that_goes_with_it() {
+        let notes = block("paragraph", "Notes", 0);
+        let shoes = block("collection", "Schuhe", 1);
+        let (fact, saola) = (
+            point(&notes, "", "Vegan heißt ohne Leder.", 0),
+            point(&shoes, "", "Saola", 0),
+        );
+        let mut kept = Kept::on(Refs {
+            blocks: vec![notes.clone(), shoes.clone()],
+            points: vec![fact, saola.clone()],
+            ..Refs::default()
+        });
+        assert!(
+            kept.add_block("collection", "Angebote", None, &[], Some("p1"))
+                .unwrap_err()
+                .contains("isn't a row")
+        );
+        assert!(
+            kept.add_block("paragraph", "Pflege", Some("b1"), &[], Some("p2"))
+                .unwrap_err()
+                .contains("on another page")
+        );
+        let offers = kept
+            .add_block(
+                "collection",
+                "Angebote",
+                None,
+                &[field("Preis", "number"), field("Tag", "day")],
+                Some("p2"),
+            )
+            .unwrap();
+        assert_eq!(offers, "b3");
+        // The same title on the topic's page is another block.
+        assert_eq!(
+            kept.add_block("collection", "Angebote", None, &[], None),
+            Ok("b4".into())
+        );
+        kept.add_rows(
+            &offers,
+            &[row(
+                "Scorett",
+                json!({ "Preis": "1599", "Tag": "2026-10-30" }),
+            )],
+        )
+        .unwrap();
+        let (_, operations) = kept.writes(&answering());
+        let made = operations
+            .iter()
+            .find_map(|o| match o {
+                Operation::Create {
+                    model: ModelKind::Block,
+                    data,
+                    ..
+                } if data["title"] == json!("Angebote") && data["row_id"] != Value::Null => {
+                    Some(data)
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(made["row_id"], json!(saola.id));
+        assert_eq!(made["position"], json!(0));
+
+        // Removing the row takes its page.
+        let mut page = block("collection", "Angebote", 0);
+        page.row_id = Some(saola.id);
+        let offer = point(&page, "", "Scorett", 0);
+        let mut kept = Kept::on(Refs {
+            blocks: vec![notes.clone(), shoes.clone(), page.clone()],
+            points: vec![saola.clone(), offer.clone()],
+            ..Refs::default()
+        });
+        kept.remove(&["p1".into()]).unwrap();
+        assert!(kept.add_rows("b3", &[row("Byway", json!({}))]).is_err());
+        let (said, operations) = kept.writes(&answering());
+        for id in [saola.id, offer.id, page.id] {
+            assert!(
+                operations
+                    .iter()
+                    .any(|o| matches!(o, Operation::Delete { id: d, .. } if *d == id)),
+                "{operations:?}"
+            );
+        }
+        let layout: PageLayout =
+            serde_json::from_value(said["changes"][0]["layout"].clone()).unwrap();
+        assert!(
+            layout
+                .blocks
+                .iter()
+                .any(|b| b.id == page.id && b.row_id == Some(saola.id) && b.removed)
+        );
     }
 
     #[test]
@@ -2232,6 +2455,7 @@ mod tests {
             "Schuhe",
             None,
             &[field("Vegan", "text"), field("Preis", "text")],
+            None,
         )
         .unwrap();
         kept.add_rows(
@@ -2289,6 +2513,7 @@ mod tests {
             "Angebote",
             None,
             &[field("Status", "status"), field("Preis", "number")],
+            None,
         )
         .unwrap();
         assert!(
@@ -2353,7 +2578,7 @@ mod tests {
         kept.add_items("Lesen", &[item("Ward, Plant care")])
             .unwrap();
         assert!(
-            kept.add_block("table", "Schuhe", None, &[])
+            kept.add_block("table", "Schuhe", None, &[], None)
                 .unwrap_err()
                 .contains("no kind of block table")
         );

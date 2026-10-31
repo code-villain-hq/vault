@@ -35,14 +35,38 @@ export function numberOf(row: Point, field: Field): number | null {
 }
 
 /**
+ * Whether a number over days draws as a line: one measurement a day, or
+ * one a day for each name that's measured again (a shop's price, day after
+ * day), which is then a line a name.
+ */
+export function measures(rows: Point[], day: Field, number: Field): boolean {
+  const measured = rows.filter((r) => dayOf(r, day) && numberOf(r, number) !== null);
+  if (measured.length === 0) return false;
+  const days = new Set(measured.map((r) => dayOf(r, day)));
+  if (days.size === measured.length) return true;
+  const named = new Set(measured.map((r) => `${r.text}\u0000${dayOf(r, day)}`));
+  const names = new Set(measured.map((r) => r.text));
+  return named.size === measured.length && names.size < measured.length;
+}
+
+/**
+ * Whether a day tells the rows apart: one shared by every row, two or
+ * more, only says when they were all seen.
+ */
+function tellsApart(rows: Point[], day: Field): boolean {
+  const days = new Set(rows.map((r) => cellOf(r, day)).filter((d) => d !== undefined));
+  return rows.length < 2 || days.size > 1 || rows.some((r) => cellOf(r, day) === undefined);
+}
+
+/**
  * The picture the app draws a collection as: the first rule that fits.
  *
- * - a day and a number are a line;
+ * - a number measured over days is a line (`measures`);
  * - a status is a board;
  * - a photo is cards;
- * - days, or spans, all past are a timeline;
+ * - days, or spans, all past are a timeline, unless every row has the same;
  * - days still to come are a week;
- * - a name and a number are bars;
+ * - a name and a number, with one field more at most, are bars;
  * - three fields or more, the name with them, are a table;
  * - anything else is a list.
  *
@@ -54,13 +78,13 @@ export function pictureOf(block: Block, rows: Point[], on = today()): string {
   const of = (kind: string) => fields.find((f) => f.kind === kind);
   const day = of("day");
   const number = of("number");
-  if (day && number && rows.some((r) => dayOf(r, day) && numberOf(r, number) !== null)) {
-    return "line";
-  }
+  if (day && number && measures(rows, day, number)) return "line";
   if (of("status")) return "board";
   if (of("photo")) return "cards";
-  if (day) return rows.some((r) => (dayOf(r, day) ?? "") >= on) ? "week" : "timeline";
-  if (number) return "bars";
+  if (day && tellsApart(rows, day)) {
+    return rows.some((r) => (dayOf(r, day) ?? "") >= on) ? "week" : "timeline";
+  }
+  if (number && fields.length <= 2) return "bars";
   return fields.length + 1 >= 3 ? "table" : "list";
 }
 
@@ -78,9 +102,7 @@ export function picturesFor(block: Block, rows: Point[], on = today()): string[]
   const day = of("day");
   const number = of("number");
   const fits = new Set([pick, "cards", "table", "list"]);
-  if (day && number && rows.some((r) => dayOf(r, day) && numberOf(r, number) !== null)) {
-    fits.add("line");
-  }
+  if (day && number && measures(rows, day, number)) fits.add("line");
   if (of("status") || of("choice")) fits.add("board");
   if (day) fits.add("timeline");
   if (day && rows.some((r) => dayOf(r, day))) fits.add("week");

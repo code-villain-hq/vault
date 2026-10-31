@@ -2,7 +2,7 @@
 import type { Facet } from "./Facet";
 import type { Field } from "./Field";
 
-export type BlockCreate = { topic_id: string, kind: string, title?: string, facets?: Array<Facet>, fields?: Array<Field>, width?: string, view?: string, 
+export type BlockCreate = { topic_id: string, kind: string, title?: string, facets?: Array<Facet>, fields?: Array<Field>, width?: string, view?: string, row_id?: string, 
 /**
  * After the topic's last block when left out.
  */

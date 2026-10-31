@@ -21,6 +21,7 @@ const collection = (...fields: Field[]): Block => ({
   fields,
   width: "",
   view: "",
+  row_id: null,
   position: 0,
   created_at: "",
   updated_at: "",
@@ -91,6 +92,41 @@ describe("pictureOf", () => {
     );
     const terms = collection(field("Heißt", "text"));
     expect(pictureOf(terms, [row("Intifada", { Heißt: "Aufstand" })], ON)).toBe("list");
+  });
+
+  test("draws a shoe's offers as a table, then as a line a shop once a shop has two days", () => {
+    const offers = collection(
+      field("Preis", "number", { unit: "kr" }),
+      field("Tag", "day"),
+      field("Link", "link"),
+    );
+    const first = [
+      row("Scorett", { Preis: 1599, Tag: "2026-10-30", Link: "https://example.com/a" }),
+      row("Skocenter", { Preis: 1799, Tag: "2026-10-30", Link: "https://example.com/b" }),
+    ];
+    expect(pictureOf(offers, first, ON)).toBe("table");
+    const again = [...first, row("Scorett", { Preis: 1499, Tag: "2026-11-02" })];
+    expect(pictureOf(offers, again, ON)).toBe("line");
+    // Two rows a day that never come again are no line: a timeline.
+    const moves = collection(field("Preis", "number"), field("Tag", "day"));
+    const sold = [
+      row("Sofa", { Preis: 300, Tag: "2026-10-01" }),
+      row("Tisch", { Preis: 80, Tag: "2026-10-01" }),
+      row("Lampe", { Preis: 20, Tag: "2026-10-02" }),
+    ];
+    expect(pictureOf(moves, sold, ON)).toBe("timeline");
+  });
+
+  test("draws a name, a number and one field more as bars, and more as a table", () => {
+    const prices = collection(
+      field("Preis", "number"),
+      field("Laden", "text"),
+      field("Größe", "text"),
+    );
+    expect(pictureOf(prices, [row("Saola", { Preis: 1599, Laden: "Scorett" })], ON)).toBe("bars");
+    expect(
+      pictureOf(prices, [row("Saola", { Preis: 1599, Laden: "Scorett", Größe: "42" })], ON),
+    ).toBe("table");
   });
 
   test("counts only the fields its rows fill", () => {

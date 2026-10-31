@@ -124,7 +124,16 @@ What they do:
   prompt says which section they're looking at: what's kept goes under
   it, and a layout asked from there moves and draws only what's under it.
   A row's own page is the section of its name, and its question names
-  the row too (`row`): what fits a field changes the row's cells.
+  the row too (`row`): what fits a field changes the row's cells, and
+  what it has parts of goes on its page.
+- **A row's page** is made of the same blocks: a block with a `row_id`
+  (migration 0017) sits on that collection row's page, not the topic's.
+  add_block's `row` (`p3`) puts it there; `after` stays on one page.
+  The page Claude reads lists those blocks after the topic's, each
+  naming its row (`in_order` in `page.rs`), and the app shows them under
+  the row's fields (`onThePage`). Removing a row takes its page's blocks
+  (the sync rules' cascade, and `Kept::take_off`), and Undo puts them
+  back with their `row_id`.
 - **Keeping** (`kept.rs`): Claude files what it learns into the one set
   of blocks (`SET_KINDS`, migration 0015, `proposals/one-set-of-blocks.md`):
   `heading`, `paragraph`, `bullets`, `checklist`, `toggle`, `callout` and
@@ -160,9 +169,12 @@ What they do:
     yes or no, or words; a day is `YYYY-MM-DD`, or a span or a year as a
     timeline reads it). The fields pick its picture by the first rule
     that fits (`pictureOf` in `collection.ts`, `pictures` in `kept.rs`
-    for the page Claude reads): a day with a number a line, a status a
-    board, a photo cards, past days a timeline, days to come a week, a
-    number bars, a name and two fields or more a table, the rest a list.
+    for the page Claude reads): a day with a number a line, when each
+    day has one measurement or each name one a day and comes again (a
+    line per name, `measures`); a status a board, a photo cards, past
+    days a timeline, days to come a week, unless every row shares the day
+    (`tellsApart`); a number with at most one field more bars, a name and
+    two fields or more a table, the rest a list.
     Only fields its rows fill count. View as offers the others its fields
     allow (`picturesFor`). A toggle opens a line per theme on its points;
     a callout is a warning when a point's `look` is `warn`.

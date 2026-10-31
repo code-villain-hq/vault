@@ -294,7 +294,8 @@ pub fn template(name: &str) -> Option<&'static [(&'static str, &'static str)]> {
 
 /// A part of a topic's page: its kind, one of [`SET_KINDS`] or `you`, says
 /// how it lays out the points kept in it; its title is the topic's own
-/// ("You", "Terms"). A topic shows its blocks by position.
+/// ("You", "Terms"). A topic shows its blocks by position, and a row's page
+/// the blocks that name it (`row_id`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Block {
@@ -313,6 +314,8 @@ pub struct Block {
     pub width: String,
     /// One of [`BLOCK_VIEWS`].
     pub view: String,
+    /// The collection row whose own page it sits on; none, the topic's.
+    pub row_id: Option<Uuid>,
     pub position: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -329,6 +332,7 @@ pub struct BlockCreate {
     pub fields: Option<Vec<Field>>,
     pub width: Option<String>,
     pub view: Option<String>,
+    pub row_id: Option<Uuid>,
     /// After the topic's last block when left out.
     pub position: Option<i32>,
 }

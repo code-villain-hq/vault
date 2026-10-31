@@ -452,13 +452,31 @@ function drawn(block: Block, points: Point[]): Block {
 }
 
 /**
- * What the page shows: the blocks that keep something, but not what it
- * knows about you, which About shows.
+ * What a page shows: the blocks that keep something, but not what it knows
+ * about you, which About shows. The topic's page has the blocks that sit on
+ * no row; a row's own (`row`), those that name it.
  */
-function onThePage(page: PageParts): PageParts {
-  const shown = page.blocks.filter((b) => b.kind && b.kind !== "you");
+function onThePage(page: PageParts, row: string | null = null): PageParts {
+  const shown = page.blocks.filter((b) => b.kind && b.kind !== "you" && (b.row_id ?? null) === row);
   const ids = new Set(shown.map((b) => b.id));
   return { ...page, blocks: shown, points: page.points.filter((p) => ids.has(p.block_id)) };
+}
+
+/** Blocks on the page's grid, each at its width. */
+function Blocks({ page }: { page: PageParts }) {
+  return (
+    <div className="page-grid">
+      {page.blocks.map((block) => (
+        <div
+          key={block.id}
+          data-width={block.width}
+          data-narrow={NARROW.has(block.width) || undefined}
+        >
+          <BlockView block={block} page={page} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
@@ -487,19 +505,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
           </p>
         </div>
       )}
-      {page.blocks.length > 0 && (
-        <div className="page-grid">
-          {page.blocks.map((block) => (
-            <div
-              key={block.id}
-              data-width={block.width}
-              data-narrow={NARROW.has(block.width) || undefined}
-            >
-              <BlockView block={block} page={page} />
-            </div>
-          ))}
-        </div>
-      )}
+      {page.blocks.length > 0 && <Blocks page={page} />}
       {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
   );
@@ -553,7 +559,9 @@ function RowFields({ row }: { row: Point }) {
       {block.fields.length > 0 && (
         <dl className="grid max-w-[68ch] grid-cols-[minmax(6rem,max-content)_1fr] gap-x-6 gap-y-1.5">
           {block.fields.map((field) => {
-            const words = cellWords(field, cellOf(row, field));
+            const cell = cellOf(row, field);
+            const words =
+              field.kind === "check" ? (cell === true ? "✓" : "") : cellWords(field, cell);
             return (
               <Fragment key={field.name}>
                 <dt className="text-muted">{field.name}</dt>
@@ -570,7 +578,8 @@ function RowFields({ row }: { row: Point }) {
 /**
  * A section on a page of its own: everything kept under its name, from every
  * block, as its block lays it out (the events, then the passages), with its
- * reminders, the questions about it, and the talks it came from.
+ * reminders, the questions about it, and the talks it came from. A row's
+ * page has its fields first, then the blocks that sit on it.
  */
 function SectionPageBody({
   topic,
@@ -583,10 +592,13 @@ function SectionPageBody({
 }) {
   const page = usePage(topic);
   const talks = useRecords("Talk");
+  const own = useMemo(() => onThePage(page, row?.id ?? null), [page, row?.id]);
   const points = page.points.filter((p) => p.theme === section);
   const questions = page.questions.filter((q) => q.theme === section);
   const reminders = page.reminders.filter((r) => r.theme === section);
-  const blocks = page.blocks.filter((b) => points.some((p) => p.block_id === b.id));
+  const blocks = page.blocks.filter(
+    (b) => !own.blocks.includes(b) && points.some((p) => p.block_id === b.id),
+  );
   // A question's point goes where the section's others are.
   const home = blocks.find((b) => b.kind === "toggle") ?? keeping(page.blocks);
   // Passages name their talk; the talks of the rest are listed under them.
@@ -595,7 +607,7 @@ function SectionPageBody({
   );
   const named = new Set(points.filter((p) => passages.has(p.block_id)).map((p) => p.talk_id));
   const from = talks
-    .filter((t) => !named.has(t.id) && points.some((p) => p.talk_id === t.id))
+    .filter((t) => !named.has(t.id) && [...points, ...own.points].some((p) => p.talk_id === t.id))
     .sort((a, b) => b.last_at.localeCompare(a.last_at));
 
   if (!row && points.length + questions.length + reminders.length === 0) {
@@ -616,6 +628,7 @@ function SectionPageBody({
       <BackTo topic={topic} />
       <p className="text-title font-semibold">{section}</p>
       {row && <RowFields row={row} />}
+      {own.blocks.length > 0 && <Blocks page={own} />}
       {reminders.length > 0 && <Dates reminders={reminders} />}
       {questions.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
@@ -681,7 +694,7 @@ function AboutPageBody({ topic }: { topic: Topic }) {
   const own = isOwn(topic);
   const page = usePage(topic);
   const talks = useTalks(topic.id);
-  const blocks = page.blocks.filter((b) => b.kind !== "you");
+  const blocks = page.blocks.filter((b) => b.kind !== "you" && !b.row_id);
   const you = new Set(page.blocks.filter((b) => b.kind === "you").map((b) => b.id));
   const facts = page.points.filter((p) => you.has(p.block_id));
   const points = page.points.length;

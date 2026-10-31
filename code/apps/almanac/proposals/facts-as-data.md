@@ -33,6 +33,13 @@ number in kr, Tag a day), drawn as a table, and as a line once a shop
 has two days. Nothing names shoes: any row can hold any block, and the
 pictures pick themselves by the same rules.
 
+_Built:_ `row_id` on a block (migration 0017), add_block's `row`, the
+row's page drawing its blocks, removing and Undo with the row. The line
+draws a line per name when names come again over days
+(`a_row_has_a_page_of_blocks_that_goes_with_it`,
+`offers_draw_as_a_line_only_once_a_shop_has_two_days`). Not yet tried
+against Claude.
+
 ## C. Only data, where words aren't the point
 
 Today's blocks are already the seven of the set. Of those, three hold

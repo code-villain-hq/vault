@@ -60,6 +60,7 @@ export function samples(): Sample[] {
       fields,
       width: "",
       view,
+      row_id: null,
       position: 0,
     };
     const point = (theme: string, text: string, more: Partial<Point> = {}): Point => ({

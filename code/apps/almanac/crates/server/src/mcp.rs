@@ -230,7 +230,13 @@ async fn call(
         "add_block" => {
             let args: BlockArgs = read(arguments)?;
             let fields = args.fields.unwrap_or_default();
-            let b = kept()?.add_block(&args.kind, &args.title, args.after.as_deref(), &fields)?;
+            let b = kept()?.add_block(
+                &args.kind,
+                &args.title,
+                args.after.as_deref(),
+                &fields,
+                args.row.as_deref(),
+            )?;
             Ok(format!("Added {b}."))
         }
         "change_block" => {
@@ -381,6 +387,7 @@ struct BlockArgs {
     title: String,
     after: Option<String>,
     fields: Option<Vec<FieldArg>>,
+    row: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -899,8 +906,9 @@ fn tools(mode: Mode) -> Vec<Value> {
                 json!({
                     "kind": { "type": "string", "enum": SET_KINDS },
                     "title": string("Its short title, in the page's language: what its points share, never one of them. A heading is only its title."),
-                    "after": string("The block it goes after, as the page names it (b2); \"\" for the top. Left out, at the end."),
+                    "after": string("The block it goes after, on the same page (b2); \"\" for the top. Left out, at the end."),
                     "fields": { "type": "array", "items": field_schema(false), "description": FIELDS_SAY },
+                    "row": string("The row whose own page it goes on (p3): what belongs to that one row and has parts of its own, such as a shoe's offers or a plant's repottings. Left out, the topic's page."),
                 }),
                 &["kind", "title"],
             ),

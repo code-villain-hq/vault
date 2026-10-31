@@ -224,6 +224,9 @@ pub struct BlockWas {
     /// A collection's fields.
     #[serde(default)]
     pub fields: Vec<Field>,
+    /// The row whose page it sits on.
+    #[serde(default)]
+    pub row_id: Option<Uuid>,
     pub position: i32,
     /// Whether the layout removed it.
     pub removed: bool,

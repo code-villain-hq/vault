@@ -10,7 +10,11 @@ view: string,
 /**
  * A collection's fields.
  */
-fields: Array<Field>, position: number, 
+fields: Array<Field>, 
+/**
+ * The row whose page it sits on.
+ */
+row_id: string | null, position: number, 
 /**
  * Whether the layout removed it.
  */

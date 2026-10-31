@@ -14,7 +14,8 @@ use sqlx::types::Json;
 use uuid::Uuid;
 
 const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
-const BLOCKS: &str = "SELECT id, kind, title, facets, fields, width, view, position FROM blocks \
+const BLOCKS: &str = "SELECT id, kind, title, facets, fields, width, view, row_id, position \
+     FROM blocks \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, look, amount, note, \
        cells, done, position, source, source_url \
@@ -29,7 +30,8 @@ const OTHERS: &str = "SELECT name FROM topics \
 const WORKSPACE: &str = "SELECT name FROM workspaces WHERE id = $1";
 const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, \
        COALESCE((SELECT string_agg(CASE WHEN b.title = '' THEN b.kind ELSE b.title END, ', ' \
-           ORDER BY b.position, b.created_at) FROM blocks b WHERE b.topic_id = t.id), ''), \
+           ORDER BY b.position, b.created_at) FROM blocks b \
+           WHERE b.topic_id = t.id AND b.row_id IS NULL), ''), \
        (SELECT count(*) FROM points p WHERE p.topic_id = t.id), \
        (SELECT max(k.last_at)::date FROM talks k WHERE k.topic_id = t.id) \
      FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
@@ -100,6 +102,8 @@ pub struct RefBlock {
     pub width: String,
     /// The picture a person or a talk picked; empty for the app's own.
     pub view: String,
+    /// The row whose own page it's on; none, the topic's.
+    pub row_id: Option<Uuid>,
     pub position: i32,
 }
 
@@ -160,10 +164,10 @@ impl Page {
             }
         }
         Ok(Some(Page {
+            blocks: in_order(blocks),
             id,
             name,
             sticks_to,
-            blocks,
             questions: sqlx::query_scalar(QUESTIONS)
                 .bind(id)
                 .bind(workspace_id)
@@ -225,13 +229,26 @@ impl Page {
         if self.blocks.is_empty() {
             out.push_str("None yet.\n");
         }
+        let numbers: Vec<&PagePoint> = self.blocks.iter().flat_map(|b| &b.points).collect();
         let mut n = 0;
+        let mut on_rows = false;
         for (b, PageBlock { block, points }) in self.blocks.iter().enumerate() {
+            let row = block
+                .row_id
+                .and_then(|id| numbers.iter().position(|p| p.id == id))
+                .map(|i| (i + 1, &numbers[i].text));
+            if row.is_some() && !on_rows {
+                out.push_str("\nOn rows' own pages, a row's blocks after its row:\n");
+                on_rows = true;
+            }
             let title = match block.title.as_str() {
                 "" => "Untitled",
                 title => title,
             };
             let mut about = vec![block.kind.clone()];
+            if let Some((n, name)) = &row {
+                about.push(format!("on the page of [p{n}] {name}"));
+            }
             if !block.fields.is_empty() {
                 about.push(format!(
                     "fields: {}",
@@ -332,6 +349,33 @@ impl Page {
     }
 }
 
+/// The topic's blocks in their order, then each row's own, after the
+/// page that holds its row: the order Claude reads them in, which numbers
+/// them. A block whose row is gone is on no page.
+fn in_order(blocks: Vec<PageBlock>) -> Vec<PageBlock> {
+    let (mut ordered, mut rest): (Vec<PageBlock>, Vec<PageBlock>) =
+        blocks.into_iter().partition(|b| b.block.row_id.is_none());
+    loop {
+        let rows: Vec<Uuid> = ordered
+            .iter()
+            .flat_map(|b| b.points.iter().map(|p| p.id))
+            .collect();
+        let at = |b: &PageBlock| {
+            b.block
+                .row_id
+                .and_then(|id| rows.iter().position(|p| *p == id))
+        };
+        let (mut found, left): (Vec<PageBlock>, Vec<PageBlock>) =
+            rest.into_iter().partition(|b| at(b).is_some());
+        rest = left;
+        if found.is_empty() {
+            return ordered;
+        }
+        found.sort_by_key(|b| (at(b), b.block.position));
+        ordered.extend(found);
+    }
+}
+
 /// A field as Claude reads it: "Gewicht (number, kg, goal 3.4)".
 fn field_words(field: &Field) -> String {
     let mut said = vec![field.kind.clone()];
@@ -416,6 +460,11 @@ a few words), status (where a row stands, Offen, Bestellt, Erledigt), check (yes
 its fields: days with numbers as a line, a status as a board, photos as cards, days past as a \
 timeline and days to come as a week, a name with a number as bars, three fields or more as a \
 table, the rest as a list. \
+A row has a page of its own, made of the same blocks: what belongs to that one row and has \
+parts of its own goes there, in a block that names the row, so the topic's page keeps the row \
+and not its details. A shoe's offers are a collection on the shoe's page (Laden, Preis in kr, \
+Tag), a plant's repottings one on the plant's, sentences about one thing a paragraph on its \
+page. \
 File each thing where it belongs, and keep the page's face short: a few words a line, whole \
 sentences in paragraphs and toggles. What's measured, compared or tracked is rows with typed \
 fields, never a sentence: a weighing is a row with its day and its number in kg, so the line \

@@ -147,7 +147,8 @@ learns. After each exchange in a talk, you decide what the page keeps from it an
 on it. Return JSON in the schema's shape; a list with nothing in it is [].
 
 - blocks: only when the page has nowhere for what you keep, a block to start: its kind, its \
-short title (what its points share), and for a collection its fields (name, kind, unit, goal \
+short title (what its points share), the row whose own page it goes on (\"p3\") or \"\" for \
+the topic's, and for a collection its fields (name, kind, unit, goal \
 as a plain number or \"\", options), each the narrowest kind that holds its fact: yes or no a \
 check, a price a number with its unit, a date a day; a reason or a note a text field of its own. \
 Items and rows name it by its title.
@@ -227,6 +228,9 @@ struct KeepBrief {
 struct KeepBlock {
     kind: String,
     title: String,
+    /// The row whose page it goes on (p3), or "" for the topic's.
+    #[serde(default)]
+    row: String,
     #[serde(default)]
     fields: Vec<KeepField>,
 }
@@ -327,6 +331,7 @@ fn keep_schema() -> Value {
         "blocks": list(object(json!({
             "kind": { "type": "string", "enum": SET_KINDS },
             "title": string,
+            "row": string,
             "fields": list(object(json!({
                 "name": string,
                 "kind": { "type": "string", "enum": FIELD_KINDS },
@@ -625,8 +630,9 @@ fn about_line(about: Option<&str>, row: Option<(usize, &str, &str)>) -> String {
         return format!(
             "\nThey ask from the page of the row [p{n}] {name}, in {collection}, which is open in \
              front of them: what they ask is about it. What fits one of {collection}'s fields \
-             changes p{n}'s cells; sentences about it go in a toggle, as points under a line \
-             named {name}, which its page shows under its fields.\n"
+             changes p{n}'s cells. The rest goes on its page, in blocks that name the row \
+             (p{n}): what it has several of, such as offers or repottings, a collection there; \
+             sentences about it a paragraph there.\n"
         );
     }
     match about {
@@ -989,7 +995,13 @@ async fn keep(
                 was: String::new(),
             })
             .collect();
-        let _ = kept.add_block(&block.kind, &block.title, None, &fields);
+        let _ = kept.add_block(
+            &block.kind,
+            &block.title,
+            None,
+            &fields,
+            Some(block.row.as_str()),
+        );
     }
     for item in &from.items {
         let _ = kept.add_items(
@@ -1099,7 +1111,7 @@ mod tests {
         let row = about_line(Some("Monstera"), Some((4, "Pflanzen", "Monstera")));
         assert!(row.contains("the row [p4] Monstera, in Pflanzen"));
         assert!(row.contains("changes p4's cells"));
-        assert!(row.contains("under a line named Monstera"));
+        assert!(row.contains("blocks that name the row (p4)"));
     }
 
     #[test]

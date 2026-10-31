@@ -21,6 +21,7 @@ const BLOCK_NEXT: &str = "SELECT COALESCE(max(position), -1) + 1 FROM blocks \
      WHERE workspace_id = $1 AND topic_id = $2";
 const TOPIC_BLOCKS: &str = "SELECT id FROM blocks WHERE topic_id = $1 AND workspace_id = $2";
 const BLOCK_POINTS: &str = "SELECT id FROM points WHERE block_id = $1 AND workspace_id = $2";
+const ROW_BLOCKS: &str = "SELECT id FROM blocks WHERE row_id = $1 AND workspace_id = $2";
 const TOPIC_REMINDERS: &str = "SELECT id FROM reminders WHERE topic_id = $1 AND workspace_id = $2";
 const TOPIC_QUESTIONS: &str = "SELECT id FROM questions WHERE topic_id = $1 AND workspace_id = $2";
 const TOPIC_POINTS: &str = "SELECT id FROM points WHERE topic_id = $1 AND workspace_id = $2";
@@ -129,8 +130,8 @@ impl Rules for Almanac {
         id: Uuid,
     ) -> Result<Vec<Operation>, SyncError> {
         // What a topic kept goes with it, a block's points with the block,
-        // and a talk's messages with the talk, logged so every client lets
-        // go of them too.
+        // a row's page with the row, and a talk's messages with the talk,
+        // logged so every client lets go of them too.
         let children: &[(ModelKind, &'static str)] = match model {
             ModelKind::Topic => &[
                 (ModelKind::Reminder, TOPIC_REMINDERS),
@@ -141,6 +142,7 @@ impl Rules for Almanac {
                 (ModelKind::Talk, TOPIC_TALKS),
             ],
             ModelKind::Block => &[(ModelKind::Point, BLOCK_POINTS)],
+            ModelKind::Point => &[(ModelKind::Block, ROW_BLOCKS)],
             ModelKind::Talk => &[(ModelKind::Message, TALK_MESSAGES)],
             ModelKind::User => {
                 return Err(SyncError::Invalid(format!(

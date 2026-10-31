@@ -126,9 +126,11 @@ topics.
   edge drags wider for long topic names, the talk's edge wider for long
   answers, and this Mac keeps both widths.
 - **A collection draws the picture its fields pick**, the same rules on
-  every page: a day and a number a line, a status a board, a photo cards,
-  days past a timeline and days to come a week, a number bars, three
-  fields or more a table, fewer a list. A toggle opens on its points; a
+  every page: a day and a number a line, once each day has one, or each
+  name one a day and comes again (a line per shop, named at its end); a
+  status a board, a photo cards, days past a timeline and days to come a
+  week (a day every row shares picks neither), a number with at most one
+  field more bars, three fields or more a table, fewer a list. A toggle opens on its points; a
   checklist's ticked items go last, faint. A colour code shows its
   colour.
 - **View as** beside a collection's title, on hover, switches to another
@@ -147,9 +149,12 @@ topics.
   kept under it from every block, its open questions and the talks it
   came from. Asking from there asks about that section.
 - **A row opens as its own page**: a row's name, in any picture, opens
-  its fields, a line each, the empty ones too, and what's kept under its
-  name. Asking from there is about that row: what fits a field fills its
-  cell, and the rest goes under its name. A button above its title
+  its fields, a line each, the empty ones too, the blocks on its own
+  page, and what's kept under its name. A row's page is made of the same
+  blocks as a topic's: a shoe's offers are a collection there, drawn as a
+  table, and as a line a shop once a shop has two days. Asking from there
+  is about that row: what fits a field fills its cell, and the rest goes
+  on its page, in blocks of its own. Removing the row takes its page. A button above its title
   goes back to the topic, as do the breadcrumb and Esc, to where you
   were on the page.
 - **Pages from before the set** move into it once, when the server

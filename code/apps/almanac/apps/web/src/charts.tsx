@@ -86,10 +86,28 @@ export function measured(points: Point[]): { measurements: Point[]; goal?: Point
   return { measurements, goal };
 }
 
+/** The width a line's name takes at its end, past the last day. */
+const NAMES = 88;
+
+/**
+ * Where each line's name goes at its end: beside its last point, nudged
+ * apart so two never overlap.
+ */
+function nameMarks(ends: { name: string; y: number }[]): { name: string; y: number }[] {
+  const marks = [...ends].sort((a, b) => a.y - b.y);
+  marks.forEach((mark, i) => {
+    const above = marks[i - 1];
+    if (above && mark.y - above.y < 13) mark.y = above.y + 13;
+  });
+  return marks;
+}
+
 /**
  * A trend: what it measures, the latest as a number to read at a glance,
  * how it moved since the first, and a line through the measurements by
- * day, on one scale with the mark it aims at, dashed.
+ * day, on one scale with the mark it aims at, dashed. When a day has
+ * several measurements, each name is a line of its own, named at its end
+ * (a shop's price, day by day), and there's no one latest to lead with.
  */
 export function TrendSet({
   name,
@@ -116,6 +134,12 @@ export function TrendSet({
   const unit = latest.note || first.note;
   const words = (amount: number) => (unit ? `${amountWords(amount)} ${unit}` : amountWords(amount));
   const change = (latest.amount ?? 0) - (first.amount ?? 0);
+  const lines = new Map<string, Point[]>();
+  if (new Set(measurements.map((p) => p.happened)).size < measurements.length) {
+    for (const p of measurements) lines.set(p.text, [...(lines.get(p.text) ?? []), p]);
+  }
+  const series = lines.size > 0;
+  const right = series ? NAMES : PAD.right;
 
   const amounts = measurements.map((p) => p.amount ?? 0);
   if (goal?.amount != null) amounts.push(goal.amount);
@@ -124,18 +148,35 @@ export function TrendSet({
   // Two lines are enough to read it by: the lowest and the highest.
   const grid = marks.length > 3 ? [lo, hi] : marks;
   const [t0, t1] = [fromKey(first.happened).getTime(), fromKey(latest.happened).getTime()];
-  const inner = Math.max(1, width - PAD.left - PAD.right);
+  const inner = Math.max(1, width - PAD.left - right);
   const x = (t: number) =>
     t1 === t0 ? PAD.left + inner / 2 : PAD.left + (inner * (t - t0)) / (t1 - t0);
   const y = (v: number) => PAD.top + (HEIGHT - PAD.top - PAD.bottom) * (1 - (v - lo) / (hi - lo));
   const at = (p: Point) => x(fromKey(p.happened).getTime());
-  const line = measurements.map((p, i) => `${i ? "L" : "M"}${at(p)},${y(p.amount ?? 0)}`).join(" ");
+  const path = (points: Point[]) =>
+    points.map((p, i) => `${i ? "L" : "M"}${at(p)},${y(p.amount ?? 0)}`).join(" ");
   const shown = hovered != null ? measurements[hovered] : undefined;
+  // A line each, in steps of the ink; the one hovered in the ink itself.
+  const inks = ["stroke-fg fill-fg", "stroke-muted fill-muted", "stroke-faint fill-faint"];
+  const drawn = series
+    ? [...lines].map(([name, points], i) => ({
+        name,
+        points,
+        ink: shown
+          ? shown.text === name
+            ? "stroke-fg fill-fg"
+            : "stroke-line-strong fill-line-strong"
+          : (inks[i % 3] ?? ""),
+      }))
+    : [{ name, points: measurements, ink: "stroke-fg fill-fg" }];
   const onMove = (event: React.MouseEvent<SVGSVGElement>) => {
-    const left = event.clientX - event.currentTarget.getBoundingClientRect().left;
+    const box = event.currentTarget.getBoundingClientRect();
+    const [left, top] = [event.clientX - box.left, event.clientY - box.top];
+    // The nearest by day, and among a day's by height.
+    const away = (p: Point) => Math.abs(at(p) - left) * 4 + Math.abs(y(p.amount ?? 0) - top);
     let nearest = 0;
     measurements.forEach((p, i) => {
-      if (Math.abs(at(p) - left) < Math.abs(at(measurements[nearest] ?? p) - left)) nearest = i;
+      if (away(p) < away(measurements[nearest] ?? p)) nearest = i;
     });
     setHovered(nearest);
   };
@@ -143,7 +184,7 @@ export function TrendSet({
   return (
     <section className="flex flex-col gap-1" aria-label={name}>
       {heading && <h3 className="text-xs text-muted">{heading}</h3>}
-      <p className="flex flex-wrap items-baseline gap-x-2.5">
+      <p className={series ? "sr-only" : "flex flex-wrap items-baseline gap-x-2.5"}>
         <span className="font-semibold text-wordmark tabular-nums">
           {words(latest.amount ?? 0)}
         </span>
@@ -170,7 +211,7 @@ export function TrendSet({
                 <g key={v}>
                   <line
                     x1={PAD.left}
-                    x2={width - PAD.right}
+                    x2={width - right}
                     y1={y(v)}
                     y2={y(v)}
                     className="stroke-line"
@@ -189,7 +230,7 @@ export function TrendSet({
               {timeMarks(first.happened, latest.happened).map((mark) => {
                 const left = x(mark.at);
                 const anchor =
-                  left < PAD.left + 16 ? "start" : left > width - PAD.right - 16 ? "end" : "middle";
+                  left < PAD.left + 16 ? "start" : left > width - right - 16 ? "end" : "middle";
                 return (
                   <text
                     key={mark.at}
@@ -206,7 +247,7 @@ export function TrendSet({
                 <>
                   <line
                     x1={PAD.left}
-                    x2={width - PAD.right}
+                    x2={width - right}
                     y1={y(goal.amount)}
                     y2={y(goal.amount)}
                     strokeWidth={1.5}
@@ -228,24 +269,45 @@ export function TrendSet({
                 className="stroke-line-strong"
               />
             )}
-            <path
-              d={line}
-              fill="none"
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              className="stroke-fg"
-            />
-            {measurements.map((p) => (
-              <circle
-                key={p.id}
-                cx={at(p)}
-                cy={y(p.amount ?? 0)}
-                r={p === shown ? 5 : 4}
-                strokeWidth={2}
-                className="fill-fg stroke-panel"
-              />
+            {drawn.map((line) => (
+              <g key={line.name}>
+                <path
+                  d={path(line.points)}
+                  fill="none"
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  className={line.ink.split(" ")[0]}
+                />
+                {line.points.map((p) => (
+                  <circle
+                    key={p.id}
+                    cx={at(p)}
+                    cy={y(p.amount ?? 0)}
+                    r={p === shown ? 5 : 4}
+                    strokeWidth={2}
+                    className={`${line.ink.split(" ")[1]} stroke-panel`}
+                  />
+                ))}
+              </g>
             ))}
+            {series &&
+              nameMarks(
+                drawn.flatMap((line) => {
+                  const last = line.points.at(-1);
+                  return last ? [{ name: line.name, y: y(last.amount ?? 0) }] : [];
+                }),
+              ).map((mark) => (
+                <text
+                  key={mark.name}
+                  x={width - right + 10}
+                  y={mark.y}
+                  dy="0.32em"
+                  className={`text-xs ${shown && shown.text !== mark.name ? "fill-faint" : "fill-muted"}`}
+                >
+                  {mark.name.length > 12 ? `${mark.name.slice(0, 11)}…` : mark.name}
+                </text>
+              ))}
           </svg>
         )}
         {shown && (

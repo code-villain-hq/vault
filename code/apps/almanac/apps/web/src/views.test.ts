@@ -12,6 +12,7 @@ const block = (kind: string, title = "Notes", facets: string[] = [], view = ""):
   fields: [],
   width: "",
   view,
+  row_id: null,
   position: 0,
   created_at: "",
   updated_at: "",

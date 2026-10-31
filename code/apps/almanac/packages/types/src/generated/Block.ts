@@ -5,7 +5,8 @@ import type { Field } from "./Field";
 /**
  * A part of a topic's page: its kind, one of [`SET_KINDS`] or `you`, says
  * how it lays out the points kept in it; its title is the topic's own
- * ("You", "Terms"). A topic shows its blocks by position.
+ * ("You", "Terms"). A topic shows its blocks by position, and a row's page
+ * the blocks that name it (`row_id`).
  */
 export type Block = { id: string, workspace_id: string, topic_id: string, kind: string, 
 /**
@@ -28,4 +29,8 @@ width: string,
 /**
  * One of [`BLOCK_VIEWS`].
  */
-view: string, position: number, created_at: string, updated_at: string, };
+view: string, 
+/**
+ * The collection row whose own page it sits on; none, the topic's.
+ */
+row_id: string | null, position: number, created_at: string, updated_at: string, };

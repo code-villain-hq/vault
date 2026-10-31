@@ -26,6 +26,7 @@ pub fn undo(
             ("fields", json!(block.fields)),
             ("width", json!(block.width)),
             ("view", json!(block.view)),
+            ("row_id", json!(block.row_id)),
             ("position", json!(block.position)),
         ]);
         if block.removed && !blocks.contains(&block.id) {
@@ -150,6 +151,7 @@ mod tests {
                 width: String::new(),
                 view: "bars".into(),
                 fields: Vec::new(),
+                row_id: None,
                 position: 2,
                 removed: true,
             }],
