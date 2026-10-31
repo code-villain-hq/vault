@@ -24,29 +24,29 @@ Collection. Any block may have a short title.
 **A collection** is rows with fields, and each row is a page of its own,
 made of the same blocks. A field is one of:
 
-| Field | Holds |
-|---|---|
-| Text | a few words |
-| Number | a number, with its unit and a goal when there is one |
-| Day | a day, or a span of days or years |
-| Choice | one of a few words the collection uses |
+| Field  | Holds                                                 |
+| ------ | ----------------------------------------------------- |
+| Text   | a few words                                           |
+| Number | a number, with its unit and a goal when there is one  |
+| Day    | a day, or a span of days or years                     |
+| Choice | one of a few words the collection uses                |
 | Status | where a row stands, such as Offen, Bestellt, Erledigt |
-| Check | yes or no |
-| Photo | a photo from a talk |
-| Link | a web page |
+| Check  | yes or no                                             |
+| Photo  | a photo from a talk                                   |
+| Link   | a web page                                            |
 
 **Eight pictures.** The first rule that fits draws the collection:
 
-| Its rows have | Picture |
-|---|---|
-| a day and a number | Line |
-| a status | Board |
-| a photo | Cards |
-| days that are past | Timeline |
-| days to come | Week |
-| a name and a number | Bars |
-| three fields or more | Table |
-| anything else | List |
+| Its rows have        | Picture  |
+| -------------------- | -------- |
+| a day and a number   | Line     |
+| a status             | Board    |
+| a photo              | Cards    |
+| days that are past   | Timeline |
+| days to come         | Week     |
+| a name and a number  | Bars     |
+| three fields or more | Table    |
+| anything else        | List     |
 
 View as offers the other pictures its fields allow, and the choice stays.
 One row with a number shows as the number; the line starts at two.
@@ -76,6 +76,10 @@ Each step leaves the app working, and is tried before it's committed.
 2. **Claude files into the set.** The tools above, and the page Claude
    reads in the new shape. Keeping a point and laying out a page go. New
    blocks are the new kinds; today's stay until step 3.
+   _Built:_ through Claude Code's tools and the API's one request alike,
+   tried with real Claude Code. Changes, moves and removals have one
+   Undo. A reminder offer no longer brings a week. An item's reminder
+   rings once it's accepted; ticked before that, the item itself is done.
 3. **Today's pages move into the set.** Chips, lists and lines become
    bullets, steps a checklist, sections toggles, cards and tables a
    collection whose rows keep their facts as fields and the rest on their

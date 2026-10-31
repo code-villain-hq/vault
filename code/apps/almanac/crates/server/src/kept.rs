@@ -1,233 +1,127 @@
-//! What one answer keeps: points in the page's blocks, questions to check,
-//! reminders it offers, the topic an off-topic question fits, the talk's
-//! title, how the topic answers from now on (its brief), and, in the
-//! workspace's own topic, a topic it proposes and the topics it changed. A point or reminder may take the place of ones the
-//! page has, by the references the page gave them (`crate::page::Refs`):
-//! the page is kept up to date, not added to. Claude Code hands them over with Almanac's tools
-//! while it answers (`crate::mcp`); through the Messages API one more
-//! request reads them from the exchange (`crate::talks`). Either way they
-//! are written with the answer, through the sync engine.
+//! What one answer keeps and changes on its topic's page, and what else it
+//! leaves: questions to check, reminders it offers, the topic an off-topic
+//! question fits, the talk's title, how the topic answers from now on (its
+//! brief), and, in the workspace's own topic, a topic it proposes and the
+//! topics it changed. Claude files into the one set of blocks
+//! (`almanac_domain::SET_KINDS`) with Almanac's tools while it answers
+//! (`crate::mcp`); through the Messages API one more request reads the same
+//! from the exchange (`crate::talks`). Each tool works on a copy of the
+//! page, by the references the page gave its blocks and points
+//! (`crate::page::Refs`), and the copy is written with the answer through
+//! the sync engine: what's new is kept, and what changed, moved or went is
+//! one change in the answer's Changes, which Undo puts back
+//! (`crate::layout::undo`).
+
+use std::collections::BTreeMap;
 
 use almanac_domain::{
-    BLOCK_KINDS, FACET_ICONS, Facet, LOOKS, MOST_FACETS, ModelKind, Operation, Proposal,
-    ProposedReminder, STICKS_TO_MAX, TopicChange, TopicPatch,
+    BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation, PageLayout,
+    PointWas, Proposal, ProposedReminder, SET_KINDS, STICKS_TO_MAX, TopicChange, TopicPatch,
 };
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{Days, Local, NaiveDate, NaiveTime};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use sqlx::types::Json;
 use uuid::Uuid;
 
-use crate::layout::Laid;
-use crate::page::{RefBlock, Refs};
+use crate::page::{PagePoint, RefBlock, Refs};
 use crate::topics::cut;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Kept {
-    /// The page's blocks, points and reminders, for where points go and
-    /// what replaces them.
+    /// The page as it was, which the answer's copy is written against.
     pub refs: Refs,
-    /// Blocks the answer starts, after the page's.
-    pub blocks: Vec<RefBlock>,
-    pub points: Vec<KeptPoint>,
+    /// The answer's copy of the page: its blocks and points, then the ones
+    /// the answer starts, in the order of their references.
+    blocks: Vec<RefBlock>,
+    points: Vec<PagePoint>,
+    /// The blocks and points it removed.
+    gone: Vec<Uuid>,
+    /// The blocks and points it moved on purpose, not only along.
+    moved: Vec<Uuid>,
+    /// The page's blocks and points it changed, moved, removed or ticked.
+    touched: Vec<Uuid>,
+    /// Items ticked done, or not.
+    ticks: Vec<(Uuid, bool)>,
+    /// Reminders an item's tick ticks, with what changes on them.
+    rung: Vec<(Uuid, Map<String, Value>)>,
+    /// The photos of the talk, in order, which a photo cell names by number.
+    pub photos: Vec<Uuid>,
+    /// For when a ticked reminder comes round again.
+    pub today: NaiveDate,
     pub questions: Vec<KeptQuestion>,
     pub reminders: Vec<KeptReminder>,
-    /// Points ticked done, or not, in a list or questions.
-    pub ticks: Vec<(Uuid, bool)>,
     /// The topic an off-topic question fits better, by name.
     pub elsewhere: Option<String>,
     pub talk_title: Option<String>,
     pub proposal: Option<Proposal>,
     pub changes: Vec<TopicChange>,
-    /// The page laid out anew, when they asked for that (`crate::layout`).
-    pub layout: Option<Laid>,
 }
 
-#[derive(Debug)]
-pub struct KeptPoint {
-    pub block_id: Uuid,
-    /// Empty in chips and lists.
-    pub theme: String,
-    /// What the answer says it kept it under: its theme, or its block.
-    pub under: String,
-    pub text: String,
-    /// When it happened, on a timeline; empty elsewhere.
-    pub happened: String,
-    pub shape: Shape,
-    pub source: Option<String>,
-    pub url: Option<String>,
-    /// The page's points it takes the place of.
-    pub replaces: Vec<Uuid>,
+impl Default for Kept {
+    fn default() -> Self {
+        Kept::on(Refs::default())
+    }
 }
 
-/// A point as Claude hands it over (`crate::mcp`, `crate::talks`): the
-/// `block` it goes in (`b2`, or its title), the `kind` that starts one the
-/// page lacks, what it `replaces` (`p3`), and the point itself.
-#[derive(Debug, Default, Deserialize)]
-pub struct Handed {
-    #[serde(default)]
-    pub block: String,
+/// A field of a collection as Claude gives it: its name, its kind (one of
+/// [`FIELD_KINDS`]), a number's unit and goal, the words of a choice or a
+/// status, and the name it `was` when it's renamed.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct FieldArg {
+    pub name: String,
     #[serde(default)]
     pub kind: String,
     #[serde(default)]
-    pub theme: String,
+    pub unit: String,
+    #[serde(default)]
+    pub goal: Option<f64>,
+    #[serde(default)]
+    pub options: Vec<String>,
+    #[serde(default)]
+    pub was: String,
+}
+
+/// An item as Claude adds it: a line, a paragraph, a toggle's point under
+/// its line (the theme), a callout with its look.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct ItemArg {
     pub text: String,
     #[serde(default)]
-    pub happened: String,
-    #[serde(default)]
-    pub facet: String,
+    pub theme: String,
     #[serde(default)]
     pub look: String,
-    #[serde(default)]
-    pub amount: Option<f64>,
-    #[serde(default)]
-    pub note: String,
     #[serde(default)]
     pub source: String,
     #[serde(default)]
     pub url: String,
+}
+
+/// A collection's row as Claude adds it: its name and its cells by field.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct RowArg {
+    pub name: String,
     #[serde(default)]
-    pub replaces: Vec<String>,
+    pub cells: Map<String, Value>,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub url: String,
 }
 
-/// What a point carries besides its text, as its block's kind shows it:
-/// the facet of a card it's about, whether it needs a look, a bar's
-/// number and the few words beside a bar or a question.
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct Shape {
-    pub facet: String,
-    pub look: String,
-    pub amount: Option<f64>,
-    pub note: String,
-}
-
-impl Shape {
-    /// The shape as a block of `kind` with these `facets` takes it, called
-    /// `title` in what's wrong. A facet the block doesn't name is wrong when
-    /// Claude gave it (`named`), and goes quietly when a point only moved.
-    pub fn fit(
-        self,
-        kind: &str,
-        facets: &[Facet],
-        title: &str,
-        named: bool,
-    ) -> Result<Shape, String> {
-        let facet = match (kind, self.facet.trim()) {
-            (_, "") => String::new(),
-            ("cards" | "table", facet) => match facets
-                .iter()
-                .find(|f| f.name.to_lowercase() == facet.to_lowercase())
-            {
-                Some(f) => f.name.clone(),
-                None if !named => String::new(),
-                None if facets.is_empty() => {
-                    return Err(format!(
-                        "{title} names no facets: leave facet out, or lay out the page to give the block some."
-                    ));
-                }
-                None => {
-                    let names: Vec<&str> = facets.iter().map(|f| f.name.as_str()).collect();
-                    return Err(format!(
-                        "{title} has no facet {facet}: it's one of {}, or none.",
-                        names.join(", ")
-                    ));
-                }
-            },
-            _ => String::new(),
-        };
-        let look = match kind {
-            "cards" | "table" | "bars" | "questions" => {
-                let look = self.look.trim().to_lowercase();
-                if !LOOKS.contains(&look.as_str()) {
-                    return Err(format!(
-                        "A point's look is warn (it needs a look), info (it's ready for something) or none, not {look}."
-                    ));
-                }
-                look
-            }
-            _ => String::new(),
-        };
-        let amount = match kind {
-            "bars" | "trend" | "parts" => match self.amount {
-                Some(amount) if amount.is_finite() => Some(amount),
-                _ => {
-                    return Err(format!(
-                        "{} in {title} needs its amount: {}.",
-                        match kind {
-                            "bars" => "A bar",
-                            "trend" => "A measurement",
-                            _ => "A part",
-                        },
-                        match kind {
-                            "parts" => "how many, plain (12)",
-                            "trend" => "the number it measured, plain (3.4)",
-                            _ => "the number, plain (900000)",
-                        }
-                    ));
-                }
-            },
-            "table" => self.amount.filter(|a| a.is_finite()),
-            _ => None,
-        };
-        let note = match kind {
-            "bars" | "questions" | "trend" | "parts" => cut(&self.note, 80),
-            _ => String::new(),
-        };
-        Ok(Shape {
-            facet,
-            look,
-            amount,
-            note,
-        })
-    }
-}
-
-/// When a point in a block of `kind`, called `title` in what's wrong,
-/// happened: on a timeline a year, a span or a day; in a trend the day it
-/// was measured, or none for the mark it aims at; nothing elsewhere.
-pub fn when(kind: &str, happened: &str, title: &str) -> Result<String, String> {
-    let happened = cut(happened, 60);
-    match kind {
-        "timeline" if !happened.chars().any(|c| c.is_ascii_digit()) => Err(format!(
-            "A point on {title} says when it happened: a year (1959), a span (1987–1993) or a day (11. September 2001)."
-        )),
-        "timeline" => Ok(happened),
-        "trend" if happened.is_empty() || happened.parse::<NaiveDate>().is_ok() => Ok(happened),
-        "trend" => Err(format!(
-            "A measurement in {title} says the day it was taken, as 2026-09-24, or none for the mark it aims at."
-        )),
-        _ => Ok(String::new()),
-    }
-}
-
-/// The facets a block of cards names, tidied: a name each, an icon Almanac
-/// has, none twice.
-pub fn facets(given: &[Facet]) -> Result<Vec<Facet>, String> {
-    if given.len() > MOST_FACETS {
-        return Err(format!(
-            "A block names at most {MOST_FACETS} facets: the facts every card has."
-        ));
-    }
-    let mut facets: Vec<Facet> = Vec::new();
-    for facet in given {
-        let name = cut(&facet.name, 40);
-        if name.is_empty() {
-            return Err("A facet needs a name: a word or two (Licht, Wasser).".into());
-        }
-        let icon = facet.icon.trim().to_lowercase();
-        if !FACET_ICONS.contains(&icon.as_str()) {
-            return Err(format!(
-                "There's no icon {icon} for {name}: it's one of {FACET_ICONS:?}."
-            ));
-        }
-        if facets
-            .iter()
-            .any(|f| f.name.to_lowercase() == name.to_lowercase())
-        {
-            return Err(format!("{name} is in facets twice."));
-        }
-        facets.push(Facet { name, icon });
-    }
-    Ok(facets)
+/// What changes on a point the page has: its words (a row's name), its
+/// theme, its look, and cells, merged into the row's, `null` removing one.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct PointChange {
+    pub point: String,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub theme: Option<String>,
+    #[serde(default)]
+    pub look: Option<String>,
+    #[serde(default)]
+    pub cells: Option<Map<String, Value>>,
 }
 
 #[derive(Debug)]
@@ -235,6 +129,8 @@ pub struct KeptReminder {
     pub reminder: ProposedReminder,
     /// The reminders it takes the place of.
     pub replaces: Vec<Uuid>,
+    /// The checklist item it rings for.
+    pub point_id: Option<Uuid>,
 }
 
 #[derive(Debug)]
@@ -254,230 +150,459 @@ pub struct Answering {
     pub first: bool,
 }
 
-/// How much one answer may keep. A page keeps points; more than this
-/// from one exchange is a list copied in. Points that take the place of
-/// others count only towards the most it may change at all, which sorting
-/// a page needs.
-const MOST_POINTS: usize = 8;
+/// How much one answer may do. A page keeps what's worth knowing later;
+/// more new points than this from one exchange is a list copied in. Tidying
+/// a page changes more, up to the most it may change at all.
+const MOST_NEW: usize = 12;
 const MOST_CHANGED: usize = 40;
+const MOST_BLOCKS: usize = 4;
 const MOST_QUESTIONS: usize = 2;
 const MOST_REMINDERS: usize = 3;
-const MOST_BLOCKS: usize = 2;
-const MOST_TICKS: usize = 40;
+
+/// Where a block or point goes among the others.
+#[derive(Clone, Copy)]
+enum At {
+    End,
+    Top,
+    After(usize),
+}
 
 impl Kept {
-    /// Keeping for a page with these points and reminders.
+    /// Keeping for a page with these blocks, points and reminders.
     pub fn on(refs: Refs) -> Self {
         Kept {
+            blocks: refs.blocks.clone(),
+            points: refs.points.clone(),
             refs,
-            ..Kept::default()
+            gone: Vec::new(),
+            moved: Vec::new(),
+            touched: Vec::new(),
+            ticks: Vec::new(),
+            rung: Vec::new(),
+            photos: Vec::new(),
+            today: Local::now().date_naive(),
+            questions: Vec::new(),
+            reminders: Vec::new(),
+            elsewhere: None,
+            talk_title: None,
+            proposal: None,
+            changes: Vec::new(),
         }
     }
 
-    /// Keeps a point in a `block` of the page (`b2`, or its title), in
-    /// place of the points it `replaces` (`p3`). A block the page doesn't
-    /// have is started, after the others, when the point gives its `kind`.
-    /// On a timeline it says when it `happened`; in cards, bars and
-    /// questions it has a [`Shape`]. What's wrong with it comes back in
-    /// words, for Claude to fix.
-    pub fn keep_point(&mut self, point: Handed) -> Result<(), String> {
-        let Handed {
-            block,
-            kind,
-            theme,
-            text,
-            happened,
-            facet,
-            look,
-            amount,
-            note,
-            source,
-            url,
-            replaces,
-        } = point;
-        if self.layout.is_some() {
-            return Err(
-                "You laid out the page in this answer: keep new points in the next one, or draw them with lay_out_page's new_points."
-                    .into(),
-            );
-        }
-        let text = cut(&text, 2000);
-        if text.is_empty() {
-            return Err("A point needs a text.".into());
-        }
-        let new = self.points.iter().filter(|p| p.replaces.is_empty()).count();
-        if replaces.is_empty() && new >= MOST_POINTS {
-            return Err(format!(
-                "This answer already keeps {MOST_POINTS} points: keep only the ones worth knowing later."
-            ));
-        }
-        if self.points.len() >= MOST_CHANGED {
-            return Err(format!(
-                "This answer already changes {MOST_CHANGED} points: the rest can wait for the next."
-            ));
-        }
-        let replaces = replaces
-            .iter()
-            .map(|r| {
-                found(r, 'p', self.refs.points.len())
-                    .map(|n| self.refs.points[n])
-                    .ok_or_else(|| format!("The page has no point {r}: name one like p3."))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let (placed, starts) = self.place(&block, &kind, replaces.first().map(|(_, b)| *b))?;
-        let theme = match placed.kind.as_str() {
-            "week" => {
-                return Err(format!(
-                    "{} keeps no points: it shows the days of the reminders, so offer one instead.",
-                    title_of(&placed)
-                ));
-            }
-            "chips" | "list" | "you" => String::new(),
-            _ => {
-                let theme = cut(&theme, 120);
-                if theme.is_empty() {
-                    return Err(format!(
-                        "A point in {} needs a theme: {}.",
-                        title_of(&placed),
-                        match placed.kind.as_str() {
-                            "today" => "what comes round, named as its reminders are",
-                            "shelf" => "the thing's name",
-                            "text" => "the section's heading",
-                            "timeline" => "the section it belongs to, named as the page names it",
-                            "bars" => "the set's caption",
-                            "questions" => "the question, as it would be asked",
-                            "table" => "the thing its row is about",
-                            "trend" => "what's measured (Lisas Gewicht)",
-                            "parts" => "the whole's caption",
-                            _ => "the thing the card is about",
-                        }
-                    ));
-                }
-                theme
-            }
-        };
-        let happened = when(&placed.kind, &happened, title_of(&placed))?;
-        let shape = Shape {
-            facet,
-            look,
-            amount,
-            note,
-        }
-        .fit(&placed.kind, &placed.facets, title_of(&placed), true)?;
-        if self
-            .points
-            .iter()
-            .any(|p| p.block_id == placed.id && p.text == text && p.theme == theme)
-        {
-            return Ok(());
-        }
-        let under = if theme.is_empty() {
-            title_of(&placed).to_string()
-        } else {
-            theme.clone()
-        };
-        let block_id = placed.id;
-        if starts {
-            self.blocks.push(placed);
-        }
-        let url = cut(&url, 2000);
-        self.points.push(KeptPoint {
-            block_id,
-            theme,
-            under,
-            text,
-            happened,
-            shape,
-            source: some(cut(&source, 200)),
-            url: (url.starts_with("https://") || url.starts_with("http://")).then_some(url),
-            replaces: replaces.into_iter().map(|(id, _)| id).collect(),
-        });
-        Ok(())
-    }
-
-    /// The block a point names, and whether the answer starts it. With no
-    /// block named, a point that replaces others stays in their block.
-    fn place(
-        &self,
-        block: &str,
+    /// Starts a block of the set, `after` the one it names ("" for the
+    /// top; the end when left out), with a collection's fields. It answers
+    /// with the block's reference. A block like it the page has already is
+    /// the one it answers with.
+    pub fn add_block(
+        &mut self,
         kind: &str,
-        replacing: Option<Uuid>,
-    ) -> Result<(RefBlock, bool), String> {
-        let named = block.trim();
-        let all = || self.refs.blocks.iter().chain(&self.blocks);
-        if let Some(n) = found(named, 'b', self.refs.blocks.len()) {
-            return Ok((self.refs.blocks[n].clone(), false));
-        }
-        if !named.is_empty()
-            && let Some(b) = all().find(|b| b.title.to_lowercase() == named.to_lowercase())
-        {
-            return Ok((b.clone(), false));
-        }
-        if named.is_empty()
-            && let Some(b) = replacing.and_then(|id| all().find(|b| b.id == id))
-        {
-            return Ok((b.clone(), false));
-        }
-        let kind = kind.trim();
-        if named.is_empty() {
-            return Err("Name the block the point goes in, like b2.".into());
-        }
-        if kind.is_empty() {
+        title: &str,
+        after: Option<&str>,
+        fields: &[FieldArg],
+    ) -> Result<String, String> {
+        let kind = kind.trim().to_lowercase();
+        if !SET_KINDS.contains(&kind.as_str()) {
             return Err(format!(
-                "The page has no block {named}: name one like b2, or give a kind to start it."
+                "There's no kind of block {kind}: it's one of {}.",
+                SET_KINDS.join(", ")
             ));
         }
-        if !BLOCK_KINDS.contains(&kind) {
-            return Err(format!(
-                "There's no kind of block {kind}: it's one of {BLOCK_KINDS:?}."
-            ));
+        let title = cut(title, 60);
+        if kind == "heading" && title.is_empty() {
+            return Err("A heading is its title: give one.".into());
         }
-        if self.blocks.len() >= MOST_BLOCKS {
+        if kind != "collection" && !fields.is_empty() {
+            return Err("Only a collection has fields.".into());
+        }
+        let (fields, _) = fields_of(fields, &[])?;
+        if let Some(n) = (0..self.blocks.len()).find(|&n| {
+            let b = &self.blocks[n];
+            !self.is_gone(b.id) && b.kind == kind && b.title.to_lowercase() == title.to_lowercase()
+        }) {
+            return Ok(format!("b{}", n + 1));
+        }
+        if self.blocks.len() - self.refs.blocks.len() >= MOST_BLOCKS {
             return Err(format!(
                 "An answer starts at most {MOST_BLOCKS} blocks: keep the rest in the page's own."
             ));
         }
-        let title = cut(named, 60);
-        Ok((
-            RefBlock {
-                id: Uuid::now_v7(),
-                kind: kind.into(),
-                title,
-                facets: Vec::new(),
-            },
-            true,
-        ))
+        let at = self.block_at_place(after)?;
+        self.blocks.push(RefBlock {
+            id: Uuid::now_v7(),
+            kind,
+            title,
+            facets: Json(Vec::new()),
+            fields: Json(fields),
+            width: String::new(),
+            view: String::new(),
+            position: 0,
+        });
+        let n = self.blocks.len() - 1;
+        self.put_block(n, at);
+        Ok(format!("b{}", n + 1))
     }
 
-    /// Ticks the page's `points` (`p3`) done, or not: a list's items, a
-    /// question they answered well.
-    pub fn tick_points(&mut self, points: &[String], done: bool) -> Result<(), String> {
-        if points.is_empty() {
-            return Err("Name the points to tick, like p3.".into());
+    /// Renames a block, gives a collection its fields as they are from now
+    /// on (one renamed says the name it `was`; one left out goes, with its
+    /// cells), or picks another of the pictures its fields can draw.
+    pub fn change_block(
+        &mut self,
+        block: &str,
+        title: Option<&str>,
+        fields: Option<&[FieldArg]>,
+        view: Option<&str>,
+    ) -> Result<(), String> {
+        let n = self.block_at(block)?;
+        let kind = self.blocks[n].kind.clone();
+        if title.is_none() && fields.is_none() && view.is_none() {
+            return Err("Say what changes: its title, its fields or its picture.".into());
         }
-        for reference in points {
-            let (id, block) = found(reference, 'p', self.refs.points.len())
-                .map(|n| self.refs.points[n])
-                .ok_or_else(|| format!("The page has no point {reference}: name one like p3."))?;
-            let kind = self
-                .refs
-                .blocks
-                .iter()
-                .find(|b| b.id == block)
-                .map_or("", |b| b.kind.as_str());
-            if kind != "list" && kind != "questions" {
+        self.touch(self.blocks[n].id)?;
+        if let Some(title) = title {
+            let title = cut(title, 60);
+            if kind == "week" {
+                return Err("The week has no title.".into());
+            }
+            if kind == "heading" && title.is_empty() {
+                return Err("A heading is its title: give one.".into());
+            }
+            self.blocks[n].title = title;
+        }
+        if let Some(given) = fields {
+            if kind != "collection" {
                 return Err(format!(
-                    "{} is in a {kind} block: only a list's items and questions are ticked.",
-                    reference.trim()
+                    "{} isn't a collection: only those have fields.",
+                    self.title(n)
                 ));
             }
-            self.ticks.retain(|(t, _)| *t != id);
-            if self.ticks.len() >= MOST_TICKS {
-                return Err(format!("An answer ticks at most {MOST_TICKS} points."));
+            let (fields, renamed) = fields_of(given, &self.blocks[n].fields)?;
+            let id = self.blocks[n].id;
+            for point in self.points.iter_mut().filter(|p| p.block_id == id) {
+                let mut cells = BTreeMap::new();
+                for (name, cell) in std::mem::take(&mut point.cells.0) {
+                    let name = renamed
+                        .iter()
+                        .find(|(was, _)| *was == name)
+                        .map_or(name, |(_, now)| now.clone());
+                    if fields.iter().any(|f| f.name == name) {
+                        cells.insert(name, cell);
+                    }
+                }
+                point.cells = Json(cells);
             }
+            self.blocks[n].fields = Json(fields);
+        }
+        if let Some(view) = view {
+            let view = view.trim().to_lowercase();
+            if kind != "collection" {
+                return Err(format!(
+                    "{} is drawn as its kind says: only a collection has pictures to pick from.",
+                    self.title(n)
+                ));
+            }
+            let id = self.blocks[n].id;
+            let rows: Vec<&PagePoint> = self.points_of(id).map(|i| &self.points[i]).collect();
+            let fits = pictures(&self.blocks[n].fields, &rows, self.today);
+            if !view.is_empty() && !fits.contains(&view.as_str()) {
+                return Err(match fits.as_slice() {
+                    [] => format!("{} has no rows yet to draw.", self.title(n)),
+                    fits => format!(
+                        "{} can be drawn as {}: its fields allow no other.",
+                        self.title(n),
+                        fits.join(", ")
+                    ),
+                });
+            }
+            self.blocks[n].view = view;
+        }
+        Ok(())
+    }
+
+    /// Adds items to a block: lines to bullets or a checklist, paragraphs,
+    /// a toggle's points under their line, a callout. It answers with their
+    /// references. One the block has already is the one it answers with.
+    pub fn add_items(&mut self, block: &str, items: &[ItemArg]) -> Result<Vec<String>, String> {
+        let n = self.block_at(block)?;
+        let (kind, title) = (self.blocks[n].kind.clone(), self.title(n).to_string());
+        let themed = takes_items(&kind, &title)?;
+        if items.is_empty() {
+            return Err("Give the items to add.".into());
+        }
+        let mut refs = Vec::new();
+        for item in items {
+            let text = cut(&item.text, 2000);
+            if text.is_empty() {
+                return Err("An item needs its words.".into());
+            }
+            let theme = match themed {
+                Some(says) => {
+                    let theme = cut(&item.theme, 120);
+                    if theme.is_empty() {
+                        return Err(format!("An item in {title} needs a theme: {says}."));
+                    }
+                    theme
+                }
+                None => String::new(),
+            };
+            let look = self.look(&kind, &title, &item.look)?;
+            refs.push(self.add_point(
+                n,
+                theme,
+                text,
+                look,
+                BTreeMap::new(),
+                &item.source,
+                &item.url,
+            )?);
+        }
+        Ok(refs)
+    }
+
+    /// Adds rows to a collection, each its name and its cells by field. It
+    /// answers with their references.
+    pub fn add_rows(&mut self, block: &str, rows: &[RowArg]) -> Result<Vec<String>, String> {
+        let n = self.block_at(block)?;
+        let title = self.title(n).to_string();
+        if self.blocks[n].kind != "collection" {
+            return Err(format!("{title} isn't a collection: add items to it."));
+        }
+        if rows.is_empty() {
+            return Err("Give the rows to add.".into());
+        }
+        let mut refs = Vec::new();
+        for row in rows {
+            let name = cut(&row.name, 200);
+            if name.is_empty() {
+                return Err("A row needs its name: the thing, event or measurement it is.".into());
+            }
+            let mut cells = BTreeMap::new();
+            fill(
+                &mut cells,
+                &title,
+                &self.blocks[n].fields,
+                &row.cells,
+                &self.photos,
+            )?;
+            refs.push(self.add_point(
+                n,
+                String::new(),
+                name,
+                String::new(),
+                cells,
+                &row.source,
+                &row.url,
+            )?);
+        }
+        Ok(refs)
+    }
+
+    /// Changes points the page has: their words, theme, look or cells.
+    pub fn change_points(&mut self, changes: &[PointChange]) -> Result<(), String> {
+        if changes.is_empty() {
+            return Err("Give the points to change.".into());
+        }
+        for change in changes {
+            let i = self.point_at(&change.point)?;
+            let b = self.block_of(i);
+            let (kind, title) = (self.blocks[b].kind.clone(), self.title(b).to_string());
+            self.touch(self.points[i].id)?;
+            if let Some(text) = &change.text {
+                let text = cut(text, 2000);
+                if text.is_empty() {
+                    return Err(format!(
+                        "{} needs its words: remove it instead.",
+                        change.point.trim()
+                    ));
+                }
+                self.points[i].text = text;
+            }
+            if let Some(theme) = &change.theme {
+                if !has_themes(&kind) {
+                    return Err(format!("{title} has no themes."));
+                }
+                let theme = cut(theme, 120);
+                if theme.is_empty() {
+                    return Err(format!("A point in {title} needs a theme."));
+                }
+                self.points[i].theme = theme;
+            }
+            if let Some(look) = &change.look {
+                self.points[i].look = self.look(&kind, &title, look)?;
+            }
+            if let Some(given) = &change.cells {
+                if kind != "collection" {
+                    return Err(format!(
+                        "{title} isn't a collection: its points have no cells."
+                    ));
+                }
+                let mut cells = self.points[i].cells.0.clone();
+                fill(
+                    &mut cells,
+                    &title,
+                    &self.blocks[b].fields,
+                    given,
+                    &self.photos,
+                )?;
+                self.points[i].cells = Json(cells);
+            }
+        }
+        Ok(())
+    }
+
+    /// Ticks items done, or not: a checklist's, and a list's or questions'
+    /// from before the set. An item a reminder rings for ticks the
+    /// reminder: done for now, it's due again on its next day.
+    pub fn tick(&mut self, items: &[String], done: bool) -> Result<(), String> {
+        if items.is_empty() {
+            return Err("Name the items to tick, like p3.".into());
+        }
+        for reference in items {
+            let i = self.point_at(reference)?;
+            let b = self.block_of(i);
+            let kind = self.blocks[b].kind.as_str();
+            if !matches!(kind, "checklist" | "list" | "questions") {
+                return Err(format!(
+                    "{} is in {}, a {kind}: only a checklist's items are ticked.",
+                    reference.trim(),
+                    self.title(b)
+                ));
+            }
+            let id = self.points[i].id;
+            self.touch(id)?;
+            let rings = self
+                .refs
+                .reminders
+                .iter()
+                .find(|r| r.point_id == Some(id) && r.status == "on");
+            match rings {
+                Some(reminder) => {
+                    self.rung.retain(|(r, _)| *r != reminder.id);
+                    if reminder.ticked() != done {
+                        let data = if done {
+                            done_for(reminder.due_on, reminder.every_days, self.today)
+                        } else {
+                            fields([
+                                ("status", json!("on")),
+                                ("due_on", json!(reminder.last_done_on)),
+                            ])
+                        };
+                        self.rung.push((reminder.id, data));
+                    }
+                }
+                None => self.points[i].done = done,
+            }
+            self.ticks.retain(|(t, _)| *t != id);
             self.ticks.push((id, done));
         }
         Ok(())
+    }
+
+    /// Moves a block `after` another ("" for the top).
+    pub fn move_block(&mut self, block: &str, after: &str) -> Result<(), String> {
+        let n = self.block_at(block)?;
+        let at = self.block_at_place(Some(after))?;
+        if matches!(at, At::After(a) if a == n) {
+            return Err("A block can't go after itself.".into());
+        }
+        let id = self.blocks[n].id;
+        self.touch(id)?;
+        self.moved.push(id);
+        self.put_block(n, at);
+        Ok(())
+    }
+
+    /// Moves points `to` a block, `after` one of its points ("" for the
+    /// top; the end when left out), in the order given. A point keeps its
+    /// theme where the block has themes.
+    pub fn move_points(
+        &mut self,
+        points: &[String],
+        to: &str,
+        after: Option<&str>,
+    ) -> Result<(), String> {
+        if points.is_empty() {
+            return Err("Name the points to move, like p3.".into());
+        }
+        let b = self.block_at(to)?;
+        let (kind, title) = (self.blocks[b].kind.clone(), self.title(b).to_string());
+        let themed = match kind.as_str() {
+            "collection" => None,
+            _ => takes_items(&kind, &title)?,
+        };
+        let mut at = match after.map(str::trim) {
+            None => At::End,
+            Some("") => At::Top,
+            Some(reference) => {
+                let p = self.point_at(reference)?;
+                if self.points[p].block_id != self.blocks[b].id {
+                    return Err(format!("{} isn't in {title}.", reference.trim()));
+                }
+                At::After(p)
+            }
+        };
+        for reference in points {
+            let i = self.point_at(reference)?;
+            if matches!(at, At::After(a) if a == i) {
+                return Err("A point can't go after itself.".into());
+            }
+            if themed.is_some() && self.points[i].theme.is_empty() {
+                return Err(format!(
+                    "{} needs a theme in {title}: give it one with change_points first.",
+                    reference.trim()
+                ));
+            }
+            if themed.is_none() {
+                self.points[i].theme = String::new();
+            }
+            let id = self.points[i].id;
+            self.touch(id)?;
+            self.moved.push(id);
+            self.points[i].block_id = self.blocks[b].id;
+            self.put_point(i, at);
+            at = At::After(i);
+        }
+        Ok(())
+    }
+
+    /// Removes blocks (`b2`), with their points, and points (`p3`).
+    pub fn remove(&mut self, references: &[String]) -> Result<(), String> {
+        if references.is_empty() {
+            return Err("Name what to remove, like b2 or p3.".into());
+        }
+        for reference in references {
+            let named = reference.trim().trim_matches(['[', ']']);
+            let id = if named.starts_with('b') {
+                let n = self.block_at(named)?;
+                if self.blocks[n].kind == "you" {
+                    return Err(
+                        "You stays: it keeps what they told you. Remove its points instead.".into(),
+                    );
+                }
+                self.blocks[n].id
+            } else {
+                self.points[self.point_at(named)?].id
+            };
+            self.touch(id)?;
+            self.gone.push(id);
+        }
+        Ok(())
+    }
+
+    /// The words of the checklist item (`p3`) a reminder rings for, for the
+    /// title it has when Claude gives none.
+    pub fn item_words(&self, reference: &str) -> Option<String> {
+        self.point_at(reference)
+            .ok()
+            .map(|i| self.points[i].text.clone())
+    }
+
+    /// The pages the points this answer adds come from.
+    pub fn urls(&self) -> impl Iterator<Item = &str> {
+        self.points[self.refs.points.len()..]
+            .iter()
+            .filter(|p| !self.is_gone(p.id))
+            .filter_map(|p| p.source_url.as_deref())
     }
 
     /// A question to check a guess the answer rested on, with the point to
@@ -500,11 +625,13 @@ impl Kept {
         Ok(())
     }
 
-    /// Offers a reminder, in place of the reminders it `replaces` (`r2`).
+    /// Offers a reminder, in place of the reminders it `replaces` (`r2`),
+    /// ringing for a checklist `item` (`p3`) when it names one.
     pub fn offer_reminder(
         &mut self,
         reminder: ProposedReminder,
         replaces: &[String],
+        item: Option<&str>,
     ) -> Result<(), String> {
         if self.reminders.len() >= MOST_REMINDERS {
             return Err(format!(
@@ -515,11 +642,29 @@ impl Kept {
             .iter()
             .map(|r| {
                 found(r, 'r', self.refs.reminders.len())
-                    .map(|n| self.refs.reminders[n].0)
+                    .map(|n| self.refs.reminders[n].id)
                     .ok_or_else(|| format!("The calendar has no reminder {r}: name one like r2."))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        self.reminders.push(KeptReminder { reminder, replaces });
+        let point_id = match item.map(str::trim).filter(|i| !i.is_empty()) {
+            None => None,
+            Some(item) => {
+                let i = self.point_at(item)?;
+                let b = self.block_of(i);
+                if self.blocks[b].kind != "checklist" {
+                    return Err(format!(
+                        "{item} is in {}: a reminder rings for a checklist's item.",
+                        self.title(b)
+                    ));
+                }
+                Some(self.points[i].id)
+            }
+        };
+        self.reminders.push(KeptReminder {
+            reminder,
+            replaces,
+            point_id,
+        });
         Ok(())
     }
 
@@ -586,102 +731,180 @@ impl Kept {
     /// `changes`), and the writes that come after it.
     pub fn writes(&self, at: &Answering) -> (Map<String, Value>, Vec<Operation>) {
         let mut operations = Vec::new();
-        // The layout first: it moves what the page has, and its new points
-        // come from this talk.
-        if let Some(laid) = &self.layout {
-            for operation in &laid.operations {
-                let mut operation = operation.clone();
-                if let Operation::Create {
-                    model: ModelKind::Point,
-                    data,
-                    ..
-                } = &mut operation
-                {
-                    data.insert("talk_id".into(), json!(at.talk_id));
-                }
-                operations.push(operation);
-            }
-        }
-        for block in &self.blocks {
-            operations.push(Operation::Create {
-                model: ModelKind::Block,
-                id: block.id,
-                data: fields([
-                    ("topic_id", json!(at.topic_id)),
-                    ("kind", json!(block.kind)),
-                    ("title", json!(block.title)),
-                    ("facets", json!(block.facets)),
-                ]),
-            });
-        }
-        let mut themes: Vec<String> = Vec::new();
-        let mut replaced: Vec<Uuid> = Vec::new();
-        let mut updated = 0;
-        for point in &self.points {
-            if !themes.contains(&point.under) {
-                themes.push(point.under.clone());
-            }
-            let data = fields([
-                ("block_id", json!(point.block_id)),
-                ("theme", json!(point.theme)),
-                ("text", json!(point.text)),
-                ("happened", json!(point.happened)),
-                ("facet", json!(point.shape.facet)),
-                ("look", json!(point.shape.look)),
-                ("amount", json!(point.shape.amount)),
-                ("note", json!(point.shape.note)),
-                ("source", json!(point.source)),
-                ("source_url", json!(point.url)),
-                ("talk_id", json!(at.talk_id)),
-            ]);
-            // A point that replaces others takes the first one's place,
-            // with the unread dot, and the rest go.
-            let replaces: Vec<Uuid> = point
-                .replaces
-                .iter()
-                .filter(|id| !replaced.contains(id))
-                .copied()
-                .collect();
-            match replaces.first() {
-                Some(&id) => {
-                    let mut data = data;
-                    data.insert("seen".into(), json!(false));
-                    operations.push(Operation::Update {
-                        model: ModelKind::Point,
-                        id,
-                        data,
+        let mut layout = PageLayout {
+            moves: Vec::new(),
+            blocks: Vec::new(),
+            points: Vec::new(),
+            made_blocks: Vec::new(),
+            made_points: Vec::new(),
+        };
+        let (mut changed_blocks, mut moved_blocks, mut removed_blocks) = (0, 0, Vec::new());
+        for (n, block) in self.blocks.iter().enumerate() {
+            let Some(was) = self.refs.blocks.get(n) else {
+                if !self.is_gone(block.id) {
+                    operations.push(Operation::Create {
+                        model: ModelKind::Block,
+                        id: block.id,
+                        data: fields([
+                            ("topic_id", json!(at.topic_id)),
+                            ("kind", json!(block.kind)),
+                            ("title", json!(block.title)),
+                            ("fields", json!(block.fields.0)),
+                            ("view", json!(block.view)),
+                            ("position", json!(block.position)),
+                        ]),
                     });
-                    updated += 1;
-                    replaced.push(id);
+                    layout.made_blocks.push(block.id);
                 }
-                None => {
-                    let mut data = data;
-                    data.insert("topic_id".into(), json!(at.topic_id));
+                continue;
+            };
+            if self.is_gone(block.id) {
+                continue;
+            }
+            let mut data = Map::new();
+            if block.title != was.title {
+                data.insert("title".into(), json!(block.title));
+            }
+            if block.fields != was.fields {
+                data.insert("fields".into(), json!(block.fields.0));
+            }
+            if block.view != was.view {
+                data.insert("view".into(), json!(block.view));
+            }
+            if !data.is_empty() {
+                changed_blocks += 1;
+            }
+            if block.position != was.position {
+                data.insert("position".into(), json!(block.position));
+                if self.moved.contains(&block.id) {
+                    moved_blocks += 1;
+                }
+            }
+            if !data.is_empty() {
+                operations.push(Operation::Update {
+                    model: ModelKind::Block,
+                    id: block.id,
+                    data,
+                });
+                layout.blocks.push(block_was(was, false));
+            }
+        }
+        let mut deletes = Vec::new();
+        let (mut changed_points, mut moved_points, mut removed_points) = (0, 0, 0);
+        let mut added = 0;
+        let mut unders: Vec<String> = Vec::new();
+        for (i, point) in self.points.iter().enumerate() {
+            let in_gone = self.is_gone(point.block_id);
+            let gone = in_gone || self.is_gone(point.id);
+            let Some(was) = self.refs.points.get(i) else {
+                if !gone {
                     operations.push(Operation::Create {
                         model: ModelKind::Point,
-                        id: Uuid::now_v7(),
-                        data,
+                        id: point.id,
+                        data: fields([
+                            ("topic_id", json!(at.topic_id)),
+                            ("block_id", json!(point.block_id)),
+                            ("theme", json!(point.theme)),
+                            ("text", json!(point.text)),
+                            ("look", json!(point.look)),
+                            ("cells", json!(point.cells.0)),
+                            ("done", json!(point.done)),
+                            ("position", json!(point.position)),
+                            ("source", json!(point.source)),
+                            ("source_url", json!(point.source_url)),
+                            ("talk_id", json!(at.talk_id)),
+                        ]),
                     });
+                    layout.made_points.push(point.id);
+                    added += 1;
+                    let under = match point.theme.as_str() {
+                        "" => self.title_of(point.block_id).to_string(),
+                        theme => theme.to_string(),
+                    };
+                    if !unders.contains(&under) {
+                        unders.push(under);
+                    }
                 }
-            }
-            for &id in replaces.iter().skip(1) {
-                operations.push(Operation::Delete {
+                continue;
+            };
+            if gone {
+                // Deleted one by one: a block's cascade wouldn't sync.
+                deletes.push(Operation::Delete {
                     model: ModelKind::Point,
-                    id,
+                    id: point.id,
                 });
-                replaced.push(id);
+                layout.points.push(point_was(was, true));
+                if !in_gone {
+                    removed_points += 1;
+                }
+                continue;
             }
-        }
-        for &(id, done) in &self.ticks {
-            if !replaced.contains(&id) {
+            let mut data = Map::new();
+            if point.text != was.text {
+                data.insert("text".into(), json!(point.text));
+            }
+            if point.theme != was.theme {
+                data.insert("theme".into(), json!(point.theme));
+            }
+            if point.look != was.look {
+                data.insert("look".into(), json!(point.look));
+            }
+            if point.cells != was.cells {
+                data.insert("cells".into(), json!(point.cells.0));
+            }
+            let reworded = !data.is_empty();
+            if reworded {
+                data.insert("seen".into(), json!(false));
+                changed_points += 1;
+            }
+            if point.block_id != was.block_id {
+                data.insert("block_id".into(), json!(point.block_id));
+            }
+            if point.position != was.position {
+                data.insert("position".into(), json!(point.position));
+            }
+            if self.moved.contains(&point.id) && data.contains_key("block_id")
+                || self.moved.contains(&point.id) && data.contains_key("position")
+            {
+                moved_points += 1;
+            }
+            // A tick isn't a change to undo: it shows with what's kept.
+            if !data.is_empty() {
+                layout.points.push(point_was(was, false));
+            }
+            if point.done != was.done {
+                data.insert("done".into(), json!(point.done));
+            }
+            if !data.is_empty() {
                 operations.push(Operation::Update {
                     model: ModelKind::Point,
-                    id,
-                    data: fields([("done", json!(done))]),
+                    id: point.id,
+                    data,
                 });
             }
         }
-        for question in self.questions.iter().take(2) {
+        operations.extend(deletes);
+        for (block, was) in self.blocks.iter().zip(&self.refs.blocks) {
+            if self.is_gone(block.id) {
+                operations.push(Operation::Delete {
+                    model: ModelKind::Block,
+                    id: block.id,
+                });
+                layout.blocks.push(block_was(was, true));
+                removed_blocks.push(match was.title.as_str() {
+                    "" => format!("the {}", was.kind),
+                    title => title.to_string(),
+                });
+            }
+        }
+        for (id, data) in &self.rung {
+            operations.push(Operation::Update {
+                model: ModelKind::Reminder,
+                id: *id,
+                data: data.clone(),
+            });
+        }
+        for question in &self.questions {
             operations.push(Operation::Create {
                 model: ModelKind::Question,
                 id: Uuid::now_v7(),
@@ -701,7 +924,7 @@ impl Kept {
                 self.refs
                     .reminders
                     .iter()
-                    .any(|(r, offered)| r == *id && *offered)
+                    .any(|r| r.id == **id && r.status == "offered")
             });
             for id in offered {
                 operations.push(Operation::Delete {
@@ -709,21 +932,13 @@ impl Kept {
                     id,
                 });
             }
-            operations.push(offer(at.topic_id, at.answer_id, &kept.reminder, &on));
-        }
-        // The week shows the days of what the topic offers to remind.
-        let has_week = self
-            .refs
-            .blocks
-            .iter()
-            .chain(&self.blocks)
-            .any(|b| b.kind == "week");
-        if !self.reminders.is_empty() && !has_week {
-            operations.push(Operation::Create {
-                model: ModelKind::Block,
-                id: Uuid::now_v7(),
-                data: fields([("topic_id", json!(at.topic_id)), ("kind", json!("week"))]),
-            });
+            operations.push(offer(
+                at.topic_id,
+                at.answer_id,
+                &kept.reminder,
+                &on,
+                kept.point_id,
+            ));
         }
         for change in &self.changes {
             let Value::Object(data) = patch_fields(&change.after) else {
@@ -748,7 +963,7 @@ impl Kept {
 
         let mut message = Map::new();
         let kept: Vec<String> = [
-            (!self.points.is_empty()).then(|| kept_words(self.points.len(), updated, &themes)),
+            (added > 0).then(|| kept_words(added, &unders)),
             ticked_words(&self.ticks),
         ]
         .into_iter()
@@ -766,15 +981,616 @@ impl Kept {
         if let Some(proposal) = &self.proposal {
             message.insert("proposal".into(), json!(proposal));
         }
-        let changes: Vec<&TopicChange> = self
-            .changes
-            .iter()
-            .chain(self.layout.as_ref().map(|laid| &laid.change))
-            .collect();
+        let mut changes = self.changes.clone();
+        let said = change_words(
+            (changed_blocks, changed_points),
+            (moved_blocks, moved_points),
+            &removed_blocks,
+            removed_points,
+        );
+        if let Some(said) = said {
+            changes.push(TopicChange {
+                topic_id: at.topic_id,
+                name: at.topic_name.clone(),
+                said,
+                before: TopicPatch::default(),
+                after: TopicPatch::default(),
+                layout: Some(layout),
+                undone: false,
+            });
+        }
         if !changes.is_empty() {
             message.insert("changes".into(), json!(changes));
         }
         (message, operations)
+    }
+
+    // The copy of the page.
+
+    fn is_gone(&self, id: Uuid) -> bool {
+        self.gone.contains(&id)
+    }
+
+    /// Counts a block or point of the page's towards what one answer may
+    /// change.
+    fn touch(&mut self, id: Uuid) -> Result<(), String> {
+        let had = self.refs.blocks.iter().any(|b| b.id == id)
+            || self.refs.points.iter().any(|p| p.id == id);
+        if had && !self.touched.contains(&id) {
+            if self.touched.len() >= MOST_CHANGED {
+                return Err(format!(
+                    "This answer already changes {MOST_CHANGED} things: the rest can wait for the next."
+                ));
+            }
+            self.touched.push(id);
+        }
+        Ok(())
+    }
+
+    /// The block a reference (`b2`) or a title names.
+    fn block_at(&self, reference: &str) -> Result<usize, String> {
+        let named = reference.trim();
+        let n = found(named, 'b', self.blocks.len()).or_else(|| {
+            (!named.is_empty())
+                .then(|| {
+                    self.blocks.iter().position(|b| {
+                        !self.is_gone(b.id) && b.title.to_lowercase() == named.to_lowercase()
+                    })
+                })
+                .flatten()
+        });
+        match n {
+            Some(n) if !self.is_gone(self.blocks[n].id) => Ok(n),
+            Some(_) => Err(format!("{named} was removed in this answer.")),
+            None if named.is_empty() => Err("Name the block, like b2.".into()),
+            None => Err(format!("The page has no block {named}: name one like b2.")),
+        }
+    }
+
+    /// Where `after` puts a block: after the one it names, at the top for
+    /// "", at the end when left out.
+    fn block_at_place(&self, after: Option<&str>) -> Result<At, String> {
+        Ok(match after.map(str::trim) {
+            None => At::End,
+            Some("") => At::Top,
+            Some(after) => At::After(self.block_at(after)?),
+        })
+    }
+
+    fn point_at(&self, reference: &str) -> Result<usize, String> {
+        let named = reference.trim();
+        match found(named, 'p', self.points.len()) {
+            Some(i) if self.is_gone(self.points[i].id) || self.is_gone(self.points[i].block_id) => {
+                Err(format!("{named} was removed in this answer."))
+            }
+            Some(i) => Ok(i),
+            None => Err(format!("The page has no point {named}: name one like p3.")),
+        }
+    }
+
+    fn block_of(&self, point: usize) -> usize {
+        let id = self.points[point].block_id;
+        self.blocks.iter().position(|b| b.id == id).unwrap_or(0)
+    }
+
+    /// A block as a sentence names it.
+    fn title(&self, n: usize) -> &str {
+        match (self.blocks[n].title.as_str(), self.blocks[n].kind.as_str()) {
+            ("", "week") => "The week",
+            ("", _) => "the untitled block",
+            (title, _) => title,
+        }
+    }
+
+    fn title_of(&self, block: Uuid) -> &str {
+        match self.blocks.iter().position(|b| b.id == block) {
+            Some(n) => self.title(n),
+            None => "",
+        }
+    }
+
+    /// A block's points, in order.
+    fn points_of(&self, block: Uuid) -> impl Iterator<Item = usize> + '_ {
+        let mut order: Vec<usize> = (0..self.points.len())
+            .filter(|&i| {
+                let p = &self.points[i];
+                p.block_id == block && !self.is_gone(p.id)
+            })
+            .collect();
+        order.sort_by_key(|&i| (self.points[i].position, i));
+        order.into_iter()
+    }
+
+    /// A point's look, as a block of `kind` takes it.
+    fn look(&self, kind: &str, title: &str, look: &str) -> Result<String, String> {
+        let look = look.trim().to_lowercase();
+        if look.is_empty() {
+            return Ok(look);
+        }
+        if !matches!(kind, "callout" | "cards" | "table" | "bars" | "questions") {
+            return Err(format!(
+                "{title} has no looks: a callout does, warn for what needs a look, info for what's ready."
+            ));
+        }
+        if !LOOKS.contains(&look.as_str()) {
+            return Err(format!(
+                "A look is warn (it needs a look), info (it's ready) or none, not {look}."
+            ));
+        }
+        Ok(look)
+    }
+
+    /// Adds a point to the block `n` of the copy, after the last with its
+    /// theme, or at the end, and answers with its reference.
+    #[allow(clippy::too_many_arguments)]
+    fn add_point(
+        &mut self,
+        n: usize,
+        theme: String,
+        text: String,
+        look: String,
+        cells: BTreeMap<String, Cell>,
+        source: &str,
+        url: &str,
+    ) -> Result<String, String> {
+        let block_id = self.blocks[n].id;
+        if let Some(i) = self.points_of(block_id).find(|&i| {
+            let p = &self.points[i];
+            p.text == text && p.theme == theme && p.cells.0 == cells
+        }) {
+            return Ok(format!("p{}", i + 1));
+        }
+        let new = (self.refs.points.len()..self.points.len())
+            .filter(|&i| !self.is_gone(self.points[i].id))
+            .count();
+        if new >= MOST_NEW {
+            return Err(format!(
+                "This answer already adds {MOST_NEW} points: keep only what's worth knowing later."
+            ));
+        }
+        let at = match theme.as_str() {
+            "" => At::End,
+            theme => self
+                .points_of(block_id)
+                .filter(|&i| self.points[i].theme == theme)
+                .last()
+                .map_or(At::End, At::After),
+        };
+        let url = cut(url, 2000);
+        self.points.push(PagePoint {
+            id: Uuid::now_v7(),
+            block_id,
+            theme,
+            text,
+            happened: String::new(),
+            facet: String::new(),
+            look,
+            amount: None,
+            note: String::new(),
+            cells: Json(cells),
+            done: false,
+            position: 0,
+            source: some(cut(source, 200)),
+            source_url: (url.starts_with("https://") || url.starts_with("http://")).then_some(url),
+        });
+        let i = self.points.len() - 1;
+        self.put_point(i, at);
+        Ok(format!("p{}", i + 1))
+    }
+
+    /// Puts block `n` where `at` says: at the end past the others, or
+    /// between them, which numbers them all anew.
+    fn put_block(&mut self, n: usize, at: At) {
+        let mut order: Vec<usize> = (0..self.blocks.len())
+            .filter(|&b| b != n && !self.is_gone(self.blocks[b].id))
+            .collect();
+        order.sort_by_key(|&b| (self.blocks[b].position, b));
+        match at {
+            At::End => {
+                self.blocks[n].position = order
+                    .iter()
+                    .map(|&b| self.blocks[b].position + 1)
+                    .max()
+                    .unwrap_or(0);
+                return;
+            }
+            At::Top => order.insert(0, n),
+            At::After(after) => {
+                let k = order
+                    .iter()
+                    .position(|&b| b == after)
+                    .map_or(order.len(), |k| k + 1);
+                order.insert(k, n);
+            }
+        }
+        for (position, b) in order.into_iter().enumerate() {
+            self.blocks[b].position = position as i32;
+        }
+    }
+
+    /// Puts point `i` where `at` says in its block, as [`Kept::put_block`].
+    fn put_point(&mut self, i: usize, at: At) {
+        let block = self.points[i].block_id;
+        let mut order: Vec<usize> = self.points_of(block).filter(|&p| p != i).collect();
+        match at {
+            At::End => {
+                self.points[i].position = order
+                    .iter()
+                    .map(|&p| self.points[p].position + 1)
+                    .max()
+                    .unwrap_or(0);
+                return;
+            }
+            At::Top => order.insert(0, i),
+            At::After(after) => {
+                let k = order
+                    .iter()
+                    .position(|&p| p == after)
+                    .map_or(order.len(), |k| k + 1);
+                order.insert(k, i);
+            }
+        }
+        for (position, p) in order.into_iter().enumerate() {
+            self.points[p].position = position as i32;
+        }
+    }
+}
+
+/// Whether a block of `kind`, called `title`, takes items, and what its
+/// theme says when its items have one.
+fn takes_items(kind: &str, title: &str) -> Result<Option<&'static str>, String> {
+    match kind {
+        "bullets" | "checklist" | "paragraph" | "callout" | "you" | "list" | "chips" => Ok(None),
+        "toggle" => Ok(Some("the line it opens from")),
+        "text" => Ok(Some("the section's heading")),
+        "today" => Ok(Some("what comes round, named as its reminders are")),
+        "shelf" | "cards" => Ok(Some("the thing it's about")),
+        "heading" => Err(format!("{title} is a heading: it has no points.")),
+        "collection" => Err(format!("{title} is a collection: add rows to it.")),
+        "week" => Err(format!(
+            "{title} shows the days of the reminders: offer one instead."
+        )),
+        _ => Err(format!(
+            "{title} is from before the set: put what's new in a block of the set."
+        )),
+    }
+}
+
+/// Whether the points of a block of `kind` go under themes.
+fn has_themes(kind: &str) -> bool {
+    !matches!(
+        kind,
+        "bullets" | "checklist" | "paragraph" | "callout" | "you" | "list" | "chips" | "collection"
+    )
+}
+
+/// Fields renamed, each (was, now).
+pub type Renamed = Vec<(String, String)>;
+
+/// A collection's fields as Claude gives them, tidied, and the ones renamed
+/// from what they `was`.
+pub fn fields_of(given: &[FieldArg], had: &[Field]) -> Result<(Vec<Field>, Renamed), String> {
+    if given.len() > MOST_FIELDS {
+        return Err(format!(
+            "A collection has at most {MOST_FIELDS} fields besides each row's name."
+        ));
+    }
+    let mut fields: Vec<Field> = Vec::new();
+    let mut renamed = Vec::new();
+    for field in given {
+        let name = cut(&field.name, 40);
+        if name.is_empty() {
+            return Err("A field needs a name: a word or two (Gewicht, Status).".into());
+        }
+        if fields
+            .iter()
+            .any(|f| f.name.to_lowercase() == name.to_lowercase())
+        {
+            return Err(format!("{name} is in the fields twice."));
+        }
+        let was = field.was.trim();
+        let before = had.iter().find(|f| {
+            let named = if was.is_empty() { &name } else { was };
+            f.name.to_lowercase() == named.to_lowercase()
+        });
+        if !was.is_empty() && before.is_none() {
+            return Err(format!("There's no field {was} to rename."));
+        }
+        let kind = match field.kind.trim().to_lowercase() {
+            kind if kind.is_empty() => before.map_or("text".into(), |f| f.kind.clone()),
+            kind => kind,
+        };
+        if !FIELD_KINDS.contains(&kind.as_str()) {
+            return Err(format!(
+                "There's no kind of field {kind}: it's one of {}.",
+                FIELD_KINDS.join(", ")
+            ));
+        }
+        if field.goal.is_some_and(|g| !g.is_finite()) {
+            return Err(format!("{name}'s goal is a number."));
+        }
+        let options = match kind.as_str() {
+            "choice" | "status" => {
+                let mut options: Vec<String> = Vec::new();
+                for option in &field.options {
+                    let option = cut(option, 40);
+                    if !option.is_empty() && !options.contains(&option) {
+                        options.push(option);
+                    }
+                }
+                if options.len() > 12 {
+                    return Err(format!("{name} has at most 12 words to choose from."));
+                }
+                options
+            }
+            _ => Vec::new(),
+        };
+        if let Some(before) = before
+            && before.name != name
+        {
+            renamed.push((before.name.clone(), name.clone()));
+        }
+        fields.push(Field {
+            unit: if kind == "number" {
+                cut(&field.unit, 12)
+            } else {
+                String::new()
+            },
+            goal: if kind == "number" { field.goal } else { None },
+            name,
+            kind,
+            options,
+        });
+    }
+    Ok((fields, renamed))
+}
+
+/// Fills a row's `cells` from what Claude gave, by the collection's
+/// `fields`: an empty or `null` one goes.
+fn fill(
+    cells: &mut BTreeMap<String, Cell>,
+    title: &str,
+    fields: &[Field],
+    given: &Map<String, Value>,
+    photos: &[Uuid],
+) -> Result<(), String> {
+    for (name, value) in given {
+        let Some(field) = fields
+            .iter()
+            .find(|f| f.name.to_lowercase() == name.trim().to_lowercase())
+        else {
+            let names: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
+            return Err(match names.as_slice() {
+                [] => format!("{title} has no fields yet: give it some with change_block."),
+                names => format!(
+                    "{title} has no field {name}: it has {}. Add one with change_block.",
+                    names.join(", ")
+                ),
+            });
+        };
+        match cell(field, value, photos)? {
+            Some(cell) => cells.insert(field.name.clone(), cell),
+            None => cells.remove(&field.name),
+        };
+    }
+    Ok(())
+}
+
+/// A row's cell in `field`, from what Claude wrote; none for an empty one.
+pub fn cell(field: &Field, value: &Value, photos: &[Uuid]) -> Result<Option<Cell>, String> {
+    let words = match value {
+        Value::Null => return Ok(None),
+        Value::String(s) => s.trim().to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::Bool(yes) => yes.to_string(),
+        _ => return Err(format!("{} is one value, not a list.", field.name)),
+    };
+    if words.is_empty() {
+        return Ok(None);
+    }
+    let name = &field.name;
+    Ok(Some(match field.kind.as_str() {
+        "number" => {
+            let plain = match value {
+                Value::Number(n) => n.as_f64(),
+                _ => {
+                    let unit = field.unit.to_lowercase();
+                    let lower = words.to_lowercase();
+                    let bare = lower
+                        .strip_suffix(unit.as_str())
+                        .filter(|_| !unit.is_empty());
+                    bare.unwrap_or(&lower)
+                        .trim()
+                        .replace(' ', "")
+                        .replace(',', ".")
+                        .parse()
+                        .ok()
+                }
+            };
+            match plain.filter(|n: &f64| n.is_finite()) {
+                Some(n) => Cell::Number(n),
+                None => return Err(format!("{name} is a number, plain (3.4), not {words}.")),
+            }
+        }
+        "check" => match words.to_lowercase().as_str() {
+            "yes" | "true" | "ja" | "y" | "x" => Cell::Check(true),
+            "no" | "false" | "nein" | "n" => Cell::Check(false),
+            _ => return Err(format!("{name} is yes or no, not {words}.")),
+        },
+        "day" => {
+            if words.parse::<NaiveDate>().is_err() && !words.chars().any(|c| c.is_ascii_digit()) {
+                return Err(format!(
+                    "{name} is a day, as 2026-09-24, or a year or a span (1987–1993)."
+                ));
+            }
+            Cell::Text(cut(&words, 60))
+        }
+        "choice" | "status" => {
+            let words = cut(&words, 40);
+            match field
+                .options
+                .iter()
+                .find(|o| o.to_lowercase() == words.to_lowercase())
+            {
+                Some(option) => Cell::Text(option.clone()),
+                None if field.options.is_empty() => Cell::Text(words),
+                None => {
+                    return Err(format!(
+                        "{name} is one of {}: change the collection's fields to add {words}.",
+                        field.options.join(", ")
+                    ));
+                }
+            }
+        }
+        "photo" => {
+            let number = words
+                .to_lowercase()
+                .trim_start_matches("photo")
+                .trim()
+                .trim_start_matches('#')
+                .parse::<usize>()
+                .ok();
+            match number
+                .and_then(|n| n.checked_sub(1))
+                .and_then(|n| photos.get(n))
+            {
+                Some(id) => Cell::Text(id.to_string()),
+                None if photos.iter().any(|id| id.to_string() == words) => Cell::Text(words),
+                None if photos.is_empty() => {
+                    return Err(format!("The talk has no photos for {name}."));
+                }
+                None => {
+                    return Err(format!(
+                        "{name} is a photo of the talk's, by its number: photo 1 to photo {}.",
+                        photos.len()
+                    ));
+                }
+            }
+        }
+        "link" if words.starts_with("https://") || words.starts_with("http://") => {
+            Cell::Text(cut(&words, 2000))
+        }
+        "link" => return Err(format!("{name} is a web page's address, from https://.")),
+        _ => Cell::Text(cut(&words, 200)),
+    }))
+}
+
+/// The pictures a collection's rows can be drawn as, as View as offers them
+/// (`apps/web/src/collection.ts`): none without rows.
+pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<&'static str> {
+    if rows.is_empty() {
+        return Vec::new();
+    }
+    let filled: Vec<&Field> = fields
+        .iter()
+        .filter(|f| rows.iter().any(|r| r.cells.contains_key(&f.name)))
+        .collect();
+    let of = |kind: &str| filled.iter().find(|f| f.kind == kind).copied();
+    let day_of = |row: &PagePoint, field: &Field| match row.cells.get(&field.name) {
+        Some(Cell::Text(t)) => t.parse::<NaiveDate>().ok(),
+        _ => None,
+    };
+    let number_of = |row: &PagePoint, field: &Field| {
+        matches!(row.cells.get(&field.name), Some(Cell::Number(_)))
+    };
+    let (day, number) = (of("day"), of("number"));
+    let line = day.zip(number).is_some_and(|(d, n)| {
+        rows.iter()
+            .any(|r| day_of(r, d).is_some() && number_of(r, n))
+    });
+    let pick = if line {
+        "line"
+    } else if of("status").is_some() {
+        "board"
+    } else if of("photo").is_some() {
+        "cards"
+    } else if let Some(day) = day {
+        if rows
+            .iter()
+            .any(|r| day_of(r, day).is_some_and(|d| d >= today))
+        {
+            "week"
+        } else {
+            "timeline"
+        }
+    } else if number.is_some() {
+        "bars"
+    } else if filled.len() + 1 >= 3 {
+        "table"
+    } else {
+        "list"
+    };
+    let mut fits = vec![pick, "cards", "table", "list"];
+    if line {
+        fits.push("line");
+    }
+    if of("status").is_some() || of("choice").is_some() {
+        fits.push("board");
+    }
+    if let Some(day) = day {
+        fits.push("timeline");
+        if rows.iter().any(|r| day_of(r, day).is_some()) {
+            fits.push("week");
+        }
+    }
+    if number.is_some() {
+        fits.push("bars");
+    }
+    [
+        "line", "board", "cards", "timeline", "week", "bars", "table", "list",
+    ]
+    .into_iter()
+    .filter(|p| fits.contains(p))
+    .collect()
+}
+
+/// What changes on a reminder ticked for its day `due_on`: one that comes
+/// round is due again a rhythm on, from today when it was overdue; one
+/// that doesn't is done.
+fn done_for(due_on: NaiveDate, every_days: Option<i32>, today: NaiveDate) -> Map<String, Value> {
+    match every_days.filter(|d| *d > 0) {
+        Some(days) => {
+            let from = if due_on > today { due_on } else { today };
+            fields([
+                ("due_on", json!(from + Days::new(days as u64))),
+                ("last_done_on", json!(due_on)),
+            ])
+        }
+        None => fields([("status", json!("done")), ("last_done_on", json!(due_on))]),
+    }
+}
+
+fn block_was(block: &RefBlock, removed: bool) -> BlockWas {
+    BlockWas {
+        id: block.id,
+        kind: block.kind.clone(),
+        title: block.title.clone(),
+        facets: block.facets.0.clone(),
+        width: block.width.clone(),
+        view: block.view.clone(),
+        fields: block.fields.0.clone(),
+        position: block.position,
+        removed,
+    }
+}
+
+fn point_was(point: &PagePoint, removed: bool) -> PointWas {
+    PointWas {
+        id: point.id,
+        block_id: point.block_id,
+        theme: point.theme.clone(),
+        text: point.text.clone(),
+        happened: point.happened.clone(),
+        facet: point.facet.clone(),
+        look: point.look.clone(),
+        amount: point.amount,
+        note: point.note.clone(),
+        cells: point.cells.0.clone(),
+        done: point.done,
+        position: point.position,
+        removed,
+        source: point.source.clone(),
+        source_url: point.source_url.clone(),
     }
 }
 
@@ -829,21 +1645,15 @@ pub fn found(reference: &str, kind: char, count: usize) -> Option<usize> {
     n.checked_sub(1).filter(|n| *n < count)
 }
 
-/// A block as a sentence names it.
-fn title_of(block: &RefBlock) -> &str {
-    match block.title.as_str() {
-        "" => "The week",
-        title => title,
-    }
-}
-
 /// A reminder an answer offers, waiting for a yes under it, in place of the
-/// reminders it `replaces` once it's taken.
+/// reminders it `replaces` once it's taken, ringing for a checklist item
+/// when it has one.
 pub fn offer(
     topic_id: Uuid,
     message_id: Uuid,
     reminder: &ProposedReminder,
     replaces: &[Uuid],
+    point_id: Option<Uuid>,
 ) -> Operation {
     Operation::Create {
         model: ModelKind::Reminder,
@@ -858,6 +1668,7 @@ pub fn offer(
             ("status", json!("offered")),
             ("message_id", json!(message_id)),
             ("replaces", json!(replaces)),
+            ("point_id", json!(point_id)),
         ]),
     }
 }
@@ -871,40 +1682,84 @@ pub fn patch_fields(patch: &almanac_domain::TopicPatch) -> Value {
     value
 }
 
-/// "Kept 2 points under Monstera and Basilikum.", or "Updated a point
-/// under Monstera." when they all replaced points the page had.
-pub fn kept_words(points: usize, updated: usize, themes: &[String]) -> String {
-    let what = if points == 1 {
-        "a point".to_string()
-    } else {
-        format!("{points} points")
-    };
-    let verb = match updated {
-        0 => "Kept",
-        n if n == points => "Updated",
-        _ => "Kept and updated",
-    };
-    let under = match themes {
+/// "Kept 2 points under Monstera and Basilikum."
+pub fn kept_words(points: usize, unders: &[String]) -> String {
+    let under = match unders {
         [] => String::new(),
-        [one] => one.clone(),
-        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+        [one] => format!(" under {one}"),
+        [rest @ .., last] => format!(" under {} and {last}", rest.join(", ")),
     };
-    format!("{verb} {what} under {under}.")
+    format!("Kept {}{under}.", count(points, "point"))
 }
 
 /// "Ticked 2 points off.", "Ticked a point on again."
 fn ticked_words(ticks: &[(Uuid, bool)]) -> Option<String> {
-    let words = |n: usize, how: &str| match n {
-        0 => None,
-        1 => Some(format!("Ticked a point {how}.")),
-        n => Some(format!("Ticked {n} points {how}.")),
-    };
+    let words =
+        |n: usize, how: &str| (n > 0).then(|| format!("Ticked {} {how}.", count(n, "point")));
     let done = ticks.iter().filter(|(_, d)| *d).count();
     let said: Vec<String> = [words(done, "off"), words(ticks.len() - done, "on again")]
         .into_iter()
         .flatten()
         .collect();
     (!said.is_empty()).then(|| said.join(" "))
+}
+
+/// "Changed 2 points, moved a block and removed Gewicht.", from how many
+/// blocks and points changed and moved, and what went; none when nothing
+/// did.
+fn change_words(
+    changed: (usize, usize),
+    moved: (usize, usize),
+    removed_blocks: &[String],
+    removed_points: usize,
+) -> Option<String> {
+    let things = |(blocks, points): (usize, usize)| {
+        let said: Vec<String> = [(blocks, "block"), (points, "point")]
+            .into_iter()
+            .filter(|(n, _)| *n > 0)
+            .map(|(n, noun)| count(n, noun))
+            .collect();
+        (!said.is_empty()).then(|| said.join(" and "))
+    };
+    let mut gone: Vec<String> = removed_blocks.to_vec();
+    if removed_points > 0 {
+        gone.push(count(removed_points, "point"));
+    }
+    let parts: Vec<String> = [
+        things(changed).map(|t| format!("changed {t}")),
+        things(moved).map(|t| format!("moved {t}")),
+        (!gone.is_empty()).then(|| format!("removed {}", and(&gone))),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let said = and(&parts);
+    let mut chars = said.chars();
+    let first = chars
+        .next()
+        .map(|c| c.to_uppercase().to_string())
+        .unwrap_or_default();
+    Some(format!("{first}{}.", chars.as_str()))
+}
+
+/// "a point", "3 points".
+fn count(n: usize, noun: &str) -> String {
+    match n {
+        1 => format!("a {noun}"),
+        n => format!("{n} {noun}s"),
+    }
+}
+
+/// "A, B and C".
+fn and(words: &[String]) -> String {
+    match words {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
 }
 
 pub fn fields<const N: usize>(pairs: [(&str, Value); N]) -> Map<String, Value> {
@@ -914,462 +1769,494 @@ pub fn fields<const N: usize>(pairs: [(&str, Value); N]) -> Map<String, Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn kept_words_name_the_themes() {
-        assert_eq!(
-            kept_words(1, 0, &["Monstera".into()]),
-            "Kept a point under Monstera."
-        );
-        assert_eq!(
-            kept_words(
-                3,
-                0,
-                &["Monstera".into(), "Basilikum".into(), "Efeu".into()]
-            ),
-            "Kept 3 points under Monstera, Basilikum and Efeu."
-        );
-        assert_eq!(
-            kept_words(1, 1, &["Monstera".into()]),
-            "Updated a point under Monstera."
-        );
-    }
+    use crate::page::PageReminder;
 
     fn answering() -> Answering {
         Answering {
             topic_id: Uuid::now_v7(),
-            topic_name: "Haare".into(),
+            topic_name: "Katzen".into(),
             talk_id: Uuid::now_v7(),
             answer_id: Uuid::now_v7(),
             first: false,
         }
     }
 
-    fn block(kind: &str, title: &str) -> RefBlock {
+    fn block(kind: &str, title: &str, position: i32) -> RefBlock {
         RefBlock {
             id: Uuid::now_v7(),
             kind: kind.into(),
             title: title.into(),
-            facets: Vec::new(),
+            facets: Json(Vec::new()),
+            fields: Json(Vec::new()),
+            width: String::new(),
+            view: String::new(),
+            position,
         }
     }
 
-    /// A point for `block`, starting one of `kind` when there's none.
-    fn point(block: &str, kind: &str, theme: &str, text: &str) -> Handed {
-        Handed {
-            block: block.into(),
-            kind: kind.into(),
+    fn point(block: &RefBlock, theme: &str, text: &str, position: i32) -> PagePoint {
+        PagePoint {
+            id: Uuid::now_v7(),
+            block_id: block.id,
             theme: theme.into(),
             text: text.into(),
-            ..Handed::default()
+            happened: String::new(),
+            facet: String::new(),
+            look: String::new(),
+            amount: None,
+            note: String::new(),
+            cells: Json(BTreeMap::new()),
+            done: false,
+            position,
+            source: None,
+            source_url: None,
+        }
+    }
+
+    fn item(text: &str) -> ItemArg {
+        ItemArg {
+            text: text.into(),
+            ..ItemArg::default()
+        }
+    }
+
+    fn field(name: &str, kind: &str) -> FieldArg {
+        FieldArg {
+            name: name.into(),
+            kind: kind.into(),
+            ..FieldArg::default()
+        }
+    }
+
+    fn row(name: &str, cells: Value) -> RowArg {
+        RowArg {
+            name: name.into(),
+            cells: cells.as_object().cloned().unwrap_or_default(),
+            ..RowArg::default()
         }
     }
 
     #[test]
-    fn a_timeline_point_says_when_it_happened() {
-        let timeline = block("timeline", "Zeitleiste");
+    fn a_weighing_is_a_row_with_typed_cells() {
         let mut kept = Kept::on(Refs {
-            blocks: vec![block("text", "Geschichte"), timeline.clone()],
+            blocks: vec![block("bullets", "Notes", 0)],
             ..Refs::default()
         });
-        let undated = kept
-            .keep_point(point("b2", "", "Intifada", "Sie beginnt"))
-            .unwrap_err();
-        assert!(undated.contains("says when it happened"), "{undated}");
-        kept.keep_point(Handed {
-            happened: "1987–1993".into(),
-            source: "From the talk".into(),
-            ..point("Zeitleiste", "", "Intifada", "Die erste Intifada beginnt")
-        })
-        .unwrap();
-        // Elsewhere a point has no date.
-        kept.keep_point(Handed {
-            happened: "1987".into(),
-            source: "From the talk".into(),
-            ..point("b1", "", "Intifada", "Ein Aufstand gegen die Besatzung.")
-        })
-        .unwrap();
-        assert_eq!(kept.points[0].block_id, timeline.id);
-        assert_eq!(kept.points[0].happened, "1987–1993");
-        assert_eq!(kept.points[1].happened, "");
-    }
-
-    #[test]
-    fn a_layout_keeps_no_other_points() {
-        let mut kept = Kept {
-            layout: Some(Laid {
-                change: TopicChange {
-                    topic_id: Uuid::now_v7(),
-                    name: "Katzen".into(),
-                    said: "Sorted it.".into(),
-                    before: TopicPatch::default(),
-                    after: TopicPatch::default(),
-                    layout: None,
-                    undone: false,
-                },
-                operations: Vec::new(),
-            }),
-            ..Kept::default()
-        };
-        assert!(
-            kept.keep_point(point("b1", "", "", "x"))
-                .unwrap_err()
-                .contains("laid out the page")
-        );
-    }
-
-    #[test]
-    fn a_point_takes_the_place_of_the_ones_it_replaces() {
-        let (first, second) = (Uuid::now_v7(), Uuid::now_v7());
-        let notes = block("cards", "Notes");
-        let mut kept = Kept::on(Refs {
-            points: vec![(first, notes.id), (second, notes.id)],
-            blocks: vec![notes.clone()],
-            reminders: vec![],
-        });
-        assert!(
-            kept.keep_point(Handed {
-                replaces: vec!["p3".into()],
-                ..point("b1", "", "Wäsche", "x")
-            })
-            .unwrap_err()
-            .contains("no point p3")
-        );
-        // Named no block, it stays in the one it replaces.
-        kept.keep_point(Handed {
-            source: "You said".into(),
-            replaces: vec!["p1".into(), "[p2]".into()],
-            ..point("", "", "Wäsche", "Washes Wednesday and Friday.")
-        })
-        .unwrap();
-        let (said, operations) = kept.writes(&answering());
-        assert!(matches!(
-            &operations[..],
-            [
-                Operation::Update { id: a, data, .. },
-                Operation::Delete { id: b, .. },
-            ] if *a == first && *b == second && data["seen"] == json!(false)
-                && data["block_id"] == json!(notes.id)
-        ));
-        assert_eq!(said["kept"], json!("Updated a point under Wäsche."));
-    }
-
-    #[test]
-    fn sorting_a_page_keeps_each_point_in_its_block() {
-        let (today, you) = (block("today", "Today"), block("you", "You"));
-        let notes = block("cards", "Notes");
-        let ids: Vec<Uuid> = (0..12).map(|_| Uuid::now_v7()).collect();
-        let mut kept = Kept::on(Refs {
-            points: ids.iter().map(|id| (*id, notes.id)).collect(),
-            blocks: vec![today.clone(), block("week", ""), you.clone(), notes],
-            reminders: vec![],
-        });
-        assert!(
-            kept.keep_point(point("b2", "", "", "Wash on Friday"))
-                .unwrap_err()
-                .contains("keeps no points")
-        );
-        assert!(
-            kept.keep_point(point("Today", "", "", "Shampoo"))
-                .unwrap_err()
-                .contains("needs a theme")
-        );
-        // More than an answer may add, each in a point's place.
-        for n in 1..=12 {
-            kept.keep_point(Handed {
-                replaces: vec![format!("p{n}")],
-                ..point("you", "", "You", &format!("Fact {n}"))
-            })
+        let weight = kept
+            .add_block(
+                "collection",
+                "Gewicht",
+                None,
+                &[
+                    field("Tag", "day"),
+                    FieldArg {
+                        unit: "kg".into(),
+                        goal: Some(3.4),
+                        ..field("Gewicht", "number")
+                    },
+                ],
+            )
             .unwrap();
-        }
-        kept.keep_point(point(
-            "b1",
-            "",
-            "Elvital wash",
-            "Elvital shampoo: on the scalp",
-        ))
-        .unwrap();
-        let (said, operations) = kept.writes(&answering());
-        assert_eq!(operations.len(), 13);
-        assert!(matches!(
-            &operations[12],
-            Operation::Create { data, .. }
-                if data["block_id"] == json!(today.id) && data["theme"] == json!("Elvital wash")
-        ));
-        // A fact about them has no theme.
-        assert!(matches!(
-            &operations[0],
-            Operation::Update { id, data, .. }
-                if *id == ids[0] && data["block_id"] == json!(you.id) && data["theme"] == json!("")
-        ));
-        assert_eq!(
-            said["kept"],
-            json!("Kept and updated 13 points under You and Elvital wash.")
-        );
-    }
-
-    #[test]
-    fn a_point_may_start_a_block_the_page_lacks() {
-        let mut kept = Kept::on(Refs::default());
+        assert_eq!(weight, "b2");
         assert!(
-            kept.keep_point(point("Reading", "", "", "Ward, Plant care"))
+            kept.add_items("b2", &[item("Lisa wiegt 3,5 kg")])
                 .unwrap_err()
-                .contains("give a kind")
+                .contains("add rows")
         );
-        kept.keep_point(point("Reading", "list", "", "Ward, Plant care"))
-            .unwrap();
-        // The next one finds it by its title.
-        kept.keep_point(point("reading", "", "", "Kew, Ferns"))
-            .unwrap();
-        kept.keep_point(point("Terms", "chips", "", "Epiphyte"))
-            .unwrap();
         assert!(
-            kept.keep_point(point("Places", "cards", "Kew", "In London"))
+            kept.add_rows("b2", &[row("Lisa", json!({"Größe": "30 cm"}))])
                 .unwrap_err()
-                .contains("at most 2 blocks")
+                .contains("has Tag, Gewicht")
         );
+        assert!(
+            kept.add_rows("b2", &[row("Lisa", json!({"Gewicht": "schwer"}))])
+                .unwrap_err()
+                .contains("a number, plain")
+        );
+        let rows = kept
+            .add_rows(
+                "gewicht",
+                &[
+                    row("Lisa", json!({"tag": "2026-10-20", "Gewicht": "3,5 kg"})),
+                    row("Lisa", json!({"Tag": "2026-10-27", "Gewicht": 3.45})),
+                ],
+            )
+            .unwrap();
+        assert_eq!(rows, ["p1", "p2"]);
         let (said, operations) = kept.writes(&answering());
         let [
             Operation::Create {
                 model: ModelKind::Block,
-                id: reading,
-                data,
-            },
-            Operation::Create {
-                model: ModelKind::Block,
-                ..
+                id,
+                data: made,
             },
             Operation::Create { data: first, .. },
             Operation::Create { data: second, .. },
-            Operation::Create { .. },
         ] = &operations[..]
         else {
             panic!("{operations:?}");
         };
-        assert_eq!(data["kind"], json!("list"));
-        assert_eq!(first["block_id"], json!(reading));
-        assert_eq!(second["block_id"], json!(reading));
-        assert_eq!(
-            said["kept"],
-            json!("Kept 3 points under Reading and Terms.")
-        );
+        assert_eq!(made["position"], json!(1));
+        assert_eq!(made["fields"][1]["unit"], json!("kg"));
+        assert_eq!(first["block_id"], json!(id));
+        assert_eq!(first["cells"], json!({"Tag": "2026-10-20", "Gewicht": 3.5}));
+        assert_eq!(second["position"], json!(1));
+        assert_eq!(said["kept"], json!("Kept 2 points under Gewicht."));
+        assert!(said.get("changes").is_none(), "only new things");
     }
 
     #[test]
-    fn a_card_point_names_one_of_its_blocks_facets() {
-        let mut plants = block("cards", "Pflanzen");
-        plants.facets = vec![
-            Facet {
-                name: "Licht".into(),
-                icon: "sun".into(),
+    fn a_toggle_keeps_points_under_their_line() {
+        let terms = block("toggle", "Begriffe", 0);
+        let first = point(&terms, "Intifada", "Ein Aufstand.", 0);
+        let other = point(&terms, "Oslo", "Ein Abkommen.", 1);
+        let mut kept = Kept::on(Refs {
+            blocks: vec![terms],
+            points: vec![first.clone(), other.clone()],
+            ..Refs::default()
+        });
+        assert!(
+            kept.add_items("b1", &[item("1987 begonnen")])
+                .unwrap_err()
+                .contains("needs a theme: the line it opens from")
+        );
+        kept.add_items(
+            "b1",
+            &[ItemArg {
+                theme: "Intifada".into(),
+                ..item("Sie begann 1987.")
+            }],
+        )
+        .unwrap();
+        // It goes after its theme's point, and the next moves down.
+        let (_, operations) = kept.writes(&answering());
+        let [
+            Operation::Update {
+                id, data: moved, ..
             },
-            Facet {
-                name: "Wasser".into(),
-                icon: "droplet".into(),
-            },
+            Operation::Create { data, .. },
+        ] = &operations[..]
+        else {
+            panic!("{operations:?}");
+        };
+        assert_eq!(data["position"], json!(1));
+        assert_eq!(*id, other.id);
+        assert_eq!(moved["position"], json!(2));
+    }
+
+    #[test]
+    fn changes_and_removals_are_one_change_to_undo() {
+        let (notes, old) = (block("bullets", "Notes", 0), block("cards", "Pflanzen", 1));
+        let fact = point(&notes, "", "Lisa wiegt 3,5 kg", 0);
+        let monstera = point(&old, "Monstera", "Hell", 0);
+        let mut kept = Kept::on(Refs {
+            blocks: vec![notes.clone(), old.clone()],
+            points: vec![fact.clone(), monstera.clone()],
+            ..Refs::default()
+        });
+        kept.change_points(&[PointChange {
+            point: "p1".into(),
+            text: Some("Lisa wiegt 3,4 kg".into()),
+            ..PointChange::default()
+        }])
+        .unwrap();
+        kept.remove(&["b2".into()]).unwrap();
+        assert!(
+            kept.change_points(&[PointChange {
+                point: "p2".into(),
+                text: Some("x".into()),
+                ..PointChange::default()
+            }])
+            .unwrap_err()
+            .contains("was removed")
+        );
+        let (said, operations) = kept.writes(&answering());
+        assert!(
+            matches!(
+                &operations[..],
+                [
+                    Operation::Update { id: a, data, .. },
+                    Operation::Delete { id: b, model: ModelKind::Point },
+                    Operation::Delete { id: c, model: ModelKind::Block },
+                ] if *a == fact.id && data["seen"] == json!(false) && *b == monstera.id && *c == old.id
+            ),
+            "{operations:?}"
+        );
+        let change = &said["changes"][0];
+        assert_eq!(
+            change["said"],
+            json!("Changed a point and removed Pflanzen.")
+        );
+        let layout: PageLayout = serde_json::from_value(change["layout"].clone()).unwrap();
+        assert!(
+            layout
+                .points
+                .iter()
+                .any(|p| p.id == monstera.id && p.removed)
+        );
+        assert!(layout.blocks.iter().any(|b| b.id == old.id && b.removed));
+    }
+
+    #[test]
+    fn moving_points_renumbers_their_block() {
+        let (a, b) = (block("bullets", "A", 0), block("checklist", "B", 1));
+        let points = vec![
+            point(&a, "", "eins", 0),
+            point(&a, "", "zwei", 1),
+            point(&b, "", "drei", 0),
         ];
         let mut kept = Kept::on(Refs {
-            blocks: vec![plants, block("list", "Lesen")],
+            blocks: vec![a, b.clone()],
+            points: points.clone(),
             ..Refs::default()
         });
-        let unknown = kept
-            .keep_point(Handed {
-                facet: "Erde".into(),
-                ..point("b1", "", "Monstera", "Torffrei")
-            })
-            .unwrap_err();
-        assert!(unknown.contains("one of Licht, Wasser"), "{unknown}");
-        kept.keep_point(Handed {
-            facet: "wasser".into(),
-            look: "Warn".into(),
-            ..point("b1", "", "Monstera", "Braune Ränder: zu wenig")
-        })
-        .unwrap();
-        // A list has no facets or looks: they go quietly.
-        kept.keep_point(Handed {
-            facet: "Wasser".into(),
-            look: "warn".into(),
-            ..point("b2", "", "", "Ward, Plant care")
-        })
-        .unwrap();
-        assert_eq!(kept.points[0].shape.facet, "Wasser");
-        assert_eq!(kept.points[0].shape.look, "warn");
-        assert_eq!(kept.points[1].shape, Shape::default());
-    }
-
-    #[test]
-    fn a_bar_has_an_amount() {
-        let mut kept = Kept::on(Refs {
-            blocks: vec![block("bars", "In Zahlen")],
-            ..Refs::default()
-        });
-        assert!(
-            kept.keep_point(point("b1", "", "9/11", "Am 11. September"))
-                .unwrap_err()
-                .contains("needs its amount")
-        );
-        kept.keep_point(Handed {
-            amount: Some(2977.0),
-            note: "getötet".into(),
-            ..point("b1", "", "9/11", "Am 11. September")
-        })
-        .unwrap();
-        let (_, operations) = kept.writes(&answering());
-        assert!(matches!(
-            &operations[..],
-            [Operation::Create { data, .. }]
-                if data["amount"] == json!(2977.0) && data["note"] == json!("getötet")
-        ));
-    }
-
-    #[test]
-    fn a_trend_keeps_a_number_on_a_day() {
-        let mut kept = Kept::on(Refs {
-            blocks: vec![block("trend", "Gewicht")],
-            ..Refs::default()
-        });
-        let weighed = |happened: &str, amount: Option<f64>| Handed {
-            happened: happened.into(),
-            amount,
-            note: "kg".into(),
-            source: "You said".into(),
-            ..point("b1", "", "Lisas Gewicht", "Gewogen")
-        };
-        assert!(
-            kept.keep_point(weighed("2026-09-24", None))
-                .unwrap_err()
-                .contains("needs its amount")
-        );
-        assert!(
-            kept.keep_point(weighed("24. September", Some(3.5)))
-                .unwrap_err()
-                .contains("as 2026-09-24")
-        );
-        kept.keep_point(weighed("2026-09-24", Some(3.5))).unwrap();
-        // With no day it's the mark it aims at.
-        kept.keep_point(Handed {
-            text: "Ziel".into(),
-            ..weighed("", Some(3.4))
-        })
-        .unwrap();
-        assert_eq!(kept.points[0].happened, "2026-09-24");
-        assert_eq!(kept.points[0].shape.note, "kg");
-        assert_eq!(kept.points[1].happened, "");
-    }
-
-    #[test]
-    fn a_table_cell_is_a_point_with_its_column() {
-        let mut shoes = block("table", "Schuhe");
-        shoes.facets = vec![Facet {
-            name: "Preis".into(),
-            icon: "tag".into(),
-        }];
-        let mut kept = Kept::on(Refs {
-            blocks: vec![shoes, block("parts", "Wo man arbeitet")],
-            ..Refs::default()
-        });
-        assert!(
-            kept.keep_point(Handed {
-                facet: "Größe".into(),
-                ..point("b1", "", "Exani Axio M", "43, 44")
-            })
-            .unwrap_err()
-            .contains("no facet Größe")
-        );
-        kept.keep_point(Handed {
-            facet: "preis".into(),
-            amount: Some(709.0),
-            look: "warn".into(),
-            ..point("b1", "", "Exani Axio M", "709 kr")
-        })
-        .unwrap();
-        assert_eq!(
-            kept.points[0].shape,
-            Shape {
-                facet: "Preis".into(),
-                look: "warn".into(),
-                amount: Some(709.0),
-                note: String::new(),
-            }
-        );
-        // A part needs how many.
-        assert!(
-            kept.keep_point(point("b2", "", "28 Anzeigen", "Remote"))
-                .unwrap_err()
-                .contains("A part in Wo man arbeitet needs its amount")
-        );
-    }
-
-    #[test]
-    fn ticks_are_for_lists_and_questions() {
-        let (read, cards) = (block("list", "Lesen"), block("cards", "Pflanzen"));
-        let (book, plant) = (Uuid::now_v7(), Uuid::now_v7());
-        let mut kept = Kept::on(Refs {
-            points: vec![(book, read.id), (plant, cards.id)],
-            blocks: vec![read, cards],
-            reminders: vec![],
-        });
-        assert!(
-            kept.tick_points(&["p2".into()], true)
-                .unwrap_err()
-                .contains("only a list's items and questions")
-        );
-        kept.tick_points(&["p1".into()], true).unwrap();
+        kept.move_points(&["p1".into()], "b2", Some("")).unwrap();
         let (said, operations) = kept.writes(&answering());
-        assert!(matches!(
-            &operations[..],
-            [Operation::Update { id, data, .. }] if *id == book && data["done"] == json!(true)
-        ));
-        assert_eq!(said["kept"], json!("Ticked a point off."));
+        assert!(
+            matches!(
+                &operations[..],
+                [
+                    Operation::Update { id: one, data, .. },
+                    Operation::Update { id: three, data: down, .. },
+                ] if *one == points[0].id && data["block_id"] == json!(b.id)
+                    && data.get("seen").is_none()
+                    && *three == points[2].id && down["position"] == json!(1)
+            ),
+            "{operations:?}"
+        );
+        assert_eq!(said["changes"][0]["said"], json!("Moved a point."));
     }
 
     #[test]
-    fn facets_have_an_icon_almanac_has() {
-        let facet = |name: &str, icon: &str| Facet {
-            name: name.into(),
-            icon: icon.into(),
+    fn a_ticked_item_ticks_its_reminder() {
+        let list = block("checklist", "Routine", 0);
+        let (wash, bin) = (
+            point(&list, "", "Haare waschen", 0),
+            point(&list, "", "Müll", 1),
+        );
+        let reminder = PageReminder {
+            id: Uuid::now_v7(),
+            title: "Haare waschen".into(),
+            due_on: NaiveDate::from_ymd_opt(2026, 10, 30).unwrap(),
+            every_days: Some(3),
+            status: "on".into(),
+            point_id: Some(wash.id),
+            last_done_on: None,
         };
+        let mut kept = Kept::on(Refs {
+            blocks: vec![list],
+            points: vec![wash, bin.clone()],
+            reminders: vec![reminder.clone()],
+        });
+        kept.today = NaiveDate::from_ymd_opt(2026, 10, 31).unwrap();
+        kept.tick(&["p1".into(), "p2".into()], true).unwrap();
+        let (said, operations) = kept.writes(&answering());
         assert!(
-            facets(&[facet("Licht", "lamp")])
+            matches!(
+                &operations[..],
+                [
+                    Operation::Update { id: item, data: done, .. },
+                    Operation::Update { model: ModelKind::Reminder, id, data },
+                ] if *item == bin.id && done["done"] == json!(true)
+                    && *id == reminder.id
+                    && data["due_on"] == json!("2026-11-03")
+                    && data["last_done_on"] == json!("2026-10-30")
+            ),
+            "{operations:?}"
+        );
+        assert_eq!(said["kept"], json!("Ticked 2 points off."));
+        assert!(said.get("changes").is_none());
+    }
+
+    #[test]
+    fn a_reminder_rings_for_a_new_item() {
+        let mut kept = Kept::on(Refs {
+            blocks: vec![
+                block("checklist", "Routine", 0),
+                block("bullets", "Notes", 1),
+            ],
+            ..Refs::default()
+        });
+        let [wash] = &kept.add_items("b1", &[item("Haare waschen")]).unwrap()[..] else {
+            panic!();
+        };
+        let wash = wash.clone();
+        kept.add_items("b2", &[item("Niedrige Porosität")]).unwrap();
+        let friday = reminder("", "Haare waschen", "2026-10-30", "", Some(3)).unwrap();
+        assert!(
+            kept.offer_reminder(friday.clone(), &[], Some("p2"))
                 .unwrap_err()
-                .contains("no icon lamp")
+                .contains("a checklist's item")
+        );
+        kept.offer_reminder(friday, &[], Some(&wash)).unwrap();
+        assert_eq!(kept.item_words(&wash).as_deref(), Some("Haare waschen"));
+        let (_, operations) = kept.writes(&answering());
+        let Operation::Create { id, .. } = &operations[0] else {
+            panic!();
+        };
+        assert!(matches!(
+            &operations[2],
+            Operation::Create { model: ModelKind::Reminder, data, .. } if data["point_id"] == json!(id)
+        ));
+    }
+
+    #[test]
+    fn a_collection_picks_among_the_pictures_its_fields_allow() {
+        let mut kept = Kept::on(Refs::default());
+        kept.add_block(
+            "collection",
+            "Angebote",
+            None,
+            &[field("Status", "status"), field("Preis", "number")],
+        )
+        .unwrap();
+        assert!(
+            kept.change_block("b1", None, None, Some("board"))
+                .unwrap_err()
+                .contains("no rows yet")
+        );
+        kept.add_rows(
+            "b1",
+            &[row("Axio", json!({"Status": "Offen", "Preis": 709}))],
+        )
+        .unwrap();
+        assert!(
+            kept.change_block("b1", None, None, Some("line"))
+                .unwrap_err()
+                .contains("board, cards, bars, table, list")
+        );
+        kept.change_block("b1", None, None, Some("bars")).unwrap();
+        // A renamed field keeps its cells; one left out takes them with it.
+        kept.change_block(
+            "b1",
+            None,
+            Some(&[FieldArg {
+                was: "Preis".into(),
+                unit: "kr".into(),
+                ..field("Kosten", "number")
+            }]),
+            None,
+        )
+        .unwrap();
+        let (_, operations) = kept.writes(&answering());
+        assert!(
+            matches!(
+                &operations[..],
+                [Operation::Create { data: b, .. }, Operation::Create { data: p, .. }]
+                    if b["view"] == json!("bars") && p["cells"] == json!({"Kosten": 709.0})
+            ),
+            "{operations:?}"
+        );
+    }
+
+    #[test]
+    fn old_blocks_take_only_what_fits_them() {
+        let mut kept = Kept::on(Refs {
+            blocks: vec![
+                block("timeline", "Zeit", 0),
+                block("list", "Lesen", 1),
+                block("heading", "Teil", 2),
+            ],
+            ..Refs::default()
+        });
+        assert!(
+            kept.add_items("b1", &[item("1987")])
+                .unwrap_err()
+                .contains("from before the set")
         );
         assert!(
-            facets(&[facet("Licht", "sun"), facet("licht", "sun")])
+            kept.add_items("b3", &[item("x")])
                 .unwrap_err()
-                .contains("twice")
+                .contains("a heading")
+        );
+        kept.add_items("Lesen", &[item("Ward, Plant care")])
+            .unwrap();
+        assert!(
+            kept.add_block("table", "Schuhe", None, &[])
+                .unwrap_err()
+                .contains("no kind of block table")
+        );
+    }
+
+    #[test]
+    fn cells_take_what_their_field_holds() {
+        let photos = [Uuid::now_v7(), Uuid::now_v7()];
+        let check = |kind: &str, value: Value| {
+            let field = Field {
+                name: "F".into(),
+                kind: kind.into(),
+                unit: "kg".into(),
+                goal: None,
+                options: if kind == "status" {
+                    vec!["Offen".into(), "Erledigt".into()]
+                } else {
+                    vec![]
+                },
+            };
+            cell(&field, &value, &photos)
+        };
+        assert_eq!(
+            check("number", json!("3,4 kg")),
+            Ok(Some(Cell::Number(3.4)))
+        );
+        assert_eq!(check("check", json!("ja")), Ok(Some(Cell::Check(true))));
+        assert_eq!(
+            check("status", json!("erledigt")),
+            Ok(Some(Cell::Text("Erledigt".into())))
+        );
+        assert!(
+            check("status", json!("Bestellt"))
+                .unwrap_err()
+                .contains("Offen, Erledigt")
         );
         assert_eq!(
-            facets(&[facet(" Licht ", "Sun")]).unwrap(),
-            [facet("Licht", "sun")]
+            check("photo", json!("photo 2")),
+            Ok(Some(Cell::Text(photos[1].to_string())))
         );
+        assert!(check("photo", json!("photo 3")).is_err());
+        assert!(check("day", json!("gestern")).is_err());
+        assert_eq!(
+            check("day", json!("1987–1993")),
+            Ok(Some(Cell::Text("1987–1993".into())))
+        );
+        assert!(check("link", json!("example.com")).is_err());
+        assert_eq!(check("text", json!("")), Ok(None));
     }
 
     #[test]
-    fn a_reminder_brings_the_week_when_the_page_has_none() {
-        let mut kept = Kept::on(Refs::default());
-        let friday = reminder("", "Water the Monstera", "2026-10-30", "", Some(7)).unwrap();
-        kept.offer_reminder(friday, &[]).unwrap();
-        let (_, operations) = kept.writes(&answering());
-        assert!(matches!(
-            &operations[..],
-            [
-                Operation::Create { model: ModelKind::Reminder, .. },
-                Operation::Create { model: ModelKind::Block, data, .. },
-            ] if data["kind"] == json!("week")
-        ));
+    fn kept_words_name_where() {
+        assert_eq!(
+            kept_words(1, &["Monstera".into()]),
+            "Kept a point under Monstera."
+        );
+        assert_eq!(
+            kept_words(3, &["Monstera".into(), "Basilikum".into(), "Efeu".into()]),
+            "Kept 3 points under Monstera, Basilikum and Efeu."
+        );
+        assert_eq!(
+            change_words((1, 2), (0, 0), &["Gewicht".into()], 1).as_deref(),
+            Some("Changed a block and 2 points and removed Gewicht and a point.")
+        );
     }
 
     #[test]
     fn a_reminder_replaces_one_on_the_calendar_once_its_taken() {
-        let (on, offered) = (Uuid::now_v7(), Uuid::now_v7());
+        let reminder_of = |status: &str| PageReminder {
+            id: Uuid::now_v7(),
+            title: "Wash".into(),
+            due_on: NaiveDate::from_ymd_opt(2026, 10, 30).unwrap(),
+            every_days: None,
+            status: status.into(),
+            point_id: None,
+            last_done_on: None,
+        };
+        let (on, offered) = (reminder_of("on"), reminder_of("offered"));
         let mut kept = Kept::on(Refs {
-            blocks: vec![block("week", "")],
-            points: vec![],
-            reminders: vec![(on, false), (offered, true)],
+            reminders: vec![on.clone(), offered.clone()],
+            ..Refs::default()
         });
         let friday = reminder("Wäsche", "Elvital wash", "2026-10-30", "", Some(7)).unwrap();
-        kept.offer_reminder(friday, &["r1".into(), "r2".into()])
+        kept.offer_reminder(friday, &["r1".into(), "r2".into()], None)
             .unwrap();
         let (_, operations) = kept.writes(&answering());
         let [
@@ -1379,8 +2266,8 @@ mod tests {
         else {
             panic!("{operations:?}");
         };
-        assert_eq!(*gone, offered);
-        assert_eq!(data["replaces"], json!([on]));
+        assert_eq!(*gone, offered.id);
+        assert_eq!(data["replaces"], json!([on.id]));
     }
 
     #[test]

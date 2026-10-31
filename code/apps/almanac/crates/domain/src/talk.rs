@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::model::{Validate, ValidationError};
-use crate::topic::{Facet, TopicPatch};
+use crate::topic::{Cell, Facet, Field, TopicPatch};
 
 /// A talk with a topic, in the panel beside its page. The server starts
 /// it with the first question; you can delete it.
@@ -91,6 +93,9 @@ pub struct Proposal {
     #[serde(default)]
     #[ts(optional)]
     pub cards: Option<String>,
+    /// For a collection, the fields its rows have.
+    #[serde(default)]
+    pub fields: Vec<Field>,
     pub starters: Vec<String>,
     /// What you told Almanac, kept as the topic's first points.
     pub points: Vec<ProposedPoint>,
@@ -110,7 +115,11 @@ pub struct ProposedPoint {
     pub block: Option<String>,
     #[serde(default)]
     pub theme: String,
+    /// In a collection, the row's name.
     pub text: String,
+    /// In a collection, the row's cells, by field.
+    #[serde(default)]
+    pub cells: BTreeMap<String, Cell>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -204,6 +213,9 @@ pub struct BlockWas {
     /// The view a person picked, which undo brings back with the block.
     #[serde(default)]
     pub view: String,
+    /// A collection's fields.
+    #[serde(default)]
+    pub fields: Vec<Field>,
     pub position: i32,
     /// Whether the layout removed it.
     pub removed: bool,
@@ -225,7 +237,22 @@ pub struct PointWas {
     pub amount: Option<f64>,
     #[serde(default)]
     pub note: String,
+    /// A row's cells.
+    #[serde(default)]
+    pub cells: BTreeMap<String, Cell>,
+    #[serde(default)]
+    pub done: bool,
     pub position: i32,
+    /// Whether the answer removed it, which undo makes again with its
+    /// source.
+    #[serde(default)]
+    pub removed: bool,
+    #[serde(default)]
+    #[ts(optional)]
+    pub source: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub source_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

@@ -143,7 +143,7 @@ async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
     assert_eq!(session["tools"], json!(["WebSearch", "WebFetch"]));
     let allowed = session["allowed"].as_array().unwrap();
     assert!(allowed.contains(&json!("mcp__almanac__propose_topic")));
-    assert!(!allowed.contains(&json!("mcp__almanac__keep_point")));
+    assert!(!allowed.contains(&json!("mcp__almanac__add_items")));
 
     // Start: the proposal as it is, with its first points and reminders.
     let start = json!({ "name": "Plants", "from_message": answer["id"] });
@@ -156,13 +156,14 @@ async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
     assert_eq!(plants["group_name"], "Home");
     assert_eq!(plants["starters"].as_array().map(Vec::len), Some(2));
     let points = app.synced(&ada, &home, "Point").await;
-    assert_eq!(points[0]["text"], "Stands by the north window.");
+    assert_eq!(points[0]["text"], "Monstera");
+    assert_eq!(points[0]["cells"], json!({ "Light": "North window" }));
     assert_eq!(points[0]["source"], "You said");
     let blocks = app.synced(&ada, &home, "Block").await;
-    let cards = blocks.iter().find(|b| b["kind"] == "cards").unwrap();
-    assert_eq!(cards["title"], "Plants");
-    assert_eq!(points[0]["block_id"], cards["id"]);
-    assert_eq!(points[0]["theme"], "Monstera");
+    let rows = blocks.iter().find(|b| b["kind"] == "collection").unwrap();
+    assert_eq!(rows["title"], "Plants");
+    assert_eq!(rows["fields"][0]["name"], "Light");
+    assert_eq!(points[0]["block_id"], rows["id"]);
     let reminders = app.synced(&ada, &home, "Reminder").await;
     assert_eq!(reminders[0]["status"], "offered");
     assert_eq!(reminders[0]["topic_id"], plants["id"]);
@@ -251,7 +252,7 @@ async fn a_topic_sets_itself_up_and_keeps_a_point_without_the_web(pool: PgPool) 
         answer["text"],
         "Water it every 7 days.\n\nCheck that the top of the soil is dry first."
     );
-    assert_eq!(answer["kept"], "Kept a point under Monstera.");
+    assert_eq!(answer["kept"], "Kept a point under Care.");
     assert_eq!(
         answer["sources"][0]["url"],
         "https://www.rhs.org.uk/plants/monstera"
@@ -270,7 +271,7 @@ async fn a_topic_sets_itself_up_and_keeps_a_point_without_the_web(pool: PgPool) 
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
+async fn a_talk_changes_the_page_and_undo_puts_it_back(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
     let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
@@ -282,7 +283,7 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
         )
         .await;
     let topic = started.body["id"].as_str().unwrap().to_string();
-    // The set-up picks a collection, whose cards are Plants.
+    // The set-up picks a collection, whose rows are Plants.
     for _ in 0..100 {
         let laid_out: bool =
             sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM blocks WHERE title = 'Plants')")
@@ -303,10 +304,11 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
             .collect()
     };
     let before = app.synced(&ada, &home, "Block").await;
-    assert_eq!(titles(&before), ["Today", "", "Plants", "You"]);
+    assert_eq!(titles(&before), ["To do", "Plants", "You"]);
     let plants = before.iter().find(|b| b["title"] == "Plants").unwrap()["id"].clone();
 
-    // Asked from the Monstera's section, the question is about it.
+    // Asked from the Monstera's section, the question is about it, and
+    // what it keeps goes in a block it starts.
     let asked = app
         .post(
             &format!("/api/w/{home}/topics/{topic}/ask"),
@@ -323,36 +325,33 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
             .contains("They ask from the section Monstera of the page"),
         "{system}"
     );
+    let blocks = app.synced(&ada, &home, "Block").await;
+    assert_eq!(titles(&blocks), ["To do", "Plants", "You", "Care"]);
+    let care = blocks.iter().find(|b| b["title"] == "Care").unwrap()["id"].clone();
 
-    let laid = ask(&app, &ada, &home, &topic, "Lay out the page anew.").await;
-    let change = &laid["changes"][0];
-    assert_eq!(change["said"], "Put the Monstera's watering in Facts.");
+    let tidied = ask(&app, &ada, &home, &topic, "Tidy the page.").await;
+    let change = &tidied["changes"][0];
     assert_eq!(
-        change["layout"]["moves"],
-        json!([
-            { "block": "Facts", "change": "new chips", "holds": "a point, all reworded to fit" },
-            { "block": "Plants", "change": "removed", "holds": "nothing was left in it" },
-        ])
+        change["said"],
+        "Changed a point, moved a point and removed Plants."
     );
     let after = app.synced(&ada, &home, "Block").await;
-    assert_eq!(
-        titles(&after),
-        ["Today", "", "Facts", "You"],
-        "the emptied block goes, and You, left out, stays"
-    );
-    let facts = after.iter().find(|b| b["title"] == "Facts").unwrap()["id"].clone();
+    assert_eq!(titles(&after), ["To do", "You", "Care"]);
+    let to_do = after.iter().find(|b| b["title"] == "To do").unwrap()["id"].clone();
     let points = app.synced(&ada, &home, "Point").await;
-    assert_eq!(points.len(), 1, "nothing is dropped");
-    assert_eq!(points[0]["block_id"], facts);
-    assert_eq!(points[0]["theme"], "");
-    assert_eq!(points[0]["text"], "Water every 7 days");
+    assert_eq!(points.len(), 1, "nothing else goes");
+    assert_eq!(points[0]["block_id"], to_do);
+    assert_eq!(
+        points[0]["text"],
+        "Water every 7 days, once the top is dry."
+    );
     assert_eq!(points[0]["source"], "Royal Horticultural Society");
 
     let undone = app
         .post(
             &format!(
                 "/api/w/{home}/messages/{}/undo",
-                laid["id"].as_str().unwrap()
+                tidied["id"].as_str().unwrap()
             ),
             Some(&ada),
             json!({}),
@@ -360,12 +359,11 @@ async fn a_talk_lays_out_the_page_and_undo_puts_it_back(pool: PgPool) {
         .await;
     assert!(undone.status.is_success(), "{}", undone.body);
     let back = app.synced(&ada, &home, "Block").await;
-    assert_eq!(titles(&back), ["Today", "", "Plants", "You"]);
+    assert_eq!(titles(&back), ["To do", "Plants", "You", "Care"]);
     assert!(back.iter().any(|b| b["id"] == plants), "the same block");
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points.len(), 1);
-    assert_eq!(points[0]["block_id"], plants);
-    assert_eq!(points[0]["theme"], "Monstera");
+    assert_eq!(points[0]["block_id"], care);
     assert_eq!(points[0]["text"], "Water every 7 days.");
 }
 
@@ -585,7 +583,7 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
+async fn an_item_rings_and_a_tick_ticks_its_reminder(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
     let (app, _) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
@@ -610,29 +608,42 @@ async fn a_moved_day_replaces_its_point_and_reminder(pool: PgPool) {
     }
 
     ask(&app, &ada, &home, &topic, "I wash on Thursday").await;
+    let points = app.synced(&ada, &home, "Point").await;
+    let item = points[0]["id"].clone();
     let first = app.synced(&ada, &home, "Reminder").await;
     assert_eq!(first.len(), 1);
+    assert_eq!(first[0]["title"], "Wash on Thursday", "the item's words");
+    assert_eq!(first[0]["point_id"], item);
     let thursday = first[0]["id"].clone();
 
     let answer = ask(&app, &ada, &home, &topic, "My wash day moved to Friday").await;
-    assert_eq!(answer["kept"], "Updated a point under Wäsche.");
+    assert_eq!(answer["changes"][0]["said"], "Changed a point.");
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points.len(), 1, "{points:?}");
-    assert_eq!(points[0]["text"], "Washes on Friday.");
+    assert_eq!(points[0]["text"], "Wash on Friday");
     assert_eq!(points[0]["seen"], false);
     // The Thursday offer wasn't taken yet, so it goes at once.
     let reminders = app.synced(&ada, &home, "Reminder").await;
     assert_eq!(reminders.len(), 1, "{reminders:?}");
     assert_ne!(reminders[0]["id"], thursday);
     assert_eq!(reminders[0]["due_on"], "2026-10-30");
-    assert_eq!(reminders[0]["replaces"], json!([]));
+    assert_eq!(reminders[0]["point_id"], item);
 
-    // Sorting keeps the point again in another block, in its place.
-    ask(&app, &ada, &home, &topic, "Sort the notes").await;
+    // Taken, the reminder is what a tick of its item ticks.
+    let friday = reminders[0]["id"].clone();
+    let taken = app
+        .sync(
+            &ada,
+            &home,
+            json!([{ "action": "update", "model": "Reminder", "id": friday, "data": { "status": "on" } }]),
+        )
+        .await;
+    assert!(taken.status.is_success(), "{}", taken.body);
+    ask(&app, &ada, &home, &topic, "I washed today").await;
+    let reminders = app.synced(&ada, &home, "Reminder").await;
+    assert_eq!(reminders[0]["status"], "on", "it comes round again");
+    assert_eq!(reminders[0]["last_done_on"], "2026-10-30");
+    assert!(reminders[0]["due_on"].as_str().unwrap() > "2026-10-30");
     let points = app.synced(&ada, &home, "Point").await;
-    assert_eq!(points.len(), 1, "{points:?}");
-    let blocks = app.synced(&ada, &home, "Block").await;
-    let today = blocks.iter().find(|b| b["kind"] == "today").unwrap();
-    assert_eq!(points[0]["block_id"], today["id"]);
-    assert_eq!(points[0]["theme"], "Elvital wash");
+    assert_eq!(points[0]["done"], false, "the reminder keeps the tick");
 }

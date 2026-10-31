@@ -115,6 +115,7 @@ export function samples(): Sample[] {
     replaces: [],
     last_done_on: null,
     notified_for: null,
+    point_id: null,
   });
 
   const running = topic("Running", "bike");

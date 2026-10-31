@@ -30,13 +30,15 @@ const TYPES: &[&str] = &["image/jpeg", "image/png", "image/webp", "image/gif"];
 const SAVE: &str = "INSERT INTO photos (id, workspace_id, message_id, position, media_type, data) \
      VALUES ($1, $2, $3, $4, $5, $6)";
 const ONE: &str = "SELECT media_type, data FROM photos WHERE id = $1 AND workspace_id = $2";
-const OF_TALK: &str = "SELECT p.message_id, p.media_type, p.data FROM photos p \
+const OF_TALK: &str = "SELECT p.id, p.message_id, p.media_type, p.data FROM photos p \
      JOIN messages m ON m.id = p.message_id \
      WHERE m.talk_id = $1 AND p.workspace_id = $2 ORDER BY p.message_id, p.position";
 
 /// A photo as Claude reads it: its type and its bytes in base64.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Image {
+    /// Which photo it is, for a collection's photo cell.
+    pub id: Uuid,
     pub media_type: String,
     pub data: String,
 }
@@ -122,14 +124,15 @@ pub async fn of_talk(
     workspace_id: Uuid,
     talk_id: Uuid,
 ) -> Result<HashMap<Uuid, Vec<Image>>, sqlx::Error> {
-    let rows: Vec<(Uuid, String, Vec<u8>)> = sqlx::query_as(OF_TALK)
+    let rows: Vec<(Uuid, Uuid, String, Vec<u8>)> = sqlx::query_as(OF_TALK)
         .bind(talk_id)
         .bind(workspace_id)
         .fetch_all(pool)
         .await?;
     let mut out: HashMap<Uuid, Vec<Image>> = HashMap::new();
-    for (message_id, media_type, bytes) in rows {
+    for (id, message_id, media_type, bytes) in rows {
         out.entry(message_id).or_default().push(Image {
+            id,
             media_type,
             data: STANDARD.encode(bytes),
         });

@@ -81,7 +81,8 @@ async function answer(prompt: string) {
         template: "collection",
         cards: "Plants",
         starters: ["How often do I water the Monstera?", "When do I repot?"],
-        points: [{ block: "Plants", theme: "Monstera", text: "Stands by the north window." }],
+        fields: [{ name: "Light", kind: "text" }],
+        points: [{ block: "Plants", text: "Monstera", cells: { light: "North window" } }],
         reminders: [
           { theme: "Monstera", title: "Water the Monstera", due_on: "2026-11-01", every_days: 7 },
         ],
@@ -89,70 +90,50 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
-  } else if (/lay out/i.test(prompt)) {
-    await tool("lay_out_page", {
-      blocks: [
-        { block: "b1" },
-        { block: "b2" },
-        { kind: "chips", title: "Facts" },
-        { block: "b3" },
-      ],
-      moves: [{ point: "p1", block: "Facts", text: "Water every 7 days" }],
-      said: "Put the Monstera's watering in Facts.",
+  } else if (/tidy/i.test(prompt)) {
+    await tool("change_points", {
+      points: [{ point: "p1", text: "Water every 7 days, once the top is dry." }],
     });
-    say("Laid out.");
+    await tool("move", { points: ["p1"], to: "b1" });
+    await tool("remove", { what: ["b2"] });
+    say("Tidied.");
   } else if (/from now on/i.test(prompt)) {
     say("I will.");
     await tool("change_brief", {
       sticks_to: `${BRIEF}\nAnswers in English.`,
       said: "Answers in English.",
     });
-  } else if (/sort/i.test(prompt)) {
-    say("Sorted.");
-    await tool("keep_point", {
-      block: "Today",
-      theme: "Elvital wash",
-      text: "Elvital shampoo: on the scalp, lukewarm water.",
-      source: "From the talk",
-      replaces: ["p1"],
-    });
+  } else if (/washed/i.test(prompt)) {
+    say("Ticked.");
+    await tool("tick", { items: ["p1"] });
   } else if (/moved/i.test(prompt)) {
     say("Then Friday it is.");
-    await tool("keep_point", {
-      theme: "Wäsche",
-      text: "Washes on Friday.",
-      source: "You said",
-      replaces: ["p1"],
-    });
+    await tool("change_points", { points: [{ point: "p1", text: "Wash on Friday" }] });
     await tool("offer_reminder", {
-      theme: "Wäsche",
-      title: "Elvital wash",
+      item: "p1",
       due_on: "2026-10-30",
       every_days: 7,
       replaces: ["r1"],
     });
   } else if (/wash/i.test(prompt)) {
     say("Thursday, then.");
-    await tool("keep_point", {
-      block: "b3",
-      theme: "Wäsche",
-      text: "Washes on Thursday.",
-      source: "You said",
+    await tool("add_items", {
+      block: "To do",
+      items: [{ text: "Wash on Thursday", source: "You said" }],
     });
-    await tool("offer_reminder", {
-      theme: "Wäsche",
-      title: "Elvital wash",
-      due_on: "2026-10-29",
-      every_days: 7,
-    });
+    await tool("offer_reminder", { item: "p1", due_on: "2026-10-29", every_days: 7 });
   } else {
     say("Water it every 7 days.");
-    await tool("keep_point", {
-      block: "Plants",
-      theme: "Monstera",
-      text: "Water every 7 days.",
-      source: "Royal Horticultural Society",
-      url: "https://www.rhs.org.uk/plants/monstera",
+    await tool("add_block", { kind: "bullets", title: "Care" });
+    await tool("add_items", {
+      block: "Care",
+      items: [
+        {
+          text: "Water every 7 days.",
+          source: "Royal Horticultural Society",
+          url: "https://www.rhs.org.uk/plants/monstera",
+        },
+      ],
     });
     say("Check that the top of the soil is dry first.");
   }

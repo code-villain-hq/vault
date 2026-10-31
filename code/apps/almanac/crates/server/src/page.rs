@@ -1,26 +1,28 @@
 //! A topic's page as Claude reads it: what the topic sticks to, its blocks
-//! in order with the points each keeps, the questions it waits on, its
-//! reminders, and the names of the other topics, for questions that belong
-//! there. For the workspace's own topic, the workspace: its topics by
+//! in order with the points each keeps (a collection's rows with their
+//! cells), the questions it waits on, its reminders, and the names of the
+//! other topics, for questions that belong there. For the workspace's own topic, the workspace: its topics by
 //! group, what each sticks to, its blocks and how much it has.
 
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use almanac_domain::Facet;
+use almanac_domain::{Cell, Facet, Field, SET_KINDS};
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use sqlx::types::Json;
 use uuid::Uuid;
 
 const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
-const BLOCKS: &str = "SELECT id, kind, title, facets, width FROM blocks \
+const BLOCKS: &str = "SELECT id, kind, title, facets, fields, width, view, position FROM blocks \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, look, amount, note, \
-       done, source \
+       cells, done, position, source, source_url \
      FROM points WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const QUESTIONS: &str = "SELECT text FROM questions \
      WHERE topic_id = $1 AND workspace_id = $2 AND status = 'open' ORDER BY created_at";
-const REMINDERS: &str = "SELECT id, title, due_on, every_days, status FROM reminders \
+const REMINDERS: &str = "SELECT id, title, due_on, every_days, status, point_id, last_done_on \
+     FROM reminders \
      WHERE topic_id = $1 AND workspace_id = $2 AND status IN ('on', 'offered') ORDER BY due_on";
 const OTHERS: &str = "SELECT name FROM topics \
      WHERE workspace_id = $2 AND id <> $1 AND kind = 'topic' ORDER BY position";
@@ -33,8 +35,9 @@ const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, \
      FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
      ORDER BY t.group_name = '', t.group_name, t.position, t.created_at";
 
-/// A point as the page has it.
-#[derive(sqlx::FromRow)]
+/// A point as the page has it: an item, or a collection's row, its text
+/// the row's name.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct PagePoint {
     pub id: Uuid,
     pub block_id: Uuid,
@@ -46,34 +49,59 @@ pub struct PagePoint {
     pub look: String,
     pub amount: Option<f64>,
     pub note: String,
+    pub cells: Json<BTreeMap<String, Cell>>,
     pub done: bool,
+    pub position: i32,
     pub source: Option<String>,
+    pub source_url: Option<String>,
 }
 
-/// A reminder as the page has it: its id, title, next day, rhythm, and
-/// whether it's `on` or only `offered`.
-pub type PageReminder = (Uuid, String, NaiveDate, Option<i32>, String);
+/// A reminder as the page has it.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PageReminder {
+    pub id: Uuid,
+    pub title: String,
+    pub due_on: NaiveDate,
+    pub every_days: Option<i32>,
+    /// `on`, or only `offered`.
+    pub status: String,
+    /// The checklist item it rings for.
+    pub point_id: Option<Uuid>,
+    pub last_done_on: Option<NaiveDate>,
+}
+
+impl PageReminder {
+    /// Whether it's ticked for now: done, or done for a day it comes due
+    /// after, as a checklist item shows it (`doneFor` in the web app).
+    pub fn ticked(&self) -> bool {
+        self.last_done_on
+            .is_some_and(|day| self.status == "done" || (self.status == "on" && self.due_on > day))
+    }
+}
 
 /// One block of the page, with its points in order.
 pub struct PageBlock {
-    pub id: Uuid,
-    /// One of [`almanac_domain::BLOCK_KINDS`].
-    pub kind: String,
-    pub title: String,
-    pub facets: Vec<Facet>,
-    /// Empty for its kind's own.
-    pub width: String,
+    pub block: RefBlock,
     pub points: Vec<PagePoint>,
 }
 
-/// A block by the reference Claude reads it with.
-#[derive(Debug, Clone)]
+/// A block as the page has it, by the reference Claude reads it with.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct RefBlock {
     pub id: Uuid,
+    /// One of [`almanac_domain::SET_KINDS`], or of the kinds from before
+    /// the set.
     pub kind: String,
     pub title: String,
-    /// For cards: the facets its points may name.
-    pub facets: Vec<Facet>,
+    /// For cards from before the set: the facets its points may name.
+    pub facets: Json<Vec<Facet>>,
+    /// For a collection: its rows' fields.
+    pub fields: Json<Vec<Field>>,
+    /// Empty for its kind's own.
+    pub width: String,
+    /// The picture a person or a talk picked; empty for the app's own.
+    pub view: String,
+    pub position: i32,
 }
 
 /// The page's blocks, points and reminders by the references Claude reads
@@ -82,10 +110,8 @@ pub struct RefBlock {
 #[derive(Debug, Default, Clone)]
 pub struct Refs {
     pub blocks: Vec<RefBlock>,
-    /// Each with the block it's in.
-    pub points: Vec<(Uuid, Uuid)>,
-    /// Each with whether it's only offered yet.
-    pub reminders: Vec<(Uuid, bool)>,
+    pub points: Vec<PagePoint>,
+    pub reminders: Vec<PageReminder>,
 }
 
 pub struct Page {
@@ -97,9 +123,6 @@ pub struct Page {
     pub reminders: Vec<PageReminder>,
     pub others: Vec<String>,
 }
-
-/// A block as `BLOCKS` reads it: id, kind, title, facets and width.
-type BlockRow = (Uuid, String, String, Json<Vec<Facet>>, String);
 
 impl Page {
     pub async fn load(
@@ -115,19 +138,15 @@ impl Page {
         let Some((name, sticks_to)) = topic else {
             return Ok(None);
         };
-        let blocks: Vec<BlockRow> = sqlx::query_as(BLOCKS)
+        let blocks: Vec<RefBlock> = sqlx::query_as(BLOCKS)
             .bind(id)
             .bind(workspace_id)
             .fetch_all(pool)
             .await?;
         let mut blocks: Vec<PageBlock> = blocks
             .into_iter()
-            .map(|(id, kind, title, Json(facets), width)| PageBlock {
-                id,
-                kind,
-                title,
-                facets,
-                width,
+            .map(|block| PageBlock {
+                block,
                 points: Vec::new(),
             })
             .collect();
@@ -137,7 +156,7 @@ impl Page {
             .fetch_all(pool)
             .await?;
         for point in points {
-            if let Some(block) = blocks.iter_mut().find(|b| b.id == point.block_id) {
+            if let Some(block) = blocks.iter_mut().find(|b| b.block.id == point.block_id) {
                 block.points.push(point);
             }
         }
@@ -167,26 +186,13 @@ impl Page {
     /// The references `describe` gives the blocks, points and reminders.
     pub fn refs(&self) -> Refs {
         Refs {
-            blocks: self
-                .blocks
-                .iter()
-                .map(|b| RefBlock {
-                    id: b.id,
-                    kind: b.kind.clone(),
-                    title: b.title.clone(),
-                    facets: b.facets.clone(),
-                })
-                .collect(),
+            blocks: self.blocks.iter().map(|b| b.block.clone()).collect(),
             points: self
                 .blocks
                 .iter()
-                .flat_map(|b| b.points.iter().map(|p| (p.id, b.id)))
+                .flat_map(|b| b.points.iter().cloned())
                 .collect(),
-            reminders: self
-                .reminders
-                .iter()
-                .map(|(id, .., status)| (*id, status == "offered"))
-                .collect(),
+            reminders: self.reminders.clone(),
         }
     }
 
@@ -200,43 +206,56 @@ impl Page {
             s => s,
         };
         let _ = writeln!(out, "What it sticks to, its brief: {sticks_to}");
-        let _ = writeln!(out, "\nHow the page lays out its points: {BLOCKS_SAY}");
+        let _ = writeln!(out, "\nHow a page is made: {SET_SAYS}");
+        if self.blocks.iter().any(|b| !in_the_set(&b.block.kind)) {
+            let _ = writeln!(out, "\n{BEFORE_THE_SET_SAYS}");
+        }
         out.push_str("\nThe page's blocks, in order:\n");
         if self.blocks.is_empty() {
             out.push_str("None yet.\n");
         }
         let mut n = 0;
-        for (b, block) in self.blocks.iter().enumerate() {
+        for (b, PageBlock { block, points }) in self.blocks.iter().enumerate() {
             let title = match block.title.as_str() {
-                "" => "The week",
+                "" if block.kind == "week" => "The week",
+                "" => "Untitled",
                 title => title,
             };
-            let facets = match block.facets.as_slice() {
-                [] => String::new(),
-                facets => format!(
-                    "; facets: {}",
-                    facets
+            let mut about = vec![block.kind.clone()];
+            if !in_the_set(&block.kind) {
+                about[0] = format!("{}, from before the set", block.kind);
+            }
+            if !block.fields.is_empty() {
+                about.push(format!(
+                    "fields: {}",
+                    block
+                        .fields
                         .iter()
-                        .map(|f| format!("{} ({})", f.name, f.icon))
+                        .map(field_words)
                         .collect::<Vec<_>>()
                         .join(", ")
-                ),
-            };
-            let width = match block.width.as_str() {
-                "" => String::new(),
-                width => format!(", {width} wide"),
-            };
-            let _ = writeln!(
-                out,
-                "## [b{}] {title} ({}{width}{facets})",
-                b + 1,
-                block.kind
-            );
-            if block.points.is_empty() && block.kind != "week" {
+                ));
+            }
+            if !block.facets.is_empty() {
+                about.push(format!(
+                    "facets: {}",
+                    block
+                        .facets
+                        .iter()
+                        .map(|f| f.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !block.view.is_empty() {
+                about.push(format!("shown as {}", block.view));
+            }
+            let _ = writeln!(out, "## [b{}] {title} ({})", b + 1, about.join("; "));
+            if points.is_empty() && block.kind != "week" && block.kind != "heading" {
                 out.push_str("Nothing yet.\n");
             }
             let mut theme = None;
-            for point in &block.points {
+            for point in points {
                 if !point.theme.is_empty() && theme != Some(&point.theme) {
                     let _ = writeln!(out, "### {}", point.theme);
                     theme = Some(&point.theme);
@@ -246,15 +265,26 @@ impl Page {
                     "" => String::new(),
                     happened => format!("{happened}: "),
                 };
+                let cells: String = block
+                    .fields
+                    .iter()
+                    .filter_map(|f| {
+                        point
+                            .cells
+                            .get(&f.name)
+                            .map(|c| format!(" | {}: {}", f.name, cell_words(c)))
+                    })
+                    .collect();
                 let source = match point.source.as_deref().filter(|s| !s.is_empty()) {
                     Some(source) => format!(" ({source})"),
                     None => String::new(),
                 };
+                let rings = self.reminders.iter().find(|r| r.point_id == Some(point.id));
                 let _ = writeln!(
                     out,
-                    "- [p{n}] {when}{}{source}{}",
+                    "- [p{n}] {when}{}{cells}{source}{}",
                     point.text,
-                    shape_words(point)
+                    shape_words(point, rings)
                 );
             }
         }
@@ -265,18 +295,34 @@ impl Page {
             }
         }
         if !self.reminders.is_empty() {
+            let ids: Vec<Uuid> = self
+                .blocks
+                .iter()
+                .flat_map(|b| b.points.iter().map(|p| p.id))
+                .collect();
             out.push_str("\nReminders on the calendar:\n");
-            for (n, (_, title, due_on, every, status)) in self.reminders.iter().enumerate() {
-                let when = match every {
+            for (n, reminder) in self.reminders.iter().enumerate() {
+                let due_on = reminder.due_on;
+                let when = match reminder.every_days {
                     Some(days) => format!("next on {due_on}, every {days} days"),
                     None => format!("on {due_on}"),
                 };
-                let offered = if status == "offered" {
+                let offered = if reminder.status == "offered" {
                     " (offered, waiting for their yes)"
                 } else {
                     ""
                 };
-                let _ = writeln!(out, "- [r{}] {title}: {when}{offered}", n + 1);
+                let item = reminder
+                    .point_id
+                    .and_then(|id| ids.iter().position(|p| *p == id))
+                    .map(|i| format!(", rings for p{}", i + 1))
+                    .unwrap_or_default();
+                let _ = writeln!(
+                    out,
+                    "- [r{}] {}: {when}{item}{offered}",
+                    n + 1,
+                    reminder.title
+                );
             }
         }
         out.push_str("\nThe other topics: ");
@@ -290,9 +336,40 @@ impl Page {
     }
 }
 
-/// What a point carries besides its text, as Claude reads it: " {facet:
-/// Wasser, look: warn}". Empty when it carries nothing.
-fn shape_words(point: &PagePoint) -> String {
+/// Whether a block of `kind` is one of the set, or You, which the
+/// topic's About shows.
+pub fn in_the_set(kind: &str) -> bool {
+    kind == "you" || SET_KINDS.contains(&kind)
+}
+
+/// A field as Claude reads it: "Gewicht (number, kg, goal 3.4)".
+fn field_words(field: &Field) -> String {
+    let mut said = vec![field.kind.clone()];
+    if !field.unit.is_empty() {
+        said.push(field.unit.clone());
+    }
+    if let Some(goal) = field.goal {
+        said.push(format!("goal {goal}"));
+    }
+    if !field.options.is_empty() {
+        said.push(field.options.join(" / "));
+    }
+    format!("{} ({})", field.name, said.join(", "))
+}
+
+/// A cell as Claude reads it.
+fn cell_words(cell: &Cell) -> String {
+    match cell {
+        Cell::Check(yes) => if *yes { "yes" } else { "no" }.into(),
+        Cell::Number(n) => n.to_string(),
+        Cell::Text(text) => text.clone(),
+    }
+}
+
+/// What a point carries besides its text and cells, as Claude reads it:
+/// " {facet: Wasser, look: warn}", or a checklist item's reminder. Empty
+/// when it carries nothing.
+fn shape_words(point: &PagePoint, rings: Option<&PageReminder>) -> String {
     let mut said = Vec::new();
     if !point.facet.is_empty() {
         said.push(format!("facet: {}", point.facet));
@@ -306,8 +383,18 @@ fn shape_words(point: &PagePoint) -> String {
     if !point.note.is_empty() {
         said.push(format!("note: {}", point.note));
     }
-    if point.done {
-        said.push("done".into());
+    match rings {
+        Some(reminder) if reminder.status == "on" => {
+            if reminder.ticked() {
+                said.push(format!("done, due again on {}", reminder.due_on));
+            }
+            said.push(match reminder.every_days {
+                Some(days) => format!("every {days} days"),
+                None => format!("on {}", reminder.due_on),
+            });
+        }
+        _ if point.done => said.push("done".into()),
+        _ => {}
     }
     match said.as_slice() {
         [] => String::new(),
@@ -315,86 +402,49 @@ fn shape_words(point: &PagePoint) -> String {
     }
 }
 
-/// What each kind of block shows, for Claude to keep each point where the
-/// page shows it.
-const BLOCKS_SAY: &str = "a page is its blocks, in order, each with a title of its own, and \
-each lays out its points one way. A point goes in one block, named by its reference (b2) or \
-its title; a theme groups points inside a block. The kinds: \
-today, the steps of what comes round on the day: the theme is what comes round, named the way \
-its reminders are (\"Elvital wash\"), and each point says what, a colon, then how (\"Elvital \
-shampoo: on the scalp, lukewarm water\"), in the order they're done; \
-week, the days of the topic's reminders, which keeps no points: offer a reminder instead; \
-chips, facts about what the topic is about, in a few words (\"Epiphyte: grows on other \
-plants\"), with no theme; \
-you, what they told you about themselves that your answers go by (\"Low porosity, by the \
-float test\", \"The balcony faces north\"), a fact each in a few words, with no theme: it \
-isn't on the page but on the topic's About, so keep there what you learn about them, not \
-on the page, however it's worded (their views, their CV, their hair), and a layout leaves it \
-a you block; \
-shelf, a tile for each thing they use, the thing's name as the theme (\"Elvital Hyaluron \
-Plump\"): its first point says what it is in two or three words (\"Shampoo and \
-conditioner\"), its second how they use it, any more are notes; \
-cards, a card for each thing the topic is about (a plant, a pet, a place), its name as the \
-theme, each point one short sentence, under 20 words. A block of cards names its facets, \
-the facts every card has, each with an icon (Licht sun, Wasser droplet, Platz map-pin): a \
-card's face shows a line for each, its first point under that facet, so that point says it \
-in a few words (\"Hell, keine direkte Mittagssonne\"), and facet names it. The card's first \
-point with no facet says what the thing is (\"Pfeilwurzgewächs\"); the other points with \
-no facet show on its own page. A point about something that needs a look (brown edges, \
-pests) has look warn; one ready for something (a cutting to pot) has look info; a card that \
-is fine has neither. A block with one card shows it as a profile: its points with no facet \
-as chips (\"3½ Jahre\", \"3,4 kg\"), and each facet as a tile of its points; \
-text, sections of one piece of writing, the section's heading as the theme (Problem, \
-Market, Team): each point keeps what the answer explained the way it explained it, two to \
-four sentences, starting with the term it's about in **bold** when there is one, and what \
-they told you stays one sentence. The page shows each section as a tile with the first \
-sentence of its first point, so that sentence stands on its own; \
-list, items to follow, read or do, one line each with its source, with no theme. They tick \
-what's done; when they tell you they did one, tick it with tick_points; \
-bars, numbers to compare, a bar each, on one scale per set: the theme is the set's \
-caption (\"9/11 und die Kriege danach\"), each point's text the bar's label (\"In den \
-Kriegen danach\") and its amount the number, plain (900000), with a few words beside it as \
-its note (\"getötet\", \"im CV\"); look warn marks a gap. The numbers of a set count the \
-same thing in the same unit, so their bars compare: hours of sleep and hours without food are \
-two sets, or no bars; \
-questions, questions they'd be asked, to rehearse (in an interview, an exam): the theme is \
-the question as it would be asked, its points the answer in short lines, and the first \
-point's note says who asks (\"Viaplay, Senior Fullstack AI Engineer\"). A question with no \
-answer yet has one point, with look warn, saying what's missing. When they practise them, \
-ask one at a time, and tick a question's points with tick_points once they answered it \
-well; \
-table, things compared across the same facts, a row each, the thing's name as the theme: the \
-block's facets are its columns, as they are a card's lines (Preis tag, Wo map-pin, Vegan \
-leaf), and a cell is the row's point with that facet, in a few words (\"709 kr\", \"Ja\", \
-\"Nein, Nubukleder\"); a number cell has its amount too (709), so its column sorts, and look \
-warn marks a cell that needs a look (over budget, not vegan). A row's points with no facet \
-show on its own page. A table and cards keep the same points, so a block of cards becomes a \
-table by its kind, when comparing them matters more than each one; \
-trend, a number kept each time it's measured (a weight, a price, a score), a line per theme: \
-the theme is what's measured (\"Lisas Gewicht\"), each point one measurement, its amount the \
-number (3.4), happened the day it was measured (2026-09-24), its note the unit (\"kg\") and its \
-text a few words on it (\"Beim Tierarzt gewogen\"). A point with no day is a mark they said \
-they aim at (text \"Ziel\"), never a number told without its day. When they tell you a new \
-measurement, keep it as a new point, never in place of the last; \
-parts, a whole split into the parts it's made of, a ring per theme: the theme is the whole's \
-caption (\"Wo man arbeitet\"), each point a part, its text the part's name (\"Remote\") and \
-its amount how many (11), and the first point's note says what they count (\"Anzeigen\"). At \
-most five parts, the largest first. The parts add up to the whole: numbers that don't (an ad \
-asks for many skills) stay bars; \
-timeline, what happened when, which the page lists oldest first: the theme is the section of \
-the page it belongs to, named exactly as that section or card is (\"Intifada\"), each point \
-one line on what happened (\"Die Erste Intifada\"), and it says when it happened: a year \
-(1959), a span (1987–1993) or a day (11. September 2001), with \"v. Chr.\" or \"BC\" before \
-the year 1, in the talk's language. When the page has a timeline and a talk explains \
-something that happened at a time, it keeps both: the explanation in its section, and one \
-line with its date on the timeline. \
-The page is a grid of twelve columns, and each block takes a width of it: 1/4, 1/3, 1/2, 2/3, \
-3/4 or whole. One that names none has its kind's: 1/3 for chips, trends and parts, 1/2 for \
-bars, questions, lists and timelines, the whole for the rest. Blocks fill the rows in their \
-order, and a row's blocks grow to fill it, so a small block sits beside its neighbour when \
-their widths add up (a trend at 1/3 before text at 2/3). \
-When no block fits a point, and only then, it may start a new block after the others, with \
-a kind and a short title.";
+/// The one set of blocks every page is made of, for Claude to file each
+/// thing where it belongs.
+const SET_SAYS: &str = "every page on every topic is made of the same few blocks, in order, \
+each with a short title or none. The app draws them; you only say what goes where. The kinds: \
+heading, a title that starts a part of the page, with no points; \
+paragraph, a point a paragraph, for what reads as prose: two to four sentences that explain, \
+starting with the term it's about in **bold** when there is one; \
+bullets, a point a line: a few words, or one short sentence; \
+checklist, a point a line to do or get, ticked once done. An item that comes round or is due on \
+a day is a reminder too (offer_reminder with its item): it rings on the Mac, and ticking the \
+item ticks the reminder, until it's due again; \
+toggle, a line per theme that opens on its points: the theme is the line (a term, a question, \
+a step), its points the bullets inside. Whole sentences that would crowd the page go here; \
+callout, a point set apart: look warn when it needs a look (a problem, a gap), info when \
+something is ready; \
+collection, rows that share the same fields, a row per thing, event or measurement (plants, \
+offers, weighings, repairs): its text is the row's name, and it has a cell for each field it \
+knows. A field is text (a few words), number (plain, 3.4, with the field's unit, kg, and a goal \
+when they aim at one), day (a day as 2026-09-24, or a year or a span, 1987–1993), choice (one of \
+a few words), status (where a row stands, Offen, Bestellt, Erledigt), check (yes or no), photo \
+(a photo from the talk, by its number) or link (a web page). The app draws a collection from \
+its fields: days with numbers as a line, a status as a board, photos as cards, days past as a \
+timeline and days to come as a week, a name with a number as bars, three fields or more as a \
+table, the rest as a list. \
+File each thing where it belongs, and keep the page's face short: a few words a line, whole \
+sentences in paragraphs and toggles. What's measured, compared or tracked is rows with typed \
+fields, never a sentence: a weighing is a row with its day and its number in kg, so the line \
+draws it. A row's cells hold only what they or a source said: leave a cell out rather than \
+guess. Add to the block it fits; add a field to a collection that lacks one; start a block \
+only when none fits. The page is kept up to date, not added to: change what changed, remove \
+what's wrong or twice, and keep one point where two would say the same. \
+Besides the set, you is what they told you about themselves that your answers go by (\"Low \
+porosity, by the float test\", \"The balcony faces north\"), a fact each in a few words: it \
+isn't on the page but on the topic's About, so keep there what you learn about them, however \
+it's worded.";
+
+/// The kinds from before the set, which a page keeps until it moves into
+/// the set.
+const BEFORE_THE_SET_SAYS: &str = "Blocks from before the set are older kinds the page will \
+move into the set. Their points can be changed, moved, ticked and removed. Items go only in \
+those of lines: list and chips with no theme, and text, today, shelf and cards under a \
+theme (the section, what comes round, the thing, the card). Anything else new goes in a block \
+of the set.";
 
 /// The workspace as its own topic reads it.
 pub struct Workspace {

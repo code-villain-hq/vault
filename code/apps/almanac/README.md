@@ -113,13 +113,12 @@ topics.
 - **Photos in a talk**: paste, drop or pick up to six with a question, of a
   shampoo, a plant, a page. Claude reads them with that question and every
   later one in the talk; they stay in the talk, not on the page.
-- **The page keeps points with their sources**, each in a block: a card
-  per plant with a short note for each point; sections of paragraphs that
-  explain, each with the talk it came from; the day's steps; facts as
-  chips; your shelf, each thing with when and how you use it; a list of
-  advice or reading. Claude keeps each point in the block that shows it,
-  and starts a block when you ask for one or none fits ("keep what I need
-  to buy"). New points carry the unread dot until you leave the topic.
+- **The page keeps points with their sources**, each in a block of the
+  set: text, bullets, a checklist, toggles, a callout, or a collection
+  whose rows fill its fields (a row per plant, with its spot and light).
+  Claude keeps each point in the block that holds it, and starts a block
+  when you ask for one or none fits ("keep what I need to buy"), a
+  collection with the fields its rows need. New points carry the unread dot until you leave the topic.
   The page is kept up to date, not added to: a point that changes one it
   has takes that one's place, in the same block. It runs the window's
   width: cards, steps and tiles take as many columns as fit, and writing,
@@ -182,19 +181,11 @@ topics.
   oldest first: when its events begin and end, and how many there are.
   Its name opens it. Asking from a section's page keeps what happened
   there on its timeline.
-- **Laying the page out anew**: ask a talk for a better layout, or "Mach
-  eine Zeitleiste daraus", and it adds, renames, reorders, removes and
-  changes blocks, and moves and rewords points, at once. It gives each
-  block the kind its points fit (a table, a trend, bars), keeps what's
-  about one thing together, and says
-  which kind has to wait for more (a second weighing for a trend). Chips
-  and table cells get a few words; what else a point said stays as a
-  point of its own. It never drops a point or changes where one came
-  from. The answer lists what moved, with
-  one Undo. A timeline made this way is new points; the sections stay as
-  they were. Asked from a section's page, it lays out only that section.
-  Only Claude Code on this Mac does this; through a key, the
-  answer says how it would lay the page out.
+- **A talk changes the page when you ask**: "tidy this up", "put the
+  shelf first", "show my plants as a table". It rewords, moves and
+  removes points and blocks, changes a collection's fields, or picks
+  another picture its fields allow, at once, and the answer says what it
+  changed, with one Undo. It never picks a colour or a width.
 - **⌘K searches what the topics keep**: sections, points, reminders and
   talks, the talks' messages too, with every word you type in any order.
   Up to five a topic show under its name; a point opens its section's
@@ -206,9 +197,10 @@ topics.
 - **Reminders**: when a talk settles something that comes round, or you
   tell it a routine you keep, such as your wash days, Almanac offers a
   reminder in the talk. When a wash day moves, the new reminder replaces
-  the old one once you say yes. The Week block shows them, with the weeks
-  before and after a click away; a topic without one gets it with its
-  first reminder. A collection's Today lists what comes round that day.
+  the old one once you say yes. A checklist item can ring: ticking it
+  ticks its reminder, and one that repeats shows its rhythm beside it and
+  comes back unticked when it's due. The Week block shows them, with the
+  weeks before and after a click away. A collection's Today lists what comes round that day.
   Calendar shows the workspace's week from every topic and what's still
   to do from before it; what you tick stays on its day, ticked, until you
   untick it. A bell marks the reminders that notify the Mac, and the
@@ -226,8 +218,8 @@ what it read. A company server's doesn't.
   Claude files them through tools and never picks the look. It follows
   from "Claude writes, code draws"; the app already draws each block from
   what it keeps. The page draws the set, beside today's kinds, and
-  Settings → Blocks shows each block and picture; talks can't file into
-  it yet.
+  Settings → Blocks shows each block and picture; talks file into it,
+  and today's pages move into it next.
   [`proposals/one-set-of-blocks.md`](proposals/one-set-of-blocks.md) has
   the set and the order of work.
 - **Workspaces**, as every Code Villain app has them: Home, and Work for

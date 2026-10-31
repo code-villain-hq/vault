@@ -5,17 +5,26 @@
 // designs a page's own. Also the parts the page's older kinds share with
 // them: a photo, a tick, a timeline's rail, ✕ to take a point off.
 
-import type { Block, Field, Point } from "@almanac/types";
+import type { Block, Field, Point, Reminder } from "@almanac/types";
 import { type Confirmation, ConfirmDialog, RowAction } from "@code-villain/web";
 import { ChevronRight, Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { TrendSet } from "./charts";
 import { byDay, cellOf, cellWords, dayOf, filled, lanesOf, numberOf } from "./collection";
-import { addDays, amountWords, dateWords, today, weekdayWords } from "./format";
+import {
+  addDays,
+  amountWords,
+  dateWords,
+  dueWords,
+  rhythmWords,
+  today,
+  weekdayWords,
+} from "./format";
 import { usePhoto } from "./photos";
 import { inline } from "./prose";
+import { doneFor, isDue, markDone, markNotDone } from "./reminders";
 import { when } from "./timeline";
-import { useIsGuest, useWorkspace } from "./workspace";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** A line's measure, for lines that read across. */
 export const LINES = "max-w-[86ch]";
@@ -39,22 +48,48 @@ export function named(point: Point): boolean {
   return !!point.source && (!!point.source_url || !/^from\b/i.test(point.source));
 }
 
+/** The reminders that ring for checklist items, by item. */
+export function useItemReminders(): Map<string, Reminder> {
+  const reminders = useRecords("Reminder");
+  return useMemo(
+    () =>
+      new Map(
+        reminders
+          .filter((r) => r.point_id && (r.status === "on" || r.status === "done"))
+          .map((r) => [r.point_id as string, r]),
+      ),
+    [reminders],
+  );
+}
+
+/**
+ * Whether an item is done: with a reminder, done for the last day it was
+ * due, until it comes due again.
+ */
+export function itemDone(point: Point, reminder: Reminder | undefined): boolean {
+  if (!reminder) return point.done;
+  return doneFor(reminder) !== undefined && !isDue(reminder);
+}
+
 /**
  * A box to tick: done once all of `points` are. A list's line has one
- * point; a question, the points of its answer. Guests see it, not tick it.
+ * point; a question, the points of its answer. An item with a `reminder`
+ * ticks that instead. Guests see it, not tick it.
  */
 export function Tick({
   points,
   label,
+  reminder,
   className = "",
 }: {
   points: Point[];
   label: string;
+  reminder?: Reminder;
   className?: string;
 }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
-  const done = points.length > 0 && points.every((p) => p.done);
+  const done = points.length > 0 && points.every((p) => itemDone(p, reminder));
   const Icon = done ? CircleCheck : Circle;
   const look = `shrink-0 ${done ? "text-accent" : "text-faint"}`;
   if (guest) {
@@ -73,7 +108,8 @@ export function Tick({
       type="button"
       aria-pressed={done}
       aria-label={`${label}: ${done ? "done" : "to do"}`}
-      onClick={() =>
+      onClick={() => {
+        if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
         sync.transact(
           points.map((p) => ({
             action: "update" as const,
@@ -81,8 +117,8 @@ export function Tick({
             id: p.id,
             data: { done: !done },
           })),
-        )
-      }
+        );
+      }}
       className={`grid place-items-center rounded-full hover:text-muted ${look} ${className}`}
     >
       <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -234,17 +270,48 @@ export function Bullets({ points }: { points: Point[] }) {
 
 /** A checklist: a point a line to tick, in their order; what's done goes faint, not away. */
 export function Checklist({ points }: { points: Point[] }) {
+  const rings = useItemReminders();
   return (
     <ul className={`flex flex-col ${LINES}`}>
-      {points.map((point) => (
-        <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
-          <Tick points={[point]} label={point.text} className="self-center" />
-          <NewDot point={point} className="self-center" />
-          <p className={`min-w-0 flex-1 ${point.done ? "text-faint" : ""}`}>{inline(point.text)}</p>
-          <RemovePoint point={point} />
-        </li>
-      ))}
+      {points.map((point) => {
+        const reminder = rings.get(point.id);
+        const done = itemDone(point, reminder);
+        return (
+          <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
+            <Tick points={[point]} label={point.text} reminder={reminder} className="self-center" />
+            <NewDot point={point} className="self-center" />
+            <p className={`min-w-0 flex-1 ${done ? "text-faint" : ""}`}>{inline(point.text)}</p>
+            {reminder && <Rings reminder={reminder} />}
+            <RemovePoint point={point} />
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+/** How many of a checklist's items are done. */
+export function ChecklistCount({ points }: { points: Point[] }) {
+  const rings = useItemReminders();
+  const done = points.filter((p) => itemDone(p, rings.get(p.id))).length;
+  return (
+    <span className="text-xs text-faint">
+      {done} of {points.length} done
+    </span>
+  );
+}
+
+/** When an item's reminder rings: its rhythm, or the day it's due. */
+function Rings({ reminder }: { reminder: Reminder }) {
+  const due = isDue(reminder);
+  const words = reminder.every_days ? rhythmWords(reminder.every_days) : dueWords(reminder.due_on);
+  return (
+    <span
+      title={reminder.status === "on" ? `Next ${dueWords(reminder.due_on)}` : undefined}
+      className={`shrink-0 text-xs ${due ? "text-accent" : "text-faint"}`}
+    >
+      {words}
+    </span>
   );
 }
 

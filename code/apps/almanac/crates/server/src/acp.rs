@@ -22,7 +22,7 @@ use crate::photos::Image;
 pub const ADAPTER: &str = "claude-agent-acp";
 /// The command that installs it, as Settings → Claude shows it.
 pub const INSTALL: &str = "npm install -g @agentclientprotocol/claude-agent-acp";
-/// The name Almanac's tools go by: Claude sees `mcp__almanac__keep_point`.
+/// The name Almanac's tools go by: Claude sees `mcp__almanac__add_items`.
 pub const MCP_NAME: &str = "almanac";
 /// Claude Code's own tools Almanac lets it use when the web is on.
 pub const WEB_TOOLS: &[&str] = &["WebSearch", "WebFetch"];

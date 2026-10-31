@@ -123,132 +123,78 @@ What they do:
   question asked from a section's own page names it (`about`), and the
   prompt says which section they're looking at: what's kept goes under
   it, and a layout asked from there moves and draws only what's under it.
-- **Keeping** (`kept.rs`): points, questions, reminder offers, the topic an
-  off-topic question belongs to, the talk's title, and a change to the
-  topic's brief. Claude Code hands
-  them over with tools while it answers (keep_point, ask_to_check,
-  offer_reminder, change_brief, lay_out_page, fits_elsewhere, name_talk,
-  tick_points); through the API one more
-  request, with structured output, reads them from the exchange. Either
-  way the server writes them with the answer, through the sync engine, so
-  every client sees it. A point goes in a block, named by its reference
-  or its title; with none named it stays in the block of the point it
-  replaces. A block's kind (`BLOCK_KINDS`) says how it lays out its
-  points, as `page.rs` tells Claude (`BLOCKS_SAY`): `today` the day's
-  steps (under the routine's name, which its reminders' titles start
-  with), `week` the reminders' days (it keeps no points), `chips` facts,
-  `shelf` a tile per thing, `cards` a card per theme, `table` a row per
-  theme, `text` sections, `list` lines, `bars` numbers to compare,
-  `trend` a number each time it's measured, `parts` a whole's parts,
-  `questions` to rehearse, and
-  `timeline` events, oldest first, each with when it
-  `happened` (a year, a span or a day, which the app reads in
-  `timeline.ts`); `you` what they told about themselves, which the
-  topic's About shows and its page doesn't. A layout never turns a block
-  into `you` or out of it. The page is for a glance and a section's own
-  page for reading: a `text` section is a tile with its first sentence
-  (`lead`), and a source shows once, not on every line.
-  - A `cards` block names its `facets`, the facts every card has, each
-    with an icon (`FACET_ICONS`), and a point its `facet`. A card's face
-    shows the first point of each facet, its first point with none as what
-    it is, and the points with a `look` (`warn` to see to, `info` ready for
-    something) as notes; its picture is the newest photo of a talk about
-    it alone. A block with one card is a profile: points with no facet as
-    chips, a tile per facet.
-  - `table`: the same points as `cards`, a row per theme and a column per
-    facet (`table.tsx`); a number cell has its `amount` too, so its column
-    sorts. The page edits cells in place: the point's text, and the amount
-    read from it (`numberIn`); an emptied cell's point goes.
-  - `bars`: a set per theme, a bar per point, its `amount` on the set's
-    own scale, its `note` beside it; `look` `warn` is a gap.
-  - `trend` (`charts.tsx`): a line per theme, what's measured; a point is
-    a measurement, its `amount` on the day it `happened` (`YYYY-MM-DD`,
-    which `kept::when` checks), its `note` the unit. A point with no day
-    is a mark they said they aim at; a layout refuses a trend with nothing
-    measured.
-  - `parts`: a ring per theme, the whole; a point is a part, its text the
-    name and its `amount` how many, the first point's `note` what they
-    count. Five at most, the rest folded into Other.
-  - `questions`: the theme is the question, its points the answer, the
-    first point's `note` who asks; `warn` is what's missing. Quiz me
-    starts a talk that asks them one at a time.
-  - A `list` item and a question are `done` once ticked, by them on the
-    page or by a talk (tick_points); done goes last.
+- **Keeping** (`kept.rs`): Claude files what it learns into the one set
+  of blocks (`SET_KINDS`, migration 0015, `proposals/one-set-of-blocks.md`):
+  `heading`, `paragraph`, `bullets`, `checklist`, `toggle`, `callout` and
+  `collection`. Claude Code does it with tools while it answers:
+  add_block (with a collection's fields), change_block (its title, its
+  fields given whole, or a picture its fields allow, only when asked),
+  add_items, add_rows (a collection's rows with their cells),
+  change_points, tick, move (a block, or points to a block), remove,
+  ask_to_check, offer_reminder, change_brief, name_talk and
+  fits_elsewhere. Through the API one more request, with structured
+  output (`KEEP` in `talks.rs`), reads the same from the exchange. Either
+  way `Kept` is a working copy of the page the answer changes, and the
+  server writes it with the answer, through the sync engine, so every
+  client sees it. What's added shows in the message's `kept` words;
+  changes, moves and removals are one `TopicChange` with a `PageLayout`,
+  so Undo (`layout.rs`) puts the blocks and points back and takes off
+  what it started ("Changed a point, moved a point and removed Plants.").
+  An answer starts at most four blocks and adds at most twelve points.
+  Claude never picks a colour, a width or a picture: the fields pick a
+  collection's picture, and asked for another it picks one they allow.
+  - A collection names its `fields` (`FIELD_KINDS`: text, number with its
+    unit and goal, day, choice, status with its words in order, check,
+    photo, link; eight at most), and its points are its rows: a row's
+    text is its name and its `cells` the rest, by field name (a number, a
+    yes or no, or words; a day is `YYYY-MM-DD`, or a span or a year as a
+    timeline reads it). The fields pick its picture by the first rule
+    that fits (`pictureOf` in `collection.ts`, `pictures` in `kept.rs`
+    for the page Claude reads): a day with a number a line, a status a
+    board, a photo cards, past days a timeline, days to come a week, a
+    number bars, a name and two fields or more a table, the rest a list.
+    Only fields its rows fill count. View as offers the others its fields
+    allow (`picturesFor`). A toggle opens a line per theme on its points;
+    a callout is a warning when a point's `look` is `warn`.
+  - A checklist item can ring: offer_reminder with an `item` makes a
+    reminder with its `point_id` (migration 0016). Ticking the item, on
+    the page or by a talk, ticks the reminder instead (`markDone`): one
+    that repeats comes due its rhythm on, and the item stays ticked until
+    then, its rhythm beside it. Unticking puts it back.
+  - The page Claude reads (`page.rs`) names each block, point and
+    reminder (`b2`, `p3`, `r2`, `page::Refs`), a collection with its
+    fields and the picture they pick. A point or reminder may `replace`
+    some: a point takes the first one's place (unread again) and the rest
+    go; a reminder offer puts the ones on the calendar in its `replaces`,
+    which the app takes off when it's accepted, and offers not yet taken
+    go at once. A question asked from a section's own page keeps what it
+    finds under that section.
+  - What a topic sticks to is its brief: what it's about and how its
+    talks answer (`STICKS_TO_MAX`). A talk changes it only when told how
+    to answer from now on, or corrected twice on the same thing, and
+    gives it whole (`Kept::change_brief`): the change is kept on the
+    message for Undo, as the own topic's are. A talk never changes a
+    topic's name, group or icon.
 
-  The app draws a block by the shape of what it keeps, not by the kind
-  or width a talk gave it (`views.ts`: `viewOf` and `widthOf`, the rules
-  in its comment). Only `today`, `week` and `you` keep their kind, and
-  `list`, `questions` and `shelf`, which say what their points are until
-  a talk can say it in what it keeps; `lines` is a view of its own,
-  sentences with nothing to tick. A block that keeps nothing stays off
-  the page. The page is a grid of twelve columns, and a block takes the
-  share of a row its view needs. A layout still gives blocks a kind and
-  a `width` (`BLOCK_WIDTHS`, `width_of`), which the page doesn't read.
-
-  View as on a block's title sets its `view` (`BLOCK_VIEWS`: `table`,
-  `cards`, `list`, `lines`, `timeline`, migration 0014; a collection's
-  pictures, 0015). `viewsFor`
-  offers the views that can draw its points, the app's pick among them,
-  and `shownAs` draws with the person's while it's one of those. Picking
-  the app's own empties it. Only a person sets it: a layout never writes
-  `view`, and its Undo brings a removed block back with the view it had.
-
-  The one set of blocks (`SET_KINDS`, migration 0015,
-  `proposals/one-set-of-blocks.md`) is the page's future: `heading`,
-  `paragraph`, `bullets`, `checklist`, `toggle`, `callout` and
-  `collection`, beside today's kinds until pages move into it. Step 1
-  is built: the page draws them (`set.tsx`), but only a client or SQL
-  makes them; talks, layouts and `page.rs` don't know them yet. A
-  collection names its `fields` (`FIELD_KINDS`: text, number with its
-  unit and goal, day, choice, status with its words in order, check,
-  photo, link; eight at most), and its points are its rows: a row's
-  text is its name and its `cells` the rest, by field name (a number, a
-  yes or no, or words; a day is `YYYY-MM-DD`, or a span or a year as a
-  timeline reads it). The fields pick its picture by the first rule that
-  fits (`pictureOf` in `collection.ts`): a day with a number a line, a
-  status a board, a photo cards, past days a timeline, days to come a
-  week, a number bars, a name and two fields or more a table, the rest a
-  list. Only fields its rows fill count. View as offers the others its
-  fields allow (`picturesFor`). A toggle opens a line per theme on its
-  points; a callout is a warning when a point's `look` is `warn`.
-
-  The topic page's timeline is a line per section, when
-  its events begin and end (`bySection`); a section's page lists its
-  events first. When none fits, an answer may start up to two blocks, with
-  a kind and a title; a reminder offer brings a week when the page has
-  none. The page Claude reads names each block, point and
-  reminder (`b2`, `p3`, `r2`, `page::Refs`), and a point or reminder may
-  `replace` some: a point takes the first one's place (unread again) and
-  the rest go; a reminder offer puts the ones on the calendar in its
-  `replaces`, which the app takes off when it's accepted, and offers not
-  yet taken go at once. What a topic sticks to is its brief: what it's
-  about and how its talks answer (`STICKS_TO_MAX`). A talk changes it
-  only when told how to answer from now on, or corrected twice on the
-  same thing, and gives it whole (`Kept::change_brief`): the change is
-  kept on the message for Undo, as the own topic's are. A talk never
-  changes a topic's name, group or icon.
-- **Laying the page out anew** (`layout.rs`), only when asked, and only
-  through Claude Code (lay_out_page; through the API the answer says how
-  it would). It names the page's blocks in their new order, each kept,
-  renamed, of another kind or new, the points that move or are reworded,
-  and new points drawn from ones the page has (a timeline's events from
-  its sections). It never drops a point or changes a point's source; a
-  block it empties goes. It's made at once and kept on the message
-  (`TopicChange.layout`, with what each block and point was), so the same
-  Undo puts it all back; the talk lists what moved. lay_out_page says
-  what a page laid out anew should be (`LAYING_OUT_SAYS` in `mcp.rs`):
-  each block the kind its points' shape asks for, fewer and fuller
-  blocks, rows filled by widths, bars of one measure only, and a kind
-  the points can't fill yet named in the answer, never filled with a
-  made-up number or day. A week, or a table of three columns or more,
-  narrower than the whole is refused. A chip, a profile's chip or a
-  table's cell longer than it shows (`CHIP_FITS`, `CELL_FITS`) is
-  refused: it gets a few words, and the rest becomes a new point drawn
-  from it. It's the same for every topic: no topic or template gets a
-  layout of its own.
+  Today's kinds (`BLOCK_KINDS`: `today`, `week`, `chips`, `shelf`,
+  `cards`, `table`, `text`, `list`, `bars`, `trend`, `parts`,
+  `questions`, `timeline`, `you`) stay until step 3 moves pages into the
+  set: the page still draws them and a talk may tick, move, reword or
+  remove their points, but nothing starts one or adds to one. The app
+  draws such a block by the shape of what it keeps (`views.ts`: `viewOf`
+  and `widthOf`, the rules in its comment), on a grid of twelve columns;
+  View as sets its `view` (`BLOCK_VIEWS`, migration 0014), which only a
+  person sets. `you` is what they told about themselves, which the
+  topic's About shows and its page doesn't. A `cards` block names its
+  `facets` (`FACET_ICONS`); a `table` is the same points a row per theme
+  and a column per facet (`table.tsx`), edited in place; `trend` and
+  `parts` are drawn in `charts.tsx`; `questions` has Quiz me. The topic
+  page's timeline is a line per section, when its events begin and end
+  (`bySection`); a section's page lists its events first.
 - **The workspace's own topic** (`own.rs`) reads every topic's name, group
   and what it sticks to, and has other tools: propose_topic and
-  change_topic, not keep_point. A proposal waits for Start; a change is
+  change_topic, not add_items. A proposal's points go in its template's
+  blocks by title, and a collection's rows come with their cells. A proposal waits for Start; a change is
   made at once and kept on the message for Undo.
 - **Starting a topic** (`topics.rs`): a template (`TEMPLATES` in
   `crates/domain`: `routine`, `collection`, `study`) names the blocks it

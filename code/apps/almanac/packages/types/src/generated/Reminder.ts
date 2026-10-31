@@ -34,6 +34,10 @@ message_id: string | null,
  */
 replaces: Array<string>, 
 /**
+ * The checklist item it rings for, which ticks it.
+ */
+point_id: string | null, 
+/**
  * The day it was last done for: the day it was due. Calendar keeps it
  * there, ticked, while it's done or comes due after it.
  */

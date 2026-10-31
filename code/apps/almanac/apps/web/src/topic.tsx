@@ -89,6 +89,7 @@ import {
   Bullets,
   Callout,
   Checklist,
+  ChecklistCount,
   Collection,
   LINES,
   named,
@@ -1336,21 +1337,12 @@ function BlockView({
           <Bullets points={points} />
         </BlockFrame>
       );
-    case "checklist": {
-      const done = points.filter((p) => p.done).length;
+    case "checklist":
       return (
-        <BlockFrame
-          {...frame}
-          aside={
-            <span className="text-xs text-faint">
-              {done} of {points.length} done
-            </span>
-          }
-        >
+        <BlockFrame {...frame} aside={<ChecklistCount points={points} />}>
           <Checklist points={points} />
         </BlockFrame>
       );
-    }
     case "toggle":
       return (
         <BlockFrame {...frame}>

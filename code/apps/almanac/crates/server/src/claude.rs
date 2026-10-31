@@ -300,6 +300,7 @@ mod tests {
     #[test]
     fn photos_come_before_the_question() {
         let image = Image {
+            id: uuid::Uuid::nil(),
             media_type: "image/png".into(),
             data: "AAAA".into(),
         };

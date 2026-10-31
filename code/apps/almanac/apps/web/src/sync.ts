@@ -87,6 +87,7 @@ export function createSyncClient(options: {
         replaces: [],
         last_done_on: null,
         notified_for: null,
+        point_id: null,
         workspace_id: options.workspaceId,
         ...timestamps(),
       }),

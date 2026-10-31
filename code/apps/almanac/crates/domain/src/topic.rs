@@ -289,35 +289,34 @@ pub struct Facet {
     pub icon: String,
 }
 
-/// The blocks a topic starts with, each its kind and title. A collection's
-/// cards are named for what they are ("Plants") when Almanac knows. Each
-/// ends with You, for what it learns about them, which only About shows.
+/// The blocks a topic starts with, each its kind (of [`SET_KINDS`]) and
+/// title. A collection's rows are named for what they are ("Plants") when
+/// Almanac knows. Each ends with You, for what it learns about them, which
+/// only About shows.
 pub const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
     (
         "routine",
         &[
-            ("today", "Today"),
-            ("week", ""),
-            ("shelf", "Your shelf"),
-            ("list", "Advice"),
+            ("checklist", "Routine"),
+            ("collection", "Your shelf"),
+            ("bullets", "Advice"),
             ("you", "You"),
         ],
     ),
     (
         "collection",
         &[
-            ("today", "Today"),
-            ("week", ""),
-            ("cards", "Notes"),
+            ("checklist", "To do"),
+            ("collection", "Notes"),
             ("you", "You"),
         ],
     ),
     (
         "study",
         &[
-            ("list", "Reading"),
-            ("chips", "Terms"),
-            ("text", "What it says"),
+            ("checklist", "Reading"),
+            ("bullets", "Terms"),
+            ("toggle", "What it says"),
             ("you", "You"),
         ],
     ),
@@ -499,6 +498,8 @@ pub struct Reminder {
     pub message_id: Option<Uuid>,
     /// The reminders it takes the place of, once it's on.
     pub replaces: Vec<Uuid>,
+    /// The checklist item it rings for, which ticks it.
+    pub point_id: Option<Uuid>,
     /// The day it was last done for: the day it was due. Calendar keeps it
     /// there, ticked, while it's done or comes due after it.
     pub last_done_on: Option<NaiveDate>,
@@ -522,6 +523,7 @@ pub struct ReminderCreate {
     pub status: Option<String>,
     pub message_id: Option<Uuid>,
     pub replaces: Option<Vec<Uuid>>,
+    pub point_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
@@ -912,7 +914,11 @@ mod tests {
     fn every_template_has_known_blocks() {
         for name in TEMPLATE_NAMES {
             let blocks = template(name).unwrap();
-            assert!(blocks.iter().all(|(kind, _)| BLOCK_KINDS.contains(kind)));
+            assert!(
+                blocks
+                    .iter()
+                    .all(|(kind, _)| SET_KINDS.contains(kind) || *kind == "you")
+            );
         }
         assert_eq!(TEMPLATES.len(), TEMPLATE_NAMES.len());
     }

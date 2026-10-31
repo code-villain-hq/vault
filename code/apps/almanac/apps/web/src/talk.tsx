@@ -29,6 +29,7 @@ import { ChevronRight, Plus, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import type { Asking } from "./asking";
+import { cellWords } from "./collection";
 import { ago, dueWords, rhythmWords, timeWords } from "./format";
 import { topicIcon } from "./icons";
 import { isOwn, useNewTopic, useTopics } from "./layout";
@@ -484,11 +485,16 @@ function Proposed({
         <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted">
           {proposal.points.map((point) => {
             const under = point.theme || point.block;
-            return (
-              <li key={`${under}${point.text}`}>
-                {under ? `${under}: ${point.text}` : point.text}
-              </li>
-            );
+            // A row's cells after its name, in its fields' order.
+            const cells = proposal.fields
+              .map((field) => {
+                const name = field.name.toLowerCase();
+                const at = Object.keys(point.cells).find((key) => key.toLowerCase() === name);
+                return at ? cellWords(field, point.cells[at]) : "";
+              })
+              .filter(Boolean);
+            const text = [point.text, ...cells].join(" · ");
+            return <li key={`${under}${point.text}`}>{under ? `${under}: ${text}` : text}</li>;
           })}
           {proposal.reminders.map((reminder) => (
             <li key={reminder.title}>

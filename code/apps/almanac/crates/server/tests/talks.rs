@@ -44,15 +44,21 @@ async fn messages(State(fake): State<Fake>, Json(body): Json<Value>) -> Response
     let system = body["system"].as_str().unwrap_or_default();
     let answer = if system.starts_with("You keep the page") {
         json!({
-            "points": [
-                { "block": "Pflanzen", "theme": "Monstera", "text": "Alle 7 Tage gießen.", "source": "From the talk" },
-                { "block": "b3", "theme": "Monstera", "text": "Steht am Nordfenster.", "source": "You said" },
+            "blocks": [{ "kind": "bullets", "title": "Pflege", "fields": [] }],
+            "items": [
+                { "block": "Pflege", "theme": "", "look": "", "text": "Alle 7 Tage gießen.", "source": "From the talk" },
             ],
+            "rows": [
+                { "block": "b2", "name": "Monstera", "cells": [], "source": "You said" },
+            ],
+            "changes": [],
+            "remove": [],
+            "ticks": [],
             "questions": [
                 { "theme": "Monstera", "text": "Ist der Topf größer als 20 cm?", "point": "Topf über 20 cm." },
             ],
             "reminders": [
-                { "theme": "Monstera", "title": "Monstera gießen", "due_on": "2026-11-01", "at": "", "every_days": 7 },
+                { "theme": "Monstera", "title": "Monstera gießen", "item": "", "due_on": "2026-11-01", "at": "", "every_days": 7, "replaces": [] },
             ],
             "elsewhere": "",
             "talk_title": "Monstera gießen",
@@ -134,8 +140,8 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     let plants = topics.iter().find(|t| t["name"] == "Pflanzen").unwrap();
     assert_eq!(plants["kind"], "topic");
     assert_eq!(plants["group_name"], "Home");
-    // Its page starts as the template Claude picked, the cards named, and
-    // You for About.
+    // Its page starts as the template Claude picked, the collection named,
+    // and You for About.
     let blocks = app.synced(&ada, &home, "Block").await;
     let mut blocks: Vec<_> = blocks
         .iter()
@@ -149,9 +155,8 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     assert_eq!(
         laid_out,
         [
-            ("today", "Today"),
-            ("week", ""),
-            ("cards", "Pflanzen"),
+            ("checklist", "To do"),
+            ("collection", "Pflanzen"),
             ("you", "You")
         ]
     );
@@ -179,9 +184,9 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     );
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points.len(), 2);
-    assert!(points.iter().all(|p| p["theme"] == "Monstera"
-        && p["seen"] == false
-        && p["block_id"] == blocks[2]["id"]));
+    assert!(points.iter().all(|p| p["seen"] == false));
+    let row = points.iter().find(|p| p["text"] == "Monstera").unwrap();
+    assert_eq!(row["block_id"], blocks[1]["id"]);
     let questions = app.synced(&ada, &home, "Question").await;
     assert_eq!(questions[0]["point"], "Topf über 20 cm.");
     let reminders = app.synced(&ada, &home, "Reminder").await;
@@ -190,7 +195,7 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     let messages = app.synced(&ada, &home, "Message").await;
     let answer = messages.iter().find(|m| m["role"] == "almanac").unwrap();
     assert_eq!(answer["text"], "Gieß die Monstera alle 7 Tage.");
-    assert_eq!(answer["kept"], "Kept 2 points under Monstera.");
+    assert_eq!(answer["kept"], "Kept 2 points under Pflege and Pflanzen.");
     assert_eq!(reminders[0]["message_id"], answer["id"]);
     let talks = app.synced(&ada, &home, "Talk").await;
     assert_eq!(talks[0]["title"], "Monstera gießen");

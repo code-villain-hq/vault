@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use almanac_domain::{
-    Actor, BLOCK_KINDS, BLOCK_WIDTHS, FACET_ICONS, ICONS, LOOKS, Proposal, ProposedPoint,
-    STICKS_TO_MAX, TEMPLATE_NAMES, TopicChange, TopicPatch,
+    Actor, FIELD_KINDS, ICONS, Proposal, ProposedPoint, SET_KINDS, STICKS_TO_MAX, TEMPLATE_NAMES,
+    TopicChange, TopicPatch,
 };
 use axum::Json;
 use axum::extract::State;
@@ -22,9 +22,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::kept::{Kept, reminder};
-use crate::layout::{CELL_FITS, CHIP_FITS, LayoutArgs, Now, lay_out};
-use crate::page::Refs;
+use crate::kept::{self, FieldArg, ItemArg, Kept, PointChange, RowArg, reminder};
 use crate::state::AppState;
 use crate::topics::{SetUp, cut};
 
@@ -53,12 +51,17 @@ impl Mode {
     pub fn tools(self) -> &'static [&'static str] {
         match self {
             Mode::Topic => &[
-                "keep_point",
-                "tick_points",
+                "add_block",
+                "change_block",
+                "add_items",
+                "add_rows",
+                "change_points",
+                "tick",
+                "move",
+                "remove",
                 "ask_to_check",
                 "offer_reminder",
                 "change_brief",
-                "lay_out_page",
                 "name_talk",
                 "fits_elsewhere",
             ],
@@ -93,10 +96,10 @@ impl Asking {
         }
     }
 
-    /// Keeping for a page with these points and reminders.
-    pub fn on(self, refs: Refs) -> Self {
+    /// Keeping on a page: its copy, with the talk's photos.
+    pub fn on(self, kept: Kept) -> Self {
         Asking {
-            kept: Mutex::new(Kept::on(refs)),
+            kept: Mutex::new(kept),
             ..self
         }
     }
@@ -224,19 +227,66 @@ async fn call(
             .map_err(|_| "Almanac stumbled.".to_string())
     };
     match name {
-        "keep_point" => {
-            kept()?.keep_point(read(arguments)?)?;
-            Ok("Kept.".into())
+        "add_block" => {
+            let args: BlockArgs = read(arguments)?;
+            let fields = args.fields.unwrap_or_default();
+            let b = kept()?.add_block(&args.kind, &args.title, args.after.as_deref(), &fields)?;
+            Ok(format!("Added {b}."))
         }
-        "tick_points" => {
+        "change_block" => {
+            let args: BlockChangeArgs = read(arguments)?;
+            kept()?.change_block(
+                &args.block,
+                args.title.as_deref(),
+                args.fields.as_deref(),
+                args.view.as_deref(),
+            )?;
+            Ok("Changed, once your answer is done.".into())
+        }
+        "add_items" => {
+            let args: ItemsArgs = read(arguments)?;
+            let refs = kept()?.add_items(&args.block, &args.items)?;
+            Ok(format!("Added {}.", refs.join(", ")))
+        }
+        "add_rows" => {
+            let args: RowsArgs = read(arguments)?;
+            let refs = kept()?.add_rows(&args.block, &args.rows)?;
+            Ok(format!("Added {}.", refs.join(", ")))
+        }
+        "change_points" => {
+            let args: PointsArgs = read(arguments)?;
+            kept()?.change_points(&args.points)?;
+            Ok("Changed, once your answer is done.".into())
+        }
+        "tick" => {
             let ticks: TickArgs = read(arguments)?;
-            kept()?.tick_points(&ticks.points, ticks.done)?;
+            kept()?.tick(&ticks.items, ticks.done)?;
             Ok(if ticks.done {
                 "Ticked off."
             } else {
                 "Ticked on again."
             }
             .into())
+        }
+        "move" => {
+            let args: MoveArgs = read(arguments)?;
+            let mut guard = kept()?;
+            match (args.block, args.points.is_empty()) {
+                (Some(block), true) => {
+                    guard.move_block(&block, args.after.as_deref().unwrap_or(""))?
+                }
+                (None, false) => {
+                    let to = args.to.ok_or("Say which block they go to.")?;
+                    guard.move_points(&args.points, &to, args.after.as_deref())?
+                }
+                _ => return Err("Move either a block or points, not both.".into()),
+            }
+            Ok("Moved, once your answer is done.".into())
+        }
+        "remove" => {
+            let args: RemoveArgs = read(arguments)?;
+            kept()?.remove(&args.what)?;
+            Ok("Removed, once your answer is done. They can undo it.".into())
         }
         "ask_to_check" => {
             let question: QuestionArgs = read(arguments)?;
@@ -245,8 +295,13 @@ async fn call(
         }
         "offer_reminder" => {
             let r: ReminderArgs = read(arguments)?;
-            let reminder = reminder(&r.theme, &r.title, &r.due_on, &r.at, r.every_days)?;
-            kept()?.offer_reminder(reminder, &r.replaces)?;
+            let mut guard = kept()?;
+            let title = match (r.title.trim(), &r.item) {
+                ("", Some(item)) => guard.item_words(item).unwrap_or_default(),
+                (title, _) => title.to_string(),
+            };
+            let reminder = reminder(&r.theme, &title, &r.due_on, &r.at, r.every_days)?;
+            guard.offer_reminder(reminder, &r.replaces, r.item.as_deref())?;
             Ok("Offered: they add it to the calendar with a click.".into())
         }
         "change_brief" => {
@@ -263,35 +318,6 @@ async fn call(
                 "Changed, once your answer is done. They see what you said, and can undo it."
                     .into(),
             )
-        }
-        "lay_out_page" => {
-            let args: LayoutArgs = read(arguments)?;
-            let topic: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
-                .bind(asking.actor.workspace_id)
-                .bind(asking.topic_id)
-                .fetch_optional(&state.pool)
-                .await
-                .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
-            let (id, name, ..) = topic.ok_or("This topic is gone.")?;
-            let now = Now::load(&state.pool, asking.actor.workspace_id, id)
-                .await
-                .map_err(|_| "Almanac couldn't look at the page.".to_string())?;
-            let mut guard = kept()?;
-            if !guard.points.is_empty() {
-                return Err(
-                    "You kept points in this answer already: lay out the page in the next one."
-                        .into(),
-                );
-            }
-            let laid = lay_out(id, &name, &guard.refs, &now, args)?;
-            let again = guard.layout.replace(laid).is_some();
-            Ok(if again {
-                "Laid out, in place of the layout before, once your answer is done."
-            } else {
-                "Laid out, once your answer is done. They see what moved under your answer, \
-                 and can undo it."
-            }
-            .into())
         }
         "name_talk" => {
             let args: NameArgs = read(arguments)?;
@@ -347,8 +373,56 @@ async fn call(
 }
 
 #[derive(Deserialize)]
-struct TickArgs {
+struct BlockArgs {
+    kind: String,
+    #[serde(default)]
+    title: String,
+    after: Option<String>,
+    fields: Option<Vec<FieldArg>>,
+}
+
+#[derive(Deserialize)]
+struct BlockChangeArgs {
+    block: String,
+    title: Option<String>,
+    fields: Option<Vec<FieldArg>>,
+    view: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ItemsArgs {
+    block: String,
+    items: Vec<ItemArg>,
+}
+
+#[derive(Deserialize)]
+struct RowsArgs {
+    block: String,
+    rows: Vec<RowArg>,
+}
+
+#[derive(Deserialize)]
+struct PointsArgs {
+    points: Vec<PointChange>,
+}
+
+#[derive(Deserialize)]
+struct MoveArgs {
+    block: Option<String>,
+    #[serde(default)]
     points: Vec<String>,
+    to: Option<String>,
+    after: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RemoveArgs {
+    what: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct TickArgs {
+    items: Vec<String>,
     #[serde(default = "yes")]
     done: bool,
 }
@@ -370,6 +444,7 @@ struct QuestionArgs {
 struct ReminderArgs {
     #[serde(default)]
     theme: String,
+    #[serde(default)]
     title: String,
     due_on: String,
     #[serde(default)]
@@ -377,6 +452,7 @@ struct ReminderArgs {
     every_days: Option<i64>,
     #[serde(default)]
     replaces: Vec<String>,
+    item: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -406,6 +482,8 @@ struct ProposeArgs {
     #[serde(default)]
     cards: String,
     #[serde(default)]
+    fields: Vec<FieldArg>,
+    #[serde(default)]
     starters: Vec<String>,
     #[serde(default)]
     points: Vec<ProposedPointArgs>,
@@ -420,6 +498,8 @@ struct ProposedPointArgs {
     #[serde(default)]
     theme: String,
     text: String,
+    #[serde(default)]
+    cells: serde_json::Map<String, Value>,
 }
 
 #[derive(Deserialize)]
@@ -466,17 +546,31 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
     if !TEMPLATE_NAMES.contains(&args.template.as_str()) {
         return Err(format!("The template is one of {TEMPLATE_NAMES:?}."));
     }
-    let points: Vec<ProposedPoint> = args
+    let (fields, _) = kept::fields_of(&args.fields, &[])?;
+    let mut points = Vec::new();
+    for p in args
         .points
         .iter()
-        .map(|p| ProposedPoint {
+        .filter(|p| !p.text.trim().is_empty())
+        .take(8)
+    {
+        let mut cells = std::collections::BTreeMap::new();
+        for (name, value) in &p.cells {
+            let field = fields
+                .iter()
+                .find(|f| f.name.eq_ignore_ascii_case(name))
+                .ok_or_else(|| format!("The collection has no field {name}: name it in fields."))?;
+            if let Some(cell) = kept::cell(field, value, &[])? {
+                cells.insert(field.name.clone(), cell);
+            }
+        }
+        points.push(ProposedPoint {
             block: Some(cut(&p.block, 60)).filter(|b| !b.is_empty()),
             theme: cut(&p.theme, 120),
             text: cut(&p.text, 2000),
-        })
-        .filter(|p| !p.text.is_empty())
-        .take(8)
-        .collect();
+            cells,
+        });
+    }
     let reminders = args
         .reminders
         .iter()
@@ -491,6 +585,7 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
         group_name: cut(&args.group, 40),
         template: args.template,
         cards: (!cards.is_empty()).then_some(cards),
+        fields,
         starters: args
             .starters
             .iter()
@@ -698,61 +793,44 @@ it checks, and what it leaves to other topics. Fit it to the topic, with nothing
 does anyway: usually 400 to 1,200 characters. The page doesn't show it, only the topic's \
 About.";
 
-/// When a timeline's point happened, or a trend's was measured, for the
-/// tools that keep one.
-const HAPPENED_SAYS: &str = "Only on a timeline and in a trend. On a timeline when it \
-happened, as a year (1959), a span (1987–1993) or a day (11. September 2001), with v. Chr. or \
-BC for the years before year 1; in a trend the day it was measured, as 2026-09-24, and left \
-out only for a mark they said they aim at (Ziel), never for a number they told you without its \
-day. Left out elsewhere.";
+/// A collection's fields, for the tools that name them.
+const FIELDS_SAY: &str = "A collection's fields, besides each row's name, eight at most, in \
+order: the facts every row has (Gewicht, Tag, Licht, Status). A field holds one kind of fact: \
+text a few words, number a plain number with its unit (kg) and a goal when they aim at one, \
+day a day or a year or a span, choice one of a few words, status where a row stands (its \
+words in order, the last one done), check yes or no, photo a photo from the talk, link a web \
+page. The app picks the picture from them: never name a colour, a width or a picture here.";
 
-/// What a point carries in cards, tables, bars, questions, trends and
-/// parts, for the tools that keep or move one.
-const FACET_SAYS: &str = "Only in cards and tables whose block names facets: the facet it's \
-about, one of the block's, as the page names them (Wasser): a card's line, a table's column. \
-Left out for what the thing is, and for the rest.";
-const LOOK_SAYS: &str = "Only in cards, tables, bars and questions: warn when it needs a look \
-(brown edges, over budget, a gap, no answer yet), info when it's ready for something (a cutting \
-to pot). Left out otherwise.";
-const AMOUNT_SAYS: &str = "In bars, trends and parts always, the number, plain (900000, 3.4, \
-12): a bar's, a measurement's, a part's. In a table, a number cell's, so it sorts (709 for \
-\"709 kr\"). Left out elsewhere.";
-const NOTE_SAYS: &str = "Only in bars, questions, trends and parts: a few words beside it, \
-under 80 characters: a bar's unit or what it counts (\"getötet\", \"im CV\"), a trend's unit \
-(\"kg\"), what a part counts (\"Anzeigen\"), who asks a question (on its first point).";
-
-/// What a page laid out anew should be, for lay_out_page: the page's
-/// design, not only where its points go.
-const LAYING_OUT_SAYS: &str = "Lay it out to read at a glance: change kinds, order and widths \
-wherever that reads better, not only add blocks. Give each block the kind its points' shape \
-asks for: things that share the same facts are cards with facets, or a table when comparing \
-them matters more; numbers of one measure to compare are bars (the shoes' prices), never \
-different measures side by side (hours of sleep beside a day without food); a number measured \
-on two days or more is a trend; a whole and what it's made of is parts; what to do or read is \
-a list; questions to practise are questions; facts of a few words are chips; only what reads \
-as prose stays text. A kind whose shape the points don't have yet waits, and your answer says \
-what it needs (a second weighing for a trend). Never make up a number or a day to fill a kind, \
-even when they ask for every kind: a span (12–16 Stunden) isn't one number, a goal isn't a \
-measurement, and a day nobody named isn't its day. Fewer, fuller blocks read better than many \
-thin ones: what's about one thing stays together (a profile's facets, one table), and a block \
-of two or three points joins the one it belongs with. First what they come back for (today, \
-what needs a look), then what they compare, then what they read. Fill the rows: blocks side by \
-side add up to the whole (1/2 and 1/2, 2/3 and 1/3), a short block sits beside another and a \
-long one takes the whole; blocks side by side are about as long, and the week takes the whole. \
-Only chips, trends and parts read at 1/3 or 1/4; a table takes 2/3 with two columns beside its \
-names, the whole with more, and keeps every column; the rest need 1/2 or more. A block's title says what its themes \
-share, never one theme again (\"Messwerte\" over Lisas Gewicht, not \"Lisas Gewicht\"). Your \
-answer is short: a line or two on what changed shape, not every block, and what a kind still \
-waits for, asked as a question.";
+/// One field, for the tools that name fields.
+fn field_schema(renames: bool) -> Value {
+    let mut properties = json!({
+        "name": { "type": "string", "description": "A word or two, in the page's language." },
+        "kind": { "type": "string", "enum": FIELD_KINDS },
+        "unit": { "type": "string", "description": "A number's unit (kg, €, cm), or left out." },
+        "goal": { "type": "number", "description": "The number they aim at, only when they said one." },
+        "options": { "type": "array", "items": { "type": "string" }, "description": "A choice's or a status's words, in order; left out for those its rows use." },
+    });
+    if renames {
+        properties["was"] =
+            json!({ "type": "string", "description": "Only when it's renamed: the name it had." });
+    }
+    json!({
+        "type": "object",
+        "properties": properties,
+        "required": ["name", "kind"],
+        "additionalProperties": false,
+    })
+}
 
 /// The templates a topic starts as, for the tools that pick one.
 const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
 keep, with steps on certain days and the things they use (a hair or skin routine, a training \
-plan): Today, the week, Your shelf and Advice. collection when it's about a set of things \
-that each get a card (plants, pets, trips, recipes): Today, the week and the cards. study when \
-it's something to learn or write up (a field, a pitch, research): Reading, Terms and What it \
-says. Each also has You, for what it learns about them, which only its About shows. When they \
-picked one, theirs.";
+plan): Routine, a checklist of its steps; Your shelf, a collection of the things they use; and \
+Advice. collection when it's about a set of things, events or measurements that each get a row \
+(plants, pets, trips, weighings): To do, and the collection, named by cards, with its fields. \
+study when it's something to learn or write up (a field, a pitch, research): Reading, a \
+checklist; Terms; and What it says, a toggle by section. Each also has You, for what it learns \
+about them, which only its About shows. When they picked one, theirs.";
 
 /// The tools a question gets, with what each is for.
 fn tools(mode: Mode) -> Vec<Value> {
@@ -785,6 +863,12 @@ fn tools(mode: Mode) -> Vec<Value> {
     };
     let mut offer_fields = reminder_fields.clone();
     offer_fields["replaces"] = replaces("reminders", "r2");
+    offer_fields["item"] = string(
+        "The checklist item it rings for, as the page names it (p3). Its title is the item's words when you give none.",
+    );
+    offer_fields["title"] = string(
+        "What to do in two to four words, as the calendar shows it: \"Water the Monstera\". Left out for an item's reminder, which takes the item's words.",
+    );
     let name_talk = tool(
         "name_talk",
         "Names the talk, on its first answer: under six words, in the talk's language.",
@@ -801,43 +885,144 @@ fn tools(mode: Mode) -> Vec<Value> {
     match mode {
         Mode::Topic => vec![
             tool(
-                "keep_point",
-                "Keeps a point on the topic's page: a fact, a decision, or something they told \
-                 you about their situation that's worth knowing later; nothing the page has \
-                 already. It goes in one of the page's blocks, with the theme and the length \
-                 that block's kind asks for, as the page says. The page is kept up to date, not \
-                 added to: when what you'd keep changes or corrects points the page has (a wash \
-                 day moved, a product swapped), keep it in place of them with replaces, naming \
-                 them as the page does (p3), and keep one point where two would say the same. \
-                 Usually none to three per answer. Only when they ask for a block the page \
-                 lacks (a reading list, the terms), or none fits, start one: block is its short \
-                 title, kind its kind. Use an existing theme when one fits.",
+                "add_block",
+                "Starts a block of the set, only when none on the page fits what you keep (a \
+                 reading list, the terms, the weighings). It answers with its reference (b5), \
+                 which the other tools take. A block like it the page has already is the one it \
+                 answers with.",
                 json!({
-                    "block": string("The block it goes in: as the page names it (b2), or its title. For a new block, its title."),
-                    "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Only for a block the page lacks: the kind it starts as. Left out otherwise." },
-                    "theme": string("What it's under inside the block, as its kind says: what comes round in today, the thing in a shelf, cards or a table, the section in text and on a timeline, what's measured in a trend, the whole in parts. Left out in chips, lists and you."),
-                    "text": string("The point: in text two to four sentences that explain; on a timeline one line on what happened; elsewhere one short sentence or a few words."),
-                    "happened": string(HAPPENED_SAYS),
-                    "facet": string(FACET_SAYS),
-                    "look": { "type": "string", "enum": LOOKS, "description": LOOK_SAYS },
-                    "amount": { "type": "number", "description": AMOUNT_SAYS },
-                    "note": string(NOTE_SAYS),
-                    "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
-                    "url": string("The page it comes from, when you read one. Never a made-up link."),
-                    "replaces": replaces("points", "p3"),
+                    "kind": { "type": "string", "enum": SET_KINDS },
+                    "title": string("Its short title, in the page's language: what its points share, never one of them. A heading is only its title."),
+                    "after": string("The block it goes after, as the page names it (b2); \"\" for the top. Left out, at the end."),
+                    "fields": { "type": "array", "items": field_schema(false), "description": FIELDS_SAY },
                 }),
-                &["block", "text", "source"],
+                &["kind", "title"],
             ),
             tool(
-                "tick_points",
-                "Ticks points done: a list's items they did or read, a question they answered \
-                 well when they practised it (every point of the question). Only when they \
-                 told you, or answered it in this talk. done false ticks them on again.",
+                "change_block",
+                "Changes a block: its title; a collection's fields, given whole as they are from \
+                 now on (one renamed says the name it was, so its cells go with it; one left out \
+                 goes, with its cells); or, only when they ask for another picture, one of the \
+                 pictures its fields allow. Only what changes.",
                 json!({
-                    "points": { "type": "array", "items": { "type": "string" }, "description": "The points, as the page names them (p3)." },
-                    "done": { "type": "boolean", "description": "Whether they're done; left out, they are." },
+                    "block": string("The block, as the page names it (b2)."),
+                    "title": string("Its new title."),
+                    "fields": { "type": "array", "items": field_schema(true), "description": FIELDS_SAY },
+                    "view": string("Only when they ask for another picture: one the page lists as its fields allow; \"\" for the app's own pick."),
+                }),
+                &["block"],
+            ),
+            tool(
+                "add_items",
+                "Adds points to a block that isn't a collection: a fact, a decision, a step, a \
+                 term, or something they told you about themselves worth knowing later; nothing \
+                 the page has already. Each as its block's kind asks, as the page says. It \
+                 answers with their references (p12). Usually none to three per answer.",
+                json!({
+                    "block": string("The block, as the page names it (b2), or its title."),
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text": string("The point: a few words or one short sentence on a line, two to four sentences in a paragraph."),
+                                "theme": string("Only in a toggle: the line it opens under (a term, a question, a step). Use one the block has when it fits."),
+                                "look": { "type": "string", "enum": ["warn", "info"], "description": "Only in a callout: warn when it needs a look, info when something's ready." },
+                                "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
+                                "url": string("The page it comes from, when you read one. Never a made-up link."),
+                            },
+                            "required": ["text", "source"],
+                            "additionalProperties": false,
+                        },
+                    },
+                }),
+                &["block", "items"],
+            ),
+            tool(
+                "add_rows",
+                "Adds rows to a collection: a thing, an event or a measurement each, its name and \
+                 a cell for each field it knows. What's measured, compared or tracked is a row, \
+                 never a sentence. A cell holds only what they or a source said: leave it out \
+                 rather than guess. A field the rows need and the collection lacks comes first, \
+                 with change_block. It answers with their references (p12).",
+                json!({
+                    "block": string("The collection, as the page names it (b2), or its title."),
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": string("The row's name: the thing, or what happened, in a few words (Monstera, Wiegen)."),
+                                "cells": { "type": "object", "description": "Its cells by field name: a number plain (3.4, without its unit), a day as 2026-09-24 (or a year, a span), a choice's or a status's word, true or false for a check, \"photo 2\" for the talk's second photo, a link's address, a few words for text.", "additionalProperties": true },
+                                "source": string("Where it comes from, in a few words."),
+                                "url": string("The page it comes from, when you read one. Never a made-up link."),
+                            },
+                            "required": ["name", "source"],
+                            "additionalProperties": false,
+                        },
+                    },
+                }),
+                &["block", "rows"],
+            ),
+            tool(
+                "change_points",
+                "Changes points the page has, when what they say changed or was wrong (a wash day \
+                 moved, a product swapped, a weighing corrected): their words (a row's name), \
+                 a toggle's theme, a callout's look, or a row's cells, which merge into the \
+                 row's (null takes one out). The page is kept up to date, not added to. They see \
+                 what changed under your answer, and can undo it.",
+                json!({
+                    "points": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "point": string("The point, as the page names it (p3)."),
+                                "text": string("Its new words."),
+                                "theme": string("Its new theme, in a toggle."),
+                                "look": { "type": "string", "enum": ["", "warn", "info"], "description": "Its new look, in a callout." },
+                                "cells": { "type": "object", "description": "The cells that change, by field name, as add_rows takes them; null takes one out.", "additionalProperties": true },
+                            },
+                            "required": ["point"],
+                            "additionalProperties": false,
+                        },
+                    },
                 }),
                 &["points"],
+            ),
+            tool(
+                "tick",
+                "Ticks checklist items done: what they did, got or read, and a question they \
+                 answered well when they practised it. Only when they told you, or did it in \
+                 this talk. An item a reminder rings for ticks the reminder too, until it's due \
+                 again. done false ticks them on again.",
+                json!({
+                    "items": { "type": "array", "items": { "type": "string" }, "description": "The items, as the page names them (p3)." },
+                    "done": { "type": "boolean", "description": "Whether they're done; left out, they are." },
+                }),
+                &["items"],
+            ),
+            tool(
+                "move",
+                "Moves a block (block and after), or points to a block (points, to and after), \
+                 when they'd read better there: a step into the checklist, a fact into the \
+                 block it belongs with. They see what moved under your answer, and can undo it.",
+                json!({
+                    "block": string("A block to move, as the page names it (b2)."),
+                    "points": { "type": "array", "items": { "type": "string" }, "description": "Points to move, in order, as the page names them (p3)." },
+                    "to": string("The block the points go to (b2)."),
+                    "after": string("What it goes after: a block (b2), or for points one of the block's points (p3); \"\" for the top. Left out, points go at the end."),
+                }),
+                &[],
+            ),
+            tool(
+                "remove",
+                "Removes blocks, with their points, and points: what's wrong, said twice, or \
+                 they asked to drop. They see what went under your answer, and can undo it.",
+                json!({
+                    "what": { "type": "array", "items": { "type": "string" }, "description": "The blocks and points, as the page names them (b2, p3)." },
+                }),
+                &["what"],
             ),
             tool(
                 "ask_to_check",
@@ -858,17 +1043,17 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "offer_reminder",
                 "Offers a reminder, only when the talk settled something recurring or dated \
                  they'd want to be reminded of (watering every 7 days, repotting in March, \
-                 sending the deck on Friday). A routine they told you they keep counts \
-                 (washing their hair three times a week): one reminder for each day it comes \
-                 round, so something a few times a week is a reminder per weekday, each every \
-                 7 days; when they didn't say which days, spread them evenly and say which in \
-                 your answer. They add it to the calendar with a click. None the calendar has \
+                 sending the deck on Friday). When it's a checklist's item, name the item: the \
+                 reminder rings for it, and ticking one ticks the other; add the item first \
+                 when the page lacks it. A routine they told you they keep counts (washing \
+                 their hair three times a week): one reminder for each day it comes round, so \
+                 something a few times a week is a reminder per weekday, each every 7 days; \
+                 when they didn't say which days, spread them evenly and say which in your \
+                 answer. They add it to the calendar with a click. None the calendar has \
                  already: when a reminder changes (a wash day moved, another rhythm), offer the \
-                 new one in place of the old with replaces, naming it as the page does (r2). \
-                 One that only goes, with nothing new on its day, is replaced by the reminder \
-                 that takes over from it.",
+                 new one in place of the old with replaces, naming it as the page does (r2).",
                 offer_fields,
-                &["title", "due_on"],
+                &["due_on"],
             ),
             tool(
                 "change_brief",
@@ -886,97 +1071,6 @@ fn tools(mode: Mode) -> Vec<Value> {
                 }),
                 &["sticks_to", "said"],
             ),
-            tool(
-                "lay_out_page",
-                &format!(
-                    "Lays out the topic's page anew, only when they ask for that in this talk \
-                 (\"sort the page better\", \"make a timeline of it\"): never on your own. \
-                 List every block the page keeps, in its new order, with a new kind or title \
-                 where it changes; one you leave out must end up empty, and goes. Move points \
-                 between blocks and themes, naming them as the page does (p3), and reword one \
-                 only to fit its new place, with every fact it had; points no move names stay \
-                 where they are. A chip holds {CHIP_FITS} characters and a table's cell \
-                 {CELL_FITS}, chips of a profile too: one that says more gets a few words there \
-                 (\"Waldkatzen-Mix, ohne Papiere\"), and what else it said is a new point drawn \
-                 from it where sentences read, a facet's tile or a list. new_points draws new points from ones the page has, with \
-                 their source: a timeline's events from its sections, which keep theirs. \
-                 Nothing is dropped and no point's source changes; a block the layout empties \
-                 goes. It's done at once, and they see what moved under your answer and can \
-                 undo it. Call it once, with the whole layout: a second call replaces the \
-                 first. Keep no other points in the same answer. {LAYING_OUT_SAYS}"
-                ),
-                json!({
-                    "blocks": {
-                        "type": "array",
-                        "description": "Every block the page keeps, in its new order.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "block": string("The page's block, as the page names it (b2); left out for a new one."),
-                                "kind": { "type": "string", "enum": BLOCK_KINDS, "description": "Its kind: for a new block, or to change one's kind. Left out, it keeps its own." },
-                                "title": string("A new block's short title, or a new title for one the page has. Left out, it keeps its own."),
-                                "width": { "type": "string", "enum": BLOCK_WIDTHS, "description": "How wide it is, of the page's twelve columns: 1/4, 1/3, 1/2, 2/3, 3/4 or whole, so a small block sits beside another (a trend at 1/3 beside text at 2/3). \"\" for its kind's own. Left out, it keeps its own." },
-                                "facets": {
-                                    "type": "array",
-                                    "description": "For cards and tables: the facts every thing has, which each card's face shows a line of, or a table's columns, in order. Left out, it keeps its own; [] for none.",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": string("A word or two, in the page's language (Licht, Wasser, Platz)."),
-                                            "icon": { "type": "string", "enum": FACET_ICONS },
-                                        },
-                                        "required": ["name", "icon"],
-                                        "additionalProperties": false,
-                                    },
-                                },
-                            },
-                            "additionalProperties": false,
-                        },
-                    },
-                    "moves": {
-                        "type": "array",
-                        "description": "The points that move or change, each once.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "point": string("The point, as the page names it (p3)."),
-                                "block": string("The block it goes to: as the page names it (b2), or the title of a new block in blocks. Left out, it stays in its block."),
-                                "theme": string("Its theme in the block it ends in, as that block's kind asks. Left out, it keeps its own; chips, lists and you have none."),
-                                "text": string("Only when it's reworded to fit its new place: the point, with every fact it had."),
-                                "happened": string(HAPPENED_SAYS),
-                                "facet": string(FACET_SAYS),
-                                "look": { "type": "string", "enum": LOOKS, "description": LOOK_SAYS },
-                                "amount": { "type": "number", "description": AMOUNT_SAYS },
-                                "note": string(NOTE_SAYS),
-                            },
-                            "required": ["point"],
-                            "additionalProperties": false,
-                        },
-                    },
-                    "new_points": {
-                        "type": "array",
-                        "description": "New points drawn from ones the page has: a timeline's events from its sections.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "from": string("The page's point it's drawn from (p3): it keeps that one's source."),
-                                "block": string("The block it goes in, as for moves."),
-                                "theme": string("Its theme there: on a timeline, the section it belongs to, named as the page names it."),
-                                "text": string("The point: on a timeline, one line on what happened."),
-                                "happened": string(HAPPENED_SAYS),
-                                "facet": string(FACET_SAYS),
-                                "look": { "type": "string", "enum": LOOKS, "description": LOOK_SAYS },
-                                "amount": { "type": "number", "description": AMOUNT_SAYS },
-                                "note": string(NOTE_SAYS),
-                            },
-                            "required": ["from", "block", "text"],
-                            "additionalProperties": false,
-                        },
-                    },
-                    "said": string("What you did, in a short sentence for under the answer, in the talk's language: \"Sorted the cards by what she does.\""),
-                }),
-                &["blocks", "said"],
-            ),
             name_talk,
             fits_elsewhere,
         ],
@@ -992,7 +1086,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                     "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
                     "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
                     "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
-                    "cards": string("For a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); otherwise left out."),
+                    "cards": string("For a collection, what its rows are, in a word or two (\"Plants\", \"Weighings\"): the collection's title. Otherwise left out."),
+                    "fields": { "type": "array", "items": field_schema(false), "description": format!("For a collection: {FIELDS_SAY}") },
                     "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions they might ask, each under 12 words." },
                     "points": {
                         "type": "array",
@@ -1000,9 +1095,10 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Your shelf (a thing they use), Today (a step of what comes round) or Advice; in a collection the cards; in a study Reading, Terms or What it says."),
-                                "theme": string("What it's under in the block: the thing on the shelf or card, what comes round today, the section. Left out for You, Advice, Reading and Terms."),
-                                "text": string("The point, one short sentence."),
+                                "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Routine (a step), Your shelf (a thing they use, a row) or Advice; in a collection To do or the collection (a row); in a study Reading, Terms or What it says."),
+                                "theme": string("Only in What it says: the section it's under."),
+                                "text": string("The point, one short sentence; in a collection, the row's name."),
+                                "cells": { "type": "object", "description": "In a collection, the row's cells by field name, as its fields say: only what they told you.", "additionalProperties": true },
                             },
                             "required": ["block", "text"],
                             "additionalProperties": false,
@@ -1047,7 +1143,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "icon": { "type": "string", "enum": ICONS },
                 "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
                 "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
-                "cards": string("For a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); otherwise \"\"."),
+                "cards": string("For a collection, what its rows are, in a word or two (\"Plants\", \"Weighings\"); otherwise \"\"."),
                 "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions, each under 12 words." },
             }),
             &[
@@ -1068,7 +1164,7 @@ mod tests {
 
     #[test]
     fn each_question_gets_its_own_tools() {
-        assert!(Mode::Topic.tools().contains(&"keep_point"));
+        assert!(Mode::Topic.tools().contains(&"add_rows"));
         assert!(!Mode::Topic.tools().contains(&"propose_topic"));
         assert!(Mode::Own.tools().contains(&"change_topic"));
         for mode in [Mode::Topic, Mode::Own, Mode::SetUp] {

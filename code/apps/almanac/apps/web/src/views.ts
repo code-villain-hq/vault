@@ -157,7 +157,7 @@ const OWN = new Set(["today", "week", "you"]);
 const SAYS = new Set(["list", "questions", "shelf"]);
 /** Cards up to this many things; past it, a table compares them. */
 const TABLE_PAST = 8;
-/** A chip's most characters, as the server's `CHIP_FITS`. */
+/** A chip's most characters. */
 const CHIP_FITS = 48;
 /** Points longer than this on average are paragraphs, not sentences. */
 const PARAGRAPH = 150;

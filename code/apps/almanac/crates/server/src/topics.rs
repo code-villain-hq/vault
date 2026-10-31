@@ -7,8 +7,8 @@
 //! keeps what you told it as its first points.
 
 use almanac_domain::{
-    Actor, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX, StartTopicRequest, StartedTopic,
-    TEMPLATE_NAMES, TopicChange, Transaction, template,
+    Actor, Field, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX, StartTopicRequest,
+    StartedTopic, TEMPLATE_NAMES, TopicChange, Transaction, template,
 };
 use almanac_sync::Origin;
 use axum::Json;
@@ -22,8 +22,8 @@ use crate::acp::Question;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::kept::{fields, offer, patch_fields};
-use crate::layout::Now;
 use crate::mcp::{Asking, Mode};
+use crate::page::Page;
 use crate::state::AppState;
 
 const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
@@ -51,13 +51,13 @@ write the rest after it.
 - group: a short group for the sidebar, such as Home, Work, Health or Learning. Reuse one of \
 the existing groups when it fits.
 - template: the blocks its page starts with. \"routine\" when it's a routine they keep, with \
-steps on certain days and the things they use (a hair or skin routine, a training plan): \
-Today, the week, Your shelf and Advice. \"collection\" when it's about a set of things \
-that each get a card (plants, pets, trips, recipes): Today, the week and the cards. \"study\" \
-when it's something to learn or write up (a field, a pitch, research): Reading, Terms and What \
-it says. Each also has You, for what it learns about them, which only its About shows. When \
-they picked one, return theirs.
-- cards: for a collection, what its cards are, in a word or two (\"Plants\", \"Recipes\"); \
+steps on certain days and the things they use (a hair or skin routine, a training plan): a \
+checklist of its steps, Your shelf (a collection of what they use) and Advice. \"collection\" \
+when it's about a set of things that each get a row (plants, pets, trips, recipes): a To do \
+checklist and a collection of the things. \"study\" when it's something to learn or write up \
+(a field, a pitch, research): a Reading checklist, Terms and What it says. Each also has You, \
+for what it learns about them, which only its About shows. When they picked one, return theirs.
+- cards: for a collection, what its rows are, in a word or two (\"Plants\", \"Recipes\"); \
 otherwise \"\".
 - starters: three or four first questions they might ask to begin, each under 12 words.
 
@@ -173,16 +173,22 @@ pub async fn start(
             .or(Some(proposal.template.as_str()))
             .filter(|t| template(t).is_some())
             .unwrap_or("collection");
-        let (writes, blocks) = template_blocks(id, template, proposal.cards.as_deref());
+        let (writes, blocks) =
+            template_blocks(id, template, proposal.cards.as_deref(), &proposal.fields);
         operations.extend(writes);
-        for point in &proposal.points {
-            let Some(block) = block_for(&blocks, point.block.as_deref()) else {
+        for (position, point) in proposal.points.iter().enumerate() {
+            let Some(block) = block_for(&blocks, point.block.as_deref(), !point.cells.is_empty())
+            else {
                 continue;
             };
             let theme = match block.kind {
-                "chips" | "list" | "you" => String::new(),
-                _ if point.theme.trim().is_empty() => block.title.clone(),
-                _ => cut(&point.theme, 120),
+                "toggle" if point.theme.trim().is_empty() => block.title.clone(),
+                "toggle" => cut(&point.theme, 120),
+                _ => String::new(),
+            };
+            let cells = match block.kind {
+                "collection" => json!(point.cells),
+                _ => json!({}),
             };
             operations.push(Operation::Create {
                 model: ModelKind::Point,
@@ -192,13 +198,15 @@ pub async fn start(
                     ("block_id", json!(block.id)),
                     ("theme", json!(theme)),
                     ("text", json!(point.text)),
+                    ("cells", cells),
+                    ("position", json!(position)),
                     ("source", json!("You said")),
                 ]),
             });
         }
         // Offered under the answer that proposed them, to add with a click.
         for reminder in &proposal.reminders {
-            operations.push(offer(id, *message_id, reminder, &[]));
+            operations.push(offer(id, *message_id, reminder, &[], None));
         }
         let mut started = proposal.clone();
         started.topic_id = Some(id);
@@ -218,9 +226,9 @@ pub async fn start(
     // blocks come with the set-up.
     let picked = match (&proposed, picked) {
         (None, Some(name)) => {
-            let (writes, blocks) = template_blocks(id, name, None);
+            let (writes, blocks) = template_blocks(id, name, None, &[]);
             operations.extend(writes);
-            let cards = blocks.iter().find(|b| b.kind == "cards").map(|b| b.id);
+            let cards = blocks.iter().find(|b| b.kind == "collection").map(|b| b.id);
             Some((name.to_string(), cards))
         }
         _ => None,
@@ -275,10 +283,15 @@ pub async fn undo(
                 data,
             });
         }
-        if let Some(layout) = &change.layout {
-            let now = Now::load(&state.pool, actor.workspace_id, change.topic_id).await?;
-            let blocks: Vec<Uuid> = now.blocks.iter().map(|b| b.id).collect();
-            let points: Vec<(Uuid, Uuid)> = now.points.iter().map(|p| (p.id, p.block_id)).collect();
+        if let Some(layout) = &change.layout
+            && let Some(page) = Page::load(&state.pool, actor.workspace_id, change.topic_id).await?
+        {
+            let blocks: Vec<Uuid> = page.blocks.iter().map(|b| b.block.id).collect();
+            let points: Vec<(Uuid, Uuid)> = page
+                .blocks
+                .iter()
+                .flat_map(|b| b.points.iter().map(|p| (p.id, p.block_id)))
+                .collect();
             operations.extend(crate::layout::undo(
                 change.topic_id,
                 layout,
@@ -342,7 +355,7 @@ async fn set_up(
                 .map(|s| s.template.as_str())
                 .filter(|t| template(t).is_some())
                 .unwrap_or("collection");
-            operations.extend(template_blocks(id, name, cards.as_deref()).0);
+            operations.extend(template_blocks(id, name, cards.as_deref(), &[]).0);
         }
     }
     if let Some(set_up) = set_up {
@@ -460,12 +473,14 @@ pub struct Started {
     pub title: String,
 }
 
-/// The writes that give a topic the blocks of a template, its cards
-/// titled `cards` when that's given, and the blocks they make.
+/// The writes that give a topic the blocks of a template, its collection
+/// titled `cards` when that's given, with these `fields`, and the blocks
+/// they make.
 pub fn template_blocks(
     topic_id: Uuid,
     name: &str,
     cards: Option<&str>,
+    fields_of: &[Field],
 ) -> (Vec<Operation>, Vec<Started>) {
     let blocks: Vec<Started> = template(name)
         .unwrap_or_default()
@@ -474,7 +489,7 @@ pub fn template_blocks(
             id: Uuid::now_v7(),
             kind,
             title: match (*kind, cards.map(|c| cut(c, 60))) {
-                ("cards", Some(cards)) if !cards.is_empty() => cards,
+                ("collection", Some(cards)) if !cards.is_empty() => cards,
                 _ => title.to_string(),
             },
         })
@@ -489,6 +504,14 @@ pub fn template_blocks(
                 ("topic_id", json!(topic_id)),
                 ("kind", json!(block.kind)),
                 ("title", json!(block.title)),
+                (
+                    "fields",
+                    json!(if block.kind == "collection" {
+                        fields_of
+                    } else {
+                        &[]
+                    }),
+                ),
                 ("position", json!(position)),
             ]),
         })
@@ -497,14 +520,19 @@ pub fn template_blocks(
 }
 
 /// The block a proposed point goes in: the one it names by title, or the
-/// first that keeps points of its kind.
-fn block_for<'a>(blocks: &'a [Started], named: Option<&str>) -> Option<&'a Started> {
+/// first that keeps points like it, a collection when it has cells.
+fn block_for<'a>(blocks: &'a [Started], named: Option<&str>, row: bool) -> Option<&'a Started> {
     let named = named.map(|n| n.trim().to_lowercase()).unwrap_or_default();
+    let kinds: &[&str] = if row {
+        &["collection"]
+    } else {
+        &["collection", "toggle", "bullets", "you", "checklist"]
+    };
     blocks
         .iter()
-        .find(|b| b.kind != "week" && !named.is_empty() && b.title.to_lowercase() == named)
+        .find(|b| !named.is_empty() && b.title.to_lowercase() == named)
         .or_else(|| {
-            ["cards", "text", "you", "chips", "list", "shelf", "today"]
+            kinds
                 .iter()
                 .find_map(|kind| blocks.iter().find(|b| b.kind == *kind))
         })

@@ -15,7 +15,7 @@
 use std::convert::Infallible;
 
 use almanac_domain::{
-    Actor, AskRequest, BLOCK_KINDS, LOOKS, ModelKind, Operation, Source, Transaction,
+    Actor, AskRequest, FIELD_KINDS, ModelKind, Operation, SET_KINDS, Source, Transaction,
 };
 use axum::Json;
 use axum::extract::{Path, State};
@@ -31,7 +31,7 @@ use crate::acp::{ClaudeCode, Failure, Question};
 use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
-use crate::kept::{Answering, Handed, Kept, fields, reminder};
+use crate::kept::{Answering, FieldArg, ItemArg, Kept, PointChange, RowArg, fields, reminder};
 use crate::mcp::{Asking, Mode};
 use crate::page::{Page, Workspace};
 use crate::photos::{self, Image};
@@ -72,18 +72,19 @@ it fits better in another topic, naming one of the other topics or a new one.
 - Answer in the language they write in.";
 
 /// With Claude Code: Almanac's tools keep the page as it answers.
-const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer: keep_point for \
-what's worth knowing later, tick_points when they did a list's item or answered a question \
-well, ask_to_check when your answer rested on a guess about their \
-situation, offer_reminder when the talk settled something recurring or dated, or they told you \
-a routine they keep, fits_elsewhere when the question belongs in another topic, change_brief \
-when they tell you how this topic should answer from now on or correct the same thing a second \
-time, and name_talk on a talk's first answer. Each point goes in the block of the page that shows it; start a block \
-only when they ask for one or none fits. Only when they ask you to lay the page out anew (sort \
-it, regroup it, make a timeline of it) do it with lay_out_page, and keep no other points in \
-that answer. The page is kept up to date, not added to: what changes a point or \
-reminder it has replaces that one. Write only the answer: they don't see the tools, so don't mention \
-them or narrate using them.";
+const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer. File what's \
+worth knowing later where it belongs: add_items for lines, steps, terms, paragraphs and what \
+they told you about themselves; add_rows for things, events and measurements, with a cell per \
+field; add_block, or a field with change_block, only when the page has nowhere for it. The page \
+is kept up to date, not added to: change_points when something changed or was wrong, remove \
+what's wrong or twice, move what reads better elsewhere. tick when they did a checklist's item, \
+ask_to_check when your answer rested on a guess about their situation, offer_reminder when the \
+talk settled something recurring or dated (for a checklist's item, naming it), fits_elsewhere \
+when the question belongs in another topic, change_brief when they tell you how this topic \
+should answer from now on or correct the same thing a second time, and name_talk on a talk's \
+first answer. Never pick a colour, a width or a picture: the app draws the page from what it \
+keeps; only when they ask for another picture of a collection, pick one its fields allow. Write \
+only the answer: they don't see the tools, so don't mention them or narrate using them.";
 
 const WEB_ON: &str = "You can search the web and read pages. Do it when the answer depends on \
 things that change (prices, laws, opening hours, news) or that you aren't sure of, and keep the \
@@ -122,8 +123,8 @@ to or its icon), do it with change_topic, then say what you changed. They can un
 - Write only the answer. They don't see the tools, so don't mention them or narrate using them.";
 
 /// A talk through the Messages API: the page keeps what it said
-/// afterwards, but nothing lays it out anew.
-const ANSWER_WITHOUT_LAYOUT: &str = "You can't lay the page out anew from here: when they ask \
+/// afterwards, but nothing moves blocks around.
+const ANSWER_WITHOUT_TOOLS: &str = "You can't move the page's blocks from here: when they ask \
 for that, say so, and how you'd lay it out.";
 
 /// The workspace's own topic through the Messages API: no tools.
@@ -131,36 +132,26 @@ const OWN_WITHOUT_TOOLS: &str = "- Here you can't start or change topics yoursel
 name and what it sticks to, and say they start it with New topic in the sidebar.";
 
 const KEEP: &str = "You keep the page of one topic in Almanac, a notebook that keeps what someone \
-learns. After each exchange in a talk, you decide what the page keeps from it. Return JSON in the \
-schema's shape.
+learns. After each exchange in a talk, you decide what the page keeps from it and what changes \
+on it. Return JSON in the schema's shape; a list with nothing in it is [].
 
-- points: what's worth knowing later from this exchange: facts, decisions, and what they told you \
-about their situation. Nothing the page already has. Usually none to three. Each goes in one of \
-the page's blocks (block: its reference, \"b2\", or its title), with the theme and the length that \
-block's kind asks for, as the page says; kind is \"\" then. Only when they asked for a block the \
-page lacks, or none fits, block is a short new title and kind its kind. Use an existing theme \
-when one fits.
-- replaces: the page is kept up to date, not added to. When a point changes or corrects points \
-the page has (a wash day moved, a product swapped), it replaces them, named as the page names \
-them ([\"p3\"]); keep one point where two would say the same. [] when it replaces none.
-- happened: only for a point on a timeline, when it happened: a year (1959), a span \
-(1987–1993) or a day (11. September 2001), with v. Chr. or BC for the years before year 1; in \
-a trend the day it was measured (\"2026-09-24\"), \"\" only for a mark they said they aim at. \
-\"\" elsewhere.
-- facet: only for a point in cards or a table whose block names facets, the facet it's about, \
-one of the block's (Wasser); \"\" for what the thing is, and elsewhere.
-- look: only in cards, tables, bars and questions: \"warn\" when it needs a look (brown edges, \
-over budget, a gap, no answer yet), \"info\" when it's ready for something (a cutting to pot); \
-\"\" otherwise.
-- amount: in bars, trends and parts always, the number, plain (\"900000\", \"3.4\"); in a \
-table a number cell's (\"709\" for 709 kr), so it sorts; \"\" elsewhere.
-- note: only in bars, questions, trends and parts, a few words beside it: a bar's unit or what \
-it counts (\"getötet\"), a trend's unit (\"kg\"), what a part counts (\"Anzeigen\"), who asks a \
-question (on its first point); \"\" elsewhere.
-- source: where the point comes from, in a few words: \"You said\", \"From the talk\", or the \
-book, guide or institution the answer relied on. Never a link.
-- ticks: the page's points the exchange says are done, named as the page names them ([\"p3\"]): \
-a list's item they did or read, every point of a question they answered well. [] for none.
+- blocks: only when the page has nowhere for what you keep, a block to start: its kind, its \
+short title (what its points share), and for a collection its fields (name, kind, unit, goal \
+as a plain number or \"\", options). Items and rows name it by its title.
+- items: what's worth knowing later, in a block that isn't a collection: facts, decisions, \
+steps, terms, and what they told you about their situation. Nothing the page already has. \
+Usually none to three. block names it as the page does (\"b2\") or by its title; theme only in \
+a toggle (the line it opens under), look only in a callout (\"warn\" or \"info\"), \"\" \
+otherwise; text as its block's kind asks; source where it comes from, in a few words (\"You \
+said\", \"From the talk\", the book, guide or institution). Never a link.
+- rows: things, events and measurements, in a collection: name, and cells, a field each \
+(field, value) as the block names its fields, only for what they or a source said. A number \
+plain (3.4), a day as 2026-09-24, a check yes or no.
+- changes: the page is kept up to date, not added to. When the exchange changes or corrects a \
+point the page has (a wash day moved, a weighing corrected), the point (\"p3\") with its new \
+text (\"\" when only cells change) and the cells that change.
+- remove: points or blocks that are wrong now, or say twice what another does (\"p4\").
+- ticks: checklist items the exchange says are done (\"p3\").
 - questions: when the answer rested on a guess about their situation, ask to check it, with the \
 point to keep if they say yes (text \"Does the Monstera stand by the north window?\", point \
 \"Stands by the north window.\"). Point is \"\" when there's nothing to keep. Only for a guess \
@@ -171,12 +162,11 @@ reminded of (watering every 7 days, repotting in March, sending the deck on Frid
 they told you they keep counts (washing their hair three times a week): one reminder for each \
 day it comes round, so something a few times a week is a reminder per weekday, each every 7 \
 days; when they didn't say which days, spread them evenly and the answer says which. title says \
-what to do in two to four words (\"Water the Monstera\", \"Elvital wash\"); the steps belong in \
-points. due_on is the next day it's due (YYYY-MM-DD), at is a time \
-(\"HH:MM\") or \"\", every_days is the rhythm in days, or 0 for once. replaces names the reminders \
-it takes the place of, as the page names them ([\"r2\"]): when a reminder changes (a wash day \
-moved, another rhythm), offer the new one in place of the old, and one that only goes is \
-replaced by the reminder that takes over from it; [] for none. None the calendar already has.
+what to do in two to four words (\"Water the Monstera\"). item is the checklist item it rings \
+for (\"p3\"), or \"\"; ticking the item ticks the reminder. due_on is the next day it's due \
+(YYYY-MM-DD), at is a time (\"HH:MM\") or \"\", every_days is the rhythm in days, or 0 for once. \
+replaces names the reminders it takes the place of, as the page names them ([\"r2\"]): when a \
+reminder changes, offer the new one in place of the old. None the calendar already has.
 - elsewhere: when the question had nothing to do with this topic, the topic it fits (one of the \
 others, or a short new name); otherwise \"\".
 - brief: only when they told you how this topic should answer from now on (\"always say when a \
@@ -186,11 +176,21 @@ added or changed where it fits. said is what changed, in a short sentence (\"Nam
 source was written.\"). Otherwise both \"\".
 - talk_title: a title for the talk, under six words.
 
-Write in the language of the talk.";
+Never pick a colour, a width or a picture: the app draws the page from what it keeps. Write in \
+the language of the talk.";
 
 #[derive(Deserialize)]
 struct Keep {
-    points: Vec<KeepPoint>,
+    #[serde(default)]
+    blocks: Vec<KeepBlock>,
+    #[serde(default)]
+    items: Vec<KeepItem>,
+    #[serde(default)]
+    rows: Vec<KeepRow>,
+    #[serde(default)]
+    changes: Vec<KeepChange>,
+    #[serde(default)]
+    remove: Vec<String>,
     #[serde(default)]
     ticks: Vec<String>,
     questions: Vec<KeepQuestion>,
@@ -208,27 +208,59 @@ struct KeepBrief {
 }
 
 #[derive(Deserialize)]
-struct KeepPoint {
-    block: String,
+struct KeepBlock {
+    kind: String,
+    title: String,
     #[serde(default)]
+    fields: Vec<KeepField>,
+}
+
+#[derive(Deserialize)]
+struct KeepField {
+    name: String,
     kind: String,
     #[serde(default)]
-    theme: String,
-    text: String,
-    #[serde(default)]
-    happened: String,
-    #[serde(default)]
-    facet: String,
-    #[serde(default)]
-    look: String,
+    unit: String,
     /// A string, as every field the schema asks for is required.
     #[serde(default)]
-    amount: String,
+    goal: String,
     #[serde(default)]
-    note: String,
+    options: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct KeepItem {
+    block: String,
+    #[serde(default)]
+    theme: String,
+    #[serde(default)]
+    look: String,
+    text: String,
     source: String,
+}
+
+#[derive(Deserialize)]
+struct KeepRow {
+    block: String,
+    name: String,
     #[serde(default)]
-    replaces: Vec<String>,
+    cells: Vec<KeepCell>,
+    source: String,
+}
+
+#[derive(Deserialize)]
+struct KeepCell {
+    field: String,
+    value: String,
+}
+
+#[derive(Deserialize)]
+struct KeepChange {
+    point: String,
+    #[serde(default)]
+    text: String,
+    #[serde(default)]
+    cells: Vec<KeepCell>,
 }
 
 #[derive(Deserialize)]
@@ -242,11 +274,21 @@ struct KeepQuestion {
 struct KeepReminder {
     theme: String,
     title: String,
+    #[serde(default)]
+    item: String,
     due_on: String,
     at: String,
     every_days: i64,
     #[serde(default)]
     replaces: Vec<String>,
+}
+
+/// Cells as the API gives them, a field and its value each.
+fn cells_of(cells: &[KeepCell]) -> serde_json::Map<String, Value> {
+    cells
+        .iter()
+        .map(|c| (c.field.clone(), json!(c.value)))
+        .collect()
 }
 
 fn keep_schema() -> Value {
@@ -264,26 +306,40 @@ fn keep_schema() -> Value {
     };
     let string = json!({ "type": "string" });
     let list = |item: Value| json!({ "type": "array", "items": item });
-    let kinds: Vec<&str> = [""].iter().chain(BLOCK_KINDS).copied().collect();
+    let cells = list(object(json!({ "field": string, "value": string })));
     object(json!({
-        "points": list(object(json!({
-            "block": string,
-            "kind": { "type": "string", "enum": kinds },
-            "theme": string,
-            "text": string,
-            "happened": string,
-            "facet": string,
-            "look": { "type": "string", "enum": LOOKS },
-            "amount": string,
-            "note": string,
-            "source": string,
-            "replaces": list(string.clone()),
+        "blocks": list(object(json!({
+            "kind": { "type": "string", "enum": SET_KINDS },
+            "title": string,
+            "fields": list(object(json!({
+                "name": string,
+                "kind": { "type": "string", "enum": FIELD_KINDS },
+                "unit": string,
+                "goal": string,
+                "options": list(string.clone()),
+            }))),
         }))),
+        "items": list(object(json!({
+            "block": string,
+            "theme": string,
+            "look": { "type": "string", "enum": ["", "warn", "info"] },
+            "text": string,
+            "source": string,
+        }))),
+        "rows": list(object(json!({
+            "block": string,
+            "name": string,
+            "cells": cells,
+            "source": string,
+        }))),
+        "changes": list(object(json!({ "point": string, "text": string, "cells": cells }))),
+        "remove": list(string.clone()),
         "ticks": list(string.clone()),
         "questions": list(object(json!({ "theme": string, "text": string, "point": string }))),
         "reminders": list(object(json!({
             "theme": string,
             "title": string,
+            "item": string,
             "due_on": string,
             "at": string,
             "every_days": { "type": "integer" },
@@ -600,9 +656,14 @@ async fn say_with_claude_code(
         )
     };
     let mode = if own { Mode::Own } else { Mode::Topic };
+    let mut kept = Kept::on(page.refs());
+    kept.photos = said
+        .iter()
+        .flat_map(|line| line.images.iter().map(|i| i.id))
+        .collect();
     let open = state
         .questions
-        .open(Asking::new(actor, page.id, mode).on(page.refs()));
+        .open(Asking::new(actor, page.id, mode).on(kept));
     let tools = mode.tools();
     let (prompt, images) = talk_prompt(&said);
     let question = Question {
@@ -755,12 +816,7 @@ fn problem_of(failure: Failure) -> Problem {
 /// others it read.
 fn sources(read: &[String], kept: &Kept) -> Vec<Source> {
     let mut urls: Vec<&str> = Vec::new();
-    for url in kept
-        .points
-        .iter()
-        .filter_map(|p| p.url.as_deref())
-        .chain(read.iter().map(String::as_str))
-    {
+    for url in kept.urls().chain(read.iter().map(String::as_str)) {
         if !urls.contains(&url) {
             urls.push(url);
         }
@@ -829,7 +885,7 @@ async fn say(
         )
     } else {
         format!(
-            "{ANSWER}\n\n{ANSWER_WITHOUT_LAYOUT}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}{}",
+            "{ANSWER}\n\n{ANSWER_WITHOUT_TOOLS}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}{}",
             today(),
             page.describe(),
             about_line(about)
@@ -869,31 +925,70 @@ async fn keep(
         .await
         .map_err(AppError::internal)?;
     let mut kept = Kept::on(page.refs());
-    for point in from.points {
-        let _ = kept.keep_point(Handed {
-            block: point.block,
-            kind: point.kind,
-            theme: point.theme,
-            text: point.text,
-            happened: point.happened,
-            facet: point.facet,
-            look: point.look,
-            amount: point.amount.trim().parse().ok(),
-            note: point.note,
-            source: point.source,
-            url: String::new(),
-            replaces: point.replaces,
-        });
+    // Each on its own: what doesn't fit the page is left out, not the rest.
+    for block in &from.blocks {
+        let fields: Vec<FieldArg> = block
+            .fields
+            .iter()
+            .map(|f| FieldArg {
+                name: f.name.clone(),
+                kind: f.kind.clone(),
+                unit: f.unit.clone(),
+                goal: f.goal.trim().replace(',', ".").parse().ok(),
+                options: f.options.clone(),
+                was: String::new(),
+            })
+            .collect();
+        let _ = kept.add_block(&block.kind, &block.title, None, &fields);
     }
-    if !from.ticks.is_empty() {
-        let _ = kept.tick_points(&from.ticks, true);
+    for item in &from.items {
+        let _ = kept.add_items(
+            &item.block,
+            &[ItemArg {
+                text: item.text.clone(),
+                theme: item.theme.clone(),
+                look: item.look.clone(),
+                source: item.source.clone(),
+                url: String::new(),
+            }],
+        );
+    }
+    for row in &from.rows {
+        let _ = kept.add_rows(
+            &row.block,
+            &[RowArg {
+                name: row.name.clone(),
+                cells: cells_of(&row.cells),
+                source: row.source.clone(),
+                url: String::new(),
+            }],
+        );
+    }
+    for change in &from.changes {
+        let _ = kept.change_points(&[PointChange {
+            point: change.point.clone(),
+            text: Some(change.text.clone()).filter(|t| !t.trim().is_empty()),
+            cells: Some(cells_of(&change.cells)).filter(|c| !c.is_empty()),
+            ..PointChange::default()
+        }]);
+    }
+    for what in &from.remove {
+        let _ = kept.remove(std::slice::from_ref(what));
+    }
+    for item in &from.ticks {
+        let _ = kept.tick(std::slice::from_ref(item), true);
     }
     for question in &from.questions {
         let _ = kept.ask_to_check(&question.theme, &question.text, &question.point);
     }
     for r in &from.reminders {
-        if let Ok(reminder) = reminder(&r.theme, &r.title, &r.due_on, &r.at, Some(r.every_days)) {
-            let _ = kept.offer_reminder(reminder, &r.replaces);
+        let title = match r.title.trim() {
+            "" => kept.item_words(&r.item).unwrap_or_default(),
+            title => title.to_string(),
+        };
+        if let Ok(reminder) = reminder(&r.theme, &title, &r.due_on, &r.at, Some(r.every_days)) {
+            let item = Some(r.item.as_str()).filter(|i| !i.trim().is_empty());
+            let _ = kept.offer_reminder(reminder, &r.replaces, item);
         }
     }
     if !from.brief.sticks_to.trim().is_empty() {
@@ -935,6 +1030,7 @@ mod tests {
 
     fn line(role: &str, text: &str, photos: usize) -> Line {
         let image = Image {
+            id: Uuid::nil(),
             media_type: "image/jpeg".into(),
             data: "AAAA".into(),
         };
@@ -1004,24 +1100,27 @@ mod tests {
     #[test]
     fn the_keep_schema_requires_every_field() {
         let schema = keep_schema();
-        assert_eq!(schema["required"].as_array().map(Vec::len), Some(7));
+        let required = |path: &[&str]| {
+            let mut at = &schema;
+            for step in path {
+                at = &at[step];
+            }
+            at["required"].as_array().map(Vec::len)
+        };
+        assert_eq!(required(&[]), Some(11));
+        assert_eq!(required(&["properties", "brief"]), Some(2));
+        assert_eq!(required(&["properties", "reminders", "items"]), Some(7));
+        assert_eq!(required(&["properties", "rows", "items"]), Some(4));
         assert_eq!(
-            schema["properties"]["brief"]["required"]
-                .as_array()
-                .map(Vec::len),
-            Some(2)
-        );
-        assert_eq!(
-            schema["properties"]["reminders"]["items"]["required"]
-                .as_array()
-                .map(Vec::len),
-            Some(6)
-        );
-        assert_eq!(
-            schema["properties"]["points"]["items"]["required"]
-                .as_array()
-                .map(Vec::len),
-            Some(11)
+            required(&[
+                "properties",
+                "blocks",
+                "items",
+                "properties",
+                "fields",
+                "items"
+            ]),
+            Some(5)
         );
     }
 }
