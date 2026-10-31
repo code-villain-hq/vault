@@ -184,7 +184,9 @@ What they do:
     few lines, and More (`Leads` in `set.tsx`). A list of names whose rows
     have pages draws as tiles, each with what its page keeps as chips (its
     leads, its rows' names: `Shelf`), and a board card with nothing else to
-    say shows the same chips.
+    say shows the same chips. A timeline's axis has a lane per choice; a
+    click on one picks its rows for the list under it, and past ten rows
+    the list shows the first eight, with All (`AxisTimeline`).
   - A checklist's row can ring: offer_reminder with an `item` makes a
     reminder with its `point_id` (migration 0016). Ticking a row writes
     its check cell; a row a reminder rings for ticks the reminder instead (`markDone`): one

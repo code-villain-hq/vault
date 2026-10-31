@@ -277,7 +277,7 @@ export function samples(): Sample[] {
     ),
     sample(
       "Collection: timeline",
-      "Days or spans that are past draw a timeline, oldest first, with an axis over them from six on: a lane per choice.",
+      "Days or spans that are past draw a timeline, oldest first, with an axis over them from six on: a lane per choice, which a click picks; past ten rows the list shows the first few, with All.",
       history,
       "collection",
       "Europe after Napoleon",

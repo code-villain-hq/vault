@@ -698,10 +698,13 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
         <RowTimeline rows={rows} day={day} fields={fields.filter((f) => f !== day)} />
       );
       return placed ? (
-        <div className="flex flex-col gap-4">
-          <TimeAxis placed={placed} rows={rows} by={by} />
-          {timeline}
-        </div>
+        <AxisTimeline
+          placed={placed}
+          rows={rows}
+          by={by}
+          day={day}
+          fields={fields.filter((f) => f !== day)}
+        />
       ) : (
         <Told rows={rows} by={by}>
           {timeline}
@@ -775,42 +778,105 @@ function ticksOf(first: number, last: number): number[] {
  * they cluster shows at a glance; a lane per status or choice when one
  * tells them apart, with how many each.
  */
-function TimeAxis({
+/** Past this many rows, a timeline under its axis shows the first few, with All. */
+const AXIS_LIST_SHOWS = 8;
+
+/** An axis over the years, a lane per choice, which picks the rows the list under it shows. */
+function AxisTimeline({
   placed,
   rows,
   by,
+  day,
+  fields,
 }: {
   placed: Placed[];
   rows: Point[];
   by: Field | undefined;
+  day: Field;
+  fields: Field[];
+}) {
+  const [lane, setLane] = useState<string | null>(null);
+  const [all, setAll] = useState(false);
+  const shown = lane === null ? rows : rows.filter((row) => laneWord(row, by) === lane);
+  const cut = lane === null && !all && shown.length > AXIS_LIST_SHOWS + 2;
+  const listed = cut ? byDay(shown, day).slice(0, AXIS_LIST_SHOWS) : shown;
+  return (
+    <div className="flex flex-col gap-4">
+      <TimeAxis
+        placed={placed}
+        rows={rows}
+        by={by}
+        chosen={lane}
+        onChoose={(word) => setLane((was) => (was === word ? null : word))}
+      />
+      {/* Picked, the lane's word would only say it again on every row. */}
+      <RowTimeline
+        rows={listed}
+        day={day}
+        fields={lane === null ? fields : fields.filter((f) => f !== by)}
+      />
+      {(cut || all) && lane === null && (
+        <button
+          type="button"
+          onClick={() => setAll((was) => !was)}
+          className="self-start rounded-md px-2 py-1 text-sm text-muted hover:bg-chip hover:text-fg"
+        >
+          {all ? "Fewer" : `All ${shown.length}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** The word a row's choice says, or "" without one. */
+function laneWord(row: Point, by: Field | undefined): string {
+  const cell = by && cellOf(row, by);
+  return typeof cell === "string" ? cell : "";
+}
+
+function TimeAxis({
+  placed,
+  rows,
+  by,
+  chosen,
+  onChoose,
+}: {
+  placed: Placed[];
+  rows: Point[];
+  by: Field | undefined;
+  chosen: string | null;
+  onChoose: (lane: string) => void;
 }) {
   const first = Math.min(...placed.map((p) => p.span[0]));
   const last = Math.max(...placed.map((p) => p.span[1]));
   const at = (year: number) => ((year - first) / (last - first)) * 100;
   const lanes = by ? [...lanesOf(by, rows), ""] : [""];
-  const laneOf = (row: Point) => {
-    const cell = by && cellOf(row, by);
-    return typeof cell === "string" ? cell : "";
-  };
   return (
     <div
-      role="img"
-      aria-label={`${placed.length} events from ${first} to ${last}`}
+      title={`${placed.length} events from ${first} to ${last}`}
       className={`grid gap-x-3 gap-y-1 text-xs ${by ? "grid-cols-[max-content_1fr]" : "grid-cols-1"}`}
     >
       {lanes.map((lane, i) => {
-        const inLane = placed.filter((p) => laneOf(p.row) === lane);
+        const inLane = placed.filter((p) => laneWord(p.row, by) === lane);
+        const off = chosen !== null && chosen !== lane;
         if (inLane.length === 0) return null;
         const colour = by && lane ? laneColour(by, i, lanes.length - 1) : "bg-accent";
         return (
           <Fragment key={lane || "-"}>
             {by && (
-              <span className="flex items-center gap-1.5 text-muted">
+              <button
+                type="button"
+                aria-pressed={chosen === lane}
+                onClick={() => onChoose(lane)}
+                className={`-mx-1.5 flex items-center gap-1.5 rounded px-1.5 text-left hover:bg-chip ${
+                  chosen === lane ? "bg-chip text-fg" : "text-muted"
+                } ${off ? "opacity-50" : ""}`}
+              >
                 {lane || "–"}
                 <span className="font-semibold text-fg tabular-nums">{inLane.length}</span>
-              </span>
+              </button>
             )}
-            <span className="relative h-4">
+            <span aria-hidden="true" className={`relative h-4 ${off ? "opacity-30" : ""}`}>
               <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
               {inLane.map(({ row, span: [from, to] }) => (
                 <span
