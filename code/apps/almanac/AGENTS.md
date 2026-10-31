@@ -136,10 +136,12 @@ What they do:
   output (`KEEP` in `talks.rs`), reads the same from the exchange. Either
   way `Kept` is a working copy of the page the answer changes, and the
   server writes it with the answer, through the sync engine, so every
-  client sees it. What's added shows in the message's `kept` words;
-  changes, moves and removals are one `TopicChange` with a `PageLayout`,
-  so Undo (`layout.rs`) puts the blocks and points back and takes off
-  what it started ("Changed a point, moved a point and removed Plants.").
+  client sees it. What's added, changed, moved and removed is one
+  `TopicChange` with a `PageLayout`, so Undo (`layout.rs`) puts the
+  blocks and points back and takes off what it started ("Kept a point
+  under Gewicht. Changed a point and removed Plants."); only ticks are
+  the message's `kept` words. The layout names the collections it
+  changed (`collections`), which the answer draws as their pictures.
   An answer starts at most four blocks and adds at most twelve points.
   Claude never picks a colour, a width or a picture: the fields pick a
   collection's picture, and asked for another it picks one they allow.

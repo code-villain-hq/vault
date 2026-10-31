@@ -733,7 +733,9 @@ impl Kept {
             points: Vec::new(),
             made_blocks: Vec::new(),
             made_points: Vec::new(),
+            collections: Vec::new(),
         };
+        let mut shown: Vec<Uuid> = Vec::new();
         let (mut changed_blocks, mut moved_blocks, mut removed_blocks) = (0, 0, Vec::new());
         for (n, block) in self.blocks.iter().enumerate() {
             let Some(was) = self.refs.blocks.get(n) else {
@@ -751,6 +753,7 @@ impl Kept {
                         ]),
                     });
                     layout.made_blocks.push(block.id);
+                    shown.push(block.id);
                 }
                 continue;
             };
@@ -769,6 +772,7 @@ impl Kept {
             }
             if !data.is_empty() {
                 changed_blocks += 1;
+                shown.push(block.id);
             }
             if block.position != was.position {
                 data.insert("position".into(), json!(block.position));
@@ -812,6 +816,7 @@ impl Kept {
                         ]),
                     });
                     layout.made_points.push(point.id);
+                    shown.push(point.block_id);
                     added += 1;
                     let under = match point.theme.as_str() {
                         "" => self.title_of(point.block_id).to_string(),
@@ -852,9 +857,11 @@ impl Kept {
             if reworded {
                 data.insert("seen".into(), json!(false));
                 changed_points += 1;
+                shown.push(point.block_id);
             }
             if point.block_id != was.block_id {
                 data.insert("block_id".into(), json!(point.block_id));
+                shown.push(point.block_id);
             }
             if point.position != was.position {
                 data.insert("position".into(), json!(point.position));
@@ -958,15 +965,8 @@ impl Kept {
         }
 
         let mut message = Map::new();
-        let kept: Vec<String> = [
-            (added > 0).then(|| kept_words(added, &unders)),
-            ticked_words(&self.ticks),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
-        if !kept.is_empty() {
-            message.insert("kept".into(), json!(kept.join(" ")));
+        if let Some(ticked) = ticked_words(&self.ticks) {
+            message.insert("kept".into(), json!(ticked));
         }
         if let Some(elsewhere) = self.elsewhere.as_deref().map(|e| cut(e, 80))
             && !elsewhere.is_empty()
@@ -978,13 +978,27 @@ impl Kept {
             message.insert("proposal".into(), json!(proposal));
         }
         let mut changes = self.changes.clone();
-        let said = change_words(
-            (changed_blocks, changed_points),
-            (moved_blocks, moved_points),
-            &removed_blocks,
-            removed_points,
-        );
-        if let Some(said) = said {
+        let said: Vec<String> = [
+            (added > 0).then(|| kept_words(added, &unders)),
+            change_words(
+                (changed_blocks, changed_points),
+                (moved_blocks, moved_points),
+                &removed_blocks,
+                removed_points,
+            ),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if !said.is_empty() {
+            let said = said.join(" ");
+            let mut collections: Vec<_> = self
+                .blocks
+                .iter()
+                .filter(|b| b.kind == "collection" && shown.contains(&b.id) && !self.is_gone(b.id))
+                .collect();
+            collections.sort_by_key(|b| b.position);
+            layout.collections = collections.into_iter().map(|b| b.id).collect();
             changes.push(TopicChange {
                 topic_id: at.topic_id,
                 name: at.topic_name.clone(),
@@ -1888,8 +1902,11 @@ mod tests {
         assert_eq!(first["block_id"], json!(id));
         assert_eq!(first["cells"], json!({"Tag": "2026-10-20", "Gewicht": 3.5}));
         assert_eq!(second["position"], json!(1));
-        assert_eq!(said["kept"], json!("Kept 2 points under Gewicht."));
-        assert!(said.get("changes").is_none(), "only new things");
+        assert!(said.get("kept").is_none(), "only ticks");
+        let change = &said["changes"][0];
+        assert_eq!(change["said"], json!("Kept 2 points under Gewicht."));
+        assert_eq!(change["layout"]["collections"], json!([id]));
+        assert_eq!(change["layout"]["made_points"].as_array().unwrap().len(), 2);
     }
 
     #[test]

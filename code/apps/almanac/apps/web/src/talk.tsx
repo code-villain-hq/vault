@@ -2,8 +2,9 @@
 // written (`asking.tsx` reads it); the talk, the answer and what the page
 // kept from it then arrive through sync. In
 // the workspace's own topic, an answer may propose a topic to start, or
-// say what it changed in one, with Undo. A question may come with photos,
-// pasted, dropped on the talk or picked.
+// say what it changed in one. Every change shows under its answer, saying
+// where it went, with Undo; a collection it changed shows as its picture.
+// A question may come with photos, pasted, dropped on the talk or picked.
 
 import type {
   Message,
@@ -36,8 +37,10 @@ import { isOwn, useNewTopic, useTopics } from "./layout";
 import { type Picked, usePhoto } from "./photos";
 import { AddPhoto, DropHint, PickedPhotos, PickingProblem, useDrop, usePicking } from "./picking";
 import { about, Prose } from "./prose";
+import { Collection } from "./set";
 import { TopicForm } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
+import { shownAs } from "./views";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** The talks of a topic, the latest first. */
@@ -375,7 +378,7 @@ function Said({
       {message.proposal && (
         <Proposed message={message} proposal={message.proposal} toStart={toStart} />
       )}
-      {message.changes.length > 0 && <Changes message={message} />}
+      {message.changes.length > 0 && <Changes message={message} here={topic.id} />}
       {reminders
         .filter((r) => r.status === "offered")
         .map((reminder) => (
@@ -532,8 +535,12 @@ function Proposed({
   );
 }
 
-/** What an answer changed in topics you named, and Undo, which puts it back. */
-function Changes({ message }: { message: Message }) {
+/**
+ * What an answer changed, where it went, and Undo, which puts it back: on
+ * the topic's page, and in topics you named from the workspace's own. A
+ * collection it changed shows as its picture, until it's undone.
+ */
+function Changes({ message, here }: { message: Message; here: string }) {
   const { workspace } = useWorkspace();
   const guest = useIsGuest();
   const [undoing, setUndoing] = useState(false);
@@ -553,11 +560,16 @@ function Changes({ message }: { message: Message }) {
     <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
       {message.changes.map((change) => (
         <div key={`${change.topic_id}${change.said}`} className="flex flex-col gap-2">
-          <p>
-            <span className="font-medium">{change.name}</span>
-            <span className="text-muted"> · {change.said}</span>
-          </p>
+          {change.topic_id === here ? (
+            <p className="text-muted">{change.said}</p>
+          ) : (
+            <p>
+              <span className="font-medium">{change.name}</span>
+              <span className="text-muted"> · {change.said}</span>
+            </p>
+          )}
           {change.layout && <WhatMoved layout={change.layout} />}
+          {change.layout && !undone && <Changed collections={change.layout.collections} />}
         </div>
       ))}
       {undone ? (
@@ -574,6 +586,27 @@ function Changes({ message }: { message: Message }) {
       <ErrorMessage>{problem}</ErrorMessage>
     </div>
   );
+}
+
+/** The collections an answer changed, each as the page draws it now. */
+function Changed({ collections }: { collections: string[] }) {
+  const blocks = useRecords("Block");
+  const points = useRecords("Point");
+  return collections.map((id) => {
+    const block = blocks.find((b) => b.id === id);
+    if (!block) return null;
+    const rows = points
+      .filter((p) => p.block_id === id)
+      .sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at));
+    const view = shownAs(block, rows);
+    if (!view) return null;
+    return (
+      <figure key={id} className="flex flex-col gap-1.5 overflow-x-auto rounded-md bg-bg p-2.5">
+        {block.title && <figcaption className="text-xs font-medium">{block.title}</figcaption>}
+        <Collection block={{ ...block, view }} rows={rows} />
+      </figure>
+    );
+  });
 }
 
 /**

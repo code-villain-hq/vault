@@ -252,7 +252,7 @@ async fn a_topic_sets_itself_up_and_keeps_a_point_without_the_web(pool: PgPool) 
         answer["text"],
         "Water it every 7 days.\n\nCheck that the top of the soil is dry first."
     );
-    assert_eq!(answer["kept"], "Kept a point under Care.");
+    assert_eq!(answer["changes"][0]["said"], "Kept a point under Care.");
     assert_eq!(
         answer["sources"][0]["url"],
         "https://www.rhs.org.uk/plants/monstera"

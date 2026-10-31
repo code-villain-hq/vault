@@ -152,8 +152,11 @@ topics.
 - **A talk changes the page when you ask**: "tidy this up", "put the
   shopping list first", "show my plants as a table". It rewords, moves and
   removes points and blocks, changes a collection's fields, or picks
-  another picture its fields allow, at once, and the answer says what it
-  changed, with one Undo. It never picks a colour or a width.
+  another picture its fields allow, at once. It never picks a colour or a
+  width.
+- **The answer shows what changed**: what it kept, changed, moved or
+  removed, and where, with one Undo. A collection it changed shows under
+  it as its picture, Lisa's weight as its line, until it's undone.
 - **⌘K searches what the topics keep**: sections, points, reminders and
   talks, the talks' messages too, with every word you type in any order.
   Up to five a topic show under its name; a point opens its section's

@@ -90,7 +90,9 @@ Each step leaves the app working, and is tried before it's committed.
    toggles, a line per thing. The old kinds' code is gone; their facets
    stay in the database for the move.
 4. **The answer shows what changed:** the picture of the collection it
-   changed, and where it went, with Undo.
+   changed, and where it went, with Undo. _Built:_ what it adds has
+   Undo too now, with its changes; only ticks stay words. The pictures
+   are drawn live, as the page draws them, and go once it's undone.
 5. **A row opens as its own page**, beside the topic's.
 6. **Tidying up** turns sentences into rows when you ask: "Lisa wiegt
    etwa 3,4 kg" becomes a row in Gewicht. In small steps, each shown.

@@ -24,4 +24,9 @@ points: Array<PointWas>,
 /**
  * The blocks and points it started, which Undo takes off again.
  */
-made_blocks: Array<string>, made_points: Array<string>, };
+made_blocks: Array<string>, made_points: Array<string>, 
+/**
+ * The collections whose rows or fields it changed, in the page's
+ * order, which the answer shows as their pictures.
+ */
+collections: Array<string>, };

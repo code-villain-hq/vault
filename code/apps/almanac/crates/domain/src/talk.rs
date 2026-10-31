@@ -188,6 +188,10 @@ pub struct PageLayout {
     /// The blocks and points it started, which Undo takes off again.
     pub made_blocks: Vec<Uuid>,
     pub made_points: Vec<Uuid>,
+    /// The collections whose rows or fields it changed, in the page's
+    /// order, which the answer shows as their pictures.
+    #[serde(default)]
+    pub collections: Vec<Uuid>,
 }
 
 /// One block in "What moved": "Wie sie ist · new cards", then what it

@@ -195,7 +195,10 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     let messages = app.synced(&ada, &home, "Message").await;
     let answer = messages.iter().find(|m| m["role"] == "almanac").unwrap();
     assert_eq!(answer["text"], "Gieß die Monstera alle 7 Tage.");
-    assert_eq!(answer["kept"], "Kept 2 points under Pflege and Pflanzen.");
+    assert_eq!(
+        answer["changes"][0]["said"],
+        "Kept 2 points under Pflege and Pflanzen."
+    );
     assert_eq!(reminders[0]["message_id"], answer["id"]);
     let talks = app.synced(&ada, &home, "Talk").await;
     assert_eq!(talks[0]["title"], "Monstera gießen");

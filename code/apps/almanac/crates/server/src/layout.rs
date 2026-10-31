@@ -159,6 +159,7 @@ mod tests {
             ],
             made_blocks: vec![made],
             made_points: vec![new],
+            collections: Vec::new(),
         };
         let operations = undo(
             topic,
