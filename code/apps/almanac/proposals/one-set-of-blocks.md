@@ -85,7 +85,10 @@ Each step leaves the app working, and is tried before it's committed.
    collection whose rows keep their facts as fields and the rest on their
    page, trends, bars and timelines collections. The week goes; Calendar
    has it. Before and after on a copy of your pages, then the old kinds
-   go.
+   go. _Built:_ straight on the real pages, from a backup, once on the
+   server's start (`convert.rs`). Cards and tables with no facts became
+   toggles, a line per thing. The old kinds' code is gone; their facets
+   stay in the database for the move.
 4. **The answer shows what changed:** the picture of the collection it
    changed, and where it went, with Undo.
 5. **A row opens as its own page**, beside the topic's.

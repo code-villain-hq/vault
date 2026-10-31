@@ -3,8 +3,6 @@
 // "v. Chr." or "BC" before the year 1. The page sorts by it and shows the
 // year in its column, a day's date before the event.
 
-import type { Point } from "@almanac/types";
-
 export interface When {
   /** For sorting, oldest first; null when it names no year. */
   key: number | null;
@@ -82,15 +80,6 @@ function monthOf(text: string): number {
   return MONTHS.find(([name]) => name.test(text))?.[1] ?? 0;
 }
 
-/** A timeline's events, oldest first; those with no year last, as they were kept. */
-export function inOrder(points: Point[]): [Point, When][] {
-  return points
-    .map((point) => [point, when(point.happened)] as [Point, When])
-    .sort(
-      ([, a], [, b]) => (a.key ?? Number.MAX_SAFE_INTEGER) - (b.key ?? Number.MAX_SAFE_INTEGER),
-    );
-}
-
 /**
  * The first and last year an event covers, below 0 before the year 1: the
  * same year twice unless it's a span. Null when it names no year.
@@ -112,55 +101,4 @@ export function years(happened: string): [number, number] | null {
         ? Number(first.slice(0, -2) + last)
         : Math.abs(from);
   return [from, Math.max(from, sign * end)];
-}
-
-/** A line of the topic page's timeline: a section's events, or one kept under no section. */
-export interface Line {
-  /** The section, which opens on its own page with its events. */
-  section: string | null;
-  /** Oldest first. */
-  points: Point[];
-  /** When its events begin and end: "1816–1953", or one event's year. */
-  year: string;
-  span: boolean;
-}
-
-/**
- * The topic page's timeline: a line for each section, oldest first by its
- * first event, when its events begin and end; an event kept under no
- * section is a line of its own.
- */
-export function bySection(points: Point[]): Line[] {
-  const lines: Line[] = [];
-  const sections = new Map<string, Line>();
-  for (const [point, at] of inOrder(points)) {
-    const line = point.theme ? sections.get(point.theme) : undefined;
-    if (line) {
-      line.points.push(point);
-      continue;
-    }
-    const made = { section: point.theme || null, points: [point], year: at.year, span: at.span };
-    if (made.section) sections.set(made.section, made);
-    lines.push(made);
-  }
-  for (const line of sections.values()) {
-    if (line.points.length === 1) continue;
-    const covered = line.points.flatMap((p) => years(p.happened) ?? []);
-    if (covered.length === 0) continue;
-    const from = Math.min(...covered);
-    const to = Math.max(...covered);
-    const era = line.points.map((p) => p.happened.match(BEFORE)?.[0].trim()).find(Boolean);
-    line.year = between(from, to, era ?? "v. Chr.");
-    line.span = from !== to;
-  }
-  return lines;
-}
-
-/** "1816–1953", "500–400 v. Chr.", "44 v. Chr.–14", or one year. */
-function between(from: number, to: number, era: string): string {
-  const year = (y: number) => String(Math.abs(y));
-  if (from === to) return from < 0 ? `${year(from)} ${era}` : year(from);
-  if (to < 0) return `${year(from)}–${year(to)} ${era}`;
-  if (from < 0) return `${year(from)} ${era}–${year(to)}`;
-  return `${from}–${to}`;
 }

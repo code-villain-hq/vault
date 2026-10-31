@@ -212,7 +212,7 @@ function useKept(query: string): Command[] {
       const sections = new Set(
         [...own.map((p) => p.theme), ...due.map((r) => r.theme ?? "")].filter(Boolean),
       );
-      // A point in a chip or a list is in no section: it opens the page;
+      // A point in no section opens the page;
       // what the topic knows about you opens its About.
       const at = (theme: string) => open(topic.id, theme ? { section: theme } : {});
       const of = (p: Point) =>

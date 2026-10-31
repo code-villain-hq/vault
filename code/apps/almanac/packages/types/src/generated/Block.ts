@@ -3,18 +3,18 @@ import type { Facet } from "./Facet";
 import type { Field } from "./Field";
 
 /**
- * A part of a topic's page: its kind, one of [`BLOCK_KINDS`] or
- * [`SET_KINDS`], says how it lays out the points kept in it; its title is the topic's own ("You",
- * "Terms"). A topic shows its blocks by position.
+ * A part of a topic's page: its kind, one of [`SET_KINDS`] or `you`, says
+ * how it lays out the points kept in it; its title is the topic's own
+ * ("You", "Terms"). A topic shows its blocks by position.
  */
 export type Block = { id: string, workspace_id: string, topic_id: string, kind: string, 
 /**
- * Empty for none: the week is headed by its days.
+ * Empty for none.
  */
 title: string, 
 /**
- * For cards and tables: the facts every card has, a line each on its
- * face, or a table's columns.
+ * For cards from before the set, which the server reads once to move
+ * them into a collection's fields.
  */
 facets: Array<Facet>, 
 /**

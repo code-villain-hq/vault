@@ -90,17 +90,17 @@ topics.
   page doesn't show these. On the page lists the blocks, with ⋯ as on the
   page; a block's name opens the page at it. The workspace's own topic
   has only its name and what it sticks to.
-- **A topic is its blocks**, in order, with no page shape to pick: Today
-  (the day's steps to tick off), Week, Chips, Shelf, Cards, Table, Text,
-  List, Bars, Trend, Parts, Questions and Timeline, each with a title of the topic's own
-  ("Advice" in Haare, "Terms" in Marx), and You, what it knows about you,
-  which About shows. Settings → Blocks shows every kind with sample points.
-  A template only names the blocks a topic starts with: Routine has Today,
-  Week, Your shelf and Advice; Collection Today, Week and a card per
-  thing; Study Reading, Terms and What it says; each has You. ⋯ beside a block's title
-  moves it up or down, renames it or removes it with what it keeps. A
-  block that keeps nothing stays off the page, and a topic with nothing
-  kept yet offers its first questions.
+- **A topic is its blocks**, in order, each one of the set: Heading,
+  Text, Bullets, Checklist, Toggle, Callout and Collection, with a title
+  of the topic's own ("Advice" in Haare, "Terms" in Marx), and You, what
+  it knows about you, which About shows. Settings → Blocks shows every
+  block and picture with sample points. A template only names the blocks
+  a topic starts with: Routine has a Routine checklist, Your shelf and
+  Advice; Collection To do and Notes; Study Reading, Terms and What it
+  says; each has You. ⋯ beside a block's title moves it up or down,
+  renames it or removes it with what it keeps. A block that keeps
+  nothing stays off the page, and a topic with nothing kept yet offers
+  its first questions.
 - **A talk** opens beside the page and streams its answer. Each question
   sends Almanac's fixed prompt, what the topic sticks to, what the page
   keeps and the current talk, nothing older. A question off the topic gets
@@ -121,68 +121,36 @@ topics.
   collection with the fields its rows need. New points carry the unread dot until you leave the topic.
   The page is kept up to date, not added to: a point that changes one it
   has takes that one's place, in the same block. It runs the window's
-  width: cards, steps and tiles take as many columns as fit, and writing,
-  lists and timelines keep a length you can read across. The sidebar's
+  width: cards take as many columns as fit, and writing and lists keep a
+  length you can read across. The sidebar's
   edge drags wider for long topic names, and this Mac keeps the width.
-- **The page is for a glance**, a section's own page for reading. A text
-  section is a tile with its first sentence, and a source shows once,
-  under its block. A card has a face: a line per facet with its icon
-  (Licht, Wasser), what needs a look in warn or info, "N points", and the
-  newest photo from a talk about it. A block with one card, one cat, is a
-  profile: the picture, chips, and a tile per facet. Bars compare numbers
-  on one scale, with a gap in warn. Questions are for rehearsing: the
-  answer folds open, a tick once practised, and Quiz me starts a talk
-  that asks them one at a time. A list's ticked items go last, faint.
-  Pages from before get facets when you ask a talk to lay them out anew.
-- **The page draws each block from what it keeps**, the same way every
-  time, whatever look a talk gave it: things with the same facets are
-  cards, or a table past eight; days a timeline, and days with numbers
-  a trend; numbers bars; paragraphs a tile per section; short facts
-  chips, other sentences lines; sentences about a thing a card each.
-  Steps, questions and a shelf stay as the talk kept them, and so do
-  Today, the week and You. A colour code shows its colour.
-- **View as** beside a block's title, on hover, switches its view: a
-  table when it has facets, cards when it's about things, a timeline when
-  it has days, a list always, and the app's own pick among them. The
-  choice stays for everyone in the workspace while the view can draw what
-  the block keeps, and a talk never changes it; picking the app's own
+- **A collection draws the picture its fields pick**, the same rules on
+  every page: a day and a number a line, a status a board, a photo cards,
+  days past a timeline and days to come a week, a number bars, three
+  fields or more a table, fewer a list. A toggle opens on its points; a
+  checklist's ticked items go last, faint. A colour code shows its
+  colour.
+- **View as** beside a collection's title, on hover, switches to another
+  picture its fields can draw, and the app's own pick among them. The
+  choice stays for everyone in the workspace while the fields can draw
+  it, and a talk never changes it on its own; picking the app's own
   leaves it to the app again.
-- **The page is a grid** of twelve columns, and a block is as wide as its
-  view needs: ⅓ for Chips, Trend and Parts; ½ for Bars, Questions, Steps,
-  Lines and Timeline; cards and tiles ⅓, ½ or the whole, by how many; the
-  whole for the rest. A row's blocks grow to fill it, and one that would
-  get too narrow to read takes a row of its own, as every block does on
-  a phone.
-- **A table compares things across the same facts**: a row per thing, a
-  column per facet, light like a sheet. A header sorts by its column,
-  again the other way, with empty cells last; a column of numbers lines
-  up on the right. A cell changes where it is: Enter or leaving keeps it,
-  Esc goes back, Tab goes on, the arrows move between cells, and an
-  emptied cell's point goes. New row names a thing, then its cells.
-- **A trend is a number kept each time it's measured**: the latest to
-  read at a glance, how it moved since the first, and a line by day, with
-  the mark it aims at dashed and the reminder to measure again under it.
-  Pointing at a day shows its number and what was said with it.
-- **Parts are a whole and what it's made of**: a ring with the total in
-  its middle and a line per part with its count and share, largest
-  first, five at most, in steps of the ink. Numbers that don't add up to
-  a whole stay bars.
-- **A section opens on its own page**: the page shows a section's first
-  sentence and a card's face. The section's
-  name opens it where the page was, with the talk still beside it:
-  everything kept under it from every block, its events, its open
-  questions and the talks it came from. Asking from there asks about
-  that section. A button above its title goes back to the topic, as do
-  the breadcrumb and Esc, to where you were on the page.
-- **A timeline per section**: a section's page starts with what happened
-  when, oldest first, a line each. A span such as 1987–1993 gets a longer
-  mark, and a day such as 11. September 2001 shows before its event. It's
-  a list, not an axis. The topic page's timeline is a line per section,
-  oldest first: when its events begin and end, and how many there are.
-  Its name opens it. Asking from a section's page keeps what happened
-  there on its timeline.
+- **The page is a grid** of twelve columns: a heading and a callout take
+  the whole row, writing half, and a collection what its picture needs.
+  A row's blocks grow to fill it, and one that would get too narrow to
+  read takes a row of its own, as every block does on a phone.
+- **A section opens on its own page**: a toggle's line opens it where
+  the page was, with the talk still beside it: everything kept under it
+  from every block, its open questions and the talks it came from.
+  Asking from there asks about that section. A button above its title
+  goes back to the topic, as do the breadcrumb and Esc, to where you
+  were on the page.
+- **Pages from before the set** move into it once, when the server
+  starts: sections, questions, shelves and cards become toggles; cards
+  with facts, tables, timelines, bars and trends collections; the rest
+  bullets or a checklist. The week goes; Calendar has it.
 - **A talk changes the page when you ask**: "tidy this up", "put the
-  shelf first", "show my plants as a table". It rewords, moves and
+  shopping list first", "show my plants as a table". It rewords, moves and
   removes points and blocks, changes a collection's fields, or picks
   another picture its fields allow, at once, and the answer says what it
   changed, with one Undo. It never picks a colour or a width.
@@ -199,8 +167,7 @@ topics.
   reminder in the talk. When a wash day moves, the new reminder replaces
   the old one once you say yes. A checklist item can ring: ticking it
   ticks its reminder, and one that repeats shows its rhythm beside it and
-  comes back unticked when it's due. The Week block shows them, with the
-  weeks before and after a click away. A collection's Today lists what comes round that day.
+  comes back unticked when it's due.
   Calendar shows the workspace's week from every topic and what's still
   to do from before it; what you tick stays on its day, ticked, until you
   untick it. A bell marks the reminders that notify the Mac, and the
@@ -211,17 +178,11 @@ what it read. A company server's doesn't.
 
 ## Decided, not built
 
-- **One set of blocks.** Every page is made of seven blocks (Heading,
-  Text, Bullets, Checklist, Toggle, Callout, Collection), and a
-  collection's fields pick its picture by the same rules on every page:
-  a day and a number make a line, a status a board. You say things;
-  Claude files them through tools and never picks the look. It follows
-  from "Claude writes, code draws"; the app already draws each block from
-  what it keeps. The page draws the set, beside today's kinds, and
-  Settings → Blocks shows each block and picture; talks file into it,
-  and today's pages move into it next.
+- **One set of blocks**, what's left of it: the answer showing the
+  picture of the collection it changed, a row opening as its own page,
+  and tidying sentences into rows when you ask.
   [`proposals/one-set-of-blocks.md`](proposals/one-set-of-blocks.md) has
-  the set and the order of work.
+  the order of work.
 - **Workspaces**, as every Code Villain app has them: Home, and Work for
   what you learn at work. Only Home is made today.
 - **Blocks that go quietly**: one that stays empty after a few talks.

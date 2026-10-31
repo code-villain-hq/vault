@@ -128,42 +128,14 @@ pub const ICONS: &[&str] = &[
 
 pub const KINDS: &[&str] = &["topic", "almanac"];
 
-/// How a block lays out its points. `today` has the steps of what's due,
-/// each under what comes round (its theme, as its reminders are called);
-/// `week` the days of the topic's reminders, and no points; `chips` short
-/// facts; `shelf` a tile per thing they use (its theme); `cards` a card per
-/// theme; `text` a section per theme; `list` one line each; `timeline` what
-/// happened when, oldest first, each under the section it belongs to; `you`
-/// what the topic knows about them, a fact each, which the topic's About
-/// shows and its page doesn't; `bars` numbers to compare, a bar each, a
-/// set per theme; `questions` questions they'd be asked, each a theme with
-/// its answer as points, to rehearse; `table` a row per theme and a column
-/// per facet, as cards are; `trend` a number kept each time it's measured,
-/// a line per theme; `parts` a whole split into its parts, a ring per theme.
-pub const BLOCK_KINDS: &[&str] = &[
-    "today",
-    "week",
-    "chips",
-    "shelf",
-    "cards",
-    "text",
-    "list",
-    "timeline",
-    "you",
-    "bars",
-    "questions",
-    "table",
-    "trend",
-    "parts",
-];
-
-/// The one set of blocks every page is made of, beside [`BLOCK_KINDS`]
-/// until today's pages move into it. A `heading` is its title; a
+/// The one set of blocks every page is made of. A `heading` is its title; a
 /// `paragraph` has a point a paragraph; `bullets` and a `checklist` a point
 /// a line, done once ticked; a `toggle` a line per theme, which opens on its
 /// points; a `callout` a point set apart, with its look; a `collection` rows
 /// with its [`Field`]s, a point a row: its text the row's name, its cells
-/// the rest. The app picks a collection's picture from its fields.
+/// the rest. The app picks a collection's picture from its fields. Beside
+/// them a topic has `you`, what it knows about them, which its About shows
+/// and its page doesn't.
 pub const SET_KINDS: &[&str] = &[
     "heading",
     "paragraph",
@@ -175,17 +147,15 @@ pub const SET_KINDS: &[&str] = &[
 ];
 
 /// How wide a block is, of the page's twelve columns: a quarter, a third,
-/// a half, two thirds, three quarters or the whole. Empty is its kind's own
-/// ([`width_of`]).
+/// a half, two thirds, three quarters or the whole. Empty is its kind's own.
 pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
 
-/// How a person asked a block to be drawn, with View as: a table, cards, a
-/// list (`lines` when it isn't steps to tick) or a timeline, and for a
-/// collection a line, a board, a week or bars too. Empty is the app's own
-/// pick from what the block keeps. Only a person sets it; a talk's layout
+/// How a person asked a collection to be drawn, with View as: a table,
+/// cards, a list, a timeline, a line, a board, a week or bars. Empty is the
+/// app's own pick from its fields. Only a person sets it; a talk's layout
 /// never does.
 pub const BLOCK_VIEWS: &[&str] = &[
-    "", "table", "cards", "list", "lines", "timeline", "line", "board", "week", "bars",
+    "", "table", "cards", "list", "timeline", "line", "board", "week", "bars",
 ];
 
 /// What a collection's field holds: a few words, a number (with its unit
@@ -224,17 +194,6 @@ pub enum Cell {
     Check(bool),
     Number(f64),
     Text(String),
-}
-
-/// The width a block of `kind` has when it names none: a third for what
-/// reads at a glance, a half for what reads as a column, the whole for the
-/// rest.
-pub fn width_of(kind: &str) -> &'static str {
-    match kind {
-        "chips" | "trend" | "parts" => "1/3",
-        "bars" | "questions" | "list" | "timeline" => "1/2",
-        _ => "whole",
-    }
 }
 
 /// How a point asks for a look: `warn` for a problem or a gap, `info` for
@@ -333,9 +292,9 @@ pub fn template(name: &str) -> Option<&'static [(&'static str, &'static str)]> {
         .map(|(_, blocks)| *blocks)
 }
 
-/// A part of a topic's page: its kind, one of [`BLOCK_KINDS`] or
-/// [`SET_KINDS`], says how it lays out the points kept in it; its title is the topic's own ("You",
-/// "Terms"). A topic shows its blocks by position.
+/// A part of a topic's page: its kind, one of [`SET_KINDS`] or `you`, says
+/// how it lays out the points kept in it; its title is the topic's own
+/// ("You", "Terms"). A topic shows its blocks by position.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Block {
@@ -343,10 +302,10 @@ pub struct Block {
     pub workspace_id: Uuid,
     pub topic_id: Uuid,
     pub kind: String,
-    /// Empty for none: the week is headed by its days.
+    /// Empty for none.
     pub title: String,
-    /// For cards and tables: the facts every card has, a line each on its
-    /// face, or a table's columns.
+    /// For cards from before the set, which the server reads once to move
+    /// them into a collection's fields.
     pub facets: Vec<Facet>,
     /// For a collection: the fields every row has, besides its name.
     pub fields: Vec<Field>,
@@ -768,9 +727,7 @@ fn facets(facets: &[Facet]) -> Result<(), ValidationError> {
 
 fn block_kind(kind: Option<&str>) -> Result<(), ValidationError> {
     match kind {
-        Some(k) if !BLOCK_KINDS.contains(&k) && !SET_KINDS.contains(&k) => {
-            invalid(format!("Unknown kind: {k}."))
-        }
+        Some(k) if k != "you" && !SET_KINDS.contains(&k) => invalid(format!("Unknown kind: {k}.")),
         _ => Ok(()),
     }
 }

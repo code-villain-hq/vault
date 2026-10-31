@@ -176,21 +176,16 @@ What they do:
     message for Undo, as the own topic's are. A talk never changes a
     topic's name, group or icon.
 
-  Today's kinds (`BLOCK_KINDS`: `today`, `week`, `chips`, `shelf`,
-  `cards`, `table`, `text`, `list`, `bars`, `trend`, `parts`,
-  `questions`, `timeline`, `you`) stay until step 3 moves pages into the
-  set: the page still draws them and a talk may tick, move, reword or
-  remove their points, but nothing starts one or adds to one. The app
-  draws such a block by the shape of what it keeps (`views.ts`: `viewOf`
-  and `widthOf`, the rules in its comment), on a grid of twelve columns;
-  View as sets its `view` (`BLOCK_VIEWS`, migration 0014), which only a
-  person sets. `you` is what they told about themselves, which the
-  topic's About shows and its page doesn't. A `cards` block names its
-  `facets` (`FACET_ICONS`); a `table` is the same points a row per theme
-  and a column per facet (`table.tsx`), edited in place; `trend` and
-  `parts` are drawn in `charts.tsx`; `questions` has Quiz me. The topic
-  page's timeline is a line per section, when its events begin and end
-  (`bySection`); a section's page lists its events first.
+  Pages from before the set move into it once, on the server's start
+  (`convert.rs`, a rule per old kind, the same for every topic): text,
+  questions, shelves and cards become toggles; cards and tables with
+  facets, timelines, bars and trends become collections; the rest
+  bullets or a checklist. It reads the blocks' old `facets`, which stay
+  in the database for it. The app draws a block as its kind
+  (`views.ts`: `viewOf` and `widthOf`), on a grid of twelve columns; a
+  collection as the picture its fields pick, which View as changes
+  (`view`, `BLOCK_VIEWS`) and only a person sets. `you` is what they told
+  about themselves, which the topic's About shows and its page doesn't.
 - **The workspace's own topic** (`own.rs`) reads every topic's name, group
   and what it sticks to, and has other tools: propose_topic and
   change_topic, not add_items. A proposal's points go in its template's

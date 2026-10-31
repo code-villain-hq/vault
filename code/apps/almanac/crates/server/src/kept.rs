@@ -261,9 +261,6 @@ impl Kept {
         self.touch(self.blocks[n].id)?;
         if let Some(title) = title {
             let title = cut(title, 60);
-            if kind == "week" {
-                return Err("The week has no title.".into());
-            }
             if kind == "heading" && title.is_empty() {
                 return Err("A heading is its title: give one.".into());
             }
@@ -450,8 +447,7 @@ impl Kept {
         Ok(())
     }
 
-    /// Ticks items done, or not: a checklist's, and a list's or questions'
-    /// from before the set. An item a reminder rings for ticks the
+    /// Ticks a checklist's items done, or not. An item a reminder rings for ticks the
     /// reminder: done for now, it's due again on its next day.
     pub fn tick(&mut self, items: &[String], done: bool) -> Result<(), String> {
         if items.is_empty() {
@@ -461,7 +457,7 @@ impl Kept {
             let i = self.point_at(reference)?;
             let b = self.block_of(i);
             let kind = self.blocks[b].kind.as_str();
-            if !matches!(kind, "checklist" | "list" | "questions") {
+            if kind != "checklist" {
                 return Err(format!(
                     "{} is in {}, a {kind}: only a checklist's items are ticked.",
                     reference.trim(),
@@ -1076,7 +1072,6 @@ impl Kept {
     /// A block as a sentence names it.
     fn title(&self, n: usize) -> &str {
         match (self.blocks[n].title.as_str(), self.blocks[n].kind.as_str()) {
-            ("", "week") => "The week",
             ("", _) => "the untitled block",
             (title, _) => title,
         }
@@ -1107,7 +1102,7 @@ impl Kept {
         if look.is_empty() {
             return Ok(look);
         }
-        if !matches!(kind, "callout" | "cards" | "table" | "bars" | "questions") {
+        if kind != "callout" {
             return Err(format!(
                 "{title} has no looks: a callout does, warn for what needs a look, info for what's ready."
             ));
@@ -1240,19 +1235,11 @@ impl Kept {
 /// theme says when its items have one.
 fn takes_items(kind: &str, title: &str) -> Result<Option<&'static str>, String> {
     match kind {
-        "bullets" | "checklist" | "paragraph" | "callout" | "you" | "list" | "chips" => Ok(None),
+        "bullets" | "checklist" | "paragraph" | "callout" | "you" => Ok(None),
         "toggle" => Ok(Some("the line it opens from")),
-        "text" => Ok(Some("the section's heading")),
-        "today" => Ok(Some("what comes round, named as its reminders are")),
-        "shelf" | "cards" => Ok(Some("the thing it's about")),
         "heading" => Err(format!("{title} is a heading: it has no points.")),
         "collection" => Err(format!("{title} is a collection: add rows to it.")),
-        "week" => Err(format!(
-            "{title} shows the days of the reminders: offer one instead."
-        )),
-        _ => Err(format!(
-            "{title} is from before the set: put what's new in a block of the set."
-        )),
+        _ => Err(format!("{title} is a {kind}, which Almanac doesn't know.")),
     }
 }
 
@@ -1260,7 +1247,7 @@ fn takes_items(kind: &str, title: &str) -> Result<Option<&'static str>, String> 
 fn has_themes(kind: &str) -> bool {
     !matches!(
         kind,
-        "bullets" | "checklist" | "paragraph" | "callout" | "you" | "list" | "chips" | "collection"
+        "bullets" | "checklist" | "paragraph" | "callout" | "you" | "collection"
     )
 }
 
@@ -1946,7 +1933,7 @@ mod tests {
 
     #[test]
     fn changes_and_removals_are_one_change_to_undo() {
-        let (notes, old) = (block("bullets", "Notes", 0), block("cards", "Pflanzen", 1));
+        let (notes, old) = (block("bullets", "Notes", 0), block("toggle", "Pflanzen", 1));
         let fact = point(&notes, "", "Lisa wiegt 3,5 kg", 0);
         let monstera = point(&old, "Monstera", "Hell", 0);
         let mut kept = Kept::on(Refs {
@@ -2150,11 +2137,11 @@ mod tests {
     }
 
     #[test]
-    fn old_blocks_take_only_what_fits_them() {
+    fn blocks_take_only_what_fits_them() {
         let mut kept = Kept::on(Refs {
             blocks: vec![
-                block("timeline", "Zeit", 0),
-                block("list", "Lesen", 1),
+                block("collection", "Zeit", 0),
+                block("bullets", "Lesen", 1),
                 block("heading", "Teil", 2),
             ],
             ..Refs::default()
@@ -2162,7 +2149,7 @@ mod tests {
         assert!(
             kept.add_items("b1", &[item("1987")])
                 .unwrap_err()
-                .contains("from before the set")
+                .contains("add rows")
         );
         assert!(
             kept.add_items("b3", &[item("x")])

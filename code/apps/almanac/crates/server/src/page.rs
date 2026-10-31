@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use almanac_domain::{Cell, Facet, Field, SET_KINDS};
+use almanac_domain::{Cell, Facet, Field};
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use sqlx::types::Json;
@@ -89,8 +89,7 @@ pub struct PageBlock {
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct RefBlock {
     pub id: Uuid,
-    /// One of [`almanac_domain::SET_KINDS`], or of the kinds from before
-    /// the set.
+    /// One of [`almanac_domain::SET_KINDS`], or `you`.
     pub kind: String,
     pub title: String,
     /// For cards from before the set: the facets its points may name.
@@ -207,9 +206,6 @@ impl Page {
         };
         let _ = writeln!(out, "What it sticks to, its brief: {sticks_to}");
         let _ = writeln!(out, "\nHow a page is made: {SET_SAYS}");
-        if self.blocks.iter().any(|b| !in_the_set(&b.block.kind)) {
-            let _ = writeln!(out, "\n{BEFORE_THE_SET_SAYS}");
-        }
         out.push_str("\nThe page's blocks, in order:\n");
         if self.blocks.is_empty() {
             out.push_str("None yet.\n");
@@ -217,14 +213,10 @@ impl Page {
         let mut n = 0;
         for (b, PageBlock { block, points }) in self.blocks.iter().enumerate() {
             let title = match block.title.as_str() {
-                "" if block.kind == "week" => "The week",
                 "" => "Untitled",
                 title => title,
             };
             let mut about = vec![block.kind.clone()];
-            if !in_the_set(&block.kind) {
-                about[0] = format!("{}, from before the set", block.kind);
-            }
             if !block.fields.is_empty() {
                 about.push(format!(
                     "fields: {}",
@@ -236,22 +228,11 @@ impl Page {
                         .join(", ")
                 ));
             }
-            if !block.facets.is_empty() {
-                about.push(format!(
-                    "facets: {}",
-                    block
-                        .facets
-                        .iter()
-                        .map(|f| f.name.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
             if !block.view.is_empty() {
                 about.push(format!("shown as {}", block.view));
             }
             let _ = writeln!(out, "## [b{}] {title} ({})", b + 1, about.join("; "));
-            if points.is_empty() && block.kind != "week" && block.kind != "heading" {
+            if points.is_empty() && block.kind != "heading" {
                 out.push_str("Nothing yet.\n");
             }
             let mut theme = None;
@@ -334,12 +315,6 @@ impl Page {
         }
         out
     }
-}
-
-/// Whether a block of `kind` is one of the set, or You, which the
-/// topic's About shows.
-pub fn in_the_set(kind: &str) -> bool {
-    kind == "you" || SET_KINDS.contains(&kind)
 }
 
 /// A field as Claude reads it: "Gewicht (number, kg, goal 3.4)".
@@ -437,14 +412,6 @@ Besides the set, you is what they told you about themselves that your answers go
 porosity, by the float test\", \"The balcony faces north\"), a fact each in a few words: it \
 isn't on the page but on the topic's About, so keep there what you learn about them, however \
 it's worded.";
-
-/// The kinds from before the set, which a page keeps until it moves into
-/// the set.
-const BEFORE_THE_SET_SAYS: &str = "Blocks from before the set are older kinds the page will \
-move into the set. Their points can be changed, moved, ticked and removed. Items go only in \
-those of lines: list and chips with no theme, and text, today, shelf and cards under a \
-theme (the section, what comes round, the thing, the card). Anything else new goes in a block \
-of the set.";
 
 /// The workspace as its own topic reads it.
 pub struct Workspace {
