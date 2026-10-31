@@ -161,6 +161,11 @@ topics.
 - **The answer shows what changed**: what it kept, changed, moved or
   removed, and where, with one Undo. A collection it changed shows under
   it as its picture, Lisa's weight as its line, until it's undone.
+- **Tidying up turns sentences into rows** when you ask: "Lisa wiegt
+  etwa 3,4 kg" becomes Lisa's row in Gewicht, with its source. One
+  collection an answer, shown as its picture with Undo ("Made a sentence
+  a row in Gewicht."); the answer says what's left, and goes on when you
+  say so.
 - **⌘K searches what the topics keep**: sections, points, reminders and
   talks, the talks' messages too, with every word you type in any order.
   Up to five a topic show under its name; a point opens its section's

@@ -793,6 +793,8 @@ impl Kept {
         let (mut changed_points, mut moved_points, mut removed_points) = (0, 0, 0);
         let mut added = 0;
         let mut unders: Vec<String> = Vec::new();
+        // Sentences tidied into a collection's rows, by the collection.
+        let mut rows_made: Vec<(String, usize)> = Vec::new();
         for (i, point) in self.points.iter().enumerate() {
             let in_gone = self.is_gone(point.block_id);
             let gone = in_gone || self.is_gone(point.id);
@@ -854,9 +856,14 @@ impl Kept {
                 data.insert("cells".into(), json!(point.cells.0));
             }
             let reworded = !data.is_empty();
+            let into_rows = point.block_id != was.block_id
+                && self.kind_of(point.block_id) == "collection"
+                && self.kind_of(was.block_id) != "collection";
             if reworded {
                 data.insert("seen".into(), json!(false));
-                changed_points += 1;
+                if !into_rows {
+                    changed_points += 1;
+                }
                 shown.push(point.block_id);
             }
             if point.block_id != was.block_id {
@@ -866,7 +873,13 @@ impl Kept {
             if point.position != was.position {
                 data.insert("position".into(), json!(point.position));
             }
-            if self.moved.contains(&point.id) && data.contains_key("block_id")
+            if into_rows {
+                let title = self.title_of(point.block_id).to_string();
+                match rows_made.iter_mut().find(|(t, _)| *t == title) {
+                    Some((_, n)) => *n += 1,
+                    None => rows_made.push((title, 1)),
+                }
+            } else if self.moved.contains(&point.id) && data.contains_key("block_id")
                 || self.moved.contains(&point.id) && data.contains_key("position")
             {
                 moved_points += 1;
@@ -980,6 +993,7 @@ impl Kept {
         let mut changes = self.changes.clone();
         let said: Vec<String> = [
             (added > 0).then(|| kept_words(added, &unders)),
+            rows_words(&rows_made),
             change_words(
                 (changed_blocks, changed_points),
                 (moved_blocks, moved_points),
@@ -1088,6 +1102,13 @@ impl Kept {
         match (self.blocks[n].title.as_str(), self.blocks[n].kind.as_str()) {
             ("", _) => "the untitled block",
             (title, _) => title,
+        }
+    }
+
+    fn kind_of(&self, block: Uuid) -> &str {
+        match self.blocks.iter().find(|b| b.id == block) {
+            Some(b) => &b.kind,
+            None => "",
         }
     }
 
@@ -1746,6 +1767,18 @@ fn change_words(
     Some(format!("{first}{}.", chars.as_str()))
 }
 
+/// "Made a sentence a row in Gewicht.", for sentences tidied into rows.
+fn rows_words(made: &[(String, usize)]) -> Option<String> {
+    let parts: Vec<String> = made
+        .iter()
+        .map(|(title, n)| match n {
+            1 => format!("a sentence a row in {title}"),
+            n => format!("{n} sentences rows in {title}"),
+        })
+        .collect();
+    (!parts.is_empty()).then(|| format!("Made {}.", and(&parts)))
+}
+
 /// "a point", "3 points".
 fn count(n: usize, noun: &str) -> String {
     match n {
@@ -1999,6 +2032,49 @@ mod tests {
                 .any(|p| p.id == monstera.id && p.removed)
         );
         assert!(layout.blocks.iter().any(|b| b.id == old.id && b.removed));
+    }
+
+    #[test]
+    fn a_sentence_tidied_into_a_row_says_so() {
+        let notes = block("bullets", "Notes", 0);
+        let mut weight = block("collection", "Gewicht", 1);
+        weight.fields = Json(vec![Field {
+            name: "Gewicht".into(),
+            kind: "number".into(),
+            unit: "kg".into(),
+            goal: None,
+            options: Vec::new(),
+        }]);
+        let fact = point(&notes, "", "Lisa wiegt etwa 3,4 kg.", 0);
+        let mut kept = Kept::on(Refs {
+            blocks: vec![notes, weight.clone()],
+            points: vec![fact.clone()],
+            ..Refs::default()
+        });
+        kept.move_points(&["p1".into()], "b2", None).unwrap();
+        kept.change_points(&[PointChange {
+            point: "p1".into(),
+            text: Some("Lisa".into()),
+            cells: Some(json!({"Gewicht": 3.4}).as_object().cloned().unwrap()),
+            ..PointChange::default()
+        }])
+        .unwrap();
+        let (said, operations) = kept.writes(&answering());
+        assert!(
+            matches!(
+                &operations[..],
+                [Operation::Update { id, data, .. }]
+                    if *id == fact.id && data["block_id"] == json!(weight.id)
+                        && data["text"] == json!("Lisa")
+                        && data["cells"] == json!({"Gewicht": 3.4})
+            ),
+            "{operations:?}"
+        );
+        let change = &said["changes"][0];
+        assert_eq!(change["said"], json!("Made a sentence a row in Gewicht."));
+        assert_eq!(change["layout"]["collections"], json!([weight.id]));
+        let layout: PageLayout = serde_json::from_value(change["layout"].clone()).unwrap();
+        assert!(layout.points.iter().any(|p| p.id == fact.id && !p.removed));
     }
 
     #[test]

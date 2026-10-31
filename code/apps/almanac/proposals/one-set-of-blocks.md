@@ -101,6 +101,11 @@ Each step leaves the app working, and is tried before it's committed.
    old kinds went.
 6. **Tidying up** turns sentences into rows when you ask: "Lisa wiegt
    etwa 3,4 kg" becomes a row in Gewicht. In small steps, each shown.
+   _Built:_ with the tools there were: move into the collection, then
+   change_points for its name and cells, so the sentence keeps its
+   source. The prompt asks for one collection an answer and what's
+   left; the answer draws it (step 4) as "Made a sentence a row in
+   Gewicht." Not yet tried against Claude: only the tests.
 
 ## Open
 

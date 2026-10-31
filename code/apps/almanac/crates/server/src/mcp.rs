@@ -1006,7 +1006,9 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "move",
                 "Moves a block (block and after), or points to a block (points, to and after), \
                  when they'd read better there: a step into the checklist, a fact into the \
-                 block it belongs with. They see what moved under your answer, and can undo it.",
+                 block it belongs with, a sentence into a collection as its row (then \
+                 change_points gives it its name and cells). They see what moved under your \
+                 answer, and can undo it.",
                 json!({
                     "block": string("A block to move, as the page names it (b2)."),
                     "points": { "type": "array", "items": { "type": "string" }, "description": "Points to move, in order, as the page names them (p3)." },

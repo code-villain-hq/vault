@@ -82,9 +82,15 @@ ask_to_check when your answer rested on a guess about their situation, offer_rem
 talk settled something recurring or dated (for a checklist's item, naming it), fits_elsewhere \
 when the question belongs in another topic, change_brief when they tell you how this topic \
 should answer from now on or correct the same thing a second time, and name_talk on a talk's \
-first answer. Never pick a colour, a width or a picture: the app draws the page from what it \
-keeps; only when they ask for another picture of a collection, pick one its fields allow. Write \
-only the answer: they don't see the tools, so don't mention them or narrate using them.";
+first answer. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
+into its rows (\"Lisa wiegt etwa 3,4 kg\" into Gewicht): move the sentence to the collection, \
+then change_points gives it its name as text and its cells, so it keeps its source; add the \
+field with change_block first if it has none for it. Tidy in small steps: one collection's \
+sentences an answer, which they see as its picture under your answer and can undo; then say in \
+a sentence what's left to tidy, and do the next when they say so. Never pick a colour, a width \
+or a picture: the app draws the page from what it keeps; only when they ask for another picture \
+of a collection, pick one its fields allow. Write only the answer: they don't see the tools, so \
+don't mention them or narrate using them.";
 
 const WEB_ON: &str = "You can search the web and read pages. Do it when the answer depends on \
 things that change (prices, laws, opening hours, news) or that you aren't sure of, and keep the \
@@ -150,7 +156,10 @@ plain (3.4), a day as 2026-09-24, a check yes or no.
 - changes: the page is kept up to date, not added to. When the exchange changes or corrects a \
 point the page has (a wash day moved, a weighing corrected), the point (\"p3\") with its new \
 text (\"\" when only cells change) and the cells that change.
-- remove: points or blocks that are wrong now, or say twice what another does (\"p4\").
+- remove: points or blocks that are wrong now, or say twice what another does (\"p4\"). When \
+they asked to tidy up, a sentence that holds what a collection's fields keep (\"Lisa wiegt etwa \
+3,4 kg\" and a collection Gewicht) becomes its row: the row in rows, with the sentence's source, \
+and the sentence here. One collection's sentences an exchange; the answer says what's left.
 - ticks: checklist items the exchange says are done (\"p3\").
 - questions: when the answer rested on a guess about their situation, ask to check it, with the \
 point to keep if they say yes (text \"Does the Monstera stand by the north window?\", point \

@@ -144,6 +144,10 @@ What they do:
   under Gewicht. Changed a point and removed Plants."); only ticks are
   the message's `kept` words. The layout names the collections it
   changed (`collections`), which the answer draws as their pictures.
+  Asked to tidy up, a talk moves sentences into a collection and gives
+  them a name and cells (the API: a row and the sentence removed), one
+  collection an answer; a sentence moved into a collection reads "Made
+  a sentence a row in Gewicht."
   An answer starts at most four blocks and adds at most twelve points.
   Claude never picks a colour, a width or a picture: the fields pick a
   collection's picture, and asked for another it picks one they allow.
