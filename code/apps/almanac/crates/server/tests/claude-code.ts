@@ -90,6 +90,14 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/\bcall ([A-Z]\w+) ([A-Z]\w+)\b/.test(prompt)) {
+    const [, topic, name] = /\bcall ([A-Z]\w+) ([A-Z]\w+)\b/.exec(prompt) ?? [];
+    try {
+      await tool("change_topic", { topic, name, said: `Renamed it ${name}.` });
+      say("Renamed.");
+    } catch (refused) {
+      say(String(refused));
+    }
   } else if (/move ([bp]\d+) to (\S+)/i.test(prompt)) {
     const [, what, to] = /move ([bp]\d+) to (\S+)/i.exec(prompt) ?? [];
     await tool("move_to_sub_topic", { to, takes: [what] });

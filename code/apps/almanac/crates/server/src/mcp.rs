@@ -36,6 +36,8 @@ const NEXT_POSITION: &str = "SELECT COALESCE(max(position) + 1, 0) FROM blocks \
      WHERE workspace_id = $1 AND topic_id = $2 AND row_id IS NULL";
 const TOPIC_BY_ID: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND id = $2";
+const THIS_OR_SUB_NAMED: &str = "SELECT id FROM topics \
+     WHERE workspace_id = $1 AND (id = $2 OR parent_id = $2) AND lower(name) = lower($3)";
 /// The sub-topics one answer proposes, at most.
 const MOST_SUB_TOPICS: usize = 6;
 const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY position";
@@ -326,13 +328,7 @@ async fn call(
         }
         "change_brief" => {
             let args: BriefArgs = read(arguments)?;
-            let topic: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
-                .bind(asking.actor.workspace_id)
-                .bind(asking.topic_id)
-                .fetch_optional(&state.pool)
-                .await
-                .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
-            let (id, name, now, ..) = topic.ok_or("This topic is gone.")?;
+            let (id, name, now, ..) = this_or_sub(state, asking, &args.topic).await?;
             kept()?.change_brief(id, &name, &now, &args.sticks_to, &args.said)?;
             Ok(
                 "Changed, once your answer is done. They see what you said, and can undo it."
@@ -362,8 +358,9 @@ async fn call(
                 .map_err(|_| "Almanac couldn't read that topic.".to_string())?
                 .ok_or("That topic is gone.")?;
             Ok(format!(
-                "Only to read: this talk changes only its own topic, so nothing of this one \
-                 goes to your tools, and its references (b2, p5) aren't this page's.\n\n{}",
+                "Its page only to read: its references (b2, p5) aren't this page's, so none \
+                 go to your tools. A sub-topic of this one you also rename, re-brief and move \
+                 into.\n\n{}",
                 page.describe()
             ))
         }
@@ -532,15 +529,9 @@ async fn call(
         }
         "change_topic" => {
             let mut args: ChangeArgs = read(arguments)?;
-            // A topic's own talk changes only its topic.
+            // A topic's own talk changes its topic and its sub-topics.
             if asking.mode == Mode::Topic {
-                let topic: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
-                    .bind(asking.actor.workspace_id)
-                    .bind(asking.topic_id)
-                    .fetch_optional(&state.pool)
-                    .await
-                    .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
-                args.topic = topic.ok_or("This topic is gone.")?.1;
+                args.topic = this_or_sub(state, asking, &args.topic).await?.1;
                 args.sticks_to = None;
             }
             let change = change(state, asking, args).await?;
@@ -660,6 +651,8 @@ struct ReminderArgs {
 
 #[derive(Deserialize)]
 struct BriefArgs {
+    #[serde(default)]
+    topic: String,
     sticks_to: String,
     #[serde(default)]
     said: String,
@@ -734,6 +727,46 @@ struct ChangeArgs {
 }
 
 type TopicRow = (Uuid, String, String, String, String, String);
+
+/// This topic, or one of its sub-topics by name, as this answer may have
+/// renamed it: what a topic's talk changes. None named, this one.
+async fn this_or_sub(state: &AppState, asking: &Asking, named: &str) -> Result<TopicRow, String> {
+    let named = cut(named, 80);
+    let renamed = asking.kept.lock().ok().and_then(|kept| {
+        kept.changes
+            .iter()
+            .find(|c| {
+                c.after
+                    .name
+                    .as_deref()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(&named))
+            })
+            .map(|c| c.topic_id)
+    });
+    let id: Option<Uuid> = match renamed {
+        Some(id) => Some(id),
+        None if named.is_empty() => Some(asking.topic_id),
+        None => sqlx::query_scalar(THIS_OR_SUB_NAMED)
+            .bind(asking.actor.workspace_id)
+            .bind(asking.topic_id)
+            .bind(&named)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|_| "Almanac couldn't look at the topics.".to_string())?,
+    };
+    let id = id.ok_or_else(|| {
+        format!(
+            "{named} is neither this topic nor one of its sub-topics: another topic you only read."
+        )
+    })?;
+    let row: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
+        .bind(asking.actor.workspace_id)
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
+    row.ok_or_else(|| "That topic is gone.".into())
+}
 
 async fn names(state: &AppState, asking: &Asking) -> String {
     let names: Vec<String> = sqlx::query_scalar(NAMES)
@@ -1356,9 +1389,11 @@ fn tools(mode: Mode) -> Vec<Value> {
                  from now on\"), or correct the same thing a second time in this talk (\"too \
                  long again\"): never for a wish about one answer. Give the brief whole, as it \
                  is from now on: all of it kept, with the rule added or changed where it fits. \
-                 Its name, group or icon go with change_topic. They see what you said under \
-                 the answer, and can undo it.",
+                 Its name, group or icon go with change_topic. A sub-topic's brief too, when \
+                 they ask, named in topic. They see what you said under the answer, and can \
+                 undo it.",
                 json!({
+                    "topic": string("One of this topic's sub-topics, by name; left out, this topic."),
                     "sticks_to": string("The whole brief as it is from now on."),
                     "said": string("What changed, in a short sentence for under the answer, in the talk's language: \"Names when each source was written.\""),
                 }),
@@ -1366,10 +1401,11 @@ fn tools(mode: Mode) -> Vec<Value> {
             ),
             tool(
                 "change_topic",
-                "Changes this topic's name, its icon or its group in the sidebar, when they \
-                 ask. Only the fields to change. They see what you said under the answer, and \
-                 can undo it.",
+                "Changes this topic's name, its icon or its group in the sidebar, or one of \
+                 its sub-topics', when they ask. Only the fields to change. They see what you \
+                 said under the answer, and can undo it.",
                 json!({
+                    "topic": string("One of this topic's sub-topics, by name; left out, this topic."),
                     "name": string("Its new name."),
                     "icon": { "type": "string", "enum": ICONS },
                     "group": string("Its group in the sidebar."),

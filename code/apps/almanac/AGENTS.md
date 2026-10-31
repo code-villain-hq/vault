@@ -218,8 +218,9 @@ What they do:
     to answer from now on, or corrected twice on the same thing, and
     gives it whole (`Kept::change_brief`): the change is kept on the
     message for Undo, as the own topic's are. Its name, group or icon it
-    changes only when asked, with change_topic, and only its own topic's;
-    other topics it only reads, but into its sub-topics it moves.
+    changes only when asked, with change_topic. Both reach its sub-topics
+    too, by name (`this_or_sub` in `mcp.rs`); other topics it only reads,
+    and into its sub-topics it moves.
   - A topic can sit under another, one level deep (`parent_id`, migration
     0019; `may_sit_under` in the sync rules): never under itself, Almanac's
     own topic or a topic that sits under one. Its talks keep to the parent's

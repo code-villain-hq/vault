@@ -814,3 +814,47 @@ async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) 
     assert_eq!(callers.len(), 1, "kept once");
     assert_eq!(callers[0]["topic_id"], backend);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_talk_renames_its_sub_topic_but_no_other_topic(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, _) = with_claude_code(pool, dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let topics = format!("/api/w/{home}/topics");
+    let start = |name: &str, parent: Value| {
+        app.post(
+            &topics,
+            Some(&ada),
+            json!({ "name": name, "template": "study", "parent_id": parent }),
+        )
+    };
+    let backend = start("Backend", Value::Null).await.body["id"].clone();
+    let notifications = start("Notifications", backend.clone()).await.body["id"].clone();
+    start("Cooking", Value::Null).await;
+    let backend_id = backend.as_str().unwrap();
+    let named = |topics: &[Value], id: &Value| {
+        topics.iter().find(|t| t["id"] == *id).unwrap()["name"].clone()
+    };
+
+    let renamed = ask(&app, &ada, &home, backend_id, "call Notifications Alerts").await;
+    let topics = app.synced(&ada, &home, "Topic").await;
+    assert_eq!(named(&topics, &notifications), "Alerts");
+    // Another topic it only reads.
+    ask(&app, &ada, &home, backend_id, "call Cooking Baking").await;
+    let topics = app.synced(&ada, &home, "Topic").await;
+    assert!(topics.iter().any(|t| t["name"] == "Cooking"));
+
+    let undone = app
+        .post(
+            &format!(
+                "/api/w/{home}/messages/{}/undo",
+                renamed["id"].as_str().unwrap()
+            ),
+            Some(&ada),
+            json!({}),
+        )
+        .await;
+    assert!(undone.status.is_success(), "{}", undone.body);
+    let topics = app.synced(&ada, &home, "Topic").await;
+    assert_eq!(named(&topics, &notifications), "Notifications");
+}
