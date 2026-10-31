@@ -569,7 +569,8 @@ function Changes({ message, here }: { message: Message; here: string }) {
             </p>
           )}
           {change.layout && <WhatMoved layout={change.layout} />}
-          {change.layout && !undone && <Changed collections={change.layout.collections} />}
+          {/* Answers from before the pictures have no collections. */}
+          {change.layout && !undone && <Changed collections={change.layout.collections ?? []} />}
         </div>
       ))}
       {undone ? (
