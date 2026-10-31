@@ -155,7 +155,7 @@ What they do:
   add_items, add_rows (a collection's rows with their cells),
   change_points, tick, move (a block, or points to a block), remove,
   ask_to_check, offer_reminder, change_brief, change_topic, read_topic (another topic's page,
-  only to read), propose_sub_topic, name_talk and fits_elsewhere. Through the API one more request, with structured
+  only to read), propose_sub_topic, move_to_sub_topic, name_talk and fits_elsewhere. Through the API one more request, with structured
   output (`KEEP` in `talks.rs`), reads the same from the exchange. Either
   way `Kept` is a working copy of the page the answer changes, and the
   server writes it with the answer, through the sync engine, so every
@@ -218,7 +218,8 @@ What they do:
     to answer from now on, or corrected twice on the same thing, and
     gives it whole (`Kept::change_brief`): the change is kept on the
     message for Undo, as the own topic's are. Its name, group or icon it
-    changes only when asked, with change_topic, and only its own topic's.
+    changes only when asked, with change_topic, and only its own topic's;
+    other topics it only reads, but into its sub-topics it moves.
   - A topic can sit under another, one level deep (`parent_id`, migration
     0019; `may_sit_under` in the sync rules): never under itself, Almanac's
     own topic or a topic that sits under one. Its talks keep to the parent's
@@ -232,7 +233,12 @@ What they do:
     its `takes` (blocks, and rows with a page of their own) and moves on
     Start (`take` in `topics.rs`): made again in the sub-topic, a row's page
     as its own page, and gone from the parent, so nothing is kept twice. A
-    sub-topic that takes something gets no template blocks but You.
+    sub-topic that takes something gets no template blocks but You. Later
+    the parent's talk moves more there with move_to_sub_topic, the only
+    change a talk makes outside its topic: off the parent's page as a
+    removal and onto the sub-topic's as what it made (`in_sub_topics` on
+    `Kept`, and a `TopicChange` for the sub-topic), so one Undo puts both
+    back.
 
   Pages from before the set move into it once, on the server's start
   (`convert.rs`, a rule per old kind, the same for every topic): text,

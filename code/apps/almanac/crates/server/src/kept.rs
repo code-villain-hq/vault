@@ -62,6 +62,8 @@ pub struct Kept {
     pub talk_title: Option<String>,
     pub proposal: Option<Proposal>,
     pub changes: Vec<TopicChange>,
+    /// What it made in this topic's sub-topics, moved there from its page.
+    pub in_sub_topics: Vec<Operation>,
 }
 
 impl Default for Kept {
@@ -191,6 +193,7 @@ impl Kept {
             talk_title: None,
             proposal: None,
             changes: Vec::new(),
+            in_sub_topics: Vec::new(),
         }
     }
 
@@ -640,6 +643,15 @@ impl Kept {
         Ok(())
     }
 
+    /// Removes blocks and rows by id, as `remove` does by reference.
+    pub fn remove_ids(&mut self, ids: &[Uuid]) -> Result<(), String> {
+        for &id in ids {
+            self.touch(id)?;
+            self.take_off(id);
+        }
+        Ok(())
+    }
+
     /// Takes a block or point off the copy, and with a row the blocks on
     /// its page, and theirs.
     fn take_off(&mut self, id: Uuid) {
@@ -1075,10 +1087,14 @@ impl Kept {
                 data: fields([("cover", json!(cover))]),
             });
         }
+        operations.extend(self.in_sub_topics.iter().cloned());
         for change in &self.changes {
             let Value::Object(data) = patch_fields(&change.after) else {
                 continue;
             };
+            if data.is_empty() {
+                continue;
+            }
             operations.push(Operation::Update {
                 model: ModelKind::Topic,
                 id: change.topic_id,
@@ -1174,12 +1190,12 @@ impl Kept {
     /// The block a reference (`b2`) or a title names.
     /// What a sub-topic would take from this page, by reference: blocks
     /// on the topic's own page (`b2`) and rows with a page of their own
-    /// (`p3`), as the page has them before this answer.
-    pub fn taken(&self, references: &[String]) -> Result<Vec<Uuid>, String> {
+    /// (`p3`), as the page has them before this answer, with their names.
+    pub fn taken(&self, references: &[String]) -> Result<Vec<(Uuid, String)>, String> {
         let mut ids = Vec::new();
         for reference in references {
-            let named = reference.trim();
-            let id = if named.trim_start_matches('[').starts_with('p') {
+            let named = reference.trim().trim_matches(['[', ']']);
+            let id = if !named.starts_with('b') {
                 let point = &self.points[self.point_at(named)?];
                 if !self.refs.points.iter().any(|p| p.id == point.id) {
                     return Err(format!(
@@ -1192,7 +1208,7 @@ impl Kept {
                         "{named} has no page of its own: take its block, or copy it as points."
                     ));
                 }
-                point.id
+                (point.id, point.text.clone())
             } else {
                 let block = &self.blocks[self.block_at(named)?];
                 if !self.refs.blocks.iter().any(|b| b.id == block.id) {
@@ -1205,9 +1221,9 @@ impl Kept {
                         "{named} isn't a block of the topic's page: take the row whose page it's on."
                     ));
                 }
-                block.id
+                (block.id, self.title(self.block_at(named)?).to_string())
             };
-            if !ids.contains(&id) {
+            if !ids.iter().any(|(had, _)| *had == id.0) {
                 ids.push(id);
             }
         }

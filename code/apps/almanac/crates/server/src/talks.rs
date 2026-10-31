@@ -90,9 +90,10 @@ when the question belongs in another topic, change_brief when they tell you how 
 should answer from now on or correct the same thing a second time, change_topic when they ask to \
 rename this topic or change its icon or group, read_topic when the question needs what another \
 topic keeps, propose_sub_topic when they ask for a sub-topic of this one (what this page keeps about it moves \
-there, in takes), and name_talk while the \
-talk has no name. You change only this topic: another one you \
-only read, and when they want it changed, say they can do it in that topic's talk. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
+there, in takes), move_to_sub_topic when they ask to move what this page keeps about a sub-topic \
+there, and name_talk while the talk has no name. You change only this topic, and move into its \
+sub-topics: another one you only read, and when they want it changed, say they can do it in that \
+topic's talk. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
 into its rows (\"Lisa wiegt etwa 3,4 kg\" into Gewicht): move the sentence to the collection, \
 then change_points gives it its name as text and its cells, so it keeps its source; add the \
 field with change_block first if it has none for it. A text field that holds yes or no, a number \

@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use almanac_domain::{
-    Actor, FIELD_KINDS, ICONS, Proposal, ProposedPoint, SET_KINDS, STICKS_TO_MAX, TEMPLATE_NAMES,
-    TopicChange, TopicPatch,
+    Actor, FIELD_KINDS, ICONS, PageLayout, Proposal, ProposedPoint, SET_KINDS, STICKS_TO_MAX,
+    TEMPLATE_NAMES, TopicChange, TopicPatch,
 };
 use axum::Json;
 use axum::extract::State;
@@ -30,6 +30,10 @@ const PROTOCOL_VERSION: &str = "2025-06-18";
 
 const TOPIC_NAMED: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND lower(name) = lower($2)";
+const SUB_TOPIC_NAMED: &str = "SELECT id, name FROM topics \
+     WHERE workspace_id = $1 AND parent_id = $2 AND lower(name) = lower($3)";
+const NEXT_POSITION: &str = "SELECT COALESCE(max(position) + 1, 0) FROM blocks \
+     WHERE workspace_id = $1 AND topic_id = $2 AND row_id IS NULL";
 const TOPIC_BY_ID: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND id = $2";
 const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY position";
@@ -65,6 +69,7 @@ impl Mode {
                 "change_topic",
                 "read_topic",
                 "propose_sub_topic",
+                "move_to_sub_topic",
                 "fetch_picture",
                 "set_cover",
                 "name_talk",
@@ -405,7 +410,11 @@ async fn call(
                 ));
             }
             args.group = group;
-            let takes = kept()?.taken(&args.takes)?;
+            let takes = kept()?
+                .taken(&args.takes)?
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
             let mut proposal = propose(state, asking, args).await?;
             proposal.parent_id = Some(asking.topic_id);
             proposal.takes = takes;
@@ -428,6 +437,70 @@ async fn call(
                  It isn't started until they click Start."
             }
             .into())
+        }
+        "move_to_sub_topic" => {
+            let args: MoveToArgs = read(arguments)?;
+            let child: Option<(Uuid, String)> = sqlx::query_as(SUB_TOPIC_NAMED)
+                .bind(asking.actor.workspace_id)
+                .bind(asking.topic_id)
+                .bind(args.to.trim())
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|_| "Almanac couldn't look at the sub-topics.".to_string())?;
+            let (child, child_name) = child.ok_or_else(|| {
+                format!(
+                    "{} isn't a sub-topic of this one: the page names its sub-topics.",
+                    args.to
+                )
+            })?;
+            let taken = kept()?.taken(&args.takes)?;
+            if taken.is_empty() {
+                return Err("Name what moves, like b2 or p3.".into());
+            }
+            let first: i32 = sqlx::query_scalar(NEXT_POSITION)
+                .bind(asking.actor.workspace_id)
+                .bind(child)
+                .fetch_one(&state.pool)
+                .await
+                .map_err(|_| "Almanac couldn't look at the sub-topic.".to_string())?;
+            let ids: Vec<Uuid> = taken.iter().map(|(id, _)| *id).collect();
+            let moved = crate::topics::take(
+                state,
+                asking.actor.workspace_id,
+                asking.topic_id,
+                &ids,
+                child,
+                first,
+            )
+            .await
+            .map_err(|_| "Almanac couldn't read what moves.".to_string())?;
+            let (made_blocks, made_points) = moved.on_the_page();
+            let names: Vec<&str> = taken.iter().map(|(_, name)| name.as_str()).collect();
+            let mut guard = kept()?;
+            // Off this page as a removal, which Undo puts back; on the
+            // sub-topic's as what it made, which Undo takes off.
+            guard.remove_ids(&ids)?;
+            guard.in_sub_topics.extend(moved.made);
+            guard.changes.push(TopicChange {
+                topic_id: child,
+                name: child_name.clone(),
+                said: format!("Moved {} here.", names.join(", ")),
+                before: TopicPatch::default(),
+                after: TopicPatch::default(),
+                layout: Some(PageLayout {
+                    moves: Vec::new(),
+                    blocks: Vec::new(),
+                    points: Vec::new(),
+                    made_blocks,
+                    made_points,
+                    collections: Vec::new(),
+                    rows: Vec::new(),
+                }),
+                undone: false,
+            });
+            Ok(format!(
+                "Moved to {child_name}, once your answer is done: it's off this page then, with its pages. They can undo it."
+            ))
         }
         "change_topic" => {
             let mut args: ChangeArgs = read(arguments)?;
@@ -603,6 +676,12 @@ struct ProposeArgs {
     #[serde(default)]
     reminders: Vec<ReminderArgs>,
     #[serde(default)]
+    takes: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct MoveToArgs {
+    to: String,
     takes: Vec<String>,
 }
 
@@ -1287,6 +1366,21 @@ fn tools(mode: Mode) -> Vec<Value> {
                 sub_topic,
                 &["name", "sticks_to", "icon", "template", "starters"],
             ),
+            tool(
+                "move_to_sub_topic",
+                "Moves what this page keeps about one of its sub-topics there, when they ask: \
+                 blocks, and rows with a page of their own, whose page goes whole. It leaves this \
+                 page, so nothing is kept twice. The only change you make outside this topic.",
+                json!({
+                    "to": string("The sub-topic's name, as the page names it."),
+                    "takes": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "What moves: blocks (b2), and rows with a page of their own (p3).",
+                    },
+                }),
+                &["to", "takes"],
+            ),
             fetch_picture,
             set_cover,
             name_talk,
@@ -1354,6 +1448,7 @@ mod tests {
         assert!(Mode::Topic.tools().contains(&"change_topic"));
         assert!(Mode::Topic.tools().contains(&"read_topic"));
         assert!(Mode::Topic.tools().contains(&"propose_sub_topic"));
+        assert!(Mode::Topic.tools().contains(&"move_to_sub_topic"));
         for mode in [Mode::Topic, Mode::Own, Mode::SetUp] {
             let tools = tools(mode);
             let described: Vec<&str> = tools

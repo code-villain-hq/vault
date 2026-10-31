@@ -90,6 +90,10 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/move ([bp]\d+) to (\S+)/i.test(prompt)) {
+    const [, what, to] = /move ([bp]\d+) to (\S+)/i.exec(prompt) ?? [];
+    await tool("move_to_sub_topic", { to, takes: [what] });
+    say("Moved.");
   } else if (/tidy/i.test(prompt)) {
     await tool("change_points", {
       points: [{ point: "p1", text: "Water every 7 days, once the top is dry." }],

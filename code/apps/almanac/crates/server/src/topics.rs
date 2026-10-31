@@ -194,7 +194,10 @@ pub async fn start(
             template_blocks(id, template, proposal.cards.as_deref(), &proposal.fields);
         let taken = match proposal.parent_id {
             Some(parent) if !proposal.takes.is_empty() => {
-                take(&state, actor.workspace_id, parent, &proposal.takes, id).await?
+                let taken =
+                    take(&state, actor.workspace_id, parent, &proposal.takes, id, 0).await?;
+                // Made there before they go here.
+                [taken.made, taken.gone].concat()
             }
             _ => Vec::new(),
         };
@@ -569,22 +572,64 @@ pub fn template_blocks(
     (writes, started)
 }
 
-/// The writes that move what a sub-topic `takes` from its `parent`'s page
-/// to it (`to`): a block whole, a row's page as the sub-topic's own, each
-/// with its points and its rows' pages, made again there and gone here.
-/// What's no longer on the parent's page is left out.
-async fn take(
+/// What a sub-topic takes from its parent's page: the writes that make it
+/// again there, and the ones that take it off the parent's.
+pub struct Taken {
+    pub made: Vec<Operation>,
+    pub gone: Vec<Operation>,
+}
+
+impl Taken {
+    /// The blocks it makes on the sub-topic's page and the points in them,
+    /// which Undo takes off; their rows' pages go with the rows.
+    pub fn on_the_page(&self) -> (Vec<Uuid>, Vec<Uuid>) {
+        let blocks: Vec<Uuid> = self
+            .made
+            .iter()
+            .filter(|o| is_top_block(o))
+            .map(|o| match o {
+                Operation::Create { id, .. } => *id,
+                _ => Uuid::nil(),
+            })
+            .collect();
+        let points = self
+            .made
+            .iter()
+            .filter_map(|o| match o {
+                Operation::Create {
+                    model: ModelKind::Point,
+                    id,
+                    data,
+                } => data
+                    .get("block_id")
+                    .and_then(Value::as_str)
+                    .and_then(|b| b.parse().ok())
+                    .filter(|b| blocks.contains(b))
+                    .map(|_| *id),
+                _ => None,
+            })
+            .collect();
+        (blocks, points)
+    }
+}
+
+/// What a sub-topic (`to`) `takes` from its `parent`'s page, from the
+/// position `first` on: a block whole, a row's page as the sub-topic's
+/// own, each with its points and its rows' pages, made again there and
+/// gone here. What's no longer on the parent's page is left out.
+pub async fn take(
     state: &AppState,
     workspace_id: Uuid,
     parent: Uuid,
     takes: &[Uuid],
     to: Uuid,
-) -> Result<Vec<Operation>, AppError> {
+    first: i32,
+) -> Result<Taken, AppError> {
     let mut db = state.pool.acquire().await?;
     // Blocks to make again: as they are, on the row they go on.
     let mut blocks: Vec<(Value, Option<Uuid>, Option<i32>)> = Vec::new();
     let mut gone = Vec::new();
-    let mut position = 0;
+    let mut position = first;
     for &id in takes {
         let block: Option<Value> = sqlx::query_scalar(TAKEN_BLOCK)
             .bind(workspace_id)
@@ -691,10 +736,11 @@ async fn take(
             }
         }
     }
-    // Made there before they go here: a block's points and a row's page go
-    // with it.
-    operations.extend(gone);
-    Ok(operations)
+    // A block's points and a row's page go with it.
+    Ok(Taken {
+        made: operations,
+        gone,
+    })
 }
 
 /// A record's id, as the database has it.

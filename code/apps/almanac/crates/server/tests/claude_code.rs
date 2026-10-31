@@ -698,3 +698,102 @@ async fn an_item_rings_and_a_tick_ticks_its_reminder(pool: PgPool) {
     let points = app.synced(&ada, &home, "Point").await;
     assert_eq!(points[0]["done"], false, "the reminder keeps the tick");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, _) = with_claude_code(pool, dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let topics = format!("/api/w/{home}/topics");
+    let start = |name: &str, parent: Value| {
+        app.post(
+            &topics,
+            Some(&ada),
+            json!({ "name": name, "template": "study", "parent_id": parent }),
+        )
+    };
+    let backend = start("Backend", Value::Null).await.body["id"].clone();
+    let notifications = start("Notifications", backend.clone()).await.body["id"].clone();
+    let blocks = app.synced(&ada, &home, "Block").await;
+    let reading = blocks
+        .iter()
+        .find(|b| b["topic_id"] == backend && b["title"] == "Reading")
+        .unwrap()["id"]
+        .clone();
+    let (lesson, sketch) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    let wrote = app
+        .sync(
+            &ada,
+            &home,
+            json!([
+                { "action": "create", "model": "Point", "id": lesson,
+                  "data": { "topic_id": backend, "block_id": reading, "text": "Lesson 1" } },
+                { "action": "create", "model": "Block", "id": sketch,
+                  "data": { "topic_id": backend, "kind": "paragraph", "title": "The sketch", "row_id": lesson } },
+                { "action": "create", "model": "Point", "id": uuid::Uuid::now_v7(),
+                  "data": { "topic_id": backend, "block_id": sketch, "text": "**Caller**: who starts it." } },
+            ]),
+        )
+        .await;
+    assert!(wrote.status.is_success(), "{}", wrote.text);
+
+    let backend_id = backend.as_str().unwrap();
+    let moved = ask(&app, &ada, &home, backend_id, "move p1 to Notifications").await;
+    let changes = moved["changes"].as_array().unwrap();
+    assert!(
+        changes
+            .iter()
+            .any(|c| c["topic_id"] == notifications && c["said"] == "Moved Lesson 1 here."),
+        "{changes:?}"
+    );
+    let on = |blocks: &[Value], topic: &Value| -> Vec<String> {
+        blocks
+            .iter()
+            .filter(|b| b["topic_id"] == *topic)
+            .map(|b| b["title"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let blocks = app.synced(&ada, &home, "Block").await;
+    // The lesson's page is on the sub-topic's own page now, and off the
+    // parent's with its row.
+    assert!(on(&blocks, &notifications).contains(&"The sketch".to_string()));
+    assert!(!on(&blocks, &backend).contains(&"The sketch".to_string()));
+    let points = app.synced(&ada, &home, "Point").await;
+    let caller = points
+        .iter()
+        .find(|p| p["text"] == "**Caller**: who starts it.")
+        .unwrap();
+    assert_eq!(caller["topic_id"], notifications);
+    assert!(!points.iter().any(|p| p["text"] == "Lesson 1"));
+
+    let undone = app
+        .post(
+            &format!(
+                "/api/w/{home}/messages/{}/undo",
+                moved["id"].as_str().unwrap()
+            ),
+            Some(&ada),
+            json!({}),
+        )
+        .await;
+    assert!(undone.status.is_success(), "{}", undone.body);
+    let blocks = app.synced(&ada, &home, "Block").await;
+    assert!(!on(&blocks, &notifications).contains(&"The sketch".to_string()));
+    let back = blocks
+        .iter()
+        .find(|b| b["id"] == sketch.to_string())
+        .unwrap();
+    assert_eq!(
+        back["row_id"],
+        lesson.to_string(),
+        "on the lesson's page again"
+    );
+    let points = app.synced(&ada, &home, "Point").await;
+    assert!(points.iter().any(|p| p["id"] == lesson.to_string()));
+    let callers: Vec<_> = points
+        .iter()
+        .filter(|p| p["text"] == "**Caller**: who starts it.")
+        .collect();
+    assert_eq!(callers.len(), 1, "kept once");
+    assert_eq!(callers[0]["topic_id"], backend);
+}
