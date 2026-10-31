@@ -29,6 +29,8 @@ export type * from "./generated/ProposedReminder";
 export type * from "./generated/Question";
 export type * from "./generated/QuestionCreate";
 export type * from "./generated/QuestionPatch";
+export type * from "./generated/ReadToken";
+export type * from "./generated/ReadTokenInfo";
 export type * from "./generated/Reminder";
 export type * from "./generated/ReminderCreate";
 export type * from "./generated/ReminderPatch";

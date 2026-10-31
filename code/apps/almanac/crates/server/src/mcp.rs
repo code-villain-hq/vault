@@ -27,7 +27,7 @@ use crate::kept::{self, FieldArg, ItemArg, Kept, PointChange, RowArg, reminder};
 use crate::state::AppState;
 use crate::topics::{SetUp, cut};
 
-const PROTOCOL_VERSION: &str = "2025-06-18";
+pub(crate) const PROTOCOL_VERSION: &str = "2025-06-18";
 
 const TOPIC_NAMED: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND lower(name) = lower($2)";

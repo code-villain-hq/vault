@@ -111,6 +111,27 @@ impl App {
         }
     }
 
+    /// One MCP message to `/api/mcp/read`, with a read token as its bearer.
+    pub async fn read_mcp(&self, token: &str, message: Value) -> (StatusCode, Value) {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/mcp/read")
+            .extension(ConnectInfo(SocketAddr::from((Ipv4Addr::LOCALHOST, 40000))))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(message.to_string()))
+            .unwrap();
+        let response = self.router.clone().oneshot(request).await.unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        )
+    }
+
     /// Writes to the workspace's synced records.
     pub async fn sync(&self, session: &str, workspace_id: &str, operations: Value) -> Response {
         self.post(

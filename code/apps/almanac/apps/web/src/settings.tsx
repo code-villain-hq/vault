@@ -1,9 +1,11 @@
-import type { ClaudeCodeInfo, ClaudeKeyInfo } from "@almanac/types";
+import type { ClaudeCodeInfo, ClaudeKeyInfo, ReadToken, ReadTokenInfo } from "@almanac/types";
 import { type AccessConfig, accountPages, messageOf, useApi } from "@code-villain/web";
 import { CircleCheck, Terminal } from "lucide-react";
 import { useState } from "react";
 import { api } from "./api";
+import { dateWords, dayKey } from "./format";
 import { PageBody, PageHeader } from "./layout";
+import { apiUrl } from "./server";
 import { loadSession, signedIn, signOut } from "./session";
 import { BlockGallery } from "./topic";
 import { Button, ErrorMessage, Section } from "./ui";
@@ -45,6 +47,7 @@ export function ClaudePage() {
         ) : (
           <TheKey data={data} path={path} reload={reload} />
         )}
+        <Reading />
       </PageBody>
     </>
   );
@@ -151,6 +154,71 @@ function ClaudeCode({ data, path, reload }: ClaudeProps) {
         </div>
       </Section>
     </div>
+  );
+}
+
+/**
+ * Another app, such as Claude Code in a terminal, reading this workspace
+ * over MCP with your token: shown once when it's made, in the command that
+ * adds it.
+ */
+function Reading() {
+  const { workspace } = useWorkspace();
+  const path = `/api/w/${workspace.id}/reading`;
+  const { data, reload } = useApi<ReadTokenInfo>(path);
+  const [token, setToken] = useState("");
+  const [problem, setProblem] = useState("");
+  const [busy, setBusy] = useState(false);
+  const run = async (method: "POST" | "DELETE") => {
+    setBusy(true);
+    setProblem("");
+    try {
+      const made = await api<ReadToken>(method, path);
+      setToken(method === "POST" ? made.token : "");
+      await reload();
+    } catch (e) {
+      setProblem(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const on = (at: string) => dateWords(dayKey(new Date(at)));
+  const address = new URL(apiUrl("/api/mcp/read"), location.href).href;
+  return (
+    <Section title="Reading from other apps">
+      <div className="flex max-w-2xl flex-col gap-3">
+        <p className="text-muted">
+          Claude Code, or another app that speaks MCP, can read your topics with a token of yours:
+          their pages and a search. It changes nothing.
+        </p>
+        {token ? (
+          <>
+            <p>Add it to Claude Code with this. It shows only now.</p>
+            <Command
+              text={`claude mcp add --transport http almanac ${address} --header "Authorization: Bearer ${token}"`}
+            />
+          </>
+        ) : (
+          data?.made_at && (
+            <p>
+              Your token was made {on(data.made_at)}
+              {data.used_at ? `, last read ${on(data.used_at)}` : ", and hasn't read yet"}.
+            </p>
+          )
+        )}
+        <div className="flex gap-2">
+          <Button variant="secondary" disabled={busy} onClick={() => void run("POST")}>
+            {data?.made_at ? "Make a new token" : "Make a token"}
+          </Button>
+          {data?.made_at && (
+            <Button variant="secondary" disabled={busy} onClick={() => void run("DELETE")}>
+              Stop it reading
+            </Button>
+          )}
+        </div>
+        <ErrorMessage>{problem}</ErrorMessage>
+      </div>
+    </Section>
   );
 }
 

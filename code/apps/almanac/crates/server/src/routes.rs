@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, groups, keys, mcp, members, oidc, photos, talks, topics, ws};
+use crate::{accounts, groups, keys, mcp, members, oidc, photos, reading, talks, topics, ws};
 
 /// The API, plus the built web app from `web_dir` when given (in production
 /// the server serves both; in development Vite serves the app).
@@ -55,13 +55,21 @@ pub fn router(state: AppState) -> Router {
             "/claude",
             get(keys::show).put(keys::set).delete(keys::forget),
         )
-        .route("/claude/web", put(keys::set_web));
+        .route("/claude/web", put(keys::set_web))
+        .route(
+            "/reading",
+            get(reading::show)
+                .post(reading::make)
+                .delete(reading::revoke),
+        );
 
     let mut api = Router::new();
     if state.claude_code.is_some() {
         // Claude Code's way to Almanac's tools, by each question's token.
         api = api.route("/api/mcp", post(mcp::handle));
     }
+    // Another app's way to read the workspace, by a member's token.
+    api = api.route("/api/mcp/read", post(reading::handle));
     if let Some(token) = &state.scim_token {
         api = api.nest(
             "/api/scim/v2",

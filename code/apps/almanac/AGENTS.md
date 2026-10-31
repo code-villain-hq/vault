@@ -120,6 +120,11 @@ Two ways to the same answers, and the same prompts:
   SDK): `claude-opus-5-5`, adaptive thinking, the server-side refusal
   fallback, web search off.
 
+The other way round, other apps read Almanac (`reading.rs`,
+`POST /api/mcp/read`): `list_topics`, `read_topic` and `search`, nothing
+that writes. Each member makes one token of their own in Settings → Claude;
+it shows once, a new one replaces it, and only its hash is kept.
+
 What they do:
 
 - **A talk** (`talks.rs`): each question sends the fixed prompt, the page

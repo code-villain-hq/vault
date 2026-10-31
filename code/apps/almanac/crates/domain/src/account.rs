@@ -251,3 +251,21 @@ mod tests {
         assert!(url_key_from(&"a".repeat(80)).len() <= 32);
     }
 }
+
+/// Settings → Claude: the token another app reads the workspace with, over
+/// MCP. Only when it was made and last used: the token itself is shown once.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, optional_fields)]
+pub struct ReadTokenInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub made_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used_at: Option<DateTime<Utc>>,
+}
+
+/// A token just made, shown this once.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ReadToken {
+    pub token: String,
+}

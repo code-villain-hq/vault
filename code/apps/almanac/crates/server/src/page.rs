@@ -240,6 +240,16 @@ impl Page {
     /// The topic and what it has kept, in plain text, each block, point
     /// and reminder with its reference.
     pub fn describe(&self) -> String {
+        self.written(true)
+    }
+
+    /// The page for another app to read: what it holds, without how a
+    /// talk makes one.
+    pub fn as_read(&self) -> String {
+        self.written(false)
+    }
+
+    fn written(&self, how: bool) -> String {
         let mut out = String::new();
         let _ = writeln!(out, "The topic: {}", self.name);
         let sticks_to = match self.sticks_to.trim() {
@@ -269,7 +279,9 @@ impl Page {
                 self.children.join(", ")
             );
         }
-        let _ = writeln!(out, "\nHow a page is made: {SET_SAYS}");
+        if how {
+            let _ = writeln!(out, "\nHow a page is made: {SET_SAYS}");
+        }
         out.push_str("\nThe page's blocks, in order:\n");
         if self.blocks.is_empty() {
             out.push_str("None yet.\n");
