@@ -38,7 +38,7 @@ const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY po
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     /// A talk in a topic: it keeps points, asks to check, offers reminders,
-    /// and changes how the topic answers.
+    /// and changes how the topic answers, its name, icon and group.
     Topic,
     /// A talk in the workspace's own topic: it proposes and changes topics.
     Own,
@@ -62,6 +62,7 @@ impl Mode {
                 "ask_to_check",
                 "offer_reminder",
                 "change_brief",
+                "change_topic",
                 "fetch_picture",
                 "set_cover",
                 "name_talk",
@@ -368,7 +369,19 @@ async fn call(
             .into())
         }
         "change_topic" => {
-            let change = change(state, asking, read(arguments)?).await?;
+            let mut args: ChangeArgs = read(arguments)?;
+            // A topic's own talk changes only its topic.
+            if asking.mode == Mode::Topic {
+                let topic: Option<TopicRow> = sqlx::query_as(TOPIC_BY_ID)
+                    .bind(asking.actor.workspace_id)
+                    .bind(asking.topic_id)
+                    .fetch_optional(&state.pool)
+                    .await
+                    .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
+                args.topic = topic.ok_or("This topic is gone.")?.1;
+                args.sticks_to = None;
+            }
+            let change = change(state, asking, args).await?;
             let mut guard = kept()?;
             match guard
                 .changes
@@ -540,6 +553,7 @@ struct ProposedPointArgs {
 
 #[derive(Deserialize)]
 struct ChangeArgs {
+    #[serde(default)]
     topic: String,
     name: Option<String>,
     sticks_to: Option<String>,
@@ -1121,13 +1135,26 @@ fn tools(mode: Mode) -> Vec<Value> {
                  from now on\"), or correct the same thing a second time in this talk (\"too \
                  long again\"): never for a wish about one answer. Give the brief whole, as it \
                  is from now on: all of it kept, with the rule added or changed where it fits. \
-                 Never its name, group or icon. They see what you said under the answer, and \
-                 can undo it.",
+                 Its name, group or icon go with change_topic. They see what you said under \
+                 the answer, and can undo it.",
                 json!({
                     "sticks_to": string("The whole brief as it is from now on."),
                     "said": string("What changed, in a short sentence for under the answer, in the talk's language: \"Names when each source was written.\""),
                 }),
                 &["sticks_to", "said"],
+            ),
+            tool(
+                "change_topic",
+                "Changes this topic's name, its icon or its group in the sidebar, when they \
+                 ask. Only the fields to change. They see what you said under the answer, and \
+                 can undo it.",
+                json!({
+                    "name": string("Its new name."),
+                    "icon": { "type": "string", "enum": ICONS },
+                    "group": string("Its group in the sidebar."),
+                    "said": string("What you changed, in a short sentence for under the answer, in the talk's language: \"Renamed it to Backend.\""),
+                }),
+                &["said"],
             ),
             fetch_picture,
             set_cover,
@@ -1226,6 +1253,7 @@ mod tests {
         assert!(Mode::Topic.tools().contains(&"add_rows"));
         assert!(!Mode::Topic.tools().contains(&"propose_topic"));
         assert!(Mode::Own.tools().contains(&"change_topic"));
+        assert!(Mode::Topic.tools().contains(&"change_topic"));
         for mode in [Mode::Topic, Mode::Own, Mode::SetUp] {
             let tools = tools(mode);
             let described: Vec<&str> = tools

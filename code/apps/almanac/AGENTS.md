@@ -154,7 +154,7 @@ What they do:
   fields given whole, or a picture its fields allow, only when asked),
   add_items, add_rows (a collection's rows with their cells),
   change_points, tick, move (a block, or points to a block), remove,
-  ask_to_check, offer_reminder, change_brief, name_talk and
+  ask_to_check, offer_reminder, change_brief, change_topic, name_talk and
   fits_elsewhere. Through the API one more request, with structured
   output (`KEEP` in `talks.rs`), reads the same from the exchange. Either
   way `Kept` is a working copy of the page the answer changes, and the
@@ -217,8 +217,8 @@ What they do:
     talks answer (`STICKS_TO_MAX`). A talk changes it only when told how
     to answer from now on, or corrected twice on the same thing, and
     gives it whole (`Kept::change_brief`): the change is kept on the
-    message for Undo, as the own topic's are. A talk never changes a
-    topic's name, group or icon.
+    message for Undo, as the own topic's are. Its name, group or icon it
+    changes only when asked, with change_topic, and only its own topic's.
   - A topic can sit under another, one level deep (`parent_id`, migration
     0019; `may_sit_under` in the sync rules): never under itself, Almanac's
     own topic or a topic that sits under one. Its talks keep to the parent's
