@@ -25,6 +25,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
+  ChevronRight,
   ChevronsUpDown,
   LayoutGrid,
   Plus,
@@ -303,6 +304,31 @@ const navLinkBase =
   "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-muted";
 const navLink = `${navLinkBase} text-fg`;
 
+/** Where this browser keeps the topics whose sub-topics are folded away. */
+const FOLDED_KEY = "almanac.folded";
+
+/** The topics whose sub-topics are folded away, kept in this browser only. */
+function useFolded(): [Set<string>, (id: string) => void] {
+  const [folded, setFolded] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]") as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  const toggle = (id: string) => {
+    const next = new Set(folded);
+    if (!next.delete(id)) next.add(id);
+    setFolded(next);
+    try {
+      localStorage.setItem(FOLDED_KEY, JSON.stringify([...next]));
+    } catch {
+      // Folding still works until the page reloads.
+    }
+  };
+  return [folded, toggle];
+}
+
 /** The last page outside settings, where "Back to …" returns. */
 let lastPath: string | null = null;
 
@@ -354,6 +380,7 @@ function TopicNav() {
   const topics = useTopics();
   const unread = useUnread();
   const newTopic = useNewTopic();
+  const [folded, toggle] = useFolded();
   const params = { workspace: workspace.url_key };
   const own = topics.find(isOwn);
   const groups = useMemo(() => {
@@ -394,18 +421,19 @@ function TopicNav() {
           <span className="sidebar-group-label truncate px-2 pb-1 text-xs text-faint">
             {group || "Topics"}
           </span>
-          {list
-            .flatMap((topic) => [topic, ...childrenOf(topic, topics)])
-            .map((topic) => (
+          {list.flatMap((topic) => {
+            const children = childrenOf(topic, topics);
+            const open = !folded.has(topic.id);
+            const link = (shown: Topic, newUnder = false) => (
               <Link
-                key={topic.id}
+                key={shown.id}
                 to="/$workspace/topics/$topic"
-                params={{ ...params, topic: topic.id }}
-                className={`${navLink} ${topic.parent_id ? "pl-7" : ""}`}
+                params={{ ...params, topic: shown.id }}
+                className={`${navLink} ${shown.parent_id ? "pl-7" : ""} ${children.length && !shown.parent_id ? "pr-8" : ""}`}
               >
-                <NavIcon icon={topicIcon(topic.icon)} />
-                <span className="truncate">{topic.name}</span>
-                {unread.has(topic.id) && (
+                <NavIcon icon={topicIcon(shown.icon)} />
+                <span className="truncate">{shown.name}</span>
+                {(unread.has(shown.id) || newUnder) && (
                   <span
                     role="img"
                     aria-label="New points"
@@ -414,7 +442,30 @@ function TopicNav() {
                   />
                 )}
               </Link>
-            ))}
+            );
+            if (!children.length) return [link(topic)];
+            return [
+              <div key={topic.id} className="group/fold relative">
+                {link(topic, !open && children.some((child) => unread.has(child.id)))}
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-label={`${open ? "Fold" : "Unfold"} ${topic.name}'s sub-topics`}
+                  title={open ? "Fold sub-topics" : "Unfold sub-topics"}
+                  onClick={() => toggle(topic.id)}
+                  className={`absolute top-1 right-1 flex size-5 items-center justify-center rounded text-muted hover:bg-hover hover:text-fg focus-visible:opacity-100 ${open ? "opacity-0 group-hover/fold:opacity-100" : ""}`}
+                >
+                  <ChevronRight
+                    size={14}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                    className={`transition-transform ${open ? "rotate-90" : ""}`}
+                  />
+                </button>
+              </div>,
+              ...(open ? children.map((child) => link(child)) : []),
+            ];
+          })}
         </nav>
       ))}
       {!guest && (
