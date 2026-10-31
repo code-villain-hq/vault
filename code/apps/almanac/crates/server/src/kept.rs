@@ -25,7 +25,7 @@ use sqlx::types::Json;
 use uuid::Uuid;
 
 use crate::page::{PagePoint, RefBlock, Refs};
-use crate::topics::cut;
+use crate::topics::{Left, cut, left_behind};
 
 #[derive(Debug)]
 pub struct Kept {
@@ -61,9 +61,13 @@ pub struct Kept {
     pub elsewhere: Option<String>,
     pub talk_title: Option<String>,
     pub proposal: Option<Proposal>,
+    /// The sub-topics it proposes, each started on its own.
+    pub sub_topics: Vec<Proposal>,
     pub changes: Vec<TopicChange>,
     /// What it made in this topic's sub-topics, moved there from its page.
     pub in_sub_topics: Vec<Operation>,
+    /// What it moved there, which isn't removed in words.
+    moved_off: Vec<Uuid>,
 }
 
 impl Default for Kept {
@@ -192,8 +196,10 @@ impl Kept {
             elsewhere: None,
             talk_title: None,
             proposal: None,
+            sub_topics: Vec::new(),
             changes: Vec::new(),
             in_sub_topics: Vec::new(),
+            moved_off: Vec::new(),
         }
     }
 
@@ -652,6 +658,50 @@ impl Kept {
         Ok(())
     }
 
+    /// Takes what moves to a sub-topic off the copy, and what the rows that
+    /// move leave behind with it (`topics::left_behind`): a block no row
+    /// stays in, a choice's lanes none does.
+    pub fn move_off(&mut self, ids: &[Uuid]) -> Result<(), String> {
+        let went: Vec<(Uuid, Value)> = self
+            .points
+            .iter()
+            .filter(|p| ids.contains(&p.id))
+            .map(|p| (p.block_id, json!(p.cells.0)))
+            .collect();
+        self.remove_ids(ids)?;
+        self.moved_off.extend(ids);
+        let mut from: Vec<Uuid> = went.iter().map(|(block, _)| *block).collect();
+        from.dedup();
+        for block in from {
+            let Some(n) = self.blocks.iter().position(|b| b.id == block) else {
+                continue;
+            };
+            if self.is_gone(block) {
+                continue;
+            }
+            let taken: Vec<Value> = went
+                .iter()
+                .filter(|(b, _)| *b == block)
+                .map(|(_, cells)| cells.clone())
+                .collect();
+            let stay: Vec<Value> = self
+                .points
+                .iter()
+                .filter(|p| p.block_id == block && !self.is_gone(p.id))
+                .map(|p| json!(p.cells.0))
+                .collect();
+            match left_behind(&self.blocks[n].kind, &self.blocks[n].fields, &taken, &stay) {
+                Left::As => {}
+                Left::Empty => self.remove_ids(&[block])?,
+                Left::Lanes(lanes) => {
+                    self.touch(block)?;
+                    self.blocks[n].fields = Json(lanes);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Takes a block or point off the copy, and with a row the blocks on
     /// its page, and theirs.
     fn take_off(&mut self, id: Uuid) {
@@ -949,7 +999,7 @@ impl Kept {
                     id: point.id,
                 });
                 layout.points.push(point_was(was, true));
-                if !in_gone {
+                if !in_gone && !self.moved_off.contains(&point.id) {
                     removed_points += 1;
                 }
                 continue;
@@ -1031,10 +1081,15 @@ impl Kept {
                     id: block.id,
                 });
                 layout.blocks.push(block_was(was, true));
-                removed_blocks.push(match was.title.as_str() {
-                    "" => format!("the {}", was.kind),
-                    title => title.to_string(),
-                });
+                // What moved to a sub-topic says so there, and a row's page
+                // goes with its row.
+                let along = was.row_id.is_some_and(|row| self.is_gone(row));
+                if !along && !self.moved_off.contains(&block.id) {
+                    removed_blocks.push(match was.title.as_str() {
+                        "" => format!("the {}", was.kind),
+                        title => title.to_string(),
+                    });
+                }
             }
         }
         for (id, data) in &self.rung {
@@ -1124,6 +1179,9 @@ impl Kept {
         }
         if let Some(proposal) = &self.proposal {
             message.insert("proposal".into(), json!(proposal));
+        }
+        if !self.sub_topics.is_empty() {
+            message.insert("sub_topics".into(), json!(self.sub_topics));
         }
         let mut changes = self.changes.clone();
         let said: Vec<String> = [

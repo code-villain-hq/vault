@@ -37,6 +37,7 @@ const TAKEN_ROW: &str = "SELECT b.id FROM points p JOIN blocks b ON b.row_id = p
 const BLOCK: &str = "SELECT to_jsonb(b) FROM blocks b WHERE b.workspace_id = $1 AND b.id = $2";
 const BLOCK_POINTS: &str = "SELECT to_jsonb(p) FROM points p \
      WHERE p.workspace_id = $1 AND p.block_id = $2 ORDER BY p.position";
+const ROW: &str = "SELECT to_jsonb(p) FROM points p WHERE p.workspace_id = $1 AND p.id = $2";
 const ROW_BLOCKS: &str = "SELECT b.id FROM blocks b \
      WHERE b.workspace_id = $1 AND b.row_id = $2 ORDER BY b.position";
 const GROUPS: &str = "SELECT DISTINCT group_name FROM topics \
@@ -44,6 +45,12 @@ const GROUPS: &str = "SELECT DISTINCT group_name FROM topics \
 /// A proposal in an answer of the workspace's own topic.
 const PROPOSAL: &str = "SELECT m.proposal FROM messages m JOIN topics t ON t.id = m.topic_id \
      WHERE m.id = $1 AND m.workspace_id = $2 AND m.proposal IS NOT NULL";
+/// The sub-topics an answer of a topic's talk proposes.
+const SUB_TOPICS: &str =
+    "SELECT m.sub_topics FROM messages m WHERE m.id = $1 AND m.workspace_id = $2";
+/// One start from a proposal at a time: two sub-topics of an answer
+/// started at once would each write the answer's list as they read it.
+static STARTING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 const CHANGES: &str = "SELECT changes FROM messages WHERE id = $1 AND workspace_id = $2";
 const STILL_THERE: &str = "SELECT id FROM topics WHERE workspace_id = $1 AND id = ANY($2)";
 
@@ -125,16 +132,34 @@ pub async fn start(
             "A topic starts as one of {TEMPLATE_NAMES:?}."
         )));
     }
+    let _starting = match request.from_message {
+        Some(_) => Some(STARTING.lock().await),
+        None => None,
+    };
+    // The answer's sub-topics, when it's one of them.
+    let mut sub_topics: Vec<Proposal> = Vec::new();
     let proposed = match request.from_message {
         Some(message_id) => {
-            let proposal: Option<Value> = sqlx::query_scalar(PROPOSAL)
-                .bind(message_id)
-                .bind(actor.workspace_id)
-                .fetch_optional(&state.pool)
-                .await?;
-            let proposal: Proposal = proposal
-                .and_then(|p| serde_json::from_value(p).ok())
-                .ok_or_else(|| AppError::not_found("proposal not found"))?;
+            let proposal: Option<Proposal> = match request.sub_topic {
+                Some(n) => {
+                    let all: Option<Value> = sqlx::query_scalar(SUB_TOPICS)
+                        .bind(message_id)
+                        .bind(actor.workspace_id)
+                        .fetch_optional(&state.pool)
+                        .await?;
+                    sub_topics = all
+                        .and_then(|all| serde_json::from_value(all).ok())
+                        .unwrap_or_default();
+                    sub_topics.get(n as usize).cloned()
+                }
+                None => sqlx::query_scalar::<_, Value>(PROPOSAL)
+                    .bind(message_id)
+                    .bind(actor.workspace_id)
+                    .fetch_optional(&state.pool)
+                    .await?
+                    .and_then(|p| serde_json::from_value(p).ok()),
+            };
+            let proposal = proposal.ok_or_else(|| AppError::not_found("proposal not found"))?;
             if proposal.topic_id.is_some() {
                 return Err(AppError::conflict("That topic is started already."));
             }
@@ -247,10 +272,17 @@ pub async fn start(
         }
         let mut started = proposal.clone();
         started.topic_id = Some(id);
+        let data = match request.sub_topic {
+            Some(n) => {
+                sub_topics[n as usize] = started;
+                fields([("sub_topics", json!(sub_topics))])
+            }
+            None => fields([("proposal", json!(started))]),
+        };
         operations.push(Operation::Update {
             model: ModelKind::Message,
             id: *message_id,
-            data: fields([("proposal", json!(started))]),
+            data,
         });
     } else {
         operations.push(Operation::Create {
@@ -629,6 +661,8 @@ pub async fn take(
     // Blocks to make again: as they are, on the row they go on.
     let mut blocks: Vec<(Value, Option<Uuid>, Option<i32>)> = Vec::new();
     let mut gone = Vec::new();
+    // The blocks the rows it takes are in.
+    let mut rows_from: Vec<Uuid> = Vec::new();
     let mut position = first;
     for &id in takes {
         let block: Option<Value> = sqlx::query_scalar(TAKEN_BLOCK)
@@ -664,11 +698,53 @@ pub async fn take(
             blocks.push((block, None, Some(position)));
             position += 1;
         }
+        let from = sqlx::query_scalar::<_, Value>(ROW)
+            .bind(workspace_id)
+            .bind(id)
+            .fetch_optional(&mut *db)
+            .await?
+            .and_then(|row| row.get("block_id")?.as_str()?.parse::<Uuid>().ok());
+        if let Some(from) = from.filter(|b| !rows_from.contains(b)) {
+            rows_from.push(from);
+        }
         // The row goes, and its page with it.
         gone.push(Operation::Delete {
             model: ModelKind::Point,
             id,
         });
+    }
+    // What the rows leave behind goes with them.
+    for from in rows_from.into_iter().filter(|b| !takes.contains(b)) {
+        let block: Value = sqlx::query_scalar(BLOCK)
+            .bind(workspace_id)
+            .bind(from)
+            .fetch_one(&mut *db)
+            .await?;
+        let rows: Vec<Value> = sqlx::query_scalar(BLOCK_POINTS)
+            .bind(workspace_id)
+            .bind(from)
+            .fetch_all(&mut *db)
+            .await?;
+        let (taken, kept): (Vec<Value>, Vec<Value>) = rows
+            .into_iter()
+            .partition(|row| id_of(row).is_some_and(|id| takes.contains(&id)));
+        let cells = |rows: Vec<Value>| -> Vec<Value> {
+            rows.into_iter().map(|r| r["cells"].clone()).collect()
+        };
+        let kind = block["kind"].as_str().unwrap_or_default();
+        let had: Vec<Field> = serde_json::from_value(block["fields"].clone()).unwrap_or_default();
+        match left_behind(kind, &had, &cells(taken), &cells(kept)) {
+            Left::As => {}
+            Left::Empty => gone.push(Operation::Delete {
+                model: ModelKind::Block,
+                id: from,
+            }),
+            Left::Lanes(lanes) => gone.push(Operation::Update {
+                model: ModelKind::Block,
+                id: from,
+                data: fields([("fields", json!(lanes))]),
+            }),
+        }
     }
     let mut operations = Vec::new();
     while let Some((block, row_id, position)) = blocks.pop() {
@@ -743,6 +819,49 @@ pub async fn take(
     })
 }
 
+/// What rows moving off a block leave of it.
+#[derive(Debug, PartialEq)]
+pub enum Left {
+    As,
+    /// No rows: the block goes too.
+    Empty,
+    /// A choice's lanes none of the rows left use, with the fields that stay.
+    Lanes(Vec<Field>),
+}
+
+/// What a block of `kind` with `fields` is left as when rows with the
+/// cells `taken` move off it and those with `kept` stay: nothing when no
+/// row stays, and a choice's lanes only the moved rows used go with them.
+/// You stays, rows or none.
+pub fn left_behind(kind: &str, fields: &[Field], taken: &[Value], kept: &[Value]) -> Left {
+    if taken.is_empty() {
+        return Left::As;
+    }
+    if kept.is_empty() && kind != "you" {
+        return Left::Empty;
+    }
+    let words = |rows: &[Value], name: &str| -> Vec<String> {
+        rows.iter()
+            .filter_map(|cells| cells.get(name)?.as_str().map(str::to_string))
+            .collect()
+    };
+    let mut fields = fields.to_vec();
+    let mut dropped = false;
+    for field in fields.iter_mut().filter(|f| f.kind == "choice") {
+        let (went, stay) = (words(taken, &field.name), words(kept, &field.name));
+        let before = field.options.len();
+        field
+            .options
+            .retain(|lane| !went.contains(lane) || stay.contains(lane));
+        dropped |= field.options.len() != before;
+    }
+    if dropped {
+        Left::Lanes(fields)
+    } else {
+        Left::As
+    }
+}
+
 /// A record's id, as the database has it.
 fn id_of(record: &Value) -> Option<Uuid> {
     record.get("id")?.as_str()?.parse().ok()
@@ -812,6 +931,40 @@ pub fn cut(text: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rows_that_move_take_what_only_they_had() {
+        let field = |kind: &str| Field {
+            name: "Part".into(),
+            kind: kind.into(),
+            unit: String::new(),
+            goal: None,
+            options: vec!["Basics".into(), "Notifications".into()],
+        };
+        let (basics, notes) = (
+            [json!({ "Part": "Basics" })],
+            [json!({ "Part": "Notifications" })],
+        );
+        assert_eq!(
+            left_behind("collection", &[field("choice")], &notes, &[]),
+            Left::Empty
+        );
+        assert_eq!(left_behind("you", &[], &[json!({})], &[]), Left::As);
+        let Left::Lanes(fields) = left_behind("collection", &[field("choice")], &notes, &basics)
+        else {
+            panic!("the lane goes");
+        };
+        assert_eq!(fields[0].options, ["Basics"]);
+        // A lane another row stays in stays, and a status keeps its steps.
+        assert_eq!(
+            left_behind("collection", &[field("choice")], &notes, &notes),
+            Left::As
+        );
+        assert_eq!(
+            left_behind("collection", &[field("status")], &notes, &basics),
+            Left::As
+        );
+    }
 
     #[test]
     fn the_brief_keeps_what_they_wrote() {

@@ -111,7 +111,7 @@ export function TalkPanel({
   const own = isOwn(topic);
   // ⌘↩ starts the topic the talk last proposed, until it's started.
   const lastAnswer = messages.findLast((m) => m.role === "almanac");
-  const toStart = lastAnswer?.proposal && !lastAnswer.proposal.topic_id ? lastAnswer.id : null;
+  const toStart = lastAnswer && firstToStart(lastAnswer) !== undefined ? lastAnswer.id : null;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -393,8 +393,21 @@ function Said({
       {message.problem && <Problem text={message.problem} />}
       {message.kept && <p className="text-xs text-muted">{message.kept}</p>}
       {message.proposal && (
-        <Proposed message={message} proposal={message.proposal} toStart={toStart} />
+        <Proposed
+          message={message}
+          proposal={message.proposal}
+          toStart={toStart && firstToStart(message) === null}
+        />
       )}
+      {message.sub_topics.map((proposal, n) => (
+        <Proposed
+          key={proposal.name}
+          message={message}
+          proposal={proposal}
+          subTopic={n}
+          toStart={toStart && firstToStart(message) === n}
+        />
+      ))}
       {message.changes.length > 0 && <Changes message={message} here={topic.id} />}
       {reminders
         .filter((r) => r.status === "offered")
@@ -409,6 +422,16 @@ function Said({
 }
 
 /**
+ * Which of an answer's proposals ⌘↩ starts: its proposal (null), the first
+ * of its sub-topics not started (its place), or none.
+ */
+function firstToStart(message: Message): number | null | undefined {
+  if (message.proposal && !message.proposal.topic_id) return null;
+  const n = message.sub_topics.findIndex((p) => !p.topic_id);
+  return n < 0 ? undefined : n;
+}
+
+/**
  * A topic the workspace's own topic would start, or a sub-topic a topic's
  * talk would, as a card: Start it as it is, or change it first. Once
  * started, a line that opens it.
@@ -416,10 +439,13 @@ function Said({
 function Proposed({
   message,
   proposal,
+  subTopic,
   toStart,
 }: {
   message: Message;
   proposal: Proposal;
+  /** Its place among the answer's sub-topics. */
+  subTopic?: number;
   toStart: boolean;
 }) {
   const { workspace } = useWorkspace();
@@ -432,10 +458,14 @@ function Proposed({
   const [problem, setProblem] = useState("");
 
   const start = useCallback(
-    async (fields: Omit<StartTopicRequest, "from_message">) => {
-      await api("POST", `/api/w/${workspace.id}/topics`, { ...fields, from_message: message.id });
+    async (fields: Omit<StartTopicRequest, "from_message" | "sub_topic">) => {
+      await api("POST", `/api/w/${workspace.id}/topics`, {
+        ...fields,
+        from_message: message.id,
+        sub_topic: subTopic,
+      });
     },
-    [workspace.id, message.id],
+    [workspace.id, message.id, subTopic],
   );
   const startAsIs = useCallback(async () => {
     if (starting) return;

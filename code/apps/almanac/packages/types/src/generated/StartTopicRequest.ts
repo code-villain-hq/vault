@@ -18,4 +18,8 @@ template?: string,
 /**
  * The answer whose proposal this starts.
  */
-from_message?: string, };
+from_message?: string, 
+/**
+ * Which of its sub-topics, counting from 0; its proposal without.
+ */
+sub_topic?: number, };

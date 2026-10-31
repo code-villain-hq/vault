@@ -26,6 +26,10 @@ elsewhere: string | null,
  */
 proposal: Proposal | null, 
 /**
+ * The sub-topics a topic's talk proposes, each started on its own.
+ */
+sub_topics: Array<Proposal>, 
+/**
  * What the answer changed in topics you named, for Undo.
  */
 changes: Array<TopicChange>, 

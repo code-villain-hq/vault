@@ -36,6 +36,8 @@ const NEXT_POSITION: &str = "SELECT COALESCE(max(position) + 1, 0) FROM blocks \
      WHERE workspace_id = $1 AND topic_id = $2 AND row_id IS NULL";
 const TOPIC_BY_ID: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
      FROM topics WHERE workspace_id = $1 AND id = $2";
+/// The sub-topics one answer proposes, at most.
+const MOST_SUB_TOPICS: usize = 6;
 const NAMES: &str = "SELECT name FROM topics WHERE workspace_id = $1 ORDER BY position";
 
 /// What a question is for, and so which tools it gets.
@@ -410,20 +412,46 @@ async fn call(
                 ));
             }
             args.group = group;
-            let takes = kept()?
-                .taken(&args.takes)?
-                .into_iter()
-                .map(|(id, _)| id)
-                .collect();
+            let taken = kept()?.taken(&args.takes)?;
             let mut proposal = propose(state, asking, args).await?;
+            {
+                let guard = kept()?;
+                let other = guard
+                    .sub_topics
+                    .iter()
+                    .filter(|p| !p.name.eq_ignore_ascii_case(&proposal.name));
+                for other in other {
+                    if let Some((_, what)) = taken.iter().find(|(id, _)| other.takes.contains(id)) {
+                        return Err(format!(
+                            "{what} goes to {} already: each thing moves to one sub-topic.",
+                            other.name
+                        ));
+                    }
+                }
+            }
             proposal.parent_id = Some(asking.topic_id);
-            proposal.takes = takes;
-            let replaced = kept()?.proposal.replace(proposal).is_some();
-            Ok(if replaced {
-                "Proposed, in place of the one before."
-            } else {
-                "Proposed. They see it as a card under your answer, with Start and Change. \
-                 It isn't started until they click Start."
+            proposal.takes = taken.into_iter().map(|(id, _)| id).collect();
+            let mut guard = kept()?;
+            let same = guard
+                .sub_topics
+                .iter()
+                .position(|p| p.name.eq_ignore_ascii_case(&proposal.name));
+            Ok(match same {
+                Some(n) => {
+                    guard.sub_topics[n] = proposal;
+                    "Proposed, in place of the one before by that name."
+                }
+                None if guard.sub_topics.len() >= MOST_SUB_TOPICS => {
+                    return Err(format!(
+                        "An answer proposes at most {MOST_SUB_TOPICS} sub-topics: the rest can come in the next."
+                    ));
+                }
+                None => {
+                    guard.sub_topics.push(proposal);
+                    "Proposed. They see it as a card under your answer, with Start and Change; \
+                     it isn't started until they click Start. Propose each other sub-topic they \
+                     asked for too, in this answer: each gets its own card."
+                }
             }
             .into())
         }
@@ -479,7 +507,7 @@ async fn call(
             let mut guard = kept()?;
             // Off this page as a removal, which Undo puts back; on the
             // sub-topic's as what it made, which Undo takes off.
-            guard.remove_ids(&ids)?;
+            guard.move_off(&ids)?;
             guard.in_sub_topics.extend(moved.made);
             guard.changes.push(TopicChange {
                 topic_id: child,
@@ -1362,7 +1390,9 @@ fn tools(mode: Mode) -> Vec<Value> {
                  start with a click or change first. Only when they ask for one. What this page \
                  keeps about it goes in takes and moves there on Start, with its pages, so \
                  nothing is kept twice; with takes, the page is what's taken, and the template \
-                 lays out nothing. One per answer.",
+                 lays out nothing. What the move empties here goes with it: a block no row \
+                 stays in, a lane none does. Call it once for each sub-topic they ask for, in \
+                 the same answer: each is its own card.",
                 sub_topic,
                 &["name", "sticks_to", "icon", "template", "starters"],
             ),
@@ -1370,7 +1400,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "move_to_sub_topic",
                 "Moves what this page keeps about one of its sub-topics there, when they ask: \
                  blocks, and rows with a page of their own, whose page goes whole. It leaves this \
-                 page, so nothing is kept twice. The only change you make outside this topic.",
+                 page, so nothing is kept twice, and what it empties here goes with it: a block \
+                 no row stays in, a lane none does. The only change you make outside this topic.",
                 json!({
                     "to": string("The sub-topic's name, as the page names it."),
                     "takes": {

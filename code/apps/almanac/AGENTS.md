@@ -227,9 +227,10 @@ What they do:
     (`page.rs`). The sidebar indents them under the parent, the parent's
     page opens with their tiles (`SubTopics`), and About moves a topic
     under another (`TopicParent`). Deleting the parent leaves them, at the
-    top. A topic's talk proposes one under its own topic with
-    propose_sub_topic, as the own topic proposes a topic: a card with
-    Start, its `parent_id` set. What the parent's page keeps about it goes in
+    top. A topic's talk proposes them under its own topic with
+    propose_sub_topic, as the own topic proposes a topic: a card each
+    (`sub_topics` on the message, migration 0021, started by their place,
+    `sub_topic`), with Start, its `parent_id` set. What the parent's page keeps about it goes in
     its `takes` (blocks, and rows with a page of their own) and moves on
     Start (`take` in `topics.rs`): made again in the sub-topic, a row's page
     as its own page, and gone from the parent, so nothing is kept twice. A
@@ -238,7 +239,9 @@ What they do:
     change a talk makes outside its topic: off the parent's page as a
     removal and onto the sub-topic's as what it made (`in_sub_topics` on
     `Kept`, and a `TopicChange` for the sub-topic), so one Undo puts both
-    back.
+    back. Both moves take along what they empty (`left_behind`): a block
+    no row stays in, and a choice's lanes no row stays in; in words, only
+    those are removed, not what moved.
 
   Pages from before the set move into it once, on the server's start
   (`convert.rs`, a rule per old kind, the same for every topic): text,

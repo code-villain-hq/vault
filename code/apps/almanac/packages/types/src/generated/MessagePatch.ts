@@ -2,4 +2,4 @@
 import type { Proposal } from "./Proposal";
 import type { TopicChange } from "./TopicChange";
 
-export type MessagePatch = { kept?: string, elsewhere?: string, proposal?: Proposal, changes?: Array<TopicChange>, };
+export type MessagePatch = { kept?: string, elsewhere?: string, proposal?: Proposal, sub_topics?: Array<Proposal>, changes?: Array<TopicChange>, };

@@ -68,6 +68,8 @@ pub struct Message {
     pub elsewhere: Option<String>,
     /// A topic the workspace's own topic proposes, to start with a click.
     pub proposal: Option<Proposal>,
+    /// The sub-topics a topic's talk proposes, each started on its own.
+    pub sub_topics: Vec<Proposal>,
     /// What the answer changed in topics you named, for Undo.
     pub changes: Vec<TopicChange>,
     /// The photos a question came with, in order. Their bytes don't sync:
@@ -285,6 +287,7 @@ pub struct MessageCreate {
     pub problem: Option<String>,
     pub elsewhere: Option<String>,
     pub proposal: Option<Proposal>,
+    pub sub_topics: Option<Vec<Proposal>>,
     pub changes: Option<Vec<TopicChange>>,
     pub photos: Option<Vec<Photo>>,
 }
@@ -296,6 +299,7 @@ pub struct MessagePatch {
     pub kept: Option<String>,
     pub elsewhere: Option<String>,
     pub proposal: Option<Proposal>,
+    pub sub_topics: Option<Vec<Proposal>>,
     pub changes: Option<Vec<TopicChange>>,
 }
 

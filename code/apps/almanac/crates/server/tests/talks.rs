@@ -258,7 +258,7 @@ async fn without_a_key_the_talk_says_where_to_add_one(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
+async fn sub_topics_take_what_their_parent_kept_about_them(pool: PgPool) {
     let app = App::new(pool.clone());
     let (ada, home) = app.signup("Ada", "Home").await;
     let started = app
@@ -275,15 +275,21 @@ async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
         json!({ "action": "create", "model": "Point", "id": uuid::Uuid::now_v7(),
             "data": { "topic_id": parent, "block_id": block, "text": text } })
     };
+    let part = json!([{ "name": "Part", "kind": "choice", "unit": "", "goal": null,
+        "options": ["Basics", "Notifications"] }]);
     let wrote = app
         .sync(
             &ada,
             &home,
             json!([
                 { "action": "create", "model": "Block", "id": reading,
-                  "data": { "topic_id": parent, "kind": "collection", "title": "Reading" } },
+                  "data": { "topic_id": parent, "kind": "collection", "title": "Reading", "fields": part } },
                 { "action": "create", "model": "Point", "id": lesson,
-                  "data": { "topic_id": parent, "block_id": reading, "text": "Lesson 1" } },
+                  "data": { "topic_id": parent, "block_id": reading, "text": "Lesson 1",
+                            "cells": { "Part": "Notifications" } } },
+                { "action": "create", "model": "Point", "id": uuid::Uuid::now_v7(),
+                  "data": { "topic_id": parent, "block_id": reading, "text": "Lesson 0",
+                            "cells": { "Part": "Basics" } } },
                 { "action": "create", "model": "Block", "id": page,
                   "data": { "topic_id": parent, "kind": "paragraph", "title": "The sketch", "row_id": lesson } },
                 point(page, "**Caller**: who starts it."),
@@ -296,7 +302,8 @@ async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
         .await;
     assert_eq!(wrote.status, StatusCode::OK, "{}", wrote.text);
 
-    // A talk of the parent proposed it, taking the lesson's page.
+    // A talk of the parent proposed two in one answer: one taking the
+    // lesson's page, one the plan.
     let (talk, message) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
     let workspace: uuid::Uuid = home.parse().unwrap();
     let parent_id: uuid::Uuid = parent.parse().unwrap();
@@ -309,32 +316,58 @@ async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
     .execute(&pool)
     .await
     .unwrap();
-    let proposal = json!({
-        "name": "Notifications", "sticks_to": "Lesson 1.", "icon": "book", "group_name": "",
-        "template": "study", "fields": [], "starters": [], "points": [], "reminders": [],
-        "topic_id": null, "parent_id": parent, "takes": [lesson],
-    });
+    let proposal = |name: &str, takes: uuid::Uuid| {
+        json!({
+            "name": name, "sticks_to": "Its part.", "icon": "book", "group_name": "",
+            "template": "study", "fields": [], "starters": [], "points": [], "reminders": [],
+            "topic_id": null, "parent_id": parent, "takes": [takes],
+        })
+    };
     sqlx::query(
-        "INSERT INTO messages (id, workspace_id, talk_id, topic_id, role, text, proposal) \
-         VALUES ($1, $2, $3, $4, 'almanac', 'Here it is.', $5)",
+        "INSERT INTO messages (id, workspace_id, talk_id, topic_id, role, text, sub_topics) \
+         VALUES ($1, $2, $3, $4, 'almanac', 'Here they are.', $5)",
     )
     .bind(message)
     .bind(workspace)
     .bind(talk)
     .bind(parent_id)
-    .bind(&proposal)
+    .bind(json!([
+        proposal("Notifications", lesson),
+        proposal("Planning", plan)
+    ]))
     .execute(&pool)
     .await
     .unwrap();
-    let started = app
+    let start = |name: &'static str, n: u32| {
+        let app = &app;
+        let (ada, home) = (&ada, &home);
+        async move {
+            let started = app
+                .post(
+                    &format!("/api/w/{home}/topics"),
+                    Some(ada),
+                    json!({ "name": name, "from_message": message, "sub_topic": n }),
+                )
+                .await;
+            assert_eq!(started.status, StatusCode::CREATED, "{}", started.body);
+            started.body["id"].as_str().unwrap().to_string()
+        }
+    };
+    let child = start("Notifications", 0).await;
+    let planning = start("Planning", 1).await;
+    // Each once.
+    let again = app
         .post(
             &format!("/api/w/{home}/topics"),
             Some(&ada),
-            json!({ "name": "Notifications", "from_message": message }),
+            json!({ "name": "Planning", "from_message": message, "sub_topic": 1 }),
         )
         .await;
-    assert_eq!(started.status, StatusCode::CREATED, "{}", started.body);
-    let child = started.body["id"].as_str().unwrap().to_string();
+    assert_eq!(again.status, StatusCode::CONFLICT, "{}", again.body);
+    let messages = app.synced(&ada, &home, "Message").await;
+    let said = messages.iter().find(|m| m["id"] == json!(message)).unwrap();
+    assert_eq!(said["sub_topics"][0]["topic_id"], json!(child));
+    assert_eq!(said["sub_topics"][1]["topic_id"], json!(planning));
 
     let blocks = app.synced(&ada, &home, "Block").await;
     let of = |topic: &str| -> Vec<String> {
@@ -358,14 +391,18 @@ async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
         .find(|b| b["topic_id"] == child.as_str() && b["kind"] == "paragraph")
         .unwrap();
     assert!(sketch["row_id"].is_null());
-    // The parent keeps the rest, without the lesson or its page.
+    assert_eq!(of(&planning), ["collection:Plan", "you:You"]);
+    // The parent keeps the rest: Reading without the lesson, its page or
+    // the lane only it was in.
     let left = of(&parent);
     assert!(left.contains(&"collection:Reading".to_string()), "{left:?}");
-    assert!(left.contains(&"collection:Plan".to_string()), "{left:?}");
+    assert!(!left.contains(&"collection:Plan".to_string()), "{left:?}");
     assert!(
         !left.contains(&"paragraph:The sketch".to_string()),
         "{left:?}"
     );
+    let reading = blocks.iter().find(|b| b["id"] == json!(reading)).unwrap();
+    assert_eq!(reading["fields"][0]["options"], json!(["Basics"]));
     let points = app.synced(&ada, &home, "Point").await;
     let texts = |topic: &str| -> Vec<&str> {
         points
@@ -381,5 +418,6 @@ async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
             "**Failures**: what if the store is down."
         ]
     );
-    assert_eq!(texts(&parent), ["Week 1"]);
+    assert_eq!(texts(&planning), ["Week 1"]);
+    assert_eq!(texts(&parent), ["Lesson 0"]);
 }

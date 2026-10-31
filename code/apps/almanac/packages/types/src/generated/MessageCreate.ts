@@ -4,4 +4,4 @@ import type { Proposal } from "./Proposal";
 import type { Source } from "./Source";
 import type { TopicChange } from "./TopicChange";
 
-export type MessageCreate = { talk_id: string, topic_id: string, role: string, text: string, sources?: Array<Source>, kept?: string, problem?: string, elsewhere?: string, proposal?: Proposal, changes?: Array<TopicChange>, photos?: Array<Photo>, };
+export type MessageCreate = { talk_id: string, topic_id: string, role: string, text: string, sources?: Array<Source>, kept?: string, problem?: string, elsewhere?: string, proposal?: Proposal, sub_topics?: Array<Proposal>, changes?: Array<TopicChange>, photos?: Array<Photo>, };

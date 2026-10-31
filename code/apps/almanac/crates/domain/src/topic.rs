@@ -591,6 +591,8 @@ pub struct StartTopicRequest {
     pub template: Option<String>,
     /// The answer whose proposal this starts.
     pub from_message: Option<Uuid>,
+    /// Which of its sub-topics, counting from 0; its proposal without.
+    pub sub_topic: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

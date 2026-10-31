@@ -753,11 +753,27 @@ async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) 
             .map(|b| b["title"].as_str().unwrap().to_string())
             .collect()
     };
+    // What moved says so there; here only Reading, which it left empty,
+    // is removed in words.
+    let here: Vec<&str> = changes
+        .iter()
+        .filter(|c| c["topic_id"] == backend)
+        .filter_map(|c| c["said"].as_str())
+        .chain(moved["kept"].as_str())
+        .collect();
+    assert!(here.iter().any(|s| s.contains("Reading")), "{moved}");
+    assert!(
+        !here
+            .iter()
+            .any(|s| s.contains("sketch") || s.contains("paragraph")),
+        "{moved}"
+    );
     let blocks = app.synced(&ada, &home, "Block").await;
     // The lesson's page is on the sub-topic's own page now, and off the
-    // parent's with its row.
+    // parent's with its row, and Reading, with no row left, with them.
     assert!(on(&blocks, &notifications).contains(&"The sketch".to_string()));
     assert!(!on(&blocks, &backend).contains(&"The sketch".to_string()));
+    assert!(!on(&blocks, &backend).contains(&"Reading".to_string()));
     let points = app.synced(&ada, &home, "Point").await;
     let caller = points
         .iter()
@@ -779,6 +795,7 @@ async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) 
     assert!(undone.status.is_success(), "{}", undone.body);
     let blocks = app.synced(&ada, &home, "Block").await;
     assert!(!on(&blocks, &notifications).contains(&"The sketch".to_string()));
+    assert!(on(&blocks, &backend).contains(&"Reading".to_string()));
     let back = blocks
         .iter()
         .find(|b| b["id"] == sketch.to_string())
