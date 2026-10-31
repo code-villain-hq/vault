@@ -1240,10 +1240,15 @@ function BlockFrame({
       className="group/block flex scroll-mt-6 flex-col gap-2"
       aria-label={title || blockName(block)}
     >
-      <div className="flex min-h-6 items-center gap-2">
-        {title && <h2 className={lead ? "font-semibold" : "text-xs text-faint"}>{title}</h2>}
-        <span className="ml-auto flex items-center gap-3">
-          {aside}
+      <div className="relative flex min-h-6 items-center gap-2">
+        {title && (
+          <h2 className={`min-w-0 truncate ${lead ? "font-semibold" : "text-xs text-faint"}`}>
+            {title}
+          </h2>
+        )}
+        {aside && <span className="ml-auto shrink-0">{aside}</span>}
+        {/* Over the line on hover, so a half block's title keeps its room. */}
+        <span className="absolute inset-y-0 right-0 flex items-center gap-3 bg-bg pl-3 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
           <ViewAs block={block} />
           <BlockMenu block={block} blocks={blocks} className="group-hover/block:opacity-100" />
         </span>

@@ -278,7 +278,7 @@ export function ChecklistCount({ block, rows }: { block: Block; rows: Point[] })
   if (!check) return null;
   const done = rows.filter((r) => itemDone(r, check, rings.get(r.id))).length;
   return (
-    <span className="flex items-center gap-2 text-xs text-faint tabular-nums">
+    <span className="flex items-center gap-2 whitespace-nowrap text-xs text-faint tabular-nums">
       <span aria-hidden="true" className="block h-1.5 w-16 rounded-full bg-chip">
         <span
           className={`block h-full rounded-full ${done === rows.length ? "bg-ok" : "bg-info"}`}
@@ -395,23 +395,48 @@ function Pills({ fields, row }: { fields: Field[]; row: Point }) {
   ) : null;
 }
 
+/** A lane's solid colour: a status open, under way or done; a choice's own. */
+function laneColour(field: Field, at: number, lanes: number) {
+  if (field.kind !== "status") return CHOICE_DOTS[at % CHOICE_DOTS.length];
+  return at === 0 ? "bg-faint" : at === lanes - 1 ? "bg-ok" : "bg-info";
+}
+
 /**
- * How many rows each status or choice has, over a collection's picture: a
- * figure each, and one bar of them all, open first and done last.
+ * How many rows each status or choice has, over a collection's picture:
+ * one bar of them all, open first and done last, and each lane's count
+ * under it. Only when it groups: two lanes or more, and one with two rows.
  */
 export function Tally({ rows, field }: { rows: Point[]; field: Field }) {
   const lanes = lanesOf(field, rows);
   const counts = lanes.map((lane) => rows.filter((row) => cellOf(row, field) === lane).length);
-  if (counts.filter((n) => n > 0).length < 2) return null;
+  if (counts.filter((n) => n > 0).length < 2 || Math.max(...counts) < 2) return null;
+  const all = counts.reduce((a, b) => a + b, 0);
   return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(8rem,100%),1fr))] gap-2">
-        {lanes.map((lane, i) => (
-          <div key={lane} className="flex flex-col gap-0.5 rounded-lg bg-surface px-3.5 py-2.5">
-            <span className="font-semibold text-2xl tabular-nums leading-tight">{counts[i]}</span>
-            <Pill field={field} value={lane} />
-          </div>
-        ))}
+    <div className="flex flex-col gap-1.5">
+      <div aria-hidden="true" className="flex h-2 gap-0.5 overflow-hidden rounded-full">
+        {lanes.map((lane, i) =>
+          counts[i] ? (
+            <span
+              key={lane}
+              className={laneColour(field, i, lanes.length)}
+              style={{ width: `${(counts[i] / all) * 100}%` }}
+            />
+          ) : null,
+        )}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+        {lanes.map((lane, i) =>
+          counts[i] ? (
+            <span key={lane} className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={`size-2 rounded-full ${laneColour(field, i, lanes.length)}`}
+              />
+              {lane}
+              <span className="font-semibold text-fg tabular-nums">{counts[i]}</span>
+            </span>
+          ) : null,
+        )}
       </div>
     </div>
   );
@@ -429,7 +454,7 @@ function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
     shown[0];
   const others = shown.filter((f) => f !== value);
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(10rem,100%),1fr))] gap-2.5">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-2.5">
       {rows.map((row) => {
         const cell = value && cellOf(row, value);
         const words = value ? cellWords(value, cell) : "";
@@ -554,7 +579,10 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
   const day = of("day");
   const number = of("number");
   // What's measured, over the picture, unless the block's title says it already.
-  const heading = number && number.name !== block.title ? number.name : undefined;
+  const heading =
+    number && !block.title.toLowerCase().includes(number.name.toLowerCase())
+      ? number.name
+      : undefined;
   const check = checkOf(block);
   switch (block.view) {
     case "line":
@@ -792,7 +820,7 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
                 return (
                   <td
                     key={field.name}
-                    className={`${cell} max-w-64 truncate ${field.kind === "number" ? "text-right" : ""} ${field.kind === "check" ? "text-ok-ink" : ""}`}
+                    className={`${cell} ${field.kind === "text" ? "min-w-40 whitespace-normal" : "max-w-64 truncate"} ${field.kind === "number" ? "text-right" : ""} ${field.kind === "check" ? "text-ok-ink" : ""}`}
                   >
                     {TOLD_BY_TONE.has(field.kind) && typeof value === "string" ? (
                       <Pill field={field} value={value} />
@@ -923,7 +951,7 @@ function RowBars({
   const told = fields.find((f) => TOLD_BY_TONE.has(f.kind));
   const fill = (row: Point) => {
     const cell = told && cellOf(row, told);
-    if (!told || typeof cell !== "string") return "bg-fg/40";
+    if (!told || typeof cell !== "string") return "bg-accent";
     const at = told.options.indexOf(cell);
     if (told.kind === "choice") return at >= 0 ? CHOICE_DOTS[at % CHOICE_DOTS.length] : "bg-faint";
     return at > 0 && at === told.options.length - 1 ? "bg-ok" : at > 0 ? "bg-info" : "bg-faint";
