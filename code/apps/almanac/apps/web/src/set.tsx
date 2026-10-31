@@ -74,6 +74,21 @@ export function Photo({ id, className }: { id: string; className: string }) {
   );
 }
 
+/** A row's photo, small, at the start of its line, when its collection keeps one. */
+function Thumb({
+  row,
+  fields,
+  className = "size-8",
+}: {
+  row: Point;
+  fields: Field[];
+  className?: string;
+}) {
+  const photo = fields.find((f) => f.kind === "photo");
+  const id = photo && cellOf(row, photo);
+  return typeof id === "string" ? <Photo id={id} className={`rounded-md ${className}`} /> : null;
+}
+
 /**
  * Where a point comes from, if the page shows it: a name or a link. "From
  * Grok" and "From the talk" say only which talk, which a section's own
@@ -1117,6 +1132,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                     className="group flex items-start gap-2 rounded-md bg-surface px-3 py-2"
                   >
                     <NewDot point={row} className="mt-2" />
+                    <Thumb row={row} fields={fields} className="size-10" />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <RowName row={row} className="line-clamp-2 break-words" />
                       {words && <span className="truncate text-xs text-faint">{words}</span>}
@@ -1221,7 +1237,10 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
           {rows.map((row) => (
             <tr key={row.id} className="[&>td]:hover:bg-hover">
               <td className={`${cell} max-w-72 truncate font-semibold`}>
-                <RowName row={row} />
+                <span className="flex items-center gap-2.5">
+                  <Thumb row={row} fields={fields} className="size-6" />
+                  <RowName row={row} className="truncate" />
+                </span>
               </td>
               {columns.map((field) => {
                 const value = cellOf(row, field);
@@ -1282,6 +1301,7 @@ function RowTimeline({ rows, day, fields }: { rows: Point[]; day: Field; fields:
         return (
           <TimelineLine key={row.id} year={label} span={at?.span ?? false} seen={row.seen}>
             <div className="flex min-w-0 items-start gap-2 py-[5px]">
+              <Thumb row={row} fields={fields} className="size-10" />
               <p className="min-w-0 flex-1">
                 {!row.seen && <span className="sr-only">New: </span>}
                 <RowName row={row} />
@@ -1425,6 +1445,7 @@ function RowBars({
             >
               <span className="flex min-w-0 items-center gap-2">
                 <NewDot point={row} />
+                <Thumb row={row} fields={fields} className="size-7" />
                 <RowName row={row} className="line-clamp-2 min-w-0" />
               </span>
               <span aria-hidden="true" className="relative block h-2.5 rounded-full bg-chip">
@@ -1477,6 +1498,7 @@ function RowChecklist({ rows, check, fields }: { rows: Point[]; check: Field; fi
           <li key={row.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
             <Tick row={row} check={check} reminder={reminder} className="self-center" />
             <NewDot point={row} className="self-center" />
+            <Thumb row={row} fields={fields} className="size-8 self-center" />
             <p className={`min-w-0 flex-1 ${done ? "text-faint" : ""}`}>
               <RowName row={row} />
               {words && <span className="text-muted"> · {words}</span>}
@@ -1574,6 +1596,7 @@ function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
         return (
           <li key={row.id} className="group flex items-baseline gap-2 rounded-md px-2.5 py-1.5">
             <NewDot point={row} className="self-center" />
+            <Thumb row={row} fields={fields} className="size-8 self-center" />
             <p className="min-w-0 flex-1">
               {/* A name alone is the line; beside its cells it leads. */}
               <RowName row={row} className={fields.length > 0 ? "font-semibold" : ""} />

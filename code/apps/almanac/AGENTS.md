@@ -84,6 +84,12 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   5 MB) and stay in `photos`, which doesn't sync: the message names them
   (id and size) and the app fetches each one (`GET
   /api/w/{id}/photos/{photo}`, `photos.rs`). They go with their message.
+- A page's other pictures are photos with no message (`POST
+  /api/w/{id}/photos`): a topic's `cover`, and a row's photo cell, dropped
+  on or picked in `pictures.tsx`. A talk keeps one from the web with
+  `fetch_picture` (public https only, the page's og:image, 5 MB at most)
+  and sets the cover with `set_cover`. Rows with a photo show it small on
+  their line in every view.
 
 Settings → Claude isn't synced. `GET /api/w/{id}/claude` says who answers:
 on this Mac Claude Code (`via` `claude_code`, with whether it's ready),

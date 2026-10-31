@@ -49,6 +49,7 @@ import {
   useDrop,
   usePicking,
 } from "./picking";
+import { CoverHead, RowPhoto } from "./pictures";
 import { about, inline } from "./prose";
 import { NotifyBell, ReminderMenu } from "./reminders";
 import { samples } from "./samples";
@@ -64,6 +65,7 @@ import {
   Opens,
   type PageTo,
   Paragraphs,
+  Photo,
   useItemReminders,
 } from "./set";
 import type { Schema } from "./sync";
@@ -512,8 +514,10 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
 
   return (
     <>
-      {parent && <UpTo topic={parent} />}
-      <TitleToAbout topic={topic} />
+      <CoverHead topic={topic}>
+        {parent && <UpTo topic={parent} />}
+        <TitleToAbout topic={topic} />
+      </CoverHead>
       <NoKey />
       {page.questions.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
@@ -618,19 +622,22 @@ function RowFields({ row }: { row: Point }) {
   return (
     <section className="-mt-6 flex flex-col gap-3" aria-label={`In ${block.title}`}>
       <p className="text-muted">in {block.title || "a collection"}</p>
+      <RowPhoto block={block} row={row} />
       {block.fields.length > 0 && (
         <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(10rem,100%),1fr))] gap-2.5">
-          {block.fields.map((field) => (
-            <div
-              key={field.name}
-              className="flex min-w-0 flex-col-reverse justify-end gap-1 rounded-lg bg-surface px-4 py-3"
-            >
-              <dt className="text-xs text-muted">{field.name}</dt>
-              <dd className="flex min-w-0 flex-col gap-2">
-                <FieldValue field={field} row={row} rows={rows} />
-              </dd>
-            </div>
-          ))}
+          {block.fields
+            .filter((f) => f.kind !== "photo")
+            .map((field) => (
+              <div
+                key={field.name}
+                className="flex min-w-0 flex-col-reverse justify-end gap-1 rounded-lg bg-surface px-4 py-3"
+              >
+                <dt className="text-xs text-muted">{field.name}</dt>
+                <dd className="flex min-w-0 flex-col gap-2">
+                  <FieldValue field={field} row={row} rows={rows} />
+                </dd>
+              </div>
+            ))}
         </dl>
       )}
     </section>
@@ -1802,8 +1809,11 @@ function TopicTile({
       to="/$workspace/topics/$topic"
       params={{ workspace: workspace.url_key, topic: topic.id }}
       title={about(topic.sticks_to) || undefined}
-      className="flex min-w-0 flex-1 flex-col gap-3 rounded-lg bg-surface px-4 py-3 hover:bg-hover"
+      className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden rounded-lg bg-surface px-4 py-3 hover:bg-hover"
     >
+      {topic.cover && (
+        <Photo id={topic.cover} className="-mx-4 -mt-3 h-24 w-[calc(100%+2rem)] max-w-none" />
+      )}
       <span className="flex items-center gap-2">
         <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-muted" />
         <span className="min-w-0 truncate font-semibold">{topic.name}</span>
