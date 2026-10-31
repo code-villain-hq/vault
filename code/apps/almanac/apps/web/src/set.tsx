@@ -23,9 +23,11 @@ import {
   addDays,
   amountWords,
   dateWords,
+  dayOfMonth,
   dueWords,
   rhythmWords,
   today,
+  weekdayShort,
   weekdayWords,
 } from "./format";
 import { usePhoto } from "./photos";
@@ -1016,6 +1018,12 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
 /** A table: a row per row, its name first, a column per field it fills. Photos stay on cards. */
 function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields: Field[] }) {
   const columns = fields.filter((f) => f.kind !== "photo");
+  // A number's bar is on its column's largest, so the column reads at a glance.
+  const most = new Map(
+    columns
+      .filter((f) => f.kind === "number" && rows.length > 1)
+      .map((f) => [f.name, Math.max(...rows.map((r) => Math.abs(numberOf(r, f) ?? 0)))]),
+  );
   const cell = "h-[34px] border-line border-r border-b px-3 last:border-r-0";
   const header =
     "h-8 border-line border-r border-b bg-surface px-3 text-left font-semibold text-xs text-muted last:border-r-0";
@@ -1055,6 +1063,21 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
                   >
                     {TOLD_BY_TONE.has(field.kind) && typeof value === "string" ? (
                       <Pill field={field} value={value} />
+                    ) : typeof value === "number" && most.get(field.name) ? (
+                      <span className="flex items-center justify-end gap-2.5">
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-chip"
+                        >
+                          <span
+                            className="block h-full rounded-full bg-accent"
+                            style={{
+                              width: `${(Math.abs(value) / (most.get(field.name) ?? 1)) * 100}%`,
+                            }}
+                          />
+                        </span>
+                        {words}
+                      </span>
                     ) : (
                       words || <span className="text-faint">–</span>
                     )}
@@ -1128,13 +1151,28 @@ function Week({ rows, day }: { rows: Point[]; day: Field }) {
           return (
             <div
               key={key}
+              title={weekdayWords(key)}
               aria-current={key === now ? "date" : undefined}
-              className="flex min-h-16 min-w-0 flex-col gap-1 rounded-md bg-surface p-2 aria-[current=date]:bg-selected"
+              className="flex min-h-20 min-w-0 flex-col gap-1.5 rounded-md bg-surface p-2 aria-[current=date]:bg-selected"
             >
-              <span className="text-xs text-muted">{weekdayWords(key)}</span>
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                <span
+                  className={`font-semibold text-xl tabular-nums leading-none ${key === now ? "text-accent" : due.length ? "" : "text-faint"}`}
+                >
+                  {dayOfMonth(key)}
+                </span>
+                <span className="text-xs text-muted">{weekdayShort(key)}</span>
+              </span>
               {due.map((row) => (
-                <span key={row.id} className="truncate text-xs" title={row.text}>
-                  <RowName row={row} />
+                <span
+                  key={row.id}
+                  className="flex min-w-0 items-center gap-1.5 text-xs"
+                  title={row.text}
+                >
+                  <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-accent" />
+                  <span className="truncate">
+                    <RowName row={row} />
+                  </span>
                 </span>
               ))}
               {due.length === 0 && <span className="sr-only">Nothing</span>}

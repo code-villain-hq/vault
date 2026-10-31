@@ -220,21 +220,33 @@ export function samples(): Sample[] {
     ),
     sample(
       "Collection: table",
-      "A name and two fields or more draw a table, a column per field.",
+      "A name and two fields or more draw a table, a column per field, a number with a bar on its column's largest.",
       plants,
       "collection",
       "Plants",
       (p) => [
         p("", "Monstera", {
-          cells: { Light: "Bright, indirect", Water: "Weekly", "Safe for cats": false },
+          cells: {
+            Light: "Bright, indirect",
+            Water: "Weekly",
+            Height: 120,
+            "Safe for cats": false,
+          },
         }),
         p("", "Spider plant", {
-          cells: { Light: "Bright", Water: "Weekly", "Safe for cats": true },
+          cells: { Light: "Bright", Water: "Weekly", Height: 30, "Safe for cats": true },
         }),
-        p("", "Snake plant", { cells: { Light: "Any", Water: "Monthly", "Safe for cats": false } }),
+        p("", "Snake plant", {
+          cells: { Light: "Any", Water: "Monthly", Height: 70, "Safe for cats": false },
+        }),
       ],
       {
-        fields: [field("Light", "choice"), field("Water", "text"), field("Safe for cats", "check")],
+        fields: [
+          field("Light", "choice"),
+          field("Water", "text"),
+          field("Height", "number", { unit: "cm" }),
+          field("Safe for cats", "check"),
+        ],
       },
     ),
     sample(
