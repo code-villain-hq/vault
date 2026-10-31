@@ -68,6 +68,7 @@ import {
 } from "./set";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
+import { Today } from "./today";
 import { Button, Empty } from "./ui";
 import { ownWidth, shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
@@ -1621,6 +1622,7 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
             />
             {todo > 0 && <Overall label="Ticked off" value={`${done}/${todo}`} />}
           </dl>
+          <Today topics={others} />
           <ul
             aria-label="Topics"
             className="grid grid-cols-[repeat(auto-fill,minmax(min(14rem,100%),1fr))] gap-2.5"

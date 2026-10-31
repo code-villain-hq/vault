@@ -273,7 +273,7 @@ them into notifications. A server with no Mac listening marks nothing.
   row, its fields above, which its name opens in every picture, `Opens`) and its About (`?about`), `talk.tsx` the talk beside it,
   `asking.tsx` the answers on their way and each topic's open talk (above
   the pages, so they last while you look elsewhere), `calendar.tsx`
-  Calendar, `settings.tsx` Settings → Claude and Blocks, every kind drawn
+  Calendar, `today.tsx` what's due today on the workspace's own page (a ring and chips to tick), `settings.tsx` Settings → Claude and Blocks, every kind drawn
   look-only with the page's own components from `samples.ts`. Keep
   `samples.ts` up to date with the kinds and views. Its workspaces come from
   places (`server.ts`): this Mac, the server it came from, or servers the
