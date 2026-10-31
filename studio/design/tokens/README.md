@@ -26,6 +26,9 @@ The source also publishes tint opacities (`status-tint`, `chip-tint`,
 semantic hue seeds and a minimum text contrast of 4.6:1, leaving room above
 AA's 4.5:1 floor. Contrast 100 raises that target to 7:1. Live dots use
 `signal`, held at the 3:1 non-text floor.
+The six data hues (`data-1` to `data-6`) are the syntax hues in their
+shared lightness, in the order violet, cyan, pink, blue, amber, teal:
+blue, amber and teal sit near info, warn and ok, so they come last.
 CSS exposes the opacities as percentages; Swift exposes fractions in
 `ColorTokens.Opacity` and the target in `ColorTokens.Contrast`. Apps needing
 numerical colours consume generated `color.resolved.json`, not the source

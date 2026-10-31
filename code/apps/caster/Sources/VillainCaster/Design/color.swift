@@ -52,6 +52,12 @@ enum ColorTokens {
     let statusWarnInk: String
     let statusInfoInk: String
     let statusNeutralInk: String
+    let data1: String
+    let data2: String
+    let data3: String
+    let data4: String
+    let data5: String
+    let data6: String
   }
 
   static let night = Theme(
@@ -82,7 +88,13 @@ enum ColorTokens {
     statusOkInk: "#5CC9A7",
     statusWarnInk: "#E9AE45",
     statusInfoInk: "#7AAEF5",
-    statusNeutralInk: "#9B9B9B"
+    statusNeutralInk: "#9B9B9B",
+    data1: "#BAB4FB",
+    data2: "#68CFE4",
+    data3: "#F3A3BC",
+    data4: "#94C0FE",
+    data5: "#E1B671",
+    data6: "#76D3B4"
   )
 
   static let day = Theme(
@@ -113,6 +125,12 @@ enum ColorTokens {
     statusOkInk: "#006A53",
     statusWarnInk: "#7D5600",
     statusInfoInk: "#2E5E9E",
-    statusNeutralInk: "#555555"
+    statusNeutralInk: "#555555",
+    data1: "#5B5197",
+    data2: "#006979",
+    data3: "#8D3F5C",
+    data4: "#305D9A",
+    data5: "#7B5500",
+    data6: "#006E55"
   )
 }
