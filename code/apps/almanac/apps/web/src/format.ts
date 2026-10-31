@@ -54,6 +54,16 @@ export function weekdayWords(key: string): string {
   return `${date.toLocaleDateString("en", { weekday: "short" })} ${date.getDate()}`;
 }
 
+/** "Mon". */
+export function weekdayShort(key: string): string {
+  return fromKey(key).toLocaleDateString("en", { weekday: "short" });
+}
+
+/** "26". */
+export function dayOfMonth(key: string): number {
+  return fromKey(key).getDate();
+}
+
 /** "Nov 2". */
 export function dateWords(key: string): string {
   const date = fromKey(key);
