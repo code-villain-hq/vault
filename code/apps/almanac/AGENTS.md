@@ -209,6 +209,14 @@ What they do:
     gives it whole (`Kept::change_brief`): the change is kept on the
     message for Undo, as the own topic's are. A talk never changes a
     topic's name, group or icon.
+  - A topic can sit under another, one level deep (`parent_id`, migration
+    0019; `may_sit_under` in the sync rules): never under itself, Almanac's
+    own topic or a topic that sits under one. Its talks keep to the parent's
+    brief too, and the parent's page for Claude names its sub-topics
+    (`page.rs`). The sidebar indents them under the parent, the parent's
+    page opens with their tiles (`SubTopics`), and About moves a topic
+    under another (`TopicParent`). Deleting the parent leaves them, at the
+    top.
 
   Pages from before the set move into it once, on the server's start
   (`convert.rs`, a rule per old kind, the same for every topic): text,

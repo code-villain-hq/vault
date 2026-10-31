@@ -563,7 +563,7 @@ function SubTopics({ topics }: { topics: Topic[] }) {
     >
       {topics.map((topic) => (
         <li key={topic.id} className="flex">
-          <TopicTile topic={topic} facts={tiles.get(topic.id) ?? NO_FACTS} />
+          <TopicTile topic={topic} facts={tiles.get(topic.id) ?? NO_FACTS} onParent />
         </li>
       ))}
     </ul>
@@ -1779,13 +1779,24 @@ function Overall({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** One topic on the index: its points large, its checklists as a bar, what's new. */
-function TopicTile({ topic, facts }: { topic: Topic; facts: TileFacts }) {
+/**
+ * One topic on the index: its points large, its checklists as a bar, what's
+ * new. Its group or parent in the corner, but not on its parent's page.
+ */
+function TopicTile({
+  topic,
+  facts,
+  onParent = false,
+}: {
+  topic: Topic;
+  facts: TileFacts;
+  onParent?: boolean;
+}) {
   const { workspace } = useWorkspace();
   const unread = useUnread();
   const parent = parentOf(topic, useTopics());
   const Icon = topicIcon(topic.icon);
-  const under = parent ? parent.name : topic.group_name;
+  const under = onParent ? "" : parent ? parent.name : topic.group_name;
   return (
     <Link
       to="/$workspace/topics/$topic"
