@@ -11,6 +11,7 @@ import { Check, Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react
 import {
   type ComponentType,
   createContext,
+  Fragment,
   type ReactNode,
   useContext,
   useMemo,
@@ -30,7 +31,7 @@ import {
 import { usePhoto } from "./photos";
 import { inline } from "./prose";
 import { doneFor, isDue, markDone, markNotDone } from "./reminders";
-import { when } from "./timeline";
+import { when, years } from "./timeline";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** A line's measure, for lines that read across. */
@@ -619,12 +620,24 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
         <Board rows={rows} status={status} fields={fields.filter((f) => f !== status)} />
       ) : null;
     }
-    case "timeline":
-      return day ? (
-        <Told rows={rows} by={of("status", "choice")}>
-          <RowTimeline rows={rows} day={day} fields={fields.filter((f) => f !== day)} />
+    case "timeline": {
+      if (!day) return null;
+      const by = of("status", "choice");
+      const placed = placedOn(rows, day);
+      const timeline = (
+        <RowTimeline rows={rows} day={day} fields={fields.filter((f) => f !== day)} />
+      );
+      return placed ? (
+        <div className="flex flex-col gap-4">
+          <TimeAxis placed={placed} rows={rows} by={by} />
+          {timeline}
+        </div>
+      ) : (
+        <Told rows={rows} by={by}>
+          {timeline}
         </Told>
-      ) : null;
+      );
+    }
     case "week":
       return day ? <Week rows={rows} day={day} /> : null;
     case "bars":
@@ -655,6 +668,110 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
         <RowList rows={rows} fields={fields} />
       )}
     </Told>
+  );
+}
+
+/** The fewest rows, and years, a timeline draws an axis over. */
+const AXIS_ROWS = 6;
+const AXIS_YEARS = 10;
+
+type Placed = { row: Point; span: [number, number] };
+
+/** A timeline's rows with the years they cover, when there are enough of them over enough years. */
+function placedOn(rows: Point[], day: Field): Placed[] | null {
+  const placed = rows.flatMap((row) => {
+    const cell = cellOf(row, day);
+    const span = typeof cell === "string" ? years(cell) : null;
+    return span ? [{ row, span }] : [];
+  });
+  if (placed.length < AXIS_ROWS) return null;
+  const first = Math.min(...placed.map((p) => p.span[0]));
+  const last = Math.max(...placed.map((p) => p.span[1]));
+  return last - first >= AXIS_YEARS ? placed : null;
+}
+
+/** Round years to mark on an axis from `first` to `last`: about five, a step of 1, 2 or 5 times ten to a power. */
+function ticksOf(first: number, last: number): number[] {
+  const rough = (last - first) / 5;
+  const power = 10 ** Math.floor(Math.log10(rough));
+  const step = [1, 2, 5, 10].map((m) => m * power).find((s) => s >= rough) ?? rough;
+  const ticks: number[] = [];
+  for (let t = Math.ceil(first / step) * step; t <= last; t += step) ticks.push(t);
+  return ticks;
+}
+
+/**
+ * A timeline's years on one axis, a dot an event and a bar a span, so where
+ * they cluster shows at a glance; a lane per status or choice when one
+ * tells them apart, with how many each.
+ */
+function TimeAxis({
+  placed,
+  rows,
+  by,
+}: {
+  placed: Placed[];
+  rows: Point[];
+  by: Field | undefined;
+}) {
+  const first = Math.min(...placed.map((p) => p.span[0]));
+  const last = Math.max(...placed.map((p) => p.span[1]));
+  const at = (year: number) => ((year - first) / (last - first)) * 100;
+  const lanes = by ? [...lanesOf(by, rows), ""] : [""];
+  const laneOf = (row: Point) => {
+    const cell = by && cellOf(row, by);
+    return typeof cell === "string" ? cell : "";
+  };
+  return (
+    <div
+      role="img"
+      aria-label={`${placed.length} events from ${first} to ${last}`}
+      className={`grid gap-x-3 gap-y-1 text-xs ${by ? "grid-cols-[max-content_1fr]" : "grid-cols-1"}`}
+    >
+      {lanes.map((lane, i) => {
+        const inLane = placed.filter((p) => laneOf(p.row) === lane);
+        if (inLane.length === 0) return null;
+        const colour = by && lane ? laneColour(by, i, lanes.length - 1) : "bg-accent";
+        return (
+          <Fragment key={lane || "-"}>
+            {by && (
+              <span className="flex items-center gap-1.5 text-muted">
+                {lane || "–"}
+                <span className="font-semibold text-fg tabular-nums">{inLane.length}</span>
+              </span>
+            )}
+            <span className="relative h-4">
+              <span className="absolute inset-x-0 top-1/2 h-px bg-line" />
+              {inLane.map(({ row, span: [from, to] }) => (
+                <span
+                  key={row.id}
+                  title={`${from === to ? from : `${from}–${to}`}: ${row.text}`}
+                  className={`absolute top-1 h-2 rounded-full ${colour} ${to > from ? "opacity-70" : "-ml-1 w-2"}`}
+                  style={
+                    to > from
+                      ? { left: `${at(from)}%`, width: `max(0.5rem, ${at(to) - at(from)}%)` }
+                      : { left: `${at(from)}%` }
+                  }
+                />
+              ))}
+            </span>
+          </Fragment>
+        );
+      })}
+      {by && <span />}
+      <span className="relative h-4 text-faint tabular-nums">
+        <span className="absolute left-0">{first}</span>
+        {/* Clear of the ends, whose years are always there. */}
+        {ticksOf(first, last)
+          .filter((t) => at(t) > 20 && at(t) < 80)
+          .map((t) => (
+            <span key={t} className="absolute -translate-x-1/2" style={{ left: `${at(t)}%` }}>
+              {t}
+            </span>
+          ))}
+        <span className="absolute right-0">{last}</span>
+      </span>
+    </div>
   );
 }
 
@@ -1011,6 +1128,10 @@ function RowBars({
       <ul className="grid max-w-5xl grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content] gap-x-3.5 @md:grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content_minmax(0,max-content)]">
         {bars.map((row) => {
           const amount = numberOf(row, number) ?? 0;
+          const more = rest(fields, row);
+          const pills = fields.some(
+            (f) => TOLD_BY_TONE.has(f.kind) && cellOf(row, f) !== undefined,
+          );
           return (
             <li
               key={row.id}
@@ -1034,10 +1155,10 @@ function RowBars({
               </span>
               <span className="text-right font-semibold tabular-nums">{words(amount)}</span>
               {/* Under the bar when the page is narrow, beside it when there's room. */}
-              <span className="col-span-full flex min-w-0 items-center gap-2 @md:col-span-1">
-                <span className="line-clamp-2 min-w-0 flex-1 text-xs text-faint">
-                  {rest(fields, row)}
-                </span>
+              <span
+                className={`col-span-full min-w-0 items-center gap-2 @md:col-span-1 @md:flex ${more || pills ? "flex" : "hidden"}`}
+              >
+                <span className="line-clamp-2 min-w-0 flex-1 text-xs text-faint">{more}</span>
                 <Pills fields={fields} row={row} />
                 <RemovePoint point={row} />
               </span>
