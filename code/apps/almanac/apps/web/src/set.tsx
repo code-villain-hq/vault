@@ -1337,19 +1337,21 @@ function useRowPages(rows: Point[]): Map<string, string[]> {
   return useMemo(() => {
     const kept = new Map<string, string[]>();
     if (!opens) return kept;
-    const ids = new Set(rows.map((r) => r.id));
+    const names = new Map(rows.map((r) => [r.id, r.text.trim().toLowerCase()]));
     const pages = blocks
       .filter(
-        (b) => b.row_id && ids.has(b.row_id) && (b.kind === "paragraph" || b.kind === "collection"),
+        (b) =>
+          b.row_id && names.has(b.row_id) && (b.kind === "paragraph" || b.kind === "collection"),
       )
       .sort((a, b) => a.position - b.position);
     for (const page of pages) {
+      const row = page.row_id as string;
       const words = points
         .filter((p) => p.block_id === page.id)
         .sort((a, b) => a.position - b.position)
         .map((p) => (page.kind === "paragraph" ? ledBy(p.text)?.[0] : p.text))
-        .filter((w): w is string => !!w);
-      const row = page.row_id as string;
+        // A name that only says the row's own again says nothing.
+        .filter((w): w is string => !!w && w.trim().toLowerCase() !== names.get(row));
       kept.set(row, [...(kept.get(row) ?? []), ...words]);
     }
     return kept;
