@@ -36,4 +36,9 @@ topic_id: string | null,
 /**
  * The topic it sits under, when a topic's own talk proposed it.
  */
-parent_id?: string, };
+parent_id?: string, 
+/**
+ * What it takes from the parent's page when it starts: blocks, and
+ * rows with a page of their own, which move to it.
+ */
+takes: Array<string>, };

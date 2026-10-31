@@ -228,8 +228,11 @@ What they do:
     under another (`TopicParent`). Deleting the parent leaves them, at the
     top. A topic's talk proposes one under its own topic with
     propose_sub_topic, as the own topic proposes a topic: a card with
-    Start, its `parent_id` set, its points copied, the parent's staying
-    until they're removed.
+    Start, its `parent_id` set. What the parent's page keeps about it goes in
+    its `takes` (blocks, and rows with a page of their own) and moves on
+    Start (`take` in `topics.rs`): made again in the sub-topic, a row's page
+    as its own page, and gone from the parent, so nothing is kept twice. A
+    sub-topic that takes something gets no template blocks but You.
 
   Pages from before the set move into it once, on the server's start
   (`convert.rs`, a rule per old kind, the same for every topic): text,

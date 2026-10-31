@@ -107,6 +107,10 @@ pub struct Proposal {
     #[serde(default)]
     #[ts(optional)]
     pub parent_id: Option<Uuid>,
+    /// What it takes from the parent's page when it starts: blocks, and
+    /// rows with a page of their own, which move to it.
+    #[serde(default)]
+    pub takes: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

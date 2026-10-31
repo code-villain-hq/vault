@@ -426,6 +426,7 @@ function Proposed({
   const guest = useIsGuest();
   const topics = useTopics();
   const points = useRecords("Point");
+  const blocks = useRecords("Block");
   const [changing, setChanging] = useState(false);
   const [starting, setStarting] = useState(false);
   const [problem, setProblem] = useState("");
@@ -493,18 +494,28 @@ function Proposed({
         ? "A study"
         : "A collection";
   const parent = proposal.parent_id && topics.find((t) => t.id === proposal.parent_id);
+  // What it takes from the parent's page, as long as the page has it.
+  const taken = (proposal.takes ?? [])
+    .map((id) => blocks.find((b) => b.id === id)?.title || points.find((p) => p.id === id)?.text)
+    .filter(Boolean);
   return (
     <div className="flex flex-col gap-2.5 rounded-lg bg-surface px-4 py-3.5">
       <div className="flex items-center gap-2">
         <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
         <p className="min-w-0 truncate font-semibold">{proposal.name}</p>
         <p className="ml-auto shrink-0 text-xs text-faint">
-          {[parent ? `Under ${parent.name}` : proposal.group_name, page]
+          {[parent ? `Under ${parent.name}` : proposal.group_name, taken.length ? "" : page]
             .filter(Boolean)
             .join(" · ")}
         </p>
       </div>
       {about(proposal.sticks_to) && <p className="text-muted">{about(proposal.sticks_to)}</p>}
+      {parent && taken.length > 0 && (
+        <p className="text-xs text-muted">
+          Moves {taken.join(", ")} here from {parent.name}, with{" "}
+          {taken.length === 1 ? "its" : "their"} pages.
+        </p>
+      )}
       {proposal.points.length + proposal.reminders.length > 0 && (
         <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted">
           {proposal.points.map((point) => {

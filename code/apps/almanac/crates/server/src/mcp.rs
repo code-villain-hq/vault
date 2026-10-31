@@ -405,8 +405,10 @@ async fn call(
                 ));
             }
             args.group = group;
+            let takes = kept()?.taken(&args.takes)?;
             let mut proposal = propose(state, asking, args).await?;
             proposal.parent_id = Some(asking.topic_id);
+            proposal.takes = takes;
             let replaced = kept()?.proposal.replace(proposal).is_some();
             Ok(if replaced {
                 "Proposed, in place of the one before."
@@ -600,6 +602,8 @@ struct ProposeArgs {
     points: Vec<ProposedPointArgs>,
     #[serde(default)]
     reminders: Vec<ReminderArgs>,
+    #[serde(default)]
+    takes: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -706,6 +710,7 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
         reminders,
         topic_id: None,
         parent_id: None,
+        takes: Vec::new(),
     })
 }
 
@@ -1052,6 +1057,14 @@ fn tools(mode: Mode) -> Vec<Value> {
     let mut sub_topic = proposal.clone();
     if let Some(props) = sub_topic.as_object_mut() {
         props.remove("group");
+        props.insert(
+            "takes".into(),
+            json!({
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "What moves from this page to the sub-topic when they start it: blocks (b2), and rows with a page of their own (p3), whose page becomes the sub-topic's. They leave this page then. Leave points out for what's taken.",
+            }),
+        );
     }
     match mode {
         Mode::Topic => vec![
@@ -1267,9 +1280,10 @@ fn tools(mode: Mode) -> Vec<Value> {
             tool(
                 "propose_sub_topic",
                 "Proposes a sub-topic under this one, shown under your answer as a card they \
-                 start with a click or change first. Only when they ask for one. Its points are \
-                 what this page keeps about it, copied: this page keeps them until they say to \
-                 remove them. One per answer.",
+                 start with a click or change first. Only when they ask for one. What this page \
+                 keeps about it goes in takes and moves there on Start, with its pages, so \
+                 nothing is kept twice; with takes, the page is what's taken, and the template \
+                 lays out nothing. One per answer.",
                 sub_topic,
                 &["name", "sticks_to", "icon", "template", "starters"],
             ),

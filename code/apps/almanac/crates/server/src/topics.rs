@@ -4,7 +4,8 @@
 //! around what you wrote, and picks its icon, its group, its template and
 //! the first questions its empty page offers. They reach the page through sync. A
 //! topic the workspace's own topic proposed starts with all of that, and
-//! keeps what you told it as its first points.
+//! keeps what you told it as its first points. A sub-topic a topic's talk
+//! proposed takes what it names from the parent's page: it moves there.
 
 use almanac_domain::{
     Actor, Field, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX, StartTopicRequest,
@@ -27,6 +28,17 @@ use crate::page::Page;
 use crate::state::AppState;
 
 const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
+/// What a sub-topic takes, as the parent's page has it: a block on the
+/// page, or a row with a page of its own.
+const TAKEN_BLOCK: &str = "SELECT to_jsonb(b) FROM blocks b \
+     WHERE b.workspace_id = $1 AND b.topic_id = $2 AND b.id = $3 AND b.row_id IS NULL";
+const TAKEN_ROW: &str = "SELECT b.id FROM points p JOIN blocks b ON b.row_id = p.id \
+     WHERE p.workspace_id = $1 AND p.topic_id = $2 AND p.id = $3 ORDER BY b.position";
+const BLOCK: &str = "SELECT to_jsonb(b) FROM blocks b WHERE b.workspace_id = $1 AND b.id = $2";
+const BLOCK_POINTS: &str = "SELECT to_jsonb(p) FROM points p \
+     WHERE p.workspace_id = $1 AND p.block_id = $2 ORDER BY p.position";
+const ROW_BLOCKS: &str = "SELECT b.id FROM blocks b \
+     WHERE b.workspace_id = $1 AND b.row_id = $2 ORDER BY b.position";
 const GROUPS: &str = "SELECT DISTINCT group_name FROM topics \
      WHERE workspace_id = $1 AND group_name <> '' ORDER BY group_name";
 /// A proposal in an answer of the workspace's own topic.
@@ -178,9 +190,32 @@ pub async fn start(
             .or(Some(proposal.template.as_str()))
             .filter(|t| template(t).is_some())
             .unwrap_or("collection");
-        let (writes, blocks) =
+        let (mut writes, mut blocks) =
             template_blocks(id, template, proposal.cards.as_deref(), &proposal.fields);
+        let taken = match proposal.parent_id {
+            Some(parent) if !proposal.takes.is_empty() => {
+                take(&state, actor.workspace_id, parent, &proposal.takes, id).await?
+            }
+            _ => Vec::new(),
+        };
+        if !taken.is_empty() {
+            // What it takes is its page: of the template, only You.
+            let you = blocks.iter().position(|b| b.kind == "you");
+            let placed = taken.iter().filter(|o| is_top_block(o)).count();
+            writes = you
+                .map(|n| {
+                    let mut write = writes.swap_remove(n);
+                    if let Operation::Create { data, .. } = &mut write {
+                        data.insert("position".into(), json!(placed));
+                    }
+                    write
+                })
+                .into_iter()
+                .collect();
+            blocks.retain(|b| b.kind == "you");
+        }
         operations.extend(writes);
+        operations.extend(taken);
         for (position, point) in proposal.points.iter().enumerate() {
             let Some(block) = block_for(&blocks, point.block.as_deref(), !point.cells.is_empty())
             else {
@@ -532,6 +567,153 @@ pub fn template_blocks(
         })
         .collect();
     (writes, started)
+}
+
+/// The writes that move what a sub-topic `takes` from its `parent`'s page
+/// to it (`to`): a block whole, a row's page as the sub-topic's own, each
+/// with its points and its rows' pages, made again there and gone here.
+/// What's no longer on the parent's page is left out.
+async fn take(
+    state: &AppState,
+    workspace_id: Uuid,
+    parent: Uuid,
+    takes: &[Uuid],
+    to: Uuid,
+) -> Result<Vec<Operation>, AppError> {
+    let mut db = state.pool.acquire().await?;
+    // Blocks to make again: as they are, on the row they go on.
+    let mut blocks: Vec<(Value, Option<Uuid>, Option<i32>)> = Vec::new();
+    let mut gone = Vec::new();
+    let mut position = 0;
+    for &id in takes {
+        let block: Option<Value> = sqlx::query_scalar(TAKEN_BLOCK)
+            .bind(workspace_id)
+            .bind(parent)
+            .bind(id)
+            .fetch_optional(&mut *db)
+            .await?;
+        if let Some(block) = block {
+            blocks.push((block, None, Some(position)));
+            position += 1;
+            gone.push(Operation::Delete {
+                model: ModelKind::Block,
+                id,
+            });
+            continue;
+        }
+        let page: Vec<Uuid> = sqlx::query_scalar(TAKEN_ROW)
+            .bind(workspace_id)
+            .bind(parent)
+            .bind(id)
+            .fetch_all(&mut *db)
+            .await?;
+        if page.is_empty() {
+            continue;
+        }
+        for block in page {
+            let block: Value = sqlx::query_scalar(BLOCK)
+                .bind(workspace_id)
+                .bind(block)
+                .fetch_one(&mut *db)
+                .await?;
+            blocks.push((block, None, Some(position)));
+            position += 1;
+        }
+        // The row goes, and its page with it.
+        gone.push(Operation::Delete {
+            model: ModelKind::Point,
+            id,
+        });
+    }
+    let mut operations = Vec::new();
+    while let Some((block, row_id, position)) = blocks.pop() {
+        let new_block = Uuid::now_v7();
+        let mut data = kept_of(
+            &block,
+            &[
+                "kind", "title", "facets", "fields", "width", "view", "position",
+            ],
+        );
+        data.insert("topic_id".into(), json!(to));
+        data.insert("row_id".into(), json!(row_id));
+        if let Some(position) = position {
+            data.insert("position".into(), json!(position));
+        }
+        operations.push(Operation::Create {
+            model: ModelKind::Block,
+            id: new_block,
+            data,
+        });
+        let points: Vec<Value> = sqlx::query_scalar(BLOCK_POINTS)
+            .bind(workspace_id)
+            .bind(id_of(&block))
+            .fetch_all(&mut *db)
+            .await?;
+        for point in points {
+            let new_point = Uuid::now_v7();
+            let mut data = kept_of(
+                &point,
+                &[
+                    "theme",
+                    "text",
+                    "happened",
+                    "facet",
+                    "look",
+                    "amount",
+                    "note",
+                    "done",
+                    "cells",
+                    "source",
+                    "source_url",
+                    "seen",
+                    "position",
+                ],
+            );
+            data.insert("topic_id".into(), json!(to));
+            data.insert("block_id".into(), json!(new_block));
+            operations.push(Operation::Create {
+                model: ModelKind::Point,
+                id: new_point,
+                data,
+            });
+            let page: Vec<Uuid> = sqlx::query_scalar(ROW_BLOCKS)
+                .bind(workspace_id)
+                .bind(id_of(&point))
+                .fetch_all(&mut *db)
+                .await?;
+            for block in page {
+                let block: Value = sqlx::query_scalar(BLOCK)
+                    .bind(workspace_id)
+                    .bind(block)
+                    .fetch_one(&mut *db)
+                    .await?;
+                blocks.push((block, Some(new_point), None));
+            }
+        }
+    }
+    // Made there before they go here: a block's points and a row's page go
+    // with it.
+    operations.extend(gone);
+    Ok(operations)
+}
+
+/// A record's id, as the database has it.
+fn id_of(record: &Value) -> Option<Uuid> {
+    record.get("id")?.as_str()?.parse().ok()
+}
+
+/// A record's `keys`, as the database has them.
+fn kept_of(record: &Value, keys: &[&str]) -> Map<String, Value> {
+    keys.iter()
+        .filter_map(|key| Some((key.to_string(), record.get(*key)?.clone())))
+        .filter(|(_, value)| !value.is_null())
+        .collect()
+}
+
+/// Whether a write makes a block on the topic's own page.
+fn is_top_block(operation: &Operation) -> bool {
+    matches!(operation, Operation::Create { model: ModelKind::Block, data, .. }
+        if data.get("row_id").is_none_or(Value::is_null))
 }
 
 /// The block a proposed point goes in: the one it names by title, or the

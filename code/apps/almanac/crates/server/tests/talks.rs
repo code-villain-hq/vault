@@ -256,3 +256,130 @@ async fn without_a_key_the_talk_says_where_to_add_one(pool: PgPool) {
     assert_eq!(key.body["ends_with"], "1234");
     assert_eq!(key.body["set"], true);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_sub_topic_takes_what_its_parent_kept_about_it(pool: PgPool) {
+    let app = App::new(pool.clone());
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Backend", "template": "routine" }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{}", started.body);
+    let parent = started.body["id"].as_str().unwrap().to_string();
+    let [reading, lesson, page, plan] = [(); 4].map(|_| uuid::Uuid::now_v7());
+    let point = |block: uuid::Uuid, text: &str| {
+        json!({ "action": "create", "model": "Point", "id": uuid::Uuid::now_v7(),
+            "data": { "topic_id": parent, "block_id": block, "text": text } })
+    };
+    let wrote = app
+        .sync(
+            &ada,
+            &home,
+            json!([
+                { "action": "create", "model": "Block", "id": reading,
+                  "data": { "topic_id": parent, "kind": "collection", "title": "Reading" } },
+                { "action": "create", "model": "Point", "id": lesson,
+                  "data": { "topic_id": parent, "block_id": reading, "text": "Lesson 1" } },
+                { "action": "create", "model": "Block", "id": page,
+                  "data": { "topic_id": parent, "kind": "paragraph", "title": "The sketch", "row_id": lesson } },
+                point(page, "**Caller**: who starts it."),
+                point(page, "**Failures**: what if the store is down."),
+                { "action": "create", "model": "Block", "id": plan,
+                  "data": { "topic_id": parent, "kind": "collection", "title": "Plan" } },
+                point(plan, "Week 1"),
+            ]),
+        )
+        .await;
+    assert_eq!(wrote.status, StatusCode::OK, "{}", wrote.text);
+
+    // A talk of the parent proposed it, taking the lesson's page.
+    let (talk, message) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    let workspace: uuid::Uuid = home.parse().unwrap();
+    let parent_id: uuid::Uuid = parent.parse().unwrap();
+    sqlx::query(
+        "INSERT INTO talks (id, workspace_id, topic_id, title) VALUES ($1, $2, $3, 'Split')",
+    )
+    .bind(talk)
+    .bind(workspace)
+    .bind(parent_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let proposal = json!({
+        "name": "Notifications", "sticks_to": "Lesson 1.", "icon": "book", "group_name": "",
+        "template": "study", "fields": [], "starters": [], "points": [], "reminders": [],
+        "topic_id": null, "parent_id": parent, "takes": [lesson],
+    });
+    sqlx::query(
+        "INSERT INTO messages (id, workspace_id, talk_id, topic_id, role, text, proposal) \
+         VALUES ($1, $2, $3, $4, 'almanac', 'Here it is.', $5)",
+    )
+    .bind(message)
+    .bind(workspace)
+    .bind(talk)
+    .bind(parent_id)
+    .bind(&proposal)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Notifications", "from_message": message }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{}", started.body);
+    let child = started.body["id"].as_str().unwrap().to_string();
+
+    let blocks = app.synced(&ada, &home, "Block").await;
+    let of = |topic: &str| -> Vec<String> {
+        blocks
+            .iter()
+            .filter(|b| b["topic_id"] == topic)
+            .map(|b| {
+                format!(
+                    "{}:{}",
+                    b["kind"].as_str().unwrap(),
+                    b["title"].as_str().unwrap()
+                )
+            })
+            .collect()
+    };
+    // The lesson's page is the sub-topic's own, beside You; the template
+    // lays out nothing else.
+    assert_eq!(of(&child), ["paragraph:The sketch", "you:You"]);
+    let sketch = blocks
+        .iter()
+        .find(|b| b["topic_id"] == child.as_str() && b["kind"] == "paragraph")
+        .unwrap();
+    assert!(sketch["row_id"].is_null());
+    // The parent keeps the rest, without the lesson or its page.
+    let left = of(&parent);
+    assert!(left.contains(&"collection:Reading".to_string()), "{left:?}");
+    assert!(left.contains(&"collection:Plan".to_string()), "{left:?}");
+    assert!(
+        !left.contains(&"paragraph:The sketch".to_string()),
+        "{left:?}"
+    );
+    let points = app.synced(&ada, &home, "Point").await;
+    let texts = |topic: &str| -> Vec<&str> {
+        points
+            .iter()
+            .filter(|p| p["topic_id"] == topic)
+            .map(|p| p["text"].as_str().unwrap())
+            .collect()
+    };
+    assert_eq!(
+        texts(&child),
+        [
+            "**Caller**: who starts it.",
+            "**Failures**: what if the store is down."
+        ]
+    );
+    assert_eq!(texts(&parent), ["Week 1"]);
+}

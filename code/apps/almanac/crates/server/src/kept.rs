@@ -1172,6 +1172,48 @@ impl Kept {
     }
 
     /// The block a reference (`b2`) or a title names.
+    /// What a sub-topic would take from this page, by reference: blocks
+    /// on the topic's own page (`b2`) and rows with a page of their own
+    /// (`p3`), as the page has them before this answer.
+    pub fn taken(&self, references: &[String]) -> Result<Vec<Uuid>, String> {
+        let mut ids = Vec::new();
+        for reference in references {
+            let named = reference.trim();
+            let id = if named.trim_start_matches('[').starts_with('p') {
+                let point = &self.points[self.point_at(named)?];
+                if !self.refs.points.iter().any(|p| p.id == point.id) {
+                    return Err(format!(
+                        "{named} came in this answer: a sub-topic takes what the page had."
+                    ));
+                }
+                let has_page = self.blocks.iter().any(|b| b.row_id == Some(point.id));
+                if !has_page {
+                    return Err(format!(
+                        "{named} has no page of its own: take its block, or copy it as points."
+                    ));
+                }
+                point.id
+            } else {
+                let block = &self.blocks[self.block_at(named)?];
+                if !self.refs.blocks.iter().any(|b| b.id == block.id) {
+                    return Err(format!(
+                        "{named} came in this answer: a sub-topic takes what the page had."
+                    ));
+                }
+                if block.row_id.is_some() || block.kind == "you" {
+                    return Err(format!(
+                        "{named} isn't a block of the topic's page: take the row whose page it's on."
+                    ));
+                }
+                block.id
+            };
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        Ok(ids)
+    }
+
     fn block_at(&self, reference: &str) -> Result<usize, String> {
         let named = reference.trim();
         let n = found(named, 'b', self.blocks.len()).or_else(|| {
