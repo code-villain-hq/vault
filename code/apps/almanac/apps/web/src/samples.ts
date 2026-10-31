@@ -150,7 +150,7 @@ export function samples(): Sample[] {
       ],
     ),
     sample(
-      "Paragraph: leads",
+      "Leads",
       "When each paragraph opens with a bold lead, they're cards: the lead, a few lines, and More opens one across.",
       history,
       "paragraph",
@@ -176,8 +176,8 @@ export function samples(): Sample[] {
       (p) => [p("", "Lilies are poisonous to cats, even the pollen.", { look: "warn" })],
     ),
     sample(
-      "Collection: line",
-      "A collection is rows with fields, and its fields pick its picture, the same on every page. A day with a number draws a line, the goal dashed.",
+      "Line",
+      "A day with a number draws a line, the goal dashed.",
       cat,
       "collection",
       "Weight",
@@ -189,7 +189,7 @@ export function samples(): Sample[] {
       { fields: [field("Day", "day"), field("Weight", "number", { unit: "kg", goal: 3.3 })] },
     ),
     sample(
-      "Collection: board",
+      "Board",
       "A status draws a board: a lane per step, the first still open and the last done.",
       career,
       "collection",
@@ -208,8 +208,8 @@ export function samples(): Sample[] {
       },
     ),
     sample(
-      "Collection: cards",
-      "A photo draws cards, a card per row. Any collection can be viewed as cards.",
+      "Cards",
+      "A photo draws cards, a card per row.",
       plants,
       "collection",
       "Plants",
@@ -221,7 +221,7 @@ export function samples(): Sample[] {
       { fields: [field("Light", "choice"), field("Water", "text")], view: "cards" },
     ),
     sample(
-      "Collection: table",
+      "Table",
       "A name and two fields or more draw a table, a column per field, a number with a bar on its column's largest.",
       plants,
       "collection",
@@ -252,7 +252,7 @@ export function samples(): Sample[] {
       },
     ),
     sample(
-      "Collection: figures",
+      "Figures",
       "A few names, each with a short value, draw figures: a tile each, the value large. A colour written #a78bfa shows as its swatch.",
       cat,
       "collection",
@@ -265,7 +265,7 @@ export function samples(): Sample[] {
       { fields: [field("Value", "text")] },
     ),
     sample(
-      "Collection: steps",
+      "Steps",
       "Rows in their order can be viewed as steps, numbered, the next one marked.",
       cat,
       "collection",
@@ -278,8 +278,8 @@ export function samples(): Sample[] {
       { view: "steps" },
     ),
     sample(
-      "Collection: timeline",
-      "Days or spans that are past draw a timeline, oldest first, with an axis over them from six on: a lane per choice, which a click picks; past ten rows the list shows the first few, with All.",
+      "Timeline",
+      "Days or spans that are past draw a timeline, oldest first: a lane per choice, which a click picks.",
       history,
       "collection",
       "Europe after Napoleon",
@@ -294,7 +294,7 @@ export function samples(): Sample[] {
       { fields: [field("When", "day"), field("Where", "choice")] },
     ),
     sample(
-      "Collection: week",
+      "Week",
       "Days still to come draw a week from today, with what comes after it below.",
       running,
       "collection",
@@ -307,7 +307,7 @@ export function samples(): Sample[] {
       { fields: [field("Day", "day")] },
     ),
     sample(
-      "Collection: bars",
+      "Bars",
       "A name with a number draws bars on one scale, the rest beside them.",
       running,
       "collection",
@@ -320,7 +320,7 @@ export function samples(): Sample[] {
       { fields: [field("Price", "number", { unit: "€" }), field("Shop", "text")] },
     ),
     sample(
-      "Collection: checklist",
+      "Checklist",
       "A check, with a day at most besides, draws a checklist: a row a line to tick. What's done goes faint and stays.",
       career,
       "collection",
@@ -333,8 +333,8 @@ export function samples(): Sample[] {
       { fields: [field("Done", "check")] },
     ),
     sample(
-      "Collection: list",
-      "Anything else is a list: the name, then the rest. Every row opens a page of its own, for what's said about it.",
+      "List",
+      "Anything else is a list: the name, then the rest.",
       spanish,
       "collection",
       "Words",

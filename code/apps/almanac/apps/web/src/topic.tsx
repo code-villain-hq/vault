@@ -53,7 +53,7 @@ import {
 import { CoverHead, RowPhoto } from "./pictures";
 import { about, inline } from "./prose";
 import { NotifyBell, ReminderMenu } from "./reminders";
-import { samples } from "./samples";
+import { type Sample, samples } from "./samples";
 import {
   Callout,
   ChecklistCount,
@@ -72,7 +72,7 @@ import {
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
 import { Today } from "./today";
-import { Button, Empty } from "./ui";
+import { Button, Empty, Section } from "./ui";
 import { ownWidth, shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
@@ -1324,41 +1324,71 @@ function blockName(block: Block): string {
 
 /**
  * Settings → Blocks: every kind of block a page can have, with sample
- * points, drawn as a page draws it. Only to look at: it changes nothing.
+ * points, drawn as a page draws it, in the groups a page's blocks fall
+ * into. Only to look at: it changes nothing.
  */
 export function BlockGallery() {
   const all = useMemo(() => samples(), []);
   return (
     <LookOnly>
-      {all.map((sample) => {
-        const page: PageParts = {
-          blocks: [sample.block],
-          points: sample.points,
-          questions: [],
-          reminders: [],
-        };
-        const block = drawn(sample.block, sample.points);
-        const width = block.width;
-        return (
-          <section key={sample.block.id} aria-label={sample.name} className="flex flex-col gap-3">
-            <div className="flex flex-col gap-0.5">
-              <h2 className="font-semibold">{sample.name}</h2>
-              <p className="max-w-measure text-muted">{sample.says}</p>
-            </div>
-            {sample.block.kind === "you" ? (
-              <Facts topic={sample.topic} facts={sample.points} />
-            ) : (
-              // At its view's width, as a page lays it out.
-              <div className="page-grid" data-alone>
-                <div data-width={width} data-narrow={NARROW.has(width) || undefined}>
-                  <BlockView block={block} page={{ ...page, blocks: [block] }} />
-                </div>
-              </div>
-            )}
-          </section>
-        );
-      })}
+      {GALLERY.map((group) => (
+        <Section key={group.title} title={group.title}>
+          {group.says && <p className="max-w-measure text-muted">{group.says}</p>}
+          <div className="flex flex-col divide-y divide-line">
+            {all
+              .filter((sample) => group.holds(sample.block.kind))
+              .map((sample) => (
+                <GallerySample key={sample.block.id} sample={sample} />
+              ))}
+          </div>
+        </Section>
+      ))}
     </LookOnly>
+  );
+}
+
+/** The gallery's groups: what a page writes, what it keeps in rows, and about you. */
+const GALLERY: { title: string; says: string; holds: (kind: string) => boolean }[] = [
+  {
+    title: "Text",
+    says: "",
+    holds: (kind) => kind !== "collection" && kind !== "you",
+  },
+  {
+    title: "Collections",
+    says: "Rows with fields. The fields pick the picture, the same on every page, and every row opens a page of its own.",
+    holds: (kind) => kind === "collection",
+  },
+  { title: "About you", says: "", holds: (kind) => kind === "you" },
+];
+
+/** One kind of block in the gallery: its name, what it's for, and a sample. */
+function GallerySample({ sample }: { sample: Sample }) {
+  const page: PageParts = {
+    blocks: [sample.block],
+    points: sample.points,
+    questions: [],
+    reminders: [],
+  };
+  const block = drawn(sample.block, sample.points);
+  const width = block.width;
+  return (
+    <section aria-label={sample.name} className="flex flex-col gap-4 py-6 first:pt-2">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="font-semibold">{sample.name}</h3>
+        <p className="max-w-measure text-muted">{sample.says}</p>
+      </div>
+      {sample.block.kind === "you" ? (
+        <Facts topic={sample.topic} facts={sample.points} />
+      ) : (
+        // At its view's width, as a page lays it out.
+        <div className="page-grid" data-alone>
+          <div data-width={width} data-narrow={NARROW.has(width) || undefined}>
+            <BlockView block={block} page={{ ...page, blocks: [block] }} />
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
