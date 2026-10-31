@@ -442,6 +442,9 @@ export function Tally({ rows, field }: { rows: Point[]; field: Field }) {
   );
 }
 
+/** A colour as words, "#a78bfa": a figure shows it as a swatch. */
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+
 /**
  * Figures: a tile a row, its value large over its name, as a dashboard's
  * numbers. The value is its number, or else the first cell it has.
@@ -453,8 +456,18 @@ function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
     shown.find((f) => !TOLD_BY_TONE.has(f.kind)) ??
     shown[0];
   const others = shown.filter((f) => f !== value);
+  // A palette's swatches fit narrower than words.
+  const palette = rows.every(
+    (row) => value && HEX_COLOUR.test(cellWords(value, cellOf(row, value))),
+  );
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-2.5">
+    <div
+      className={`grid gap-2.5 ${
+        palette
+          ? "grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))]"
+          : "grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))]"
+      }`}
+    >
       {rows.map((row) => {
         const cell = value && cellOf(row, value);
         const words = value ? cellWords(value, cell) : "";
@@ -464,6 +477,13 @@ function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
             key={row.id}
             className="group relative flex min-w-0 flex-col gap-1 rounded-lg bg-surface px-4 py-3"
           >
+            {HEX_COLOUR.test(words) && (
+              <span
+                aria-hidden="true"
+                className="mb-1 h-10 rounded-md ring-1 ring-line ring-inset"
+                style={{ backgroundColor: words }}
+              />
+            )}
             <span className="flex items-start gap-2">
               <span
                 className={`min-w-0 flex-1 font-semibold leading-tight tabular-nums ${
