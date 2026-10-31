@@ -36,7 +36,7 @@ import {
   useState,
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
-import { cellOf, cellWords } from "./collection";
+import { cellOf, cellWords, checkOf } from "./collection";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
@@ -57,11 +57,13 @@ import {
   Callout,
   ChecklistCount,
   Collection,
+  itemDone,
   LINES,
   named,
   Opens,
   type PageTo,
   Paragraphs,
+  useItemReminders,
 } from "./set";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
@@ -1452,22 +1454,56 @@ function NoKeyOnServer() {
 }
 
 /**
- * The workspace's own topic: every other topic by group, as in the sidebar,
- * with what it sticks to and what's new. Almanac keeps it; nobody writes it.
+ * The workspace's own topic: every other topic by group, a tile each, with
+ * how much it keeps, how far its checklists are and what's new. Almanac
+ * keeps it; nobody writes it.
  */
 function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
   const { workspace } = useWorkspace();
   const topics = useTopics();
+  const blocks = useRecords("Block");
+  const points = useRecords("Point");
+  const talks = useRecords("Talk");
+  const rings = useItemReminders();
   const Icon = topicIcon(topic.icon);
+  const others = useMemo(() => topics.filter((t) => !isOwn(t)), [topics]);
   const groups = useMemo(() => {
     const byName = new Map<string, Topic[]>();
-    for (const other of topics.filter((t) => !isOwn(t))) {
+    for (const other of others) {
       const list = byName.get(other.group_name) ?? [];
       list.push(other);
       byName.set(other.group_name, list);
     }
     return [...byName.entries()].sort(([a], [b]) => (a && b ? a.localeCompare(b) : a ? 1 : -1));
-  }, [topics]);
+  }, [others]);
+  const tiles = useMemo(() => {
+    const ids = new Set(others.map((t) => t.id));
+    const byTopic = new Map<string, TileFacts>();
+    for (const id of ids) byTopic.set(id, { kept: 0, done: 0, todo: 0, last: null });
+    for (const point of points) {
+      const facts = byTopic.get(point.topic_id);
+      if (facts) facts.kept += 1;
+    }
+    for (const block of blocks) {
+      const facts = byTopic.get(block.topic_id);
+      const check = facts && block.kind === "collection" ? checkOf(block) : undefined;
+      if (!facts || !check) continue;
+      for (const row of points) {
+        if (row.block_id !== block.id) continue;
+        facts.todo += 1;
+        if (itemDone(row, check, rings.get(row.id))) facts.done += 1;
+      }
+    }
+    for (const talk of talks) {
+      const facts = byTopic.get(talk.topic_id);
+      if (facts && (!facts.last || talk.last_at > facts.last)) facts.last = talk.last_at;
+    }
+    return byTopic;
+  }, [others, blocks, points, talks, rings]);
+  const all = [...tiles.values()];
+  const kept = all.reduce((n, t) => n + t.kept, 0);
+  const done = all.reduce((n, t) => n + t.done, 0);
+  const todo = all.reduce((n, t) => n + t.todo, 0);
 
   return (
     <>
@@ -1493,66 +1529,94 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
           <Starters topic={topic} onAsk={onAsk} />
         </div>
       ) : (
-        <div className={`flex flex-col gap-0.5 ${LINES}`}>
-          {groups.map(([group, list]) => (
-            <section key={group || "-"} aria-label={group || "Topics"} className="flex flex-col">
-              <h2 className="px-2.5 pt-3 pb-0.5 text-xs text-faint first:pt-0">
-                {group || "Topics"}
-              </h2>
-              {list.map((other) => (
-                <IndexRow key={other.id} topic={other} />
-              ))}
-            </section>
-          ))}
+        <div className="flex flex-col gap-6">
+          <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(9rem,100%),1fr))] gap-2.5">
+            <Overall label="Topics" value={String(others.length)} />
+            <Overall label="Points" value={String(kept)} />
+            <Overall
+              label="Talks"
+              value={String(talks.filter((t) => tiles.has(t.topic_id)).length)}
+            />
+            {todo > 0 && <Overall label="Ticked off" value={`${done}/${todo}`} />}
+          </dl>
+          <ul
+            aria-label="Topics"
+            className="grid grid-cols-[repeat(auto-fill,minmax(min(14rem,100%),1fr))] gap-2.5"
+          >
+            {groups.flatMap(([, list]) =>
+              list.map((other) => (
+                <li key={other.id} className="flex">
+                  <TopicTile
+                    topic={other}
+                    facts={tiles.get(other.id) ?? { kept: 0, done: 0, todo: 0, last: null }}
+                  />
+                </li>
+              )),
+            )}
+          </ul>
         </div>
       )}
     </>
   );
 }
 
-/** One topic in the index: its name, what's new, how much it keeps, what it sticks to. */
-function IndexRow({ topic }: { topic: Topic }) {
+/** What a topic's tile shows: its points, its checklists' rows ticked and to tick, its last talk. */
+type TileFacts = { kept: number; done: number; todo: number; last: string | null };
+
+/** One figure over every topic, large. */
+function Overall({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col-reverse gap-0.5 rounded-lg bg-surface px-4 py-3">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="font-semibold text-2xl tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+/** One topic on the index: its points large, its checklists as a bar, what's new. */
+function TopicTile({ topic, facts }: { topic: Topic; facts: TileFacts }) {
   const { workspace } = useWorkspace();
   const unread = useUnread();
-  const points = useRecords("Point");
-  const talks = useRecords("Talk");
   const Icon = topicIcon(topic.icon);
-  const kept = points.filter((p) => p.topic_id === topic.id).length;
-  const last = talks
-    .filter((t) => t.topic_id === topic.id)
-    .reduce<string | null>((at, t) => (at && at > t.last_at ? at : t.last_at), null);
-  const detail = [
-    kept === 0 ? "nothing kept yet" : `${kept} ${kept === 1 ? "point" : "points"}`,
-    last ? ago(last) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
   return (
     <Link
       to="/$workspace/topics/$topic"
       params={{ workspace: workspace.url_key, topic: topic.id }}
-      className="ui-row flex items-start gap-2.5 rounded-md px-2.5 py-2 hover:bg-hover"
+      title={about(topic.sticks_to) || undefined}
+      className="flex min-w-0 flex-1 flex-col gap-3 rounded-lg bg-surface px-4 py-3 hover:bg-hover"
     >
-      <Icon
-        size={15}
-        strokeWidth={1.75}
-        aria-hidden="true"
-        className="mt-0.5 shrink-0 text-muted"
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-baseline gap-2">
-          <span className="truncate font-semibold">{topic.name}</span>
-          {unread.has(topic.id) && (
+      <span className="flex items-center gap-2">
+        <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-muted" />
+        <span className="min-w-0 truncate font-semibold">{topic.name}</span>
+        {unread.has(topic.id) && (
+          <span
+            role="img"
+            aria-label="New points"
+            className="size-1.5 shrink-0 rounded-full bg-accent"
+          />
+        )}
+        {topic.group_name && (
+          <span className="ml-auto shrink-0 text-xs text-faint">{topic.group_name}</span>
+        )}
+      </span>
+      <span className="flex items-baseline gap-1.5">
+        <span className="font-semibold text-2xl tabular-nums">{facts.kept}</span>
+        <span className="text-xs text-muted">{facts.kept === 1 ? "point" : "points"}</span>
+        {facts.last && <span className="ml-auto text-xs text-faint">{ago(facts.last)}</span>}
+      </span>
+      {facts.todo > 0 && (
+        <span className="flex items-center gap-2">
+          <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-chip">
             <span
-              role="img"
-              aria-label="New points"
-              className="size-1.5 shrink-0 self-center rounded-full bg-accent"
+              className={`block h-full rounded-full ${facts.done === facts.todo ? "bg-ok" : "bg-info"}`}
+              style={{ width: `${(facts.done / facts.todo) * 100}%` }}
             />
-          )}
-          <span className="ml-auto shrink-0 text-xs text-faint">{detail}</span>
-        </div>
-        {about(topic.sticks_to) && <p className="text-muted">{about(topic.sticks_to)}</p>}
-      </div>
+          </span>
+          <span className="text-xs text-muted tabular-nums">
+            {facts.done}/{facts.todo}
+          </span>
+        </span>
+      )}
     </Link>
   );
 }
