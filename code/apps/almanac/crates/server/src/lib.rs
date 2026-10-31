@@ -10,6 +10,7 @@ pub mod auth;
 pub mod claude;
 pub mod company;
 pub mod config;
+pub mod convert;
 pub mod error;
 pub mod groups;
 pub mod kept;

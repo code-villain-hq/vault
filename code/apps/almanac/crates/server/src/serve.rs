@@ -23,6 +23,7 @@ pub async fn serve(
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
     crate::own::ensure_everywhere(&state.pool).await;
+    crate::convert::everywhere(&state.pool).await;
     let mut workers = JoinSet::new();
     if state.scim_token.is_some() {
         workers.spawn(code_villain_scim::watch_departures::<
