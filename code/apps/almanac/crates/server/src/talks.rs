@@ -88,7 +88,9 @@ should answer from now on or correct the same thing a second time, and name_talk
 has no name. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
 into its rows (\"Lisa wiegt etwa 3,4 kg\" into Gewicht): move the sentence to the collection, \
 then change_points gives it its name as text and its cells, so it keeps its source; add the \
-field with change_block first if it has none for it. Tidy in small steps: one collection's \
+field with change_block first if it has none for it. A text field that holds yes or no, a number \
+or a day with words around it is tidied too: change its kind with change_block, give each row \
+its cell, and the words around it a text field of its own. Tidy in small steps: one collection's \
 sentences an answer, which they see as its picture under your answer and can undo; then say in \
 a sentence what's left to tidy, and do the next when they say so. Never pick a colour, a width \
 or a picture: the app draws the page from what it keeps; only when they ask for another picture \
@@ -146,7 +148,9 @@ on it. Return JSON in the schema's shape; a list with nothing in it is [].
 
 - blocks: only when the page has nowhere for what you keep, a block to start: its kind, its \
 short title (what its points share), and for a collection its fields (name, kind, unit, goal \
-as a plain number or \"\", options). Items and rows name it by its title.
+as a plain number or \"\", options), each the narrowest kind that holds its fact: yes or no a \
+check, a price a number with its unit, a date a day; a reason or a note a text field of its own. \
+Items and rows name it by its title.
 - items: what's worth knowing later, in a block that isn't a collection: facts, decisions, \
 steps, terms, and what they told you about their situation. Nothing the page already has. \
 Usually none to three. block names it as the page does (\"b2\") or by its title; theme only in \

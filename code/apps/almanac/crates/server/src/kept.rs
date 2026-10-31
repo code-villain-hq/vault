@@ -246,20 +246,23 @@ impl Kept {
 
     /// Renames a block, gives a collection its fields as they are from now
     /// on (one renamed says the name it `was`; one left out goes, with its
-    /// cells), or picks another of the pictures its fields can draw.
+    /// cells), or picks another of the pictures its fields can draw. A field
+    /// of another kind reads its cells anew; it answers with the rows whose
+    /// words it couldn't read, which it left empty.
     pub fn change_block(
         &mut self,
         block: &str,
         title: Option<&str>,
         fields: Option<&[FieldArg]>,
         view: Option<&str>,
-    ) -> Result<(), String> {
+    ) -> Result<String, String> {
         let n = self.block_at(block)?;
         let kind = self.blocks[n].kind.clone();
         if title.is_none() && fields.is_none() && view.is_none() {
             return Err("Say what changes: its title, its fields or its picture.".into());
         }
         self.touch(self.blocks[n].id)?;
+        let mut unread: Vec<String> = Vec::new();
         if let Some(title) = title {
             let title = cut(title, 60);
             if kind == "heading" && title.is_empty() {
@@ -276,15 +279,38 @@ impl Kept {
             }
             let (fields, renamed) = fields_of(given, &self.blocks[n].fields)?;
             let id = self.blocks[n].id;
+            // The fields as they were, to tell a cell whose kind changed.
+            let kinds: Vec<(String, String)> = self.blocks[n]
+                .fields
+                .iter()
+                .map(|f| (f.name.clone(), f.kind.clone()))
+                .collect();
             for point in self.points.iter_mut().filter(|p| p.block_id == id) {
                 let mut cells = BTreeMap::new();
-                for (name, cell) in std::mem::take(&mut point.cells.0) {
+                for (was, cell) in std::mem::take(&mut point.cells.0) {
                     let name = renamed
                         .iter()
-                        .find(|(was, _)| *was == name)
-                        .map_or(name, |(_, now)| now.clone());
-                    if fields.iter().any(|f| f.name == name) {
+                        .find(|(old, _)| *old == was)
+                        .map_or(was.clone(), |(_, now)| now.clone());
+                    let Some(field) = fields.iter().find(|f| f.name == name) else {
+                        continue;
+                    };
+                    let same = kinds.iter().any(|(n, k)| *n == was && *k == field.kind);
+                    if same {
                         cells.insert(name, cell);
+                        continue;
+                    }
+                    let value = match &cell {
+                        Cell::Check(yes) => json!(yes),
+                        Cell::Number(n) => json!(n),
+                        Cell::Text(words) => json!(words),
+                    };
+                    match self::cell(field, &value, &self.photos) {
+                        Ok(Some(read)) => {
+                            cells.insert(name, read);
+                        }
+                        Ok(None) => {}
+                        Err(_) => unread.push(format!("{}: {name} was {value}", point.text)),
                     }
                 }
                 point.cells = Json(cells);
@@ -314,7 +340,14 @@ impl Kept {
             }
             self.blocks[n].view = view;
         }
-        Ok(())
+        Ok(match unread.as_slice() {
+            [] => String::new(),
+            rows => format!(
+                "These cells don't read as their field's kind now, so they're empty: {}. Give \
+                 each its cell with change_points, and what else it said a text field of its own.",
+                rows.join("; ")
+            ),
+        })
     }
 
     /// Adds items to a block: lines to bullets or a checklist, paragraphs,
@@ -2189,6 +2222,63 @@ mod tests {
             &operations[2],
             Operation::Create { model: ModelKind::Reminder, data, .. } if data["point_id"] == json!(id)
         ));
+    }
+
+    #[test]
+    fn a_field_of_another_kind_reads_its_cells_anew() {
+        let mut kept = Kept::on(Refs::default());
+        kept.add_block(
+            "collection",
+            "Schuhe",
+            None,
+            &[field("Vegan", "text"), field("Preis", "text")],
+        )
+        .unwrap();
+        kept.add_rows(
+            "b1",
+            &[
+                row("Saola", json!({"Vegan": "Ja", "Preis": "1 790"})),
+                row(
+                    "Byway",
+                    json!({"Vegan": "Nein, Nubuk und Wildleder", "Preis": "1599 kr"}),
+                ),
+            ],
+        )
+        .unwrap();
+        let unread = kept
+            .change_block(
+                "b1",
+                None,
+                Some(&[
+                    field("Vegan", "check"),
+                    FieldArg {
+                        unit: "kr".into(),
+                        ..field("Preis", "number")
+                    },
+                ]),
+                None,
+            )
+            .unwrap();
+        assert!(
+            unread.contains("Byway: Vegan was \"Nein, Nubuk und Wildleder\""),
+            "{unread}"
+        );
+        assert!(!unread.contains("Saola"), "{unread}");
+        let (_, operations) = kept.writes(&answering());
+        let cells: Vec<&Value> = operations
+            .iter()
+            .filter_map(|o| match o {
+                Operation::Create { data, .. } => data.get("cells"),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            cells,
+            [
+                &json!({"Vegan": true, "Preis": 1790.0}),
+                &json!({"Preis": 1599.0})
+            ]
+        );
     }
 
     #[test]

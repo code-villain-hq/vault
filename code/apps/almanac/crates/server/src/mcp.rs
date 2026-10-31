@@ -235,13 +235,15 @@ async fn call(
         }
         "change_block" => {
             let args: BlockChangeArgs = read(arguments)?;
-            kept()?.change_block(
+            let unread = kept()?.change_block(
                 &args.block,
                 args.title.as_deref(),
                 args.fields.as_deref(),
                 args.view.as_deref(),
             )?;
-            Ok("Changed, once your answer is done.".into())
+            Ok(format!("Changed, once your answer is done. {unread}")
+                .trim_end()
+                .into())
         }
         "add_items" => {
             let args: ItemsArgs = read(arguments)?;
@@ -799,7 +801,11 @@ order: the facts every row has (Gewicht, Tag, Licht, Status). A field holds one 
 text a few words, number a plain number with its unit (kg) and a goal when they aim at one, \
 day a day or a year or a span, choice one of a few words, status where a row stands (its \
 words in order, the last one done), check yes or no, photo a photo from the talk, link a web \
-page. The app picks the picture from them: never name a colour, a width or a picture here.";
+page. Pick the narrowest kind that holds the fact: yes or no is a check, an amount or a price a \
+number with its unit, a date a day, a web page a link, one of a few words that repeat a choice; \
+text only for words. A cell holds the fact alone: a reason or a note goes in a text field of its \
+own (Vegan a check, Material \"Nubuk und Wildleder\"). A field changed to another kind reads its \
+cells anew. The app picks the picture from them: never name a colour, a width or a picture here.";
 
 /// One field, for the tools that name fields.
 fn field_schema(renames: bool) -> Value {
