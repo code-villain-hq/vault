@@ -452,8 +452,11 @@ when they aim at one), day (a day as 2026-09-24, or a year or a span, 1987–199
 a few words), status (where a row stands, Offen, Bestellt, Erledigt), check (yes or no), photo \
 (a photo from the talk, by its number) or link (a web page). The app draws a collection from \
 its fields: days with numbers as a line, a check with at most a day as a checklist, a status as \
-a board, photos as cards, days past as a timeline and days to come as a week, a name with a \
-number as bars, three fields or more as a table, the rest as a list. \
+a board, photos as cards, a few names each with a short value (Gewicht: 3,4 kg) as figures, \
+large in tiles, days past as a timeline and days to come as a week, a name with a number as \
+bars, three fields or more as a table, the rest as a list. A status or a choice shows as a \
+coloured pill, counted over the rows; steps in an order can be drawn as numbered steps. Prefer \
+what draws to what reads: a number, a status or a choice says more at a glance than words. \
 Lists are collections too: a list of things or terms is rows with only a name, a few words \
 each; what to do or get is rows with a check (Done), ticked once done. A row to do that comes \
 round or is due on a day is a reminder too (offer_reminder with its item): it rings on the Mac, \

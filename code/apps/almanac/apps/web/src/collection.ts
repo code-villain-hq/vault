@@ -10,7 +10,9 @@ import { when } from "./timeline";
 export const PICTURES = [
   "line",
   "checklist",
+  "steps",
   "board",
+  "figures",
   "cards",
   "timeline",
   "week",
@@ -79,6 +81,31 @@ export function checkOf(block: Block): Field | undefined {
   return checks.length === 1 && only ? checks[0] : undefined;
 }
 
+/** The most rows figures draw, a tile each: past it they're a table. */
+const FIGURES_MOST = 8;
+/** The longest value a figure's tile holds, "12–16 Stunden". */
+const FIGURE_LONGEST = 16;
+/** The most rows drawn as steps, a numbered line each. */
+const STEPS_MOST = 12;
+
+/**
+ * Whether a collection is a few names each with a short value of its own,
+ * "Gewicht 3,4 kg", "Schlaf 12–16 h": a tile each, the value large.
+ */
+export function figuresOf(fields: Field[], rows: Point[]): boolean {
+  const [only, ...more] = fields;
+  return (
+    rows.length >= 2 &&
+    rows.length <= FIGURES_MOST &&
+    more.length === 0 &&
+    only?.kind === "text" &&
+    rows.every((row) => {
+      const cell = cellOf(row, only);
+      return typeof cell === "string" && [...cell].length <= FIGURE_LONGEST;
+    })
+  );
+}
+
 /**
  * The picture the app draws a collection as: the first rule that fits.
  *
@@ -86,6 +113,7 @@ export function checkOf(block: Block): Field | undefined {
  * - a check, with at most a day besides, is a checklist (`checkOf`);
  * - a status is a board;
  * - a photo is cards;
+ * - a few names each with a short value are figures (`figuresOf`);
  * - days, or spans, all past are a timeline, unless every row has the same;
  * - days still to come are a week;
  * - a name and a number, with one field more at most, are bars;
@@ -104,6 +132,7 @@ export function pictureOf(block: Block, rows: Point[], on = today()): string {
   if (checkOf(block)) return "checklist";
   if (of("status")) return "board";
   if (of("photo")) return "cards";
+  if (figuresOf(fields, rows)) return "figures";
   if (day && tellsApart(rows, day)) {
     return rows.some((r) => (dayOf(r, day) ?? "") >= on) ? "week" : "timeline";
   }
@@ -114,8 +143,8 @@ export function pictureOf(block: Block, rows: Point[], on = today()): string {
 /**
  * What View as offers for a collection, the app's pick among them: the
  * pictures its fields can draw. A line needs days with numbers, a
- * checklist its check, a board a status or a choice, a timeline days or spans, a week days, bars numbers;
- * cards, a table and a list draw anything.
+ * checklist its check, a board a status or a choice, a timeline days or spans, a week days, bars numbers,
+ * figures a few rows with a value; steps a few rows in their order; cards, a table and a list draw anything.
  */
 export function picturesFor(block: Block, rows: Point[], on = today()): string[] {
   const pick = pictureOf(block, rows, on);
@@ -131,19 +160,22 @@ export function picturesFor(block: Block, rows: Point[], on = today()): string[]
   if (day) fits.add("timeline");
   if (day && rows.some((r) => dayOf(r, day))) fits.add("week");
   if (number) fits.add("bars");
+  if (rows.length >= 2 && rows.length <= FIGURES_MOST && fields.length > 0) fits.add("figures");
+  if (rows.length >= 2 && rows.length <= STEPS_MOST) fits.add("steps");
   return PICTURES.filter((picture) => fits.has(picture));
 }
 
 /**
  * How much of a row a collection takes, of the page's twelve columns: a
- * board, a week and a timeline the whole; a table the whole past three
- * columns; cards the whole past two; a line, bars and a list half.
+ * board, a week, a timeline and figures the whole; a table the whole past three
+ * columns; cards the whole past two; a line, bars, steps and a list half.
  */
 export function pictureWidth(picture: string, block: Block, rows: Point[]): string {
   switch (picture) {
     case "board":
     case "week":
     case "timeline":
+    case "figures":
       return "whole";
     case "table":
       return filled(block, rows).length + 1 > 3 ? "whole" : "1/2";

@@ -1201,7 +1201,9 @@ function BlockView({ block, page }: { block: Block; page: PageParts }) {
         <BlockFrame
           {...frame}
           aside={
-            block.view === "checklist" ? <ChecklistCount block={block} rows={points} /> : undefined
+            block.view === "checklist" || block.view === "steps" ? (
+              <ChecklistCount block={block} rows={points} />
+            ) : undefined
           }
         >
           <Collection block={block} rows={points} />

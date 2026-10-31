@@ -151,6 +151,24 @@ describe("pictureOf", () => {
   });
 });
 
+describe("figures", () => {
+  test("a few names each with a short value are figures, a long one a list", () => {
+    const facts = collection(field("Wert", "text"));
+    const short = [row("Alter", { Wert: "3½ Jahre" }), row("Gewicht", { Wert: "3,4 kg" })];
+    expect(pictureOf(facts, short, ON)).toBe("figures");
+    expect(pictureWidth("figures", facts, short)).toBe("whole");
+    const long = [...short, row("Schlaf", { Wert: "zwölf bis sechzehn Stunden am Tag" })];
+    expect(pictureOf(facts, long, ON)).toBe("list");
+  });
+
+  test("steps are offered for a few rows in their order, never picked", () => {
+    const leash = collection(field("Geübt", "check"), field("Tipp", "text"));
+    const rows = [row("Geschirr zeigen", { Geübt: true }), row("Drinnen tragen", { Tipp: "kurz" })];
+    expect(pictureOf(leash, rows, ON)).not.toBe("steps");
+    expect(picturesFor(leash, rows, ON)).toContain("steps");
+  });
+});
+
 describe("picturesFor", () => {
   test("offers what the fields can draw, the app's pick among them", () => {
     const weight = collection(field("Tag", "day"), field("Gewicht", "number"));

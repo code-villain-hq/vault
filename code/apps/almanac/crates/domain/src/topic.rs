@@ -146,8 +146,8 @@ pub const LIST_KINDS: &[&str] = &["bullets", "checklist", "toggle"];
 pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
 
 /// How a person asked a collection to be drawn, with View as: a table,
-/// cards, a list, a checklist, a timeline, a line, a board, a week or
-/// bars. Empty is the
+/// cards, a list, a checklist, a timeline, a line, a board, a week, bars,
+/// figures or steps. Empty is the
 /// app's own pick from its fields. Only a person sets it; a talk's layout
 /// never does.
 pub const BLOCK_VIEWS: &[&str] = &[
@@ -161,6 +161,8 @@ pub const BLOCK_VIEWS: &[&str] = &[
     "board",
     "week",
     "bars",
+    "figures",
+    "steps",
 ];
 
 /// What a collection's field holds: a few words, a number (with its unit

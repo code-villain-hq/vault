@@ -7,7 +7,7 @@
 
 import type { Block, Field, Point, Reminder } from "@almanac/types";
 import { type Confirmation, ConfirmDialog, RowAction } from "@code-villain/web";
-import { Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
+import { Check, Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import {
   type ComponentType,
   createContext,
@@ -274,11 +274,17 @@ export function Paragraphs({ points }: { points: Point[] }) {
 /** How many of a checklist's rows are done. */
 export function ChecklistCount({ block, rows }: { block: Block; rows: Point[] }) {
   const rings = useItemReminders();
-  const check = checkOf(block);
+  const check = checkOf(block) ?? block.fields.find((f) => f.kind === "check");
   if (!check) return null;
   const done = rows.filter((r) => itemDone(r, check, rings.get(r.id))).length;
   return (
-    <span className="text-xs text-faint">
+    <span className="flex items-center gap-2 text-xs text-faint tabular-nums">
+      <span aria-hidden="true" className="block h-1.5 w-16 rounded-full bg-chip">
+        <span
+          className={`block h-full rounded-full ${done === rows.length ? "bg-ok" : "bg-info"}`}
+          style={{ width: `${rows.length ? (done / rows.length) * 100 : 0}%` }}
+        />
+      </span>
       {done} of {rows.length} done
     </span>
   );
@@ -325,6 +331,7 @@ export function Callout({ points }: { points: Point[] }) {
 /** A row's other cells, in words: "Bad · Offen · ✓ Geimpft". */
 function rest(fields: Field[], row: Point): string {
   return fields
+    .filter((field) => !TOLD_BY_TONE.has(field.kind))
     .flatMap((field) => {
       const cell = cellOf(row, field);
       if (field.kind === "check") return cell === true ? [`✓ ${field.name}`] : [];
@@ -338,6 +345,209 @@ function rest(fields: Field[], row: Point): string {
  * A collection, as the picture the page draws it with (`block.view`): its
  * fields pick it, or a person did with View as.
  */
+/** The kinds a row's line shows as a coloured pill, not words. */
+const TOLD_BY_TONE = new Set(["status", "choice"]);
+
+/** A choice's options told apart by a dot each, in its order. */
+const CHOICE_DOTS = ["bg-info", "bg-warn", "bg-ok", "bg-accent", "bg-signal", "bg-danger"];
+
+/**
+ * How a status's or a choice's word looks: a status still open at first
+ * (its first option), done at its last and under way between, as a
+ * board's lanes; a choice's options a dot each.
+ */
+export function Pill({ field, value }: { field: Field; value: string }) {
+  const at = field.options.indexOf(value);
+  if (field.kind === "status") {
+    const tone =
+      at > 0 && at === field.options.length - 1
+        ? "bg-ok/15 text-ok-ink"
+        : at > 0
+          ? "bg-info/15 text-info-ink"
+          : "bg-chip text-muted";
+    return (
+      <span
+        className={`inline-flex max-w-full shrink-0 items-center truncate rounded-full px-2 py-px font-medium text-xs ${tone}`}
+      >
+        {value}
+      </span>
+    );
+  }
+  const dot = at >= 0 ? CHOICE_DOTS[at % CHOICE_DOTS.length] : "bg-faint";
+  return (
+    <span className="inline-flex max-w-full shrink-0 items-center gap-1.5 truncate rounded-full bg-chip px-2 py-px text-xs">
+      <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dot}`} />
+      {value}
+    </span>
+  );
+}
+
+/** A row's statuses and choices, a pill each. */
+function Pills({ fields, row }: { fields: Field[]; row: Point }) {
+  const pills = fields.flatMap((field) => {
+    const cell = cellOf(row, field);
+    return TOLD_BY_TONE.has(field.kind) && typeof cell === "string"
+      ? [<Pill key={field.name} field={field} value={cell} />]
+      : [];
+  });
+  return pills.length > 0 ? (
+    <span className="flex shrink-0 gap-1.5 self-center">{pills}</span>
+  ) : null;
+}
+
+/**
+ * How many rows each status or choice has, over a collection's picture: a
+ * figure each, and one bar of them all, open first and done last.
+ */
+export function Tally({ rows, field }: { rows: Point[]; field: Field }) {
+  const lanes = lanesOf(field, rows);
+  const counts = lanes.map((lane) => rows.filter((row) => cellOf(row, field) === lane).length);
+  if (counts.filter((n) => n > 0).length < 2) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(8rem,100%),1fr))] gap-2">
+        {lanes.map((lane, i) => (
+          <div key={lane} className="flex flex-col gap-0.5 rounded-lg bg-surface px-3.5 py-2.5">
+            <span className="font-semibold text-2xl tabular-nums leading-tight">{counts[i]}</span>
+            <Pill field={field} value={lane} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Figures: a tile a row, its value large over its name, as a dashboard's
+ * numbers. The value is its number, or else the first cell it has.
+ */
+function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
+  const shown = fields.filter((f) => f.kind !== "photo" && f.kind !== "check");
+  const value =
+    shown.find((f) => f.kind === "number") ??
+    shown.find((f) => !TOLD_BY_TONE.has(f.kind)) ??
+    shown[0];
+  const others = shown.filter((f) => f !== value);
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(10rem,100%),1fr))] gap-2.5">
+      {rows.map((row) => {
+        const cell = value && cellOf(row, value);
+        const words = value ? cellWords(value, cell) : "";
+        const more = rest(others, row);
+        return (
+          <article
+            key={row.id}
+            className="group relative flex min-w-0 flex-col gap-1 rounded-lg bg-surface px-4 py-3"
+          >
+            <span className="flex items-start gap-2">
+              <span
+                className={`min-w-0 flex-1 font-semibold leading-tight tabular-nums ${
+                  [...words].length > 9 ? "text-lg" : "text-2xl"
+                }`}
+              >
+                {value && TOLD_BY_TONE.has(value.kind) && typeof cell === "string" ? (
+                  <Pill field={value} value={cell} />
+                ) : (
+                  words || <span className="text-faint">–</span>
+                )}
+              </span>
+              <RemovePoint point={row} />
+            </span>
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+              <NewDot point={row} />
+              <RowName row={row} className="truncate" />
+            </span>
+            {more && <span className="truncate text-xs text-faint">{more}</span>}
+            <Pills fields={others} row={row} />
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A step's number on the rail, ✓ once done; with a check, it ticks the step. */
+function StepMark({
+  row,
+  check,
+  done,
+  n,
+  className,
+}: {
+  row: Point;
+  check?: Field;
+  done: boolean;
+  n: number;
+  className: string;
+}) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const rings = useItemReminders();
+  const look = `relative grid size-7 shrink-0 place-items-center rounded-full font-semibold text-xs tabular-nums ${className}`;
+  const face = done ? <Check size={14} strokeWidth={2.5} aria-hidden="true" /> : n;
+  if (!check || guest) return <span className={look}>{face}</span>;
+  const reminder = rings.get(row.id);
+  return (
+    <button
+      type="button"
+      aria-pressed={done}
+      aria-label={`${row.text}: ${done ? "done" : "to do"}`}
+      onClick={() => {
+        if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
+        sync.update("Point", row.id, { cells: { ...row.cells, [check.name]: !done } });
+      }}
+      className={`${look} hover:opacity-80`}
+    >
+      {face}
+    </button>
+  );
+}
+
+/**
+ * Steps: the rows in their order, numbered on a rail, as a way through.
+ * With a check, a step done is ticked on its number, and the first still
+ * to do stands out.
+ */
+function Steps({ rows, check, fields }: { rows: Point[]; check?: Field; fields: Field[] }) {
+  const rings = useItemReminders();
+  const done = (row: Point) => (check ? itemDone(row, check, rings.get(row.id)) : false);
+  const next = check ? rows.find((row) => !done(row)) : undefined;
+  return (
+    <ol className={`flex flex-col ${LINES}`}>
+      {rows.map((row, i) => {
+        const finished = done(row);
+        const words = rest(fields, row);
+        const mark = finished
+          ? "bg-ok text-bg"
+          : row === next
+            ? "bg-primary text-on-primary"
+            : "bg-surface text-muted ring-1 ring-line ring-inset";
+        return (
+          <li key={row.id} className="group relative flex gap-3 pb-3 last:pb-0">
+            <span
+              aria-hidden="true"
+              className="absolute top-7 bottom-0 left-[13px] w-[1.5px] bg-line group-last:hidden"
+            />
+            <StepMark row={row} check={check} done={finished} className={mark} n={i + 1} />
+            <div className="flex min-w-0 flex-1 flex-col pt-[3px]">
+              <span className="flex items-baseline gap-2">
+                <NewDot point={row} className="self-center" />
+                <RowName
+                  row={row}
+                  className={`min-w-0 flex-1 font-medium ${finished ? "text-faint line-through decoration-faint" : ""}`}
+                />
+                <Pills fields={fields} row={row} />
+                <RemovePoint point={row} />
+              </span>
+              {words && <span className="text-xs text-muted">{words}</span>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
   const fields = filled(block, rows);
   const of = (...kinds: string[]) => fields.find((f) => kinds.includes(f.kind));
@@ -376,14 +586,34 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
           heading={heading}
         />
       ) : null;
-    case "cards":
-      return <RowCards rows={rows} fields={fields} />;
-    case "table":
-      return <RowTable block={block} rows={rows} fields={fields} />;
-    default:
-      return <RowList rows={rows} fields={fields} />;
+    case "figures":
+      return <Figures rows={rows} fields={fields} />;
+    case "steps": {
+      const ticks = block.fields.find((f) => f.kind === "check");
+      return <Steps rows={rows} check={ticks} fields={fields.filter((f) => f !== ticks)} />;
+    }
   }
+  // Rows told apart by a status or a choice count each over the picture.
+  const told = of("status", "choice");
+  const picture =
+    block.view === "cards" ? (
+      <RowCards rows={rows} fields={fields} />
+    ) : block.view === "table" ? (
+      <RowTable block={block} rows={rows} fields={fields} />
+    ) : (
+      <RowList rows={rows} fields={fields} />
+    );
+  if (!told || rows.length < TALLY_FROM) return picture;
+  return (
+    <div className="flex flex-col gap-3">
+      <Tally rows={rows} field={told} />
+      {picture}
+    </div>
+  );
 }
+
+/** The fewest rows a tally counts over: under it, the rows are seen at a glance. */
+const TALLY_FROM = 4;
 
 /**
  * A line: a number over the days, with the goal its field names, dashed.
@@ -464,6 +694,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                     <RowName row={row} className="truncate" />
                     {words && <span className="truncate text-xs text-faint">{words}</span>}
                   </div>
+                  <Pills fields={fields} row={row} />
                   <RemovePoint point={row} />
                 </article>
               );
@@ -503,7 +734,13 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
                   <div key={field.name} className="col-span-full grid grid-cols-subgrid">
                     <dt className="text-faint">{field.name}</dt>
                     <dd className="min-w-0 truncate">
-                      {field.kind === "check" ? "✓" : cellWords(field, cell)}
+                      {field.kind === "check" ? (
+                        <span className="text-ok-ink">✓</span>
+                      ) : TOLD_BY_TONE.has(field.kind) && typeof cell === "string" ? (
+                        <Pill field={field} value={cell} />
+                      ) : (
+                        cellWords(field, cell)
+                      )}
                     </dd>
                   </div>
                 );
@@ -554,9 +791,13 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
                 return (
                   <td
                     key={field.name}
-                    className={`${cell} max-w-64 truncate ${field.kind === "number" ? "text-right" : ""}`}
+                    className={`${cell} max-w-64 truncate ${field.kind === "number" ? "text-right" : ""} ${field.kind === "check" ? "text-ok-ink" : ""}`}
                   >
-                    {words || <span className="text-faint">–</span>}
+                    {TOLD_BY_TONE.has(field.kind) && typeof value === "string" ? (
+                      <Pill field={field} value={value} />
+                    ) : (
+                      words || <span className="text-faint">–</span>
+                    )}
                   </td>
                 );
               })}
@@ -592,6 +833,7 @@ function RowTimeline({ rows, day, fields }: { rows: Point[]; day: Field; fields:
                 <RowName row={row} />
                 {words && <span className="text-faint"> · {words}</span>}
               </p>
+              <Pills fields={fields} row={row} />
               <RemovePoint point={row} />
             </div>
           </TimelineLine>
@@ -654,7 +896,11 @@ function Week({ rows, day }: { rows: Point[]; day: Field }) {
   );
 }
 
-/** Bars: a bar per row with a number, on the largest, its other cells beside it. */
+/**
+ * Bars: a bar per row with a number, on the largest, its other cells
+ * beside it. A goal draws as a mark on every bar's track, and a status or
+ * a choice colours the bars by its pill.
+ */
 function RowBars({
   rows,
   number,
@@ -667,10 +913,35 @@ function RowBars({
   heading?: string;
 }) {
   const bars = rows.filter((row) => numberOf(row, number) !== null);
-  const most = Math.max(...bars.map((row) => Math.abs(numberOf(row, number) ?? 0)), 0);
+  const goal = number.goal ?? null;
+  const most = Math.max(
+    ...bars.map((row) => Math.abs(numberOf(row, number) ?? 0)),
+    Math.abs(goal ?? 0),
+    0,
+  );
+  const told = fields.find((f) => TOLD_BY_TONE.has(f.kind));
+  const fill = (row: Point) => {
+    const cell = told && cellOf(row, told);
+    if (!told || typeof cell !== "string") return "bg-fg/40";
+    const at = told.options.indexOf(cell);
+    if (told.kind === "choice") return at >= 0 ? CHOICE_DOTS[at % CHOICE_DOTS.length] : "bg-faint";
+    return at > 0 && at === told.options.length - 1 ? "bg-ok" : at > 0 ? "bg-info" : "bg-faint";
+  };
+  const words = (amount: number) =>
+    number.unit ? `${amountWords(amount)} ${number.unit}` : amountWords(amount);
   return (
     <section className="flex flex-col gap-1.5" aria-label={number.name}>
-      {heading && <h3 className="text-xs text-muted">{heading}</h3>}
+      {(heading || goal !== null) && (
+        <h3 className="flex gap-3 text-xs text-muted">
+          {heading && <span>{heading}</span>}
+          {goal !== null && (
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="h-3 w-[2px] rounded-full bg-warn" />
+              Goal {words(goal)}
+            </span>
+          )}
+        </h3>
+      )}
       <ul className="grid max-w-5xl grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content_minmax(0,max-content)] gap-x-3.5">
         {bars.map((row) => {
           const amount = numberOf(row, number) ?? 0;
@@ -683,19 +954,24 @@ function RowBars({
                 <NewDot point={row} />
                 <RowName row={row} className="line-clamp-2 min-w-0" />
               </span>
-              <span aria-hidden="true" className="block h-2.5 rounded-full bg-chip">
+              <span aria-hidden="true" className="relative block h-2.5 rounded-full bg-chip">
                 <span
-                  className="block h-full min-w-[3px] rounded-full bg-fg/40"
+                  className={`block h-full min-w-[3px] rounded-full ${fill(row)}`}
                   style={{ width: `${most ? (Math.abs(amount) / most) * 100 : 0}%` }}
                 />
+                {goal !== null && most > 0 && (
+                  <span
+                    className="absolute -top-1 -bottom-1 w-[2px] rounded-full bg-warn"
+                    style={{ left: `calc(${(Math.abs(goal) / most) * 100}% - 1px)` }}
+                  />
+                )}
               </span>
-              <span className="text-right font-semibold tabular-nums">
-                {number.unit ? `${amountWords(amount)} ${number.unit}` : amountWords(amount)}
-              </span>
+              <span className="text-right font-semibold tabular-nums">{words(amount)}</span>
               <span className="flex min-w-0 items-center gap-2">
                 <span className="line-clamp-2 min-w-0 flex-1 text-xs text-faint">
                   {rest(fields, row)}
                 </span>
+                <Pills fields={fields} row={row} />
                 <RemovePoint point={row} />
               </span>
             </li>
@@ -726,6 +1002,7 @@ function RowChecklist({ rows, check, fields }: { rows: Point[]; check: Field; fi
               <RowName row={row} />
               {words && <span className="text-muted"> · {words}</span>}
             </p>
+            <Pills fields={fields} row={row} />
             {reminder && <Rings reminder={reminder} />}
             <RemovePoint point={row} />
           </li>
@@ -749,6 +1026,7 @@ function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
               <RowName row={row} className={fields.length > 0 ? "font-semibold" : ""} />
               {words && <span className="text-muted"> · {words}</span>}
             </p>
+            <Pills fields={fields} row={row} />
             <RemovePoint point={row} />
           </li>
         );

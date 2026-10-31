@@ -69,6 +69,8 @@ export const VIEW_NAMES: Record<string, string> = {
   checklist: "Checklist",
   board: "Board",
   week: "Week",
+  figures: "Figures",
+  steps: "Steps",
 };
 
 /**

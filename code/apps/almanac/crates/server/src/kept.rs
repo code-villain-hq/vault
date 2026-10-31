@@ -1587,6 +1587,13 @@ pub fn cell(field: &Field, value: &Value, photos: &[Uuid]) -> Result<Option<Cell
     }))
 }
 
+/// The most rows figures draw, a tile each: past it they're a table.
+const FIGURES_MOST: usize = 8;
+/// The longest value a figure's tile holds, "12–16 Stunden".
+const FIGURE_LONGEST: usize = 16;
+/// The most rows drawn as steps, a numbered line each.
+const STEPS_MOST: usize = 12;
+
 /// The pictures a collection's rows can be drawn as, as View as offers them
 /// (`apps/web/src/collection.ts`): none without rows.
 pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<&'static str> {
@@ -1631,6 +1638,14 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
     // One check, and at most a day besides: rows to tick, as `check_of`.
     let checklist = fields.iter().filter(|f| f.kind == "check").count() == 1
         && fields.iter().all(|f| f.kind == "check" || f.kind == "day");
+    // A few names each with a short value of its own, "Gewicht 3,4 kg", as
+    // `figuresOf`.
+    let figures = (2..=FIGURES_MOST).contains(&rows.len())
+        && matches!(filled.as_slice(), [f] if f.kind == "text")
+        && rows.iter().all(|r| match r.cells.get(&filled[0].name) {
+            Some(Cell::Text(t)) => t.chars().count() <= FIGURE_LONGEST,
+            _ => false,
+        });
     let pick = if line {
         "line"
     } else if checklist {
@@ -1639,6 +1654,8 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
         "board"
     } else if of("photo").is_some() {
         "cards"
+    } else if figures {
+        "figures"
     } else if let Some(day) = day.filter(|d| apart(d)) {
         if rows
             .iter()
@@ -1674,10 +1691,18 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
     if number.is_some() {
         fits.push("bars");
     }
+    if (2..=FIGURES_MOST).contains(&rows.len()) && !filled.is_empty() {
+        fits.push("figures");
+    }
+    if (2..=STEPS_MOST).contains(&rows.len()) {
+        fits.push("steps");
+    }
     [
         "line",
         "checklist",
+        "steps",
         "board",
+        "figures",
         "cards",
         "timeline",
         "week",
@@ -2054,6 +2079,32 @@ mod tests {
         let again = offer("Scorett", json!({"Preis": 1499, "Tag": "2026-11-02"}));
         let rows: Vec<&PagePoint> = first.iter().chain([&again]).collect();
         assert!(pictures(&fields, &rows, today).contains(&"line"));
+    }
+
+    #[test]
+    fn a_few_names_with_short_values_are_figures() {
+        let fields = vec![Field {
+            name: "Wert".into(),
+            kind: "text".into(),
+            unit: String::new(),
+            goal: None,
+            options: Vec::new(),
+        }];
+        let facts = block("collection", "Lisa", 0);
+        let fact = |name: &str, value: &str| PagePoint {
+            cells: Json(serde_json::from_value(json!({ "Wert": value })).unwrap()),
+            ..point(&facts, "", name, 0)
+        };
+        let today = NaiveDate::from_ymd_opt(2026, 10, 31).unwrap();
+        let short = [fact("Alter", "3½ Jahre"), fact("Gewicht", "3,4 kg")];
+        let rows: Vec<&PagePoint> = short.iter().collect();
+        assert_eq!(
+            pictures(&fields, &rows, today),
+            ["steps", "figures", "cards", "table", "list"]
+        );
+        let long = fact("Schlaf", "zwölf bis sechzehn Stunden am Tag");
+        let rows: Vec<&PagePoint> = short.iter().chain([&long]).collect();
+        assert!(pictures(&fields, &rows, today).contains(&"list"));
     }
 
     #[test]
