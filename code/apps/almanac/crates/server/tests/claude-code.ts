@@ -90,6 +90,15 @@ async function answer(prompt: string) {
       say("Here's a topic for your plants.");
     }
     await tool("name_talk", { title: "Plants" });
+  } else if (/\bin ([A-Z]\w+) note (.+)$/m.test(prompt)) {
+    const [, topic, text] = /\bin ([A-Z]\w+) note (.+)$/m.exec(prompt) ?? [];
+    try {
+      await tool("add_block", { topic, kind: "paragraph", title: "Notes" });
+      await tool("add_items", { topic, block: "Notes", items: [{ text }] });
+      say("Noted there.");
+    } catch (refused) {
+      say(String(refused));
+    }
   } else if (/\bcall ([A-Z]\w+) ([A-Z]\w+)\b/.test(prompt)) {
     const [, topic, name] = /\bcall ([A-Z]\w+) ([A-Z]\w+)\b/.exec(prompt) ?? [];
     try {

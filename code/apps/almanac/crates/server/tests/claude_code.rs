@@ -858,3 +858,77 @@ async fn a_talk_renames_its_sub_topic_but_no_other_topic(pool: PgPool) {
     let topics = app.synced(&ada, &home, "Topic").await;
     assert_eq!(named(&topics, &notifications), "Notifications");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_talk_changes_its_sub_topics_pages_but_no_other(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, _) = with_claude_code(pool, dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let topics = format!("/api/w/{home}/topics");
+    let start = |name: &str, parent: Value| {
+        app.post(
+            &topics,
+            Some(&ada),
+            json!({ "name": name, "template": "study", "parent_id": parent }),
+        )
+    };
+    let backend = start("Backend", Value::Null).await.body["id"].clone();
+    let notifications = start("Notifications", backend.clone()).await.body["id"].clone();
+    let cooking = start("Cooking", Value::Null).await.body["id"].clone();
+    let backend_id = backend.as_str().unwrap();
+    let notes_on = |blocks: &[Value], topic: &Value| {
+        blocks
+            .iter()
+            .any(|b| b["topic_id"] == *topic && b["title"] == "Notes")
+    };
+
+    let noted = ask(
+        &app,
+        &ada,
+        &home,
+        backend_id,
+        "in Notifications note Use web push.",
+    )
+    .await;
+    let blocks = app.synced(&ada, &home, "Block").await;
+    assert!(notes_on(&blocks, &notifications));
+    assert!(!notes_on(&blocks, &backend));
+    let points = app.synced(&ada, &home, "Point").await;
+    assert!(
+        points
+            .iter()
+            .any(|p| p["topic_id"] == notifications && p["text"] == "Use web push.")
+    );
+    let changes = noted["changes"].as_array().unwrap();
+    assert!(
+        changes.iter().any(|c| c["topic_id"] == notifications),
+        "{changes:?}"
+    );
+    // Another topic it only reads.
+    ask(
+        &app,
+        &ada,
+        &home,
+        backend_id,
+        "in Cooking note Salt the water.",
+    )
+    .await;
+    let blocks = app.synced(&ada, &home, "Block").await;
+    assert!(!notes_on(&blocks, &cooking));
+
+    let undone = app
+        .post(
+            &format!(
+                "/api/w/{home}/messages/{}/undo",
+                noted["id"].as_str().unwrap()
+            ),
+            Some(&ada),
+            json!({}),
+        )
+        .await;
+    assert!(undone.status.is_success(), "{}", undone.body);
+    let blocks = app.synced(&ada, &home, "Block").await;
+    assert!(!notes_on(&blocks, &notifications));
+    let points = app.synced(&ada, &home, "Point").await;
+    assert!(!points.iter().any(|p| p["text"] == "Use web push."));
+}

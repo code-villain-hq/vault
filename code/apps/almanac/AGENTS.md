@@ -219,8 +219,10 @@ What they do:
     gives it whole (`Kept::change_brief`): the change is kept on the
     message for Undo, as the own topic's are. Its name, group or icon it
     changes only when asked, with change_topic. Both reach its sub-topics
-    too, by name (`this_or_sub` in `mcp.rs`); other topics it only reads,
-    and into its sub-topics it moves.
+    too, by name (`this_or_sub` in `mcp.rs`), and so do the page tools
+    (`PAGE_TOOLS`), each on a copy of the sub-topic's page that the answer
+    writes and undoes with its own (`Kept::sub_pages`); other topics it
+    only reads, and into its sub-topics it moves.
   - A topic can sit under another, one level deep (`parent_id`, migration
     0019; `may_sit_under` in the sync rules): never under itself, Almanac's
     own topic or a topic that sits under one. Its talks keep to the parent's

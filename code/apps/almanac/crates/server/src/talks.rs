@@ -93,9 +93,10 @@ topic keeps, propose_sub_topic when they ask for a sub-topic of this one (what t
 there, in takes), once for each they ask for, all in the same answer, move_to_sub_topic when they ask to \
 move what this page keeps about a sub-topic there, and name_talk while the talk has no name. A move \
 takes along what it empties, a block no row stays in and a lane none does, so nothing is left to \
-tidy after it; and what they ask to make a sub-topic of, propose, rather than talk them out of it. You change this topic, and of its sub-topics \
-their names, icons and briefs (change_topic, change_brief, naming the sub-topic), and move into \
-them: another topic you only read, and when they want it changed, say they can do it in that \
+tidy after it; and what they ask to make a sub-topic of, propose, rather than talk them out of it. You change this topic and its sub-topics, all of \
+them: their names, icons and briefs (change_topic, change_brief), and their pages, with the page \
+tools given the sub-topic as their topic and the references read_topic gives its page. Moving \
+back to this page is adding here and removing there. Another topic you only read, and when they want it changed, say they can do it in that \
 topic's talk. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
 into its rows (\"Lisa wiegt etwa 3,4 kg\" into Gewicht): move the sentence to the collection, \
 then change_points gives it its name as text and its cells, so it keeps its source; add the \

@@ -7,7 +7,8 @@
 //! writes it with the answer, in one transaction.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use almanac_domain::{
     Actor, FIELD_KINDS, ICONS, PageLayout, Proposal, ProposedPoint, SET_KINDS, STICKS_TO_MAX,
@@ -234,10 +235,15 @@ async fn call(
     fn read<T: DeserializeOwned>(arguments: Value) -> Result<T, String> {
         serde_json::from_value(arguments).map_err(|e| format!("The arguments don't fit: {e}."))
     }
+    let sub = match PAGE_TOOLS.contains(&name) {
+        true => sub_page(state, asking, &arguments).await?,
+        false => None,
+    };
     let kept = || {
         asking
             .kept
             .lock()
+            .map(|guard| On { guard, sub })
             .map_err(|_| "Almanac stumbled.".to_string())
     };
     match name {
@@ -357,10 +363,18 @@ async fn call(
                 .await
                 .map_err(|_| "Almanac couldn't read that topic.".to_string())?
                 .ok_or("That topic is gone.")?;
+            let sub = this_or_sub(state, asking, &named).await.is_ok();
             Ok(format!(
-                "Its page only to read: its references (b2, p5) aren't this page's, so none \
-                 go to your tools. A sub-topic of this one you also rename, re-brief and move \
-                 into.\n\n{}",
+                "{}\n\n{}",
+                match sub {
+                    true =>
+                        "A sub-topic of this one: its page's references (b2, p5) go to your \
+                             page tools with its name as their topic. You also rename, re-brief \
+                             and move into it.",
+                    false =>
+                        "Its page only to read: its references (b2, p5) aren't this page's, \
+                              so none go to your tools.",
+                },
                 page.describe()
             ))
         }
@@ -479,6 +493,11 @@ async fn call(
                 )
             })?;
             let taken = kept()?.taken(&args.takes)?;
+            if kept()?.sub_pages.iter().any(|p| p.topic_id == child) {
+                return Err(format!(
+                    "You change {child_name}'s page in this answer already: move into it in the next."
+                ));
+            }
             if taken.is_empty() {
                 return Err("Name what moves, like b2 or p3.".into());
             }
@@ -766,6 +785,100 @@ async fn this_or_sub(state: &AppState, asking: &Asking, named: &str) -> Result<T
         .await
         .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
     row.ok_or_else(|| "That topic is gone.".into())
+}
+
+/// The tools that change a page: this topic's, or a sub-topic's they name.
+const PAGE_TOOLS: &[&str] = &[
+    "add_block",
+    "change_block",
+    "add_items",
+    "add_rows",
+    "change_points",
+    "tick",
+    "move",
+    "remove",
+    "set_cover",
+];
+
+/// The page a tool works on, held while it does: this topic's, or the copy
+/// of one of its sub-topics'.
+struct On<'a> {
+    guard: MutexGuard<'a, Kept>,
+    sub: Option<usize>,
+}
+
+impl Deref for On<'_> {
+    type Target = Kept;
+
+    fn deref(&self) -> &Kept {
+        match self.sub {
+            Some(n) => &self.guard.sub_pages[n].kept,
+            None => &self.guard,
+        }
+    }
+}
+
+impl DerefMut for On<'_> {
+    fn deref_mut(&mut self) -> &mut Kept {
+        match self.sub {
+            Some(n) => &mut self.guard.sub_pages[n].kept,
+            None => &mut self.guard,
+        }
+    }
+}
+
+/// The sub-topic whose page a page tool's `topic` names, copied the first
+/// time this answer changes it; none for this topic's own page.
+async fn sub_page(
+    state: &AppState,
+    asking: &Asking,
+    arguments: &Value,
+) -> Result<Option<usize>, String> {
+    let named = arguments["topic"].as_str().unwrap_or("").trim();
+    if named.is_empty() {
+        return Ok(None);
+    }
+    let (id, name, ..) = this_or_sub(state, asking, named).await?;
+    if id == asking.topic_id {
+        return Ok(None);
+    }
+    let moved_into = |kept: &Kept| {
+        kept.changes
+            .iter()
+            .any(|c| c.topic_id == id && c.layout.is_some())
+    };
+    let at = |kept: &mut Kept| {
+        let n = kept.sub_pages.iter().position(|p| p.topic_id == id)?;
+        // A photo of the talk, or one it fetched, goes on any page.
+        kept.sub_pages[n].kept.photos = kept.photos.clone();
+        Some(n)
+    };
+    {
+        let mut kept = asking.kept.lock().map_err(|_| "Almanac stumbled.")?;
+        if moved_into(&kept) {
+            return Err(format!(
+                "You moved into {name} in this answer: change its page in the next."
+            ));
+        }
+        if let Some(n) = at(&mut kept) {
+            return Ok(Some(n));
+        }
+    }
+    let page = crate::page::Page::load(&state.pool, asking.actor.workspace_id, id)
+        .await
+        .map_err(|_| "Almanac couldn't read that topic.".to_string())?
+        .ok_or("That topic is gone.")?;
+    let mut kept = asking.kept.lock().map_err(|_| "Almanac stumbled.")?;
+    if at(&mut kept).is_none() {
+        let mut copy = Kept::on(page.refs());
+        copy.today = kept.today;
+        kept.sub_pages.push(kept::SubPage {
+            topic_id: id,
+            name,
+            kept: copy,
+        });
+    }
+    Ok(at(&mut kept))
 }
 
 async fn names(state: &AppState, asking: &Asking) -> String {
@@ -1206,7 +1319,7 @@ fn tools(mode: Mode) -> Vec<Value> {
             }),
         );
     }
-    match mode {
+    let mut tools = match mode {
         Mode::Topic => vec![
             tool(
                 "add_block",
@@ -1500,7 +1613,17 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "starters",
             ],
         )],
+    };
+    // Each page tool works on a sub-topic's page too.
+    for tool in &mut tools {
+        if PAGE_TOOLS.contains(&tool["name"].as_str().unwrap_or("")) {
+            tool["inputSchema"]["properties"]["topic"] = string(
+                "One of this topic's sub-topics, by name, to change its page instead, with the \
+                 references read_topic gives it. Left out, this page.",
+            );
+        }
     }
+    tools
 }
 
 #[cfg(test)]

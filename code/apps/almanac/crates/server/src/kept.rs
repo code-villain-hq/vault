@@ -68,6 +68,17 @@ pub struct Kept {
     pub in_sub_topics: Vec<Operation>,
     /// What it moved there, which isn't removed in words.
     moved_off: Vec<Uuid>,
+    /// Copies of its sub-topics' pages it changes, each written with this
+    /// one and undone with it.
+    pub sub_pages: Vec<SubPage>,
+}
+
+/// A sub-topic's page, as one answer of its parent's talk changes it.
+#[derive(Debug)]
+pub struct SubPage {
+    pub topic_id: Uuid,
+    pub name: String,
+    pub kept: Kept,
 }
 
 impl Default for Kept {
@@ -200,6 +211,7 @@ impl Kept {
             changes: Vec::new(),
             in_sub_topics: Vec::new(),
             moved_off: Vec::new(),
+            sub_pages: Vec::new(),
         }
     }
 
@@ -1184,6 +1196,22 @@ impl Kept {
             message.insert("sub_topics".into(), json!(self.sub_topics));
         }
         let mut changes = self.changes.clone();
+        for sub in &self.sub_pages {
+            let at = Answering {
+                topic_id: sub.topic_id,
+                topic_name: sub.name.clone(),
+                unnamed: false,
+                ..*at
+            };
+            let (said, written) = sub.kept.writes(&at);
+            operations.extend(written);
+            if let Some(Ok(theirs)) = said
+                .get("changes")
+                .map(|c| serde_json::from_value::<Vec<TopicChange>>(c.clone()))
+            {
+                changes.extend(theirs);
+            }
+        }
         let said: Vec<String> = [
             self.cover.map(|_| "Gave the page a cover.".to_string()),
             (added > 0).then(|| kept_words(added, &unders)),
