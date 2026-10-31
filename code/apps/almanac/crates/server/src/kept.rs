@@ -279,7 +279,8 @@ impl Kept {
     /// on (one renamed says the name it `was`; one left out goes, with its
     /// cells), or picks another of the pictures its fields can draw. A field
     /// of another kind reads its cells anew; it answers with the rows whose
-    /// words it couldn't read, which it left empty.
+    /// words it couldn't read, which it left empty. A new kind of field
+    /// leaves the picture to the app, unless one is picked with it.
     pub fn change_block(
         &mut self,
         block: &str,
@@ -345,6 +346,14 @@ impl Kept {
                     }
                 }
                 point.cells = Json(cells);
+            }
+            // A picture picked before a new kind of field came gives way to
+            // the app's pick, unless one comes with it.
+            let new_kind = fields
+                .iter()
+                .any(|f| !kinds.iter().any(|(_, kind)| *kind == f.kind));
+            if new_kind && view.is_none() {
+                self.blocks[n].view = String::new();
             }
             self.blocks[n].fields = Json(fields);
         }
@@ -2617,6 +2626,14 @@ mod tests {
                 [Operation::Create { data: b, .. }, Operation::Create { data: p, .. }]
                     if b["view"] == json!("bars") && p["cells"] == json!({"Kosten": 709.0})
             ),
+            "{operations:?}"
+        );
+        // A new kind of field leaves the picture to the app again.
+        kept.change_block("b1", None, Some(&[field("Stand", "status")]), None)
+            .unwrap();
+        let (_, operations) = kept.writes(&answering());
+        assert!(
+            matches!(&operations[..], [Operation::Create { data: b, .. }, ..] if b["view"] == json!("")),
             "{operations:?}"
         );
     }
