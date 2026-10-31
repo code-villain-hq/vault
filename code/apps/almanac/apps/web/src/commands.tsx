@@ -13,10 +13,12 @@ import {
   MessagesSquare,
   Plus,
   Sparkles,
+  Table2,
   UserRound,
   UsersRound,
 } from "lucide-react";
 import { useMemo } from "react";
+import { fold } from "./format";
 import { NavIcon, topicIcon } from "./icons";
 import { useNewTopic, useTopics } from "./layout";
 import { isDesktop } from "./platform";
@@ -168,15 +170,16 @@ interface Kept {
   icon: LucideIcon;
   /** What the row shows. */
   text: string;
-  /** What a query is matched against, lowercased: the text, and a talk's messages. */
+  /** What a query is matched against, folded: the text, a row's cells, a talk's messages. */
   words: string;
   open: () => void;
 }
 
 /**
  * What the topics keep, for ⌘K to find beyond their names: sections,
- * points, reminders and talks with every word of the query. Up to five a
- * topic, under its name, in the sidebar's order.
+ * blocks by their titles, points with their cells, reminders and talks
+ * with every word of the query. Up to five a topic, under its name, in the
+ * sidebar's order.
  */
 function useKept(query: string): Command[] {
   const { workspace } = useWorkspace();
@@ -192,8 +195,13 @@ function useKept(query: string): Command[] {
   // Forge's menu does: answers are long.
   const kept = useMemo(() => {
     const ws = workspace.url_key;
-    const open = (topic: string, search: TopicSearch) => () =>
-      void navigate({ to: "/$workspace/topics/$topic", params: { workspace: ws, topic }, search });
+    const open = (topic: string, search: TopicSearch, hash?: string) => () =>
+      void navigate({
+        to: "/$workspace/topics/$topic",
+        params: { workspace: ws, topic },
+        search,
+        hash,
+      });
     const you = new Set(blocks.filter((b) => b.kind === "you").map((b) => b.id));
     const said = new Map<string, string>();
     for (const m of messages) said.set(m.talk_id, `${said.get(m.talk_id) ?? ""} ${m.text}`);
@@ -203,9 +211,12 @@ function useKept(query: string): Command[] {
       text: string,
       open: () => void,
       more = "",
-    ): Kept => ({ id, icon, text, words: `${text} ${more}`.toLowerCase(), open });
+    ): Kept => ({ id, icon, text, words: fold(`${text} ${more}`), open });
     return topics.map((topic) => {
       const own = points.filter((p) => p.topic_id === topic.id);
+      // Blocks on the page itself, not on a row's: a hit scrolls to them.
+      const onPage = blocks.filter((b) => b.topic_id === topic.id && !b.row_id && b.title);
+      const shown = new Set(onPage.map((b) => b.id));
       const due = reminders.filter(
         (r) => r.topic_id === topic.id && (r.status === "on" || r.status === "done"),
       );
@@ -216,14 +227,31 @@ function useKept(query: string): Command[] {
       // what the topic knows about you opens its About.
       const at = (theme: string) => open(topic.id, theme ? { section: theme } : {});
       const of = (p: Point) =>
-        you.has(p.block_id) ? open(topic.id, { about: true }) : at(p.theme);
+        you.has(p.block_id)
+          ? open(topic.id, { about: true })
+          : !p.theme && shown.has(p.block_id)
+            ? open(topic.id, {}, `block-${p.block_id}`)
+            : at(p.theme);
       return {
         topic,
         kept: [
           ...[...sections].map((theme) =>
             thing(`section-${topic.id}-${theme}`, FileText, theme, at(theme)),
           ),
-          ...own.map((p) => thing(`point-${p.id}`, Dot, plain(p.text), of(p))),
+          ...onPage.map((b) =>
+            thing(`block-${b.id}`, Table2, b.title, open(topic.id, {}, `block-${b.id}`)),
+          ),
+          ...own.map((p) =>
+            thing(
+              `point-${p.id}`,
+              Dot,
+              plain(p.text),
+              of(p),
+              Object.values(p.cells)
+                .filter((c) => typeof c !== "boolean")
+                .join(" "),
+            ),
+          ),
           ...due.map((r) => thing(`reminder-${r.id}`, Bell, r.title, at(r.theme ?? ""))),
           ...talks
             .filter((t) => t.topic_id === topic.id)
@@ -242,7 +270,7 @@ function useKept(query: string): Command[] {
   }, [workspace, navigate, topics, points, blocks, reminders, talks, messages]);
 
   return useMemo(() => {
-    const words = query.split(/\s+/).filter(Boolean);
+    const words = fold(query).split(/\s+/).filter(Boolean);
     if (!words.length) return [];
     const found: Command[] = [];
     for (const { topic, kept: things } of kept) {
@@ -252,7 +280,7 @@ function useKept(query: string): Command[] {
         found.push({
           id: k.id,
           group: `In ${topic.name}`,
-          label: around(k.text, k.text.toLowerCase().indexOf(words[0] ?? "")),
+          label: around(k.text, fold(k.text).indexOf(words[0] ?? "")),
           icon: <NavIcon icon={k.icon} />,
           run: k.open,
         });

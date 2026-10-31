@@ -125,3 +125,17 @@ const MONEY = new Set([
   "zł",
   "kč",
 ]);
+
+/**
+ * Text as search compares it: lowercased, umlauts and accents as their
+ * letter, "ae" as "a" and "ß" as "ss", so "Militar", "Militaer" and
+ * "Militär" all find "Militärausgaben".
+ */
+export function fold(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/ß/g, "ss")
+    .replace(/([aou])e/g, "$1");
+}
