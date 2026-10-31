@@ -136,8 +136,10 @@ What they do:
   back with their `row_id`.
 - **Keeping** (`kept.rs`): Claude files what it learns into the one set
   of blocks (`SET_KINDS`, migration 0015, `proposals/one-set-of-blocks.md`):
-  `heading`, `paragraph`, `bullets`, `checklist`, `toggle`, `callout` and
-  `collection`. Claude Code does it with tools while it answers:
+  `heading`, `paragraph`, `callout` and `collection`. Lists are
+  collections (`proposals/facts-as-data.md`, C): a list's rows have only
+  a name, a checklist's a check, and the parts of a subject are rows
+  with their sentences in a paragraph on the row's page (`row_id`). Claude Code does it with tools while it answers:
   add_block (with a collection's fields), change_block (its title, its
   fields given whole, or a picture its fields allow, only when asked),
   add_items, add_rows (a collection's rows with their cells),
@@ -171,16 +173,16 @@ What they do:
     that fits (`pictureOf` in `collection.ts`, `pictures` in `kept.rs`
     for the page Claude reads): a day with a number a line, when each
     day has one measurement or each name one a day and comes again (a
-    line per name, `measures`); a status a board, a photo cards, past
+    line per name, `measures`); one check with at most a day besides a
+    checklist (`checkOf`, `check_of`); a status a board, a photo cards, past
     days a timeline, days to come a week, unless every row shares the day
     (`tellsApart`); a number with at most one field more bars, a name and
     two fields or more a table, the rest a list.
     Only fields its rows fill count. View as offers the others its fields
-    allow (`picturesFor`). A toggle opens a line per theme on its points;
-    a callout is a warning when a point's `look` is `warn`.
-  - A checklist item can ring: offer_reminder with an `item` makes a
-    reminder with its `point_id` (migration 0016). Ticking the item, on
-    the page or by a talk, ticks the reminder instead (`markDone`): one
+    allow (`picturesFor`). A callout is a warning when a point's `look` is `warn`.
+  - A checklist's row can ring: offer_reminder with an `item` makes a
+    reminder with its `point_id` (migration 0016). Ticking a row writes
+    its check cell; a row a reminder rings for ticks the reminder instead (`markDone`): one
     that repeats comes due its rhythm on, and the item stays ticked until
     then, its rhythm beside it. Unticking puts it back.
   - The page Claude reads (`page.rs`) names each block, point and
@@ -202,7 +204,10 @@ What they do:
   (`convert.rs`, a rule per old kind, the same for every topic): text,
   questions, shelves and cards become toggles; cards and tables with
   facets, timelines, bars and trends become collections; the rest
-  bullets or a checklist. It reads the blocks' old `facets`, which stay
+  bullets or a checklist. A second pass (`lists`) makes those
+  collections: bullets rows with only a name, a checklist rows with a
+  Done check (from `done`), a toggle a row per theme with its sentences
+  in a paragraph on the row's page. It reads the blocks' old `facets`, which stay
   in the database for it. The app draws a block as its kind
   (`views.ts`: `viewOf` and `widthOf`), on a grid of twelve columns, at
   the width a person picked with the block's ⋯ (`width`, half or the

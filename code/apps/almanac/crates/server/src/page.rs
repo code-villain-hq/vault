@@ -443,12 +443,6 @@ each with a short title or none. The app draws them; you only say what goes wher
 heading, a title that starts a part of the page, with no points; \
 paragraph, a point a paragraph, for what reads as prose: two to four sentences that explain, \
 starting with the term it's about in **bold** when there is one; \
-bullets, a point a line: a few words, or one short sentence; \
-checklist, a point a line to do or get, ticked once done. An item that comes round or is due on \
-a day is a reminder too (offer_reminder with its item): it rings on the Mac, and ticking the \
-item ticks the reminder, until it's due again; \
-toggle, a line per theme that opens on its points: the theme is the line (a term, a question, \
-a step), its points the bullets inside. Whole sentences that would crowd the page go here; \
 callout, a point set apart: look warn when it needs a look (a problem, a gap), info when \
 something is ready; \
 collection, rows that share the same fields, a row per thing, event or measurement (plants, \
@@ -457,16 +451,21 @@ knows. A field is text (a few words), number (plain, 3.4, with the field's unit,
 when they aim at one), day (a day as 2026-09-24, or a year or a span, 1987–1993), choice (one of \
 a few words), status (where a row stands, Offen, Bestellt, Erledigt), check (yes or no), photo \
 (a photo from the talk, by its number) or link (a web page). The app draws a collection from \
-its fields: days with numbers as a line, a status as a board, photos as cards, days past as a \
-timeline and days to come as a week, a name with a number as bars, three fields or more as a \
-table, the rest as a list. \
+its fields: days with numbers as a line, a check with at most a day as a checklist, a status as \
+a board, photos as cards, days past as a timeline and days to come as a week, a name with a \
+number as bars, three fields or more as a table, the rest as a list. \
+Lists are collections too: a list of things or terms is rows with only a name, a few words \
+each; what to do or get is rows with a check (Done), ticked once done. A row to do that comes \
+round or is due on a day is a reminder too (offer_reminder with its item): it rings on the Mac, \
+and ticking the row ticks the reminder, until it's due again. Sections are rows too: a term, a \
+question or a step is a row, and its sentences a paragraph on its page. \
 A row has a page of its own, made of the same blocks: what belongs to that one row and has \
 parts of its own goes there, in a block that names the row, so the topic's page keeps the row \
 and not its details. A shoe's offers are a collection on the shoe's page (Laden, Preis in kr, \
 Tag), a plant's repottings one on the plant's, sentences about one thing a paragraph on its \
 page. \
 File each thing where it belongs, and keep the page's face short: a few words a line, whole \
-sentences in paragraphs and toggles. What's measured, compared or tracked is rows with typed \
+sentences in paragraphs, on a row's page when they're about one row. What's measured, compared or tracked is rows with typed \
 fields, never a sentence: a weighing is a row with its day and its number in kg, so the line \
 draws it. A row's cells hold only what they or a source said: leave a cell out rather than \
 guess. Add to the block it fits; add a field to a collection that lacks one; start a block \

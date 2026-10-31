@@ -44,9 +44,9 @@ async fn messages(State(fake): State<Fake>, Json(body): Json<Value>) -> Response
     let system = body["system"].as_str().unwrap_or_default();
     let answer = if system.starts_with("You keep the page") {
         json!({
-            "blocks": [{ "kind": "bullets", "title": "Pflege", "fields": [] }],
+            "blocks": [{ "kind": "paragraph", "title": "Pflege", "fields": [] }],
             "items": [
-                { "block": "Pflege", "theme": "", "look": "", "text": "Alle 7 Tage gießen.", "source": "From the talk" },
+                { "block": "Pflege", "look": "", "text": "Alle 7 Tage gießen.", "source": "From the talk" },
             ],
             "rows": [
                 { "block": "b2", "name": "Monstera", "cells": [], "source": "You said" },
@@ -155,7 +155,7 @@ async fn a_topic_sets_itself_up_and_a_talk_keeps_what_it_learned(pool: PgPool) {
     assert_eq!(
         laid_out,
         [
-            ("checklist", "To do"),
+            ("collection", "To do"),
             ("collection", "Pflanzen"),
             ("you", "You")
         ]

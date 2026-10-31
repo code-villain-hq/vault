@@ -160,8 +160,8 @@ async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
     assert_eq!(points[0]["cells"], json!({ "Light": "North window" }));
     assert_eq!(points[0]["source"], "You said");
     let blocks = app.synced(&ada, &home, "Block").await;
-    let rows = blocks.iter().find(|b| b["kind"] == "collection").unwrap();
-    assert_eq!(rows["title"], "Plants");
+    let rows = blocks.iter().find(|b| b["title"] == "Plants").unwrap();
+    assert_eq!(rows["kind"], "collection");
     assert_eq!(rows["fields"][0]["name"], "Light");
     assert_eq!(points[0]["block_id"], rows["id"]);
     let reminders = app.synced(&ada, &home, "Reminder").await;
@@ -331,9 +331,10 @@ async fn a_talk_changes_the_page_and_undo_puts_it_back(pool: PgPool) {
 
     let tidied = ask(&app, &ada, &home, &topic, "Tidy the page.").await;
     let change = &tidied["changes"][0];
+    // To do is a checklist now: the sentence becomes one of its rows.
     assert_eq!(
         change["said"],
-        "Changed a point, moved a point and removed Plants."
+        "Made a sentence a row in To do. Removed Plants."
     );
     let after = app.synced(&ada, &home, "Block").await;
     assert_eq!(titles(&after), ["To do", "You", "Care"]);

@@ -66,21 +66,14 @@ export const VIEW_NAMES: Record<string, string> = {
   timeline: "Timeline",
   list: "List",
   line: "Line",
+  checklist: "Checklist",
   board: "Board",
   week: "Week",
 };
 
 /**
- * The one set of blocks every page is made of: a heading, a paragraph,
- * bullets, a checklist, a toggle, a callout, and a collection, rows with
- * fields.
+ * The one set of blocks every page is made of: a heading, a paragraph and
+ * a callout for words, and a collection, rows with fields, for the rest:
+ * a list, a checklist, rows with pages of their own.
  */
-export const SET_KINDS = new Set([
-  "heading",
-  "paragraph",
-  "bullets",
-  "checklist",
-  "toggle",
-  "callout",
-  "collection",
-]);
+export const SET_KINDS = new Set(["heading", "paragraph", "callout", "collection"]);

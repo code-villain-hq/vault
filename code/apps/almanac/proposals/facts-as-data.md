@@ -52,5 +52,11 @@ words: Heading, Text, Callout. The other three could be collections:
 | Toggle    | a row, with its sentences on its page (B)  |
 
 That leaves four blocks: Heading, Text, Callout, Collection. It needs B
-first, since a toggle's sentences move onto a row's page. Decided after
-B is tried.
+first, since a toggle's sentences move onto a row's page.
+
+_Built:_ `SET_KINDS` of four; a check with at most a day besides draws
+a checklist (`checkOf`, `check_of`), ticked in its cell, and a reminder
+rings for such a row. Templates start with checklists as collections.
+Pages move over once on the server's start (`convert::lists`,
+`lists_become_collections_and_a_toggle_rows_with_pages`). Not yet tried
+against Claude.

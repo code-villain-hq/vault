@@ -504,8 +504,6 @@ struct ProposeArgs {
 struct ProposedPointArgs {
     #[serde(default)]
     block: String,
-    #[serde(default)]
-    theme: String,
     text: String,
     #[serde(default)]
     cells: serde_json::Map<String, Value>,
@@ -575,7 +573,6 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
         }
         points.push(ProposedPoint {
             block: Some(cut(&p.block, 60)).filter(|b| !b.is_empty()),
-            theme: cut(&p.theme, 120),
             text: cut(&p.text, 2000),
             cells,
         });
@@ -838,11 +835,11 @@ fn field_schema(renames: bool) -> Value {
 /// The templates a topic starts as, for the tools that pick one.
 const TEMPLATES_SAY: &str = "The blocks its page starts with. routine when it's a routine they \
 keep, with steps on certain days and the things they use (a hair or skin routine, a training \
-plan): Routine, a checklist of its steps; Your shelf, a collection of the things they use; and \
-Advice. collection when it's about a set of things, events or measurements that each get a row \
-(plants, pets, trips, weighings): To do, and the collection, named by cards, with its fields. \
-study when it's something to learn or write up (a field, a pitch, research): Reading, a \
-checklist; Terms; and What it says, a toggle by section. Each also has You, for what it learns \
+plan): Routine, its steps to tick; Your shelf, a collection of the things they use, named by \
+cards, with its fields; and Advice. collection when it's about a set of things, events or \
+measurements that each get a row (plants, pets, trips, weighings): To do, and the collection, \
+named by cards, with its fields. study when it's something to learn or write up (a field, a \
+pitch, research): Reading, to tick; Terms, a collection, named by cards; and What it says. Each also has You, for what it learns \
 about them, which only its About shows. When they picked one, theirs.";
 
 /// The tools a question gets, with what each is for.
@@ -877,7 +874,7 @@ fn tools(mode: Mode) -> Vec<Value> {
     let mut offer_fields = reminder_fields.clone();
     offer_fields["replaces"] = replaces("reminders", "r2");
     offer_fields["item"] = string(
-        "The checklist item it rings for, as the page names it (p3). Its title is the item's words when you give none.",
+        "The row to do it rings for, in a collection with a check, as the page names it (p3). Its title is the row's name when you give none.",
     );
     offer_fields["title"] = string(
         "What to do in two to four words, as the calendar shows it: \"Water the Monstera\". Left out for an item's reminder, which takes the item's words.",
@@ -928,9 +925,9 @@ fn tools(mode: Mode) -> Vec<Value> {
             ),
             tool(
                 "add_items",
-                "Adds points to a block that isn't a collection: a fact, a decision, a step, a \
-                 term, or something they told you about themselves worth knowing later; nothing \
-                 the page has already. Each as its block's kind asks, as the page says. It \
+                "Adds sentences to a paragraph, a callout or You: what explains, a decision, or \
+                 something they told you about themselves worth knowing later; nothing the page \
+                 has already. Things, terms and steps are rows (add_rows). Each as its block's kind asks, as the page says. It \
                  answers with their references (p12). Usually none to three per answer.",
                 json!({
                     "block": string("The block, as the page names it (b2), or its title."),
@@ -939,8 +936,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "text": string("The point: a few words or one short sentence on a line, two to four sentences in a paragraph."),
-                                "theme": string("Only in a toggle: the line it opens under (a term, a question, a step). Use one the block has when it fits."),
+                                "text": string("The point: two to four sentences in a paragraph, a few words in a callout or You."),
                                 "look": { "type": "string", "enum": ["warn", "info"], "description": "Only in a callout: warn when it needs a look, info when something's ready." },
                                 "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                                 "url": string("The page it comes from, when you read one. Never a made-up link."),
@@ -954,7 +950,8 @@ fn tools(mode: Mode) -> Vec<Value> {
             ),
             tool(
                 "add_rows",
-                "Adds rows to a collection: a thing, an event or a measurement each, its name and \
+                "Adds rows to a collection: a thing, a term, a step, an event or a measurement \
+                 each, its name (a few words) and \
                  a cell for each field it knows. What's measured, compared or tracked is a row, \
                  never a sentence. A cell holds only what they or a source said: leave it out \
                  rather than guess. A field the rows need and the collection lacks comes first, \
@@ -982,7 +979,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "change_points",
                 "Changes points the page has, when what they say changed or was wrong (a wash day \
                  moved, a product swapped, a weighing corrected): their words (a row's name), \
-                 a toggle's theme, a callout's look, or a row's cells, which merge into the \
+                 a callout's look, or a row's cells, which merge into the \
                  row's (null takes one out). The page is kept up to date, not added to. They see \
                  what changed under your answer, and can undo it.",
                 json!({
@@ -993,7 +990,6 @@ fn tools(mode: Mode) -> Vec<Value> {
                             "properties": {
                                 "point": string("The point, as the page names it (p3)."),
                                 "text": string("Its new words."),
-                                "theme": string("Its new theme, in a toggle."),
                                 "look": { "type": "string", "enum": ["", "warn", "info"], "description": "Its new look, in a callout." },
                                 "cells": { "type": "object", "description": "The cells that change, by field name, as add_rows takes them; null takes one out.", "additionalProperties": true },
                             },
@@ -1006,12 +1002,12 @@ fn tools(mode: Mode) -> Vec<Value> {
             ),
             tool(
                 "tick",
-                "Ticks checklist items done: what they did, got or read, and a question they \
-                 answered well when they practised it. Only when they told you, or did it in \
-                 this talk. An item a reminder rings for ticks the reminder too, until it's due \
-                 again. done false ticks them on again.",
+                "Ticks rows to do done, in a collection with a check: what they did, got or \
+                 read, and a question they answered well when they practised it. Only when \
+                 they told you, or did it in this talk. A row a reminder rings for ticks the \
+                 reminder too, until it's due again. done false ticks them on again.",
                 json!({
-                    "items": { "type": "array", "items": { "type": "string" }, "description": "The items, as the page names them (p3)." },
+                    "items": { "type": "array", "items": { "type": "string" }, "description": "The rows, as the page names them (p3)." },
                     "done": { "type": "boolean", "description": "Whether they're done; left out, they are." },
                 }),
                 &["items"],
@@ -1019,8 +1015,8 @@ fn tools(mode: Mode) -> Vec<Value> {
             tool(
                 "move",
                 "Moves a block (block and after), or points to a block (points, to and after), \
-                 when they'd read better there: a step into the checklist, a fact into the \
-                 block it belongs with, a sentence into a collection as its row (then \
+                 when they'd read better there: a sentence into the paragraph it belongs \
+                 with, a sentence into a collection as its row (then \
                  change_points gives it its name and cells). They see what moved under your \
                  answer, and can undo it.",
                 json!({
@@ -1059,8 +1055,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "offer_reminder",
                 "Offers a reminder, only when the talk settled something recurring or dated \
                  they'd want to be reminded of (watering every 7 days, repotting in March, \
-                 sending the deck on Friday). When it's a checklist's item, name the item: the \
-                 reminder rings for it, and ticking one ticks the other; add the item first \
+                 sending the deck on Friday). When it's a row to do, name the row: the \
+                 reminder rings for it, and ticking one ticks the other; add the row first \
                  when the page lacks it. A routine they told you they keep counts (washing \
                  their hair three times a week): one reminder for each day it comes round, so \
                  something a few times a week is a reminder per weekday, each every 7 days; \
@@ -1111,8 +1107,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Routine (a step), Your shelf (a thing they use, a row) or Advice; in a collection To do or the collection (a row); in a study Reading, Terms or What it says."),
-                                "theme": string("Only in What it says: the section it's under."),
+                                "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Routine (a step), Your shelf (a thing they use) or Advice (a sentence); in a collection To do or the collection; in a study Reading, Terms (a term) or What it says (a sentence)."),
                                 "text": string("The point, one short sentence; in a collection, the row's name."),
                                 "cells": { "type": "object", "description": "In a collection, the row's cells by field name, as its fields say: only what they told you.", "additionalProperties": true },
                             },

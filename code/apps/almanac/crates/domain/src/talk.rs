@@ -113,8 +113,6 @@ pub struct ProposedPoint {
     #[serde(default)]
     #[ts(optional)]
     pub block: Option<String>,
-    #[serde(default)]
-    pub theme: String,
     /// In a collection, the row's name.
     pub text: String,
     /// In a collection, the row's cells, by field.

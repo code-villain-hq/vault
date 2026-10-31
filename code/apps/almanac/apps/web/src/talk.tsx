@@ -504,7 +504,7 @@ function Proposed({
       {proposal.points.length + proposal.reminders.length > 0 && (
         <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted">
           {proposal.points.map((point) => {
-            const under = point.theme || point.block;
+            const under = point.block;
             // A row's cells after its name, in its fields' order.
             const cells = proposal.fields
               .map((field) => {

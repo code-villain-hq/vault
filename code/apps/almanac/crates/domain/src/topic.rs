@@ -129,33 +129,38 @@ pub const ICONS: &[&str] = &[
 pub const KINDS: &[&str] = &["topic", "almanac"];
 
 /// The one set of blocks every page is made of. A `heading` is its title; a
-/// `paragraph` has a point a paragraph; `bullets` and a `checklist` a point
-/// a line, done once ticked; a `toggle` a line per theme, which opens on its
-/// points; a `callout` a point set apart, with its look; a `collection` rows
-/// with its [`Field`]s, a point a row: its text the row's name, its cells
-/// the rest. The app picks a collection's picture from its fields. Beside
-/// them a topic has `you`, what it knows about them, which its About shows
-/// and its page doesn't.
-pub const SET_KINDS: &[&str] = &[
-    "heading",
-    "paragraph",
-    "bullets",
-    "checklist",
-    "toggle",
-    "callout",
-    "collection",
-];
+/// `paragraph` has a point a paragraph; a `callout` a point set apart, with
+/// its look; a `collection` rows with its [`Field`]s, a point a row: its
+/// text the row's name, its cells the rest, and a page of its own. The app
+/// picks a collection's picture from its fields: a list is rows with only
+/// a name, a checklist rows with a check. Beside them a topic has `you`,
+/// what it knows about them, which its About shows and its page doesn't.
+pub const SET_KINDS: &[&str] = &["heading", "paragraph", "callout", "collection"];
+
+/// The kinds the set had before lists, checklists and toggles became
+/// collections (`proposals/facts-as-data.md`, C).
+pub const LIST_KINDS: &[&str] = &["bullets", "checklist", "toggle"];
 
 /// How wide a block is, of the page's twelve columns: a quarter, a third,
 /// a half, two thirds, three quarters or the whole. Empty is its kind's own.
 pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
 
 /// How a person asked a collection to be drawn, with View as: a table,
-/// cards, a list, a timeline, a line, a board, a week or bars. Empty is the
+/// cards, a list, a checklist, a timeline, a line, a board, a week or
+/// bars. Empty is the
 /// app's own pick from its fields. Only a person sets it; a talk's layout
 /// never does.
 pub const BLOCK_VIEWS: &[&str] = &[
-    "", "table", "cards", "list", "timeline", "line", "board", "week", "bars",
+    "",
+    "table",
+    "cards",
+    "list",
+    "checklist",
+    "timeline",
+    "line",
+    "board",
+    "week",
+    "bars",
 ];
 
 /// What a collection's field holds: a few words, a number (with its unit
@@ -248,35 +253,39 @@ pub struct Facet {
     pub icon: String,
 }
 
-/// The blocks a topic starts with, each its kind (of [`SET_KINDS`]) and
-/// title. A collection's rows are named for what they are ("Plants") when
-/// Almanac knows. Each ends with You, for what it learns about them, which
-/// only About shows.
-pub const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
+/// A block a topic starts with: its kind (of [`SET_KINDS`]), its title,
+/// and for a checklist, a collection, the name of its check field.
+pub type TemplateBlock = (&'static str, &'static str, &'static str);
+
+/// The blocks a topic starts with. The first collection with no check is
+/// the one its rows go in, named for what they are ("Plants") when Almanac
+/// knows. Each ends with You, for what it learns about them, which only
+/// About shows.
+pub const TEMPLATES: &[(&str, &[TemplateBlock])] = &[
     (
         "routine",
         &[
-            ("checklist", "Routine"),
-            ("collection", "Your shelf"),
-            ("bullets", "Advice"),
-            ("you", "You"),
+            ("collection", "Routine", "Done"),
+            ("collection", "Your shelf", ""),
+            ("paragraph", "Advice", ""),
+            ("you", "You", ""),
         ],
     ),
     (
         "collection",
         &[
-            ("checklist", "To do"),
-            ("collection", "Notes"),
-            ("you", "You"),
+            ("collection", "To do", "Done"),
+            ("collection", "Notes", ""),
+            ("you", "You", ""),
         ],
     ),
     (
         "study",
         &[
-            ("checklist", "Reading"),
-            ("bullets", "Terms"),
-            ("toggle", "What it says"),
-            ("you", "You"),
+            ("collection", "Reading", "Done"),
+            ("collection", "Terms", ""),
+            ("paragraph", "What it says", ""),
+            ("you", "You", ""),
         ],
     ),
 ];
@@ -285,7 +294,7 @@ pub const TEMPLATES: &[(&str, &[(&str, &str)])] = &[
 pub const TEMPLATE_NAMES: &[&str] = &["routine", "collection", "study"];
 
 /// The blocks of a template, by its name.
-pub fn template(name: &str) -> Option<&'static [(&'static str, &'static str)]> {
+pub fn template(name: &str) -> Option<&'static [TemplateBlock]> {
     TEMPLATES
         .iter()
         .find(|(n, _)| *n == name)
@@ -878,7 +887,7 @@ mod tests {
             assert!(
                 blocks
                     .iter()
-                    .all(|(kind, _)| SET_KINDS.contains(kind) || *kind == "you")
+                    .all(|(kind, _, _)| SET_KINDS.contains(kind) || *kind == "you")
             );
         }
         assert_eq!(TEMPLATES.len(), TEMPLATE_NAMES.len());

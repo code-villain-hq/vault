@@ -181,11 +181,6 @@ pub async fn start(
             else {
                 continue;
             };
-            let theme = match block.kind {
-                "toggle" if point.theme.trim().is_empty() => block.title.clone(),
-                "toggle" => cut(&point.theme, 120),
-                _ => String::new(),
-            };
             let cells = match block.kind {
                 "collection" => json!(point.cells),
                 _ => json!({}),
@@ -196,7 +191,6 @@ pub async fn start(
                 data: fields([
                     ("topic_id", json!(id)),
                     ("block_id", json!(block.id)),
-                    ("theme", json!(theme)),
                     ("text", json!(point.text)),
                     ("cells", cells),
                     ("position", json!(position)),
@@ -228,7 +222,7 @@ pub async fn start(
         (None, Some(name)) => {
             let (writes, blocks) = template_blocks(id, name, None, &[]);
             operations.extend(writes);
-            let cards = blocks.iter().find(|b| b.kind == "collection").map(|b| b.id);
+            let cards = blocks.iter().find(|b| b.rows).map(|b| b.id);
             Some((name.to_string(), cards))
         }
         _ => None,
@@ -471,33 +465,41 @@ pub struct Started {
     pub id: Uuid,
     pub kind: &'static str,
     pub title: String,
+    /// The collection its rows go in: the first with no check.
+    pub rows: bool,
 }
 
-/// The writes that give a topic the blocks of a template, its collection
-/// titled `cards` when that's given, with these `fields`, and the blocks
-/// they make.
+/// The writes that give a topic the blocks of a template, the collection
+/// its rows go in titled `cards` when that's given, with these `fields`,
+/// a checklist with its check, and the blocks they make.
 pub fn template_blocks(
     topic_id: Uuid,
     name: &str,
     cards: Option<&str>,
     fields_of: &[Field],
 ) -> (Vec<Operation>, Vec<Started>) {
-    let blocks: Vec<Started> = template(name)
-        .unwrap_or_default()
+    let blocks = template(name).unwrap_or_default();
+    let rows = blocks
         .iter()
-        .map(|(kind, title)| Started {
-            id: Uuid::now_v7(),
-            kind,
-            title: match (*kind, cards.map(|c| cut(c, 60))) {
-                ("collection", Some(cards)) if !cards.is_empty() => cards,
-                _ => title.to_string(),
-            },
-        })
-        .collect();
-    let writes = blocks
+        .position(|(kind, _, check)| *kind == "collection" && check.is_empty());
+    let started: Vec<Started> = blocks
         .iter()
         .enumerate()
-        .map(|(position, block)| Operation::Create {
+        .map(|(n, (kind, title, _))| Started {
+            id: Uuid::now_v7(),
+            kind,
+            title: match cards.map(|c| cut(c, 60)) {
+                Some(cards) if rows == Some(n) && !cards.is_empty() => cards,
+                _ => title.to_string(),
+            },
+            rows: rows == Some(n),
+        })
+        .collect();
+    let writes = started
+        .iter()
+        .zip(blocks)
+        .enumerate()
+        .map(|(position, (block, (_, _, check)))| Operation::Create {
             model: ModelKind::Block,
             id: block.id,
             data: fields([
@@ -506,35 +508,42 @@ pub fn template_blocks(
                 ("title", json!(block.title)),
                 (
                     "fields",
-                    json!(if block.kind == "collection" {
-                        fields_of
+                    if block.rows {
+                        json!(fields_of)
+                    } else if check.is_empty() {
+                        json!([])
                     } else {
-                        &[]
-                    }),
+                        json!([Field {
+                            name: check.to_string(),
+                            kind: "check".into(),
+                            unit: String::new(),
+                            goal: None,
+                            options: Vec::new(),
+                        }])
+                    },
                 ),
                 ("position", json!(position)),
             ]),
         })
         .collect();
-    (writes, blocks)
+    (writes, started)
 }
 
 /// The block a proposed point goes in: the one it names by title, or the
-/// first that keeps points like it, a collection when it has cells.
+/// collection its rows go in, and a sentence without cells the first
+/// paragraph or You when there's none.
 fn block_for<'a>(blocks: &'a [Started], named: Option<&str>, row: bool) -> Option<&'a Started> {
     let named = named.map(|n| n.trim().to_lowercase()).unwrap_or_default();
-    let kinds: &[&str] = if row {
-        &["collection"]
-    } else {
-        &["collection", "toggle", "bullets", "you", "checklist"]
-    };
     blocks
         .iter()
         .find(|b| !named.is_empty() && b.title.to_lowercase() == named)
+        .or_else(|| blocks.iter().find(|b| b.rows))
         .or_else(|| {
-            kinds
-                .iter()
-                .find_map(|kind| blocks.iter().find(|b| b.kind == *kind))
+            (!row)
+                .then_some(["paragraph", "you"])
+                .into_iter()
+                .flatten()
+                .find_map(|kind| blocks.iter().find(|b| b.kind == kind))
         })
 }
 

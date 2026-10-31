@@ -7,7 +7,17 @@ import { amountWords, dateWords, today } from "./format";
 import { when } from "./timeline";
 
 /** The pictures a collection is drawn as, in the order View as offers them. */
-export const PICTURES = ["line", "board", "cards", "timeline", "week", "bars", "table", "list"];
+export const PICTURES = [
+  "line",
+  "checklist",
+  "board",
+  "cards",
+  "timeline",
+  "week",
+  "bars",
+  "table",
+  "list",
+];
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -59,9 +69,21 @@ function tellsApart(rows: Point[], day: Field): boolean {
 }
 
 /**
+ * The check a collection's rows are ticked by: its one check field, when
+ * it has at most a day besides, as a to-do list has. Others draw their
+ * checks as ✓, not boxes to tick.
+ */
+export function checkOf(block: Block): Field | undefined {
+  const checks = block.fields.filter((f) => f.kind === "check");
+  const only = block.fields.every((f) => f.kind === "check" || f.kind === "day");
+  return checks.length === 1 && only ? checks[0] : undefined;
+}
+
+/**
  * The picture the app draws a collection as: the first rule that fits.
  *
  * - a number measured over days is a line (`measures`);
+ * - a check, with at most a day besides, is a checklist (`checkOf`);
  * - a status is a board;
  * - a photo is cards;
  * - days, or spans, all past are a timeline, unless every row has the same;
@@ -79,6 +101,7 @@ export function pictureOf(block: Block, rows: Point[], on = today()): string {
   const day = of("day");
   const number = of("number");
   if (day && number && measures(rows, day, number)) return "line";
+  if (checkOf(block)) return "checklist";
   if (of("status")) return "board";
   if (of("photo")) return "cards";
   if (day && tellsApart(rows, day)) {
@@ -90,8 +113,8 @@ export function pictureOf(block: Block, rows: Point[], on = today()): string {
 
 /**
  * What View as offers for a collection, the app's pick among them: the
- * pictures its fields can draw. A line needs days with numbers, a board a
- * status or a choice, a timeline days or spans, a week days, bars numbers;
+ * pictures its fields can draw. A line needs days with numbers, a
+ * checklist its check, a board a status or a choice, a timeline days or spans, a week days, bars numbers;
  * cards, a table and a list draw anything.
  */
 export function picturesFor(block: Block, rows: Point[], on = today()): string[] {
@@ -103,6 +126,7 @@ export function picturesFor(block: Block, rows: Point[], on = today()): string[]
   const number = of("number");
   const fits = new Set([pick, "cards", "table", "list"]);
   if (day && number && measures(rows, day, number)) fits.add("line");
+  if (checkOf(block)) fits.add("checklist");
   if (of("status") || of("choice")) fits.add("board");
   if (day) fits.add("timeline");
   if (day && rows.some((r) => dayOf(r, day))) fits.add("week");

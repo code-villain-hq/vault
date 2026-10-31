@@ -41,8 +41,11 @@ pub struct Kept {
     moved: Vec<Uuid>,
     /// The page's blocks and points it changed, moved, removed or ticked.
     touched: Vec<Uuid>,
-    /// Items ticked done, or not.
+    /// Rows ticked done, or not.
     ticks: Vec<(Uuid, bool)>,
+    /// Rows whose check a tick sets, with what it sets: a tick isn't a
+    /// change to undo.
+    checked: Vec<(Uuid, bool)>,
     /// Reminders an item's tick ticks, with what changes on them.
     rung: Vec<(Uuid, Map<String, Value>)>,
     /// The photos of the talk, in order, which a photo cell names by number.
@@ -82,13 +85,10 @@ pub struct FieldArg {
     pub was: String,
 }
 
-/// An item as Claude adds it: a line, a paragraph, a toggle's point under
-/// its line (the theme), a callout with its look.
+/// An item as Claude adds it: a paragraph, a callout with its look.
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct ItemArg {
     pub text: String,
-    #[serde(default)]
-    pub theme: String,
     #[serde(default)]
     pub look: String,
     #[serde(default)]
@@ -116,8 +116,6 @@ pub struct PointChange {
     pub point: String,
     #[serde(default)]
     pub text: Option<String>,
-    #[serde(default)]
-    pub theme: Option<String>,
     #[serde(default)]
     pub look: Option<String>,
     #[serde(default)]
@@ -179,6 +177,7 @@ impl Kept {
             moved: Vec::new(),
             touched: Vec::new(),
             ticks: Vec::new(),
+            checked: Vec::new(),
             rung: Vec::new(),
             photos: Vec::new(),
             today: Local::now().date_naive(),
@@ -378,13 +377,13 @@ impl Kept {
         })
     }
 
-    /// Adds items to a block: lines to bullets or a checklist, paragraphs,
-    /// a toggle's points under their line, a callout. It answers with their
-    /// references. One the block has already is the one it answers with.
+    /// Adds items to a block: paragraphs, or a callout's. It answers with
+    /// their references. One the block has already is the one it answers
+    /// with.
     pub fn add_items(&mut self, block: &str, items: &[ItemArg]) -> Result<Vec<String>, String> {
         let n = self.block_at(block)?;
         let (kind, title) = (self.blocks[n].kind.clone(), self.title(n).to_string());
-        let themed = takes_items(&kind, &title)?;
+        takes_items(&kind, &title)?;
         if items.is_empty() {
             return Err("Give the items to add.".into());
         }
@@ -394,20 +393,10 @@ impl Kept {
             if text.is_empty() {
                 return Err("An item needs its words.".into());
             }
-            let theme = match themed {
-                Some(says) => {
-                    let theme = cut(&item.theme, 120);
-                    if theme.is_empty() {
-                        return Err(format!("An item in {title} needs a theme: {says}."));
-                    }
-                    theme
-                }
-                None => String::new(),
-            };
             let look = self.look(&kind, &title, &item.look)?;
             refs.push(self.add_point(
                 n,
-                theme,
+                String::new(),
                 text,
                 look,
                 BTreeMap::new(),
@@ -476,16 +465,6 @@ impl Kept {
                 }
                 self.points[i].text = text;
             }
-            if let Some(theme) = &change.theme {
-                if !has_themes(&kind) {
-                    return Err(format!("{title} has no themes."));
-                }
-                let theme = cut(theme, 120);
-                if theme.is_empty() {
-                    return Err(format!("A point in {title} needs a theme."));
-                }
-                self.points[i].theme = theme;
-            }
             if let Some(look) = &change.look {
                 self.points[i].look = self.look(&kind, &title, look)?;
             }
@@ -509,8 +488,9 @@ impl Kept {
         Ok(())
     }
 
-    /// Ticks a checklist's items done, or not. An item a reminder rings for ticks the
-    /// reminder: done for now, it's due again on its next day.
+    /// Ticks rows done, or not: their collection's check. A row a reminder
+    /// rings for ticks the reminder: done for now, it's due again on its
+    /// next day.
     pub fn tick(&mut self, items: &[String], done: bool) -> Result<(), String> {
         if items.is_empty() {
             return Err("Name the items to tick, like p3.".into());
@@ -518,10 +498,9 @@ impl Kept {
         for reference in items {
             let i = self.point_at(reference)?;
             let b = self.block_of(i);
-            let kind = self.blocks[b].kind.as_str();
-            if kind != "checklist" {
+            if check_of(&self.blocks[b]).is_none() {
                 return Err(format!(
-                    "{} is in {}, a {kind}: only a checklist's items are ticked.",
+                    "{} is in {}, which has no check: only rows with a check are ticked.",
                     reference.trim(),
                     self.title(b)
                 ));
@@ -548,7 +527,10 @@ impl Kept {
                         self.rung.push((reminder.id, data));
                     }
                 }
-                None => self.points[i].done = done,
+                None => {
+                    self.checked.retain(|(c, _)| *c != id);
+                    self.checked.push((id, done));
+                }
             }
             self.ticks.retain(|(t, _)| *t != id);
             self.ticks.push((id, done));
@@ -579,8 +561,7 @@ impl Kept {
     }
 
     /// Moves points `to` a block, `after` one of its points ("" for the
-    /// top; the end when left out), in the order given. A point keeps its
-    /// theme where the block has themes.
+    /// top; the end when left out), in the order given.
     pub fn move_points(
         &mut self,
         points: &[String],
@@ -592,10 +573,9 @@ impl Kept {
         }
         let b = self.block_at(to)?;
         let (kind, title) = (self.blocks[b].kind.clone(), self.title(b).to_string());
-        let themed = match kind.as_str() {
-            "collection" => None,
-            _ => takes_items(&kind, &title)?,
-        };
+        if kind != "collection" {
+            takes_items(&kind, &title)?;
+        }
         let mut at = match after.map(str::trim) {
             None => At::End,
             Some("") => At::Top,
@@ -612,15 +592,7 @@ impl Kept {
             if matches!(at, At::After(a) if a == i) {
                 return Err("A point can't go after itself.".into());
             }
-            if themed.is_some() && self.points[i].theme.is_empty() {
-                return Err(format!(
-                    "{} needs a theme in {title}: give it one with change_points first.",
-                    reference.trim()
-                ));
-            }
-            if themed.is_none() {
-                self.points[i].theme = String::new();
-            }
+            self.points[i].theme = String::new();
             let id = self.points[i].id;
             self.touch(id)?;
             self.moved.push(id);
@@ -741,9 +713,9 @@ impl Kept {
             Some(item) => {
                 let i = self.point_at(item)?;
                 let b = self.block_of(i);
-                if self.blocks[b].kind != "checklist" {
+                if check_of(&self.blocks[b]).is_none() {
                     return Err(format!(
-                        "{item} is in {}: a reminder rings for a checklist's item.",
+                        "{item} is in {}: a reminder rings for a row with a check.",
                         self.title(b)
                     ));
                 }
@@ -992,8 +964,15 @@ impl Kept {
             if !data.is_empty() {
                 layout.points.push(point_was(was, false));
             }
-            if point.done != was.done {
-                data.insert("done".into(), json!(point.done));
+            if let Some((_, done)) = self.checked.iter().find(|(c, _)| *c == point.id) {
+                let block = self.blocks.iter().find(|b| b.id == point.block_id);
+                if let Some(check) = block.and_then(check_of) {
+                    let mut cells = point.cells.0.clone();
+                    cells.insert(check.to_string(), Cell::Check(*done));
+                    if cells != was.cells.0 {
+                        data.insert("cells".into(), json!(cells));
+                    }
+                }
             }
             if !data.is_empty() {
                 operations.push(Operation::Update {
@@ -1371,24 +1350,30 @@ impl Kept {
     }
 }
 
-/// Whether a block of `kind`, called `title`, takes items, and what its
-/// theme says when its items have one.
-fn takes_items(kind: &str, title: &str) -> Result<Option<&'static str>, String> {
+/// Whether a block of `kind`, called `title`, takes items: sentences.
+fn takes_items(kind: &str, title: &str) -> Result<(), String> {
     match kind {
-        "bullets" | "checklist" | "paragraph" | "callout" | "you" => Ok(None),
-        "toggle" => Ok(Some("the line it opens from")),
+        "paragraph" | "callout" | "you" => Ok(()),
         "heading" => Err(format!("{title} is a heading: it has no points.")),
         "collection" => Err(format!("{title} is a collection: add rows to it.")),
         _ => Err(format!("{title} is a {kind}, which Almanac doesn't know.")),
     }
 }
 
-/// Whether the points of a block of `kind` go under themes.
-fn has_themes(kind: &str) -> bool {
-    !matches!(
-        kind,
-        "bullets" | "checklist" | "paragraph" | "callout" | "you" | "collection"
-    )
+/// The check a collection's rows are ticked by: its check field, when it
+/// has one and only a day besides, as a checklist has.
+pub fn check_of(block: &RefBlock) -> Option<&str> {
+    let fields = &block.fields.0;
+    let checks: Vec<&Field> = fields.iter().filter(|f| f.kind == "check").collect();
+    match checks[..] {
+        [check]
+            if block.kind == "collection"
+                && fields.iter().all(|f| f.kind == "check" || f.kind == "day") =>
+        {
+            Some(&check.name)
+        }
+        _ => None,
+    }
 }
 
 /// Fields renamed, each (was, now).
@@ -1643,8 +1628,13 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
             .collect();
         rows.len() < 2 || days.len() > 1 || rows.iter().any(|r| !r.cells.contains_key(&day.name))
     };
+    // One check, and at most a day besides: rows to tick, as `check_of`.
+    let checklist = fields.iter().filter(|f| f.kind == "check").count() == 1
+        && fields.iter().all(|f| f.kind == "check" || f.kind == "day");
     let pick = if line {
         "line"
+    } else if checklist {
+        "checklist"
     } else if of("status").is_some() {
         "board"
     } else if of("photo").is_some() {
@@ -1669,6 +1659,9 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
     if line {
         fits.push("line");
     }
+    if checklist {
+        fits.push("checklist");
+    }
     if of("status").is_some() || of("choice").is_some() {
         fits.push("board");
     }
@@ -1682,7 +1675,15 @@ pub fn pictures(fields: &[Field], rows: &[&PagePoint], today: NaiveDate) -> Vec<
         fits.push("bars");
     }
     [
-        "line", "board", "cards", "timeline", "week", "bars", "table", "list",
+        "line",
+        "checklist",
+        "board",
+        "cards",
+        "timeline",
+        "week",
+        "bars",
+        "table",
+        "list",
     ]
     .into_iter()
     .filter(|p| fits.contains(p))
@@ -1962,6 +1963,19 @@ mod tests {
         }
     }
 
+    fn checklist(title: &str, position: i32) -> RefBlock {
+        RefBlock {
+            fields: Json(vec![Field {
+                name: "Done".into(),
+                kind: "check".into(),
+                unit: String::new(),
+                goal: None,
+                options: Vec::new(),
+            }]),
+            ..block("collection", title, position)
+        }
+    }
+
     fn point(block: &RefBlock, theme: &str, text: &str, position: i32) -> PagePoint {
         PagePoint {
             id: Uuid::now_v7(),
@@ -2045,7 +2059,7 @@ mod tests {
     #[test]
     fn a_weighing_is_a_row_with_typed_cells() {
         let mut kept = Kept::on(Refs {
-            blocks: vec![block("bullets", "Notes", 0)],
+            blocks: vec![block("paragraph", "Notes", 0)],
             ..Refs::default()
         });
         let weight = kept
@@ -2116,49 +2130,13 @@ mod tests {
     }
 
     #[test]
-    fn a_toggle_keeps_points_under_their_line() {
-        let terms = block("toggle", "Begriffe", 0);
-        let first = point(&terms, "Intifada", "Ein Aufstand.", 0);
-        let other = point(&terms, "Oslo", "Ein Abkommen.", 1);
-        let mut kept = Kept::on(Refs {
-            blocks: vec![terms],
-            points: vec![first.clone(), other.clone()],
-            ..Refs::default()
-        });
-        assert!(
-            kept.add_items("b1", &[item("1987 begonnen")])
-                .unwrap_err()
-                .contains("needs a theme: the line it opens from")
-        );
-        kept.add_items(
-            "b1",
-            &[ItemArg {
-                theme: "Intifada".into(),
-                ..item("Sie begann 1987.")
-            }],
-        )
-        .unwrap();
-        // It goes after its theme's point, and the next moves down.
-        let (_, operations) = kept.writes(&answering());
-        let [
-            Operation::Update {
-                id, data: moved, ..
-            },
-            Operation::Create { data, .. },
-        ] = &operations[..]
-        else {
-            panic!("{operations:?}");
-        };
-        assert_eq!(data["position"], json!(1));
-        assert_eq!(*id, other.id);
-        assert_eq!(moved["position"], json!(2));
-    }
-
-    #[test]
     fn changes_and_removals_are_one_change_to_undo() {
-        let (notes, old) = (block("bullets", "Notes", 0), block("toggle", "Pflanzen", 1));
+        let (notes, old) = (
+            block("paragraph", "Notes", 0),
+            block("paragraph", "Pflanzen", 1),
+        );
         let fact = point(&notes, "", "Lisa wiegt 3,5 kg", 0);
-        let monstera = point(&old, "Monstera", "Hell", 0);
+        let monstera = point(&old, "", "Hell", 0);
         let mut kept = Kept::on(Refs {
             blocks: vec![notes.clone(), old.clone()],
             points: vec![fact.clone(), monstera.clone()],
@@ -2302,7 +2280,7 @@ mod tests {
 
     #[test]
     fn a_sentence_tidied_into_a_row_says_so() {
-        let notes = block("bullets", "Notes", 0);
+        let notes = block("paragraph", "Notes", 0);
         let mut weight = block("collection", "Gewicht", 1);
         weight.fields = Json(vec![Field {
             name: "Gewicht".into(),
@@ -2346,7 +2324,7 @@ mod tests {
 
     #[test]
     fn moving_points_renumbers_their_block() {
-        let (a, b) = (block("bullets", "A", 0), block("checklist", "B", 1));
+        let (a, b) = (block("paragraph", "A", 0), block("paragraph", "B", 1));
         let points = vec![
             point(&a, "", "eins", 0),
             point(&a, "", "zwei", 1),
@@ -2376,7 +2354,7 @@ mod tests {
 
     #[test]
     fn a_ticked_item_ticks_its_reminder() {
-        let list = block("checklist", "Routine", 0);
+        let list = checklist("Routine", 0);
         let (wash, bin) = (
             point(&list, "", "Haare waschen", 0),
             point(&list, "", "Müll", 1),
@@ -2404,7 +2382,7 @@ mod tests {
                 [
                     Operation::Update { id: item, data: done, .. },
                     Operation::Update { model: ModelKind::Reminder, id, data },
-                ] if *item == bin.id && done["done"] == json!(true)
+                ] if *item == bin.id && done["cells"] == json!({"Done": true})
                     && *id == reminder.id
                     && data["due_on"] == json!("2026-11-03")
                     && data["last_done_on"] == json!("2026-10-30")
@@ -2418,13 +2396,13 @@ mod tests {
     #[test]
     fn a_reminder_rings_for_a_new_item() {
         let mut kept = Kept::on(Refs {
-            blocks: vec![
-                block("checklist", "Routine", 0),
-                block("bullets", "Notes", 1),
-            ],
+            blocks: vec![checklist("Routine", 0), block("paragraph", "Notes", 1)],
             ..Refs::default()
         });
-        let [wash] = &kept.add_items("b1", &[item("Haare waschen")]).unwrap()[..] else {
+        let [wash] = &kept
+            .add_rows("b1", &[row("Haare waschen", json!({}))])
+            .unwrap()[..]
+        else {
             panic!();
         };
         let wash = wash.clone();
@@ -2433,7 +2411,7 @@ mod tests {
         assert!(
             kept.offer_reminder(friday.clone(), &[], Some("p2"))
                 .unwrap_err()
-                .contains("a checklist's item")
+                .contains("a row with a check")
         );
         kept.offer_reminder(friday, &[], Some(&wash)).unwrap();
         assert_eq!(kept.item_words(&wash).as_deref(), Some("Haare waschen"));
@@ -2560,7 +2538,7 @@ mod tests {
         let mut kept = Kept::on(Refs {
             blocks: vec![
                 block("collection", "Zeit", 0),
-                block("bullets", "Lesen", 1),
+                block("paragraph", "Lesen", 1),
                 block("heading", "Teil", 2),
             ],
             ..Refs::default()

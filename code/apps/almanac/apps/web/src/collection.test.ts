@@ -60,6 +60,14 @@ describe("pictureOf", () => {
     expect(pictureOf(weight, rows, ON)).toBe("line");
   });
 
+  test("draws a check, with a day at most besides, as a checklist, ticked or not", () => {
+    const todo = collection(field("Done", "check"), field("Bis", "day"));
+    expect(pictureOf(todo, [row("Haare waschen")], ON)).toBe("checklist");
+    expect(pictureOf(todo, [row("Müll", { Done: true, Bis: "2026-11-02" })], ON)).toBe("checklist");
+    const shoes = collection(field("Vegan", "check"), field("Preis", "number"));
+    expect(pictureOf(shoes, [row("Saola", { Vegan: true, Preis: 1599 })], ON)).toBe("bars");
+  });
+
   test("draws a status as a board, before anything else it has", () => {
     const repairs = collection(field("Raum", "text"), field("Status", "status"));
     expect(pictureOf(repairs, [row("Abfluss", { Raum: "Bad", Status: "Offen" })], ON)).toBe(

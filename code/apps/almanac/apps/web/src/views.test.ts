@@ -47,12 +47,13 @@ describe("the one set", () => {
   test("draws a block as its kind once it has something to show", () => {
     expect(viewOf(block("heading", "Care"), [])).toBe("heading");
     expect(viewOf(block("heading", ""), [])).toBe("");
-    expect(viewOf(block("bullets"), [])).toBe("");
-    expect(viewOf(block("bullets"), [point("", "Water weekly")])).toBe("bullets");
+    expect(viewOf(block("paragraph"), [])).toBe("");
+    expect(viewOf(block("paragraph"), [point("", "Water weekly")])).toBe("paragraph");
   });
 
   test("leaves out a block of a kind from before the set, and keeps You for About", () => {
     expect(viewOf(block("chips"), [point("", "Water weekly")])).toBe("");
+    expect(viewOf(block("bullets"), [point("", "Water weekly")])).toBe("");
     expect(viewOf(block("you", "You"), [])).toBe("you");
   });
 
@@ -69,7 +70,7 @@ describe("the one set", () => {
   });
 
   test("offers no other views for a block of writing", () => {
-    expect(viewsFor(block("checklist"), [point("", "Bring the CV up to date")])).toEqual([]);
+    expect(viewsFor(block("paragraph"), [point("", "Bring the CV up to date")])).toEqual([]);
   });
 
   test("draws a collection as the picture its fields pick, and keeps a person's pick", () => {

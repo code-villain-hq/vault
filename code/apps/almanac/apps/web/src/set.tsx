@@ -1,22 +1,13 @@
-// The one set of blocks every page is made of: paragraphs, bullets, a
-// checklist, toggles, a callout, and a collection drawn as the picture its
-// fields pick (`collection.ts`): a line, a board, cards, a table, a
-// timeline, a week, bars or a list. The same on every topic; nobody
-// designs a page's own. A toggle's line and a row open their own page on
-// a topic's page (`Opens`). Also the parts the blocks share: a photo, a
-// tick, a timeline's rail, ✕ to take a point off.
+// The one set of blocks every page is made of: paragraphs, a callout, and
+// a collection drawn as the picture its fields pick (`collection.ts`): a
+// line, a checklist, a board, cards, a table, a timeline, a week, bars or
+// a list. The same on every topic; nobody designs a page's own. A row
+// opens its own page on a topic's page (`Opens`). Also the parts the
+// blocks share: a photo, a tick, a timeline's rail, ✕ to take a point off.
 
 import type { Block, Field, Point, Reminder } from "@almanac/types";
 import { type Confirmation, ConfirmDialog, RowAction } from "@code-villain/web";
-import {
-  ArrowUpRight,
-  ChevronRight,
-  Circle,
-  CircleCheck,
-  Info,
-  TriangleAlert,
-  X,
-} from "lucide-react";
+import { Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import {
   type ComponentType,
   createContext,
@@ -26,7 +17,7 @@ import {
   useState,
 } from "react";
 import { TrendSet } from "./charts";
-import { byDay, cellOf, cellWords, dayOf, filled, lanesOf, numberOf } from "./collection";
+import { byDay, cellOf, cellWords, checkOf, dayOf, filled, lanesOf, numberOf } from "./collection";
 import {
   addDays,
   amountWords,
@@ -104,33 +95,32 @@ export function useItemReminders(): Map<string, Reminder> {
 }
 
 /**
- * Whether an item is done: with a reminder, done for the last day it was
- * due, until it comes due again.
+ * Whether a row to tick is done: its `check`, or, with a reminder, done
+ * for the last day it was due, until it comes due again.
  */
-export function itemDone(point: Point, reminder: Reminder | undefined): boolean {
-  if (!reminder) return point.done;
+export function itemDone(row: Point, check: Field, reminder: Reminder | undefined): boolean {
+  if (!reminder) return cellOf(row, check) === true;
   return doneFor(reminder) !== undefined && !isDue(reminder);
 }
 
 /**
- * A box to tick: done once all of `points` are. A list's line has one
- * point; a question, the points of its answer. An item with a `reminder`
- * ticks that instead. Guests see it, not tick it.
+ * A box to tick a row by its `check`. A row with a `reminder` ticks that
+ * instead. Guests see it, not tick it.
  */
 export function Tick({
-  points,
-  label,
+  row,
+  check,
   reminder,
   className = "",
 }: {
-  points: Point[];
-  label: string;
+  row: Point;
+  check: Field;
   reminder?: Reminder;
   className?: string;
 }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
-  const done = points.length > 0 && points.every((p) => itemDone(p, reminder));
+  const done = itemDone(row, check, reminder);
   const Icon = done ? CircleCheck : Circle;
   const look = `shrink-0 ${done ? "text-accent" : "text-faint"}`;
   if (guest) {
@@ -148,17 +138,10 @@ export function Tick({
     <button
       type="button"
       aria-pressed={done}
-      aria-label={`${label}: ${done ? "done" : "to do"}`}
+      aria-label={`${row.text}: ${done ? "done" : "to do"}`}
       onClick={() => {
         if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
-        sync.transact(
-          points.map((p) => ({
-            action: "update" as const,
-            model: "Point" as const,
-            id: p.id,
-            data: { done: !done },
-          })),
-        );
+        sync.update("Point", row.id, { cells: { ...row.cells, [check.name]: !done } });
       }}
       className={`grid place-items-center rounded-full hover:text-muted ${look} ${className}`}
     >
@@ -288,56 +271,15 @@ export function Paragraphs({ points }: { points: Point[] }) {
   );
 }
 
-/** Bullets: a point a line, in their order. */
-export function Bullets({ points }: { points: Point[] }) {
-  return (
-    <div className={`flex flex-col gap-1.5 ${LINES}`}>
-      <ul className="flex flex-col gap-0.5">
-        {points.map((point) => (
-          <li
-            key={point.id}
-            className="group relative flex items-baseline gap-2 py-0.5 pl-3.5 before:absolute before:left-0.5 before:text-faint before:content-['·']"
-          >
-            <NewDot point={point} className="self-center" />
-            <span className="min-w-0 flex-1">{inline(point.text)}</span>
-            <RemovePoint point={point} />
-          </li>
-        ))}
-      </ul>
-      <Sources points={points} />
-    </div>
-  );
-}
-
-/** A checklist: a point a line to tick, in their order; what's done goes faint, not away. */
-export function Checklist({ points }: { points: Point[] }) {
+/** How many of a checklist's rows are done. */
+export function ChecklistCount({ block, rows }: { block: Block; rows: Point[] }) {
   const rings = useItemReminders();
-  return (
-    <ul className={`flex flex-col ${LINES}`}>
-      {points.map((point) => {
-        const reminder = rings.get(point.id);
-        const done = itemDone(point, reminder);
-        return (
-          <li key={point.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
-            <Tick points={[point]} label={point.text} reminder={reminder} className="self-center" />
-            <NewDot point={point} className="self-center" />
-            <p className={`min-w-0 flex-1 ${done ? "text-faint" : ""}`}>{inline(point.text)}</p>
-            {reminder && <Rings reminder={reminder} />}
-            <RemovePoint point={point} />
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** How many of a checklist's items are done. */
-export function ChecklistCount({ points }: { points: Point[] }) {
-  const rings = useItemReminders();
-  const done = points.filter((p) => itemDone(p, rings.get(p.id))).length;
+  const check = checkOf(block);
+  if (!check) return null;
+  const done = rows.filter((r) => itemDone(r, check, rings.get(r.id))).length;
   return (
     <span className="text-xs text-faint">
-      {done} of {points.length} done
+      {done} of {rows.length} done
     </span>
   );
 }
@@ -353,67 +295,6 @@ function Rings({ reminder }: { reminder: Reminder }) {
     >
       {words}
     </span>
-  );
-}
-
-/**
- * Toggles: a line per theme that opens on its points, as bullets, closed
- * until you open it. Points under no theme show as bullets after them.
- */
-export function Toggles({ points }: { points: Point[] }) {
-  const themes = [...new Set(points.map((p) => p.theme).filter(Boolean))];
-  const loose = points.filter((p) => !p.theme);
-  return (
-    <div className={`flex flex-col gap-1 ${LINES}`}>
-      {themes.map((theme) => (
-        <Toggle key={theme} name={theme} points={points.filter((p) => p.theme === theme)} />
-      ))}
-      {loose.length > 0 && <Bullets points={loose} />}
-    </div>
-  );
-}
-
-function Toggle({ name, points }: { name: string; points: Point[] }) {
-  const [open, setOpen] = useState(false);
-  const Open = useContext(Opens);
-  const fresh = points.some((p) => !p.seen);
-  return (
-    <section className="flex flex-col">
-      <div className="group/line flex items-center gap-1">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-          className="group/toggle flex items-center gap-1.5 rounded-md py-1 text-left hover:text-fg"
-        >
-          <ChevronRight
-            size={15}
-            strokeWidth={1.75}
-            aria-hidden="true"
-            className={`shrink-0 text-faint transition-[rotate] group-hover/toggle:text-muted ${open ? "rotate-90" : ""}`}
-          />
-          <span className="font-medium">{name}</span>
-          {fresh && (
-            <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
-          )}
-          {!open && <span className="text-xs text-faint">{points.length}</span>}
-        </button>
-        {Open && (
-          <Open
-            section={name}
-            label={`Open ${name}`}
-            className="ui-button ui-icon-button size-6 shrink-0 text-faint opacity-0 group-hover/line:opacity-100 focus-visible:opacity-100"
-          >
-            <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
-          </Open>
-        )}
-      </div>
-      {open && (
-        <div className="pt-1 pb-2 pl-5">
-          <Bullets points={points} />
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -464,10 +345,15 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
   const number = of("number");
   // What's measured, over the picture, unless the block's title says it already.
   const heading = number && number.name !== block.title ? number.name : undefined;
+  const check = checkOf(block);
   switch (block.view) {
     case "line":
       return day && number ? (
         <Line rows={rows} day={day} number={number} heading={heading} />
+      ) : null;
+    case "checklist":
+      return check ? (
+        <RowChecklist rows={rows} check={check} fields={fields.filter((f) => f !== check)} />
       ) : null;
     case "board": {
       const status = of("status", "choice");
@@ -820,6 +706,35 @@ function RowBars({
   );
 }
 
+/**
+ * A checklist: a row a line to tick, its name, then its day; what's done
+ * goes faint, not away.
+ */
+function RowChecklist({ rows, check, fields }: { rows: Point[]; check: Field; fields: Field[] }) {
+  const rings = useItemReminders();
+  return (
+    <ul className={`flex flex-col ${LINES}`}>
+      {rows.map((row) => {
+        const reminder = rings.get(row.id);
+        const done = itemDone(row, check, reminder);
+        const words = rest(fields, row);
+        return (
+          <li key={row.id} className="group flex items-baseline gap-3 rounded-md px-2.5 py-1.5">
+            <Tick row={row} check={check} reminder={reminder} className="self-center" />
+            <NewDot point={row} className="self-center" />
+            <p className={`min-w-0 flex-1 ${done ? "text-faint" : ""}`}>
+              <RowName row={row} />
+              {words && <span className="text-muted"> · {words}</span>}
+            </p>
+            {reminder && <Rings reminder={reminder} />}
+            <RemovePoint point={row} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** A list: a row a line, its name, then its other cells. */
 function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
   return (
@@ -830,7 +745,8 @@ function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
           <li key={row.id} className="group flex items-baseline gap-2 rounded-md px-2.5 py-1.5">
             <NewDot point={row} className="self-center" />
             <p className="min-w-0 flex-1">
-              <RowName row={row} className="font-semibold" />
+              {/* A name alone is the line; beside its cells it leads. */}
+              <RowName row={row} className={fields.length > 0 ? "font-semibold" : ""} />
               {words && <span className="text-muted"> · {words}</span>}
             </p>
             <RemovePoint point={row} />

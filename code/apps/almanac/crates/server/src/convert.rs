@@ -7,11 +7,17 @@
 //! card with its facts as fields, and the rest in a toggle under it; a
 //! timeline, bars, a trend and parts collections. The week goes: Calendar
 //! has it. Points keep their ids, sources and themes wherever they can.
+//!
+//! A second pass makes the lists collections (C in
+//! `proposals/facts-as-data.md`): bullets rows with only a name, a
+//! checklist rows with a check, Done, and a toggle a row per theme with its
+//! sentences as a paragraph on the row's page.
 
 use std::collections::{BTreeMap, HashSet};
 
 use almanac_domain::{
-    Actor, Cell, Facet, Field, MOST_FIELDS, ModelKind, Operation, SET_KINDS, Transaction,
+    Actor, Cell, Facet, Field, LIST_KINDS, MOST_FIELDS, ModelKind, Operation, SET_KINDS,
+    Transaction,
 };
 use almanac_sync::Origin;
 use serde_json::{Map, Value, json};
@@ -28,15 +34,19 @@ const OLD: &str = "SELECT DISTINCT b.topic_id, b.workspace_id, m.user_id FROM bl
      CROSS JOIN LATERAL (SELECT user_id FROM workspace_members \
        WHERE workspace_id = b.workspace_id ORDER BY role = 'admin' DESC, created_at LIMIT 1) m \
      WHERE NOT (b.kind = ANY($1))";
-const BLOCKS: &str = "SELECT id, kind, title, facets, position FROM blocks \
+const BLOCKS: &str = "SELECT id, kind, title, facets, position, row_id FROM blocks \
      WHERE topic_id = $1 ORDER BY position, created_at, id";
 const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, amount, note, done \
      FROM points WHERE topic_id = $1 ORDER BY position, created_at, id";
 
-/// The kinds that stay: the set's, and what they told about themselves.
+/// The kinds the first pass leaves: the set's, what they told about
+/// themselves, and the lists, for the second.
 fn stays(kind: &str) -> bool {
-    SET_KINDS.contains(&kind) || kind == "you"
+    SET_KINDS.contains(&kind) || LIST_KINDS.contains(&kind) || kind == "you"
 }
+
+/// What a checklist's check is called once it's a collection.
+const DONE: &str = "Done";
 
 #[derive(Debug, Clone)]
 pub struct OldBlock {
@@ -45,6 +55,8 @@ pub struct OldBlock {
     pub title: String,
     pub facets: Vec<Facet>,
     pub position: i32,
+    /// The row whose page it's on; `None` on the topic's.
+    pub row_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -89,19 +101,33 @@ pub async fn everywhere(pool: &PgPool) {
 
 async fn one(pool: &PgPool, actor: Actor, topic_id: Uuid) -> Result<(), AppError> {
     let mut db = pool.begin().await?;
-    type BlockRow = (Uuid, String, String, Json<Vec<Facet>>, i32);
+    let (blocks, points) = read(&mut db, topic_id).await?;
+    write(&mut db, actor, page(topic_id, &blocks, &points)).await?;
+    let (blocks, points) = read(&mut db, topic_id).await?;
+    write(&mut db, actor, lists(topic_id, &blocks, &points)).await?;
+    db.commit().await?;
+    tracing::info!(topic = %topic_id, "moved a page into the set");
+    Ok(())
+}
+
+async fn read(
+    db: &mut sqlx::PgConnection,
+    topic_id: Uuid,
+) -> Result<(Vec<OldBlock>, Vec<OldPoint>), AppError> {
+    type BlockRow = (Uuid, String, String, Json<Vec<Facet>>, i32, Option<Uuid>);
     let blocks: Vec<BlockRow> = sqlx::query_as(BLOCKS)
         .bind(topic_id)
         .fetch_all(&mut *db)
         .await?;
-    let blocks: Vec<OldBlock> = blocks
+    let blocks = blocks
         .into_iter()
-        .map(|(id, kind, title, facets, position)| OldBlock {
+        .map(|(id, kind, title, facets, position, row_id)| OldBlock {
             id,
             kind,
             title,
             facets: facets.0,
             position,
+            row_id,
         })
         .collect();
     type Row = (
@@ -119,7 +145,7 @@ async fn one(pool: &PgPool, actor: Actor, topic_id: Uuid) -> Result<(), AppError
         .bind(topic_id)
         .fetch_all(&mut *db)
         .await?;
-    let points: Vec<OldPoint> = points
+    let points = points
         .into_iter()
         .map(
             |(id, block_id, theme, text, happened, facet, amount, note, done)| OldPoint {
@@ -135,16 +161,21 @@ async fn one(pool: &PgPool, actor: Actor, topic_id: Uuid) -> Result<(), AppError
             },
         )
         .collect();
-    let operations = page(topic_id, &blocks, &points);
+    Ok((blocks, points))
+}
+
+async fn write(
+    db: &mut sqlx::PgConnection,
+    actor: Actor,
+    operations: Vec<Operation>,
+) -> Result<(), AppError> {
     if !operations.is_empty() {
         let transaction = Transaction {
             id: Uuid::now_v7(),
             operations,
         };
-        almanac_sync::apply_in(&mut db, actor, &transaction, Origin::Server).await?;
+        almanac_sync::apply_in(db, actor, &transaction, Origin::Server).await?;
     }
-    db.commit().await?;
-    tracing::info!(topic = %topic_id, "moved a page into the set");
     Ok(())
 }
 
@@ -227,6 +258,134 @@ pub fn page(topic_id: Uuid, blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Ope
         }
     }
     page.finish()
+}
+
+/// The writes that make a page's lists collections: bullets rows with only
+/// a name, a checklist rows with a check, and a toggle a row per theme with
+/// its sentences in a paragraph on the row's page, the sentences without a
+/// theme in a paragraph after it. Blocks keep their ids, and points theirs,
+/// so reminders stay with their items.
+pub fn lists(topic_id: Uuid, blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Operation> {
+    if !blocks.iter().any(|b| LIST_KINDS.contains(&b.kind.as_str())) {
+        return Vec::new();
+    }
+    let (mut changed, mut rows, mut on_rows, mut moves) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let mut pages: Vec<Option<Uuid>> = Vec::new();
+    for block in blocks {
+        if !pages.contains(&block.row_id) {
+            pages.push(block.row_id);
+        }
+    }
+    for at in pages {
+        let mut order: Vec<NewBlock> = Vec::new();
+        for block in blocks.iter().filter(|b| b.row_id == at) {
+            let of: Vec<&OldPoint> = points.iter().filter(|p| p.block_id == block.id).collect();
+            let turned = |kind: &str, fields: Vec<Field>| NewBlock {
+                id: block.id,
+                data: Some(block_data(kind, &block.title, fields)),
+                made: false,
+                was: Some(block.position),
+            };
+            match block.kind.as_str() {
+                "bullets" => order.push(turned("collection", Vec::new())),
+                "checklist" => {
+                    order.push(turned("collection", vec![field(DONE, "check", "", None)]));
+                    for p in of.iter().filter(|p| p.done) {
+                        moves.push(Operation::Update {
+                            model: ModelKind::Point,
+                            id: p.id,
+                            data: record([("cells", json!(cells([(DONE, Cell::Check(true))])))]),
+                        });
+                    }
+                }
+                "toggle" if themes(&of).is_empty() => order.push(turned("paragraph", Vec::new())),
+                "toggle" => {
+                    order.push(turned("collection", Vec::new()));
+                    for (n, theme) in themes(&of).into_iter().enumerate() {
+                        let row = Uuid::now_v7();
+                        rows.push(Operation::Create {
+                            model: ModelKind::Point,
+                            id: row,
+                            data: record([
+                                ("topic_id", json!(topic_id)),
+                                ("block_id", json!(block.id)),
+                                ("text", json!(cut(theme, 500))),
+                                ("cells", json!({})),
+                                ("seen", json!(true)),
+                                ("position", json!(n)),
+                            ]),
+                        });
+                        let paragraph = Uuid::now_v7();
+                        let mut data = block_data("paragraph", "", Vec::new());
+                        data.insert("topic_id".into(), json!(topic_id));
+                        data.insert("row_id".into(), json!(row));
+                        data.insert("position".into(), json!(0));
+                        on_rows.push(Operation::Create {
+                            model: ModelKind::Block,
+                            id: paragraph,
+                            data,
+                        });
+                        for p in of.iter().filter(|p| p.theme == theme) {
+                            moves.push(moved(p.id, paragraph));
+                        }
+                    }
+                    let loose: Vec<&&OldPoint> = of.iter().filter(|p| p.theme.is_empty()).collect();
+                    if !loose.is_empty() {
+                        let id = Uuid::now_v7();
+                        let mut data = block_data("paragraph", "", Vec::new());
+                        data.insert("topic_id".into(), json!(topic_id));
+                        data.insert("row_id".into(), json!(at));
+                        order.push(NewBlock {
+                            id,
+                            data: Some(data),
+                            made: true,
+                            was: None,
+                        });
+                        moves.extend(loose.iter().map(|p| moved(p.id, id)));
+                    }
+                }
+                _ => order.push(NewBlock::kept(block)),
+            }
+        }
+        for (n, block) in order.into_iter().enumerate() {
+            let position = n as i32;
+            let mut data = block.data.unwrap_or_default();
+            if block.was != Some(position) {
+                data.insert("position".into(), json!(position));
+            }
+            if block.made {
+                changed.push(Operation::Create {
+                    model: ModelKind::Block,
+                    id: block.id,
+                    data,
+                });
+            } else if !data.is_empty() {
+                changed.push(Operation::Update {
+                    model: ModelKind::Block,
+                    id: block.id,
+                    data,
+                });
+            }
+        }
+    }
+    // Blocks first, then the rows, then the pages on them, then the
+    // sentences that move there.
+    changed
+        .into_iter()
+        .chain(rows)
+        .chain(on_rows)
+        .chain(moves)
+        .collect()
+}
+
+/// `point` into `block`, out of its theme.
+fn moved(point: Uuid, block: Uuid) -> Operation {
+    Operation::Update {
+        model: ModelKind::Point,
+        id: point,
+        data: record([("block_id", json!(block)), ("theme", json!(""))]),
+    }
 }
 
 struct NewBlock {
@@ -548,6 +707,7 @@ mod tests {
             title: title.into(),
             facets: Vec::new(),
             position,
+            row_id: None,
         }
     }
 
@@ -654,5 +814,78 @@ mod tests {
         assert!(operations.iter().any(|o| matches!(o,
             Operation::Update { model: ModelKind::Point, id, data }
                 if *id == event.id && data["cells"] == json!({ "When": "1989" }))));
+    }
+
+    #[test]
+    fn lists_become_collections_and_a_toggle_rows_with_pages() {
+        let things = block("bullets", "Dinge", 0);
+        let steps = block("checklist", "Morgens", 1);
+        let history = block("toggle", "Geschichte", 2);
+        let mut brushed = point(&steps, "", "Zähne", "");
+        brushed.done = true;
+        let points = [
+            point(&things, "", "Leine", ""),
+            brushed.clone(),
+            point(&steps, "", "Lesen", ""),
+            point(&history, "Intifada", "Begann 1987.", ""),
+            point(&history, "Intifada", "Endete 1993.", ""),
+            point(&history, "", "Ein Satz ohne Thema.", ""),
+        ];
+        let operations = lists(Uuid::nil(), &[things, steps, history.clone()], &points);
+        assert_eq!(
+            kinds(&operations),
+            [
+                "collection",
+                "collection",
+                "collection",
+                "paragraph",
+                "paragraph"
+            ]
+        );
+        let Operation::Update { data, .. } = &operations[1] else {
+            panic!("{operations:?}")
+        };
+        assert_eq!(data["fields"][0]["kind"], "check");
+        assert!(operations.iter().any(|o| matches!(o,
+            Operation::Update { model: ModelKind::Point, id, data }
+                if *id == brushed.id && data["cells"] == json!({ "Done": true }))));
+        let row = operations
+            .iter()
+            .find_map(|o| match o {
+                Operation::Create {
+                    model: ModelKind::Point,
+                    id,
+                    data,
+                } if data["text"] == "Intifada" => Some(*id),
+                _ => None,
+            })
+            .unwrap();
+        let page = operations
+            .iter()
+            .find_map(|o| match o {
+                Operation::Create {
+                    model: ModelKind::Block,
+                    id,
+                    data,
+                } if data["row_id"] == json!(row) => Some(*id),
+                _ => None,
+            })
+            .unwrap();
+        let moved = |text: &str| {
+            let p = points.iter().find(|p| p.text == text).unwrap();
+            operations.iter().find_map(|o| match o {
+                Operation::Update {
+                    model: ModelKind::Point,
+                    id,
+                    data,
+                } if *id == p.id => data.get("block_id").cloned(),
+                _ => None,
+            })
+        };
+        assert_eq!(moved("Endete 1993."), Some(json!(page)));
+        let loose = moved("Ein Satz ohne Thema.").unwrap();
+        assert_ne!(loose, json!(page));
+        assert_ne!(loose, json!(history.id));
+        assert!(lists(Uuid::nil(), &[block("paragraph", "", 0)], &[]).is_empty());
     }
 }

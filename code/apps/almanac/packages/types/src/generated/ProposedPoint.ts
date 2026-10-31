@@ -6,7 +6,7 @@ export type ProposedPoint = {
  * The template's block it goes in, by title ("You"); the first that
  * keeps points when left out.
  */
-block?: string, theme: string, 
+block?: string, 
 /**
  * In a collection, the row's name.
  */

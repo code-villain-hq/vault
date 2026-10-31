@@ -117,14 +117,14 @@ async function answer(prompt: string) {
     });
   } else if (/wash/i.test(prompt)) {
     say("Thursday, then.");
-    await tool("add_items", {
+    await tool("add_rows", {
       block: "To do",
-      items: [{ text: "Wash on Thursday", source: "You said" }],
+      rows: [{ name: "Wash on Thursday", source: "You said" }],
     });
     await tool("offer_reminder", { item: "p1", due_on: "2026-10-29", every_days: 7 });
   } else {
     say("Water it every 7 days.");
-    await tool("add_block", { kind: "bullets", title: "Care" });
+    await tool("add_block", { kind: "paragraph", title: "Care" });
     await tool("add_items", {
       block: "Care",
       items: [

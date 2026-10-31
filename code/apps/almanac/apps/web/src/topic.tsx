@@ -1,8 +1,8 @@
 // A topic's page: its blocks in order, on a grid of twelve columns, each one
-// of the set (a heading, a paragraph, bullets, a checklist, a toggle, a
-// callout or a collection), the questions it waits on, and the talk beside
-// it. A section, and a collection's row, opens on a page of its own, in the
-// page's place, and so does the topic's
+// of the set (a heading, a paragraph, a callout or a collection), the
+// questions it waits on, and the talk beside it. A section, and a
+// collection's row, opens on a page of its own, in the page's place, and so
+// does the topic's
 // About: its name, what it sticks to, what it knows about you and its
 // blocks. The workspace's own topic, Almanac, has the index of the others
 // for its page.
@@ -54,9 +54,7 @@ import { about, inline } from "./prose";
 import { NotifyBell, ReminderMenu } from "./reminders";
 import { samples } from "./samples";
 import {
-  Bullets,
   Callout,
-  Checklist,
   ChecklistCount,
   Collection,
   LINES,
@@ -64,7 +62,6 @@ import {
   Opens,
   type PageTo,
   Paragraphs,
-  Toggles,
 } from "./set";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
@@ -483,7 +480,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
   const all = usePage(topic);
   const page = useMemo(() => onThePage(all), [all]);
   // An answer may go in a block the page leaves out, which keeps nothing yet.
-  const home = keeping(all.blocks);
+  const home = keeping(page.blocks);
 
   return (
     <>
@@ -599,12 +596,10 @@ function SectionPageBody({
   const blocks = page.blocks.filter(
     (b) => !own.blocks.includes(b) && points.some((p) => p.block_id === b.id),
   );
-  // A question's point goes where the section's others are.
-  const home = blocks.find((b) => b.kind === "toggle") ?? keeping(page.blocks);
+  // A question's point goes on the row's page, where its sentences are.
+  const home = keeping(own.blocks) ?? keeping(page.blocks.filter((b) => !b.row_id));
   // Passages name their talk; the talks of the rest are listed under them.
-  const passages = new Set(
-    blocks.filter((b) => b.kind === "paragraph" || b.kind === "toggle").map((b) => b.id),
-  );
+  const passages = new Set(blocks.filter((b) => b.kind === "paragraph").map((b) => b.id));
   const named = new Set(points.filter((p) => passages.has(p.block_id)).map((p) => p.talk_id));
   const from = talks
     .filter((t) => !named.has(t.id) && [...points, ...own.points].some((p) => p.talk_id === t.id))
@@ -761,20 +756,16 @@ function onDay(at: string): string {
 const HOLDS: Record<string, [kind: string, one: string, many: string]> = {
   heading: ["Heading", "", ""],
   paragraph: ["Paragraph", "point", "points"],
-  bullets: ["Bullets", "point", "points"],
-  checklist: ["Checklist", "item", "items"],
-  toggle: ["Toggle", "part", "parts"],
   callout: ["Callout", "point", "points"],
   collection: ["Collection", "row", "rows"],
 };
 
-/** What a block holds, for its line on About: "Toggle · 3 parts", "Heading". */
+/** What a block holds, for its line on About: "Collection · 3 rows", "Heading". */
 function holds(block: Block, page: PageParts): string {
   const points = page.points.filter((p) => p.block_id === block.id);
   const [kind, one, many] = HOLDS[block.kind] ?? ["", "point", "points"];
   if (block.kind === "heading") return kind;
-  // A toggle counts its parts, a line each.
-  const count = block.kind === "toggle" ? new Set(points.map((p) => p.theme)).size : points.length;
+  const count = points.length;
   const amount = count ? `${count} ${count === 1 ? one : many}` : "nothing yet";
   // A block titled by its kind says it once.
   return kind && kind !== blockName(block) ? `${kind} · ${amount}` : amount;
@@ -1133,16 +1124,9 @@ function Facts({ topic, facts }: { topic: Topic; facts: Point[] }) {
   );
 }
 
-/**
- * The block a question's point goes in when it's about nothing on the page:
- * its first toggle, which keeps it under its theme, or else its first block
- * of lines.
- */
+/** The block a question's point goes in: the first paragraph of `blocks`. */
 function keeping(blocks: Block[]): Block | undefined {
-  return (
-    blocks.find((b) => b.kind === "toggle") ??
-    blocks.find((b) => b.kind === "bullets" || b.kind === "paragraph")
-  );
+  return blocks.find((b) => b.kind === "paragraph");
 }
 
 /** The widths that read at a glance, and so hold out narrower. */
@@ -1206,24 +1190,6 @@ function BlockView({ block, page }: { block: Block; page: PageParts }) {
           <Paragraphs points={points} />
         </BlockFrame>
       );
-    case "bullets":
-      return (
-        <BlockFrame {...frame}>
-          <Bullets points={points} />
-        </BlockFrame>
-      );
-    case "checklist":
-      return (
-        <BlockFrame {...frame} aside={<ChecklistCount points={points} />}>
-          <Checklist points={points} />
-        </BlockFrame>
-      );
-    case "toggle":
-      return (
-        <BlockFrame {...frame}>
-          <Toggles points={points} />
-        </BlockFrame>
-      );
     case "callout":
       return (
         <BlockFrame {...frame}>
@@ -1232,7 +1198,12 @@ function BlockView({ block, page }: { block: Block; page: PageParts }) {
       );
     case "collection":
       return (
-        <BlockFrame {...frame}>
+        <BlockFrame
+          {...frame}
+          aside={
+            block.view === "checklist" ? <ChecklistCount block={block} rows={points} /> : undefined
+          }
+        >
           <Collection block={block} rows={points} />
         </BlockFrame>
       );
@@ -1740,7 +1711,6 @@ function Ask({ question, block }: { question: Question; block?: Block }) {
       sync.create("Point", {
         topic_id: question.topic_id,
         block_id: block.id,
-        theme: block.kind === "toggle" ? (question.theme ?? "Notes") : "",
         text: question.point,
         source: question.source ?? "You said",
         talk_id: question.talk_id ?? undefined,

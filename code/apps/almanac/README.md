@@ -91,7 +91,7 @@ topics.
   page; a block's name opens the page at it. The workspace's own topic
   has only its name and what it sticks to.
 - **A topic is its blocks**, in order, each one of the set: Heading,
-  Text, Bullets, Checklist, Toggle, Callout and Collection, with a title
+  Text, Callout and Collection, with a title
   of the topic's own ("Advice" in Haare, "Terms" in Marx), and You, what
   it knows about you, which About shows. Settings → Blocks shows every
   block and picture with sample points. A template only names the blocks
@@ -114,8 +114,10 @@ topics.
   shampoo, a plant, a page. Claude reads them with that question and every
   later one in the talk; they stay in the talk, not on the page.
 - **The page keeps points with their sources**, each in a block of the
-  set: text, bullets, a checklist, toggles, a callout, or a collection
-  whose rows fill its fields (a row per plant, with its spot and light).
+  set: text, a callout, or a collection whose rows fill its fields (a
+  row per plant, with its spot and light). A list is a collection whose
+  rows have only a name, a to-do list one with a check, Done, and the
+  parts of a subject rows, with their sentences on each row's page.
   Claude keeps each point in the block that holds it, and starts a block
   when you ask for one or none fits ("keep what I need to buy"), a
   collection with the fields its rows need. New points carry the unread dot until you leave the topic.
@@ -128,10 +130,11 @@ topics.
 - **A collection draws the picture its fields pick**, the same rules on
   every page: a day and a number a line, once each day has one, or each
   name one a day and comes again (a line per shop, named at its end); a
-  status a board, a photo cards, days past a timeline and days to come a
+  check with at most a day besides a checklist, a status a board, a
+  photo cards, days past a timeline and days to come a
   week (a day every row shares picks neither), a number with at most one
-  field more bars, three fields or more a table, fewer a list. A toggle opens on its points; a
-  checklist's ticked items go last, faint. A colour code shows its
+  field more bars, three fields or more a table, fewer a list. A
+  checklist's ticked rows go faint and stay. A colour code shows its
   colour.
 - **View as** beside a collection's title, on hover, switches to another
   picture its fields can draw, and the app's own pick among them. The
@@ -144,10 +147,6 @@ topics.
   read takes a row of its own, as every block does on a phone. A
   block's ⋯ makes it half the page or the whole, for everyone, until
   it's changed back; a heading stays whole.
-- **A section opens on its own page**: the arrow beside a toggle's line
-  opens it where the page was, with the talk still beside it: everything
-  kept under it from every block, its open questions and the talks it
-  came from. Asking from there asks about that section.
 - **A row opens as its own page**: a row's name, in any picture, opens
   its fields, a line each, the empty ones too, the blocks on its own
   page, and what's kept under its name. A row's page is made of the same
@@ -158,9 +157,10 @@ topics.
   goes back to the topic, as do the breadcrumb and Esc, to where you
   were on the page.
 - **Pages from before the set** move into it once, when the server
-  starts: sections, questions, shelves and cards become toggles; cards
-  with facts, tables, timelines, bars and trends collections; the rest
-  bullets or a checklist. The week goes; Calendar has it.
+  starts: cards with facts, tables, timelines, bars and trends become
+  collections; steps a checklist; sections, questions and the rest
+  lists, and the parts of a section rows with their sentences on their
+  pages. The week goes; Calendar has it.
 - **A talk changes the page when you ask**: "tidy this up", "put the
   shopping list first", "show my plants as a table". It rewords, moves and
   removes points and blocks, changes a collection's fields, or picks
@@ -186,7 +186,7 @@ topics.
 - **Reminders**: when a talk settles something that comes round, or you
   tell it a routine you keep, such as your wash days, Almanac offers a
   reminder in the talk. When a wash day moves, the new reminder replaces
-  the old one once you say yes. A checklist item can ring: ticking it
+  the old one once you say yes. A checklist's row can ring: ticking it
   ticks its reminder, and one that repeats shows its rhythm beside it and
   comes back unticked when it's due.
   Calendar shows the workspace's week from every topic and what's still

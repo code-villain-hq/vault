@@ -76,13 +76,13 @@ it fits better in another topic, naming one of the other topics or a new one.
 
 /// With Claude Code: Almanac's tools keep the page as it answers.
 const ANSWER_TOOLS: &str = "Keep the page with Almanac's tools while you answer. File what's \
-worth knowing later where it belongs: add_items for lines, steps, terms, paragraphs and what \
-they told you about themselves; add_rows for things, events and measurements, with a cell per \
-field; add_block, or a field with change_block, only when the page has nowhere for it. The page \
+worth knowing later where it belongs: add_items for paragraphs, callouts and what they told \
+you about themselves; add_rows for things, terms, steps, events and measurements, with a cell \
+per field; add_block, or a field with change_block, only when the page has nowhere for it. The page \
 is kept up to date, not added to: change_points when something changed or was wrong, remove \
-what's wrong or twice, move what reads better elsewhere. tick when they did a checklist's item, \
+what's wrong or twice, move what reads better elsewhere. tick when they did a row to do, \
 ask_to_check when your answer rested on a guess about their situation, offer_reminder when the \
-talk settled something recurring or dated (for a checklist's item, naming it), fits_elsewhere \
+talk settled something recurring or dated (for a row to do, naming it), fits_elsewhere \
 when the question belongs in another topic, change_brief when they tell you how this topic \
 should answer from now on or correct the same thing a second time, and name_talk while the talk \
 has no name. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
@@ -104,7 +104,7 @@ const WEB_OFF: &str = "You can't search the web: for things that change, such as
 or news, say your knowledge may be out of date.";
 
 const OWN: &str = "You are Almanac, a notebook that keeps what someone learns, one topic at a \
-time. Each topic has a page that keeps points by theme, talks beside it, and reminders on the \
+time. Each topic has a page that keeps what they learn in blocks, talks beside it, and reminders on the \
 calendar. This talk is in the workspace's own topic: you know every topic in it, and help \
 start new ones and change them.
 
@@ -152,13 +152,12 @@ the topic's, and for a collection its fields (name, kind, unit, goal \
 as a plain number or \"\", options), each the narrowest kind that holds its fact: yes or no a \
 check, a price a number with its unit, a date a day; a reason or a note a text field of its own. \
 Items and rows name it by its title.
-- items: what's worth knowing later, in a block that isn't a collection: facts, decisions, \
-steps, terms, and what they told you about their situation. Nothing the page already has. \
-Usually none to three. block names it as the page does (\"b2\") or by its title; theme only in \
-a toggle (the line it opens under), look only in a callout (\"warn\" or \"info\"), \"\" \
-otherwise; text as its block's kind asks; source where it comes from, in a few words (\"You \
+- items: sentences worth knowing later, in a block that isn't a collection: what explains, \
+decisions, and what they told you about their situation. Nothing the page already has. \
+Usually none to three. block names it as the page does (\"b2\") or by its title; look only in \
+a callout (\"warn\" or \"info\"), \"\" otherwise; text as its block's kind asks; source where it comes from, in a few words (\"You \
 said\", \"From the talk\", the book, guide or institution). Never a link.
-- rows: things, events and measurements, in a collection: name, and cells, a field each \
+- rows: things, terms, steps, events and measurements, in a collection: name, and cells, a field each \
 (field, value) as the block names its fields, only for what they or a source said. A number \
 plain (3.4), a day as 2026-09-24, a check yes or no.
 - changes: the page is kept up to date, not added to. When the exchange changes or corrects a \
@@ -168,7 +167,7 @@ text (\"\" when only cells change) and the cells that change.
 they asked to tidy up, a sentence that holds what a collection's fields keep (\"Lisa wiegt etwa \
 3,4 kg\" and a collection Gewicht) becomes its row: the row in rows, with the sentence's source, \
 and the sentence here. One collection's sentences an exchange; the answer says what's left.
-- ticks: checklist items the exchange says are done (\"p3\").
+- ticks: rows to do the exchange says are done (\"p3\"): rows of a collection with a check.
 - questions: when the answer rested on a guess about their situation, ask to check it, with the \
 point to keep if they say yes (text \"Does the Monstera stand by the north window?\", point \
 \"Stands by the north window.\"). Point is \"\" when there's nothing to keep. Only for a guess \
@@ -179,7 +178,7 @@ reminded of (watering every 7 days, repotting in March, sending the deck on Frid
 they told you they keep counts (washing their hair three times a week): one reminder for each \
 day it comes round, so something a few times a week is a reminder per weekday, each every 7 \
 days; when they didn't say which days, spread them evenly and the answer says which. title says \
-what to do in two to four words (\"Water the Monstera\"). item is the checklist item it rings \
+what to do in two to four words (\"Water the Monstera\"). item is the row to do it rings \
 for (\"p3\"), or \"\"; ticking the item ticks the reminder. due_on is the next day it's due \
 (YYYY-MM-DD), at is a time (\"HH:MM\") or \"\", every_days is the rhythm in days, or 0 for once. \
 replaces names the reminders it takes the place of, as the page names them ([\"r2\"]): when a \
@@ -251,8 +250,6 @@ struct KeepField {
 #[derive(Deserialize)]
 struct KeepItem {
     block: String,
-    #[serde(default)]
-    theme: String,
     #[serde(default)]
     look: String,
     text: String,
@@ -342,7 +339,6 @@ fn keep_schema() -> Value {
         }))),
         "items": list(object(json!({
             "block": string,
-            "theme": string,
             "look": { "type": "string", "enum": ["", "warn", "info"] },
             "text": string,
             "source": string,
@@ -1008,7 +1004,6 @@ async fn keep(
             &item.block,
             &[ItemArg {
                 text: item.text.clone(),
-                theme: item.theme.clone(),
                 look: item.look.clone(),
                 source: item.source.clone(),
                 url: String::new(),
