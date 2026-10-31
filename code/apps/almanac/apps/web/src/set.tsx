@@ -621,18 +621,22 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
     }
     case "timeline":
       return day ? (
-        <RowTimeline rows={rows} day={day} fields={fields.filter((f) => f !== day)} />
+        <Told rows={rows} by={of("status", "choice")}>
+          <RowTimeline rows={rows} day={day} fields={fields.filter((f) => f !== day)} />
+        </Told>
       ) : null;
     case "week":
       return day ? <Week rows={rows} day={day} /> : null;
     case "bars":
       return number ? (
-        <RowBars
-          rows={rows}
-          number={number}
-          fields={fields.filter((f) => f !== number)}
-          heading={heading}
-        />
+        <Told rows={rows} by={of("status", "choice")}>
+          <RowBars
+            rows={rows}
+            number={number}
+            fields={fields.filter((f) => f !== number)}
+            heading={heading}
+          />
+        </Told>
       ) : null;
     case "figures":
       return <Figures rows={rows} fields={fields} />;
@@ -641,21 +645,34 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
       return <Steps rows={rows} check={ticks} fields={fields.filter((f) => f !== ticks)} />;
     }
   }
-  // Rows told apart by a status or a choice count each over the picture.
-  const told = of("status", "choice");
-  const picture =
-    block.view === "cards" ? (
-      <RowCards rows={rows} fields={fields} />
-    ) : block.view === "table" ? (
-      <RowTable block={block} rows={rows} fields={fields} />
-    ) : (
-      <RowList rows={rows} fields={fields} />
-    );
-  if (!told || rows.length < TALLY_FROM) return picture;
+  return (
+    <Told rows={rows} by={of("status", "choice")}>
+      {block.view === "cards" ? (
+        <RowCards rows={rows} fields={fields} />
+      ) : block.view === "table" ? (
+        <RowTable block={block} rows={rows} fields={fields} />
+      ) : (
+        <RowList rows={rows} fields={fields} />
+      )}
+    </Told>
+  );
+}
+
+/** A picture whose rows a status or a choice tells apart, with how many each over it. */
+function Told({
+  rows,
+  by,
+  children,
+}: {
+  rows: Point[];
+  by: Field | undefined;
+  children: ReactNode;
+}) {
+  if (!by || rows.length < TALLY_FROM) return children;
   return (
     <div className="flex flex-col gap-3">
-      <Tally rows={rows} field={told} />
-      {picture}
+      <Tally rows={rows} field={by} />
+      {children}
     </div>
   );
 }
