@@ -10,6 +10,13 @@ test("keeps bold and italic", () => {
   );
 });
 
+test("keeps italic inside bold, at its end too", () => {
+  expect(html("**1867 erscheint der erste Band des *Kapital***. Darin")).toBe(
+    '<div class="flex flex-col gap-2"><p><strong class="font-semibold">1867 erscheint der erste Band des <em>Kapital</em></strong>. Darin</p></div>',
+  );
+  expect(plain("**Band des *Kapital*** und *mehr*")).toBe("Band des Kapital und mehr");
+});
+
 test("leaves a lone star and a sum as they are", () => {
   expect(html("2 * 3 * 4 and a star *")).toContain("<p>2 * 3 * 4 and a star *</p>");
 });

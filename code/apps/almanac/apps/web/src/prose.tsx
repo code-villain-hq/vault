@@ -63,16 +63,21 @@ export function about(brief: string): string {
   return first?.segment.trim() ?? "";
 }
 
+/** *Italic*: a word or more, not a lone star or a sum's. */
+const ITALIC = String.raw`\*[^*\s](?:[^*]*[^*\s])?\*`;
+/** **Bold**, which can hold *italic*, at its end too: "**des *Kapital***". */
+const BOLD = String.raw`\*\*(?:[^*]|${ITALIC})+?\*\*`;
+
 /** A line as written, with **bold**, *italic* and links kept: an answer's, or a point's. */
 export function inline(text: string): ReactNode {
   // The marked parts sit at the odd places the split leaves them, marks and
-  // all: **bold** and *italic*, which can hold a link.
-  return text.split(/(\*\*[^*]+\*\*|\*[^*\s](?:[^*]*[^*\s])?\*)/).map((part, i) => {
+  // all: **bold**, which can hold italic, and *italic*, either with links.
+  return text.split(new RegExp(`(${BOLD}|${ITALIC})`)).map((part, i) => {
     if (i % 2 === 0) return linked(part, i);
     return part.startsWith("**") ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
       <strong key={i} className="font-semibold">
-        {linked(part.slice(2, -2), i)}
+        {inline(part.slice(2, -2))}
       </strong>
     ) : (
       // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
@@ -127,7 +132,8 @@ function swatched(text: string, at: number): ReactNode {
 export function plain(text: string): string {
   return text
     .replace(new RegExp(LINK, "g"), "$1")
-    .replace(/\*\*([^*]+)\*\*|\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1$2");
+    .replace(new RegExp(BOLD, "g"), (bold) => bold.slice(2, -2))
+    .replace(new RegExp(ITALIC, "g"), (italic) => italic.slice(1, -1));
 }
 
 /**
