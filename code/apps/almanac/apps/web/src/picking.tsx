@@ -46,29 +46,33 @@ export function usePicking(then?: () => void) {
 
 export type Picking = ReturnType<typeof usePicking>;
 
-/** Whether a photo is being dragged over, and the handlers that take its drop. */
+/**
+ * Whether a photo is being dragged over, and the handlers that take its
+ * drop. A drop a box inside already took (a cover, a row's photo) is
+ * theirs: its event comes up with its default prevented.
+ */
 export function useDrop(picking: Picking) {
   const [dropping, setDropping] = useState(false);
+  const over = (event: DragEvent) => {
+    if (!holdsPhoto(event.dataTransfer)) return;
+    if (event.defaultPrevented) return setDropping(false);
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDropping(true);
+  };
   return {
     dropping,
     handlers: {
-      onDragEnter: (event: DragEvent) => {
-        if (!holdsPhoto(event.dataTransfer)) return;
-        event.preventDefault();
-        setDropping(true);
-      },
-      onDragOver: (event: DragEvent) => {
-        if (!holdsPhoto(event.dataTransfer)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-      },
+      onDragEnter: over,
+      onDragOver: over,
       onDragLeave: (event: DragEvent) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
       },
       onDrop: (event: DragEvent) => {
         if (!holdsPhoto(event.dataTransfer)) return;
-        event.preventDefault();
         setDropping(false);
+        if (event.defaultPrevented) return;
+        event.preventDefault();
         void picking.add(photosIn(event.dataTransfer.files));
       },
     },
