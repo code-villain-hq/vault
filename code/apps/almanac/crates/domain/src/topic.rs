@@ -118,6 +118,8 @@ pub const ICONS: &[&str] = &[
     "scale",
     "wallet",
     "piggy-bank",
+    "shirt",
+    "footprints",
     "baby",
     "users",
     "calendar",
