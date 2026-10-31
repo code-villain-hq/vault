@@ -35,7 +35,7 @@ import {
   useState,
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
-import { cellOf, cellWords, checkOf, lanesOf, numberOf } from "./collection";
+import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf } from "./collection";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
@@ -57,6 +57,7 @@ import {
   ChecklistCount,
   Collection,
   choiceDot,
+  figureField,
   itemDone,
   LINES,
   named,
@@ -1543,7 +1544,7 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
   const tiles = useMemo(() => {
     const ids = new Set(others.map((t) => t.id));
     const byTopic = new Map<string, TileFacts>();
-    for (const id of ids) byTopic.set(id, { kept: 0, done: 0, todo: 0, last: null });
+    for (const id of ids) byTopic.set(id, { kept: 0, done: 0, todo: 0, last: null, figures: [] });
     for (const point of points) {
       const facts = byTopic.get(point.topic_id);
       if (facts) facts.kept += 1;
@@ -1561,6 +1562,23 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
     for (const talk of talks) {
       const facts = byTopic.get(talk.topic_id);
       if (facts && (!facts.last || talk.last_at > facts.last)) facts.last = talk.last_at;
+    }
+    // The first figures on a topic's page, which say most about it at a glance.
+    const ordered = [...blocks].sort((a, b) => a.position - b.position);
+    for (const block of ordered) {
+      const facts = byTopic.get(block.topic_id);
+      if (!facts || facts.figures.length > 0 || block.row_id || block.kind !== "collection")
+        continue;
+      const rows = points
+        .filter((p) => p.block_id === block.id)
+        .sort((a, b) => a.position - b.position);
+      if (shownAs(block, rows) !== "figures") continue;
+      const value = figureField(filled(block, rows));
+      if (!value) continue;
+      facts.figures = rows
+        .map((row) => ({ label: row.text, value: cellWords(value, cellOf(row, value)) }))
+        .filter((f) => f.value && !f.value.startsWith("#"))
+        .slice(0, TILE_FIGURES);
     }
     return byTopic;
   }, [others, blocks, points, talks, rings]);
@@ -1612,7 +1630,9 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
                 <li key={other.id} className="flex">
                   <TopicTile
                     topic={other}
-                    facts={tiles.get(other.id) ?? { kept: 0, done: 0, todo: 0, last: null }}
+                    facts={
+                      tiles.get(other.id) ?? { kept: 0, done: 0, todo: 0, last: null, figures: [] }
+                    }
                   />
                 </li>
               )),
@@ -1625,7 +1645,16 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
 }
 
 /** What a topic's tile shows: its points, its checklists' rows ticked and to tick, its last talk. */
-type TileFacts = { kept: number; done: number; todo: number; last: string | null };
+type TileFacts = {
+  kept: number;
+  done: number;
+  todo: number;
+  last: string | null;
+  figures: { label: string; value: string }[];
+};
+
+/** How many of its figures a topic's tile shows. */
+const TILE_FIGURES = 2;
 
 /** One figure over every topic, large. */
 function Overall({ label, value }: { label: string; value: string }) {
@@ -1663,13 +1692,26 @@ function TopicTile({ topic, facts }: { topic: Topic; facts: TileFacts }) {
           <span className="ml-auto shrink-0 text-xs text-faint">{topic.group_name}</span>
         )}
       </span>
-      <span className="flex items-baseline gap-1.5">
-        <span className="font-semibold text-2xl tabular-nums">{facts.kept}</span>
-        <span className="text-xs text-muted">{facts.kept === 1 ? "point" : "points"}</span>
-        {facts.last && <span className="ml-auto text-xs text-faint">{ago(facts.last)}</span>}
-      </span>
+      {facts.figures.length > 0 ? (
+        <span className="grid grid-cols-2 gap-3">
+          {facts.figures.map((figure) => (
+            <span key={figure.label} className="flex min-w-0 flex-col">
+              <span className="line-clamp-2 break-words font-semibold text-base leading-snug">
+                {figure.value}
+              </span>
+              <span className="truncate text-xs text-muted">{figure.label}</span>
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span className="flex items-baseline gap-1.5">
+          <span className="font-semibold text-2xl tabular-nums">{facts.kept}</span>
+          <span className="text-xs text-muted">{facts.kept === 1 ? "point" : "points"}</span>
+          {facts.last && <span className="ml-auto text-xs text-faint">{ago(facts.last)}</span>}
+        </span>
+      )}
       {facts.todo > 0 && (
-        <span className="flex items-center gap-2">
+        <span className="mt-auto flex items-center gap-2">
           <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-chip">
             <span
               className={`block h-full rounded-full ${facts.done === facts.todo ? "bg-ok" : "bg-info"}`}

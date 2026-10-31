@@ -561,12 +561,19 @@ const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
  * Figures: a tile a row, its value large over its name, as a dashboard's
  * numbers. The value is its number, or else the first cell it has.
  */
-function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
+/** The field a figure shows large: its number, or else the first that isn't a tone. */
+export function figureField(fields: Field[]): Field | undefined {
   const shown = fields.filter((f) => f.kind !== "photo" && f.kind !== "check");
-  const value =
+  return (
     shown.find((f) => f.kind === "number") ??
     shown.find((f) => !TOLD_BY_TONE.has(f.kind)) ??
-    shown[0];
+    shown[0]
+  );
+}
+
+function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
+  const shown = fields.filter((f) => f.kind !== "photo" && f.kind !== "check");
+  const value = figureField(fields);
   const others = shown.filter((f) => f !== value);
   // A palette's swatches fit narrower than words.
   const palette = rows.every(

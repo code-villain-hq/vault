@@ -188,6 +188,8 @@ What they do:
     click on one picks its rows for the list under it, and past ten rows
     the list shows the first eight, with All (`AxisTimeline`). A tally's
     words do the same for the bars, table, cards or list under it (`Told`).
+    A topic's tile on the home page shows the first two rows of its first
+    figures collection, value over name (`figureField`), or else its count.
   - A checklist's row can ring: offer_reminder with an `item` makes a
     reminder with its `point_id` (migration 0016). Ticking a row writes
     its check cell; a row a reminder rings for ticks the reminder instead (`markDone`): one
