@@ -20,7 +20,7 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 pub use code_villain_sync::{Origin, SyncError, current_sync_id, lock_workspace, workspace_epoch};
-pub use rules::Almanac;
+pub use rules::{Almanac, may_sit_under};
 
 /// The Postgres channel notified, with the workspace id as payload, whenever
 /// a workspace's log grows.

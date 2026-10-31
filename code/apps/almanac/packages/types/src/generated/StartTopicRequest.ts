@@ -8,6 +8,10 @@
  */
 export type StartTopicRequest = { name: string, sticks_to?: string, icon?: string, group_name?: string, 
 /**
+ * The topic it sits under.
+ */
+parent_id?: string, 
+/**
  * One of [`TEMPLATE_NAMES`]; Almanac picks one when it's left out.
  */
 template?: string, 

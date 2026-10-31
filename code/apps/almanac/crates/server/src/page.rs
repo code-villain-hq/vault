@@ -1,7 +1,8 @@
 //! A topic's page as Claude reads it: what the topic sticks to, its blocks
 //! in order with the points each keeps (a collection's rows with their
 //! cells), the questions it waits on, its reminders, and the names of the
-//! other topics, for questions that belong there. For the workspace's own topic, the workspace: its topics by
+//! other topics, for questions that belong there. A sub-topic follows its
+//! parent's brief too, and a parent names its sub-topics. For the workspace's own topic, the workspace: its topics by
 //! group, what each sticks to, its blocks and how much it has.
 
 use std::collections::BTreeMap;
@@ -13,7 +14,11 @@ use sqlx::PgPool;
 use sqlx::types::Json;
 use uuid::Uuid;
 
-const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
+const TOPIC: &str = "SELECT t.name, t.sticks_to, p.name, p.sticks_to FROM topics t \
+     LEFT JOIN topics p ON p.id = t.parent_id AND p.workspace_id = t.workspace_id \
+     WHERE t.id = $1 AND t.workspace_id = $2";
+const CHILDREN: &str = "SELECT name FROM topics \
+     WHERE parent_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
 const BLOCKS: &str = "SELECT id, kind, title, facets, fields, width, view, row_id, position \
      FROM blocks \
      WHERE topic_id = $1 AND workspace_id = $2 ORDER BY position, created_at";
@@ -28,13 +33,15 @@ const REMINDERS: &str = "SELECT id, title, due_on, every_days, status, point_id,
 const OTHERS: &str = "SELECT name FROM topics \
      WHERE workspace_id = $2 AND id <> $1 AND kind = 'topic' ORDER BY position";
 const WORKSPACE: &str = "SELECT name FROM workspaces WHERE id = $1";
-const TOPICS: &str = "SELECT t.name, t.group_name, t.sticks_to, \
+const TOPICS: &str = "SELECT COALESCE(t.name || ', under ' || p.name, t.name), t.group_name, t.sticks_to, \
        COALESCE((SELECT string_agg(CASE WHEN b.title = '' THEN b.kind ELSE b.title END, ', ' \
            ORDER BY b.position, b.created_at) FROM blocks b \
            WHERE b.topic_id = t.id AND b.row_id IS NULL), ''), \
        (SELECT count(*) FROM points p WHERE p.topic_id = t.id), \
        (SELECT max(k.last_at)::date FROM talks k WHERE k.topic_id = t.id) \
-     FROM topics t WHERE t.workspace_id = $1 AND t.kind = 'topic' \
+     FROM topics t \
+     LEFT JOIN topics p ON p.id = t.parent_id AND p.workspace_id = t.workspace_id \
+     WHERE t.workspace_id = $1 AND t.kind = 'topic' \
      ORDER BY t.group_name = '', t.group_name, t.position, t.created_at";
 
 /// A point as the page has it: an item, or a collection's row, its text
@@ -121,6 +128,10 @@ pub struct Page {
     pub id: Uuid,
     pub name: String,
     pub sticks_to: String,
+    /// The topic it sits under: its name and brief.
+    pub parent: Option<(String, String)>,
+    /// The names of the topics under it.
+    pub children: Vec<String>,
     pub blocks: Vec<PageBlock>,
     pub questions: Vec<String>,
     pub reminders: Vec<PageReminder>,
@@ -133,12 +144,12 @@ impl Page {
         workspace_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Page>, sqlx::Error> {
-        let topic: Option<(String, String)> = sqlx::query_as(TOPIC)
+        let topic: Option<(String, String, Option<String>, Option<String>)> = sqlx::query_as(TOPIC)
             .bind(id)
             .bind(workspace_id)
             .fetch_optional(pool)
             .await?;
-        let Some((name, sticks_to)) = topic else {
+        let Some((name, sticks_to, parent, parent_sticks_to)) = topic else {
             return Ok(None);
         };
         let blocks: Vec<RefBlock> = sqlx::query_as(BLOCKS)
@@ -168,6 +179,12 @@ impl Page {
             id,
             name,
             sticks_to,
+            parent: parent.zip(parent_sticks_to),
+            children: sqlx::query_scalar(CHILDREN)
+                .bind(id)
+                .bind(workspace_id)
+                .fetch_all(pool)
+                .await?,
             questions: sqlx::query_scalar(QUESTIONS)
                 .bind(id)
                 .bind(workspace_id)
@@ -224,6 +241,25 @@ impl Page {
             s => s,
         };
         let _ = writeln!(out, "What it sticks to, its brief: {sticks_to}");
+        if let Some((parent, brief)) = &self.parent {
+            let _ = writeln!(
+                out,
+                "It sits under {parent}, whose brief holds here too where this one doesn't say \
+                 otherwise: {}",
+                match brief.trim() {
+                    "" => "not written yet.",
+                    s => s,
+                }
+            );
+        }
+        if !self.children.is_empty() {
+            let _ = writeln!(
+                out,
+                "Its sub-topics, each with its own page and talks: {}. What's about one of \
+                 them alone belongs in that one's talks; here stays what they share.",
+                self.children.join(", ")
+            );
+        }
         let _ = writeln!(out, "\nHow a page is made: {SET_SAYS}");
         out.push_str("\nThe page's blocks, in order:\n");
         if self.blocks.is_empty() {

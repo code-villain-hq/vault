@@ -22,6 +22,10 @@ pub struct Topic {
     pub icon: String,
     /// The sidebar group it sits in, such as "Hobby". Empty for none.
     pub group_name: String,
+    /// The topic it sits under, one level deep: its page shows this one as
+    /// a tile, and this one's talks keep to its brief too. A parent that's
+    /// gone counts as none.
+    pub parent_id: Option<Uuid>,
     /// First questions, for the empty page.
     pub starters: Vec<String>,
     pub position: i32,
@@ -40,6 +44,7 @@ pub struct TopicCreate {
     pub sticks_to: Option<String>,
     pub icon: Option<String>,
     pub group_name: Option<String>,
+    pub parent_id: Option<Uuid>,
     pub starters: Option<Vec<String>>,
     /// After the last topic when left out.
     pub position: Option<i32>,
@@ -55,6 +60,9 @@ pub struct TopicPatch {
     pub sticks_to: Option<String>,
     pub icon: Option<String>,
     pub group_name: Option<String>,
+    /// Null takes it out from under its parent.
+    #[ts(optional = nullable)]
+    pub parent_id: Option<Uuid>,
     pub starters: Option<Vec<String>>,
     pub position: Option<i32>,
 }
@@ -570,6 +578,8 @@ pub struct StartTopicRequest {
     pub sticks_to: Option<String>,
     pub icon: Option<String>,
     pub group_name: Option<String>,
+    /// The topic it sits under.
+    pub parent_id: Option<Uuid>,
     /// One of [`TEMPLATE_NAMES`]; Almanac picks one when it's left out.
     pub template: Option<String>,
     /// The answer whose proposal this starts.
@@ -873,6 +883,7 @@ mod tests {
             sticks_to: None,
             icon: icon.map(Into::into),
             group_name: None,
+            parent_id: None,
             starters: None,
             position: None,
             kind: None,

@@ -161,6 +161,11 @@ pub async fn start(
             given.push(field);
         }
     }
+    if let Some(parent) = request.parent_id {
+        let mut db = state.pool.acquire().await?;
+        almanac_sync::may_sit_under(&mut db, actor.workspace_id, id, parent).await?;
+        data.insert("parent_id".into(), json!(parent));
+    }
     let mut operations = Vec::new();
     if let Some((message_id, proposal)) = &proposed {
         data.insert("starters".into(), json!(proposal.starters));

@@ -28,6 +28,13 @@ const TOPIC_POINTS: &str = "SELECT id FROM points WHERE topic_id = $1 AND worksp
 const TOPIC_MESSAGES: &str = "SELECT id FROM messages WHERE topic_id = $1 AND workspace_id = $2";
 const TOPIC_TALKS: &str = "SELECT id FROM talks WHERE topic_id = $1 AND workspace_id = $2";
 const TALK_MESSAGES: &str = "SELECT id FROM messages WHERE talk_id = $1 AND workspace_id = $2";
+const TOPIC_CHILDREN: &str = "SELECT id FROM topics WHERE parent_id = $1 AND workspace_id = $2";
+/// Whether a topic can be a parent: a plain topic of the workspace that
+/// sits under none itself.
+const CAN_PARENT: &str = "SELECT EXISTS (SELECT 1 FROM topics \
+     WHERE id = $1 AND workspace_id = $2 AND kind = 'topic' AND parent_id IS NULL)";
+const HAS_CHILDREN: &str =
+    "SELECT EXISTS (SELECT 1 FROM topics WHERE parent_id = $1 AND workspace_id = $2)";
 const OWN_TOPIC: &str = "SELECT EXISTS (SELECT 1 FROM topics \
      WHERE id = $1 AND workspace_id = $2 AND kind = 'almanac')";
 
@@ -61,6 +68,26 @@ impl Rules for Almanac {
             } if data.contains_key("notified_for") => Err(SyncError::Forbidden(
                 "Only Almanac says when it told the Mac.".into(),
             )),
+            // A topic sits under another one level deep, and never under
+            // itself or the workspace's own topic.
+            Operation::Create {
+                model: ModelKind::Topic,
+                id,
+                data,
+            }
+            | Operation::Update {
+                model: ModelKind::Topic,
+                id,
+                data,
+            } => match data.get("parent_id").and_then(Value::as_str) {
+                None => Ok(()),
+                Some(parent) => {
+                    let parent = parent
+                        .parse()
+                        .map_err(|_| SyncError::Invalid("That parent isn't a topic.".into()))?;
+                    may_sit_under(db, actor.workspace_id, *id, parent).await
+                }
+            },
             // The workspace's own topic stays: it's how topics start.
             Operation::Delete {
                 model: ModelKind::Topic,
@@ -132,15 +159,29 @@ impl Rules for Almanac {
         // What a topic kept goes with it, a block's points with the block,
         // a row's page with the row, and a talk's messages with the talk,
         // logged so every client lets go of them too.
+        let mut operations = Vec::new();
         let children: &[(ModelKind, &'static str)] = match model {
-            ModelKind::Topic => &[
-                (ModelKind::Reminder, TOPIC_REMINDERS),
-                (ModelKind::Question, TOPIC_QUESTIONS),
-                (ModelKind::Point, TOPIC_POINTS),
-                (ModelKind::Block, TOPIC_BLOCKS),
-                (ModelKind::Message, TOPIC_MESSAGES),
-                (ModelKind::Talk, TOPIC_TALKS),
-            ],
+            ModelKind::Topic => {
+                // Its sub-topics stay, at the top.
+                let children: Vec<Uuid> = sqlx::query_scalar(TOPIC_CHILDREN)
+                    .bind(id)
+                    .bind(actor.workspace_id)
+                    .fetch_all(&mut *db)
+                    .await?;
+                operations.extend(children.into_iter().map(|id| Operation::Update {
+                    model: ModelKind::Topic,
+                    id,
+                    data: Map::from_iter([("parent_id".into(), Value::Null)]),
+                }));
+                &[
+                    (ModelKind::Reminder, TOPIC_REMINDERS),
+                    (ModelKind::Question, TOPIC_QUESTIONS),
+                    (ModelKind::Point, TOPIC_POINTS),
+                    (ModelKind::Block, TOPIC_BLOCKS),
+                    (ModelKind::Message, TOPIC_MESSAGES),
+                    (ModelKind::Talk, TOPIC_TALKS),
+                ]
+            }
             ModelKind::Block => &[(ModelKind::Point, BLOCK_POINTS)],
             ModelKind::Point => &[(ModelKind::Block, ROW_BLOCKS)],
             ModelKind::Talk => &[(ModelKind::Message, TALK_MESSAGES)],
@@ -152,7 +193,6 @@ impl Rules for Almanac {
             }
             _ => &[],
         };
-        let mut operations = Vec::new();
         for (child, query) in children {
             let ids: Vec<Uuid> = sqlx::query_scalar(*query)
                 .bind(id)
@@ -166,4 +206,30 @@ impl Rules for Almanac {
         }
         Ok(operations)
     }
+}
+
+/// Whether `topic` may sit under `parent`: one level deep, and never under
+/// itself or the workspace's own topic.
+pub async fn may_sit_under(
+    db: &mut PgConnection,
+    workspace_id: Uuid,
+    topic: Uuid,
+    parent: Uuid,
+) -> Result<(), SyncError> {
+    let can: bool = sqlx::query_scalar(CAN_PARENT)
+        .bind(parent)
+        .bind(workspace_id)
+        .fetch_one(&mut *db)
+        .await?;
+    let has: bool = sqlx::query_scalar(HAS_CHILDREN)
+        .bind(topic)
+        .bind(workspace_id)
+        .fetch_one(&mut *db)
+        .await?;
+    if parent == topic || !can || has {
+        return Err(SyncError::Invalid(
+            "A topic sits under another one level deep, not under itself or Almanac's own.".into(),
+        ));
+    }
+    Ok(())
 }

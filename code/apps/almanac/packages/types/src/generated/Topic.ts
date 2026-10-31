@@ -19,6 +19,12 @@ icon: string,
  */
 group_name: string, 
 /**
+ * The topic it sits under, one level deep: its page shows this one as
+ * a tile, and this one's talks keep to its brief too. A parent that's
+ * gone counts as none.
+ */
+parent_id: string | null, 
+/**
  * First questions, for the empty page.
  */
 starters: Array<string>, position: number, 

@@ -403,6 +403,56 @@ async fn the_workspaces_own_topic_can_be_renamed_but_stays(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_topic_sits_under_another_one_level_deep(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let own = topic_named(&app, &ada, &home, "Almanac").await["id"].clone();
+    let topics = format!("/api/w/{home}/topics");
+    let start = |name: &str, parent: Value| {
+        app.post(
+            &topics,
+            Some(&ada),
+            json!({ "name": name, "parent_id": parent }),
+        )
+    };
+    let prices = start("Prices", Value::Null).await.body["id"].clone();
+    let shoes = start("Shoes", prices.clone()).await;
+    assert_eq!(shoes.status, StatusCode::CREATED, "{}", shoes.body);
+    let shoes = shoes.body["id"].clone();
+
+    // Not two levels deep, and not under Almanac's own.
+    for parent in [shoes.clone(), own] {
+        let refused = start("Preppy", parent.clone()).await;
+        assert!(!refused.status.is_success(), "{parent}: {}", refused.body);
+    }
+    // Not under itself, and a topic with sub-topics goes under none.
+    for (id, parent) in [(&shoes, &shoes), (&prices, &shoes)] {
+        let refused = app
+            .sync(
+                &ada,
+                &home,
+                json!([{ "action": "update", "model": "Topic", "id": id,
+                         "data": { "parent_id": parent } }]),
+            )
+            .await;
+        assert!(!refused.status.is_success(), "{}", refused.body);
+    }
+
+    // Deleting the parent leaves its sub-topic, at the top.
+    let deleted = app
+        .sync(
+            &ada,
+            &home,
+            json!([{ "action": "delete", "model": "Topic", "id": prices }]),
+        )
+        .await;
+    assert!(deleted.status.is_success(), "{}", deleted.body);
+    let topics = app.synced(&ada, &home, "Topic").await;
+    let shoes = topics.iter().find(|t| t["name"] == "Shoes").unwrap();
+    assert!(shoes["parent_id"].is_null(), "{shoes}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_topic_keeps_what_you_wrote_and_learns_how_to_answer(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
     let (app, _) = with_claude_code(pool.clone(), dir.path()).await;
