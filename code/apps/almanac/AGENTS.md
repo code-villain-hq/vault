@@ -180,6 +180,8 @@ What they do:
     two fields or more a table, the rest a list.
     Only fields its rows fill count. View as offers the others its fields
     allow (`picturesFor`). A callout is a warning when a point's `look` is `warn`.
+    Paragraphs that each open with a bold lead draw as cards: the lead, a
+    few lines, and More (`Leads` in `set.tsx`).
   - A checklist's row can ring: offer_reminder with an `item` makes a
     reminder with its `point_id` (migration 0016). Ticking a row writes
     its check cell; a row a reminder rings for ticks the reminder instead (`markDone`): one

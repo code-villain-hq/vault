@@ -442,7 +442,8 @@ const SET_SAYS: &str = "every page on every topic is made of the same few blocks
 each with a short title or none. The app draws them; you only say what goes where. The kinds: \
 heading, a title that starts a part of the page, with no points; \
 paragraph, a point a paragraph, for what reads as prose: two to four sentences that explain, \
-starting with the term it's about in **bold** when there is one; \
+starting with the term it's about in **bold** when there is one (when each does, the \
+paragraphs show as cards, the term over a few lines, which reads at a glance); \
 callout, a point set apart: look warn when it needs a look (a problem, a gap), info when \
 something is ready; \
 collection, rows that share the same fields, a row per thing, event or measurement (plants, \
