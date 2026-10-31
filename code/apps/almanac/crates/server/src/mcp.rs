@@ -871,7 +871,7 @@ fn tools(mode: Mode) -> Vec<Value> {
     );
     let name_talk = tool(
         "name_talk",
-        "Names the talk, on its first answer: under six words, in the talk's language.",
+        "Names the talk while it has no name: under six words, in the talk's language.",
         json!({ "title": string("The talk's title.") }),
         &["title"],
     );

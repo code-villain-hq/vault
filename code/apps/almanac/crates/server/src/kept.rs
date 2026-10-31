@@ -146,8 +146,9 @@ pub struct Answering {
     pub topic_name: String,
     pub talk_id: Uuid,
     pub answer_id: Uuid,
-    /// Only the first answer names the talk.
-    pub first: bool,
+    /// Only an answer in a talk without a name names it: its first, or a
+    /// later one when the first didn't.
+    pub unnamed: bool,
 }
 
 /// How much one answer may do. A page keeps what's worth knowing later;
@@ -975,7 +976,7 @@ impl Kept {
                 data,
             });
         }
-        if at.first
+        if at.unnamed
             && let Some(title) = self.talk_title.as_deref().map(|t| cut(t, 80))
             && !title.is_empty()
         {
@@ -1820,7 +1821,7 @@ mod tests {
             topic_name: "Katzen".into(),
             talk_id: Uuid::now_v7(),
             answer_id: Uuid::now_v7(),
-            first: false,
+            unnamed: false,
         }
     }
 
@@ -2411,7 +2412,7 @@ mod tests {
     }
 
     #[test]
-    fn only_the_first_answer_names_the_talk() {
+    fn only_an_answer_in_an_unnamed_talk_names_it() {
         let kept = Kept {
             talk_title: Some("Gießen".into()),
             ..Kept::default()
@@ -2421,10 +2422,10 @@ mod tests {
             topic_name: "Pflanzen".into(),
             talk_id: Uuid::now_v7(),
             answer_id: Uuid::now_v7(),
-            first: true,
+            unnamed: true,
         };
         assert_eq!(kept.writes(&at).1.len(), 1);
-        at.first = false;
+        at.unnamed = false;
         assert!(kept.writes(&at).1.is_empty());
     }
 }

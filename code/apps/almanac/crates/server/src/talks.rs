@@ -44,8 +44,11 @@ const TALK: &str = "SELECT id, role, text FROM ( \
      SELECT id, role, text, created_at FROM messages \
      WHERE talk_id = $1 AND workspace_id = $2 AND problem IS NULL \
      ORDER BY created_at DESC LIMIT 40) m ORDER BY created_at";
-const ANSWERS_SO_FAR: &str =
-    "SELECT count(*) FROM messages WHERE talk_id = $1 AND workspace_id = $2 AND role = 'almanac'";
+/// The talk's title and its first question, which it keeps as its title
+/// until an answer names it.
+const TITLE_AND_QUESTION: &str = "SELECT t.title, coalesce((SELECT m.text FROM messages m \
+     WHERE m.talk_id = t.id AND m.role = 'you' ORDER BY m.created_at LIMIT 1), '') \
+     FROM talks t WHERE t.id = $1 AND t.workspace_id = $2";
 const KIND: &str = "SELECT kind FROM topics WHERE id = $1 AND workspace_id = $2";
 const WEB: &str = "SELECT web FROM claude_choices";
 
@@ -81,8 +84,8 @@ what's wrong or twice, move what reads better elsewhere. tick when they did a ch
 ask_to_check when your answer rested on a guess about their situation, offer_reminder when the \
 talk settled something recurring or dated (for a checklist's item, naming it), fits_elsewhere \
 when the question belongs in another topic, change_brief when they tell you how this topic \
-should answer from now on or correct the same thing a second time, and name_talk on a talk's \
-first answer. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
+should answer from now on or correct the same thing a second time, and name_talk while the talk \
+has no name. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
 into its rows (\"Lisa wiegt etwa 3,4 kg\" into Gewicht): move the sentence to the collection, \
 then change_points gives it its name as text and its cells, so it keeps its source; add the \
 field with change_block first if it has none for it. Tidy in small steps: one collection's \
@@ -125,7 +128,7 @@ offer. Never say it's started or set up: they start it with the card under your 
 change it first.
 - When they ask to change a topic (rename it, move it to another group, change what it sticks \
 to or its icon), do it with change_topic, then say what you changed. They can undo it.
-- Name the talk with name_talk on its first answer.
+- Name the talk with name_talk while it has no name.
 - Write only the answer. They don't see the tools, so don't mention them or narrate using them.";
 
 /// A talk through the Messages API: the page keeps what it said
@@ -479,18 +482,20 @@ async fn answer(
     events: mpsc::UnboundedSender<Event>,
 ) {
     let answer_id = Uuid::now_v7();
-    let answers: i64 = sqlx::query_scalar(ANSWERS_SO_FAR)
+    let unnamed = sqlx::query_as::<_, (String, String)>(TITLE_AND_QUESTION)
         .bind(talk_id)
         .bind(actor.workspace_id)
-        .fetch_one(&state.pool)
+        .fetch_optional(&state.pool)
         .await
-        .unwrap_or(1);
+        .ok()
+        .flatten()
+        .is_some_and(|(title, question)| unnamed(&title, &question));
     let at = Answering {
         topic_id: page.id,
         topic_name: page.name.clone(),
         talk_id,
         answer_id,
-        first: answers == 0,
+        unnamed,
     };
     let said = match &state.claude_code {
         Some(claude_code) => {
@@ -499,6 +504,7 @@ async fn answer(
                 own,
                 talk_id,
                 about,
+                unnamed,
             };
             say_with_claude_code(state, claude_code, actor, &asked, &events).await
         }
@@ -603,6 +609,8 @@ struct Asked<'a> {
     own: bool,
     talk_id: Uuid,
     about: Option<&'a str>,
+    /// The talk still has its first question for a title.
+    unnamed: bool,
 }
 
 /// "They ask from the section Intifada…", after the page, when they ask
@@ -642,6 +650,7 @@ async fn say_with_claude_code(
         own,
         talk_id,
         about,
+        unnamed,
     } = *asked;
     let trouble = |error: sqlx::Error| {
         tracing::warn!(%error, "couldn't read the talk");
@@ -674,6 +683,11 @@ async fn say_with_claude_code(
             page.describe(),
             about.unwrap_or_default()
         )
+    };
+    let system = if unnamed {
+        format!("{system}\n{UNNAMED}\n")
+    } else {
+        system
     };
     let mode = if own { Mode::Own } else { Mode::Topic };
     let mut kept = Kept::on(page.refs());
@@ -807,6 +821,18 @@ fn with_photos(first: usize, count: usize) -> String {
         2 => format!(" (with photos {first} and {})", first + 1),
         n => format!(" (with photos {first} to {})", first + n - 1),
     }
+}
+
+/// Said when the talk has no name yet: on its first answer, or one after
+/// answers that didn't name it.
+const UNNAMED: &str = "This talk has no name yet: name it with name_talk, for what it is about.";
+
+/// Whether the talk still has the title it started with, its first question.
+fn unnamed(title: &str, question: &str) -> bool {
+    title.is_empty()
+        || [1, 2]
+            .iter()
+            .any(|&photos| title == self::title(question, photos))
 }
 
 /// A new talk's title: its first question, short, or what it showed.
@@ -1120,6 +1146,9 @@ mod tests {
         assert_eq!(title("", 1), "A photo");
         assert_eq!(title("", 3), "Photos");
         assert_eq!(title("Meine Routine", 2), "Meine Routine");
+        assert!(unnamed("Meine Routine", "Meine Routine"));
+        assert!(unnamed("Photos", ""));
+        assert!(!unnamed("Gießplan", "Wann gieße ich die Monstera?"));
     }
 
     #[test]
