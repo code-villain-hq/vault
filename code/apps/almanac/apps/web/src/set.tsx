@@ -1413,7 +1413,12 @@ function RowBars({
               <span
                 className={`col-span-full min-w-0 items-center gap-2 @md:col-span-1 @md:flex ${more || pills ? "flex" : "hidden"}`}
               >
-                <span className="line-clamp-2 min-w-0 flex-1 text-xs text-faint">{more}</span>
+                <span
+                  title={more || undefined}
+                  className="min-w-0 flex-1 truncate text-xs text-faint"
+                >
+                  {more}
+                </span>
                 <Pills fields={fields} row={row} />
                 <RemovePoint point={row} />
               </span>
