@@ -1921,7 +1921,8 @@ function Overall({ label, value }: { label: string; value: string }) {
 
 /**
  * One topic on the index: its points large, its checklists as a bar, what's
- * new. Its group or parent in the corner, but not on its parent's page.
+ * new, in its hue. Its group or parent in the corner, but not on its
+ * parent's page.
  */
 function TopicTile({
   topic,
@@ -1934,7 +1935,8 @@ function TopicTile({
 }) {
   const { workspace } = useWorkspace();
   const unread = useUnread();
-  const parent = parentOf(topic, useTopics());
+  const topics = useTopics();
+  const parent = parentOf(topic, topics);
   const Icon = topicIcon(topic.icon);
   const under = onParent ? "" : parent ? parent.name : topic.group_name;
   return (
@@ -1942,13 +1944,16 @@ function TopicTile({
       to="/$workspace/topics/$topic"
       params={{ workspace: workspace.url_key, topic: topic.id }}
       title={about(topic.sticks_to) || undefined}
+      style={hueStyle(hueOf(topic, topics))}
       className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden rounded-lg bg-surface px-4 py-3 hover:bg-hover"
     >
       {topic.cover && (
         <Photo id={topic.cover} className="-mx-4 -mt-3 h-24 w-[calc(100%+2rem)] max-w-none" />
       )}
       <span className="flex items-center gap-2">
-        <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-muted" />
+        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-hue/15 text-hue">
+          <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
+        </span>
         <span className="min-w-0 truncate font-semibold">{topic.name}</span>
         {unread.has(topic.id) && (
           <span
@@ -1963,7 +1968,7 @@ function TopicTile({
         <span className="grid grid-cols-2 gap-3">
           {facts.figures.map((figure) => (
             <span key={figure.label} className="flex min-w-0 flex-col">
-              <span className="line-clamp-2 break-words font-semibold text-base leading-snug">
+              <span className="line-clamp-2 break-words font-semibold text-base text-hue leading-snug">
                 {figure.value}
               </span>
               <span className="truncate text-xs text-muted">{figure.label}</span>
@@ -1972,7 +1977,7 @@ function TopicTile({
         </span>
       ) : (
         <span className="flex items-baseline gap-1.5">
-          <span className="font-semibold text-2xl tabular-nums">{facts.kept}</span>
+          <span className="font-semibold text-2xl text-hue tabular-nums">{facts.kept}</span>
           <span className="text-xs text-muted">{facts.kept === 1 ? "point" : "points"}</span>
           {facts.last && <span className="ml-auto text-xs text-faint">{ago(facts.last)}</span>}
         </span>
@@ -1981,7 +1986,7 @@ function TopicTile({
         <span className="mt-auto flex items-center gap-2">
           <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-chip">
             <span
-              className={`block h-full rounded-full ${facts.done === facts.todo ? "bg-ok" : "bg-info"}`}
+              className={`block h-full rounded-full ${facts.done === facts.todo ? "bg-ok" : "bg-hue"}`}
               style={{ width: `${(facts.done / facts.todo) * 100}%` }}
             />
           </span>

@@ -1,17 +1,21 @@
 // Today on the workspace's own page: a ring of how much of today is done,
 // and what's due today or still to do from before, from every topic, as
-// chips to tick, done for today. What's ticked today stays, faint.
+// chips to tick, done for today, each with its topic's icon in its hue.
+// What's ticked today stays, faint.
 import type { Reminder, Topic } from "@almanac/types";
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { today, weekdayWords } from "./format";
+import { hueOf } from "./hues";
 import { topicIcon } from "./icons";
+import { useTopics } from "./layout";
 import { doneFor, isDue, markDone, markNotDone } from "./reminders";
 import { useRecords, useWorkspace } from "./workspace";
 
 export function Today({ topics }: { topics: Topic[] }) {
   const { workspace, sync } = useWorkspace();
   const all = useRecords("Reminder");
+  const every = useTopics();
   const now = today();
   const byId = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics]);
   const due = useMemo(
@@ -44,7 +48,14 @@ export function Today({ topics }: { topics: Topic[] }) {
             aria-label={`${reminder.title}: done`}
             className="size-3.5 shrink-0 accent-accent"
           />
-          <Icon size={13} strokeWidth={1.75} aria-hidden="true" className="shrink-0 text-muted" />
+          {/* Its topic's hue, so a glance says whose it is. */}
+          <Icon
+            size={13}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className="shrink-0"
+            style={topic && !done ? { color: `var(--data-${hueOf(topic, every)})` } : undefined}
+          />
           <span className={`truncate ${done ? "line-through" : ""}`}>{reminder.title}</span>
         </label>
       </li>

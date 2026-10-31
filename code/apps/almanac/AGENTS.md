@@ -217,7 +217,9 @@ What they do:
     the list shows the first eight, with All (`AxisTimeline`). A tally's
     words do the same for the bars, table, cards or list under it (`Told`).
     A topic wears one of the six data hues (`hues.ts`), its sidebar
-    group's: its icon, bars, lines, step marks, list dots and figures.
+    group's: its icon, bars, lines, step marks, list dots and figures,
+    and on the home page its tile (icon, figures, checklist bar) and its
+    icon on Today's chips.
     A choice's options take the other five, in order: pills, board
     lanes, the tally, bars and tinted cards (`choiceTint`). Status and
     chrome keep their own colours.
