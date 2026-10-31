@@ -88,7 +88,9 @@ ask_to_check when your answer rested on a guess about their situation, offer_rem
 talk settled something recurring or dated (for a row to do, naming it), fits_elsewhere \
 when the question belongs in another topic, change_brief when they tell you how this topic \
 should answer from now on or correct the same thing a second time, change_topic when they ask to \
-rename this topic or change its icon or group, and name_talk while the talk has no name. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
+rename this topic or change its icon or group, read_topic when the question needs what another \
+topic keeps, and name_talk while the talk has no name. You change only this topic: another one you \
+only read, and when they want it changed, say they can do it in that topic's talk. When they ask to tidy up, turn sentences that hold what a collection's fields keep \
 into its rows (\"Lisa wiegt etwa 3,4 kg\" into Gewicht): move the sentence to the collection, \
 then change_points gives it its name as text and its cells, so it keeps its source; add the \
 field with change_block first if it has none for it. A text field that holds yes or no, a number \

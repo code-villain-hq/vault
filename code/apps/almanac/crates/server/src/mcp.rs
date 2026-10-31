@@ -63,6 +63,7 @@ impl Mode {
                 "offer_reminder",
                 "change_brief",
                 "change_topic",
+                "read_topic",
                 "fetch_picture",
                 "set_cover",
                 "name_talk",
@@ -329,6 +330,34 @@ async fn call(
                 "Changed, once your answer is done. They see what you said, and can undo it."
                     .into(),
             )
+        }
+        "read_topic" => {
+            let args: ElsewhereArgs = read(arguments)?;
+            let named = cut(&args.topic, 80);
+            let row: Option<TopicRow> = sqlx::query_as(TOPIC_NAMED)
+                .bind(asking.actor.workspace_id)
+                .bind(&named)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
+            let Some((id, ..)) = row else {
+                return Err(format!(
+                    "No topic is called {named}. The topics: {}.",
+                    names(state, asking).await
+                ));
+            };
+            if id == asking.topic_id {
+                return Ok("That's this topic: its page is the one you have.".into());
+            }
+            let page = crate::page::Page::load(&state.pool, asking.actor.workspace_id, id)
+                .await
+                .map_err(|_| "Almanac couldn't read that topic.".to_string())?
+                .ok_or("That topic is gone.")?;
+            Ok(format!(
+                "Only to read: this talk changes only its own topic, so nothing of this one \
+                 goes to your tools, and its references (b2, p5) aren't this page's.\n\n{}",
+                page.describe()
+            ))
         }
         "fetch_picture" => {
             let args: PictureArgs = read(arguments)?;
@@ -1156,6 +1185,13 @@ fn tools(mode: Mode) -> Vec<Value> {
                 }),
                 &["said"],
             ),
+            tool(
+                "read_topic",
+                "Reads another topic's page, by its name, when the question needs what it \
+                 keeps. Only to read: this talk changes nothing there.",
+                json!({ "topic": string("The topic's name.") }),
+                &["topic"],
+            ),
             fetch_picture,
             set_cover,
             name_talk,
@@ -1254,6 +1290,7 @@ mod tests {
         assert!(!Mode::Topic.tools().contains(&"propose_topic"));
         assert!(Mode::Own.tools().contains(&"change_topic"));
         assert!(Mode::Topic.tools().contains(&"change_topic"));
+        assert!(Mode::Topic.tools().contains(&"read_topic"));
         for mode in [Mode::Topic, Mode::Own, Mode::SetUp] {
             let tools = tools(mode);
             let described: Vec<&str> = tools
