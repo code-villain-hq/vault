@@ -506,7 +506,7 @@ impl Kept {
                 &row.cells,
                 &self.photos,
             )?;
-            refs.push(self.add_point(
+            match self.add_point(
                 n,
                 String::new(),
                 name,
@@ -514,7 +514,20 @@ impl Kept {
                 cells,
                 &row.source,
                 &row.url,
-            )?);
+            ) {
+                Ok(r) => refs.push(r),
+                // Rows before it are kept: say which, so the rest waits
+                // for the next answer rather than coming twice.
+                Err(e) if !refs.is_empty() => {
+                    return Err(format!(
+                        "{e} The first {} rows are kept ({}); from {} on, the rest waits for the next answer.",
+                        refs.len(),
+                        refs.join(", "),
+                        row.name.trim()
+                    ));
+                }
+                Err(e) => return Err(e),
+            }
         }
         Ok(refs)
     }
@@ -2361,6 +2374,30 @@ mod tests {
         let long = fact("Schlaf", "zwölf bis sechzehn Stunden am Tag");
         let rows: Vec<&PagePoint> = short.iter().chain([&long]).collect();
         assert!(pictures(&fields, &rows, today).contains(&"list"));
+    }
+
+    #[test]
+    fn rows_past_an_answers_share_wait_and_it_says_which() {
+        let mut kept = Kept::on(Refs::default());
+        kept.add_block(
+            "collection",
+            "Zeitleiste",
+            None,
+            &[field("Jahr", "day")],
+            None,
+        )
+        .unwrap();
+        let years: Vec<RowArg> = (0..14)
+            .map(|i| {
+                row(
+                    &format!("Ereignis {i}"),
+                    json!({ "Jahr": format!("{}", 1950 + i) }),
+                )
+            })
+            .collect();
+        let said = kept.add_rows("b1", &years).unwrap_err();
+        assert!(said.contains("The first 12 rows are kept (p1, "), "{said}");
+        assert!(said.contains("from Ereignis 12 on"), "{said}");
     }
 
     #[test]
