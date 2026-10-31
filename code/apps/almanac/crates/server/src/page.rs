@@ -350,10 +350,15 @@ impl Page {
                     None => String::new(),
                 };
                 let rings = self.reminders.iter().find(|r| r.point_id == Some(point.id));
+                // A picture's caption, which may be none: you don't see its photo.
+                let text = match (block.kind.as_str(), point.text.as_str()) {
+                    ("picture", "") => "a photo, with no caption".to_string(),
+                    ("picture", caption) => format!("a photo: {caption}"),
+                    (_, text) => text.to_string(),
+                };
                 let _ = writeln!(
                     out,
-                    "- [p{n}] {when}{}{cells}{source}{}",
-                    point.text,
+                    "- [p{n}] {when}{text}{cells}{source}{}",
                     shape_words(point, rings)
                 );
             }
@@ -502,6 +507,9 @@ paragraph, a point a paragraph, for what reads as prose: two to four sentences t
 never opening with a term in bold (a term with what it means is a collection's row); \
 callout, a point set apart: look warn when it needs a look (a problem, a gap), info when \
 something is ready; \
+picture, photos shown large, a point each: its photo (a photo from the talk, by its number) and \
+a short caption or none, for a picture that explains by itself: a diagram, a sketch, a map, a \
+screenshot (a thing's own photo is a photo cell of its row); \
 collection, rows that share the same fields, a row per thing, event or measurement (plants, \
 offers, weighings, repairs): its text is the row's name, and it has a cell for each field it \
 knows. A field is text (a few words, or a sentence or two for what a term means), number (plain, 3.4, with the field's unit, kg, and a goal \

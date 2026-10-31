@@ -148,9 +148,14 @@ pub const KINDS: &[&str] = &["topic", "almanac"];
 /// its look; a `collection` rows with its [`Field`]s, a point a row: its
 /// text the row's name, its cells the rest, and a page of its own. The app
 /// picks a collection's picture from its fields: a list is rows with only
-/// a name, a checklist rows with a check. Beside them a topic has `you`,
-/// what it knows about them, which its About shows and its page doesn't.
-pub const SET_KINDS: &[&str] = &["heading", "paragraph", "callout", "collection"];
+/// a name, a checklist rows with a check. A `picture` shows photos, a
+/// point each: its photo in its one cell, [`PICTURE_CELL`], and its text a
+/// caption or none. Beside them a topic has `you`, what it knows about
+/// them, which its About shows and its page doesn't.
+pub const SET_KINDS: &[&str] = &["heading", "paragraph", "callout", "collection", "picture"];
+
+/// The cell a picture's point keeps its photo in.
+pub const PICTURE_CELL: &str = "photo";
 
 /// The kinds the set had before lists, checklists and toggles became
 /// collections (`proposals/facts-as-data.md`, C).
@@ -661,6 +666,15 @@ impl Validate for PointCreate {
             self.note.as_deref(),
         )?;
         self.cells.as_ref().map(cells).transpose()?;
+        // A picture's caption may be left out: its photo says it.
+        let picture = self
+            .cells
+            .as_ref()
+            .is_some_and(|c| c.contains_key(PICTURE_CELL))
+            && self.text.is_empty();
+        if picture {
+            return Ok(());
+        }
         words(&self.text, "A point needs some words.", 2000)
     }
 }
@@ -676,10 +690,17 @@ impl Validate for PointPatch {
             self.note.as_deref(),
         )?;
         self.cells.as_ref().map(cells).transpose()?;
-        if let Some(text) = &self.text {
-            words(text, "A point needs some words.", 2000)?;
+        // A picture's caption may be taken off, with its photo given again.
+        let picture = self
+            .cells
+            .as_ref()
+            .is_some_and(|c| c.contains_key(PICTURE_CELL));
+        match &self.text {
+            Some(text) if !(picture && text.is_empty()) => {
+                words(text, "A point needs some words.", 2000)
+            }
+            _ => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -913,6 +934,20 @@ mod tests {
             );
         }
         assert_eq!(TEMPLATES.len(), TEMPLATE_NAMES.len());
+    }
+
+    #[test]
+    fn only_a_picture_may_go_without_words() {
+        let photo: BTreeMap<String, Cell> =
+            serde_json::from_str(r#"{"photo": "0b6c5a1e-2f40-4c8e-9a1d-3e7f5b2c9d10"}"#).unwrap();
+        let patch = |text: &str, cells: Option<BTreeMap<String, Cell>>| PointPatch {
+            text: Some(text.into()),
+            cells,
+            ..Default::default()
+        };
+        assert!(patch("", Some(photo.clone())).validate().is_ok());
+        assert!(patch("A sketch", Some(photo)).validate().is_ok());
+        assert!(patch("", None).validate().is_err());
     }
 
     #[test]

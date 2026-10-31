@@ -1,9 +1,11 @@
 // Sample blocks for Settings → Blocks: every kind of the one set a page is
 // made of, with a few points each, drawn by the page's own components, and a
-// collection once for each picture its fields pick. Nothing here syncs.
+// collection once for each picture its fields pick. Nothing here syncs; a
+// picture's photo is a file of the app's own, not one the server keeps.
 
 import type { Block, Field, Point, Topic } from "@almanac/types";
 import { addDays, today } from "./format";
+import nextWord from "./samples/next-word.svg";
 
 /** A kind of block, as the gallery shows it: what it's called and for, and a page that has one. */
 export interface Sample {
@@ -95,6 +97,7 @@ export function samples(): Sample[] {
   const history = topic("History", "globe");
   const career = topic("Career", "briefcase");
   const spanish = topic("Spanish", "languages");
+  const ai = topic("AI", "cpu");
   const field = (name: string, kind: string, more: Partial<Field> = {}): Field => ({
     name,
     kind,
@@ -179,6 +182,18 @@ export function samples(): Sample[] {
       "callout",
       "",
       (p) => [p("", "Lilies are poisonous to cats, even the pollen.", { look: "warn" })],
+    ),
+    sample(
+      "Picture",
+      "A diagram, a sketch or a screenshot that explains by itself, with a caption or none. Drop one on the page, or a talk keeps one.",
+      ai,
+      "picture",
+      "",
+      (p) => [
+        p("", "A model writes a word at a time, each the likeliest after the words so far.", {
+          cells: { photo: nextWord },
+        }),
+      ],
     ),
     sample(
       "Line",

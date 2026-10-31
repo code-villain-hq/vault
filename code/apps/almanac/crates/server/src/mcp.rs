@@ -1354,7 +1354,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "add_items",
                 "Adds sentences to a paragraph, a callout or You: what explains, a decision, or \
                  something they told you about themselves worth knowing later; nothing the page \
-                 has already. Things, terms and steps are rows (add_rows). Each as its block's kind asks, as the page says. It \
+                 has already. Things, terms and steps are rows (add_rows). Each as its block's kind asks, as the page says. \
+                 To a picture it adds photos, each with a caption or none. It \
                  answers with their references (p12). Usually none to three per answer.",
                 json!({
                     "block": string("The block, as the page names it (b2), or its title."),
@@ -1363,7 +1364,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "text": string("The point: two to four sentences in a paragraph, never opening with a term in bold; a few words in a callout or You."),
+                                "text": string("The point: two to four sentences in a paragraph, never opening with a term in bold; a few words in a callout or You; a picture's caption, a few words, or \"\" for none."),
+                                "photo": string("Only in a picture: its photo, \"photo 2\" for the talk's second, or the number fetch_picture answered with."),
                                 "look": { "type": "string", "enum": ["warn", "info"], "description": "Only in a callout: warn when it needs a look, info when something's ready." },
                                 "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                                 "url": string("The page it comes from, when you read one. Never a made-up link."),

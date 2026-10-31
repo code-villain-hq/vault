@@ -1,16 +1,17 @@
-// Pictures on a page beyond a question's photos: a topic's cover and a
-// row's photo, dropped on, or picked with a button. A photo is made smaller
+// Pictures on a page beyond a question's photos: a topic's cover, a row's
+// photo and a picture block's photos, dropped on, or picked with a button. A photo is made smaller
 // on the way in, as a question's is, kept on the server
 // (`POST /api/w/{id}/photos`), and its id set on the topic or in the row's
-// photo cell, which the sync engine carries to every client.
+// photo cell, or a picture's point, which the sync engine carries to every
+// client.
 
 import type { Block, Field, Photo as Kept, Point, Topic } from "@almanac/types";
 import { ImagePlus, X } from "lucide-react";
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
-import { holdsPhoto, photosIn, pick } from "./photos";
+import { holdsPhoto, MOST_PHOTOS, photosIn, pick } from "./photos";
 import { apiUrl, authHeaders, credentialsFor } from "./server";
 import { Photo } from "./set";
-import { useIsGuest, useWorkspace } from "./workspace";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** The field a row's photo goes in when its collection has none yet. */
 const PHOTO_FIELD: Field = { name: "Foto", kind: "photo", unit: "", goal: null, options: [] };
@@ -32,18 +33,21 @@ function useKeep(): (file: File) => Promise<string> {
   };
 }
 
-/** Sets a photo kept by `useKeep`, or says what went wrong. */
-function useSetting(set: (id: string) => void) {
+/**
+ * Sets a photo kept by `useKeep`, or says what went wrong; with `many`,
+ * each of the photos dropped or picked at once, in their order.
+ */
+function useSetting(set: (id: string) => void, many = false) {
   const keep = useKeep();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const take = async (files: FileList | File[] | null | undefined) => {
-    const [file] = photosIn(files);
-    if (!file) return;
+    const taken = photosIn(files).slice(0, many ? MOST_PHOTOS : 1);
+    if (taken.length === 0) return;
     setBusy(true);
     setProblem(null);
     try {
-      set(await keep(file));
+      for (const file of taken) set(await keep(file));
     } catch (error) {
       setProblem(error instanceof Error ? error.message : "That photo didn't come through.");
     } finally {
@@ -93,11 +97,14 @@ function PickButton({
   label,
   onPick,
   className,
+  many = false,
   children,
 }: {
   label: string;
   onPick: (files: FileList | null) => void;
   className: string;
+  /** Several photos at once. */
+  many?: boolean;
   children: ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -115,6 +122,7 @@ function PickButton({
         ref={input}
         type="file"
         accept="image/*"
+        multiple={many}
         hidden
         onChange={(event) => {
           onPick(event.target.files);
@@ -231,6 +239,193 @@ export function RowPhoto({ block, row }: { block: Block; row: Point }) {
         <ImagePlus size={18} strokeWidth={1.5} aria-hidden="true" />
         {setting.busy ? "Adding…" : (setting.problem ?? "Add a photo")}
       </PickButton>
+    </DropBox>
+  );
+}
+
+/** The one cell a picture's point keeps its photo in, as the server has it. */
+const PICTURE_CELL = "photo";
+
+/** A picture's point's photo, if it has one. */
+function photoOf(point: Point): string | null {
+  const id = point.cells[PICTURE_CELL];
+  return typeof id === "string" ? id : null;
+}
+
+/**
+ * A picture block: its photos large, each with its caption under it, one
+ * a row or two side by side. A member drops more on it or adds them with
+ * Add on hover, writes a caption in place and takes a photo off with ✕.
+ */
+export function Pictures({ block, points }: { block: Block; points: Point[] }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const last = useRef(Math.max(-1, ...points.map((p) => p.position)));
+  last.current = Math.max(last.current, ...points.map((p) => p.position));
+  const setting = useSetting((photo) => {
+    last.current += 1;
+    sync.create("Point", {
+      topic_id: block.topic_id,
+      block_id: block.id,
+      text: "",
+      cells: { [PICTURE_CELL]: photo },
+      seen: true,
+      position: last.current,
+    });
+  }, true);
+  const shown = points.filter((p) => photoOf(p));
+  const grid = `grid gap-x-4 gap-y-5 ${shown.length > 1 ? "sm:grid-cols-2" : ""}`;
+  if (guest) {
+    return (
+      <div className={grid}>
+        {shown.map((point) => (
+          <Figure key={point.id} point={point} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <DropBox onDrop={setting.take} className="-m-1 flex flex-col gap-2 rounded-lg p-1">
+      <div className={grid}>
+        {shown.map((point) => (
+          <Figure key={point.id} point={point} editable />
+        ))}
+      </div>
+      <div className="flex min-h-7 items-center gap-2">
+        <PickButton
+          label="Add a picture, or drop one here"
+          onPick={setting.take}
+          many
+          className="ui-button h-7 gap-1.5 px-2 text-xs text-muted opacity-0 transition-opacity focus-visible:opacity-100 group-hover/block:opacity-100"
+        >
+          <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
+          {setting.busy ? "Adding…" : "Add"}
+        </PickButton>
+        {setting.problem && <p className="text-xs text-warn-ink">{setting.problem}</p>}
+      </div>
+    </DropBox>
+  );
+}
+
+/** One of a picture's photos, its caption under it. */
+function Figure({ point, editable = false }: { point: Point; editable?: boolean }) {
+  const { sync } = useWorkspace();
+  const id = photoOf(point);
+  if (!id) return null;
+  return (
+    <figure className="group/figure relative m-0 flex min-w-0 flex-col gap-1.5">
+      <Photo id={id} className="min-h-24 w-full rounded-lg border border-line" />
+      {editable ? (
+        <>
+          <Caption point={point} />
+          <button
+            type="button"
+            title="Take this picture off"
+            aria-label="Take this picture off"
+            onClick={() => sync.delete("Point", point.id)}
+            className="ui-button absolute top-2 right-2 size-7 justify-center bg-bg/80 p-0 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-bg focus-visible:opacity-100 group-hover/figure:opacity-100"
+          >
+            <X size={14} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </>
+      ) : (
+        point.text && <figcaption className="text-xs text-muted">{point.text}</figcaption>
+      )}
+    </figure>
+  );
+}
+
+/**
+ * A picture's caption, written in place: Add a caption shows on hover while
+ * there's none, and leaving the line keeps what's written.
+ */
+function Caption({ point }: { point: Point }) {
+  const { sync } = useWorkspace();
+  const [text, setText] = useState(point.text);
+  const [was, setWas] = useState(point.text);
+  if (point.text !== was) {
+    setWas(point.text);
+    setText(point.text);
+  }
+  const keep = () => {
+    const caption = text.trim();
+    if (caption === point.text) return;
+    sync.update("Point", point.id, { text: caption, cells: point.cells });
+  };
+  return (
+    <input
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={keep}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          setText(point.text);
+          event.currentTarget.blur();
+        }
+      }}
+      placeholder="Add a caption"
+      aria-label="Caption"
+      maxLength={2000}
+      className={`w-full min-w-0 bg-transparent text-xs text-muted outline-none placeholder:text-faint focus:text-fg ${
+        point.text ? "" : "opacity-0 focus:opacity-100 group-hover/figure:opacity-100"
+      }`}
+    />
+  );
+}
+
+/**
+ * Add a picture, at the end of a page: a picture block of its own with the
+ * photos picked or dropped, after the page's last block. On a row's page
+ * (`row`) it sits there.
+ */
+export function AddPicture({ topic, row = null }: { topic: Topic; row?: string | null }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const blocks = useRecords("Block");
+  const into = useRef<string | null>(null);
+  const count = useRef(0);
+  const setting = useSetting((photo) => {
+    if (!into.current) {
+      const ofTopic = blocks.filter((b) => b.topic_id === topic.id);
+      into.current = sync.create("Block", {
+        topic_id: topic.id,
+        kind: "picture",
+        title: "",
+        facets: [],
+        fields: [],
+        row_id: row ?? undefined,
+        position: Math.max(-1, ...ofTopic.map((b) => b.position)) + 1,
+      });
+    }
+    sync.create("Point", {
+      topic_id: topic.id,
+      block_id: into.current,
+      text: "",
+      cells: { [PICTURE_CELL]: photo },
+      seen: true,
+      position: count.current++,
+    });
+  }, true);
+  if (guest) return null;
+  // Each pick or drop starts a block of its own.
+  const take = (files: FileList | null) => {
+    into.current = null;
+    count.current = 0;
+    void setting.take(files);
+  };
+  return (
+    <DropBox onDrop={take} className="-mx-2 flex items-center gap-2 self-start rounded-md px-2">
+      <PickButton
+        label="Add a picture: a diagram, a sketch, a screenshot. Or drop one here."
+        onPick={take}
+        many
+        className="ui-button -ml-2 h-7 gap-1.5 px-2 text-xs text-faint hover:text-muted"
+      >
+        <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
+        {setting.busy ? "Adding…" : "Add a picture"}
+      </PickButton>
+      {setting.problem && <p className="text-xs text-warn-ink">{setting.problem}</p>}
     </DropBox>
   );
 }

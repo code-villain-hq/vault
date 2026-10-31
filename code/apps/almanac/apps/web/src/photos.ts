@@ -76,6 +76,8 @@ const fetched = new Map<string, Promise<string>>();
 export function usePhoto(place: Place, workspaceId: string, id: string): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
+    // A sample's photo is the app's own file, at its address already.
+    if (ownFile(id)) return;
     let current = true;
     let photo = fetched.get(id);
     if (!photo) {
@@ -95,5 +97,10 @@ export function usePhoto(place: Place, workspaceId: string, id: string): string 
       current = false;
     };
   }, [place, workspaceId, id]);
-  return url;
+  return ownFile(id) ? id : url;
+}
+
+/** Whether a photo's id is the address of one of the app's own files. */
+function ownFile(id: string): boolean {
+  return id.startsWith("/") || id.startsWith("data:");
 }

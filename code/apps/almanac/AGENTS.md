@@ -90,6 +90,14 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   `fetch_picture` (public https only, the page's og:image, 5 MB at most)
   and sets the cover with `set_cover`. Rows with a photo show it small on
   their line in every view.
+- A picture block (`picture`) shows photos large, a point each: its photo
+  in its one cell (`PICTURE_CELL`, `photo`) and its text the caption, which
+  may be empty there only. Add a picture at the end of a page (and of a
+  row's page) makes one with the photos picked or dropped; on the block,
+  more are dropped or added, a caption written in place and a photo taken
+  off with ✕ (`Pictures` in `pictures.tsx`). One photo takes half the
+  page, more the whole. A talk adds them with add_items' `photo`, "photo
+  2" or what fetch_picture answered.
 - A collection is changed by hand too (`editing.tsx`): a click on a row's
   value changes it in place (in the table, on cards, on the row's page),
   and "+ New" under the collection adds a row. Both write the row's
@@ -159,7 +167,7 @@ What they do:
   back with their `row_id`.
 - **Keeping** (`kept.rs`): Claude files what it learns into the one set
   of blocks (`SET_KINDS`, migration 0015, `proposals/one-set-of-blocks.md`):
-  `heading`, `paragraph`, `callout` and `collection`. Lists are
+  `heading`, `paragraph`, `callout`, `collection` and `picture`. Lists are
   collections (`proposals/facts-as-data.md`, C): a list's rows have only
   a name, a checklist's a check, and the parts of a subject are rows
   with their sentences in a paragraph on the row's page (`row_id`). Claude Code does it with tools while it answers:

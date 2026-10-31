@@ -15,8 +15,9 @@
 use std::collections::{BTreeMap, HashSet};
 
 use almanac_domain::{
-    BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation, PageLayout,
-    PointWas, Proposal, ProposedReminder, SET_KINDS, STICKS_TO_MAX, TopicChange, TopicPatch,
+    BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation, PICTURE_CELL,
+    PageLayout, PointWas, Proposal, ProposedReminder, SET_KINDS, STICKS_TO_MAX, TopicChange,
+    TopicPatch,
 };
 use chrono::{Days, Local, NaiveDate, NaiveTime};
 use serde::Deserialize;
@@ -108,9 +109,13 @@ pub struct FieldArg {
 /// An item as Claude adds it: a paragraph, a callout with its look.
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct ItemArg {
+    #[serde(default)]
     pub text: String,
     #[serde(default)]
     pub look: String,
+    /// A picture's photo, "photo 2".
+    #[serde(default)]
+    pub photo: String,
     #[serde(default)]
     pub source: String,
     #[serde(default)]
@@ -411,9 +416,9 @@ impl Kept {
         })
     }
 
-    /// Adds items to a block: paragraphs, or a callout's. It answers with
-    /// their references. One the block has already is the one it answers
-    /// with.
+    /// Adds items to a block: paragraphs, a callout's, or a picture's
+    /// photos, each with a caption or none. It answers with their
+    /// references. One the block has already is the one it answers with.
     pub fn add_items(&mut self, block: &str, items: &[ItemArg]) -> Result<Vec<String>, String> {
         let n = self.block_at(block)?;
         let (kind, title) = (self.blocks[n].kind.clone(), self.title(n).to_string());
@@ -424,7 +429,8 @@ impl Kept {
         let mut refs = Vec::new();
         for item in items {
             let text = cut(&item.text, 2000);
-            if text.is_empty() {
+            let cells = self.picture_cells(&kind, &title, &item.photo)?;
+            if text.is_empty() && cells.is_empty() {
                 return Err("An item needs its words.".into());
             }
             as_prose(&kind, &text)?;
@@ -434,12 +440,45 @@ impl Kept {
                 String::new(),
                 text,
                 look,
-                BTreeMap::new(),
+                cells,
                 &item.source,
                 &item.url,
             )?);
         }
         Ok(refs)
+    }
+
+    /// A picture's one cell, its photo, from "photo 2"; none for the other
+    /// kinds, which take no photo.
+    fn picture_cells(
+        &self,
+        kind: &str,
+        title: &str,
+        photo: &str,
+    ) -> Result<BTreeMap<String, Cell>, String> {
+        let mut cells = BTreeMap::new();
+        match (kind == "picture", photo.trim().is_empty()) {
+            (false, true) => {}
+            (false, false) => {
+                return Err(format!(
+                    "{title} is a {kind}: only a picture block or a photo cell takes a photo."
+                ));
+            }
+            (true, true) => return Err(format!("{title} is a picture: give each its photo.")),
+            (true, false) => {
+                let field = Field {
+                    name: PICTURE_CELL.into(),
+                    kind: "photo".into(),
+                    unit: String::new(),
+                    goal: None,
+                    options: Vec::new(),
+                };
+                if let Some(cell) = cell(&field, &json!(photo), &self.photos)? {
+                    cells.insert(PICTURE_CELL.into(), cell);
+                }
+            }
+        }
+        Ok(cells)
     }
 
     /// Adds rows to a collection, each its name and its cells by field. It
@@ -1570,7 +1609,7 @@ fn as_prose(kind: &str, text: &str) -> Result<(), String> {
 /// Whether a block of `kind`, called `title`, takes items: sentences.
 fn takes_items(kind: &str, title: &str) -> Result<(), String> {
     match kind {
-        "paragraph" | "callout" | "you" => Ok(()),
+        "paragraph" | "callout" | "picture" | "you" => Ok(()),
         "heading" => Err(format!("{title} is a heading: it has no points.")),
         "collection" => Err(format!("{title} is a collection: add rows to it.")),
         _ => Err(format!("{title} is a {kind}, which Almanac doesn't know.")),
@@ -2835,6 +2874,44 @@ mod tests {
             kept.add_block("table", "Schuhe", None, &[], None)
                 .unwrap_err()
                 .contains("no kind of block table")
+        );
+    }
+
+    #[test]
+    fn a_picture_takes_photos_with_a_caption_or_none() {
+        let mut kept = Kept::on(Refs {
+            blocks: vec![
+                block("picture", "Skizze", 0),
+                block("paragraph", "Lesen", 1),
+            ],
+            ..Refs::default()
+        });
+        kept.photos = vec![Uuid::now_v7(), Uuid::now_v7()];
+        let photo = |text: &str, photo: &str| ItemArg {
+            photo: photo.into(),
+            ..item(text)
+        };
+        let refs = kept
+            .add_items(
+                "b1",
+                &[photo("", "photo 2"), photo("Der Transformer", "photo 1")],
+            )
+            .unwrap();
+        assert_eq!(refs.len(), 2);
+        let first = kept.points.iter().find(|p| p.text.is_empty()).unwrap();
+        assert_eq!(
+            first.cells.0.get(PICTURE_CELL),
+            Some(&Cell::Text(kept.photos[1].to_string()))
+        );
+        assert!(
+            kept.add_items("b1", &[item("Nur Worte")])
+                .unwrap_err()
+                .contains("give each its photo")
+        );
+        assert!(
+            kept.add_items("b2", &[photo("Satz", "photo 1")])
+                .unwrap_err()
+                .contains("only a picture block")
         );
     }
 

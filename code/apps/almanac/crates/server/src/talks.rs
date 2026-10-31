@@ -272,6 +272,9 @@ struct KeepItem {
     #[serde(default)]
     look: String,
     text: String,
+    /// A picture's photo, "photo 2".
+    #[serde(default)]
+    photo: String,
     source: String,
 }
 
@@ -360,6 +363,7 @@ fn keep_schema() -> Value {
             "block": string,
             "look": { "type": "string", "enum": ["", "warn", "info"] },
             "text": string,
+            "photo": string,
             "source": string,
         }))),
         "rows": list(object(json!({
@@ -1030,6 +1034,7 @@ async fn keep(
             &[ItemArg {
                 text: item.text.clone(),
                 look: item.look.clone(),
+                photo: item.photo.clone(),
                 source: item.source.clone(),
                 url: String::new(),
             }],

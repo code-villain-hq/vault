@@ -51,7 +51,7 @@ import {
   useDrop,
   usePicking,
 } from "./picking";
-import { CoverHead, RowPhoto } from "./pictures";
+import { AddPicture, CoverHead, Pictures, RowPhoto } from "./pictures";
 import { about, inline } from "./prose";
 import { NotifyBell, ReminderMenu } from "./reminders";
 import { type Sample, samples } from "./samples";
@@ -539,6 +539,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
         </div>
       )}
       {page.blocks.length > 0 && <Blocks page={page} />}
+      <AddPicture topic={topic} />
       {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
   );
@@ -761,6 +762,7 @@ function SectionPageBody({
       <p className="text-title font-semibold">{section}</p>
       {row && <RowFields row={row} />}
       {own.blocks.length > 0 && <Blocks page={own} />}
+      {row && <AddPicture topic={topic} row={row.id} />}
       {reminders.length > 0 && <Dates reminders={reminders} />}
       {questions.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
@@ -1320,7 +1322,7 @@ const NARROW = new Set(["1/4", "1/3"]);
 
 /** A block's name, for its menu and its dialogs. */
 function blockName(block: Block): string {
-  return block.title || "This block";
+  return block.title || (block.kind === "picture" ? "This picture" : "This block");
 }
 
 /**
@@ -1425,6 +1427,12 @@ function BlockView({ block, page }: { block: Block; page: PageParts }) {
           <Glide view={block.view}>
             <Collection block={block} rows={points} />
           </Glide>
+        </BlockFrame>
+      );
+    case "picture":
+      return (
+        <BlockFrame {...frame}>
+          <Pictures block={block} points={points} />
         </BlockFrame>
       );
     default:

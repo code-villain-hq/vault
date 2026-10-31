@@ -32,8 +32,9 @@ export function viewOf(block: Block, points: Point[]): string {
 
 /**
  * How much of a row a block takes, of the page's twelve columns: half, as
- * writing keeps its measure; a heading and a callout the whole, and a
- * collection what its picture needs. A person's pick (`width`, half or
+ * writing keeps its measure; a heading and a callout the whole, a
+ * collection what its picture needs, and a picture the whole once it holds
+ * more than one. A person's pick (`width`, half or
  * the whole) holds over the app's. The row's blocks grow to fill it.
  */
 export function widthOf(view: string, block: Block, points: Point[]): string {
@@ -48,6 +49,7 @@ export const WIDTHS = ["1/2", "whole"];
 /** The width the app picks for a block. */
 export function ownWidth(view: string, block: Block, points: Point[]): string {
   if (block.kind === "collection") return pictureWidth(view, block, points);
+  if (block.kind === "picture") return points.length > 1 ? "whole" : "1/2";
   return block.kind === "heading" || block.kind === "callout" || block.kind === "you"
     ? "whole"
     : "1/2";
@@ -104,7 +106,8 @@ export const VIEW_ICONS: Record<string, LucideIcon> = {
 
 /**
  * The one set of blocks every page is made of: a heading, a paragraph and
- * a callout for words, and a collection, rows with fields, for the rest:
- * a list, a checklist, rows with pages of their own.
+ * a callout for words, a collection, rows with fields, for the rest: a
+ * list, a checklist, rows with pages of their own; and a picture, photos
+ * that explain by themselves, a diagram or a sketch.
  */
-export const SET_KINDS = new Set(["heading", "paragraph", "callout", "collection"]);
+export const SET_KINDS = new Set(["heading", "paragraph", "callout", "collection", "picture"]);
