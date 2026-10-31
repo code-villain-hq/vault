@@ -157,19 +157,26 @@ export function TrendSet({
   const path = (points: Point[]) =>
     points.map((p, i) => `${i ? "L" : "M"}${at(p)},${y(p.amount ?? 0)}`).join(" ");
   const shown = hovered != null ? measurements[hovered] : undefined;
-  // A line each, in steps of the ink; the one hovered in the ink itself.
-  const inks = ["stroke-fg fill-fg", "stroke-muted fill-muted", "stroke-faint fill-faint"];
+  // A line each, the topic's hue first and then the others; the one
+  // hovered keeps its colour while the rest step back.
+  const inks = [
+    "stroke-hue fill-hue",
+    "stroke-choice-1 fill-choice-1",
+    "stroke-choice-2 fill-choice-2",
+    "stroke-choice-3 fill-choice-3",
+    "stroke-choice-4 fill-choice-4",
+    "stroke-choice-5 fill-choice-5",
+  ];
   const drawn = series
     ? [...lines].map(([name, points], i) => ({
         name,
         points,
-        ink: shown
-          ? shown.text === name
-            ? "stroke-fg fill-fg"
-            : "stroke-line-strong fill-line-strong"
-          : (inks[i % 3] ?? ""),
+        ink:
+          shown && shown.text !== name
+            ? "stroke-line-strong fill-line-strong"
+            : (inks[i % inks.length] ?? ""),
       }))
-    : [{ name, points: measurements, ink: "stroke-fg fill-fg" }];
+    : [{ name, points: measurements, ink: "stroke-hue fill-hue" }];
   const onMove = (event: React.MouseEvent<SVGSVGElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const [left, top] = [event.clientX - box.left, event.clientY - box.top];

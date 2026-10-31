@@ -216,6 +216,11 @@ What they do:
     click on one picks its rows for the list under it, and past ten rows
     the list shows the first eight, with All (`AxisTimeline`). A tally's
     words do the same for the bars, table, cards or list under it (`Told`).
+    A topic wears one of the six data hues (`hues.ts`), its sidebar
+    group's: its icon, bars, lines, step marks, list dots and figures.
+    A choice's options take the other five, in order: pills, board
+    lanes, the tally, bars and tinted cards (`choiceTint`). Status and
+    chrome keep their own colours.
     A topic's tile on the home page shows the first two rows of its first
     figures collection, value over name (`figureField`), or else its count.
   - A checklist's row can ring: offer_reminder with an `item` makes a
@@ -277,7 +282,11 @@ What they do:
   the width a person picked with the block's ⋯ (`width`, half or the
   whole), or else its own; a
   collection as the picture its fields pick, which View as changes
-  (`view`, `BLOCK_VIEWS`) and only a person sets. `you` is what they told
+  (`view`, `BLOCK_VIEWS`) and only a person sets. View as shows each
+  view's icon (`VIEW_ICONS`) and the one showing its name, in the
+  selected tint; a pick also writes the width the block is drawn at, so
+  it keeps its place, and the picture glides to its new height and fades
+  in (`Glide`, none with reduced motion). `you` is what they told
   about themselves, which the topic's About shows and its page doesn't.
 - **The workspace's own topic** (`own.rs`) reads every topic's name, group
   and what it sticks to, and has other tools: propose_topic and

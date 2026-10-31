@@ -23,7 +23,7 @@ import {
   useApi,
 } from "@code-villain/web";
 import { Link, useLocation, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { ArrowLeft, ChevronDown, ChevronRight, MessagesSquare, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, List, MessagesSquare, X } from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
@@ -38,6 +38,7 @@ import { type Asking, useTopicTalks } from "./asking";
 import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf } from "./collection";
 import { EditCell } from "./editing";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
+import { hueOf, hueStyle } from "./hues";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { childrenOf, isOwn, PageHeader, parentOf, useTopics, useUnread } from "./layout";
 import type { Picked } from "./photos";
@@ -73,7 +74,7 @@ import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
 import { Today } from "./today";
 import { Button, Empty, Section } from "./ui";
-import { ownWidth, shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
+import { ownWidth, shownAs, VIEW_ICONS, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
@@ -357,7 +358,7 @@ function TopicView({
           />
         )}
       </PageHeader>
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1" style={hueStyle(hueOf(topic, topics))}>
         <div className="relative flex min-w-0 flex-1 flex-col" {...(panel ? {} : drop.handlers)}>
           <div
             ref={scroller}
@@ -959,10 +960,10 @@ function TopicIcon({ topic }: { topic: Topic }) {
   const guest = useIsGuest();
   const [open, setOpen] = useState(false);
   const Icon = topicIcon(topic.icon);
-  const look = "size-10 rounded-lg px-0 text-muted";
+  const look = "size-10 rounded-lg bg-hue/15 px-0 text-hue";
   if (guest) {
     return (
-      <span className={`ui-chip grid place-items-center ${look}`}>
+      <span className={`grid place-items-center ${look}`}>
         <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
       </span>
     );
@@ -972,7 +973,7 @@ function TopicIcon({ topic }: { topic: Topic }) {
       <Popover.Trigger
         aria-label="Icon"
         title="Pick another icon"
-        className={`ui-button ${look} data-popup-open:bg-hover`}
+        className={`ui-button ${look} hover:bg-hue/25 data-popup-open:bg-hue/25`}
       >
         <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
       </Popover.Trigger>
@@ -1421,7 +1422,9 @@ function BlockView({ block, page }: { block: Block; page: PageParts }) {
             ) : undefined
           }
         >
-          <Collection block={block} rows={points} />
+          <Glide view={block.view}>
+            <Collection block={block} rows={points} />
+          </Glide>
         </BlockFrame>
       );
     default:
@@ -1463,7 +1466,7 @@ function BlockFrame({
         )}
         {aside && <span className="ml-auto shrink-0">{aside}</span>}
         {/* Over the line on hover, so a half block's title keeps its room. */}
-        <span className="absolute inset-y-0 right-0 flex items-center gap-3 bg-bg pl-3 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+        <span className="absolute inset-y-0 right-0 flex items-center gap-3 bg-bg pl-3 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 has-[[data-stays]]:opacity-100">
           <ViewAs block={block} />
           <BlockMenu block={block} blocks={blocks} className="group-hover/block:opacity-100" />
         </span>
@@ -1477,13 +1480,19 @@ function BlockFrame({
  * View as, beside a block's title on hover: the views that can draw what
  * it keeps, the one it's drawn with pressed. A person's pick stays until
  * they pick another, for everyone in the workspace, and a talk never
- * changes it; the app's own pick leaves the view to the app again.
+ * changes it; the app's own pick leaves the view to the app again. The
+ * block keeps the width it's drawn at, so it stays where it is; ⋯ can
+ * still change that. Each view is its icon, the one showing its name too,
+ * and View as stays a moment after a pick while the page settles.
  */
 function ViewAs({ block }: { block: Block }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const blocks = useRecords("Block");
   const points = useRecords("Point");
+  const [stays, setStays] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
   // The block as kept, not as drawn: its kind is the talk's.
   const kept = blocks.find((b) => b.id === block.id);
   if (guest || !kept) return null;
@@ -1491,24 +1500,73 @@ function ViewAs({ block }: { block: Block }) {
   const views = viewsFor(kept, held);
   if (views.length === 0) return null;
   const pick = viewOf(kept, held);
+  const choose = (view: string) => {
+    sync.update("Block", block.id, {
+      view: view === pick ? "" : view,
+      width: widthOf(shownAs(kept, held), kept, held),
+    });
+    setStays(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStays(false), STAYS_MS);
+  };
   return (
-    <span className="flex items-center gap-2 text-xs text-faint opacity-0 group-hover/block:opacity-100 focus-within:opacity-100">
+    <span
+      data-stays={stays || undefined}
+      className="view-as flex items-center gap-2 text-xs text-faint opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 data-stays:opacity-100"
+    >
       <span aria-hidden="true">View as</span>
       <fieldset aria-label={`View ${blockName(block)} as`} className="ui-segmented -my-0.5">
-        {views.map((view) => (
-          <button
-            key={view}
-            type="button"
-            className="ui-segment"
-            aria-pressed={view === block.kind}
-            onClick={() => sync.update("Block", block.id, { view: view === pick ? "" : view })}
-          >
-            {VIEW_NAMES[view]}
-          </button>
-        ))}
+        {views.map((view) => {
+          const Icon = VIEW_ICONS[view] ?? List;
+          const showing = view === block.view;
+          return (
+            <button
+              key={view}
+              type="button"
+              className="ui-segment"
+              aria-pressed={showing}
+              aria-label={VIEW_NAMES[view]}
+              title={showing ? undefined : VIEW_NAMES[view]}
+              onClick={() => choose(view)}
+            >
+              <Icon aria-hidden="true" className="size-3.5" />
+              {showing && VIEW_NAMES[view]}
+            </button>
+          );
+        })}
       </fieldset>
     </span>
   );
+}
+
+/** How long View as stays after a pick, while the page settles. */
+const STAYS_MS = 1500;
+
+/**
+ * A collection's picture, which glides to its new height and fades in when
+ * View as swaps it, so the page under it moves once, and slowly; at once
+ * where a person asks for less motion.
+ */
+function Glide({ view, children }: { view: string; children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const was = useRef({ view, height: 0 });
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const from = was.current;
+    const height = el.offsetHeight;
+    was.current = { view, height };
+    if (from.view === view || !from.height) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    el.style.overflow = "clip";
+    const glide = el.animate([{ height: `${from.height}px` }, { height: `${height}px` }], {
+      duration: 200,
+      easing: "cubic-bezier(.2,.7,.3,1)",
+    });
+    glide.onfinish = glide.oncancel = () => el.style.removeProperty("overflow");
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: "ease-out" });
+  });
+  return <div ref={box}>{children}</div>;
 }
 
 /**

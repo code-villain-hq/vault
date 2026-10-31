@@ -1,4 +1,18 @@
 import type { Block, Point } from "@almanac/types";
+import {
+  CalendarDays,
+  ChartBar,
+  ChartGantt,
+  ChartLine,
+  Hash,
+  LayoutGrid,
+  List,
+  ListChecks,
+  ListOrdered,
+  type LucideIcon,
+  SquareKanban,
+  Table2,
+} from "lucide-react";
 import { pictureOf, picturesFor, pictureWidth } from "./collection";
 
 /**
@@ -71,6 +85,21 @@ export const VIEW_NAMES: Record<string, string> = {
   week: "Week",
   figures: "Figures",
   steps: "Steps",
+};
+
+/** Each picture's icon in View as. */
+export const VIEW_ICONS: Record<string, LucideIcon> = {
+  table: Table2,
+  cards: LayoutGrid,
+  bars: ChartBar,
+  timeline: ChartGantt,
+  list: List,
+  line: ChartLine,
+  checklist: ListChecks,
+  board: SquareKanban,
+  week: CalendarDays,
+  figures: Hash,
+  steps: ListOrdered,
 };
 
 /**

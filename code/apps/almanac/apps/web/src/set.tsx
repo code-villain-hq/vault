@@ -10,6 +10,7 @@ import { type Confirmation, ConfirmDialog, RowAction } from "@code-villain/web";
 import { Check, Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import {
   type ComponentType,
+  type CSSProperties,
   createContext,
   Fragment,
   type ReactNode,
@@ -366,8 +367,19 @@ function rest(fields: Field[], row: Point): string {
 /** The kinds a row's line shows as a coloured pill, not words. */
 const TOLD_BY_TONE = new Set(["status", "choice"]);
 
-/** A choice's options told apart by a dot each, in its order. */
-const CHOICE_DOTS = ["bg-info", "bg-accent", "bg-warn", "bg-signal", "bg-ok", "bg-faint"];
+/**
+ * A choice's options told apart by a colour each, in its order: the data
+ * hues the topic's own leaves (`hues.ts`). Status colours keep their meanings.
+ */
+const CHOICE_DOTS = ["bg-choice-1", "bg-choice-2", "bg-choice-3", "bg-choice-4", "bg-choice-5"];
+/** A choice's pill: its colour, tinted. */
+const CHOICE_PILLS = [
+  "bg-choice-1/15",
+  "bg-choice-2/15",
+  "bg-choice-3/15",
+  "bg-choice-4/15",
+  "bg-choice-5/15",
+];
 
 /**
  * How a status's or a choice's word looks: a status still open at first
@@ -378,6 +390,14 @@ const CHOICE_DOTS = ["bg-info", "bg-accent", "bg-warn", "bg-signal", "bg-ok", "b
 export function choiceDot(field: Field, value: string): string {
   const at = field.options.indexOf(value);
   return at >= 0 ? (CHOICE_DOTS[at % CHOICE_DOTS.length] ?? "bg-faint") : "bg-faint";
+}
+
+/** A card's tint (`bg-tinted`) by a row's choice: its option's colour. None for a status, or no choice. */
+function choiceTint(fields: Field[], row: Point): CSSProperties | undefined {
+  const choice = fields.find((f) => f.kind === "choice");
+  const cell = choice && cellOf(row, choice);
+  const at = choice && typeof cell === "string" ? choice.options.indexOf(cell) : -1;
+  return at >= 0 ? ({ "--tint": `var(--choice-${(at % 5) + 1})` } as CSSProperties) : undefined;
 }
 
 export function Pill({ field, value }: { field: Field; value: string }) {
@@ -398,8 +418,11 @@ export function Pill({ field, value }: { field: Field; value: string }) {
     );
   }
   const dot = choiceDot(field, value);
+  const tint = at >= 0 ? CHOICE_PILLS[at % CHOICE_PILLS.length] : "bg-chip";
   return (
-    <span className="inline-flex max-w-full shrink-0 items-center gap-1.5 truncate rounded-full bg-chip px-2 py-px text-xs">
+    <span
+      className={`inline-flex max-w-full shrink-0 items-center gap-1.5 truncate rounded-full px-2 py-px text-xs ${tint}`}
+    >
       <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${dot}`} />
       {value}
     </span>
@@ -590,7 +613,7 @@ function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
             )}
             <span className="flex items-start gap-2">
               <span
-                className={`min-w-0 flex-1 font-semibold leading-tight tabular-nums ${
+                className={`min-w-0 flex-1 font-semibold text-hue leading-tight tabular-nums ${
                   [...words].length > 9 ? "text-lg" : "text-2xl"
                 }`}
               >
@@ -670,7 +693,7 @@ function Steps({ rows, check, fields }: { rows: Point[]; check?: Field; fields: 
           ? "bg-ok text-bg"
           : row === next
             ? "bg-primary text-on-primary"
-            : "bg-surface text-muted ring-1 ring-line ring-inset";
+            : "bg-hue/15 text-hue";
         return (
           <li key={row.id} className="group relative flex gap-3 pb-3 last:pb-0">
             <span
@@ -911,7 +934,7 @@ function TimeAxis({
         const inLane = placed.filter((p) => laneWord(p.row, by) === lane);
         const off = chosen !== null && chosen !== lane;
         if (inLane.length === 0) return null;
-        const colour = by && lane ? laneColour(by, i, lanes.length - 1) : "bg-accent";
+        const colour = by && lane ? laneColour(by, i, lanes.length - 1) : "bg-hue";
         return (
           <Fragment key={lane || "-"}>
             {by && (
@@ -1101,6 +1124,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
               {cards.map((row) => {
                 const words = rest(fields, row);
                 const kept = words ? [] : (pages.get(row.id) ?? []);
+                const tint = choiceTint([status], row);
                 return (
                   <article
                     key={row.id}
@@ -1114,7 +1138,8 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                       setDragged(null);
                       setOver(null);
                     }}
-                    className={`group flex items-start gap-2 rounded-md bg-surface px-3 py-2 ${guest ? "" : "cursor-grab active:cursor-grabbing"} ${dragged === row.id ? "opacity-50" : ""}`}
+                    style={tint}
+                    className={`group flex items-start gap-2 rounded-md px-3 py-2 ${tint ? "bg-tinted" : "bg-surface"} ${guest ? "" : "cursor-grab active:cursor-grabbing"} ${dragged === row.id ? "opacity-50" : ""}`}
                   >
                     <NewDot point={row} className="mt-2" />
                     <Thumb row={row} fields={fields} className="size-10" />
@@ -1158,8 +1183,13 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-3">
       {rows.map((row) => {
         const pic = photo && cellOf(row, photo);
+        const tint = choiceTint(shown, row);
         return (
-          <article key={row.id} className="group flex flex-col gap-2.5 rounded-lg bg-surface p-3">
+          <article
+            key={row.id}
+            style={tint}
+            className={`group flex flex-col gap-2.5 rounded-lg p-3 ${tint ? "bg-tinted" : "bg-surface"}`}
+          >
             {typeof pic === "string" && (
               <Photo id={pic} className="aspect-[4/3] w-full rounded-md" />
             )}
@@ -1279,7 +1309,7 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
                             className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-chip"
                           >
                             <span
-                              className="block h-full rounded-full bg-accent"
+                              className="block h-full rounded-full bg-hue"
                               style={{
                                 width: `${(Math.abs(value) / (most.get(field.name) ?? 1)) * 100}%`,
                               }}
@@ -1446,7 +1476,9 @@ function RowBars({
   const told = fields.find((f) => TOLD_BY_TONE.has(f.kind));
   const fill = (row: Point) => {
     const cell = told && cellOf(row, told);
-    if (!told || typeof cell !== "string") return "bg-accent";
+    if (!told) return "bg-hue";
+    // Where a choice colours the bars, the topic's hue steps aside.
+    if (typeof cell !== "string") return "bg-faint";
     const at = told.options.indexOf(cell);
     if (told.kind === "choice") return at >= 0 ? CHOICE_DOTS[at % CHOICE_DOTS.length] : "bg-faint";
     return at > 0 && at === told.options.length - 1 ? "bg-ok" : at > 0 ? "bg-info" : "bg-faint";
@@ -1614,6 +1646,12 @@ function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
         return (
           <li key={row.id} className="group flex items-baseline gap-2 rounded-md px-2.5 py-1.5">
             <NewDot point={row} className="self-center" />
+            {!fields.some((f) => f.kind === "photo") && (
+              <span
+                aria-hidden="true"
+                className="size-1.5 shrink-0 translate-y-[-2px] rounded-full bg-hue"
+              />
+            )}
             <Thumb row={row} fields={fields} className="size-8 self-center" />
             <p className="min-w-0 flex-1">
               {/* A name alone is the line; beside its cells it leads. */}

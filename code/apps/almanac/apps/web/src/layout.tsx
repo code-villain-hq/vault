@@ -36,6 +36,7 @@ import {
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { TalksProvider } from "./asking";
 import { AlmanacMenus } from "./commands";
+import { groupsOf, hueOf } from "./hues";
 import { Initial, NavIcon, topicIcon } from "./icons";
 import { NewTopicDialog, useNewTopicKey } from "./new-topic";
 import { isDesktop } from "./platform";
@@ -390,8 +391,8 @@ function TopicNav() {
       list.push(topic);
       byName.set(topic.group_name, list);
     }
-    // Ungrouped topics first, then the groups by name.
-    return [...byName.entries()].sort(([a], [b]) => (a && b ? a.localeCompare(b) : a ? 1 : -1));
+    // Ungrouped topics first, then the groups by name, as their hues go.
+    return groupsOf(topics).map((name) => [name, byName.get(name) ?? []] as const);
   }, [topics]);
   return (
     <>
@@ -431,7 +432,7 @@ function TopicNav() {
                 params={{ ...params, topic: shown.id }}
                 className={`${navLink} ${shown.parent_id ? "pl-7" : ""} ${children.length && !shown.parent_id ? "pr-8" : ""}`}
               >
-                <NavIcon icon={topicIcon(shown.icon)} />
+                <TopicNavIcon topic={shown} topics={topics} />
                 <span className="truncate">{shown.name}</span>
                 {(unread.has(shown.id) || newUnder) && (
                   <span
@@ -480,6 +481,20 @@ function TopicNav() {
         </button>
       )}
     </>
+  );
+}
+
+/** A topic's icon in the sidebar, in its hue, where the other icons are grey. */
+function TopicNavIcon({ topic, topics }: { topic: Topic; topics: Topic[] }) {
+  const Icon = topicIcon(topic.icon);
+  return (
+    <Icon
+      size={15}
+      strokeWidth={1.75}
+      aria-hidden="true"
+      className="shrink-0"
+      style={{ color: `var(--data-${hueOf(topic, topics)})` }}
+    />
   );
 }
 
