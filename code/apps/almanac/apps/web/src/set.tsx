@@ -913,6 +913,7 @@ function Line({
  * side, so one full lane beside two thin ones doesn't run down the page.
  */
 function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields: Field[] }) {
+  const pages = useRowPages(rows);
   const steps = status.kind === "status";
   const lanes = lanesOf(status, rows);
   const laneOf = (row: Point) => {
@@ -945,6 +946,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(13rem,100%),1fr))] gap-1.5">
               {cards.map((row) => {
                 const words = rest(fields, row);
+                const kept = words ? [] : (pages.get(row.id) ?? []);
                 return (
                   <article
                     key={row.id}
@@ -954,6 +956,11 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                     <div className="flex min-w-0 flex-1 flex-col">
                       <RowName row={row} className="line-clamp-2 break-words" />
                       {words && <span className="truncate text-xs text-faint">{words}</span>}
+                      {kept.length > 0 && (
+                        <div className="mt-1.5">
+                          <PageNames words={kept} />
+                        </div>
+                      )}
                     </div>
                     <Pills fields={fields} row={row} />
                     <RemovePoint point={row} />
@@ -1316,7 +1323,79 @@ function RowChecklist({ rows, check, fields }: { rows: Point[]; check: Field; fi
 }
 
 /** A list: a row a line, its name, then its other cells. */
+/** The most a shelf's tile names of what its row's page keeps. */
+const SHELF_NAMES = 4;
+
+/**
+ * What each row's own page keeps, in a word each: a paragraph's bold lead,
+ * a collection's row names. Only where rows open a page (`Opens`).
+ */
+function useRowPages(rows: Point[]): Map<string, string[]> {
+  const opens = useContext(Opens) !== null;
+  const blocks = useRecords("Block");
+  const points = useRecords("Point");
+  return useMemo(() => {
+    const kept = new Map<string, string[]>();
+    if (!opens) return kept;
+    const ids = new Set(rows.map((r) => r.id));
+    const pages = blocks
+      .filter(
+        (b) => b.row_id && ids.has(b.row_id) && (b.kind === "paragraph" || b.kind === "collection"),
+      )
+      .sort((a, b) => a.position - b.position);
+    for (const page of pages) {
+      const words = points
+        .filter((p) => p.block_id === page.id)
+        .sort((a, b) => a.position - b.position)
+        .map((p) => (page.kind === "paragraph" ? ledBy(p.text)?.[0] : p.text))
+        .filter((w): w is string => !!w);
+      const row = page.row_id as string;
+      kept.set(row, [...(kept.get(row) ?? []), ...words]);
+    }
+    return kept;
+  }, [opens, rows, blocks, points]);
+}
+
+/** What a row's page keeps, a chip a name, the first few. */
+function PageNames({ words }: { words: string[] }) {
+  const names = [...new Set(words)];
+  if (names.length === 0) return null;
+  const more = names.length - SHELF_NAMES;
+  return (
+    <ul className="flex flex-wrap gap-1 text-xs">
+      {names.slice(0, SHELF_NAMES).map((name) => (
+        <li key={name} className="max-w-full truncate rounded bg-chip px-1.5 py-0.5 text-muted">
+          {name}
+        </li>
+      ))}
+      {more > 0 && <li className="px-1 py-0.5 text-faint tabular-nums">+{more}</li>}
+    </ul>
+  );
+}
+
+/** Rows with nothing but a name, each a tile of what its own page keeps. */
+function Shelf({ rows, pages }: { rows: Point[]; pages: Map<string, string[]> }) {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(16rem,100%),1fr))] gap-3">
+      {rows.map((row) => (
+        <article key={row.id} className="group flex flex-col gap-2 rounded-lg bg-surface p-3">
+          <h3 className="flex items-start gap-2 font-semibold">
+            <NewDot point={row} className="mt-2" />
+            <RowName row={row} className="min-w-0 flex-1 break-words" />
+            <RemovePoint point={row} />
+          </h3>
+          <PageNames words={pages.get(row.id) ?? []} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
+  const pages = useRowPages(rows);
+  if (fields.length === 0 && rows.some((row) => pages.get(row.id)?.length)) {
+    return <Shelf rows={rows} pages={pages} />;
+  }
   return (
     <ul className={`flex flex-col ${LINES}`}>
       {rows.map((row) => {

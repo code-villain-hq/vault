@@ -181,7 +181,10 @@ What they do:
     Only fields its rows fill count. View as offers the others its fields
     allow (`picturesFor`). A callout is a warning when a point's `look` is `warn`.
     Paragraphs that each open with a bold lead draw as cards: the lead, a
-    few lines, and More (`Leads` in `set.tsx`).
+    few lines, and More (`Leads` in `set.tsx`). A list of names whose rows
+    have pages draws as tiles, each with what its page keeps as chips (its
+    leads, its rows' names: `Shelf`), and a board card with nothing else to
+    say shows the same chips.
   - A checklist's row can ring: offer_reminder with an `item` makes a
     reminder with its `point_id` (migration 0016). Ticking a row writes
     its check cell; a row a reminder rings for ticks the reminder instead (`markDone`): one
