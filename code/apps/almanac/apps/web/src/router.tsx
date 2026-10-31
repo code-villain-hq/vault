@@ -85,6 +85,7 @@ const topic = createRoute({
     talk: text(search.talk),
     ask: text(search.ask),
     section: text(search.section),
+    row: text(search.row),
     about: search.about === true || search.about === "true" ? true : undefined,
   }),
   component: TopicPage,

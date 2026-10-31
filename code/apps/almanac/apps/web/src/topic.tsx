@@ -1,8 +1,8 @@
 // A topic's page: its blocks in order, on a grid of twelve columns, each one
 // of the set (a heading, a paragraph, bullets, a checklist, a toggle, a
 // callout or a collection), the questions it waits on, and the talk beside
-// it. A section
-// opens on a page of its own, in the page's place, and so does the topic's
+// it. A section, and a collection's row, opens on a page of its own, in the
+// page's place, and so does the topic's
 // About: its name, what it sticks to, what it knows about you and its
 // blocks. The workspace's own topic, Almanac, has the index of the others
 // for its page.
@@ -25,6 +25,7 @@ import {
 import { Link, useLocation, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { ArrowLeft, ChevronDown, ChevronRight, MessagesSquare, X } from "lucide-react";
 import {
+  Fragment,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -35,6 +36,7 @@ import {
   useState,
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
+import { cellOf, cellWords } from "./collection";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
@@ -59,6 +61,8 @@ import {
   Collection,
   LINES,
   named,
+  Opens,
+  type PageTo,
   Paragraphs,
   Toggles,
 } from "./set";
@@ -71,26 +75,55 @@ import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from ".
 /**
  * `?talk=` opens the talk panel (`new` for a new talk); `?ask=` starts it
  * with a question; `?section=` opens a section, by its theme, in the page's
- * place, and `?about` the topic's About.
+ * place, with `&row=` a collection's row, by its id, and `?about` the
+ * topic's About.
  */
 export interface TopicSearch {
   talk?: string;
   ask?: string;
   section?: string;
+  row?: string;
   about?: true;
 }
 
-/** What's open in the page's place: a section, About, or the page. */
+/** What's open in the page's place: a section or a row, About, or the page. */
 function placeOf(search: TopicSearch): TopicSearch {
-  return search.section ? { section: search.section } : search.about ? { about: true } : {};
+  return search.section
+    ? { section: search.section, ...(search.row ? { row: search.row } : {}) }
+    : search.about
+      ? { about: true }
+      : {};
 }
 
 /** The search that opens `section` (none: the page), keeping the open talk. */
-function inSection(section: string | undefined) {
+function inSection(section: string | undefined, row?: string) {
   return (prev: TopicSearch): TopicSearch => ({
     ...(prev.talk ? { talk: prev.talk } : {}),
     ...(section ? { section } : {}),
+    ...(section && row ? { row } : {}),
   });
+}
+
+/** Opens a section's or a row's own page, for the blocks of a topic's page. */
+function OpenPage({
+  section,
+  row,
+  className,
+  label,
+  children,
+}: PageTo & { className?: string; label?: string; children: ReactNode }) {
+  return (
+    <Link
+      to="."
+      search={inSection(section, row)}
+      aria-label={label}
+      title={label}
+      className={className}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </Link>
+  );
 }
 
 /** The search that opens the topic's About, keeping the open talk. */
@@ -110,6 +143,7 @@ export function TopicPage() {
   const { ready } = useSyncStatus();
   const topics = useRecords("Topic");
   const topic = topics.find((t) => t.id === id);
+  const points = useRecords("Point");
   const talks = useTalks(id);
   const { asking, ask, open: kept, setOpen } = useTopicTalks(id);
 
@@ -148,14 +182,17 @@ export function TopicPage() {
       : undefined;
   const shown = search.talk ?? left;
   const talkId = shown && shown !== "new" ? shown : null;
-  // Asked with a section open, a question is about it, in the talk too.
-  const section = isOwn(topic) ? undefined : search.section;
+  // Asked with a section or a row open, a question is about it, in the talk
+  // too. A row's page is its name's section, under what it is now called.
+  const row = isOwn(topic) ? undefined : points.find((p) => p.id === search.row);
+  const section = isOwn(topic) ? undefined : (row?.text ?? search.section);
   return (
     <TopicView
       // A new topic starts with its own state: what it asked, what it saw.
       key={topic.id}
       topic={topic}
       section={section}
+      row={row}
       about={!section && search.about === true}
       panel={shown !== undefined}
       talkId={talkId}
@@ -163,7 +200,7 @@ export function TopicPage() {
       asking={asking}
       onAsk={(text, talk, photos) => {
         if (talk === null) open(null);
-        void ask(text, talk, photos, section);
+        void ask(text, talk, photos, section ? { section, row: row?.id } : undefined);
       }}
       onOpen={open}
     />
@@ -173,6 +210,7 @@ export function TopicPage() {
 function TopicView({
   topic,
   section,
+  row,
   about,
   panel,
   talkId,
@@ -184,6 +222,8 @@ function TopicView({
   topic: Topic;
   /** The section open in the page's place. */
   section: string | undefined;
+  /** The collection's row whose page that is. */
+  row: Point | undefined;
   /** The topic's About, in the page's place. */
   about: boolean;
   panel: boolean;
@@ -305,9 +345,13 @@ function TopicView({
               ) : isOwn(topic) ? (
                 <OwnPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
               ) : section ? (
-                <SectionPageBody topic={topic} section={section} />
+                <Opens.Provider value={OpenPage}>
+                  <SectionPageBody topic={topic} section={section} row={row} />
+                </Opens.Provider>
               ) : (
-                <TopicPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
+                <Opens.Provider value={OpenPage}>
+                  <TopicPageBody topic={topic} onAsk={(text) => onAsk(text, null)} />
+                </Opens.Provider>
               )}
             </div>
           </div>
@@ -496,11 +540,47 @@ function BackTo({ topic }: { topic: Topic }) {
 }
 
 /**
+ * A collection's row at the top of its page: which collection it's in, and
+ * its fields, a line each, the empty ones too, so a talk can fill them.
+ */
+function RowFields({ row }: { row: Point }) {
+  const blocks = useRecords("Block");
+  const block = blocks.find((b) => b.id === row.block_id);
+  if (!block) return null;
+  return (
+    <section className="-mt-6 flex flex-col gap-3" aria-label={`In ${block.title}`}>
+      <p className="text-muted">in {block.title || "a collection"}</p>
+      {block.fields.length > 0 && (
+        <dl className="grid max-w-[68ch] grid-cols-[minmax(6rem,max-content)_1fr] gap-x-6 gap-y-1.5">
+          {block.fields.map((field) => {
+            const words = cellWords(field, cellOf(row, field));
+            return (
+              <Fragment key={field.name}>
+                <dt className="text-muted">{field.name}</dt>
+                <dd className={words ? "" : "text-faint"}>{words || "—"}</dd>
+              </Fragment>
+            );
+          })}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+/**
  * A section on a page of its own: everything kept under its name, from every
  * block, as its block lays it out (the events, then the passages), with its
  * reminders, the questions about it, and the talks it came from.
  */
-function SectionPageBody({ topic, section }: { topic: Topic; section: string }) {
+function SectionPageBody({
+  topic,
+  section,
+  row,
+}: {
+  topic: Topic;
+  section: string;
+  row: Point | undefined;
+}) {
   const page = usePage(topic);
   const talks = useRecords("Talk");
   const points = page.points.filter((p) => p.theme === section);
@@ -518,7 +598,7 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
     .filter((t) => !named.has(t.id) && points.some((p) => p.talk_id === t.id))
     .sort((a, b) => b.last_at.localeCompare(a.last_at));
 
-  if (points.length + questions.length + reminders.length === 0) {
+  if (!row && points.length + questions.length + reminders.length === 0) {
     return (
       <div className="flex flex-col gap-1">
         <p className="font-medium">Nothing is kept under {section}.</p>
@@ -535,6 +615,7 @@ function SectionPageBody({ topic, section }: { topic: Topic; section: string }) 
     <>
       <BackTo topic={topic} />
       <p className="text-title font-semibold">{section}</p>
+      {row && <RowFields row={row} />}
       {reminders.length > 0 && <Dates reminders={reminders} />}
       {questions.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">

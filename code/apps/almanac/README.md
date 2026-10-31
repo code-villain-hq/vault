@@ -139,10 +139,14 @@ topics.
   the whole row, writing half, and a collection what its picture needs.
   A row's blocks grow to fill it, and one that would get too narrow to
   read takes a row of its own, as every block does on a phone.
-- **A section opens on its own page**: a toggle's line opens it where
-  the page was, with the talk still beside it: everything kept under it
-  from every block, its open questions and the talks it came from.
-  Asking from there asks about that section. A button above its title
+- **A section opens on its own page**: the arrow beside a toggle's line
+  opens it where the page was, with the talk still beside it: everything
+  kept under it from every block, its open questions and the talks it
+  came from. Asking from there asks about that section.
+- **A row opens as its own page**: a row's name, in any picture, opens
+  its fields, a line each, the empty ones too, and what's kept under its
+  name. Asking from there is about that row: what fits a field fills its
+  cell, and the rest goes under its name. A button above its title
   goes back to the topic, as do the breadcrumb and Esc, to where you
   were on the page.
 - **Pages from before the set** move into it once, when the server

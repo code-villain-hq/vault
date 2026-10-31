@@ -195,6 +195,21 @@ impl Page {
         }
     }
 
+    /// A collection's row by its id: its reference's number (p3), its
+    /// collection's title and its name.
+    pub fn row(&self, id: Uuid) -> Option<(usize, &str, &str)> {
+        let mut n = 0;
+        for PageBlock { block, points } in &self.blocks {
+            for point in points {
+                n += 1;
+                if point.id == id && block.kind == "collection" {
+                    return Some((n, &block.title, &point.text));
+                }
+            }
+        }
+        None
+    }
+
     /// The topic and what it has kept, in plain text, each block, point
     /// and reminder with its reference.
     pub fn describe(&self) -> String {

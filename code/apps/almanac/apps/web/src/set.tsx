@@ -2,13 +2,29 @@
 // checklist, toggles, a callout, and a collection drawn as the picture its
 // fields pick (`collection.ts`): a line, a board, cards, a table, a
 // timeline, a week, bars or a list. The same on every topic; nobody
-// designs a page's own. Also the parts the page's older kinds share with
-// them: a photo, a tick, a timeline's rail, ✕ to take a point off.
+// designs a page's own. A toggle's line and a row open their own page on
+// a topic's page (`Opens`). Also the parts the blocks share: a photo, a
+// tick, a timeline's rail, ✕ to take a point off.
 
 import type { Block, Field, Point, Reminder } from "@almanac/types";
 import { type Confirmation, ConfirmDialog, RowAction } from "@code-villain/web";
-import { ChevronRight, Circle, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  ArrowUpRight,
+  ChevronRight,
+  Circle,
+  CircleCheck,
+  Info,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import {
+  type ComponentType,
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { TrendSet } from "./charts";
 import { byDay, cellOf, cellWords, dayOf, filled, lanesOf, numberOf } from "./collection";
 import {
@@ -28,6 +44,31 @@ import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** A line's measure, for lines that read across. */
 export const LINES = "max-w-[86ch]";
+
+/** What opens: a section's own page, by its name, or a row's, by its id too. */
+export interface PageTo {
+  section: string;
+  row?: string;
+}
+
+/**
+ * The link that opens a section's or a row's own page, which a topic's
+ * page gives its blocks; elsewhere (Settings → Blocks) names stay words.
+ */
+export const Opens = createContext<ComponentType<
+  PageTo & { className?: string; label?: string; children: ReactNode }
+> | null>(null);
+
+/** A row's name, which opens its page where there's one to open. */
+function RowName({ row, className = "" }: { row: Point; className?: string }) {
+  const Open = useContext(Opens);
+  if (!Open) return <span className={className}>{row.text}</span>;
+  return (
+    <Open section={row.text} row={row.id} className={`${className} hover:underline`}>
+      {row.text}
+    </Open>
+  );
+}
 
 export function Photo({ id, className }: { id: string; className: string }) {
   const { place, workspace } = useWorkspace();
@@ -334,25 +375,39 @@ export function Toggles({ points }: { points: Point[] }) {
 
 function Toggle({ name, points }: { name: string; points: Point[] }) {
   const [open, setOpen] = useState(false);
+  const Open = useContext(Opens);
   const fresh = points.some((p) => !p.seen);
   return (
     <section className="flex flex-col">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="group/toggle flex items-center gap-1.5 rounded-md py-1 text-left hover:text-fg"
-      >
-        <ChevronRight
-          size={15}
-          strokeWidth={1.75}
-          aria-hidden="true"
-          className={`shrink-0 text-faint transition-[rotate] group-hover/toggle:text-muted ${open ? "rotate-90" : ""}`}
-        />
-        <span className="font-medium">{name}</span>
-        {fresh && <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />}
-        {!open && <span className="text-xs text-faint">{points.length}</span>}
-      </button>
+      <div className="group/line flex items-center gap-1">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="group/toggle flex items-center gap-1.5 rounded-md py-1 text-left hover:text-fg"
+        >
+          <ChevronRight
+            size={15}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className={`shrink-0 text-faint transition-[rotate] group-hover/toggle:text-muted ${open ? "rotate-90" : ""}`}
+          />
+          <span className="font-medium">{name}</span>
+          {fresh && (
+            <span role="img" aria-label="New" className="size-1.5 rounded-full bg-accent" />
+          )}
+          {!open && <span className="text-xs text-faint">{points.length}</span>}
+        </button>
+        {Open && (
+          <Open
+            section={name}
+            label={`Open ${name}`}
+            className="ui-button ui-icon-button size-6 shrink-0 text-faint opacity-0 group-hover/line:opacity-100 focus-visible:opacity-100"
+          >
+            <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
+          </Open>
+        )}
+      </div>
       {open && (
         <div className="pt-1 pb-2 pl-5">
           <Bullets points={points} />
@@ -520,7 +575,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                 >
                   <NewDot point={row} className="mt-2" />
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate">{row.text}</span>
+                    <RowName row={row} className="truncate" />
                     {words && <span className="truncate text-xs text-faint">{words}</span>}
                   </div>
                   <RemovePoint point={row} />
@@ -549,7 +604,9 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
             )}
             <div className="flex items-center gap-2">
               <NewDot point={row} />
-              <h3 className="min-w-0 flex-1 truncate font-semibold">{row.text}</h3>
+              <h3 className="min-w-0 flex-1 truncate font-semibold">
+                <RowName row={row} />
+              </h3>
               <RemovePoint point={row} />
             </div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
@@ -601,7 +658,9 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
         <tbody>
           {rows.map((row) => (
             <tr key={row.id} className="[&>td]:hover:bg-hover">
-              <td className={`${cell} max-w-72 truncate font-semibold`}>{row.text}</td>
+              <td className={`${cell} max-w-72 truncate font-semibold`}>
+                <RowName row={row} />
+              </td>
               {columns.map((field) => {
                 const value = cellOf(row, field);
                 const words =
@@ -644,7 +703,7 @@ function RowTimeline({ rows, day, fields }: { rows: Point[]; day: Field; fields:
             <div className="flex min-w-0 items-start gap-2 py-[5px]">
               <p className="min-w-0 flex-1">
                 {!row.seen && <span className="sr-only">New: </span>}
-                {inline(row.text)}
+                <RowName row={row} />
                 {words && <span className="text-faint"> · {words}</span>}
               </p>
               <RemovePoint point={row} />
@@ -687,7 +746,7 @@ function Week({ rows, day }: { rows: Point[]; day: Field }) {
               <span className="text-xs text-muted">{weekdayWords(key)}</span>
               {due.map((row) => (
                 <span key={row.id} className="truncate text-xs" title={row.text}>
-                  {row.text}
+                  <RowName row={row} />
                 </span>
               ))}
               {due.length === 0 && <span className="sr-only">Nothing</span>}
@@ -736,7 +795,7 @@ function RowBars({
             >
               <span className="flex min-w-0 items-center gap-2">
                 <NewDot point={row} />
-                <span className="line-clamp-2 min-w-0">{row.text}</span>
+                <RowName row={row} className="line-clamp-2 min-w-0" />
               </span>
               <span aria-hidden="true" className="block h-2.5 rounded-full bg-chip">
                 <span
@@ -771,7 +830,7 @@ function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
           <li key={row.id} className="group flex items-baseline gap-2 rounded-md px-2.5 py-1.5">
             <NewDot point={row} className="self-center" />
             <p className="min-w-0 flex-1">
-              <span className="font-semibold">{row.text}</span>
+              <RowName row={row} className="font-semibold" />
               {words && <span className="text-muted"> · {words}</span>}
             </p>
             <RemovePoint point={row} />

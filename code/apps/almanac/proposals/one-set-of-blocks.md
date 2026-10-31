@@ -93,7 +93,12 @@ Each step leaves the app working, and is tried before it's committed.
    changed, and where it went, with Undo. _Built:_ what it adds has
    Undo too now, with its changes; only ticks stay words. The pictures
    are drawn live, as the page draws them, and go once it's undone.
-5. **A row opens as its own page**, beside the topic's.
+5. **A row opens as its own page**, beside the topic's. _Built:_ the
+   row's name opens it (`?section=<name>&row=<id>`): its collection, its
+   fields and what's kept under its name, the section page's way. Asking
+   there names the row, so a talk fills its cells. A toggle's line got
+   an arrow that opens its section, which nothing linked to since the
+   old kinds went.
 6. **Tidying up** turns sentences into rows when you ask: "Lisa wiegt
    etwa 3,4 kg" becomes a row in Gewicht. In small steps, each shown.
 

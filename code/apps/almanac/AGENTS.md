@@ -123,6 +123,8 @@ What they do:
   question asked from a section's own page names it (`about`), and the
   prompt says which section they're looking at: what's kept goes under
   it, and a layout asked from there moves and draws only what's under it.
+  A row's own page is the section of its name, and its question names
+  the row too (`row`): what fits a field changes the row's cells.
 - **Keeping** (`kept.rs`): Claude files what it learns into the one set
   of blocks (`SET_KINDS`, migration 0015, `proposals/one-set-of-blocks.md`):
   `heading`, `paragraph`, `bullets`, `checklist`, `toggle`, `callout` and
@@ -232,7 +234,8 @@ them into notifications. A server with no Mac listening marks nothing.
 - `apps/web`: React + Base UI + Tailwind. `layout.tsx` is the sidebar,
   `topic.tsx` a topic's page (the one set's blocks and pictures in
   `set.tsx`, the rules for a collection's picture in `collection.ts`), a section's own (`?section=`, what's
-  kept under that theme from every block) and its About (`?about`), `talk.tsx` the talk beside it,
+  kept under that theme from every block; with `&row=` a collection's
+  row, its fields above, which its name opens in every picture, `Opens`) and its About (`?about`), `talk.tsx` the talk beside it,
   `asking.tsx` the answers on their way and each topic's open talk (above
   the pages, so they last while you look elsewhere), `calendar.tsx`
   Calendar, `settings.tsx` Settings → Claude and Blocks, every kind drawn

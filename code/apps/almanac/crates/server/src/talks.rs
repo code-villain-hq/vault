@@ -439,7 +439,9 @@ pub async fn ask(
     let (events, heard) = mpsc::unbounded_channel::<Event>();
     let _ = events.send(json_event("talk", json!({ "talk_id": talk_id })));
     tokio::spawn(async move {
-        let about = about.as_deref().filter(|_| !own);
+        let row = request.row.and_then(|id| page.row(id));
+        let about = (!own).then(|| about_line(about.as_deref(), row));
+        let about = about.as_deref().filter(|a| !a.is_empty());
         answer(&state, actor, &page, own, talk_id, &text, about, events).await;
     });
     let stream = futures::stream::unfold(heard, |mut heard| async move {
@@ -595,8 +597,17 @@ struct Asked<'a> {
 }
 
 /// "They ask from the section Intifada…", after the page, when they ask
-/// with a section of it open.
-fn about_line(about: Option<&str>) -> String {
+/// with a section of it open, or a row's page: its reference's number,
+/// its collection and its name.
+fn about_line(about: Option<&str>, row: Option<(usize, &str, &str)>) -> String {
+    if let Some((n, collection, name)) = row {
+        return format!(
+            "\nThey ask from the page of the row [p{n}] {name}, in {collection}, which is open in \
+             front of them: what they ask is about it. What fits one of {collection}'s fields \
+             changes p{n}'s cells; sentences about it go in a toggle, as points under a line \
+             named {name}, which its page shows under its fields.\n"
+        );
+    }
     match about {
         Some(about) => format!(
             "\nThey ask from the section {about} of the page, which is open in front of them: \
@@ -652,7 +663,7 @@ async fn say_with_claude_code(
             "{ANSWER}\n\n{ANSWER_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}{}",
             today(),
             page.describe(),
-            about_line(about)
+            about.unwrap_or_default()
         )
     };
     let mode = if own { Mode::Own } else { Mode::Topic };
@@ -888,7 +899,7 @@ async fn say(
             "{ANSWER}\n\n{ANSWER_WITHOUT_TOOLS}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}{}",
             today(),
             page.describe(),
-            about_line(about)
+            about.unwrap_or_default()
         )
     };
     state
@@ -917,7 +928,7 @@ async fn keep(
         "Today is {}.\n\n{}{}\nThe exchange:\n\nThey asked: {question}\n\nAlmanac answered: {answer}",
         today(),
         page.describe(),
-        about_line(about),
+        about.unwrap_or_default(),
     );
     let from: Keep = state
         .claude
@@ -1039,6 +1050,17 @@ mod tests {
             text: text.into(),
             images: vec![image; photos],
         }
+    }
+
+    #[test]
+    fn a_row_page_says_which_row_they_ask_about() {
+        assert_eq!(about_line(None, None), "");
+        let section = about_line(Some("Futter"), None);
+        assert!(section.contains("goes under Futter"));
+        let row = about_line(Some("Monstera"), Some((4, "Pflanzen", "Monstera")));
+        assert!(row.contains("the row [p4] Monstera, in Pflanzen"));
+        assert!(row.contains("changes p4's cells"));
+        assert!(row.contains("under a line named Monstera"));
     }
 
     #[test]

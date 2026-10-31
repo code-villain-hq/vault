@@ -301,6 +301,10 @@ pub struct AskRequest {
     /// The section of the page open in front of them, by its theme
     /// ("Intifada"): the answer is about it, and keeps what it finds there.
     pub about: Option<String>,
+    /// The collection's row whose page is open in front of them: the
+    /// answer is about it, and keeps what it finds in its cells and under
+    /// its name.
+    pub row: Option<Uuid>,
 }
 
 impl Validate for TalkCreate {

@@ -42,8 +42,14 @@ interface Talks {
     question: string,
     talkId: string | null,
     photos?: Picked[],
-    about?: string,
+    about?: About,
   ) => Promise<void>;
+}
+
+/** What's open in front of them as they ask: a section, or a row's page. */
+export interface About {
+  section: string;
+  row?: string;
 }
 
 const TalksContext = createContext<Talks | null>(null);
@@ -70,7 +76,7 @@ export function TalksProvider({ children }: { children: ReactNode }) {
       question: string,
       talkId: string | null,
       photos: Picked[] = [],
-      about?: string,
+      about?: About,
     ) => {
       const text = question.trim();
       if (!text && photos.length === 0) return;
@@ -107,7 +113,8 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             ...(talkId ? { talk_id: talkId } : {}),
             text,
-            ...(about ? { about } : {}),
+            ...(about ? { about: about.section } : {}),
+            ...(about?.row ? { row: about.row } : {}),
             ...(photos.length > 0
               ? {
                   photos: photos.map(({ media_type, data, width, height }) => ({
@@ -187,7 +194,7 @@ export function useTopicTalks(topicId: string) {
     open: open[topicId],
     setOpen: useCallback((talk: string | undefined) => setOpen(topicId, talk), [setOpen, topicId]),
     ask: useCallback(
-      (question: string, talkId: string | null, photos?: Picked[], about?: string) =>
+      (question: string, talkId: string | null, photos?: Picked[], about?: About) =>
         ask(topicId, question, talkId, photos, about),
       [ask, topicId],
     ),

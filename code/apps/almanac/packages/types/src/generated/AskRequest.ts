@@ -16,4 +16,10 @@ photos?: Array<PhotoUpload>,
  * The section of the page open in front of them, by its theme
  * ("Intifada"): the answer is about it, and keeps what it finds there.
  */
-about?: string, };
+about?: string, 
+/**
+ * The collection's row whose page is open in front of them: the
+ * answer is about it, and keeps what it finds in its cells and under
+ * its name.
+ */
+row?: string, };
