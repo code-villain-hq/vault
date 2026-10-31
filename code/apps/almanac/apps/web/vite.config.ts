@@ -20,9 +20,10 @@ export default defineConfig({
     strictPort: true,
     // The server answers CORS itself, so the packaged app can use this port.
     cors: false,
-    // The Rust server, so the app and the API share an origin in development.
+    // The Rust server, so the app and the API share an origin in development;
+    // ALMANAC_API points it at another, such as the desktop app's own (7785).
     proxy: {
-      "/api": { target: "http://127.0.0.1:7780", ws: true },
+      "/api": { target: process.env.ALMANAC_API ?? "http://127.0.0.1:7780", ws: true },
     },
   },
 });

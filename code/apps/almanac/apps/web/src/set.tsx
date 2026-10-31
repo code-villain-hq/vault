@@ -349,7 +349,7 @@ function rest(fields: Field[], row: Point): string {
 const TOLD_BY_TONE = new Set(["status", "choice"]);
 
 /** A choice's options told apart by a dot each, in its order. */
-const CHOICE_DOTS = ["bg-info", "bg-warn", "bg-ok", "bg-accent", "bg-signal", "bg-danger"];
+const CHOICE_DOTS = ["bg-info", "bg-accent", "bg-warn", "bg-signal", "bg-ok", "bg-faint"];
 
 /**
  * How a status's or a choice's word looks: a status still open at first
@@ -669,8 +669,9 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(13rem,100%),1fr))] gap-3">
       {lanes.map((lane, i) => {
         const cards = rows.filter((row) => laneOf(row) === lane);
-        const dot =
-          i === 0
+        const dot = !steps
+          ? CHOICE_DOTS[i % CHOICE_DOTS.length]
+          : i === 0
             ? "ring-[1.5px] ring-faint ring-inset"
             : i === lanes.length - 1
               ? "bg-ok"
@@ -678,7 +679,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
         return (
           <section key={lane} aria-label={lane} className="flex min-w-0 flex-col gap-1.5">
             <h3 className="flex items-center gap-2 text-xs text-muted">
-              {steps && <span aria-hidden="true" className={`size-2 rounded-full ${dot}`} />}
+              <span aria-hidden="true" className={`size-2 rounded-full ${dot}`} />
               {lane}
               <span className="text-faint tabular-nums">{cards.length}</span>
             </h3>
