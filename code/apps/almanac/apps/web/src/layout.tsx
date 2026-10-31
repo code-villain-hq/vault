@@ -118,6 +118,16 @@ export function useTopics(): Topic[] {
 }
 
 /** Whether a topic is the workspace's own, Almanac, which knows the others. */
+/** The topic `topic` sits under, while it's there. */
+export function parentOf(topic: Topic, topics: Topic[]): Topic | undefined {
+  return topic.parent_id ? topics.find((t) => t.id === topic.parent_id) : undefined;
+}
+
+/** The topics under `topic`, in their order. */
+export function childrenOf(topic: Topic, topics: Topic[]): Topic[] {
+  return topics.filter((t) => t.parent_id === topic.id);
+}
+
 export function isOwn(topic: Topic) {
   return topic.kind === "almanac";
 }
@@ -334,7 +344,10 @@ function Sidebar() {
   );
 }
 
-/** Almanac and Calendar, then the topics by group, then the way to start one. */
+/**
+ * Almanac and Calendar, then the topics by group, each with its sub-topics
+ * under it, then the way to start one.
+ */
 function TopicNav() {
   const { workspace } = useWorkspace();
   const guest = useIsGuest();
@@ -345,7 +358,7 @@ function TopicNav() {
   const own = topics.find(isOwn);
   const groups = useMemo(() => {
     const byName = new Map<string, Topic[]>();
-    for (const topic of topics.filter((t) => !isOwn(t))) {
+    for (const topic of topics.filter((t) => !isOwn(t) && !parentOf(t, topics))) {
       const list = byName.get(topic.group_name) ?? [];
       list.push(topic);
       byName.set(topic.group_name, list);
@@ -381,25 +394,27 @@ function TopicNav() {
           <span className="sidebar-group-label truncate px-2 pb-1 text-xs text-faint">
             {group || "Topics"}
           </span>
-          {list.map((topic) => (
-            <Link
-              key={topic.id}
-              to="/$workspace/topics/$topic"
-              params={{ ...params, topic: topic.id }}
-              className={navLink}
-            >
-              <NavIcon icon={topicIcon(topic.icon)} />
-              <span className="truncate">{topic.name}</span>
-              {unread.has(topic.id) && (
-                <span
-                  role="img"
-                  aria-label="New points"
-                  title="New points"
-                  className="ml-auto size-1.5 shrink-0 rounded-full bg-accent"
-                />
-              )}
-            </Link>
-          ))}
+          {list
+            .flatMap((topic) => [topic, ...childrenOf(topic, topics)])
+            .map((topic) => (
+              <Link
+                key={topic.id}
+                to="/$workspace/topics/$topic"
+                params={{ ...params, topic: topic.id }}
+                className={`${navLink} ${topic.parent_id ? "pl-7" : ""}`}
+              >
+                <NavIcon icon={topicIcon(topic.icon)} />
+                <span className="truncate">{topic.name}</span>
+                {unread.has(topic.id) && (
+                  <span
+                    role="img"
+                    aria-label="New points"
+                    title="New points"
+                    className="ml-auto size-1.5 shrink-0 rounded-full bg-accent"
+                  />
+                )}
+              </Link>
+            ))}
         </nav>
       ))}
       {!guest && (

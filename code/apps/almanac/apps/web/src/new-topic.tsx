@@ -1,5 +1,5 @@
-// Starting a topic: a name, what it sticks to if you know, and the blocks
-// it starts with if you'd pick them. The server makes it at once, and
+// Starting a topic: a name, what it sticks to if you know, the topic it
+// sits under if any, and the blocks it starts with if you'd pick them. The server makes it at once, and
 // Claude writes the rest while its page opens.
 
 import type { StartedTopic, StartTopicRequest } from "@almanac/types";
@@ -8,6 +8,8 @@ import { CreateDialog, messageOf, shortcutFree } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { topicIcon } from "./icons";
+import { isOwn, parentOf, useTopics } from "./layout";
 import { StartsAs } from "./topic-dialog";
 import { Button, ErrorMessage } from "./ui";
 import { useIsGuest, useWorkspace } from "./workspace";
@@ -50,6 +52,9 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
   const [name, setName] = useState(first);
   const [sticksTo, setSticksTo] = useState("");
   const [template, setTemplate] = useState("");
+  const [parent, setParent] = useState<string | null>(null);
+  const topics = useTopics();
+  const parents = topics.filter((t) => !isOwn(t) && !parentOf(t, topics));
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
 
@@ -61,6 +66,7 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
       const body: StartTopicRequest = { name: name.trim() };
       if (sticksTo.trim()) body.sticks_to = sticksTo.trim();
       if (template) body.template = template;
+      if (parent) body.parent_id = parent;
       const { id } = await api<StartedTopic>("POST", `/api/w/${workspace.id}/topics`, body);
       onDone();
       await navigate({
@@ -111,6 +117,28 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
             className="ui-field resize-none rounded-md px-3 py-2"
           />
         </label>
+        {parents.length > 0 && (
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-xs font-medium text-muted">Under</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {parents.map((topic) => {
+                const Icon = topicIcon(topic.icon);
+                return (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    aria-pressed={parent === topic.id}
+                    onClick={() => setParent(parent === topic.id ? null : topic.id)}
+                    className="flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs ring-1 ring-line ring-inset hover:bg-hover aria-pressed:bg-selected aria-pressed:ring-fg"
+                  >
+                    <Icon size={13} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
+                    {topic.name}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
         <StartsAs value={template} picks onChange={setTemplate} />
         <p className="text-xs text-faint">
           Almanac picks an icon and a group. You can change both later.

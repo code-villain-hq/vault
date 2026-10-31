@@ -38,7 +38,7 @@ import { type Asking, useTopicTalks } from "./asking";
 import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf } from "./collection";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
-import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
+import { childrenOf, isOwn, PageHeader, parentOf, useTopics, useUnread } from "./layout";
 import type { Picked } from "./photos";
 import {
   AddPhoto,
@@ -237,6 +237,7 @@ function TopicView({
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const talks = useTalks(topic.id);
+  const topics = useTopics();
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
@@ -267,20 +268,40 @@ function TopicView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [place, panel, navigate]);
 
+  const up = parentOf(topic, topics);
+
   return (
     <>
       <PageHeader
         title={section ?? (about ? "About" : topic.name)}
         parent={
-          (section || about) && (
+          (section || about || up) && (
             <>
               {workspace.name}
-              <span aria-hidden="true" className="text-faint">
-                ›
-              </span>
-              <Link to="." search={inSection(undefined)} className="truncate hover:text-fg">
-                {topic.name}
-              </Link>
+              {up && (
+                <>
+                  <span aria-hidden="true" className="text-faint">
+                    ›
+                  </span>
+                  <Link
+                    to="/$workspace/topics/$topic"
+                    params={{ workspace: workspace.url_key, topic: up.id }}
+                    className="truncate hover:text-fg"
+                  >
+                    {up.name}
+                  </Link>
+                </>
+              )}
+              {(section || about) && (
+                <>
+                  <span aria-hidden="true" className="text-faint">
+                    ›
+                  </span>
+                  <Link to="." search={inSection(undefined)} className="truncate hover:text-fg">
+                    {topic.name}
+                  </Link>
+                </>
+              )}
             </>
           )
         }
@@ -485,9 +506,13 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
   const page = useMemo(() => onThePage(all), [all]);
   // An answer may go in a block the page leaves out, which keeps nothing yet.
   const home = keeping(page.blocks);
+  const topics = useTopics();
+  const parent = parentOf(topic, topics);
+  const children = useMemo(() => childrenOf(topic, topics), [topic, topics]);
 
   return (
     <>
+      {parent && <UpTo topic={parent} />}
       <TitleToAbout topic={topic} />
       <NoKey />
       {page.questions.length > 0 && (
@@ -497,7 +522,8 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
           ))}
         </section>
       )}
-      {page.blocks.length === 0 && (
+      {children.length > 0 && <SubTopics topics={children} />}
+      {page.blocks.length === 0 && children.length === 0 && (
         <div className="flex flex-col gap-1">
           <p className="font-medium">Nothing kept yet.</p>
           <p className="text-muted">
@@ -509,6 +535,38 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
       {page.blocks.length > 0 && <Blocks page={page} />}
       {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
     </>
+  );
+}
+
+/** Up to the topic this one sits under, above its title. */
+function UpTo({ topic }: { topic: Topic }) {
+  const { workspace } = useWorkspace();
+  return (
+    <Link
+      to="/$workspace/topics/$topic"
+      params={{ workspace: workspace.url_key, topic: topic.id }}
+      className="ui-button -mb-5 -ml-2 gap-1.5 self-start px-2 text-xs text-muted"
+    >
+      <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+      {topic.name}
+    </Link>
+  );
+}
+
+/** The topics under this one, a tile each, as the workspace's own page has them. */
+function SubTopics({ topics }: { topics: Topic[] }) {
+  const tiles = useTileFacts(topics);
+  return (
+    <ul
+      aria-label="Sub-topics"
+      className="grid grid-cols-[repeat(auto-fill,minmax(min(14rem,100%),1fr))] gap-2.5"
+    >
+      {topics.map((topic) => (
+        <li key={topic.id} className="flex">
+          <TopicTile topic={topic} facts={tiles.get(topic.id) ?? NO_FACTS} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -772,7 +830,8 @@ function AboutPageBody({ topic }: { topic: Topic }) {
           <div className="flex min-w-0 flex-col gap-0.5">
             <TopicName topic={topic} />
             <div className="flex items-center gap-2.5">
-              <TopicGroup topic={topic} />
+              {!topic.parent_id && <TopicGroup topic={topic} />}
+              <TopicParent topic={topic} />
               <span className="text-xs text-faint">
                 Started {onDay(topic.created_at)} · {points} {points === 1 ? "point" : "points"} ·{" "}
                 {talks.length} {talks.length === 1 ? "talk" : "talks"}
@@ -936,6 +995,54 @@ function TopicIcon({ topic }: { topic: Topic }) {
         </Popover.Positioner>
       </Popover.Portal>
     </Popover.Root>
+  );
+}
+
+/**
+ * The topic it sits under, one level deep: another topic that sits under
+ * none, or none. A topic with sub-topics sits under none itself.
+ */
+function TopicParent({ topic }: { topic: Topic }) {
+  const { sync } = useWorkspace();
+  const guest = useIsGuest();
+  const topics = useTopics();
+  const parent = parentOf(topic, topics);
+  if (childrenOf(topic, topics).length > 0) return null;
+  const others = topics.filter(
+    (t) => !isOwn(t) && t.id !== topic.id && t.id !== parent?.id && !parentOf(t, topics),
+  );
+  const move = (parent_id: string | null) => sync.update("Topic", topic.id, { parent_id });
+  const look = "-ml-1.5 h-6 gap-1 px-1.5 text-xs";
+  if (guest) return parent ? <span className="text-xs text-faint">{parent.name}</span> : null;
+  if (!parent && others.length === 0) return null;
+  const item = "ui-option flex cursor-default items-center px-2 py-1.5 outline-none select-none";
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        title="Put it under another topic"
+        className={`ui-button ${look} data-popup-open:bg-hover`}
+      >
+        {parent ? `Under ${parent.name}` : "Under no topic"}
+        <ChevronDown size={12} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="z-50 outline-none" sideOffset={4} align="start">
+          <Menu.Popup finalFocus={focusBackAfterKeys} className="ui-menu min-w-44 p-1 outline-none">
+            {others.map((other) => (
+              <Menu.Item key={other.id} className={item} onClick={() => move(other.id)}>
+                {other.name}
+              </Menu.Item>
+            ))}
+            {parent && others.length > 0 && <Menu.Separator className="my-1 h-px bg-line" />}
+            {parent && (
+              <Menu.Item className={item} onClick={() => move(null)}>
+                Under no topic
+              </Menu.Item>
+            )}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -1527,62 +1634,20 @@ function NoKeyOnServer() {
 function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
   const { workspace } = useWorkspace();
   const topics = useTopics();
-  const blocks = useRecords("Block");
-  const points = useRecords("Point");
   const talks = useRecords("Talk");
-  const rings = useItemReminders();
   const Icon = topicIcon(topic.icon);
   const others = useMemo(() => topics.filter((t) => !isOwn(t)), [topics]);
   const groups = useMemo(() => {
     const byName = new Map<string, Topic[]>();
-    for (const other of others) {
+    // A sub-topic follows its parent.
+    for (const other of others.filter((t) => !parentOf(t, others))) {
       const list = byName.get(other.group_name) ?? [];
-      list.push(other);
+      list.push(other, ...childrenOf(other, others));
       byName.set(other.group_name, list);
     }
     return [...byName.entries()].sort(([a], [b]) => (a && b ? a.localeCompare(b) : a ? 1 : -1));
   }, [others]);
-  const tiles = useMemo(() => {
-    const ids = new Set(others.map((t) => t.id));
-    const byTopic = new Map<string, TileFacts>();
-    for (const id of ids) byTopic.set(id, { kept: 0, done: 0, todo: 0, last: null, figures: [] });
-    for (const point of points) {
-      const facts = byTopic.get(point.topic_id);
-      if (facts) facts.kept += 1;
-    }
-    for (const block of blocks) {
-      const facts = byTopic.get(block.topic_id);
-      const check = facts && block.kind === "collection" ? checkOf(block) : undefined;
-      if (!facts || !check) continue;
-      for (const row of points) {
-        if (row.block_id !== block.id) continue;
-        facts.todo += 1;
-        if (itemDone(row, check, rings.get(row.id))) facts.done += 1;
-      }
-    }
-    for (const talk of talks) {
-      const facts = byTopic.get(talk.topic_id);
-      if (facts && (!facts.last || talk.last_at > facts.last)) facts.last = talk.last_at;
-    }
-    // The first figures on a topic's page, which say most about it at a glance.
-    const ordered = [...blocks].sort((a, b) => a.position - b.position);
-    for (const block of ordered) {
-      const facts = byTopic.get(block.topic_id);
-      if (!facts || facts.figures.length > 0 || block.row_id || block.kind !== "collection")
-        continue;
-      const rows = points
-        .filter((p) => p.block_id === block.id)
-        .sort((a, b) => a.position - b.position);
-      if (shownAs(block, rows) !== "figures") continue;
-      const value = figureField(filled(block, rows));
-      if (!value) continue;
-      facts.figures = rows
-        .map((row) => ({ label: row.text, value: cellWords(value, cellOf(row, value)) }))
-        .filter((f) => f.value && !f.value.startsWith("#"))
-        .slice(0, TILE_FIGURES);
-    }
-    return byTopic;
-  }, [others, blocks, points, talks, rings]);
+  const tiles = useTileFacts(others);
   const all = [...tiles.values()];
   const kept = all.reduce((n, t) => n + t.kept, 0);
   const done = all.reduce((n, t) => n + t.done, 0);
@@ -1630,12 +1695,7 @@ function OwnPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => 
             {groups.flatMap(([, list]) =>
               list.map((other) => (
                 <li key={other.id} className="flex">
-                  <TopicTile
-                    topic={other}
-                    facts={
-                      tiles.get(other.id) ?? { kept: 0, done: 0, todo: 0, last: null, figures: [] }
-                    }
-                  />
+                  <TopicTile topic={other} facts={tiles.get(other.id) ?? NO_FACTS} />
                 </li>
               )),
             )}
@@ -1655,6 +1715,57 @@ type TileFacts = {
   figures: { label: string; value: string }[];
 };
 
+const NO_FACTS: TileFacts = { kept: 0, done: 0, todo: 0, last: null, figures: [] };
+
+/** Each topic's tile facts, by id. */
+function useTileFacts(topics: Topic[]): Map<string, TileFacts> {
+  const blocks = useRecords("Block");
+  const points = useRecords("Point");
+  const talks = useRecords("Talk");
+  const rings = useItemReminders();
+  return useMemo(() => {
+    const ids = new Set(topics.map((t) => t.id));
+    const byTopic = new Map<string, TileFacts>();
+    for (const id of ids) byTopic.set(id, { kept: 0, done: 0, todo: 0, last: null, figures: [] });
+    for (const point of points) {
+      const facts = byTopic.get(point.topic_id);
+      if (facts) facts.kept += 1;
+    }
+    for (const block of blocks) {
+      const facts = byTopic.get(block.topic_id);
+      const check = facts && block.kind === "collection" ? checkOf(block) : undefined;
+      if (!facts || !check) continue;
+      for (const row of points) {
+        if (row.block_id !== block.id) continue;
+        facts.todo += 1;
+        if (itemDone(row, check, rings.get(row.id))) facts.done += 1;
+      }
+    }
+    for (const talk of talks) {
+      const facts = byTopic.get(talk.topic_id);
+      if (facts && (!facts.last || talk.last_at > facts.last)) facts.last = talk.last_at;
+    }
+    // The first figures on a topic's page, which say most about it at a glance.
+    const ordered = [...blocks].sort((a, b) => a.position - b.position);
+    for (const block of ordered) {
+      const facts = byTopic.get(block.topic_id);
+      if (!facts || facts.figures.length > 0 || block.row_id || block.kind !== "collection")
+        continue;
+      const rows = points
+        .filter((p) => p.block_id === block.id)
+        .sort((a, b) => a.position - b.position);
+      if (shownAs(block, rows) !== "figures") continue;
+      const value = figureField(filled(block, rows));
+      if (!value) continue;
+      facts.figures = rows
+        .map((row) => ({ label: row.text, value: cellWords(value, cellOf(row, value)) }))
+        .filter((f) => f.value && !f.value.startsWith("#"))
+        .slice(0, TILE_FIGURES);
+    }
+    return byTopic;
+  }, [topics, blocks, points, talks, rings]);
+}
+
 /** How many of its figures a topic's tile shows. */
 const TILE_FIGURES = 2;
 
@@ -1672,7 +1783,9 @@ function Overall({ label, value }: { label: string; value: string }) {
 function TopicTile({ topic, facts }: { topic: Topic; facts: TileFacts }) {
   const { workspace } = useWorkspace();
   const unread = useUnread();
+  const parent = parentOf(topic, useTopics());
   const Icon = topicIcon(topic.icon);
+  const under = parent ? parent.name : topic.group_name;
   return (
     <Link
       to="/$workspace/topics/$topic"
@@ -1690,9 +1803,7 @@ function TopicTile({ topic, facts }: { topic: Topic; facts: TileFacts }) {
             className="size-1.5 shrink-0 rounded-full bg-accent"
           />
         )}
-        {topic.group_name && (
-          <span className="ml-auto shrink-0 text-xs text-faint">{topic.group_name}</span>
-        )}
+        {under && <span className="ml-auto shrink-0 text-xs text-faint">{under}</span>}
       </span>
       {facts.figures.length > 0 ? (
         <span className="grid grid-cols-2 gap-3">
