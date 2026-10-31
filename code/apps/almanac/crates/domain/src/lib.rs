@@ -17,8 +17,9 @@ mod user;
 
 pub use account::{
     ClaudeCodeInfo, ClaudeKeyInfo, Me, MemberInfo, ReadToken, ReadTokenInfo, Role,
-    SetClaudeKeyRequest, SetClaudeWebRequest, UpdateMemberRequest, UpdateProfileRequest,
-    UpdateWorkspaceRequest, UserInfo, WorkspaceInfo, clean_name, normalize_email, url_key_from,
+    SetAnswersRequest, SetClaudeKeyRequest, SetClaudeWebRequest, UpdateMemberRequest,
+    UpdateProfileRequest, UpdateWorkspaceRequest, UserInfo, WorkspaceInfo, clean_name,
+    normalize_email, url_key_from,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{

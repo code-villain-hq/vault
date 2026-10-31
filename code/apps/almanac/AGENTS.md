@@ -116,6 +116,14 @@ Two ways to the same answers, and the same prompts:
   question. It answers as the user is signed in to Claude Code: no key.
   A start takes a few seconds; one that hasn't opened a session in 30 is
   stopped and made again, once, with what it last printed in the log.
+- **On this Mac, ChatGPT instead**, when Settings → Claude chooses it
+  (`claude_choices.answers`, `AppState::answerer`): the same `acp.rs`
+  starts `codex-acp` with `CODEX_HOME` in Almanac's own folder, so none of
+  the user's Codex config, plugins or hooks come along, and `CODEX_CONFIG`
+  turns its shell, file edits and extras off (`CODEX_OFF`). Almanac's
+  prompt replaces Codex's own through `model_instructions_file`, one file
+  per question. It's signed in to once from Settings, in the browser
+  (ACP `authenticate`, `chat-gpt`), apart from the user's Codex.
 - **On a server, the Messages API** (`claude.rs`, with the key; Rust has no
   SDK): `claude-opus-5-5`, adaptive thinking, the server-side refusal
   fallback, web search off.

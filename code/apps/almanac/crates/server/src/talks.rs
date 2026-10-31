@@ -27,7 +27,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::acp::{ClaudeCode, Failure, Question};
+use crate::acp::{Adapter, Failure, Kind, Question};
 use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
@@ -521,7 +521,8 @@ async fn answer(
         answer_id,
         unnamed,
     };
-    let said = match &state.claude_code {
+    let answerer = state.answerer().await.ok().flatten();
+    let said = match answerer {
         Some(claude_code) => {
             let asked = Asked {
                 page,
@@ -661,11 +662,11 @@ fn about_line(about: Option<&str>, row: Option<(usize, &str, &str)>) -> String {
     }
 }
 
-/// Claude Code's answer to the talk's last question, streamed to `events`,
-/// with what Almanac's tools kept meanwhile.
+/// Claude Code's or ChatGPT's answer to the talk's last question, streamed
+/// to `events`, with what Almanac's tools kept meanwhile.
 async fn say_with_claude_code(
     state: &AppState,
-    claude_code: &ClaudeCode,
+    claude_code: &Adapter,
     actor: Actor,
     asked: &Asked<'_>,
     events: &mpsc::UnboundedSender<Event>,
@@ -738,12 +739,13 @@ async fn say_with_claude_code(
             let _ = events.send(json_event("text", json!({ "text": piece })));
         })
         .await
-        .map_err(problem_of)?;
+        .map_err(|failure| problem_of(claude_code.kind(), failure))?;
+    let name = claude_code.kind().name();
     match answer.stop.as_str() {
         "refusal" => {
-            return Err(Problem(
-                "Claude declined to answer this. Ask it another way.".into(),
-            ));
+            return Err(Problem(format!(
+                "{name} declined to answer this. Ask it another way."
+            )));
         }
         "cancelled" => {
             return Err(Problem(
@@ -754,7 +756,7 @@ async fn say_with_claude_code(
     }
     let text = answer.text.trim().to_string();
     if text.is_empty() {
-        return Err(Problem("Claude Code gave no answer. Ask again.".into()));
+        return Err(Problem(format!("{name} gave no answer. Ask again.")));
     }
     let kept = open.asking.take_kept();
     Ok(Said {
@@ -869,17 +871,21 @@ fn title(text: &str, photos: usize) -> String {
     }
 }
 
-/// Why Claude Code gave no answer, in words for the talk.
-fn problem_of(failure: Failure) -> Problem {
-    Problem(match failure {
-        Failure::NotInstalled => "Almanac answers with Claude Code on this Mac, and its ACP \
-             adapter isn't installed. Settings → Claude has the command that installs it; \
-             then ask again."
+/// Why it gave no answer, in words for the talk.
+fn problem_of(kind: Kind, failure: Failure) -> Problem {
+    Problem(match (failure, kind) {
+        (Failure::NotInstalled, _) => format!(
+            "Almanac answers with {} on this Mac, and its ACP adapter isn't installed. \
+             Settings → Claude has the command that installs it; then ask again.",
+            kind.name()
+        ),
+        (Failure::SignedOut, Kind::ClaudeCode) => "Claude Code isn't signed in on this Mac. \
+             Run claude in Terminal and sign in there, then ask again."
             .into(),
-        Failure::SignedOut => "Claude Code isn't signed in on this Mac. Run claude in Terminal \
-             and sign in there, then ask again."
+        (Failure::SignedOut, Kind::Chatgpt) => "ChatGPT isn't signed in for Almanac. Sign in \
+             under Settings → Claude, then ask again."
             .into(),
-        Failure::Trouble(said) => said,
+        (Failure::Trouble(said), _) => said,
     })
 }
 

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use almanac_server::acp::ClaudeCode;
+use almanac_server::acp::{Adapter, Kind};
 use almanac_server::claude::Claude;
 use almanac_server::{AppState, local};
 use code_villain_desktop::{LocalPostgres, LocalServer};
@@ -153,14 +153,15 @@ async fn start(dir: &Path, app: &AppHandle) -> Result<Running, String> {
         .map_err(|e| e.to_string())?;
 
     // Claude Code answers, as you're signed in to it, in an empty folder of
-    // its own, with Almanac's tools on this server. No key.
-    let claude_code = ClaudeCode::new(
-        dir.join("claude"),
-        format!("http://127.0.0.1:{SERVER_PORT}/api/mcp"),
-    );
+    // its own, with Almanac's tools on this server. No key. ChatGPT answers
+    // instead when Settings says so, from a Codex home of its own.
+    let mcp = format!("http://127.0.0.1:{SERVER_PORT}/api/mcp");
+    let claude_code = Adapter::new(Kind::ClaudeCode, dir.join("claude"), &mcp);
+    let chatgpt = Adapter::new(Kind::Chatgpt, dir.join("chatgpt"), &mcp);
     let mut state = AppState::new(pool.clone(), false, Claude::new(None))
         .on_this_mac()
-        .with_claude_code(claude_code);
+        .with_claude_code(claude_code)
+        .with_chatgpt(chatgpt);
     notify(app.clone(), &state);
     if cfg!(debug_assertions) {
         // `bun run dev:desktop` shows the web app from Vite.

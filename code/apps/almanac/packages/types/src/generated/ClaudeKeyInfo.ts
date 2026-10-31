@@ -3,7 +3,7 @@ import type { ClaudeCodeInfo } from "./ClaudeCodeInfo";
 
 /**
  * Settings → Claude: who answers. On this Mac that's Claude Code, as
- * you're signed in to it; a server answers with a key. The key itself
+ * you're signed in to it, or ChatGPT; a server answers with a key. The key itself
  * never leaves the server; its last four characters tell it apart.
  */
 export type ClaudeKeyInfo = { 
@@ -16,7 +16,15 @@ via: string,
  */
 claude_code?: ClaudeCodeInfo, 
 /**
- * Whether Claude Code may search the web.
+ * How ChatGPT is doing, on this Mac.
+ */
+chatgpt?: ClaudeCodeInfo, 
+/**
+ * Who answers on this Mac: `claude_code` or `chatgpt`.
+ */
+answers?: string, 
+/**
+ * Whether it may search the web.
  */
 web: boolean, set: boolean, ends_with?: string, 
 /**

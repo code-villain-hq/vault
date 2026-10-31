@@ -101,7 +101,7 @@ pub struct UpdateMemberRequest {
 }
 
 /// Settings → Claude: who answers. On this Mac that's Claude Code, as
-/// you're signed in to it; a server answers with a key. The key itself
+/// you're signed in to it, or ChatGPT; a server answers with a key. The key itself
 /// never leaves the server; its last four characters tell it apart.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, optional_fields)]
@@ -111,7 +111,13 @@ pub struct ClaudeKeyInfo {
     /// How Claude Code is doing, on this Mac.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claude_code: Option<ClaudeCodeInfo>,
-    /// Whether Claude Code may search the web.
+    /// How ChatGPT is doing, on this Mac.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chatgpt: Option<ClaudeCodeInfo>,
+    /// Who answers on this Mac: `claude_code` or `chatgpt`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answers: Option<String>,
+    /// Whether it may search the web.
     pub web: bool,
     pub set: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -120,7 +126,7 @@ pub struct ClaudeKeyInfo {
     pub from_settings: bool,
 }
 
-/// Whether Claude Code on this Mac can answer: `ready`, `not_installed`
+/// Whether Claude Code or ChatGPT on this Mac can answer: `ready`, `not_installed`
 /// (its ACP adapter isn't), `signed_out`, or `trouble`, with what it said.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, optional_fields)]
@@ -141,6 +147,15 @@ pub struct ClaudeCodeInfo {
 #[ts(export)]
 pub struct SetClaudeWebRequest {
     pub web: bool,
+}
+
+/// `PUT /api/w/{id}/claude/answers`: who answers on this Mac,
+/// `claude_code` or `chatgpt`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct SetAnswersRequest {
+    pub answers: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

@@ -56,6 +56,8 @@ pub fn router(state: AppState) -> Router {
             get(keys::show).put(keys::set).delete(keys::forget),
         )
         .route("/claude/web", put(keys::set_web))
+        .route("/claude/answers", put(keys::set_answers))
+        .route("/claude/chatgpt/sign-in", post(keys::sign_in_chatgpt))
         .route(
             "/reading",
             get(reading::show)

@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::acp::ClaudeCode;
+use crate::acp::Adapter;
 use crate::claude::Claude;
 use crate::mcp::Questions;
 use crate::oidc::OidcLogin;
@@ -29,7 +29,10 @@ pub struct AppState {
     pub claude: Claude,
     /// Claude Code on this Mac, which answers instead, as you're signed in
     /// to it: no key.
-    pub claude_code: Option<ClaudeCode>,
+    pub claude_code: Option<Adapter>,
+    /// ChatGPT on this Mac, through Codex, which answers when Settings
+    /// says so.
+    pub chatgpt: Option<Adapter>,
     /// The questions Claude Code is answering, for Almanac's tools.
     pub questions: Questions,
     /// Reminders as they come due, for the desktop app to notify.
@@ -55,6 +58,7 @@ impl AppState {
             scim_token: None,
             claude,
             claude_code: None,
+            chatgpt: None,
             questions: Questions::default(),
             due,
             on_this_mac: false,
@@ -70,9 +74,30 @@ impl AppState {
 
     /// Answers with Claude Code on this Mac, and gives it Almanac's tools
     /// at `/api/mcp`.
-    pub fn with_claude_code(mut self, claude_code: ClaudeCode) -> Self {
+    pub fn with_claude_code(mut self, claude_code: Adapter) -> Self {
         self.claude_code = Some(claude_code);
         self
+    }
+
+    /// Lets ChatGPT answer on this Mac instead, when it's chosen.
+    pub fn with_chatgpt(mut self, chatgpt: Adapter) -> Self {
+        self.chatgpt = Some(chatgpt);
+        self
+    }
+
+    /// Who answers on this Mac: ChatGPT when Settings chose it, otherwise
+    /// Claude Code. None on a server.
+    pub async fn answerer(&self) -> Result<Option<&Adapter>, sqlx::Error> {
+        let Some(claude_code) = &self.claude_code else {
+            return Ok(None);
+        };
+        let answers: Option<String> = sqlx::query_scalar("SELECT answers FROM claude_choices")
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(match (answers.as_deref(), &self.chatgpt) {
+            (Some("chatgpt"), Some(chatgpt)) => Some(chatgpt),
+            _ => Some(claude_code),
+        })
     }
 
     /// Lets `origin` call the API across origins, as the desktop app may.

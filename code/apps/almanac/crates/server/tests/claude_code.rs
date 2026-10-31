@@ -15,7 +15,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use almanac_server::acp::ClaudeCode;
+use almanac_server::acp::{Adapter, Kind};
 use almanac_server::router;
 use axum::http::StatusCode;
 use common::App;
@@ -52,12 +52,24 @@ async fn with_claude_code(pool: PgPool, dir: &Path) -> (App, PathBuf) {
     let address = listener.local_addr().unwrap();
     // The stand-in starts in well under a second; one that hangs is tried
     // again soon.
-    let claude_code = ClaudeCode::new(dir.join("claude"), format!("http://{address}/api/mcp"))
-        .program(adapter)
-        .start_timeout(Duration::from_secs(5));
+    let claude_code = Adapter::new(
+        Kind::ClaudeCode,
+        dir.join("claude"),
+        format!("http://{address}/api/mcp"),
+    )
+    .program(&adapter)
+    .start_timeout(Duration::from_secs(5));
+    let chatgpt = Adapter::new(
+        Kind::Chatgpt,
+        dir.join("chatgpt"),
+        format!("http://{address}/api/mcp"),
+    )
+    .program(&adapter)
+    .start_timeout(Duration::from_secs(5));
     let state = common::state(pool)
         .on_this_mac()
-        .with_claude_code(claude_code);
+        .with_claude_code(claude_code)
+        .with_chatgpt(chatgpt);
     let service = router(state.clone()).into_make_service_with_connect_info::<SocketAddr>();
     tokio::spawn(async move { axum::serve(listener, service).await });
     (App::with_state(state), log)
@@ -137,7 +149,8 @@ async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
         "only Almanac so far"
     );
 
-    let session = &sessions(&log)[1];
+    // After the checks Settings made, Claude Code's and ChatGPT's.
+    let session = &sessions(&log)[2];
     let system = session["system"].as_str().unwrap();
     assert!(system.contains("Home"), "knows the workspace: {system}");
     assert_eq!(session["tools"], json!(["WebSearch", "WebFetch"]));
@@ -931,4 +944,80 @@ async fn a_talk_changes_its_sub_topics_pages_but_no_other(pool: PgPool) {
     assert!(!notes_on(&blocks, &notifications));
     let points = app.synced(&ada, &home, "Point").await;
     assert!(!points.iter().any(|p| p["text"] == "Use web push."));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn chatgpt_answers_once_it_is_chosen(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, log) = with_claude_code(pool, dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+
+    let shown = app
+        .call("GET", &format!("/api/w/{home}/claude"), Some(&ada), None)
+        .await;
+    assert_eq!(shown.body["answers"], "claude_code", "{}", shown.body);
+    assert_eq!(shown.body["chatgpt"]["state"], "ready", "{}", shown.body);
+    assert_eq!(
+        shown.body["chatgpt"]["install"],
+        "npm install -g @agentclientprotocol/codex-acp"
+    );
+    let wrong = app
+        .call(
+            "PUT",
+            &format!("/api/w/{home}/claude/answers"),
+            Some(&ada),
+            Some(json!({ "answers": "gemini" })),
+        )
+        .await;
+    assert!(wrong.status.is_client_error(), "{}", wrong.body);
+    let chosen = app
+        .call(
+            "PUT",
+            &format!("/api/w/{home}/claude/answers"),
+            Some(&ada),
+            Some(json!({ "answers": "chatgpt" })),
+        )
+        .await;
+    assert!(chosen.status.is_success(), "{}", chosen.body);
+
+    let topic = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Pflanzen" }),
+        )
+        .await
+        .body["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let answer = ask(
+        &app,
+        &ada,
+        &home,
+        &topic,
+        "How often do I water the Monstera?",
+    )
+    .await;
+    assert_eq!(answer["changes"][0]["said"], "Kept a point under Care.");
+
+    let asked = sessions(&log);
+    let last = asked.last().unwrap();
+    assert!(
+        last["system"].as_str().unwrap().contains("You are Almanac"),
+        "Almanac's prompt in place of Codex's: {last}"
+    );
+    assert_eq!(last["config"]["features"]["shell_tool"], false, "{last}");
+    assert_eq!(last["config"]["sandbox_mode"], "read-only");
+    assert_eq!(last["config"]["web_search"], "live");
+    assert!(
+        last["home"].as_str().unwrap().ends_with("chatgpt/codex"),
+        "a Codex home of Almanac's own: {last}"
+    );
+    let left: Vec<_> = std::fs::read_dir(dir.path().join("chatgpt/codex"))
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|x| x == "md"))
+        .collect();
+    assert!(left.is_empty(), "the prompt's file goes once it's answered");
 }

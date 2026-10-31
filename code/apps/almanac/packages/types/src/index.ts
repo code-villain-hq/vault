@@ -35,6 +35,7 @@ export type * from "./generated/Reminder";
 export type * from "./generated/ReminderCreate";
 export type * from "./generated/ReminderPatch";
 export type * from "./generated/Role";
+export type * from "./generated/SetAnswersRequest";
 export type * from "./generated/SetClaudeKeyRequest";
 export type * from "./generated/SetClaudeWebRequest";
 export type * from "./generated/Source";

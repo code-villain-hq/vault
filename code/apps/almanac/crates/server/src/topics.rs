@@ -502,7 +502,7 @@ async fn ask_set_up(
         },
         ICONS.join(", "),
     );
-    match &state.claude_code {
+    match state.answerer().await? {
         Some(claude_code) => {
             let open = state.questions.open(Asking::new(actor, id, Mode::SetUp));
             let system = format!("{SET_UP}\n\n{SET_UP_WITH_TOOL}");
@@ -516,7 +516,7 @@ async fn ask_set_up(
                 token: &open.token,
             };
             if let Err(failure) = claude_code.ask(&question, |_| {}).await {
-                tracing::info!(?failure, topic = %id, "Claude Code didn't set up the topic");
+                tracing::info!(?failure, topic = %id, "it didn't set up the topic");
                 return Ok(None);
             }
             Ok(open.asking.take_set_up())

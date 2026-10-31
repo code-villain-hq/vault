@@ -1,10 +1,14 @@
-//! Claude Code on this Mac, over the Agent Client Protocol, as Layer's
-//! conversations run. For each question Almanac starts `claude-agent-acp`
-//! in an empty folder of its own, with Almanac's prompt, none of Claude
-//! Code's tools but the web's (when it's on), none of the user's Claude
-//! Code settings or CLAUDE.md, and Almanac's own tools over MCP
-//! (`crate::mcp`). It answers as the user is signed in to Claude Code:
-//! Almanac never signs in for it, and needs no key.
+//! Claude Code or ChatGPT on this Mac, over the Agent Client Protocol, as
+//! Layer's conversations run. For each question Almanac starts the app's
+//! ACP adapter in an empty folder of its own, with Almanac's prompt, none
+//! of the app's tools but the web's (when it's on), none of the user's
+//! settings for it, and Almanac's own tools over MCP (`crate::mcp`).
+//!
+//! - Claude Code (`claude-agent-acp`) answers as the user is signed in to
+//!   it: Almanac never signs in for it, and needs no key.
+//! - ChatGPT answers through Codex (`codex-acp`), from a Codex home of
+//!   Almanac's own, so none of the user's Codex config, plugins or hooks
+//!   come along. It's signed in to once, from Settings, in the browser.
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -18,14 +22,62 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use crate::login_env;
 use crate::photos::Image;
 
-/// The ACP adapter Almanac runs, looked for on the login shell's PATH.
-pub const ADAPTER: &str = "claude-agent-acp";
-/// The command that installs it, as Settings → Claude shows it.
-pub const INSTALL: &str = "npm install -g @agentclientprotocol/claude-agent-acp";
 /// The name Almanac's tools go by: Claude sees `mcp__almanac__add_items`.
 pub const MCP_NAME: &str = "almanac";
 /// Claude Code's own tools Almanac lets it use when the web is on.
 pub const WEB_TOOLS: &[&str] = &["WebSearch", "WebFetch"];
+/// Codex's features Almanac turns off: its shell, its file edits, and
+/// whatever else would reach past Almanac's tools.
+const CODEX_OFF: &[&str] = &[
+    "shell_tool",
+    "unified_exec",
+    "apply_patch_freeform",
+    "view_image",
+    "js_repl",
+    "multi_agent",
+    "image_generation",
+    "apps",
+];
+
+/// Which app answers on this Mac.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    ClaudeCode,
+    Chatgpt,
+}
+
+impl Kind {
+    /// What Settings stores and shows: `claude_code` or `chatgpt`.
+    pub fn key(self) -> &'static str {
+        match self {
+            Kind::ClaudeCode => "claude_code",
+            Kind::Chatgpt => "chatgpt",
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::ClaudeCode => "Claude Code",
+            Kind::Chatgpt => "ChatGPT",
+        }
+    }
+
+    /// The ACP adapter Almanac runs, looked for on the login shell's PATH.
+    pub fn adapter(self) -> &'static str {
+        match self {
+            Kind::ClaudeCode => "claude-agent-acp",
+            Kind::Chatgpt => "codex-acp",
+        }
+    }
+
+    /// The command that installs it, as Settings → Claude shows it.
+    pub fn install(self) -> &'static str {
+        match self {
+            Kind::ClaudeCode => "npm install -g @agentclientprotocol/claude-agent-acp",
+            Kind::Chatgpt => "npm install -g @agentclientprotocol/codex-acp",
+        }
+    }
+}
 
 const PROTOCOL_VERSION: i64 = 1;
 /// Starting the adapter and opening a session, which takes a few seconds.
@@ -33,24 +85,26 @@ const PROTOCOL_VERSION: i64 = 1;
 const START_TIMEOUT: Duration = Duration::from_secs(30);
 /// One answer, searching included.
 const ANSWER_TIMEOUT: Duration = Duration::from_secs(600);
+/// Signing ChatGPT in, in the browser.
+const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(300);
 /// How much of the end of its stderr is kept, to say why it stopped.
 const STDERR_TAIL: usize = 4096;
 /// How long a check that found it ready holds. Settings asks every few
 /// seconds while it's open, and each check starts the adapter.
 const READY_FOR: Duration = Duration::from_secs(600);
 
-/// Why Claude Code gave no answer.
+/// Why it gave no answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
     /// The ACP adapter isn't on the login shell's PATH.
     NotInstalled,
-    /// Claude Code isn't signed in on this Mac.
+    /// The app isn't signed in on this Mac.
     SignedOut,
     /// Anything else, in its words.
     Trouble(String),
 }
 
-/// One question for Claude Code.
+/// One question for it.
 pub struct Question<'a> {
     /// Almanac's prompt: how to answer, and the page.
     pub system: &'a str,
@@ -66,7 +120,7 @@ pub struct Question<'a> {
     pub token: &'a str,
 }
 
-/// What Claude Code answered.
+/// What it answered.
 #[derive(Debug, Default)]
 pub struct Answer {
     pub text: String,
@@ -78,12 +132,15 @@ pub struct Answer {
     paragraph: bool,
 }
 
-/// When a check found Claude Code ready, and the adapter's version.
+/// When a check found it ready, and the adapter's version.
 type Ready = Option<(Instant, Option<String>)>;
 
+/// Claude Code or ChatGPT on this Mac, as Almanac starts it.
 #[derive(Clone)]
-pub struct ClaudeCode {
-    /// An empty folder it runs in, so it has no project to look at.
+pub struct Adapter {
+    kind: Kind,
+    /// Its folder: Claude Code runs in it, empty, so it has no project to
+    /// look at; ChatGPT runs in `empty` inside it, beside its Codex home.
     folder: PathBuf,
     /// Almanac's MCP endpoint (`/api/mcp`) on this Mac's server.
     mcp_url: String,
@@ -95,9 +152,10 @@ pub struct ClaudeCode {
     ready: Arc<Mutex<Ready>>,
 }
 
-impl ClaudeCode {
-    pub fn new(folder: impl Into<PathBuf>, mcp_url: impl Into<String>) -> Self {
-        ClaudeCode {
+impl Adapter {
+    pub fn new(kind: Kind, folder: impl Into<PathBuf>, mcp_url: impl Into<String>) -> Self {
+        Adapter {
+            kind,
             folder: folder.into(),
             mcp_url: mcp_url.into(),
             program: None,
@@ -118,9 +176,20 @@ impl ClaudeCode {
         self
     }
 
-    /// Whether Claude Code can answer, and the adapter's version: it starts
-    /// the adapter and opens a session, which is where a signed-out Claude
-    /// Code says so. Nothing is asked, so nothing is spent. A check that
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    /// Where it runs: no project, no files.
+    fn cwd(&self) -> PathBuf {
+        match self.kind {
+            Kind::ClaudeCode => self.folder.clone(),
+            Kind::Chatgpt => self.folder.join("empty"),
+        }
+    }
+
+    /// Whether it can answer, and the adapter's version: it starts the
+    /// adapter and opens a session, which is where a signed-out app says so. Nothing is asked, so nothing is spent. A check that
     /// found it ready holds for a while; one that didn't, doesn't.
     pub async fn check(&self) -> Result<Option<String>, Failure> {
         if let Some((at, version)) = self.ready.lock().unwrap().clone()
@@ -137,33 +206,62 @@ impl ClaudeCode {
     }
 
     async fn check_now(&self) -> Result<Option<String>, Failure> {
-        let mut agent = self.start().await?;
+        let question = Question {
+            system: "",
+            prompt: "",
+            images: &[],
+            web: false,
+            tools: &[],
+            token: "",
+        };
+        let mut agent = self.start(&question).await?;
         let checked = tokio::time::timeout(self.start_timeout, async {
             let version = agent.initialize().await?;
-            let question = Question {
-                system: "",
-                prompt: "",
-                images: &[],
-                web: false,
-                tools: &[],
-                token: "",
-            };
             agent
-                .new_session(&self.folder, &self.mcp_url, &question, false)
+                .new_session(&self.cwd(), &self.mcp_url, &question, false)
                 .await?;
             Ok(version)
         })
         .await
-        .unwrap_or_else(|_| {
-            Err(Failure::Trouble(
-                "Claude Code took too long to start.".into(),
-            ))
-        });
+        .unwrap_or_else(|_| Err(self.trouble("took too long to start.")));
         agent.stop().await;
         checked
     }
 
-    /// Asks Claude Code one question, handing each piece of the answer to
+    /// Signs ChatGPT in for Almanac: the browser opens on OpenAI's sign-in,
+    /// and this waits until it's done there, or for five minutes.
+    pub async fn sign_in(&self) -> Result<(), Failure> {
+        let question = Question {
+            system: "",
+            prompt: "",
+            images: &[],
+            web: false,
+            tools: &[],
+            token: "",
+        };
+        let mut agent = self.start(&question).await?;
+        let signed_in = tokio::time::timeout(SIGN_IN_TIMEOUT, async {
+            agent.initialize().await?;
+            agent
+                .call(
+                    "authenticate",
+                    json!({ "methodId": "chat-gpt" }),
+                    &mut |_| {},
+                )
+                .await
+        })
+        .await
+        .unwrap_or(Err(Failure::SignedOut));
+        agent.stop().await;
+        *self.ready.lock().unwrap() = None;
+        signed_in.map(|_| ())
+    }
+
+    fn trouble(&self, what: &str) -> Failure {
+        Failure::Trouble(format!("{} {what}", self.kind.name()))
+    }
+
+    /// Asks it one question, handing each piece of the answer to
     /// `piece` as it's written.
     pub async fn ask(
         &self,
@@ -196,11 +294,7 @@ impl ClaudeCode {
                 }),
             )
             .await
-            .unwrap_or_else(|_| {
-                Err(Failure::Trouble(
-                    "Claude Code took too long to answer.".into(),
-                ))
-            })?;
+            .unwrap_or_else(|_| Err(self.trouble("took too long to answer.")))?;
             answer.stop = done["stopReason"]
                 .as_str()
                 .unwrap_or("end_turn")
@@ -217,11 +311,11 @@ impl ClaudeCode {
     /// start beside it opened in seconds, so a fresh one is likely to work.
     async fn open(&self, question: &Question<'_>) -> Result<(Agent, String), Failure> {
         for attempt in 1..=2 {
-            let mut agent = self.start().await?;
+            let mut agent = self.start(question).await?;
             let opened = tokio::time::timeout(self.start_timeout, async {
                 agent.initialize().await?;
                 agent
-                    .new_session(&self.folder, &self.mcp_url, question, true)
+                    .new_session(&self.cwd(), &self.mcp_url, question, true)
                     .await
             })
             .await;
@@ -235,45 +329,66 @@ impl ClaudeCode {
                     tracing::warn!(
                         attempt,
                         said = agent.last_said(),
-                        "Claude Code didn't open a session in time"
+                        kind = self.kind.name(),
+                        "the adapter didn't open a session in time"
                     );
                     agent.stop().await;
                 }
             }
         }
-        Err(Failure::Trouble(
-            "Claude Code took too long to start.".into(),
-        ))
+        Err(self.trouble("took too long to start."))
     }
 
-    async fn start(&self) -> Result<Agent, Failure> {
+    async fn start(&self, question: &Question<'_>) -> Result<Agent, Failure> {
         let program = match &self.program {
             Some(program) => program.clone(),
-            None => find_adapter().await.ok_or(Failure::NotInstalled)?,
+            None => find_adapter(self.kind.adapter())
+                .await
+                .ok_or(Failure::NotInstalled)?,
         };
-        let env = tokio::task::spawn_blocking(login_env::user_env)
+        let mut env = tokio::task::spawn_blocking(login_env::user_env)
             .await
-            .map_err(|e| Failure::Trouble(e.to_string()))?;
-        std::fs::create_dir_all(&self.folder).map_err(|e| Failure::Trouble(e.to_string()))?;
+            .map_err(|e| Failure::Trouble(e.to_string()))?
+            .clone();
+        let cwd = self.cwd();
+        std::fs::create_dir_all(&cwd).map_err(|e| Failure::Trouble(e.to_string()))?;
+        let mut instructions = None;
+        if self.kind == Kind::Chatgpt {
+            let home = self.folder.join("codex");
+            std::fs::create_dir_all(&home).map_err(|e| Failure::Trouble(e.to_string()))?;
+            // Almanac's prompt in place of Codex's own, which is a coding
+            // agent's; one file per question, gone when it's answered.
+            let mut config = codex_config(question.web);
+            if !question.system.is_empty() {
+                let file = home.join(format!("{}.md", uuid::Uuid::now_v7()));
+                std::fs::write(&file, question.system)
+                    .map_err(|e| Failure::Trouble(e.to_string()))?;
+                config["model_instructions_file"] = json!(file);
+                instructions = Some(file);
+            }
+            env.insert("CODEX_HOME".into(), home.display().to_string());
+            env.insert("CODEX_CONFIG".into(), config.to_string());
+        }
+        let name = self.kind.name();
         let mut child = Command::new(&program)
-            .current_dir(&self.folder)
+            .current_dir(&cwd)
             .env_clear()
             .envs(env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            // Its own group, so stopping it reaches the Claude Code it starts.
+            // Its own group, so stopping it reaches the app it starts.
             .process_group(0)
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| match e.kind() {
                 std::io::ErrorKind::NotFound => Failure::NotInstalled,
-                _ => Failure::Trouble(format!("Claude Code didn't start: {e}")),
+                _ => Failure::Trouble(format!("{name} didn't start: {e}")),
             })?;
         let (Some(stdin), Some(stdout), Some(mut stderr)) =
             (child.stdin.take(), child.stdout.take(), child.stderr.take())
         else {
-            return Err(Failure::Trouble("Claude Code didn't start.".into()));
+            return Err(self.trouble("didn't start."));
         };
         let tail = Arc::new(Mutex::new(String::new()));
         {
@@ -298,23 +413,40 @@ impl ClaudeCode {
             });
         }
         Ok(Agent {
+            kind: self.kind,
             child,
             stdin,
             lines: BufReader::new(stdout).lines(),
             next_id: 0,
             tail,
+            instructions,
         })
     }
 }
 
+/// What Codex runs with: its shell, files and extras off, nothing to ask
+/// about, and the web as Settings says.
+fn codex_config(web: bool) -> Value {
+    let features: serde_json::Map<String, Value> = CODEX_OFF
+        .iter()
+        .map(|feature| (feature.to_string(), json!(false)))
+        .collect();
+    json!({
+        "sandbox_mode": "read-only",
+        "approval_policy": "never",
+        "web_search": if web { "live" } else { "disabled" },
+        "features": features,
+    })
+}
+
 /// The adapter on the login shell's PATH.
-async fn find_adapter() -> Option<PathBuf> {
+async fn find_adapter(adapter: &str) -> Option<PathBuf> {
     let env = tokio::task::spawn_blocking(login_env::user_env)
         .await
         .ok()?;
     let path = env.get("PATH")?;
     std::env::split_paths(path)
-        .map(|dir| dir.join(ADAPTER))
+        .map(|dir| dir.join(adapter))
         .find(|candidate| candidate.is_file())
 }
 
@@ -347,11 +479,14 @@ fn heard(update: &Value, answer: &mut Answer, piece: &mut impl FnMut(&str)) {
 
 /// A running adapter, spoken to in JSON-RPC, one message per line.
 struct Agent {
+    kind: Kind,
     child: Child,
     stdin: ChildStdin,
     lines: Lines<BufReader<ChildStdout>>,
     next_id: i64,
     tail: Arc<Mutex<String>>,
+    /// ChatGPT's prompt for this question, removed when it stops.
+    instructions: Option<PathBuf>,
 }
 
 /// The prompt's content blocks: the text, then each photo with its number.
@@ -410,25 +545,29 @@ impl Agent {
         } else {
             json!([])
         };
-        let params = json!({
-            "cwd": folder,
-            "mcpServers": servers,
-            "_meta": {
-                "systemPrompt": question.system,
-                "claudeCode": {
-                    "options": {
-                        "tools": tools,
-                        "allowedTools": allowed,
-                        "settingSources": [],
+        // ChatGPT's prompt and tools came with its start (`codex_config`).
+        let params = match self.kind {
+            Kind::ClaudeCode => json!({
+                "cwd": folder,
+                "mcpServers": servers,
+                "_meta": {
+                    "systemPrompt": question.system,
+                    "claudeCode": {
+                        "options": {
+                            "tools": tools,
+                            "allowedTools": allowed,
+                            "settingSources": [],
+                        },
                     },
                 },
-            },
-        });
+            }),
+            Kind::Chatgpt => json!({ "cwd": folder, "mcpServers": servers }),
+        };
         let result = self.call("session/new", params, &mut |_| {}).await?;
         result["sessionId"]
             .as_str()
             .map(str::to_string)
-            .ok_or_else(|| Failure::Trouble("Claude Code opened no session.".into()))
+            .ok_or_else(|| Failure::Trouble(format!("{} opened no session.", self.kind.name())))
     }
 
     async fn send(&mut self, message: Value) -> Result<(), Failure> {
@@ -498,11 +637,12 @@ impl Agent {
     /// Why the adapter stopped talking, from the end of what it printed.
     fn ended(&self) -> Failure {
         let last = self.last_said();
+        let name = self.kind.name();
         if last.is_empty() {
-            Failure::Trouble("Claude Code stopped before it answered.".into())
+            Failure::Trouble(format!("{name} stopped before it answered."))
         } else {
             Failure::Trouble(format!(
-                "Claude Code stopped: {}",
+                "{name} stopped: {}",
                 last.chars().take(300).collect::<String>()
             ))
         }
@@ -524,6 +664,9 @@ impl Agent {
             .is_err()
         {
             let _ = self.child.kill().await;
+        }
+        if let Some(file) = &self.instructions {
+            let _ = std::fs::remove_file(file);
         }
     }
 }
@@ -566,7 +709,7 @@ fn failure_of(error: &Value) -> Failure {
         return Failure::SignedOut;
     }
     if message.is_empty() {
-        return Failure::Trouble("Claude Code couldn't answer.".into());
+        return Failure::Trouble("It couldn't answer.".into());
     }
     Failure::Trouble(message.chars().take(300).collect())
 }

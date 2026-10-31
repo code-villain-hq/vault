@@ -27,7 +27,7 @@ export const { MembersPage, AccountPage } = accountPages({
 
 /**
  * Settings → Claude: who answers. On this Mac that's Claude Code, as you're
- * signed in to it, and whether it may search the web. On a server it's the
+ * signed in to it, or ChatGPT, and whether it may search the web. On a server it's the
  * key Almanac answers with, which stays on the server and never syncs.
  */
 export function ClaudePage() {
@@ -78,11 +78,29 @@ interface ClaudeProps {
   reload: () => Promise<unknown>;
 }
 
+/** Who can answer on this Mac, as Settings names them. */
+const WHO = [
+  { key: "claude_code", name: "Claude Code", adapter: "claude-agent-acp", settings: "Claude Code" },
+  { key: "chatgpt", name: "ChatGPT", adapter: "codex-acp", settings: "Codex" },
+] as const;
+type Who = (typeof WHO)[number];
+
 function ClaudeCode({ data, path, reload }: ClaudeProps) {
   const { workspace } = useWorkspace();
   const admin = useIsAdmin();
   const [problem, setProblem] = useState("");
-  const code = data.claude_code;
+  const who = WHO.find((w) => w.key === data.answers) ?? WHO[0];
+  const code = who.key === "chatgpt" ? data.chatgpt : data.claude_code;
+
+  const setAnswers = async (answers: Who["key"]) => {
+    setProblem("");
+    try {
+      await api("PUT", `${path}/answers`, { answers });
+      await reload();
+    } catch (e) {
+      setProblem(messageOf(e));
+    }
+  };
 
   const setWeb = async (web: boolean) => {
     setProblem("");
@@ -98,6 +116,25 @@ function ClaudeCode({ data, path, reload }: ClaudeProps) {
     <div className="flex max-w-2xl flex-col gap-7">
       <Section title="Who answers">
         <div className="flex flex-col gap-3">
+          {data.chatgpt && (
+            <fieldset
+              className="ui-segmented self-start"
+              aria-label="Who answers"
+              disabled={!admin}
+            >
+              {WHO.map((w) => (
+                <button
+                  key={w.key}
+                  type="button"
+                  className="ui-segment"
+                  aria-pressed={who.key === w.key}
+                  onClick={() => who.key !== w.key && void setAnswers(w.key)}
+                >
+                  {w.name}
+                </button>
+              ))}
+            </fieldset>
+          )}
           {code?.state === "ready" ? (
             <div className="flex items-start gap-2.5">
               <CircleCheck
@@ -107,20 +144,23 @@ function ClaudeCode({ data, path, reload }: ClaudeProps) {
                 className="mt-0.5 shrink-0 text-ok"
               />
               <div>
-                <p className="font-semibold">Claude Code on this Mac</p>
+                <p className="font-semibold">{who.name} on this Mac</p>
                 <p className="text-muted">
-                  As you're signed in to it, through claude-agent-acp
+                  {who.key === "chatgpt"
+                    ? "Signed in for Almanac, through"
+                    : "As you're signed in to it, through"}{" "}
+                  {who.adapter}
                   {code.version ? ` ${code.version}` : ""}.
                 </p>
               </div>
             </div>
           ) : (
-            code && <CantReach code={code} reload={reload} />
+            code && <CantReach who={who} code={code} path={path} reload={reload} />
           )}
           <p className="text-muted">
             Almanac sends it what the topic sticks to, its page and the talk, and lets it use only
             Almanac's own tools: keeping points, asking you, reminders, and starting topics. Not
-            your files, your shell, or your Claude Code settings.
+            your files, your shell, or your {who.settings} settings.
           </p>
         </div>
       </Section>
@@ -223,25 +263,55 @@ function Reading() {
 }
 
 /** Why Claude Code can't answer, and what to do about it. */
-function CantReach({ code, reload }: { code: ClaudeCodeInfo; reload: () => Promise<unknown> }) {
+function CantReach({
+  who,
+  code,
+  path,
+  reload,
+}: {
+  who: Who;
+  code: ClaudeCodeInfo;
+  path: string;
+  reload: () => Promise<unknown>;
+}) {
+  const admin = useIsAdmin();
   const [checking, setChecking] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [problem, setProblem] = useState("");
   const check = async () => {
     setChecking(true);
     await reload();
     setChecking(false);
   };
+  const signIn = async () => {
+    setProblem("");
+    setSigningIn(true);
+    try {
+      await api("POST", `${path}/chatgpt/sign-in`);
+      await reload();
+    } catch (e) {
+      setProblem(messageOf(e));
+    }
+    setSigningIn(false);
+  };
+  const signsInHere = who.key === "chatgpt" && code.state === "signed_out";
   const [title, body] =
     code.state === "not_installed"
       ? [
-          "Almanac can't reach Claude Code",
-          "It talks to Claude Code through its ACP adapter, which isn't installed. Install it, then ask again.",
+          `Almanac can't reach ${who.name}`,
+          `It talks to ${who.name} through its ACP adapter, which isn't installed. Install it, then ask again.`,
         ]
-      : code.state === "signed_out"
+      : signsInHere
         ? [
-            "Claude Code isn't signed in",
-            "Run claude in Terminal and sign in there. Almanac answers as soon as you have.",
+            "ChatGPT isn't signed in for Almanac",
+            "Almanac signs in on its own, apart from your Codex. Sign in once, in the browser.",
           ]
-        : ["Almanac can't reach Claude Code", code.problem ?? "It didn't answer."];
+        : code.state === "signed_out"
+          ? [
+              "Claude Code isn't signed in",
+              "Run claude in Terminal and sign in there. Almanac answers as soon as you have.",
+            ]
+          : [`Almanac can't reach ${who.name}`, code.problem ?? "It didn't answer."];
   return (
     <div className="flex flex-col gap-2.5 rounded-lg bg-panel px-5 py-4">
       <p className="flex items-center gap-2 font-semibold">
@@ -250,11 +320,17 @@ function CantReach({ code, reload }: { code: ClaudeCodeInfo; reload: () => Promi
       </p>
       <p className="text-muted">{body}</p>
       {code.state === "not_installed" && <Command text={code.install} />}
-      <div>
+      <div className="flex gap-2">
+        {signsInHere && admin && (
+          <Button disabled={signingIn} onClick={() => void signIn()}>
+            {signingIn ? "Finish in your browser…" : "Sign in to ChatGPT"}
+          </Button>
+        )}
         <Button variant="secondary" disabled={checking} onClick={() => void check()}>
           Check again
         </Button>
       </div>
+      <ErrorMessage>{problem}</ErrorMessage>
     </div>
   );
 }

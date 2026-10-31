@@ -1,13 +1,15 @@
-// A stand-in for claude-agent-acp in the server's tests (`claude_code.rs`).
+// A stand-in for claude-agent-acp in the server's tests (`claude_code.rs`),
+// and for codex-acp, when the session comes without Claude Code's options.
 // It speaks ACP on stdin and stdout and answers the way Claude Code would
 // with Almanac's tools: it calls them over the MCP server the session names,
-// picked by which tools the session allows. Each session's options are
-// appended to the file named first, one JSON line each, for the test to read.
+// picked by which tools the session allows (Codex's: those the server
+// lists). Each session's options are appended to the file named first, one
+// JSON line each, for the test to read.
 // While that file's name with `.hang` exists, the next session never opens,
 // as Claude Code's sometimes doesn't, and the file goes. Each prompt's
 // blocks go to that file's name with `.prompts`, one JSON line each.
 
-import { appendFileSync, existsSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 
 type Session = { url: string; authorization: string; system: string; allowed: string[] };
 
@@ -175,18 +177,36 @@ for await (const line of console) {
       continue;
     }
     const server = params.mcpServers[0];
-    const options = params._meta.claudeCode.options;
+    const options = params._meta?.claudeCode?.options;
     session = {
       url: server?.url ?? "",
       authorization:
         server?.headers.find((h: { name: string }) => h.name === "Authorization")?.value ?? "",
-      system: params._meta.systemPrompt,
-      allowed: options.allowedTools,
+      system: params._meta?.systemPrompt ?? "",
+      allowed: options?.allowedTools ?? [],
     };
-    appendFileSync(
-      log,
-      `${JSON.stringify({ system: session.system, tools: options.tools, allowed: session.allowed })}\n`,
-    );
+    if (options) {
+      appendFileSync(
+        log,
+        `${JSON.stringify({ system: session.system, tools: options.tools, allowed: session.allowed })}\n`,
+      );
+    } else {
+      // Codex: its prompt and tools came with its start.
+      const config = JSON.parse(process.env.CODEX_CONFIG ?? "{}");
+      if (config.model_instructions_file) {
+        session.system = readFileSync(config.model_instructions_file, "utf8");
+      }
+      if (server) {
+        const listed = await mcp("tools/list", {});
+        session.allowed = listed.result.tools.map(
+          (t: { name: string }) => `mcp__almanac__${t.name}`,
+        );
+      }
+      appendFileSync(
+        log,
+        `${JSON.stringify({ system: session.system, config, home: process.env.CODEX_HOME, allowed: session.allowed })}\n`,
+      );
+    }
     send({ jsonrpc: "2.0", id, result: { sessionId: "s1" } });
   } else if (method === "session/prompt") {
     appendFileSync(`${log}.prompts`, `${JSON.stringify(params.prompt)}\n`);
