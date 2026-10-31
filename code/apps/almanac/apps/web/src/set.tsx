@@ -472,12 +472,48 @@ function laneColour(field: Field, at: number, lanes: number) {
   return at === 0 ? "bg-faint" : at === lanes - 1 ? "bg-ok" : "bg-info";
 }
 
+/** A tally's word with its count: a button that picks its rows, where a click can. */
+function TallyWord({
+  pressed,
+  off,
+  onClick,
+  children,
+}: {
+  pressed: boolean | undefined;
+  off: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const look = `flex items-center gap-1.5 ${off ? "opacity-50" : ""}`;
+  if (pressed === undefined) return <span className={look}>{children}</span>;
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`${look} -mx-1.5 rounded px-1.5 hover:bg-chip ${pressed ? "bg-chip text-fg" : ""}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 /**
  * How many rows each status or choice has, over a collection's picture:
  * one bar of them all, open first and done last, and each lane's count
  * under it. Only when it groups: two lanes or more, and one with two rows.
  */
-export function Tally({ rows, field }: { rows: Point[]; field: Field }) {
+export function Tally({
+  rows,
+  field,
+  chosen = null,
+  onChoose,
+}: {
+  rows: Point[];
+  field: Field;
+  chosen?: string | null;
+  onChoose?: (lane: string) => void;
+}) {
   const lanes = lanesOf(field, rows);
   const counts = lanes.map((lane) => rows.filter((row) => cellOf(row, field) === lane).length);
   if (counts.filter((n) => n > 0).length < 2 || Math.max(...counts) < 2) return null;
@@ -489,7 +525,7 @@ export function Tally({ rows, field }: { rows: Point[]; field: Field }) {
           counts[i] ? (
             <span
               key={lane}
-              className={laneColour(field, i, lanes.length)}
+              className={`${laneColour(field, i, lanes.length)} ${chosen !== null && chosen !== lane ? "opacity-30" : ""}`}
               style={{ width: `${(counts[i] / all) * 100}%` }}
             />
           ) : null,
@@ -498,14 +534,19 @@ export function Tally({ rows, field }: { rows: Point[]; field: Field }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
         {lanes.map((lane, i) =>
           counts[i] ? (
-            <span key={lane} className="flex items-center gap-1.5">
+            <TallyWord
+              key={lane}
+              pressed={onChoose ? chosen === lane : undefined}
+              off={chosen !== null && chosen !== lane}
+              onClick={() => onChoose?.(lane)}
+            >
               <span
                 aria-hidden="true"
                 className={`size-2 rounded-full ${laneColour(field, i, lanes.length)}`}
               />
               {lane}
               <span className="font-semibold text-fg tabular-nums">{counts[i]}</span>
-            </span>
+            </TallyWord>
           ) : null,
         )}
       </div>
@@ -694,9 +735,6 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
       if (!day) return null;
       const by = of("status", "choice");
       const placed = placedOn(rows, day);
-      const timeline = (
-        <RowTimeline rows={rows} day={day} fields={fields.filter((f) => f !== day)} />
-      );
       return placed ? (
         <AxisTimeline
           placed={placed}
@@ -707,7 +745,9 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
         />
       ) : (
         <Told rows={rows} by={by}>
-          {timeline}
+          {(shown, rest) => (
+            <RowTimeline rows={shown} day={day} fields={rest(fields).filter((f) => f !== day)} />
+          )}
         </Told>
       );
     }
@@ -716,12 +756,15 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
     case "bars":
       return number ? (
         <Told rows={rows} by={of("status", "choice")}>
-          <RowBars
-            rows={rows}
-            number={number}
-            fields={fields.filter((f) => f !== number)}
-            heading={heading}
-          />
+          {/* The bars keep the tally's colours, picked or not. */}
+          {(shown) => (
+            <RowBars
+              rows={shown}
+              number={number}
+              fields={fields.filter((f) => f !== number)}
+              heading={heading}
+            />
+          )}
         </Told>
       ) : null;
     case "figures":
@@ -733,13 +776,15 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
   }
   return (
     <Told rows={rows} by={of("status", "choice")}>
-      {block.view === "cards" ? (
-        <RowCards rows={rows} fields={fields} />
-      ) : block.view === "table" ? (
-        <RowTable block={block} rows={rows} fields={fields} />
-      ) : (
-        <RowList rows={rows} fields={fields} />
-      )}
+      {(shown, rest) =>
+        block.view === "cards" ? (
+          <RowCards rows={shown} fields={rest(fields)} />
+        ) : block.view === "table" ? (
+          <RowTable block={block} rows={shown} fields={rest(fields)} />
+        ) : (
+          <RowList rows={shown} fields={rest(fields)} />
+        )
+      }
     </Told>
   );
 }
@@ -919,13 +964,28 @@ function Told({
 }: {
   rows: Point[];
   by: Field | undefined;
-  children: ReactNode;
+  /** The picture of the rows a click on the tally picked, its fields through `rest`. */
+  children: (shown: Point[], rest: (fields: Field[]) => Field[]) => ReactNode;
 }) {
-  if (!by || rows.length < TALLY_FROM) return children;
+  const [picked, setPicked] = useState<string | null>(null);
+  const all = (fields: Field[]) => fields;
+  if (!by || rows.length < TALLY_FROM) return children(rows, all);
+  const lane = picked !== null && rows.some((row) => cellOf(row, by) === picked) ? picked : null;
   return (
     <div className="flex flex-col gap-3">
-      <Tally rows={rows} field={by} />
-      {children}
+      <Tally
+        rows={rows}
+        field={by}
+        chosen={lane}
+        onChoose={(word) => setPicked((was) => (was === word ? null : word))}
+      />
+      {lane === null
+        ? children(rows, all)
+        : children(
+            rows.filter((row) => cellOf(row, by) === lane),
+            // Picked, its word would only say it again on every row.
+            (fields) => fields.filter((f) => f !== by),
+          )}
     </div>
   );
 }
