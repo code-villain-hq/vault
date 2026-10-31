@@ -839,6 +839,8 @@ function Line({
  * A board: a lane per status, its first still open and its last done, and
  * a card per row in its lane. A row with no status waits in the first. A
  * choice's lanes are only its words, with no step from open to done.
+ * A lane is as wide as its cards ask, and a wide one sets them side by
+ * side, so one full lane beside two thin ones doesn't run down the page.
  */
 function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields: Field[] }) {
   const steps = status.kind === "status";
@@ -848,7 +850,7 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
     return typeof cell === "string" ? cell : lanes[0];
   };
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(13rem,100%),1fr))] gap-3">
+    <div className="flex flex-wrap gap-3">
       {lanes.map((lane, i) => {
         const cards = rows.filter((row) => laneOf(row) === lane);
         const dot = !steps
@@ -859,29 +861,36 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
               ? "bg-ok"
               : "bg-info";
         return (
-          <section key={lane} aria-label={lane} className="flex min-w-0 flex-col gap-1.5">
+          <section
+            key={lane}
+            aria-label={lane}
+            className="flex min-w-0 basis-52 flex-col gap-1.5"
+            style={{ flexGrow: Math.max(cards.length, 1) }}
+          >
             <h3 className="flex items-center gap-2 text-xs text-muted">
               <span aria-hidden="true" className={`size-2 rounded-full ${dot}`} />
               {lane}
               <span className="text-faint tabular-nums">{cards.length}</span>
             </h3>
-            {cards.map((row) => {
-              const words = rest(fields, row);
-              return (
-                <article
-                  key={row.id}
-                  className="group flex items-start gap-2 rounded-md bg-surface px-3 py-2"
-                >
-                  <NewDot point={row} className="mt-2" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <RowName row={row} className="truncate" />
-                    {words && <span className="truncate text-xs text-faint">{words}</span>}
-                  </div>
-                  <Pills fields={fields} row={row} />
-                  <RemovePoint point={row} />
-                </article>
-              );
-            })}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(13rem,100%),1fr))] gap-1.5">
+              {cards.map((row) => {
+                const words = rest(fields, row);
+                return (
+                  <article
+                    key={row.id}
+                    className="group flex items-start gap-2 rounded-md bg-surface px-3 py-2"
+                  >
+                    <NewDot point={row} className="mt-2" />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <RowName row={row} className="truncate" />
+                      {words && <span className="truncate text-xs text-faint">{words}</span>}
+                    </div>
+                    <Pills fields={fields} row={row} />
+                    <RemovePoint point={row} />
+                  </article>
+                );
+              })}
+            </div>
           </section>
         );
       })}
