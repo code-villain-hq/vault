@@ -36,6 +36,7 @@ import {
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
 import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf } from "./collection";
+import { EditCell } from "./editing";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { childrenOf, isOwn, PageHeader, parentOf, useTopics, useUnread } from "./layout";
@@ -634,7 +635,9 @@ function RowFields({ row }: { row: Point }) {
               >
                 <dt className="text-xs text-muted">{field.name}</dt>
                 <dd className="flex min-w-0 flex-col gap-2">
-                  <FieldValue field={field} row={row} rows={rows} />
+                  <EditCell row={row} field={field} className="flex flex-col gap-2 py-0.5">
+                    <FieldValue field={field} row={row} rows={rows} />
+                  </EditCell>
                 </dd>
               </div>
             ))}

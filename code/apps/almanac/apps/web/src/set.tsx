@@ -19,6 +19,7 @@ import {
 } from "react";
 import { TrendSet } from "./charts";
 import { byDay, cellOf, cellWords, checkOf, dayOf, filled, lanesOf, numberOf } from "./collection";
+import { EditCell, NewRow } from "./editing";
 import {
   addDays,
   amountWords,
@@ -758,7 +759,17 @@ function Steps({ rows, check, fields }: { rows: Point[]; check?: Field; fields: 
   );
 }
 
+/** A collection: its picture, and New under it to add a row by hand. */
 export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Picture block={block} rows={rows} />
+      <NewRow block={block} rows={rows} />
+    </div>
+  );
+}
+
+function Picture({ block, rows }: { block: Block; rows: Point[] }) {
   const fields = filled(block, rows);
   const of = (...kinds: string[]) => fields.find((f) => kinds.includes(f.kind));
   const day = of("day");
@@ -1183,13 +1194,15 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
                   <div key={field.name} className="col-span-full grid grid-cols-subgrid">
                     <dt className="text-faint">{field.name}</dt>
                     <dd className="min-w-0 truncate">
-                      {field.kind === "check" ? (
-                        <span className="text-ok-ink">✓</span>
-                      ) : TOLD_BY_TONE.has(field.kind) && typeof cell === "string" ? (
-                        <Pill field={field} value={cell} />
-                      ) : (
-                        cellWords(field, cell)
-                      )}
+                      <EditCell row={row} field={field} className="truncate">
+                        {field.kind === "check" ? (
+                          <span className="text-ok-ink">✓</span>
+                        ) : TOLD_BY_TONE.has(field.kind) && typeof cell === "string" ? (
+                          <Pill field={field} value={cell} />
+                        ) : (
+                          cellWords(field, cell)
+                        )}
+                      </EditCell>
                     </dd>
                   </div>
                 );
@@ -1241,11 +1254,14 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="[&>td]:hover:bg-hover">
+            <tr key={row.id} className="group [&>td]:hover:bg-hover">
               <td className={`${cell} max-w-72 truncate font-semibold`}>
                 <span className="flex items-center gap-2.5">
                   <Thumb row={row} fields={fields} className="size-6" />
                   <RowName row={row} className="truncate" />
+                  <span className="ml-auto font-normal">
+                    <RemovePoint point={row} />
+                  </span>
                 </span>
               </td>
               {columns.map((field) => {
@@ -1257,26 +1273,28 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
                     key={field.name}
                     className={`${cell} ${field.kind === "text" ? "min-w-40 whitespace-normal" : "max-w-64 truncate"} ${field.kind === "number" ? "text-right" : ""} ${field.kind === "check" ? "text-ok-ink" : ""}`}
                   >
-                    {TOLD_BY_TONE.has(field.kind) && typeof value === "string" ? (
-                      <Pill field={field} value={value} />
-                    ) : typeof value === "number" && most.get(field.name) ? (
-                      <span className="flex items-center justify-end gap-2.5">
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-chip"
-                        >
+                    <EditCell row={row} field={field} className="block truncate">
+                      {TOLD_BY_TONE.has(field.kind) && typeof value === "string" ? (
+                        <Pill field={field} value={value} />
+                      ) : typeof value === "number" && most.get(field.name) ? (
+                        <span className="flex items-center justify-end gap-2.5">
                           <span
-                            className="block h-full rounded-full bg-accent"
-                            style={{
-                              width: `${(Math.abs(value) / (most.get(field.name) ?? 1)) * 100}%`,
-                            }}
-                          />
+                            aria-hidden="true"
+                            className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-chip"
+                          >
+                            <span
+                              className="block h-full rounded-full bg-accent"
+                              style={{
+                                width: `${(Math.abs(value) / (most.get(field.name) ?? 1)) * 100}%`,
+                              }}
+                            />
+                          </span>
+                          {words}
                         </span>
-                        {words}
-                      </span>
-                    ) : (
-                      words || <span className="text-faint">–</span>
-                    )}
+                      ) : (
+                        words || <span className="text-faint">–</span>
+                      )}
+                    </EditCell>
                   </td>
                 );
               })}

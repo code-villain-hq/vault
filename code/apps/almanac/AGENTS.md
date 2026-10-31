@@ -90,6 +90,10 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   `fetch_picture` (public https only, the page's og:image, 5 MB at most)
   and sets the cover with `set_cover`. Rows with a photo show it small on
   their line in every view.
+- A collection is changed by hand too (`editing.tsx`): a click on a row's
+  value changes it in place (in the table, on cards, on the row's page),
+  and "+ New" under the collection adds a row. Both write the row's
+  `cells` through the sync engine; guests and samples get neither.
 
 Settings → Claude isn't synced. `GET /api/w/{id}/claude` says who answers:
 on this Mac Claude Code (`via` `claude_code`, with whether it's ready),
