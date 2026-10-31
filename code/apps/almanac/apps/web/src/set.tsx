@@ -19,7 +19,7 @@ import {
 } from "react";
 import { TrendSet } from "./charts";
 import { byDay, cellOf, cellWords, checkOf, dayOf, filled, lanesOf, numberOf } from "./collection";
-import { EditCell, NewRow } from "./editing";
+import { EditCell, NewRow, useSetCell } from "./editing";
 import {
   addDays,
   amountWords,
@@ -1101,9 +1101,14 @@ function Line({
  * choice's lanes are only its words, with no step from open to done.
  * A lane is as wide as its cards ask, and a wide one sets them side by
  * side, so one full lane beside two thin ones doesn't run down the page.
+ * A card dragged to another lane takes its status or choice.
  */
 function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields: Field[] }) {
   const pages = useRowPages(rows);
+  const guest = useIsGuest();
+  const setCell = useSetCell();
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
   const steps = status.kind === "status";
   const lanes = lanesOf(status, rows);
   const laneOf = (row: Point) => {
@@ -1125,7 +1130,24 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
           <section
             key={lane}
             aria-label={lane}
-            className="flex min-w-0 basis-52 flex-col gap-1.5"
+            onDragOver={(event) => {
+              if (!dragged) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              setOver(lane);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(null);
+            }}
+            onDrop={(event) => {
+              const row = rows.find((r) => r.id === dragged);
+              if (!row) return;
+              event.preventDefault();
+              if (laneOf(row) !== lane) setCell(row, status, lane);
+              setDragged(null);
+              setOver(null);
+            }}
+            className={`-m-1 flex min-w-0 basis-52 flex-col gap-1.5 rounded-lg p-1 ${over === lane ? "bg-hover" : ""}`}
             style={{ flexGrow: Math.max(cards.length, 1) }}
           >
             <h3 className="flex items-center gap-2 text-xs text-muted">
@@ -1140,7 +1162,17 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
                 return (
                   <article
                     key={row.id}
-                    className="group flex items-start gap-2 rounded-md bg-surface px-3 py-2"
+                    draggable={!guest}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", row.text);
+                      setDragged(row.id);
+                    }}
+                    onDragEnd={() => {
+                      setDragged(null);
+                      setOver(null);
+                    }}
+                    className={`group flex items-start gap-2 rounded-md bg-surface px-3 py-2 ${guest ? "" : "cursor-grab active:cursor-grabbing"} ${dragged === row.id ? "opacity-50" : ""}`}
                   >
                     <NewDot point={row} className="mt-2" />
                     <Thumb row={row} fields={fields} className="size-10" />

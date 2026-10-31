@@ -32,7 +32,7 @@ function cellFrom(field: Field, typed: string | boolean): Cell | undefined | nul
 }
 
 /** Writes a row's cell, or takes it out. */
-function useSetCell() {
+export function useSetCell() {
   const { sync } = useWorkspace();
   return (row: Point, field: Field, cell: Cell | undefined) => {
     const cells = { ...row.cells };
