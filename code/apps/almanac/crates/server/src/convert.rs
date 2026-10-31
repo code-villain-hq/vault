@@ -16,7 +16,9 @@
 //! A third pass (`terms`) turns paragraphs that were terms into collections:
 //! each opened with a term in bold, and was drawn as a card. A term is a
 //! row now, its name the term and what it means a text field, which View as
-//! draws as a list, a table or cards.
+//! draws as a list, a table or cards. Before, a term that meant more than a
+//! cell held stayed whole as its row's name, the bold and all; a fourth
+//! pass (`named_terms`) gives those their name and what they mean too.
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -43,6 +45,17 @@ const BLOCKS: &str = "SELECT id, kind, title, facets, position, row_id FROM bloc
      WHERE topic_id = $1 ORDER BY position, created_at, id";
 const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, amount, note, done \
      FROM points WHERE topic_id = $1 ORDER BY position, created_at, id";
+
+/// The rows of a collection still named with a term in bold and what it
+/// means, with nothing in their cells, each with its collection's fields
+/// and a member of its workspace to write as.
+const HALF_TERMS: &str = "SELECT p.id, p.text, b.fields, b.workspace_id, m.user_id FROM points p \
+     JOIN blocks b ON b.id = p.block_id \
+     CROSS JOIN LATERAL (SELECT user_id FROM workspace_members \
+       WHERE workspace_id = b.workspace_id ORDER BY role = 'admin' DESC, created_at LIMIT 1) m \
+     WHERE b.kind = 'collection' AND p.cells = '{}'::jsonb \
+       AND p.text ~ '^\\s*\\*\\*[^*]+\\*\\*[:.,]?\\s+\\S' \
+     ORDER BY b.workspace_id, p.id";
 
 /// The topics with a paragraph of terms, two or more, each opening with
 /// one in bold (`led`), and a member to write as.
@@ -134,6 +147,46 @@ pub async fn everywhere(pool: &PgPool) {
         match moved.await {
             Ok(()) => tracing::info!(topic = %topic_id, "made terms rows"),
             Err(error) => tracing::warn!(%error, topic = %topic_id, "couldn't make terms rows"),
+        }
+    }
+    named(pool).await;
+}
+
+/// The fourth pass: rows named with a whole term and what it means get the
+/// term as their name and the rest in their text field, a workspace at a
+/// time.
+async fn named(pool: &PgPool) {
+    type Row = (Uuid, String, Json<Vec<Field>>, Uuid, Uuid);
+    let rows: Vec<Row> = match sqlx::query_as(HALF_TERMS).fetch_all(pool).await {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::warn!(%error, "couldn't look for rows named with a term");
+            return;
+        }
+    };
+    let mut by_workspace: BTreeMap<(Uuid, Uuid), Vec<NamedRow>> = BTreeMap::new();
+    for (id, text, fields, workspace_id, user_id) in rows {
+        by_workspace
+            .entry((workspace_id, user_id))
+            .or_default()
+            .push((id, text, fields.0));
+    }
+    for ((workspace_id, user_id), rows) in by_workspace {
+        let actor = Actor {
+            user_id,
+            workspace_id,
+        };
+        let named = async {
+            let mut db = pool.begin().await?;
+            write(&mut db, actor, named_terms(&rows)).await?;
+            db.commit().await?;
+            Ok::<_, AppError>(())
+        };
+        match named.await {
+            Ok(()) => tracing::info!(workspace = %workspace_id, "named rows by their terms"),
+            Err(error) => {
+                tracing::warn!(%error, workspace = %workspace_id, "couldn't name rows by their terms")
+            }
         }
     }
 }
@@ -421,13 +474,10 @@ pub fn lists(topic_id: Uuid, blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Op
 /// What a term means, once it's a row.
 const MEANS: &str = "Text";
 
-/// The longest words a cell holds; what means more stays prose.
-const CELL_MOST: usize = 500;
-
 /// The writes that make each paragraph of terms a collection: a block of
-/// two or more points that each open with a term in bold, and say what it
-/// means in what a cell holds. The term is the row's name and the rest its
-/// text field, so the points keep their ids and sources.
+/// two or more points that each open with a term in bold and say what it
+/// means. The term is the row's name and the rest its text field, so the
+/// points keep their ids and sources.
 pub fn terms(blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Operation> {
     let mut writes = Vec::new();
     for block in blocks.iter().filter(|b| b.kind == "paragraph") {
@@ -435,7 +485,6 @@ pub fn terms(blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Operation> {
         let Some(rows) = of
             .iter()
             .map(|p| led(&p.text).map(|(term, means)| (p.id, term, means)))
-            .filter(|row| row.is_none_or(|(_, _, means)| means.chars().count() <= CELL_MOST))
             .collect::<Option<Vec<_>>>()
             .filter(|rows| rows.len() >= 2)
         else {
@@ -462,6 +511,32 @@ pub fn terms(blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Operation> {
         }
     }
     writes
+}
+
+/// A row of a collection: its id, its name and its collection's fields.
+pub type NamedRow = (Uuid, String, Vec<Field>);
+
+/// The writes that name each of `rows` by the term in bold it opens with,
+/// and put what the term means in the collection's first text field. A row
+/// whose collection has no text field stays as it is.
+pub fn named_terms(rows: &[NamedRow]) -> Vec<Operation> {
+    rows.iter()
+        .filter_map(|(id, text, fields)| {
+            let (term, means) = led(text)?;
+            let field = fields.iter().find(|f| f.kind == "text")?;
+            Some(Operation::Update {
+                model: ModelKind::Point,
+                id: *id,
+                data: record([
+                    ("text", json!(cut(term, 500))),
+                    (
+                        "cells",
+                        json!(cells([(field.name.as_str(), Cell::Text(means.into()))])),
+                    ),
+                ]),
+            })
+        })
+        .collect()
 }
 
 /// `point` into `block`, out of its theme.
@@ -931,7 +1006,8 @@ mod tests {
             "",
         ));
         let writes = terms(&[terms_block.clone(), prose, long], &points);
-        assert_eq!(kinds(&writes), ["collection"]);
+        // What a long term means is a row's too, never left whole as its name.
+        assert_eq!(kinds(&writes), ["collection", "collection"]);
         let rows: Vec<&Map<String, Value>> = writes
             .iter()
             .filter_map(|w| match w {
@@ -943,7 +1019,9 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(rows.len(), 2);
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[3]["text"], "Lang");
+        assert_eq!(rows[3]["cells"]["Text"], "x".repeat(501));
         assert_eq!(rows[0]["text"], "Managing Up");
         assert_eq!(
             rows[0]["cells"]["Text"],
@@ -951,6 +1029,37 @@ mod tests {
         );
         assert_eq!(rows[1]["text"], "Issue Selling");
         assert_eq!(rows[1]["cells"]["Text"], "Themen nach oben bringen.");
+    }
+
+    #[test]
+    fn a_row_named_with_a_whole_term_gets_its_name() {
+        let text = |name: &str| Field {
+            name: name.into(),
+            kind: "text".into(),
+            unit: String::new(),
+            goal: None,
+            options: vec![],
+        };
+        let (half, plain, no_text) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
+        let writes = named_terms(&[
+            (
+                half,
+                "**Nakam**, eine Gruppe von Überlebenden, plante 1945 einen Anschlag.".into(),
+                vec![text("Text")],
+            ),
+            (plain, "Antideutsche".into(), vec![text("Text")]),
+            (no_text, "**Kurz**: ohne Feld.".into(), vec![]),
+        ]);
+        assert_eq!(writes.len(), 1);
+        let Operation::Update { id, data, .. } = &writes[0] else {
+            panic!("{writes:?}")
+        };
+        assert_eq!(*id, half);
+        assert_eq!(data["text"], "Nakam");
+        assert_eq!(
+            data["cells"]["Text"],
+            "eine Gruppe von Überlebenden, plante 1945 einen Anschlag."
+        );
     }
 
     #[test]

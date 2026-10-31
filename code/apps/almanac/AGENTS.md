@@ -218,7 +218,9 @@ What they do:
     cards without its field's name (`BESIDE_MOST`). add_items and
     change_points refuse a paragraph that opens with a term in bold
     (`as_prose` in `kept.rs`), and a third pass on start (`terms` in
-    `convert.rs`) made such paragraphs collections. Cards and a board
+    `convert.rs`) made such paragraphs collections; a fourth
+    (`named_terms`) names the rows that pass left whole, a term too long for
+    a cell then. A text cell holds 2000 characters, as a point does. Cards and a board
     card with nothing else to say show what a row's page keeps as chips
     (its collections' row names). A timeline's axis has a lane per choice; a
     click on one picks its rows for the list under it, and past ten rows

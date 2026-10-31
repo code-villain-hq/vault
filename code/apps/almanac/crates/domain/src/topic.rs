@@ -824,8 +824,9 @@ fn cells(cells: &BTreeMap<String, Cell>) -> Result<(), ValidationError> {
         }
         match cell {
             Cell::Number(n) if !n.is_finite() => return invalid("A number cell is a number."),
-            Cell::Text(t) if t.chars().count() > 500 => {
-                return invalid("A cell is at most 500 characters.");
+            // As much as a point's words: what a term means may be a paragraph.
+            Cell::Text(t) if t.chars().count() > 2000 => {
+                return invalid("A cell is at most 2000 characters.");
             }
             _ => {}
         }
