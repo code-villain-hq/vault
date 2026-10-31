@@ -7,7 +7,7 @@
 // blocks. The workspace's own topic, Almanac, has the index of the others
 // for its page.
 
-import type { Block, ClaudeKeyInfo, Point, Question, Reminder, Topic } from "@almanac/types";
+import type { Block, ClaudeKeyInfo, Field, Point, Question, Reminder, Topic } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
@@ -25,7 +25,6 @@ import {
 import { Link, useLocation, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { ArrowLeft, ChevronDown, ChevronRight, MessagesSquare, X } from "lucide-react";
 import {
-  Fragment,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -36,7 +35,7 @@ import {
   useState,
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
-import { cellOf, cellWords, checkOf } from "./collection";
+import { cellOf, cellWords, checkOf, lanesOf, numberOf } from "./collection";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { isOwn, PageHeader, useTopics, useUnread } from "./layout";
@@ -63,6 +62,7 @@ import {
   Opens,
   type PageTo,
   Paragraphs,
+  Pill,
   useItemReminders,
 } from "./set";
 import type { Schema } from "./sync";
@@ -546,31 +546,85 @@ function BackTo({ topic }: { topic: Topic }) {
 
 /**
  * A collection's row at the top of its page: which collection it's in, and
- * its fields, a line each, the empty ones too, so a talk can fill them.
+ * its fields, a tile each, the empty ones too, so a talk can fill them. A
+ * number has a bar against the collection's largest, a status its steps.
  */
 function RowFields({ row }: { row: Point }) {
   const blocks = useRecords("Block");
+  const points = useRecords("Point");
   const block = blocks.find((b) => b.id === row.block_id);
   if (!block) return null;
+  const rows = points.filter((p) => p.block_id === block.id);
   return (
     <section className="-mt-6 flex flex-col gap-3" aria-label={`In ${block.title}`}>
       <p className="text-muted">in {block.title || "a collection"}</p>
       {block.fields.length > 0 && (
-        <dl className="grid max-w-[68ch] grid-cols-[minmax(6rem,max-content)_1fr] gap-x-6 gap-y-1.5">
-          {block.fields.map((field) => {
-            const cell = cellOf(row, field);
-            const words =
-              field.kind === "check" ? (cell === true ? "✓" : "") : cellWords(field, cell);
-            return (
-              <Fragment key={field.name}>
-                <dt className="text-muted">{field.name}</dt>
-                <dd className={words ? "" : "text-faint"}>{words || "—"}</dd>
-              </Fragment>
-            );
-          })}
+        <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(10rem,100%),1fr))] gap-2.5">
+          {block.fields.map((field) => (
+            <div
+              key={field.name}
+              className="flex min-w-0 flex-col-reverse justify-end gap-1 rounded-lg bg-surface px-4 py-3"
+            >
+              <dt className="text-xs text-muted">{field.name}</dt>
+              <dd className="flex min-w-0 flex-col gap-2">
+                <FieldValue field={field} row={row} rows={rows} />
+              </dd>
+            </div>
+          ))}
         </dl>
       )}
     </section>
+  );
+}
+
+/** One field of a row, large: a number with its bar, a status with its steps, a choice its pill. */
+function FieldValue({ field, row, rows }: { field: Field; row: Point; rows: Point[] }) {
+  const cell = cellOf(row, field);
+  if (cell === undefined) return <span className="text-faint">—</span>;
+  if (field.kind === "check") return <span className="text-2xl">{cell === true ? "✓" : "–"}</span>;
+  if (typeof cell === "string" && (field.kind === "status" || field.kind === "choice")) {
+    const lanes = lanesOf(field, rows);
+    const at = lanes.indexOf(cell);
+    return (
+      <>
+        <span>
+          <Pill field={field} value={cell} />
+        </span>
+        {field.kind === "status" && lanes.length > 1 && (
+          <span
+            role="img"
+            aria-label={`Step ${at + 1} of ${lanes.length}`}
+            className="flex h-1.5 gap-0.5"
+          >
+            {lanes.map((lane, i) => (
+              <span
+                key={lane}
+                className={`flex-1 rounded-full ${i > at ? "bg-chip" : at === lanes.length - 1 ? "bg-ok" : "bg-info"}`}
+              />
+            ))}
+          </span>
+        )}
+      </>
+    );
+  }
+  const words = cellWords(field, cell);
+  const most = Math.max(...rows.map((r) => Math.abs(numberOf(r, field) ?? 0)));
+  return (
+    <>
+      <span
+        className={`font-semibold tabular-nums leading-tight ${[...words].length > 12 ? "text-lg" : "text-2xl"} break-words`}
+      >
+        {words || "—"}
+      </span>
+      {typeof cell === "number" && rows.length > 1 && most > 0 && (
+        <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-chip">
+          <span
+            className="block h-full rounded-full bg-accent"
+            style={{ width: `${(Math.abs(cell) / most) * 100}%` }}
+          />
+        </span>
+      )}
+    </>
   );
 }
 
