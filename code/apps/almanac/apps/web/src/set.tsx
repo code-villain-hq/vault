@@ -1431,7 +1431,7 @@ function RowBars({
           )}
         </h3>
       )}
-      <ul className="grid max-w-5xl grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content] gap-x-3.5 @md:grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content_minmax(0,max-content)]">
+      <ul className="grid max-w-5xl grid-cols-[fit-content(45%)_minmax(5rem,1fr)_max-content] gap-x-3.5 @md:grid-cols-[fit-content(32%)_minmax(6rem,1fr)_max-content_fit-content(32%)]">
         {bars.map((row) => {
           const amount = numberOf(row, number) ?? 0;
           const more = rest(fields, row);
