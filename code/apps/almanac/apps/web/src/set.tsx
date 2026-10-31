@@ -274,13 +274,8 @@ function Sources({ points }: { points: Point[] }) {
   );
 }
 
-/**
- * Paragraphs: a point each, at a reading measure. When each opens with a
- * bold lead, they're cards instead: the lead, and a few lines under it
- * that open across the row on More, so the page reads at a glance.
- */
+/** Paragraphs: a point each, at a reading measure. */
 export function Paragraphs({ points }: { points: Point[] }) {
-  if (points.length >= 2 && points.every((p) => ledBy(p.text))) return <Leads points={points} />;
   return (
     <div className="flex max-w-measure flex-col gap-2">
       {points.map((point) => (
@@ -290,63 +285,6 @@ export function Paragraphs({ points }: { points: Point[] }) {
           <RemovePoint point={point} />
         </p>
       ))}
-      <Sources points={points} />
-    </div>
-  );
-}
-
-/** A point's bold lead and what follows it: "**Zwei Sichten**: Für …", "**Nakam**, eine …". */
-export function ledBy(text: string): [string, string] | null {
-  const found = /^\*\*([^*]+)\*\*[:.,]?\s+([\s\S]+)$/.exec(text.trim());
-  return found?.[1] && found[2] ? [found[1].trim(), found[2]] : null;
-}
-
-/** Past this a card's words are cut to three lines, with More. */
-const CUT_AT = 110;
-
-/** Paragraphs that each open with a bold lead, as a card each. */
-function Leads({ points }: { points: Point[] }) {
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const toggle = (id: string) =>
-    setOpen((was) => {
-      const now = new Set(was);
-      if (!now.delete(id)) now.add(id);
-      return now;
-    });
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(16rem,100%),1fr))] items-start gap-3">
-        {points.map((point) => {
-          const [title, words] = ledBy(point.text) ?? ["", point.text];
-          const long = words.length > CUT_AT;
-          const shown = !long || open.has(point.id);
-          return (
-            <article
-              key={point.id}
-              className={`group flex flex-col gap-1.5 rounded-lg bg-surface p-3 ${long && shown ? "col-span-full" : ""}`}
-            >
-              <h3 className="flex items-start gap-2 font-semibold leading-snug">
-                <NewDot point={point} className="mt-1.5" />
-                <span className="min-w-0 flex-1">{title}</span>
-                <RemovePoint point={point} />
-              </h3>
-              <p className={`max-w-measure text-muted ${shown ? "" : "line-clamp-3"}`}>
-                {inline(words)}
-              </p>
-              {long && (
-                <button
-                  type="button"
-                  aria-expanded={shown}
-                  onClick={() => toggle(point.id)}
-                  className="self-start text-xs text-faint hover:text-fg"
-                >
-                  {shown ? "Less" : "More"}
-                </button>
-              )}
-            </article>
-          );
-        })}
-      </div>
       <Sources points={points} />
     </div>
   );
@@ -838,18 +776,22 @@ function Picture({ block, rows }: { block: Block; rows: Point[] }) {
       return <Steps rows={rows} check={ticks} fields={fields.filter((f) => f !== ticks)} />;
     }
   }
+  // Words read with where they come from, as a paragraph's do.
   return (
-    <Told rows={rows} by={of("status", "choice")}>
-      {(shown, rest) =>
-        block.view === "cards" ? (
-          <RowCards rows={shown} fields={rest(fields)} />
-        ) : block.view === "table" ? (
-          <RowTable block={block} rows={shown} fields={rest(fields)} />
-        ) : (
-          <RowList rows={shown} fields={rest(fields)} />
-        )
-      }
-    </Told>
+    <>
+      <Told rows={rows} by={of("status", "choice")}>
+        {(shown, rest) =>
+          block.view === "cards" ? (
+            <RowCards rows={shown} fields={rest(fields)} />
+          ) : block.view === "table" ? (
+            <RowTable block={block} rows={shown} fields={rest(fields)} />
+          ) : (
+            <RowList rows={shown} fields={rest(fields)} />
+          )
+        }
+      </Told>
+      <Sources points={rows} />
+    </>
   );
 }
 
@@ -1199,9 +1141,19 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
 }
 
 /** Cards: a card per row, its photo on top, its name, then each field it fills. */
+/**
+ * Cards: a card a row, its photo over its name, then its cells, each by
+ * its field's name; words past a line read under the name without it, and
+ * what the row's own page keeps shows as chips.
+ */
 function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
   const photo = fields.find((f) => f.kind === "photo");
   const shown = fields.filter((f) => f !== photo);
+  const pages = useRowPages(rows);
+  const long = (row: Point, field: Field) => {
+    const cell = cellOf(row, field);
+    return field.kind === "text" && typeof cell === "string" && cell.length > BESIDE_MOST;
+  };
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-3">
       {rows.map((row) => {
@@ -1218,10 +1170,17 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
               </h3>
               <RemovePoint point={row} />
             </div>
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
+            {shown
+              .filter((field) => long(row, field))
+              .map((field) => (
+                <EditCell key={field.name} row={row} field={field} className="text-muted">
+                  {inline(String(cellOf(row, field)))}
+                </EditCell>
+              ))}
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs empty:hidden">
               {shown.map((field) => {
                 const cell = cellOf(row, field);
-                if (cell === undefined || cell === false) return null;
+                if (cell === undefined || cell === false || long(row, field)) return null;
                 return (
                   <div key={field.name} className="col-span-full grid grid-cols-subgrid">
                     <dt className="text-faint">{field.name}</dt>
@@ -1240,6 +1199,7 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
                 );
               })}
             </dl>
+            <PageNames words={pages.get(row.id) ?? []} />
           </article>
         );
       })}
@@ -1305,7 +1265,11 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
                     key={field.name}
                     className={`${cell} ${field.kind === "text" ? "min-w-40 whitespace-normal" : "max-w-64 truncate"} ${field.kind === "number" ? "text-right" : ""} ${field.kind === "check" ? "text-ok-ink" : ""}`}
                   >
-                    <EditCell row={row} field={field} className="block truncate">
+                    <EditCell
+                      row={row}
+                      field={field}
+                      className={field.kind === "text" ? "block" : "block truncate"}
+                    >
                       {TOLD_BY_TONE.has(field.kind) && typeof value === "string" ? (
                         <Pill field={field} value={value} />
                       ) : typeof value === "number" && most.get(field.name) ? (
@@ -1572,7 +1536,12 @@ function RowChecklist({ rows, check, fields }: { rows: Point[]; check: Field; fi
             <Thumb row={row} fields={fields} className="size-8 self-center" />
             <p className={`min-w-0 flex-1 ${done ? "text-faint" : ""}`}>
               <RowName row={row} />
-              {words && <span className="text-muted"> · {words}</span>}
+              {words &&
+                (words.length > BESIDE_MOST ? (
+                  <span className="block text-muted">{inline(words)}</span>
+                ) : (
+                  <span className="text-muted"> · {words}</span>
+                ))}
             </p>
             <Pills fields={fields} row={row} />
             {reminder && <Rings reminder={reminder} />}
@@ -1584,13 +1553,12 @@ function RowChecklist({ rows, check, fields }: { rows: Point[]; check: Field; fi
   );
 }
 
-/** A list: a row a line, its name, then its other cells. */
-/** The most a shelf's tile names of what its row's page keeps. */
-const SHELF_NAMES = 4;
+/** The most chips a card names of what its row's page keeps. */
+const PAGE_NAMES = 4;
 
 /**
- * What each row's own page keeps, in a word each: a paragraph's bold lead,
- * a collection's row names. Only where rows open a page (`Opens`).
+ * What each row's own page keeps, in a word each: its collections' row
+ * names. Only where rows open a page (`Opens`).
  */
 function useRowPages(rows: Point[]): Map<string, string[]> {
   const opens = useContext(Opens) !== null;
@@ -1601,17 +1569,14 @@ function useRowPages(rows: Point[]): Map<string, string[]> {
     if (!opens) return kept;
     const names = new Map(rows.map((r) => [r.id, r.text.trim().toLowerCase()]));
     const pages = blocks
-      .filter(
-        (b) =>
-          b.row_id && names.has(b.row_id) && (b.kind === "paragraph" || b.kind === "collection"),
-      )
+      .filter((b) => b.row_id && names.has(b.row_id) && b.kind === "collection")
       .sort((a, b) => a.position - b.position);
     for (const page of pages) {
       const row = page.row_id as string;
       const words = points
         .filter((p) => p.block_id === page.id)
         .sort((a, b) => a.position - b.position)
-        .map((p) => (page.kind === "paragraph" ? ledBy(p.text)?.[0] : p.text))
+        .map((p) => p.text)
         // A name that only says the row's own again says nothing.
         .filter((w): w is string => !!w && w.trim().toLowerCase() !== names.get(row));
       kept.set(row, [...(kept.get(row) ?? []), ...words]);
@@ -1624,10 +1589,10 @@ function useRowPages(rows: Point[]): Map<string, string[]> {
 function PageNames({ words }: { words: string[] }) {
   const names = [...new Set(words)];
   if (names.length === 0) return null;
-  const more = names.length - SHELF_NAMES;
+  const more = names.length - PAGE_NAMES;
   return (
     <ul className="flex flex-wrap gap-1 text-xs">
-      {names.slice(0, SHELF_NAMES).map((name) => (
+      {names.slice(0, PAGE_NAMES).map((name) => (
         <li key={name} className="max-w-full truncate rounded bg-chip px-1.5 py-0.5 text-muted">
           {name}
         </li>
@@ -1637,29 +1602,11 @@ function PageNames({ words }: { words: string[] }) {
   );
 }
 
-/** Rows with nothing but a name, each a tile of what its own page keeps. */
-function Shelf({ rows, pages }: { rows: Point[]; pages: Map<string, string[]> }) {
-  return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(16rem,100%),1fr))] gap-3">
-      {rows.map((row) => (
-        <article key={row.id} className="group flex flex-col gap-2 rounded-lg bg-surface p-3">
-          <h3 className="flex items-start gap-2 font-semibold">
-            <NewDot point={row} className="mt-2" />
-            <RowName row={row} className="min-w-0 flex-1 break-words" />
-            <RemovePoint point={row} />
-          </h3>
-          <PageNames words={pages.get(row.id) ?? []} />
-        </article>
-      ))}
-    </div>
-  );
-}
+/** Past this a row's words go under its name, not beside it: what a term means. */
+const BESIDE_MOST = 60;
 
+/** A list: a row a line, its name, then its other cells. */
 function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
-  const pages = useRowPages(rows);
-  if (fields.length === 0 && rows.some((row) => pages.get(row.id)?.length)) {
-    return <Shelf rows={rows} pages={pages} />;
-  }
   return (
     <ul className={`flex flex-col ${LINES}`}>
       {rows.map((row) => {
@@ -1671,7 +1618,12 @@ function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
             <p className="min-w-0 flex-1">
               {/* A name alone is the line; beside its cells it leads. */}
               <RowName row={row} className={fields.length > 0 ? "font-semibold" : ""} />
-              {words && <span className="text-muted"> · {words}</span>}
+              {words &&
+                (words.length > BESIDE_MOST ? (
+                  <span className="block text-muted">{inline(words)}</span>
+                ) : (
+                  <span className="text-muted"> · {words}</span>
+                ))}
             </p>
             <Pills fields={fields} row={row} />
             <RemovePoint point={row} />

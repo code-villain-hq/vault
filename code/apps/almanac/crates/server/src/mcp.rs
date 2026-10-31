@@ -1164,7 +1164,7 @@ About.";
 /// A collection's fields, for the tools that name them.
 const FIELDS_SAY: &str = "A collection's fields, besides each row's name, eight at most, in \
 order: the facts every row has (Gewicht, Tag, Licht, Status). A field holds one kind of fact: \
-text a few words, number a plain number with its unit (kg) and a goal when they aim at one, \
+text a few words (or a sentence or two for what a term means), number a plain number with its unit (kg) and a goal when they aim at one, \
 day a day or a year or a span, choice one of a few words, status where a row stands (its \
 words in order, the last one done), check yes or no, photo a photo from the talk, link a web \
 page. Pick the narrowest kind that holds the fact: yes or no is a check, an amount or a price a \
@@ -1363,7 +1363,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "text": string("The point: two to four sentences in a paragraph, a few words in a callout or You."),
+                                "text": string("The point: two to four sentences in a paragraph, never opening with a term in bold; a few words in a callout or You."),
                                 "look": { "type": "string", "enum": ["warn", "info"], "description": "Only in a callout: warn when it needs a look, info when something's ready." },
                                 "source": string("Where it comes from, in a few words: \"You said\", \"From the talk\", or the book, guide, institution or site the answer relied on."),
                                 "url": string("The page it comes from, when you read one. Never a made-up link."),
@@ -1391,7 +1391,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                             "type": "object",
                             "properties": {
                                 "name": string("The row's name: the thing, or what happened, in a few words (Monstera, Wiegen)."),
-                                "cells": { "type": "object", "description": "Its cells by field name: a number plain (3.4, without its unit), a day as 2026-09-24 (or a year, a span), a choice's or a status's word, true or false for a check, \"photo 2\" for the talk's second photo, a link's address, a few words for text.", "additionalProperties": true },
+                                "cells": { "type": "object", "description": "Its cells by field name: a number plain (3.4, without its unit), a day as 2026-09-24 (or a year, a span), a choice's or a status's word, true or false for a check, \"photo 2\" for the talk's second photo, a link's address, a few words for text, or a sentence or two for what a term means.", "additionalProperties": true },
                                 "source": string("Where it comes from, in a few words."),
                                 "url": string("The page it comes from, when you read one. Never a made-up link."),
                             },

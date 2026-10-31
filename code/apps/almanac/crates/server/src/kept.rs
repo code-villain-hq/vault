@@ -427,6 +427,7 @@ impl Kept {
             if text.is_empty() {
                 return Err("An item needs its words.".into());
             }
+            as_prose(&kind, &text)?;
             let look = self.look(&kind, &title, &item.look)?;
             refs.push(self.add_point(
                 n,
@@ -497,6 +498,7 @@ impl Kept {
                         change.point.trim()
                     ));
                 }
+                as_prose(&kind, &text)?;
                 self.points[i].text = text;
             }
             if let Some(look) = &change.look {
@@ -1538,6 +1540,31 @@ impl Kept {
             self.points[p].position = position as i32;
         }
     }
+}
+
+/// A text's bold lead and what follows it: "**Zwei Sichten**: Für …".
+pub fn led(text: &str) -> Option<(&str, &str)> {
+    let rest = text.trim().strip_prefix("**")?;
+    let (lead, after) = rest.split_once("**")?;
+    let after = after.strip_prefix([':', '.', ',']).unwrap_or(after);
+    let words = after.trim_start();
+    let lead = lead.trim();
+    (!lead.is_empty() && !lead.contains('*') && words.len() < after.len() && !words.is_empty())
+        .then_some((lead, words))
+}
+
+/// A paragraph's words as they may go in: prose, not a term with what it
+/// means, which is a collection's row.
+fn as_prose(kind: &str, text: &str) -> Result<(), String> {
+    if kind == "paragraph" && led(text).is_some() {
+        return Err(
+            "A paragraph doesn't open with a term in bold: a term with what it means is \
+             a row of a collection, the term its name and what it means a text field. Add them \
+             with add_rows, to a collection with that field (add_block)."
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 /// Whether a block of `kind`, called `title`, takes items: sentences.
@@ -2969,5 +2996,22 @@ mod tests {
         assert_eq!(kept.writes(&at).1.len(), 1);
         at.unnamed = false;
         assert!(kept.writes(&at).1.is_empty());
+    }
+
+    #[test]
+    fn a_paragraph_is_prose_not_terms() {
+        assert_eq!(
+            led("**Managing Up** heißt, die Beziehung zu gestalten."),
+            Some(("Managing Up", "heißt, die Beziehung zu gestalten."))
+        );
+        assert_eq!(
+            led("**Nakam**, eine Gruppe"),
+            Some(("Nakam", "eine Gruppe"))
+        );
+        assert_eq!(led("**Achtung**"), None);
+        assert_eq!(led("Das ist **wichtig** hier."), None);
+        assert!(as_prose("paragraph", "**Issue Selling**: Themen nach oben.").is_err());
+        assert!(as_prose("paragraph", "Themen nach oben, mit **Nachdruck**.").is_ok());
+        assert!(as_prose("callout", "**Achtung**: Lilien sind giftig.").is_ok());
     }
 }

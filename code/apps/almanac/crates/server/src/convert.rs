@@ -12,6 +12,11 @@
 //! `proposals/facts-as-data.md`): bullets rows with only a name, a
 //! checklist rows with a check, Done, and a toggle a row per theme with its
 //! sentences as a paragraph on the row's page.
+//!
+//! A third pass (`terms`) turns paragraphs that were terms into collections:
+//! each opened with a term in bold, and was drawn as a card. A term is a
+//! row now, its name the term and what it means a text field, which View as
+//! draws as a list, a table or cards.
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -26,7 +31,7 @@ use sqlx::types::Json;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::kept::fields as record;
+use crate::kept::{fields as record, led};
 
 /// The topics with a block of a kind from before, each with a member of
 /// its workspace to write as: an admin when there is one.
@@ -38,6 +43,16 @@ const BLOCKS: &str = "SELECT id, kind, title, facets, position, row_id FROM bloc
      WHERE topic_id = $1 ORDER BY position, created_at, id";
 const POINTS: &str = "SELECT id, block_id, theme, text, happened, facet, amount, note, done \
      FROM points WHERE topic_id = $1 ORDER BY position, created_at, id";
+
+/// The topics with a paragraph of terms, two or more, each opening with
+/// one in bold (`led`), and a member to write as.
+const TERMS: &str = "SELECT DISTINCT b.topic_id, b.workspace_id, m.user_id FROM blocks b \
+     CROSS JOIN LATERAL (SELECT user_id FROM workspace_members \
+       WHERE workspace_id = b.workspace_id ORDER BY role = 'admin' DESC, created_at LIMIT 1) m \
+     WHERE b.kind = 'paragraph' \
+       AND (SELECT count(*) FROM points p WHERE p.block_id = b.id) >= 2 \
+       AND NOT EXISTS (SELECT 1 FROM points p WHERE p.block_id = b.id \
+         AND p.text !~ '^\\s*\\*\\*[^*]+\\*\\*[:.,]?\\s+\\S')";
 
 /// The kinds the first pass leaves: the set's, what they told about
 /// themselves, and the lists, for the second.
@@ -95,6 +110,30 @@ pub async fn everywhere(pool: &PgPool) {
         };
         if let Err(error) = one(pool, actor, topic_id).await {
             tracing::warn!(%error, topic = %topic_id, "couldn't move a page into the set");
+        }
+    }
+    let topics: Vec<(Uuid, Uuid, Uuid)> = match sqlx::query_as(TERMS).fetch_all(pool).await {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::warn!(%error, "couldn't look for paragraphs of terms");
+            return;
+        }
+    };
+    for (topic_id, workspace_id, user_id) in topics {
+        let actor = Actor {
+            user_id,
+            workspace_id,
+        };
+        let moved = async {
+            let mut db = pool.begin().await?;
+            let (blocks, points) = read(&mut db, topic_id).await?;
+            write(&mut db, actor, terms(&blocks, &points)).await?;
+            db.commit().await?;
+            Ok::<_, AppError>(())
+        };
+        match moved.await {
+            Ok(()) => tracing::info!(topic = %topic_id, "made terms rows"),
+            Err(error) => tracing::warn!(%error, topic = %topic_id, "couldn't make terms rows"),
         }
     }
 }
@@ -377,6 +416,52 @@ pub fn lists(topic_id: Uuid, blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Op
         .chain(on_rows)
         .chain(moves)
         .collect()
+}
+
+/// What a term means, once it's a row.
+const MEANS: &str = "Text";
+
+/// The longest words a cell holds; what means more stays prose.
+const CELL_MOST: usize = 500;
+
+/// The writes that make each paragraph of terms a collection: a block of
+/// two or more points that each open with a term in bold, and say what it
+/// means in what a cell holds. The term is the row's name and the rest its
+/// text field, so the points keep their ids and sources.
+pub fn terms(blocks: &[OldBlock], points: &[OldPoint]) -> Vec<Operation> {
+    let mut writes = Vec::new();
+    for block in blocks.iter().filter(|b| b.kind == "paragraph") {
+        let of: Vec<&OldPoint> = points.iter().filter(|p| p.block_id == block.id).collect();
+        let Some(rows) = of
+            .iter()
+            .map(|p| led(&p.text).map(|(term, means)| (p.id, term, means)))
+            .filter(|row| row.is_none_or(|(_, _, means)| means.chars().count() <= CELL_MOST))
+            .collect::<Option<Vec<_>>>()
+            .filter(|rows| rows.len() >= 2)
+        else {
+            continue;
+        };
+        writes.push(Operation::Update {
+            model: ModelKind::Block,
+            id: block.id,
+            data: record([
+                ("kind", json!("collection")),
+                ("fields", json!([field(MEANS, "text", "", None)])),
+                ("view", json!("")),
+            ]),
+        });
+        for (id, term, means) in rows {
+            writes.push(Operation::Update {
+                model: ModelKind::Point,
+                id,
+                data: record([
+                    ("text", json!(cut(term, 500))),
+                    ("cells", json!(cells([(MEANS, Cell::Text(means.into()))]))),
+                ]),
+            });
+        }
+    }
+    writes
 }
 
 /// `point` into `block`, out of its theme.
@@ -814,6 +899,58 @@ mod tests {
         assert!(operations.iter().any(|o| matches!(o,
             Operation::Update { model: ModelKind::Point, id, data }
                 if *id == event.id && data["cells"] == json!({ "When": "1989" }))));
+    }
+
+    #[test]
+    fn paragraphs_of_terms_become_rows_with_what_they_mean() {
+        let terms_block = block("paragraph", "Grundlagen", 0);
+        let prose = block("paragraph", "", 1);
+        let points = vec![
+            point(
+                &terms_block,
+                "",
+                "**Managing Up** heißt, die Beziehung zu gestalten.",
+                "",
+            ),
+            point(
+                &terms_block,
+                "",
+                "**Issue Selling**: Themen nach oben bringen.",
+                "",
+            ),
+            point(&prose, "", "**Wichtig** ist das hier.", ""),
+            point(&prose, "", "Und das ist nur ein Satz.", ""),
+        ];
+        let long = block("paragraph", "", 2);
+        let mut points = points;
+        points.push(point(&long, "", "**Kurz**: geht.", ""));
+        points.push(point(
+            &long,
+            "",
+            &format!("**Lang**: {}", "x".repeat(501)),
+            "",
+        ));
+        let writes = terms(&[terms_block.clone(), prose, long], &points);
+        assert_eq!(kinds(&writes), ["collection"]);
+        let rows: Vec<&Map<String, Value>> = writes
+            .iter()
+            .filter_map(|w| match w {
+                Operation::Update {
+                    model: ModelKind::Point,
+                    data,
+                    ..
+                } => Some(data),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["text"], "Managing Up");
+        assert_eq!(
+            rows[0]["cells"]["Text"],
+            "heißt, die Beziehung zu gestalten."
+        );
+        assert_eq!(rows[1]["text"], "Issue Selling");
+        assert_eq!(rows[1]["cells"]["Text"], "Themen nach oben bringen.");
     }
 
     #[test]

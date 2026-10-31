@@ -106,6 +106,14 @@ export function figuresOf(fields: Field[], rows: Point[]): boolean {
   );
 }
 
+/** Whether every row says `field` briefly enough for a figure's tile: no sentence. */
+function brief(rows: Point[], field: Field): boolean {
+  return rows.every((row) => {
+    const cell = cellOf(row, field);
+    return typeof cell !== "string" || [...cell].length <= FIGURE_LONGEST * 2;
+  });
+}
+
 /**
  * The picture the app draws a collection as: the first rule that fits.
  *
@@ -144,7 +152,7 @@ export function pictureOf(block: Block, rows: Point[], on = today()): string {
  * What View as offers for a collection, the app's pick among them: the
  * pictures its fields can draw. A line needs days with numbers, a
  * checklist its check, a board a status or a choice, a timeline days or spans, a week days, bars numbers,
- * figures a few rows with a value; steps a few rows in their order; cards, a table and a list draw anything.
+ * figures a few rows with a brief value; steps a few rows in their order; cards, a table and a list draw anything.
  */
 export function picturesFor(block: Block, rows: Point[], on = today()): string[] {
   const pick = pictureOf(block, rows, on);
@@ -160,7 +168,9 @@ export function picturesFor(block: Block, rows: Point[], on = today()): string[]
   if (day) fits.add("timeline");
   if (day && rows.some((r) => dayOf(r, day))) fits.add("week");
   if (number) fits.add("bars");
-  if (rows.length >= 2 && rows.length <= FIGURES_MOST && fields.length > 0) fits.add("figures");
+  if (rows.length >= 2 && rows.length <= FIGURES_MOST && fields.some((f) => brief(rows, f))) {
+    fits.add("figures");
+  }
   if (rows.length >= 2 && rows.length <= STEPS_MOST) fits.add("steps");
   return PICTURES.filter((picture) => fits.has(picture));
 }

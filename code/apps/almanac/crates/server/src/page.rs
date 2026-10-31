@@ -499,13 +499,12 @@ const SET_SAYS: &str = "every page on every topic is made of the same few blocks
 each with a short title or none. The app draws them; you only say what goes where. The kinds: \
 heading, a title that starts a part of the page, with no points; \
 paragraph, a point a paragraph, for what reads as prose: two to four sentences that explain, \
-starting with the term it's about in **bold** when there is one (when each does, the \
-paragraphs show as cards, the term over a few lines, which reads at a glance); \
+never opening with a term in bold (a term with what it means is a collection's row); \
 callout, a point set apart: look warn when it needs a look (a problem, a gap), info when \
 something is ready; \
 collection, rows that share the same fields, a row per thing, event or measurement (plants, \
 offers, weighings, repairs): its text is the row's name, and it has a cell for each field it \
-knows. A field is text (a few words), number (plain, 3.4, with the field's unit, kg, and a goal \
+knows. A field is text (a few words, or a sentence or two for what a term means), number (plain, 3.4, with the field's unit, kg, and a goal \
 when they aim at one), day (a day as 2026-09-24, or a year or a span, 1987–1993), choice (one of \
 a few words), status (where a row stands, Offen, Bestellt, Erledigt), check (yes or no), photo \
 (a photo from the talk, by its number) or link (a web page). The app draws a collection from \
@@ -518,8 +517,10 @@ what draws to what reads: a number, a status or a choice says more at a glance t
 Lists are collections too: a list of things or terms is rows with only a name, a few words \
 each; what to do or get is rows with a check (Done), ticked once done. A row to do that comes \
 round or is due on a day is a reminder too (offer_reminder with its item): it rings on the Mac, \
-and ticking the row ticks the reminder, until it's due again. Sections are rows too: a term, a \
-question or a step is a row, and its sentences a paragraph on its page. \
+and ticking the row ticks the reminder, until it's due again. Terms are rows too: the term its \
+name and what it means a text field, a sentence or two, which draws as a list, a table or cards \
+as they pick; a question or a step with more to say is a row, and its sentences a paragraph on \
+its page. \
 A row has a page of its own, made of the same blocks: what belongs to that one row and has \
 parts of its own goes there, in a block that names the row, so the topic's page keeps the row \
 and not its details. A shoe's offers are a collection on the shoe's page (Laden, Preis in kr, \

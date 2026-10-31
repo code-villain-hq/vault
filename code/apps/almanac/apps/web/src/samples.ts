@@ -150,22 +150,27 @@ export function samples(): Sample[] {
       ],
     ),
     sample(
-      "Leads",
-      "When each paragraph opens with a bold lead, they're cards: the lead, a few lines, and More opens one across.",
+      "Terms",
+      "Terms with what they mean are rows: the term, and a sentence or two under it. View as draws them as a table or cards too.",
       history,
-      "paragraph",
+      "collection",
       "How it held",
       (p) => [
-        p(
-          "",
-          "**Borders** drawn in Vienna held, more or less, for a century: no great power left the table wanting another war, and the small ones were told where they stood.",
-        ),
-        p("", "**Talks** came before fights: the powers met again whenever a crisis came up."),
-        p(
-          "",
-          "**Revolutions** in 1848 shook it, but the order held until the unification of Germany and Italy redrew the map.",
-        ),
+        p("", "Borders", {
+          cells: {
+            Text: "Drawn in Vienna, they held for a century: no great power left the table wanting another war.",
+          },
+        }),
+        p("", "Talks", {
+          cells: { Text: "Came before fights: the powers met again whenever a crisis came up." },
+        }),
+        p("", "Revolutions", {
+          cells: {
+            Text: "Shook it in 1848, but the order held until Germany and Italy were unified.",
+          },
+        }),
       ],
+      { fields: [field("Text", "text")] },
     ),
     sample(
       "Callout",

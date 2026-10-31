@@ -203,11 +203,16 @@ What they do:
     two fields or more a table, the rest a list.
     Only fields its rows fill count. View as offers the others its fields
     allow (`picturesFor`). A callout is a warning when a point's `look` is `warn`.
-    Paragraphs that each open with a bold lead draw as cards: the lead, a
-    few lines, and More (`Leads` in `set.tsx`). A list of names whose rows
-    have pages draws as tiles, each with what its page keeps as chips (its
-    leads, its rows' names: `Shelf`), and a board card with nothing else to
-    say shows the same chips. A timeline's axis has a lane per choice; a
+    A block draws one way of its own; only a collection has more, its
+    pictures, and only a person picks among them. A paragraph is prose:
+    a term with what it means is a collection's row, the term its name
+    and the rest a text field, which a list shows under the name and
+    cards without its field's name (`BESIDE_MOST`). add_items and
+    change_points refuse a paragraph that opens with a term in bold
+    (`as_prose` in `kept.rs`), and a third pass on start (`terms` in
+    `convert.rs`) made such paragraphs collections. Cards and a board
+    card with nothing else to say show what a row's page keeps as chips
+    (its collections' row names). A timeline's axis has a lane per choice; a
     click on one picks its rows for the list under it, and past ten rows
     the list shows the first eight, with All (`AxisTimeline`). A tally's
     words do the same for the bars, table, cards or list under it (`Told`).
