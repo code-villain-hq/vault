@@ -183,7 +183,9 @@ a callout (\"warn\" or \"info\"), \"\" otherwise; text as its block's kind asks;
 said\", \"From the talk\", the book, guide or institution). Never a link.
 - rows: things, terms, steps, events and measurements, in a collection: name, and cells, a field each \
 (field, value) as the block names its fields, only for what they or a source said. A number \
-plain (3.4), a day as 2026-09-24 (or a year, 1867, or a span, 1987–1993), a check yes or no.
+plain (3.4), a day as 2026-09-24 (or a year, 1867, or a span, 1987–1993), a check yes or no. \
+A row that is a share of the row before it starts its name with \"davon\" (\"davon Haushalte\"), \
+so a total doesn't count it twice.
 - changes: the page is kept up to date, not added to. When the exchange changes or corrects a \
 point the page has (a wash day moved, a weighing corrected), the point (\"p3\") with its new \
 text (\"\" when only cells change) and the cells that change.

@@ -19,7 +19,18 @@ import {
   useState,
 } from "react";
 import { TrendSet } from "./charts";
-import { byDay, cellOf, cellWords, checkOf, dayOf, filled, lanesOf, numberOf } from "./collection";
+import {
+  byDay,
+  cellOf,
+  cellWords,
+  checkOf,
+  dayOf,
+  filled,
+  isPart,
+  lanesOf,
+  numberOf,
+  sumOf,
+} from "./collection";
 import { EditCell, NewRow, useSetCell } from "./editing";
 import {
   addDays,
@@ -1246,11 +1257,12 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
       .filter((f) => f.kind === "number" && new Set(rows.map((r) => numberOf(r, f))).size > 2)
       .map((f) => [f.name, Math.max(...rows.map((r) => Math.abs(numberOf(r, f) ?? 0)))]),
   );
-  // What a column of amounts with a unit comes to, under it.
+  // What a column of amounts with a unit comes to, under it; a row that's
+  // a part of the one above ("davon …") is in that one's already.
   const sums = new Map(
     columns
-      .filter((f) => f.kind === "number" && f.unit && rows.length > 1)
-      .map((f) => [f.name, rows.reduce((total, r) => total + (numberOf(r, f) ?? 0), 0)]),
+      .filter((f) => f.kind === "number" && f.unit && rows.filter((r) => !isPart(r)).length > 1)
+      .map((f) => [f.name, sumOf(rows, f)]),
   );
   const cell = "h-[34px] border-line border-r border-b px-3 last:border-r-0";
   const header =
@@ -1280,7 +1292,10 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
               <td className={`${cell} max-w-72 truncate font-semibold`}>
                 <span className="flex items-center gap-2.5">
                   <Thumb row={row} fields={fields} className="size-6" />
-                  <RowName row={row} className="truncate" />
+                  <RowName
+                    row={row}
+                    className={`truncate ${isPart(row) ? "pl-4 font-normal text-muted" : ""}`}
+                  />
                   <span className="ml-auto font-normal">
                     <RemovePoint point={row} />
                   </span>

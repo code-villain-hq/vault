@@ -46,6 +46,20 @@ export function numberOf(row: Point, field: Field): number | null {
   return typeof cell === "number" ? cell : null;
 }
 
+// A row named as a share of the one above it: "davon Haushalte", "of which
+// recycled". Its amount is already in that row's.
+const PART = /^(davon|darunter|dabei|of which|including|incl\.)\s/i;
+
+/** Whether a row is a part of the row above it, by how it's named. */
+export function isPart(row: Point): boolean {
+  return PART.test(row.text.trim());
+}
+
+/** What a column of numbers comes to, its parts not counted twice. */
+export function sumOf(rows: Point[], field: Field): number {
+  return rows.reduce((total, r) => total + (isPart(r) ? 0 : (numberOf(r, field) ?? 0)), 0);
+}
+
 /**
  * Whether a number over days draws as a line: one measurement a day, or
  * one a day for each name that's measured again (a shop's price, day after

@@ -35,7 +35,7 @@ import {
   useState,
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
-import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf } from "./collection";
+import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf, sumOf } from "./collection";
 import { EditCell } from "./editing";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { hueOf, hueStyle } from "./hues";
@@ -1894,7 +1894,7 @@ function sumAndStage(fields: Field[], rows: Point[]): TileFacts["figures"] {
   const figures: TileFacts["figures"] = [];
   const amount = fields.find((f) => f.kind === "number" && f.unit);
   if (amount) {
-    const sum = rows.reduce((total, row) => total + (numberOf(row, amount) ?? 0), 0);
+    const sum = sumOf(rows, amount);
     if (sum) figures.push({ label: amount.name, value: cellWords(amount, round(sum)) });
   }
   const status = fields.find((f) => f.kind === "status" && f.options.length > 1);

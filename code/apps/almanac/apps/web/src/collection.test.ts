@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { Block, Cell, Field, Point } from "@almanac/types";
-import { byDay, cellWords, lanesOf, pictureOf, picturesFor, pictureWidth } from "./collection";
+import {
+  byDay,
+  cellWords,
+  lanesOf,
+  pictureOf,
+  picturesFor,
+  pictureWidth,
+  sumOf,
+} from "./collection";
 
 const field = (name: string, kind: string, more: Partial<Field> = {}): Field => ({
   name,
@@ -229,4 +237,21 @@ test("a board, a week and a timeline take the whole row; a line half", () => {
   const block = collection(field("Status", "status"));
   expect(pictureWidth("board", block, [])).toBe("whole");
   expect(pictureWidth("line", block, [])).toBe("1/2");
+});
+
+describe("sumOf", () => {
+  const amount = field("Menge", "number", { unit: "Mio. t" });
+  test("leaves out rows that are part of the one above", () => {
+    const rows = [
+      row("Lebensmittelabfall gesamt", { Menge: 1050 }),
+      row("davon Haushalte", { Menge: 631 }),
+      row("Davon Gastronomie", { Menge: 290 }),
+      row("Elektroschrott", { Menge: 62 }),
+      row("of which recycled", { Menge: 13.8 }),
+    ];
+    expect(sumOf(rows, amount)).toBe(1112);
+  });
+  test("counts a row whose name only has the word inside", () => {
+    expect(sumOf([row("Kosten davon", { Menge: 2 }), row("Rest", { Menge: 3 })], amount)).toBe(5);
+  });
 });
