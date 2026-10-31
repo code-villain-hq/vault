@@ -190,7 +190,9 @@ What they do:
   facets, timelines, bars and trends become collections; the rest
   bullets or a checklist. It reads the blocks' old `facets`, which stay
   in the database for it. The app draws a block as its kind
-  (`views.ts`: `viewOf` and `widthOf`), on a grid of twelve columns; a
+  (`views.ts`: `viewOf` and `widthOf`), on a grid of twelve columns, at
+  the width a person picked with the block's ⋯ (`width`, half or the
+  whole), or else its own; a
   collection as the picture its fields pick, which View as changes
   (`view`, `BLOCK_VIEWS`) and only a person sets. `you` is what they told
   about themselves, which the topic's About shows and its page doesn't.

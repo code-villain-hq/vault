@@ -61,6 +61,12 @@ describe("the one set", () => {
     expect(widthOf("paragraph", block("paragraph"), [])).toBe("1/2");
   });
 
+  test("keeps a person's width, but a heading takes the whole row", () => {
+    expect(widthOf("paragraph", { ...block("paragraph"), width: "whole" }, [])).toBe("whole");
+    expect(widthOf("callout", { ...block("callout"), width: "1/2" }, [])).toBe("1/2");
+    expect(widthOf("heading", { ...block("heading", "Care"), width: "1/2" }, [])).toBe("whole");
+  });
+
   test("offers no other views for a block of writing", () => {
     expect(viewsFor(block("checklist"), [point("", "Bring the CV up to date")])).toEqual([]);
   });

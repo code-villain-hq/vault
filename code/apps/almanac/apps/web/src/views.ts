@@ -19,9 +19,20 @@ export function viewOf(block: Block, points: Point[]): string {
 /**
  * How much of a row a block takes, of the page's twelve columns: half, as
  * writing keeps its measure; a heading and a callout the whole, and a
- * collection what its picture needs. The row's blocks grow to fill it.
+ * collection what its picture needs. A person's pick (`width`, half or
+ * the whole) holds over the app's. The row's blocks grow to fill it.
  */
 export function widthOf(view: string, block: Block, points: Point[]): string {
+  if (block.kind === "heading") return "whole";
+  if (WIDTHS.includes(block.width)) return block.width;
+  return ownWidth(view, block, points);
+}
+
+/** The widths a person picks between: half the page or the whole. */
+export const WIDTHS = ["1/2", "whole"];
+
+/** The width the app picks for a block. */
+export function ownWidth(view: string, block: Block, points: Point[]): string {
   if (block.kind === "collection") return pictureWidth(view, block, points);
   return block.kind === "heading" || block.kind === "callout" || block.kind === "you"
     ? "whole"

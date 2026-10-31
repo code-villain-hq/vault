@@ -138,7 +138,9 @@ topics.
 - **The page is a grid** of twelve columns: a heading and a callout take
   the whole row, writing half, and a collection what its picture needs.
   A row's blocks grow to fill it, and one that would get too narrow to
-  read takes a row of its own, as every block does on a phone.
+  read takes a row of its own, as every block does on a phone. A
+  block's ⋯ makes it half the page or the whole, for everyone, until
+  it's changed back; a heading stays whole.
 - **A section opens on its own page**: the arrow beside a toggle's line
   opens it where the page was, with the talk still beside it: everything
   kept under it from every block, its open questions and the talks it

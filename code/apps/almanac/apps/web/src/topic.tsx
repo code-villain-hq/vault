@@ -69,7 +69,7 @@ import {
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
 import { Button, Empty } from "./ui";
-import { shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
+import { ownWidth, shownAs, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
 /**
@@ -1306,8 +1306,9 @@ function ViewAs({ block }: { block: Block }) {
 }
 
 /**
- * ⋯ beside a block's title, or its line on About: move it, rename it, or
- * remove it and what it keeps. It shows while `className`'s hover holds.
+ * ⋯ beside a block's title, or its line on About: move it, make it half
+ * the page or the whole, rename it, or remove it and what it keeps. It
+ * shows while `className`'s hover holds.
  */
 function BlockMenu({
   block,
@@ -1322,6 +1323,7 @@ function BlockMenu({
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const points = useRecords("Point");
+  const kept = useRecords("Block").find((b) => b.id === block.id);
   const [renaming, setRenaming] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   if (guest) return null;
@@ -1336,8 +1338,23 @@ function BlockMenu({
     );
     if (moved.length) sync.transact(moved);
   };
-  const kept = points.filter((p) => p.block_id === block.id).length;
+  const held = points.filter((p) => p.block_id === block.id);
   const name = blockName(block);
+  // The other width; the app's own leaves the width to the app again.
+  const drawn = kept && widthOf(shownAs(kept, held), kept, held);
+  const other = drawn === "whole" ? "1/2" : "whole";
+  const resize =
+    kept && kept.kind !== "heading"
+      ? [
+          {
+            label: other === "whole" ? "Full width" : "Half width",
+            onSelect: () =>
+              sync.update("Block", block.id, {
+                width: other === ownWidth(shownAs(kept, held), kept, held) ? "" : other,
+              }),
+          },
+        ]
+      : [];
   return (
     <span
       className={`opacity-0 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100 ${className}`}
@@ -1347,6 +1364,7 @@ function BlockMenu({
         items={[
           ...(at > 0 ? [{ label: "Move up", onSelect: () => move(-1) }] : []),
           ...(at < blocks.length - 1 ? [{ label: "Move down", onSelect: () => move(1) }] : []),
+          ...resize,
           { label: "Rename…", onSelect: () => setRenaming(true) },
           {
             label: "Remove…",
@@ -1354,8 +1372,8 @@ function BlockMenu({
             onSelect: () =>
               setConfirmation({
                 title: `Remove ${name}?`,
-                body: kept
-                  ? `Its ${kept} ${kept === 1 ? "point goes" : "points go"} with it, for everyone in the workspace. This can't be undone.`
+                body: held.length
+                  ? `Its ${held.length} ${held.length === 1 ? "point goes" : "points go"} with it, for everyone in the workspace. This can't be undone.`
                   : "It keeps nothing yet. This can't be undone.",
                 action: "Remove block",
                 onConfirm: () => sync.delete("Block", block.id),
