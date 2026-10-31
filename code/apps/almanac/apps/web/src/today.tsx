@@ -83,16 +83,19 @@ function Ring({ done, of }: { done: number; of: number }) {
     <span className="relative grid size-11 shrink-0 place-items-center">
       <svg viewBox="0 0 44 44" className="-rotate-90 absolute inset-0" aria-hidden="true">
         <circle cx="22" cy="22" r={r} fill="none" strokeWidth="4" className="stroke-chip" />
-        <circle
-          cx="22"
-          cy="22"
-          r={r}
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={`${(done / of) * around} ${around}`}
-          className={done === of ? "stroke-ok" : "stroke-accent"}
-        />
+        {/* Nothing done draws no arc: a round cap alone would be a dot. */}
+        {done > 0 && (
+          <circle
+            cx="22"
+            cy="22"
+            r={r}
+            fill="none"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${(done / of) * around} ${around}`}
+            className={done === of ? "stroke-ok" : "stroke-accent"}
+          />
+        )}
       </svg>
       <span
         className="font-semibold text-xs tabular-nums"
