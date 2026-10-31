@@ -537,7 +537,12 @@ page. \
 File each thing where it belongs, and keep the page's face short: a few words a line, whole \
 sentences in paragraphs, on a row's page when they're about one row. What's measured, compared or tracked is rows with typed \
 fields, never a sentence: a weighing is a row with its day and its number in kg, so the line \
-draws it. A row's cells hold only what they or a source said: leave a cell out rather than \
+draws it. Explaining is no exception: when an answer names events with their years or spans, \
+they're rows of a collection of events, a short name each and its year (1987–1993), which draws \
+as a timeline; when it names amounts to compare (deaths, costs, sizes, a share in %), they're \
+rows with a number field, which draw as bars. Two or more of either make the collection, \
+started when the page has none; the paragraph then says what they mean, without the numbers. \
+A term with a year keeps its meaning in its row and its year in a row of the events. A row's cells hold only what they or a source said: leave a cell out rather than \
 guess. Add to the block it fits; add a field to a collection that lacks one; start a block \
 only when none fits. The page is kept up to date, not added to: change what changed, remove \
 what's wrong or twice, and keep one point where two would say the same. \

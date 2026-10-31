@@ -1382,7 +1382,8 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "Adds rows to a collection: a thing, a term, a step, an event or a measurement \
                  each, its name (a few words) and \
                  a cell for each field it knows. What's measured, compared or tracked is a row, \
-                 never a sentence. A cell holds only what they or a source said: leave it out \
+                 never a sentence: an event with its year a row of events, an amount to \
+                 compare a row with its number. A cell holds only what they or a source said: leave it out \
                  rather than guess. A field the rows need and the collection lacks comes first, \
                  with change_block. It answers with their references (p12).",
                 json!({

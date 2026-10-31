@@ -81,7 +81,9 @@ you about themselves; add_rows for things, terms, steps, events and measurements
 per field; add_block, or a field with change_block, only when the page has nowhere for it. The page is \
 read at a glance, as pictures of what it keeps: what a field can hold (a number, a day, a choice, \
 yes or no) goes in a cell, not a sentence, and a paragraph is a sentence or two that only reads \
-as prose. The page \
+as prose. So when you explain with years or numbers, keep them as data too: events with their \
+years in a collection of events (a timeline), amounts to compare in one with a number field \
+(bars). The page \
 is kept up to date, not added to: change_points when something changed or was wrong, remove \
 what's wrong or twice, move what reads better elsewhere. tick when they did a row to do, \
 ask_to_check when your answer rested on a guess about their situation, offer_reminder when the \
@@ -172,13 +174,16 @@ check, a price a number with its unit, a date a day; a reason or a note a text f
 Items and rows name it by its title.
 - items: sentences worth knowing later, in a block that isn't a collection: what explains, \
 decisions, and what they told you about their situation. Nothing the page already has, and \
-nothing a collection's field can hold (a number, a day, a choice): that is a row. \
+nothing a collection's field can hold (a number, a day, a choice): that is a row. When the \
+answer names events with their years, or amounts to compare, two or more, they're rows, not a \
+sentence: events a short name each and its year or span in a collection of events, amounts a \
+number each, and the sentence keeps only what they mean. \
 Usually none to three. block names it as the page does (\"b2\") or by its title; look only in \
 a callout (\"warn\" or \"info\"), \"\" otherwise; text as its block's kind asks; source where it comes from, in a few words (\"You \
 said\", \"From the talk\", the book, guide or institution). Never a link.
 - rows: things, terms, steps, events and measurements, in a collection: name, and cells, a field each \
 (field, value) as the block names its fields, only for what they or a source said. A number \
-plain (3.4), a day as 2026-09-24, a check yes or no.
+plain (3.4), a day as 2026-09-24 (or a year, 1867, or a span, 1987–1993), a check yes or no.
 - changes: the page is kept up to date, not added to. When the exchange changes or corrects a \
 point the page has (a wash day moved, a weighing corrected), the point (\"p3\") with its new \
 text (\"\" when only cells change) and the cells that change.

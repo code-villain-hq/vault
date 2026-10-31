@@ -209,6 +209,11 @@ What they do:
     days a timeline, days to come a week, unless every row shares the day
     (`tellsApart`); a number with at most one field more bars, a name and
     two fields or more a table, the rest a list.
+    So that explaining draws too, the prompts (`SET_SAYS`, the talk's
+    and the keep prompt) ask for two or more events with their years as
+    rows of a collection of events, a short name and its year or span,
+    and two or more amounts to compare as rows with a number; the
+    paragraph keeps what they mean.
     Only fields its rows fill count. View as offers the others its fields
     allow (`picturesFor`). A callout is a warning when a point's `look` is `warn`.
     A block draws one way of its own; only a collection has more, its
