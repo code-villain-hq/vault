@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { about, lead, Prose } from "./prose";
+import { about, lead, Prose, plain } from "./prose";
 
 const html = (text: string) => renderToStaticMarkup(Prose({ text }));
 
@@ -51,4 +51,15 @@ test("shows a colour code's colour before it", () => {
   expect(html("Accent #a78bfa, not *#fff*.")).toBe(
     '<div class="flex flex-col gap-2"><p>Accent <span class="whitespace-nowrap"><span aria-hidden="true" class="mr-1 inline-block size-2.5 rounded-sm ring-1 ring-line" style="background:#a78bfa"></span>#a78bfa</span>, not <em>#fff</em>.</p></div>',
   );
+});
+
+test("a link shows its name, in bold too", () => {
+  expect(
+    html(
+      "- **[Scorett Outlet](https://example.com/a-b):** 1.599 kr\n- [Skocenter: Byway](https://example.com/c)",
+    ),
+  ).toContain(
+    '<li><strong class="font-semibold"><a href="https://example.com/a-b" target="_blank" rel="noreferrer" class="ui-link">Scorett Outlet</a>:</strong> 1.599 kr</li><li><a href="https://example.com/c" target="_blank" rel="noreferrer" class="ui-link">Skocenter: Byway</a></li>',
+  );
+  expect(plain("Bei [Scorett](https://example.com) **billig**")).toBe("Bei Scorett billig");
 });

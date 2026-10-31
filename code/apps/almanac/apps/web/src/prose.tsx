@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 /**
- * An answer as written: paragraphs and short lists, with **bold** and *italic* kept.
+ * An answer as written: paragraphs and short lists, with **bold**, *italic*
+ * and [links](https://…) kept.
  * Answers are told to stay short and plain, so this is all they use.
  */
 export function Prose({ text }: { text: string }) {
@@ -52,7 +53,6 @@ export function Prose({ text }: { text: string }) {
   return <div className="flex flex-col gap-2">{blocks}</div>;
 }
 
-/** A line as written, with **bold** and *italic* kept: an answer's, or a point's. */
 /**
  * What a topic is about: the first sentence of what it sticks to. The rest of
  * that brief says how its talks answer, which nobody needs to read in a list.
@@ -63,21 +63,43 @@ export function about(brief: string): string {
   return first?.segment.trim() ?? "";
 }
 
+/** A line as written, with **bold**, *italic* and links kept: an answer's, or a point's. */
 export function inline(text: string): ReactNode {
   // The marked parts sit at the odd places the split leaves them, marks and
-  // all: **bold** and *italic*.
+  // all: **bold** and *italic*, which can hold a link.
   return text.split(/(\*\*[^*]+\*\*|\*[^*\s](?:[^*]*[^*\s])?\*)/).map((part, i) => {
-    if (i % 2 === 0) return swatched(part, i);
+    if (i % 2 === 0) return linked(part, i);
     return part.startsWith("**") ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
       <strong key={i} className="font-semibold">
-        {part.slice(2, -2)}
+        {linked(part.slice(2, -2), i)}
       </strong>
     ) : (
       // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
-      <em key={i}>{part.slice(1, -1)}</em>
+      <em key={i}>{linked(part.slice(1, -1), i)}</em>
     );
   });
+}
+
+/** "[Scorett Outlet](https://…)", and its name and address as the split leaves them. */
+const LINK = /\[([^\]]+)\]\s?\((https?:\/\/[^\s)]+)\)/;
+
+/** Links as their name, opening the page: "[Scorett Outlet](https://…)". */
+function linked(text: string, at: number): ReactNode {
+  const parts = text.split(new RegExp(LINK, "g"));
+  if (parts.length === 1) return swatched(text, at);
+  // The split leaves the words, then each link's name and address.
+  return parts.map((part, i) =>
+    i % 3 === 0 ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
+      <Fragment key={i}>{swatched(part, at)}</Fragment>
+    ) : i % 3 === 1 ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
+      <a key={i} href={parts[i + 1]} target="_blank" rel="noreferrer" className="ui-link">
+        {part}
+      </a>
+    ) : null,
+  );
 }
 
 /** Colour codes with their colour before them: "#a78bfa". */
@@ -103,7 +125,9 @@ function swatched(text: string, at: number): ReactNode {
 
 /** A point's words without the marks `inline` reads: what a search shows. */
 export function plain(text: string): string {
-  return text.replace(/\*\*([^*]+)\*\*|\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1$2");
+  return text
+    .replace(new RegExp(LINK, "g"), "$1")
+    .replace(/\*\*([^*]+)\*\*|\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1$2");
 }
 
 /**
