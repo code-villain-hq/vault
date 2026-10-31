@@ -464,8 +464,8 @@ function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
     <div
       className={`grid gap-2.5 ${
         palette
-          ? "grid-cols-[repeat(auto-fit,minmax(min(7rem,100%),1fr))]"
-          : "grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))]"
+          ? "grid-cols-[repeat(auto-fit,minmax(min(7rem,calc(50%-0.5rem)),1fr))]"
+          : "grid-cols-[repeat(auto-fit,minmax(min(10rem,calc(50%-0.5rem)),1fr))]"
       }`}
     >
       {rows.map((row) => {
@@ -996,7 +996,7 @@ function RowBars({
   const words = (amount: number) =>
     number.unit ? `${amountWords(amount)} ${number.unit}` : amountWords(amount);
   return (
-    <section className="flex flex-col gap-1.5" aria-label={number.name}>
+    <section className="@container flex flex-col gap-1.5" aria-label={number.name}>
       {(heading || goal !== null) && (
         <h3 className="flex gap-3 text-xs text-muted">
           {heading && <span>{heading}</span>}
@@ -1008,7 +1008,7 @@ function RowBars({
           )}
         </h3>
       )}
-      <ul className="grid max-w-5xl grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content_minmax(0,max-content)] gap-x-3.5">
+      <ul className="grid max-w-5xl grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content] gap-x-3.5 @md:grid-cols-[minmax(0,max-content)_minmax(4rem,1fr)_max-content_minmax(0,max-content)]">
         {bars.map((row) => {
           const amount = numberOf(row, number) ?? 0;
           return (
@@ -1033,7 +1033,8 @@ function RowBars({
                 )}
               </span>
               <span className="text-right font-semibold tabular-nums">{words(amount)}</span>
-              <span className="flex min-w-0 items-center gap-2">
+              {/* Under the bar when the page is narrow, beside it when there's room. */}
+              <span className="col-span-full flex min-w-0 items-center gap-2 @md:col-span-1">
                 <span className="line-clamp-2 min-w-0 flex-1 text-xs text-faint">
                   {rest(fields, row)}
                 </span>
