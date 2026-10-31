@@ -1208,8 +1208,14 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
   // A number's bar is on its column's largest, so the column reads at a glance.
   const most = new Map(
     columns
-      .filter((f) => f.kind === "number" && rows.length > 1)
+      .filter((f) => f.kind === "number" && new Set(rows.map((r) => numberOf(r, f))).size > 2)
       .map((f) => [f.name, Math.max(...rows.map((r) => Math.abs(numberOf(r, f) ?? 0)))]),
+  );
+  // What a column of amounts with a unit comes to, under it.
+  const sums = new Map(
+    columns
+      .filter((f) => f.kind === "number" && f.unit && rows.length > 1)
+      .map((f) => [f.name, rows.reduce((total, r) => total + (numberOf(r, f) ?? 0), 0)]),
   );
   const cell = "h-[34px] border-line border-r border-b px-3 last:border-r-0";
   const header =
@@ -1277,6 +1283,21 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
             </tr>
           ))}
         </tbody>
+        {sums.size > 0 && (
+          <tfoot>
+            <tr className="font-semibold">
+              <td className={`${cell} border-t text-muted`}>Total</td>
+              {columns.map((field) => {
+                const sum = sums.get(field.name);
+                return (
+                  <td key={field.name} className={`${cell} border-t text-right`}>
+                    {sum === undefined ? "" : cellWords(field, Math.round(sum * 100) / 100)}
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
@@ -1417,7 +1438,7 @@ function RowBars({
     return at > 0 && at === told.options.length - 1 ? "bg-ok" : at > 0 ? "bg-info" : "bg-faint";
   };
   const words = (amount: number) =>
-    number.unit ? `${amountWords(amount)} ${number.unit}` : amountWords(amount);
+    number.unit ? `${amountWords(amount, number.unit)} ${number.unit}` : amountWords(amount);
   return (
     <section className="@container flex flex-col gap-1.5" aria-label={number.name}>
       {(heading || goal !== null) && (

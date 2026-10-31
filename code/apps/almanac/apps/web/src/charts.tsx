@@ -132,7 +132,8 @@ export function TrendSet({
   const latest = measurements.at(-1);
   if (!first || !latest) return null;
   const unit = latest.note || first.note;
-  const words = (amount: number) => (unit ? `${amountWords(amount)} ${unit}` : amountWords(amount));
+  const words = (amount: number) =>
+    unit ? `${amountWords(amount, unit)} ${unit}` : amountWords(amount);
   const change = (latest.amount ?? 0) - (first.amount ?? 0);
   const lines = new Map<string, Point[]>();
   if (new Set(measurements.map((p) => p.happened)).size < measurements.length) {

@@ -204,7 +204,7 @@ export function lanesOf(field: Field, rows: Point[]): string[] {
 export function cellWords(field: Field, cell: Cell | undefined): string {
   if (cell === undefined || typeof cell === "boolean") return "";
   if (typeof cell === "number") {
-    return field.unit ? `${amountWords(cell)} ${field.unit}` : amountWords(cell);
+    return field.unit ? `${amountWords(cell, field.unit)} ${field.unit}` : amountWords(cell);
   }
   if (field.kind === "photo") return "";
   if (field.kind === "day") return DAY.test(cell) ? dateWords(cell) : cell;

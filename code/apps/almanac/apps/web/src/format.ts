@@ -98,9 +98,30 @@ export function timeWords(at: string | null): string | null {
 }
 
 /** "1,2 Mio.", "900": an amount in the reader's numbers, short past a million. */
-export function amountWords(amount: number): string {
+export function amountWords(amount: number, unit = ""): string {
+  // Money keeps its cents: 9.95 €, not 10 €.
+  const cents = MONEY.has(unit.toLowerCase()) && !Number.isInteger(amount);
   return new Intl.NumberFormat(undefined, {
     notation: Math.abs(amount) >= 1e6 ? "compact" : "standard",
-    maximumFractionDigits: 1,
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: cents ? 2 : 1,
   }).format(amount);
 }
+
+/** The units that are money. */
+const MONEY = new Set([
+  "€",
+  "$",
+  "£",
+  "¥",
+  "kr",
+  "sek",
+  "nok",
+  "dkk",
+  "eur",
+  "usd",
+  "gbp",
+  "chf",
+  "zł",
+  "kč",
+]);

@@ -1769,12 +1769,54 @@ function useTileFacts(topics: Topic[]): Map<string, TileFacts> {
         .filter((f) => f.value && !f.value.startsWith("#"))
         .slice(0, TILE_FIGURES);
     }
+    // Without figures, its first collection's: the sum of what it costs or
+    // weighs (a number with a unit), and how far its status has come.
+    for (const block of ordered) {
+      const facts = byTopic.get(block.topic_id);
+      if (!facts || facts.figures.length > 0 || block.row_id || block.kind !== "collection")
+        continue;
+      const rows = points.filter((p) => p.block_id === block.id);
+      if (rows.length === 0) continue;
+      facts.figures = sumAndStage(filled(block, rows), rows);
+    }
     return byTopic;
   }, [topics, blocks, points, talks, rings]);
 }
 
 /** How many of its figures a topic's tile shows. */
 const TILE_FIGURES = 2;
+
+/**
+ * A collection in two figures: the sum of its first number with a unit
+ * ("44.6 €", "Preis"), and the furthest step of its status any row has
+ * reached, with how many rows got that far ("5/5", "Bestellt").
+ */
+function sumAndStage(fields: Field[], rows: Point[]): TileFacts["figures"] {
+  const figures: TileFacts["figures"] = [];
+  const amount = fields.find((f) => f.kind === "number" && f.unit);
+  if (amount) {
+    const sum = rows.reduce((total, row) => total + (numberOf(row, amount) ?? 0), 0);
+    if (sum) figures.push({ label: amount.name, value: cellWords(amount, round(sum)) });
+  }
+  const status = fields.find((f) => f.kind === "status" && f.options.length > 1);
+  if (status) {
+    const stage = (row: Point) => status.options.indexOf(String(cellOf(row, status)));
+    const furthest = Math.max(...rows.map(stage));
+    if (furthest > 0) {
+      const there = rows.filter((row) => stage(row) >= furthest).length;
+      figures.push({
+        label: status.options[furthest] ?? status.name,
+        value: `${there}/${rows.length}`,
+      });
+    }
+  }
+  return figures;
+}
+
+/** A sum without the float's crumbs: 44.6, not 44.599999. */
+function round(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 /** One figure over every topic, large. */
 function Overall({ label, value }: { label: string; value: string }) {
