@@ -155,7 +155,7 @@ What they do:
   add_items, add_rows (a collection's rows with their cells),
   change_points, tick, move (a block, or points to a block), remove,
   ask_to_check, offer_reminder, change_brief, change_topic, read_topic (another topic's page,
-  only to read), name_talk and fits_elsewhere. Through the API one more request, with structured
+  only to read), propose_sub_topic, name_talk and fits_elsewhere. Through the API one more request, with structured
   output (`KEEP` in `talks.rs`), reads the same from the exchange. Either
   way `Kept` is a working copy of the page the answer changes, and the
   server writes it with the answer, through the sync engine, so every
@@ -226,7 +226,10 @@ What they do:
     (`page.rs`). The sidebar indents them under the parent, the parent's
     page opens with their tiles (`SubTopics`), and About moves a topic
     under another (`TopicParent`). Deleting the parent leaves them, at the
-    top.
+    top. A topic's talk proposes one under its own topic with
+    propose_sub_topic, as the own topic proposes a topic: a card with
+    Start, its `parent_id` set, its points copied, the parent's staying
+    until they're removed.
 
   Pages from before the set move into it once, on the server's start
   (`convert.rs`, a rule per old kind, the same for every topic): text,

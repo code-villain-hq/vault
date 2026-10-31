@@ -409,8 +409,9 @@ function Said({
 }
 
 /**
- * A topic the workspace's own topic would start, as a card: Start it as it
- * is, or change it first. Once started, a line that opens it.
+ * A topic the workspace's own topic would start, or a sub-topic a topic's
+ * talk would, as a card: Start it as it is, or change it first. Once
+ * started, a line that opens it.
  */
 function Proposed({
   message,
@@ -491,13 +492,16 @@ function Proposed({
       : proposal.template === "study"
         ? "A study"
         : "A collection";
+  const parent = proposal.parent_id && topics.find((t) => t.id === proposal.parent_id);
   return (
     <div className="flex flex-col gap-2.5 rounded-lg bg-surface px-4 py-3.5">
       <div className="flex items-center gap-2">
         <Icon size={15} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
         <p className="min-w-0 truncate font-semibold">{proposal.name}</p>
         <p className="ml-auto shrink-0 text-xs text-faint">
-          {[proposal.group_name, page].filter(Boolean).join(" · ")}
+          {[parent ? `Under ${parent.name}` : proposal.group_name, page]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
       {about(proposal.sticks_to) && <p className="text-muted">{about(proposal.sticks_to)}</p>}

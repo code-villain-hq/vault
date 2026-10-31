@@ -103,6 +103,10 @@ pub struct Proposal {
     pub reminders: Vec<ProposedReminder>,
     /// The topic, once it was started.
     pub topic_id: Option<Uuid>,
+    /// The topic it sits under, when a topic's own talk proposed it.
+    #[serde(default)]
+    #[ts(optional)]
+    pub parent_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

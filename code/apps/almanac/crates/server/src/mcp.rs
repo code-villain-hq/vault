@@ -64,6 +64,7 @@ impl Mode {
                 "change_brief",
                 "change_topic",
                 "read_topic",
+                "propose_sub_topic",
                 "fetch_picture",
                 "set_cover",
                 "name_talk",
@@ -386,6 +387,35 @@ async fn call(
             kept()?.elsewhere = Some(cut(&args.topic, 80));
             Ok("They'll see where it fits.".into())
         }
+        "propose_sub_topic" => {
+            let mut args: ProposeArgs = read(arguments)?;
+            let here: Option<(String, String, Option<Uuid>)> = sqlx::query_as(
+                "SELECT name, group_name, parent_id FROM topics WHERE workspace_id = $1 AND id = $2",
+            )
+            .bind(asking.actor.workspace_id)
+            .bind(asking.topic_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|_| "Almanac couldn't look at the topic.".to_string())?;
+            let (name, group, parent) = here.ok_or("This topic is gone.")?;
+            if parent.is_some() {
+                return Err(format!(
+                    "{name} sits under another topic already: sub-topics go one level deep. \
+                     Say so, and that its parent's talk can start one."
+                ));
+            }
+            args.group = group;
+            let mut proposal = propose(state, asking, args).await?;
+            proposal.parent_id = Some(asking.topic_id);
+            let replaced = kept()?.proposal.replace(proposal).is_some();
+            Ok(if replaced {
+                "Proposed, in place of the one before."
+            } else {
+                "Proposed. They see it as a card under your answer, with Start and Change. \
+                 It isn't started until they click Start."
+            }
+            .into())
+        }
         "propose_topic" => {
             let proposal = propose(state, asking, read(arguments)?).await?;
             let replaced = kept()?.proposal.replace(proposal).is_some();
@@ -557,6 +587,7 @@ struct ProposeArgs {
     name: String,
     sticks_to: String,
     icon: String,
+    #[serde(default)]
     group: String,
     template: String,
     #[serde(default)]
@@ -674,6 +705,7 @@ async fn propose(state: &AppState, asking: &Asking, args: ProposeArgs) -> Result
         points,
         reminders,
         topic_id: None,
+        parent_id: None,
     })
 }
 
@@ -981,6 +1013,46 @@ fn tools(mode: Mode) -> Vec<Value> {
         json!({ "topic": string("The topic's name.") }),
         &["topic"],
     );
+    // What a proposed topic is, for the workspace's own talk and, under
+    // the topic, for a topic's.
+    let proposal = json!({
+        "name": string("A short name, one to three words, in their language."),
+        "sticks_to": string(BRIEF_SAYS),
+        "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
+        "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
+        "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
+        "cards": string("For a collection, what its rows are, in a word or two (\"Plants\", \"Weighings\"): the collection's title. Otherwise left out."),
+        "fields": { "type": "array", "items": field_schema(false), "description": format!("For a collection: {FIELDS_SAY}") },
+        "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions they might ask, each under 12 words." },
+        "points": {
+            "type": "array",
+            "description": "Only what they told you, as its first points: never advice or what you know, which the topic's talks keep with its source.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Routine (a step), Your shelf (a thing they use) or Advice (a sentence); in a collection To do or the collection; in a study Reading, Terms (a term) or What it says (a sentence)."),
+                    "text": string("The point, one short sentence; in a collection, the row's name."),
+                    "cells": { "type": "object", "description": "In a collection, the row's cells by field name, as its fields say: only what they told you.", "additionalProperties": true },
+                },
+                "required": ["block", "text"],
+                "additionalProperties": false,
+            },
+        },
+        "reminders": {
+            "type": "array",
+            "description": "Reminders to offer once it's started, only when they asked for one or clearly need it.",
+            "items": {
+                "type": "object",
+                "properties": reminder_fields,
+                "required": ["title", "due_on"],
+                "additionalProperties": false,
+            },
+        },
+    });
+    let mut sub_topic = proposal.clone();
+    if let Some(props) = sub_topic.as_object_mut() {
+        props.remove("group");
+    }
     match mode {
         Mode::Topic => vec![
             tool(
@@ -1192,6 +1264,15 @@ fn tools(mode: Mode) -> Vec<Value> {
                 json!({ "topic": string("The topic's name.") }),
                 &["topic"],
             ),
+            tool(
+                "propose_sub_topic",
+                "Proposes a sub-topic under this one, shown under your answer as a card they \
+                 start with a click or change first. Only when they ask for one. Its points are \
+                 what this page keeps about it, copied: this page keeps them until they say to \
+                 remove them. One per answer.",
+                sub_topic,
+                &["name", "sticks_to", "icon", "template", "starters"],
+            ),
             fetch_picture,
             set_cover,
             name_talk,
@@ -1203,40 +1284,7 @@ fn tools(mode: Mode) -> Vec<Value> {
                 "Proposes a new topic, shown under your answer as a card they start with a \
                  click or change first. Only when they said what they want to keep track of \
                  and no topic has it already. One per answer.",
-                json!({
-                    "name": string("A short name, one to three words, in their language."),
-                    "sticks_to": string(BRIEF_SAYS),
-                    "icon": { "type": "string", "enum": ICONS, "description": "The icon that fits best." },
-                    "group": string("A short group for the sidebar, such as Home, Work, Health or Learning. Reuse an existing group when one fits."),
-                    "template": { "type": "string", "enum": TEMPLATE_NAMES, "description": TEMPLATES_SAY },
-                    "cards": string("For a collection, what its rows are, in a word or two (\"Plants\", \"Weighings\"): the collection's title. Otherwise left out."),
-                    "fields": { "type": "array", "items": field_schema(false), "description": format!("For a collection: {FIELDS_SAY}") },
-                    "starters": { "type": "array", "items": { "type": "string" }, "description": "Three or four first questions they might ask, each under 12 words." },
-                    "points": {
-                        "type": "array",
-                        "description": "Only what they told you, as its first points: never advice or what you know, which the topic's talks keep with its source.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "block": string("The template's block it goes in, by title: in any of them You (a fact about them, which the topic's About shows); in a routine Routine (a step), Your shelf (a thing they use) or Advice (a sentence); in a collection To do or the collection; in a study Reading, Terms (a term) or What it says (a sentence)."),
-                                "text": string("The point, one short sentence; in a collection, the row's name."),
-                                "cells": { "type": "object", "description": "In a collection, the row's cells by field name, as its fields say: only what they told you.", "additionalProperties": true },
-                            },
-                            "required": ["block", "text"],
-                            "additionalProperties": false,
-                        },
-                    },
-                    "reminders": {
-                        "type": "array",
-                        "description": "Reminders to offer once it's started, only when they asked for one or clearly need it.",
-                        "items": {
-                            "type": "object",
-                            "properties": reminder_fields,
-                            "required": ["title", "due_on"],
-                            "additionalProperties": false,
-                        },
-                    },
-                }),
+                proposal.clone(),
                 &["name", "sticks_to", "icon", "group", "template", "starters"],
             ),
             tool(
@@ -1291,6 +1339,7 @@ mod tests {
         assert!(Mode::Own.tools().contains(&"change_topic"));
         assert!(Mode::Topic.tools().contains(&"change_topic"));
         assert!(Mode::Topic.tools().contains(&"read_topic"));
+        assert!(Mode::Topic.tools().contains(&"propose_sub_topic"));
         for mode in [Mode::Topic, Mode::Own, Mode::SetUp] {
             let tools = tools(mode);
             let described: Vec<&str> = tools

@@ -32,4 +32,8 @@ reminders: Array<ProposedReminder>,
 /**
  * The topic, once it was started.
  */
-topic_id: string | null, };
+topic_id: string | null, 
+/**
+ * The topic it sits under, when a topic's own talk proposed it.
+ */
+parent_id?: string, };

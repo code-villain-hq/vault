@@ -31,7 +31,7 @@ const GROUPS: &str = "SELECT DISTINCT group_name FROM topics \
      WHERE workspace_id = $1 AND group_name <> '' ORDER BY group_name";
 /// A proposal in an answer of the workspace's own topic.
 const PROPOSAL: &str = "SELECT m.proposal FROM messages m JOIN topics t ON t.id = m.topic_id \
-     WHERE m.id = $1 AND m.workspace_id = $2 AND t.kind = 'almanac' AND m.proposal IS NOT NULL";
+     WHERE m.id = $1 AND m.workspace_id = $2 AND m.proposal IS NOT NULL";
 const CHANGES: &str = "SELECT changes FROM messages WHERE id = $1 AND workspace_id = $2";
 const STILL_THERE: &str = "SELECT id FROM topics WHERE workspace_id = $1 AND id = ANY($2)";
 
@@ -161,7 +161,7 @@ pub async fn start(
             given.push(field);
         }
     }
-    if let Some(parent) = request.parent_id {
+    if let Some(parent) = request.parent_id.or(proposal.and_then(|p| p.parent_id)) {
         let mut db = state.pool.acquire().await?;
         almanac_sync::may_sit_under(&mut db, actor.workspace_id, id, parent).await?;
         data.insert("parent_id".into(), json!(parent));
