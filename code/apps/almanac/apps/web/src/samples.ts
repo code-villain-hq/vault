@@ -220,6 +220,32 @@ export function samples(): Sample[] {
       },
     ),
     sample(
+      "Collection: figures",
+      "A few names, each with a short value, draw figures: a tile each, the value large. A colour written #a78bfa shows as its swatch.",
+      cat,
+      "collection",
+      "At a glance",
+      (p) => [
+        p("", "Age", { cells: { Value: "3½ years" } }),
+        p("", "Weight", { cells: { Value: "3,4 kg" } }),
+        p("", "Sleep", { cells: { Value: "12–16 h a day" } }),
+      ],
+      { fields: [field("Value", "text")] },
+    ),
+    sample(
+      "Collection: steps",
+      "Rows in their order can be viewed as steps, numbered, the next one marked.",
+      cat,
+      "collection",
+      "Changing food",
+      (p) => [
+        p("", "Keep the old food as the base"),
+        p("", "Mix in a spoon of the new"),
+        p("", "A little more each week"),
+      ],
+      { view: "steps" },
+    ),
+    sample(
       "Collection: timeline",
       "Days or spans that are past draw a timeline, oldest first.",
       history,
