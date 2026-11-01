@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" font-family="-apple-system, Helvetica, Arial, sans-serif">
+  <title>Bright, indirect light: a metre or two from a window</title>
+  <rect width="640" height="300" fill="#ffffff"/>
+  <rect x="0" y="250" width="640" height="50" fill="#eef2f7"/>
+  <rect x="40" y="40" width="110" height="150" rx="4" fill="#dbeaf7" stroke="#9fb4c8" stroke-width="3"/>
+  <path d="M95 40v150M40 115h110" stroke="#9fb4c8" stroke-width="3"/>
+  <g stroke="#e0b341" stroke-width="2.5" stroke-dasharray="7 6">
+    <path d="M150 80l110 170M150 120l80 130M150 160l50 90"/>
+  </g>
+  <text x="200" y="276" font-size="13" fill="#9a7618" text-anchor="middle">direct sun</text>
+  <g fill="#3f8a52">
+    <ellipse cx="430" cy="170" rx="34" ry="18" transform="rotate(-25 430 170)"/>
+    <ellipse cx="478" cy="160" rx="34" ry="18" transform="rotate(25 478 160)"/>
+    <ellipse cx="454" cy="138" rx="16" ry="30"/>
+  </g>
+  <path d="M428 200h52l-6 50h-40z" fill="#c4724f"/>
+  <g stroke="#5b6470" stroke-width="1.6">
+    <path d="M150 222h270"/>
+    <path d="M150 214v16M420 214v16"/>
+  </g>
+  <text x="285" y="214" font-size="15" fill="#1f2328" text-anchor="middle">1–2 m</text>
+  <text x="454" y="100" font-size="15" fill="#1f2328" text-anchor="middle" font-weight="600">bright, indirect</text>
+  <text x="454" y="80" font-size="12" fill="#5b6470" text-anchor="middle">out of the midday sun</text>
+</svg>

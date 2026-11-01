@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240">
+  <title>A monstera in a terracotta pot</title>
+  <rect width="320" height="240" fill="#f3efe6"/>
+  <rect y="196" width="320" height="44" fill="#e7dfd0"/>
+  <g stroke="#2f6b3e" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M160 178c-4-40-30-70-62-86"/>
+    <path d="M160 178c2-50 10-90 34-118"/>
+    <path d="M160 178c8-30 34-52 72-58"/>
+  </g>
+  <g fill="#3f8a52">
+    <path d="M98 92c-34-6-62 16-60 44 18 6 52 2 70-14 10-10 6-26-10-30z"/>
+    <path d="M194 60c-6-30 20-52 50-46 6 26-6 54-30 64-14 6-20-6-20-18z"/>
+    <path d="M232 120c24-20 58-14 70 10-14 22-46 30-66 18-12-8-12-20-4-28z"/>
+  </g>
+  <g stroke="#f3efe6" stroke-width="3" stroke-linecap="round">
+    <path d="M70 104l-6 14M84 100l-4 16M58 112l-8 10"/>
+    <path d="M222 30l10 10M214 46l12 6M232 22l6 12"/>
+    <path d="M262 122l2 14M278 120l6 12M248 128l-2 12"/>
+  </g>
+  <path d="M120 170h80l-10 54h-60z" fill="#c4724f"/>
+  <rect x="114" y="164" width="92" height="14" rx="3" fill="#b0603f"/>
+</svg>
