@@ -187,8 +187,6 @@
   overflow: hidden;
   background: var(--bg);
 }
-.run-row + .run-row {
-}
 .run-line {
   display: flex;
   align-items: center;

@@ -188,9 +188,6 @@ textarea {
   min-width: 0;
   margin: 0 8px 8px;
 }
-.main {
-  margin: 0 8px 8px 0;
-}
 .app.no-sidebar > .main {
   margin-left: 8px;
 }
@@ -329,6 +326,7 @@ body.dragging * {
 
 /* ------------------------------------------------------------------ main */
 .main {
+  margin: 0 8px 8px 0;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -1371,7 +1369,7 @@ body.dragging * {
   line-height: 1.45;
   color: var(--fg);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   user-select: text;
   cursor: text;
 }
@@ -2714,7 +2712,7 @@ body.dragging * {
 /* An error is all title: cut to one line, it lost the part that said why. */
 .message.solo .what {
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -2738,7 +2736,7 @@ body.dragging * {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* --------------------------------------------------------- context menu */
@@ -2816,8 +2814,6 @@ body.dragging * {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.switch-label {
 }
 .switch-detail {
   font-size: var(--type-ui-small-size);
