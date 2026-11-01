@@ -94,8 +94,8 @@ body {
   .capture-stage { padding: 16px; }
 }
 
-/* The Products menu: a disclosure in the header, opening on the dialog step
-   of grey. It hangs from the nav's right edge, so it stays on the page however
+/* The Products and Extras menus: disclosures in the header, opening on the dialog
+   step of grey. Each hangs from the nav's right edge, so it stays on the page however
    the header wraps. */
 .products-menu summary { display: inline-flex; align-items: center; gap: 0.35rem; padding-block: 0.25rem; cursor: pointer; list-style: none; }
 .products-menu summary::-webkit-details-marker { display: none; }

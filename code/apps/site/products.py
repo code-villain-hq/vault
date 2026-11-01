@@ -1,4 +1,4 @@
-"""The product pages, and the Products menu every page shares.
+"""The product pages, and the Products and Extras menus every page shares.
 
 Each product's words live in studio/content/products/<slug>.toml. A page sits
 one folder down from the site (`forge/index.html`), like the blog.
@@ -24,6 +24,7 @@ ICONS = {
     'caster': '../caster/Resources/AppIcon.svg',
     'glyph': '../glyph/apps/web/public/icon.svg',
     'raven': '../raven/apps/web/public/icon.svg',
+    'almanac': '../../../studio/brand/mark/almanac.svg',
     'theme': '../../../studio/brand/mark/mark.svg',
 }
 
@@ -43,6 +44,11 @@ class Product:
     def line(self) -> str:
         return self.data['line']
 
+    @property
+    def extra(self) -> bool:
+        """Caster and the theme: in the Extras menu, not Products."""
+        return self.data.get('extra', False)
+
 
 def products() -> list[Product]:
     found = [Product(path.stem, tomllib.loads(path.read_text())) for path in CONTENT.glob('*.toml')]
@@ -55,25 +61,32 @@ def icon(slug: str, up: int) -> str:
 
 
 def menu(up: int, here: str | None = None) -> str:
-    """The Products menu and The log, for a page `up` folders below the site."""
+    """The Products and Extras menus and the Blog, for a page `up` folders below the site."""
     root = '../' * up
-    rows = []
-    for product in products():
-        current = ' aria-current="page"' if product.slug == here else ''
-        rows.append(
-            f'          <li><a href="{root}{product.slug}/"{current}>'
-            f'<img src="{icon(product.slug, up)}" width="32" height="32" alt="">'
-            f'<span><b>{html.escape(product.name)}</b><span>{html.escape(product.line)}</span></span></a></li>'
-        )
-    log = ' aria-current="page"' if here == 'log' else ''
+
+    def disclosure(label: str, group: list[Product]) -> list[str]:
+        rows = []
+        for product in group:
+            current = ' aria-current="page"' if product.slug == here else ''
+            rows.append(
+                f'          <li><a href="{root}{product.slug}/"{current}>'
+                f'<img src="{icon(product.slug, up)}" width="32" height="32" alt="">'
+                f'<span><b>{html.escape(product.name)}</b><span>{html.escape(product.line)}</span></span></a></li>'
+            )
+        return [
+            '      <details class="products-menu">',
+            f'        <summary class="ui-link">{label}{CHEVRON}</summary>',
+            '        <ul>',
+            *rows,
+            '        </ul>',
+            '      </details>',
+        ]
+
+    blog = ' aria-current="page"' if here == 'blog' else ''
     return '\n'.join([
-        '      <details class="products-menu">',
-        f'        <summary class="ui-link">Products{CHEVRON}</summary>',
-        '        <ul>',
-        *rows,
-        '        </ul>',
-        '      </details>',
-        f'      <a class="ui-link" href="{root}blog/"{log}>The log</a>',
+        *disclosure('Products', [p for p in products() if not p.extra]),
+        *disclosure('Extras', [p for p in products() if p.extra]),
+        f'      <a class="ui-link" href="{root}blog/"{blog}>Blog</a>',
     ])
 
 

@@ -1,0 +1,48 @@
+name = "Almanac"
+line = "Keeps what you learn, by topic"
+order = 5
+lead = "Keeps what you learn, by topic. Ask a topic things in a talk beside its page, and the page keeps what’s worth keeping, with its sources."
+fact = "Web and desktop app · runs for a company or on one Mac"
+
+[[get]]
+label = "Source"
+href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/almanac"
+
+[hero]
+captures = [
+  { src = "almanac-page.png", alt = "Almanac's page for the topic Pflanzen: Dünger as a table with a total of 15 ml, notes on watering beside the checklist Pflege im Herbst, a callout never to fertilise dry soil, and the field to ask Pflanzen something." },
+]
+caption = "A topic’s page in Almanac · made-up topic for Acme Inc"
+
+[[feature]]
+title = "A topic is its blocks."
+text = "Headings, writing, callouts, lists, checklists, tables and pictures, on a grid that fills the window. Claude keeps each point in the block that holds it, and you can add one yourself."
+captures = [
+  { src = "almanac-add-block.png", alt = "Pflanzen's page with Add a block open: Heading, Paragraph, Callout, List, Checklist, Table and Picture." },
+]
+
+[[feature]]
+title = "Write where it will read."
+text = "A click on a passage writes in it, and Return keeps it and starts the next. A block’s menu adds another right below it, moves it, or makes it half the page."
+captures = [
+  { src = "almanac-writing.png", alt = "A new passage being written on Pflanzen's page, “Im Frühjahr alle zwei Wochen düngen, die Erde vorher anfeuchten.”, with Return to keep it and go on, Shift-Return for a new line and Esc to stop." },
+]
+
+[[feature]]
+title = "Fields pick the picture."
+text = "A collection’s fields have kinds: a choice, text, a number with its unit. They pick how it’s drawn: a table, bars, a checklist, a timeline or a week."
+captures = [
+  { src = "almanac-fields.png", alt = "The fields of Dünger: Art, a choice of Flüssig, Stäbchen or Granulat; Wann, text; and Menge, a number in ml." },
+]
+
+[[point]]
+title = "Ask beside the page."
+text = "A talk answers from what the topic sticks to and what its page keeps. What it changes on the page, it shows, with Undo."
+
+[[point]]
+title = "Claude Code, no key."
+text = "On your Mac, Almanac answers with Claude Code as you’re signed in to it. Claude gets the topic, not your files or your shell."
+
+[[point]]
+title = "Reminders."
+text = "When a talk settles something that comes round, Almanac offers a reminder. Calendar gathers them from every topic."

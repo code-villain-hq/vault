@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Code Villain</title>
-  <meta name="description" content="Code Villain builds Forge, Layer, Caster, Glyph, Raven, and an editor theme: real tools for shipping with AI.">
+  <meta name="description" content="Code Villain builds Forge, Layer, Glyph, Raven and Almanac: real tools for working with AI. On the side, Caster and an editor theme.">
   <link rel="canonical" href="https://www.codevillain.eu/">
   <meta property="og:site_name" content="Code Villain">
   <meta property="og:title" content="Code Villain">
-  <meta property="og:description" content="Code Villain builds Forge, Layer, Caster, Glyph, Raven, and an editor theme: real tools for shipping with AI.">
+  <meta property="og:description" content="Code Villain builds Forge, Layer, Glyph, Raven and Almanac: real tools for working with AI. On the side, Caster and an editor theme.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.codevillain.eu/">
   <link rel="stylesheet" href="assets/fonts/fonts.css">
@@ -30,13 +30,19 @@
         <ul>
           <li><a href="forge/"><img src="../forge/apps/web/public/icon.svg" width="32" height="32" alt=""><span><b>Forge</b><span>AI-first issue tracker</span></span></a></li>
           <li><a href="layer/"><img src="../layer/src-tauri/icons/icon.svg" width="32" height="32" alt=""><span><b>Layer</b><span>Agent development environment for macOS</span></span></a></li>
-          <li><a href="caster/"><img src="../caster/Resources/AppIcon.svg" width="32" height="32" alt=""><span><b>Caster</b><span>Launcher for macOS</span></span></a></li>
           <li><a href="glyph/"><img src="../glyph/apps/web/public/icon.svg" width="32" height="32" alt=""><span><b>Glyph</b><span>Translation with models you run yourself</span></span></a></li>
           <li><a href="raven/"><img src="../raven/apps/web/public/icon.svg" width="32" height="32" alt=""><span><b>Raven</b><span>Observability for the studio’s apps</span></span></a></li>
+          <li><a href="almanac/"><img src="../../../studio/brand/mark/almanac.svg" width="32" height="32" alt=""><span><b>Almanac</b><span>Keeps what you learn, by topic</span></span></a></li>
+        </ul>
+      </details>
+      <details class="products-menu">
+        <summary class="ui-link">Extras<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <ul>
+          <li><a href="caster/"><img src="../caster/Resources/AppIcon.svg" width="32" height="32" alt=""><span><b>Caster</b><span>Launcher for macOS</span></span></a></li>
           <li><a href="theme/"><img src="../../../studio/brand/mark/mark.svg" width="32" height="32" alt=""><span><b>Code Villain</b><span>Editor and terminal theme, in night and day</span></span></a></li>
         </ul>
       </details>
-      <a class="ui-link" href="blog/">The log</a>
+      <a class="ui-link" href="blog/">Blog</a>
     </nav>
       <h1 class="splash">
         <svg viewBox="10 10 327.48 51.58" role="img" aria-label="Code Villain">
@@ -74,20 +80,6 @@
         <a class="ui-link product-more" href="layer/">More on Layer <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
       </article>
 
-      <article class="product product-caster" id="caster" aria-labelledby="caster-title">
-        <header class="product-head"><div class="product-name"><img src="../caster/Resources/AppIcon.svg" width="44" height="44" alt=""><div><h3 id="caster-title">Caster</h3><p>Launcher for macOS</p></div></div></header>
-        <figure class="product-figure">
-          <div class="capture-stage capture-stack">
-            <img src="assets/captures/caster-calculator.png" width="680" height="144" alt="Caster with the query “33 / 3” and the answer 11 from its calculator." loading="lazy">
-            <img src="assets/captures/caster-currency.png" width="680" height="144" alt="Caster with the query “32 sek to eur” and the answer 2.87 EUR." loading="lazy">
-            <img src="assets/captures/caster-apps.png" width="680" height="112" alt="Caster with the query “saf” and Safari as the app to open." loading="lazy">
-          </div>
-          <figcaption>Caster’s own window · a sum, a currency, an app</figcaption>
-        </figure>
-        <p class="product-note">Apps, calculations, and quick answers. A shortcut away.</p>
-        <a class="ui-link product-more" href="caster/">More on Caster <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
-      </article>
-
       <article class="product product-glyph" id="glyph" aria-labelledby="glyph-title">
         <header class="product-head"><div class="product-name"><img src="../glyph/apps/web/public/icon.svg" width="44" height="44" alt=""><div><h3 id="glyph-title">Glyph</h3><p>Translation with models you run yourself</p></div></div></header>
         <figure class="product-figure">
@@ -112,29 +104,60 @@
         <a class="ui-link product-more" href="raven/">More on Raven <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
       </article>
 
-      <article class="product product-theme" id="theme" aria-labelledby="theme-title">
-        <header class="product-head"><div class="product-name"><img src="../../../studio/brand/mark/mark.svg" width="44" height="44" alt=""><div><h3 id="theme-title">Code Villain</h3><p>Editor and terminal theme, in night and day</p></div></div></header>
+      <article class="product product-almanac" id="almanac" aria-labelledby="almanac-title">
+        <header class="product-head"><div class="product-name"><img src="../../../studio/brand/mark/almanac.svg" width="44" height="44" alt=""><div><h3 id="almanac-title">Almanac</h3><p>Keeps what you learn, by topic</p></div></div></header>
         <figure class="product-figure">
           <div class="capture-stage">
-            <img src="assets/captures/theme-code.png" width="1052" height="477" alt="TypeScript from Layer&#x27;s diff parser in the night theme: keywords in violet, functions in blue, strings in green, numbers in amber, comments in grey italics." loading="lazy">
+            <img src="assets/captures/almanac-page.png" width="1280" height="800" alt="Almanac&#x27;s page for the topic Pflanzen: Dünger as a table with a total of 15 ml, notes on watering beside the checklist Pflege im Herbst, a callout never to fertilise dry soil, and the field to ask Pflanzen something." loading="lazy">
           </div>
-          <figcaption>Night · Layer’s diff parser</figcaption>
+          <figcaption>A topic’s page in Almanac · made-up topic for Acme Inc</figcaption>
         </figure>
-        <p class="product-note">VS Code, Cursor, Neovim, WezTerm, and the Starship prompt, in Nightshade’s colours for code.</p>
-        <a class="ui-link product-more" href="theme/">More on Code Villain <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
+        <p class="product-note">Ask a topic things in a talk beside its page. The page keeps what’s worth keeping, with its sources.</p>
+        <a class="ui-link product-more" href="almanac/">More on Almanac <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
       </article>
     </section>
 
     <section class="shared page-width" aria-labelledby="shared-title">
       <h2 id="shared-title">Built one way.</h2>
       <ul class="shared-points">
-        <li><strong>Offline first.</strong> Forge, Glyph and Raven keep a copy of the workspace on every client. It opens at once and catches up when the network returns.</li>
+        <li><strong>Offline first.</strong> Forge, Glyph, Raven and Almanac keep a copy of the workspace on every client. It opens at once and catches up when the network returns.</li>
         <li><strong>Your company’s sign-in.</strong> A server runs for one company. People sign in with its account over OpenID Connect and arrive over SCIM. No passwords, no invites.</li>
         <li><strong>No server needed.</strong> The desktop apps start their own Postgres and server for the workspaces on that Mac.</li>
         <li><strong>In the open.</strong> Every tool lives in <a class="ui-link" href="https://git.codevillain.eu/code-villain/vault">one public repository</a>.</li>
       </ul>
     </section>
+
+    <section class="extras page-width" id="extras" aria-labelledby="extras-title">
+      <h2 id="extras-title">Extras</h2>
+      <div class="showcase">
+        <article class="product product-caster" id="caster" aria-labelledby="caster-title">
+          <header class="product-head"><div class="product-name"><img src="../caster/Resources/AppIcon.svg" width="44" height="44" alt=""><div><h3 id="caster-title">Caster</h3><p>Launcher for macOS</p></div></div></header>
+          <figure class="product-figure">
+            <div class="capture-stage capture-stack">
+              <img src="assets/captures/caster-calculator.png" width="680" height="144" alt="Caster with the query “33 / 3” and the answer 11 from its calculator." loading="lazy">
+              <img src="assets/captures/caster-currency.png" width="680" height="144" alt="Caster with the query “32 sek to eur” and the answer 2.87 EUR." loading="lazy">
+              <img src="assets/captures/caster-apps.png" width="680" height="112" alt="Caster with the query “saf” and Safari as the app to open." loading="lazy">
+            </div>
+            <figcaption>Caster’s own window · a sum, a currency, an app</figcaption>
+          </figure>
+          <p class="product-note">Apps, calculations, and quick answers. A shortcut away.</p>
+          <a class="ui-link product-more" href="caster/">More on Caster <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
+        </article>
+
+        <article class="product product-theme" id="theme" aria-labelledby="theme-title">
+          <header class="product-head"><div class="product-name"><img src="../../../studio/brand/mark/mark.svg" width="44" height="44" alt=""><div><h3 id="theme-title">Code Villain</h3><p>Editor and terminal theme, in night and day</p></div></div></header>
+          <figure class="product-figure">
+            <div class="capture-stage">
+              <img src="assets/captures/theme-code.png" width="1052" height="477" alt="TypeScript from Layer&#x27;s diff parser in the night theme: keywords in violet, functions in blue, strings in green, numbers in amber, comments in grey italics." loading="lazy">
+            </div>
+            <figcaption>Night · Layer’s diff parser</figcaption>
+          </figure>
+          <p class="product-note">VS Code, Cursor, Neovim, WezTerm, and the Starship prompt, in Nightshade’s colours for code.</p>
+          <a class="ui-link product-more" href="theme/">More on Code Villain <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a>
+        </article>
+      </div>
+    </section>
   </main>
-  <footer class="home-foot page-width"><span>Code Villain</span><a class="ui-link" href="blog/">The log <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a></footer>
+  <footer class="home-foot page-width"><span>Code Villain</span><a class="ui-link" href="blog/">Blog <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></a></footer>
 </body>
 </html>

@@ -1,6 +1,7 @@
 name = "Code Villain"
 line = "Editor and terminal theme, in night and day"
-order = 6
+order = 7
+extra = true
 lead = "VS Code, Cursor, Neovim, WezTerm, and the Starship prompt, in Nightshade’s colours for code."
 fact = "Night and day · built from the apps’ own tokens"
 

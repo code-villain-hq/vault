@@ -104,12 +104,12 @@ def write(target: Path, drafts: bool) -> list[str]:
             minutes=max(1, math.ceil(words / WORDS_PER_MINUTE)),
             draft=('\n        <span aria-hidden="true">·</span>\n        ' + DRAFT) if post.draft else '',
             body=body,
-            menu=products.menu(1, 'log'),
+            menu=products.menu(1, 'blog'),
         )
         (target / f'{post.slug}.html').write_text(page)
         names.append(f'{post.slug}.html')
     rows = '\n'.join(row(post) for post in shown)
-    (target / 'index.html').write_text(Template((TEMPLATES / 'index.html').read_text()).substitute(rows=rows, menu=products.menu(1, 'log')))
+    (target / 'index.html').write_text(Template((TEMPLATES / 'index.html').read_text()).substitute(rows=rows, menu=products.menu(1, 'blog')))
     return ['index.html', *names]
 
 

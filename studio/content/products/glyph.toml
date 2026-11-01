@@ -1,6 +1,6 @@
 name = "Glyph"
 line = "Translation with models you run yourself"
-order = 4
+order = 3
 lead = "Translates an app’s strings with models you run yourself. A team reviews what they propose before it ships."
 fact = "Web and desktop app · runs for a company or on one Mac"
 

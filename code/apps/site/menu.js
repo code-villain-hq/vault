@@ -1,5 +1,5 @@
-// The Products menu is a <details>, so it opens without this script.
-// This closes it the way a menu closes: Escape, or a click outside it.
+// The Products and Extras menus are <details>, so they open without this script.
+// This closes one the way a menu closes: Escape, or a click outside it.
 for (const menu of document.querySelectorAll('.products-menu')) {
   document.addEventListener('click', (event) => {
     if (menu.open && !menu.contains(event.target)) menu.open = false;

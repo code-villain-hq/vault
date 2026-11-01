@@ -68,6 +68,7 @@ code/apps/site/caster/
 code/apps/site/glyph/
 code/apps/site/raven/
 code/apps/site/theme/
+code/apps/site/almanac/
 
 # Playwright MCP snapshots
 .playwright-mcp/

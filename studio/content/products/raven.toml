@@ -1,6 +1,6 @@
 name = "Raven"
 line = "Observability for the studio’s apps"
-order = 5
+order = 4
 lead = "Whether an app is up, how each action behaves, and where a slow call spent its time."
 fact = "Web and desktop app · runs for a company or on one Mac"
 

@@ -19,7 +19,7 @@ The site's blog: an index of posts and the post page. It follows [`../principles
 
 ## Post
 
-- A meta line in `small`, `faint`: "The log" (link back), product, date, reading time, and a draft pill when it is one.
+- A meta line in `small`, `faint`: "Blog" (link back), product, date, reading time, and a draft pill when it is one.
 - The title in `display`. Section headings in `headline`. Both Grenze, both sentence case.
 - Body in `body`, 17px, at a 66ch measure.
 - Links are ink, bold, underlined at 45%. Inline code in mono on `surface` with `radius-sm`.

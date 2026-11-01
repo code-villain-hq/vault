@@ -1,6 +1,7 @@
 name = "Caster"
 line = "Launcher for macOS"
-order = 3
+order = 6
+extra = true
 lead = "Apps, calculations, and quick answers. A shortcut away."
 fact = "macOS 27 · build from source for now"
 
