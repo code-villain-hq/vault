@@ -39,6 +39,7 @@ import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf, sumOf } from "./
 import { EditCell, itemDone, useItemReminders } from "./editing";
 import { FieldsDialog } from "./fields";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
+import { asksHere } from "./here";
 import { hueOf, hueStyle } from "./hues";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
 import { childrenOf, isOwn, PageHeader, parentOf, useTopics, useUnread } from "./layout";
@@ -1736,12 +1737,12 @@ function RenameBlock({ block, onClose }: { block: Block; onClose: () => void }) 
 
 /**
  * Without a Claude key nothing answers: say so where it's noticed. On this
- * Mac Claude Code answers, and a talk says when it can't; asking here would
- * start it on every page.
+ * Mac, and in the desktop app wherever Claude Code here answers, it does,
+ * and a talk says when it can't; asking here would start it on every page.
  */
 function NoKey() {
   const { place } = useWorkspace();
-  return place.kind === "mac" ? null : <NoKeyOnServer />;
+  return place.kind === "mac" || asksHere(place) ? null : <NoKeyOnServer />;
 }
 
 function NoKeyOnServer() {
