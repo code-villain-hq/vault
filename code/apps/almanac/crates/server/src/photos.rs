@@ -182,6 +182,7 @@ pub async fn from_web(
     let client = reqwest::Client::builder()
         .timeout(FETCH_FOR)
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) Almanac")
+        .dns_resolver(PublicOnly)
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             if attempt.previous().len() > 5 || !public(attempt.url()) {
                 attempt.stop()
@@ -223,7 +224,8 @@ enum Fetched {
 }
 
 /// A public https address: no other scheme, no name or address of this
-/// Mac or a private network.
+/// Mac or a private network. A name is resolved by [`PublicOnly`], so one
+/// that leads there doesn't connect either.
 fn public(url: &reqwest::Url) -> bool {
     use std::net::IpAddr;
     if url.scheme() != "https" {
@@ -235,15 +237,64 @@ fn public(url: &reqwest::Url) -> bool {
     let host = host
         .trim_start_matches('[')
         .trim_end_matches(']')
+        .trim_end_matches('.')
         .to_ascii_lowercase();
     match host.parse::<IpAddr>() {
-        Ok(IpAddr::V4(ip)) => {
-            !(ip.is_loopback() || ip.is_unspecified() || ip.is_private() || ip.is_link_local())
-        }
-        Ok(IpAddr::V6(ip)) => !(ip.is_loopback() || ip.is_unspecified()),
+        Ok(ip) => public_ip(ip),
         Err(_) => {
             !(host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local"))
         }
+    }
+}
+
+/// An address on the internet: not this Mac's, a private network's (a
+/// tailnet's too), a link's, or one kept for documentation or later.
+fn public_ip(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(ip) => {
+            let [a, b, ..] = ip.octets();
+            !(ip.is_loopback()
+                || ip.is_unspecified()
+                || ip.is_private()
+                || ip.is_link_local()
+                || ip.is_broadcast()
+                || ip.is_multicast()
+                || ip.is_documentation()
+                || a == 0
+                || a >= 240
+                || (a == 100 && (64..128).contains(&b))
+                || (a == 198 && (18..20).contains(&b)))
+        }
+        IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
+            Some(v4) => public_ip(IpAddr::V4(v4)),
+            None => {
+                !(ip.is_loopback()
+                    || ip.is_unspecified()
+                    || ip.is_unique_local()
+                    || ip.is_unicast_link_local()
+                    || ip.is_multicast()
+                    || ip.segments()[..2] == [0x2001, 0xdb8])
+            }
+        },
+    }
+}
+
+/// Resolves a name to its public addresses only, and the fetch connects to
+/// those: a name that leads to this Mac or a private network finds nothing.
+struct PublicOnly;
+
+impl reqwest::dns::Resolve for PublicOnly {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let found = tokio::net::lookup_host((host.as_str(), 443)).await?;
+            let public: Vec<_> = found.filter(|a| public_ip(a.ip())).collect();
+            if public.is_empty() {
+                return Err(format!("{host} isn't a public address").into());
+            }
+            Ok(Box::new(public.into_iter()) as reqwest::dns::Addrs)
+        })
     }
 }
 
@@ -405,6 +456,19 @@ mod tests {
         assert!(!ok("https://127.0.0.1:7785/api"));
         assert!(!ok("https://192.168.1.4/x.png"));
         assert!(!ok("https://[::1]/x.png"));
+        assert!(!ok("https://localhost./x.png"));
+        assert!(!ok("https://[::ffff:127.0.0.1]/x.png"));
+        assert!(!ok("https://[fd12::1]/x.png"));
+        assert!(!ok("https://[fe80::1]/x.png"));
+        assert!(!ok("https://100.100.1.2/x.png"));
+        assert!(ok("https://[2a00:1450:4001::200e]/x.png"));
+    }
+
+    #[tokio::test]
+    async fn a_name_that_leads_here_finds_nothing() {
+        use reqwest::dns::Resolve;
+        let name = "localhost".parse().unwrap();
+        assert!(PublicOnly.resolve(name).await.is_err());
     }
 
     #[test]
