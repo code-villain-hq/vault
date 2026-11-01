@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errMessage } from "../lib/api";
 import { paneName } from "../lib/derive";
 import { lineOf, parseDiff, toTree, type DiffLine, type Node } from "../lib/diff";
-import { dragGrip } from "../lib/drag";
+import { dragGrip, gripMove } from "../lib/drag";
 import { useRunningAgentsOf } from "../lib/panes";
 import { read, write } from "../lib/persist";
+import { pressKeys } from "../lib/press";
 import { reportRepoResults } from "../lib/report";
 import type {
   ChangedFile,
@@ -47,6 +48,10 @@ const fileKey = (f: ChangedFile) => `${f.checkout_id}:${f.path}`;
 
 /** Lines drawn before the rest is held back behind a click. */
 const LINE_BUDGET = 3000;
+
+/** The file list's bounds: never dragged away, never the whole pane; the diff is the point. */
+const FILES_MIN = 150;
+const FILES_MAX = 640;
 
 export function DiffView({ task }: { task: TaskView }) {
   // Loading follows the sidebar's poll, so it fails in the top bar; what the
@@ -356,9 +361,13 @@ export function DiffView({ task }: { task: TaskView }) {
         return (
           <div key={`d:${node.path}`}>
             <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={!closed}
               className="diff-dir"
               style={pad}
               onClick={() => setShut((c) => ({ ...c, [key]: !closed }))}
+              onKeyDown={pressKeys(() => setShut((c) => ({ ...c, [key]: !closed })))}
             >
               <span className={`chev${closed ? "" : " open"}`}>
                 <ChevronIcon />
@@ -373,9 +382,12 @@ export function DiffView({ task }: { task: TaskView }) {
       return (
         <div
           key={fileKey(f)}
+          role="button"
+          tabIndex={0}
           className={`diff-file${fileKey(f) === selected ? " active" : ""}`}
           style={pad}
           onClick={() => setSelected(fileKey(f))}
+          onKeyDown={pressKeys(() => setSelected(fileKey(f)))}
           title={`${f.repo}/${f.path}`}
         >
           <span className="chev-spacer" aria-hidden />
@@ -715,19 +727,26 @@ export function DiffView({ task }: { task: TaskView }) {
                 (inRange ? " picked" : "")
               }
             >
-              {/* The old version's number, then the new one's, as the editor numbers a diff. */}
-              <span
-                className="ln"
-                title={
-                  at
-                    ? "Click to comment; shift-click another line to comment on the range"
-                    : undefined
-                }
-                onClick={(e) => pickLineRef.current(l, e.shiftKey)}
-              >
-                <span>{l.oldLine ?? ""}</span>
-                <span>{l.newLine ?? ""}</span>
-              </span>
+              {/* The old version's number, then the new one's, as the editor numbers a diff.
+                  A line that can take a comment is a button: Enter as a click, ⇧Enter as a shift-click. */}
+              {at ? (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="ln"
+                  title="Click to comment; shift-click another line to comment on the range"
+                  onClick={(e) => pickLineRef.current(l, e.shiftKey)}
+                  onKeyDown={pressKeys((e) => pickLineRef.current(l, e.shiftKey))}
+                >
+                  <span>{l.oldLine ?? ""}</span>
+                  <span>{l.newLine ?? ""}</span>
+                </span>
+              ) : (
+                <span className="ln">
+                  <span>{l.oldLine ?? ""}</span>
+                  <span>{l.newLine ?? ""}</span>
+                </span>
+              )}
               {l.kind === "add" || l.kind === "del" || l.kind === "ctx" ? (
                 <>
                   <span className="sg">{l.kind === "add" ? "+" : l.kind === "del" ? "−" : ""}</span>
@@ -830,8 +849,14 @@ export function DiffView({ task }: { task: TaskView }) {
               <div key={g.checkout.id}>
                 {multi && (
                   <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={!closed}
                     className="diff-group"
                     onClick={() => setShut((c) => ({ ...c, [g.checkout.id]: !closed }))}
+                    onKeyDown={pressKeys(() =>
+                      setShut((c) => ({ ...c, [g.checkout.id]: !closed })),
+                    )}
                   >
                     <span className={`chev${closed ? "" : " open"}`}>
                       <ChevronIcon />
@@ -847,8 +872,22 @@ export function DiffView({ task }: { task: TaskView }) {
         </div>
 
         <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the file list"
+          aria-valuenow={width}
+          aria-valuemin={FILES_MIN}
+          aria-valuemax={FILES_MAX}
+          tabIndex={0}
           className="diff-grip"
           title="Drag to resize"
+          onKeyDown={(e) => {
+            const by = gripMove(e);
+            if (by === null) return;
+            const next = Math.min(FILES_MAX, Math.max(FILES_MIN, width + by));
+            setWidth(next);
+            write("diffWidth", next);
+          }}
           onMouseDown={(e) => {
             const startX = e.clientX;
             const startWidth = width;
@@ -858,9 +897,7 @@ export function DiffView({ task }: { task: TaskView }) {
             dragGrip(
               e,
               (m) => {
-                // Clamped so the list cannot be dragged away entirely or take
-                // the whole pane; the diff is still the point of this view.
-                next = Math.min(640, Math.max(150, startWidth + m.clientX - startX));
+                next = Math.min(FILES_MAX, Math.max(FILES_MIN, startWidth + m.clientX - startX));
                 if (filesRef.current) filesRef.current.style.width = `${next}px`;
               },
               () => {

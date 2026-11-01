@@ -4,6 +4,7 @@ import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, useEpicViews } from "../../lib/epicState";
 import type { EpicOf } from "../../lib/grouping";
 import { useTaskAgents } from "../../lib/panes";
+import { pressKeys } from "../../lib/press";
 import type { TaskView } from "../../lib/types";
 import { useStore } from "../../store";
 import { ChevronIcon } from "../icons";
@@ -69,8 +70,12 @@ export const EpicRow = memo(function EpicRow({
   return (
     <div>
       <div
+        // A div, not a button: it holds the chevron.
+        role="button"
+        tabIndex={0}
         className={`ws${selected === epic.id ? " active" : ""}`}
         onClick={() => onSelect(epic.id)}
+        onKeyDown={pressKeys(() => onSelect(epic.id))}
         onContextMenu={(e) => {
           e.preventDefault();
           onMenu(e.clientX, e.clientY, epic);
@@ -78,11 +83,16 @@ export const EpicRow = memo(function EpicRow({
       >
         <div className="ws-title">
           <span
+            role="button"
+            tabIndex={0}
+            aria-expanded={open}
+            aria-label="Sub-tasks"
             className={`chev${open ? " open" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggle(epic.id);
             }}
+            onKeyDown={pressKeys(() => onToggle(epic.id))}
           >
             <ChevronIcon />
           </span>
@@ -153,17 +163,26 @@ export const JiraEpicRow = memo(function JiraEpicRow({
   return (
     <div>
       <div
+        // A div, not a button: it holds the chevron.
+        role="button"
+        tabIndex={0}
         className="ws"
         title="Not an epic here yet: open it to make it one"
         onClick={() => onOpen(epic, tasks)}
+        onKeyDown={pressKeys(() => onOpen(epic, tasks))}
       >
         <div className="ws-title">
           <span
+            role="button"
+            tabIndex={0}
+            aria-expanded={open}
+            aria-label="Its tasks"
             className={`chev${open ? " open" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggle(id);
             }}
+            onKeyDown={pressKeys(() => onToggle(id))}
           >
             <ChevronIcon />
           </span>
@@ -216,8 +235,11 @@ function SubLine({
   const dot = state === "waits" ? "queued" : agents.waiting ? "idle" : agents.busy ? "live" : "";
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={`sub-row${selected ? " active" : ""}`}
       onClick={() => onSelect(task.id)}
+      onKeyDown={pressKeys(() => onSelect(task.id))}
       onContextMenu={(e) => {
         e.preventDefault();
         onMenu(e.clientX, e.clientY, task);

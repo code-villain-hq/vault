@@ -4,6 +4,7 @@ import { canRestart, paneScope, paneState } from "../lib/derive";
 import { useFocusedPane } from "../lib/goto";
 import { usePanesOf } from "../lib/panes";
 import { read, write } from "../lib/persist";
+import { pressKeys } from "../lib/press";
 import { ago } from "../lib/time";
 import type { PaneInfo, Resumable, TaskView } from "../lib/types";
 import { useStore } from "../store";
@@ -298,10 +299,14 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
     <>
       <div className="pane-bar">
         {panes.map((p) => (
+          // A div, not a button: it holds buttons of its own.
           <div
             key={p.id}
+            role="button"
+            tabIndex={0}
             className={`pane-tab${p.id === active ? " active" : ""}`}
             onClick={() => setActive(p.id)}
+            onKeyDown={pressKeys(() => setActive(p.id))}
           >
             <span className={`dot ${paneState(p).dot}`} title={paneState(p).label} />
             {p.topic ? (
@@ -334,12 +339,15 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
               !closing.has(p.id) &&
               !restarting.has(p.id) && (
                 <span
+                  role="button"
+                  tabIndex={0}
                   className="x"
                   title="Hand off to another agent"
                   onClick={(e) => {
                     e.stopPropagation();
                     startHandoff(p);
                   }}
+                  onKeyDown={pressKeys(() => startHandoff(p))}
                 >
                   <SwapIcon />
                 </span>
@@ -348,11 +356,15 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
               <Spinner />
             ) : (
               <span
+                role="button"
+                tabIndex={0}
                 className="x"
+                aria-label="Close this pane"
                 onClick={(e) => {
                   e.stopPropagation();
                   void closePane(p);
                 }}
+                onKeyDown={pressKeys(() => void closePane(p))}
               >
                 <CloseIcon />
               </span>
@@ -364,18 +376,26 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         {multi && (
           <>
             <span
+              role="button"
+              tabIndex={0}
+              aria-pressed={scope === null}
               className={`ui-chip repo-tag${scope === null ? " active" : ""}`}
               title="New panes start at the task root, seeing every repo"
               onClick={() => setScope(null)}
+              onKeyDown={pressKeys(() => setScope(null))}
             >
               all
             </span>
             {task.checkouts.map((c) => (
               <span
                 key={c.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={scope === c.id}
                 className={`ui-chip repo-tag${scope === c.id ? " active" : ""}`}
                 title={`New panes start inside ${c.project_name}`}
                 onClick={() => setScope(c.id)}
+                onKeyDown={pressKeys(() => setScope(c.id))}
               >
                 {c.project_name}
               </span>

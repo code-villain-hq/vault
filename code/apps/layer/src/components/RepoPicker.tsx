@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { groupProjects } from "../lib/derive";
+import { pressKeys } from "../lib/press";
 import type { Project } from "../lib/types";
 import { ChevronIcon } from "./icons";
 
@@ -91,9 +92,16 @@ export function RepoPicker({
           const isCollapsed = collapsed[g.group] ?? false;
           return (
             <div key={g.group || "_"}>
+              {/* A div, not a button: it holds the all/none button. */}
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={!isCollapsed}
                 className="group-head"
                 onClick={() => setCollapsed((c) => ({ ...c, [g.group]: !isCollapsed }))}
+                onKeyDown={pressKeys(() =>
+                  setCollapsed((c) => ({ ...c, [g.group]: !isCollapsed })),
+                )}
               >
                 <span className={`chev${isCollapsed ? "" : " open"}`}>
                   <ChevronIcon />
@@ -101,8 +109,15 @@ export function RepoPicker({
                 {g.label}
                 <span className="count">{g.projects.length}</span>
                 <div className="spacer" />
-                <div className="acts" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => setGroup(ids, !all)}>{all ? "none" : "all"}</button>
+                <div className="acts">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGroup(ids, !all);
+                    }}
+                  >
+                    {all ? "none" : "all"}
+                  </button>
                 </div>
               </div>
               {!isCollapsed &&

@@ -582,6 +582,7 @@ export function BrowserPanel({
             {driving && driver && (
               // Over the page and taking its clicks: the user's input would
               // land in the middle of the agent's.
+              // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- a shield, not a control: Take over, on it, is
               <div className="browser-driving" onMouseDown={(e) => e.preventDefault()}>
                 <div className="browser-driving-card">
                   <span className="dot live" />

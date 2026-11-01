@@ -2,6 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type ReactNode } from "react";
 import { canRestart, paneName, paneState, showsFolded } from "../lib/derive";
 import { read, write } from "../lib/persist";
+import { pressKeys } from "../lib/press";
 import type { PaneInfo, SlackThreadView } from "../lib/types";
 import { useStore } from "../store";
 import { ChevronIcon } from "./icons";
@@ -43,7 +44,14 @@ export function ChatItem({
 }: ItemProps) {
   const agents = useStore((s) => s.agents);
   return (
-    <div className={`chat-item${active ? " active" : ""}`} onClick={() => onSelect(p.id)}>
+    // A div, not a button: it holds buttons of its own.
+    <div
+      role="button"
+      tabIndex={0}
+      className={`chat-item${active ? " active" : ""}`}
+      onClick={() => onSelect(p.id)}
+      onKeyDown={pressKeys(() => onSelect(p.id))}
+    >
       <span className={`dot ${paneState(p).dot}`} title={paneState(p).label} />
       <span className="chat-item-text">
         <span className="chat-item-title" title={paneName(p)}>
@@ -54,12 +62,17 @@ export function ChatItem({
           {thread && (
             <>
               <span
+                role="button"
+                tabIndex={0}
                 className="ui-link chat-item-slack"
                 title={`Its replies go to the Slack thread in ${thread.label}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (thread.link) void openUrl(thread.link);
                 }}
+                onKeyDown={pressKeys(() => {
+                  if (thread.link) void openUrl(thread.link);
+                })}
               >
                 {thread.label} ↗
               </span>
@@ -72,12 +85,15 @@ export function ChatItem({
       </span>
       {canRestart(p, agents) && !restarting && <RestartButton pane={p} onRestart={onRestart} />}
       <span
+        role="button"
+        tabIndex={0}
         className="x"
         title="Close this chat"
         onClick={(e) => {
           e.stopPropagation();
           onClose(p.id);
         }}
+        onKeyDown={pressKeys(() => onClose(p.id))}
       >
         ✕
       </span>

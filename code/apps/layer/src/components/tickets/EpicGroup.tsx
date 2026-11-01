@@ -1,4 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
+import { pressKeys } from "../../lib/press";
 import type { Ticket } from "../../lib/types";
 import { ChevronIcon } from "../icons";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
@@ -37,7 +38,16 @@ export function EpicGroup({
 }) {
   return (
     <div className="epic">
-      <div className="epic-head" onClick={onToggle} onContextMenu={onContextMenu}>
+      {/* A div, not a button: it holds buttons of its own. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!closed}
+        className="epic-head"
+        onClick={onToggle}
+        onKeyDown={pressKeys(onToggle)}
+        onContextMenu={onContextMenu}
+      >
         <span className={`chev${closed ? "" : " open"}`}>
           <ChevronIcon />
         </span>

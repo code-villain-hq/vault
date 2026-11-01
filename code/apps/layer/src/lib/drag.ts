@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 
 /**
  * Dragging a grip that resizes part of the layout: the sidebar's edge
@@ -59,6 +59,28 @@ export function dragGrip(
   window.addEventListener("mouseup", up);
   window.addEventListener("blur", up);
   return true;
+}
+
+/**
+ * How far ←, →, Home or End on a focused grip move its edge, in the UI's
+ * pixels: 16 (with ⇧, 64), or as far as it goes (±Infinity, which the grip's
+ * own bounds then hold). Null for any other key. The sidebar's edge moves
+ * the same way (TASK-16).
+ */
+export function gripMove(e: KeyboardEvent): number | null {
+  const step = e.shiftKey ? 64 : 16;
+  const by =
+    e.key === "ArrowLeft"
+      ? -step
+      : e.key === "ArrowRight"
+        ? step
+        : e.key === "Home"
+          ? -Infinity
+          : e.key === "End"
+            ? Infinity
+            : null;
+  if (by !== null) e.preventDefault();
+  return by;
 }
 
 export const SIDEBAR_DEFAULT = 260;

@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { dragGrip } from "../../lib/drag";
+import { dragGrip, gripMove } from "../../lib/drag";
 import { read, write } from "../../lib/persist";
 import { useSpecs } from "../../lib/specs";
 import type { RepoSpec, SpecPart, TaskSpec, TaskView } from "../../lib/types";
@@ -55,8 +55,23 @@ export function SpecSide({
   return (
     <>
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the spec's panel"
+        aria-valuenow={width}
+        aria-valuemin={SIDE_MIN}
+        tabIndex={0}
         className="diff-grip spec-grip"
         title="Drag to resize; double-click for the usual width"
+        onKeyDown={(e) => {
+          const by = gripMove(e);
+          if (by === null) return;
+          const room = e.currentTarget.parentElement?.clientWidth ?? 0;
+          const most = Math.max(SIDE_MIN, room - EDITOR_MIN);
+          const next = Math.min(most, Math.max(SIDE_MIN, Math.min(width, most) - by));
+          setWidth(next);
+          write("specSideWidth", next);
+        }}
         onMouseDown={(e) => {
           // Not onDoubleClick: the drag the first press starts gives the
           // release to `body`, so the dblclick event never reaches the grip.

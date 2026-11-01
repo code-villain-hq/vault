@@ -215,6 +215,7 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
         hairline, a long review's tables and rules ran into the next one and
         there was no telling where one reviewer stopped and the next began.
       */}
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- a wider target for the checkbox, which the keyboard reaches */}
       <div className="row fb-pick" onClick={onToggle}>
         <input
           type="checkbox"

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { canRestart, paneName } from "../lib/derive";
+import { pressKeys } from "../lib/press";
 import type { PaneInfo } from "../lib/types";
 import { useStore } from "../store";
 import { ReloadIcon } from "./icons";
@@ -47,6 +48,8 @@ export function RestartButton({
 }) {
   return (
     <span
+      role="button"
+      tabIndex={0}
       className="x"
       title={
         pane.running
@@ -57,6 +60,7 @@ export function RestartButton({
         e.stopPropagation();
         onRestart(pane);
       }}
+      onKeyDown={pressKeys(() => onRestart(pane))}
     >
       <ReloadIcon />
     </span>

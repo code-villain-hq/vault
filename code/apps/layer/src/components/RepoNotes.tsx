@@ -86,6 +86,7 @@ export function RepoNotes({
   // note is only added by Add note or ⌘Enter: clicking away from one half
   // written is not asking to keep it.
   const editor = (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- not a control: it hears its fields' Esc, and focus leaving them
     <div
       className="repo-note-edit"
       onBlur={(e) => {

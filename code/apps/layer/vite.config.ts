@@ -15,18 +15,7 @@ const rules = lint(
 // https://vite.dev/config/
 export default defineConfig({
   fmt: fmt(generated),
-  lint: {
-    ...rules,
-    rules: {
-      ...rules.rules,
-      // Rows, pane bars and chips take clicks on divs and spans, which the
-      // keyboard can't reach; the app's keymap covers the common ones. Each
-      // becomes a control in a change of its own, then these come back on.
-      "jsx-a11y/no-static-element-interactions": "off",
-      "jsx-a11y/click-events-have-key-events": "off",
-    },
-    ignorePatterns: generated,
-  },
+  lint: { ...rules, ignorePatterns: generated },
   plugins: [react()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

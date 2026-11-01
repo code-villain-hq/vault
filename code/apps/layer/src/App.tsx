@@ -25,6 +25,7 @@ import { UsageView } from "./components/UsageView";
 import { api } from "./lib/api";
 import { CHAT_TASK_ID, needsYou, repoTrouble, reviewCounts, taskTotals } from "./lib/derive";
 import { goTo } from "./lib/goto";
+import { pressKeys } from "./lib/press";
 import { specProgress, useSpecs } from "./lib/specs";
 import type { TaskView } from "./lib/types";
 import { selectedTask, useStore, type View } from "./store";
@@ -374,19 +375,25 @@ function Toasts() {
   const dismissToast = useStore((s) => s.dismissToast);
   return (
     <div className="toasts">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`toast ${t.kind}${t.target ? " linked" : ""}`}
-          title={t.target ? "Open" : undefined}
-          onClick={() => {
-            if (t.target) goTo(t.target);
-            dismissToast(t.id);
-          }}
-        >
-          {t.text}
-        </div>
-      ))}
+      {toasts.map((t) => {
+        const press = () => {
+          if (t.target) goTo(t.target);
+          dismissToast(t.id);
+        };
+        return (
+          <div
+            key={t.id}
+            role="button"
+            tabIndex={0}
+            className={`toast ${t.kind}${t.target ? " linked" : ""}`}
+            title={t.target ? "Open" : undefined}
+            onClick={press}
+            onKeyDown={pressKeys(press)}
+          >
+            {t.text}
+          </div>
+        );
+      })}
     </div>
   );
 }

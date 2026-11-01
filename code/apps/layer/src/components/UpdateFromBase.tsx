@@ -273,6 +273,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                     )}
                     <div className="spacer" />
                     {/* Inside the label, so a click here would tick the repo too. */}
+                    {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- not a control: it keeps the buttons' clicks from the label */}
                     <span
                       className="ui-segmented by-toggle"
                       title={way(c.project_id).why}
@@ -297,6 +298,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                       ← origin/
                     </span>
                     {/* Inside the label too: picking from the list would tick the repo. */}
+                    {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- not a control: it keeps the field's clicks from the label */}
                     <span onClick={(e) => e.preventDefault()}>
                       <Combo
                         value={c.base}

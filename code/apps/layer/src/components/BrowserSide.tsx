@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { dragGrip } from "../lib/drag";
+import { dragGrip, gripMove } from "../lib/drag";
 import { read, write } from "../lib/persist";
 import type { BrowserView } from "../lib/types";
 import { BrowserPanel, useBrowserView } from "./BrowserPanel";
@@ -78,8 +78,24 @@ export function BrowserSide({
   return (
     <>
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the browser"
+        aria-valuenow={Math.round(share * 100)}
+        aria-valuemin={20}
+        aria-valuemax={80}
+        tabIndex={0}
         className="diff-grip"
         title="Drag to resize"
+        onKeyDown={(e) => {
+          const by = gripMove(e);
+          const room = e.currentTarget.parentElement?.clientWidth;
+          if (by === null || !room) return;
+          // The side is right of the edge: moving it left widens the side.
+          const next = Math.min(0.8, Math.max(0.2, share - by / room));
+          setShare(next);
+          write("browserShare", next);
+        }}
         onMouseDown={(e) => {
           const box = e.currentTarget.parentElement?.getBoundingClientRect();
           if (!box) return;

@@ -6,6 +6,7 @@ import { taskReview } from "../../lib/derive";
 import { byEpic, groupBy } from "../../lib/grouping";
 import { useFleetAgents } from "../../lib/panes";
 import { readOneOf, write } from "../../lib/persist";
+import { pressKeys } from "../../lib/press";
 import { trackerOfKey } from "../../lib/tracker";
 import type { JiraTransition, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
@@ -49,7 +50,13 @@ function FleetRow({ selected, onSelect }: { selected: boolean; onSelect: () => v
   // the count can be explained.
   const { running, waiting } = useFleetAgents();
   return (
-    <div className={`ws${selected ? " active" : ""}`} onClick={onSelect}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`ws${selected ? " active" : ""}`}
+      onClick={onSelect}
+      onKeyDown={pressKeys(onSelect)}
+    >
       <div className="ws-title">
         <span
           className={`dot ${waiting ? "idle" : running ? "live" : ""}`}

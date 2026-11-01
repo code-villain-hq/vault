@@ -265,8 +265,11 @@ count, running agents, uncommitted changes and the review verdict.
   smallest window. The width is remembered across launches. Double-clicking
   the edge puts it back to 260px. The edge is also a focusable separator:
   ←/→ move it 16px (with ⇧, 64px), Home and End to its narrowest and
-  widest. Hiding the sidebar hides the edge too, and showing it brings
-  back the width it had. While that edge, or any grip beside a terminal (BRW-9),
+  widest. So is every other grip that resizes part of a view (the browser
+  beside the terminals, the diff's file list, the spec's panel, the epic's
+  chat), with the same keys inside its own bounds. Hiding the sidebar
+  hides the edge too, and showing it brings back the width it had. While
+  that edge, or any grip beside a terminal (BRW-9),
   is dragged, terminals keep their size and are fitted once, when it is
   let go: each fit resizes the agent's terminal, which redraws its whole
   screen for it.
@@ -572,7 +575,8 @@ new one. Commit commits every repo with changes, with one message.
   old version of the file; shift-clicking a second line number on the same
   side stretches the note being written over every line between. Both go
   to an agent as `file:12-16` or `file:3 (removed)`, with the lines they
-  read.
+  read. A line number that takes a note is reached with Tab: Enter is a
+  click on it, ⇧Enter a shift-click.
 - **DIFF-9** A patch MUST read as it does in Cursor or VS Code with the
   Code Villain theme: the code coloured by the same TextMate grammars and
   theme scopes, added and removed lines on the editor's diff tints, the

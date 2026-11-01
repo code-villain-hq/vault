@@ -30,8 +30,12 @@ export function Modal({
   }, [onClose]);
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- the backdrop, not a control: Esc and ✕ close it from the keyboard
     <div className="ui-backdrop overlay" onMouseDown={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={`ui-dialog modal${tall ? " tall" : ""}`}
         style={wide ? { maxWidth: 720 } : undefined}
         onMouseDown={(e) => e.stopPropagation()}
@@ -278,6 +282,7 @@ export function Floating({
   }, [onClose, ignore]);
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- not a control: a press inside must not reach the window, which closes it
     <div
       ref={ref}
       className={className}

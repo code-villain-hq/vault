@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { CHAT_TASK_ID } from "../lib/derive";
 import { goTo } from "../lib/goto";
+import { pressKeys } from "../lib/press";
 import type { WaitingPane } from "../lib/types";
 import { useStore } from "../store";
 import { Confirm, ErrorMessage, useFailure } from "./ui";
@@ -106,10 +107,14 @@ export function WaitingChats({
         </div>
       )}
       {waiting.map((w) => (
+        // A div, not a button: it holds the ✕.
         <div
           key={w.id}
+          role="button"
+          tabIndex={0}
           className="chat-item waiting"
           onClick={() => void reopen(w)}
+          onKeyDown={pressKeys(() => void reopen(w))}
           title="Reopen this chat where it left off"
         >
           <span className="dot" />
@@ -118,12 +123,15 @@ export function WaitingChats({
             <span className="chat-item-sub">{busy === w.id ? "Reopening…" : sub}</span>
           </span>
           <span
+            role="button"
+            tabIndex={0}
             className="x"
             title="Forget this chat"
             onClick={(e) => {
               e.stopPropagation();
               ask(w);
             }}
+            onKeyDown={pressKeys(() => ask(w))}
           >
             ✕
           </span>

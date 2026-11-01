@@ -105,6 +105,16 @@ body {
 textarea {
   font-family: var(--font-mono);
 }
+/* These sit flush against the edge of something that scrolls or clips, which
+   would cut a ring drawn outside them: theirs is drawn inside. */
+.ws:focus-visible,
+.sub-row:focus-visible,
+.repo-row:focus-visible,
+.chev:focus-visible,
+.chat-item-slack:focus-visible,
+.diff-line .ln:focus-visible {
+  outline-offset: -2px;
+}
 
 /* Buttons, fields, chips, status pills, links, menus and dialogs are the
    studio's shared recipes (studio/design/components.css, the ui-* classes). What
@@ -2297,6 +2307,7 @@ body.dragging * {
   opacity: 0;
 }
 .chat-item:hover .x,
+.chat-item:focus-within .x,
 .chat-item.active .x {
   opacity: 1;
 }

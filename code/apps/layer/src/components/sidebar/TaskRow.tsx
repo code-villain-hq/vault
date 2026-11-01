@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { taskTotals, type TaskReview } from "../../lib/derive";
 import { useTaskAgents } from "../../lib/panes";
+import { pressKeys } from "../../lib/press";
 import type { TaskView } from "../../lib/types";
 import { ChevronIcon, CloseIcon } from "../icons";
 import { Spinner } from "../ui";
@@ -53,14 +54,22 @@ export const TaskRow = memo(function TaskRow({
   const totals = taskTotals(task);
   const multi = task.checkouts.length > 1;
   const verdict = REVIEW_WORD[review];
+  const select = () => {
+    if (!vanishing) onSelect(task.id);
+  };
+  const toggle = () => {
+    if (!vanishing) onToggle(task.id);
+  };
 
   return (
     <div>
       <div
+        // A div, not a button: it holds the chevron.
+        role="button"
+        tabIndex={vanishing ? -1 : 0}
         className={`ws${selected ? " active" : ""}${vanishing ? " deleting" : ""}`}
-        onClick={() => {
-          if (!vanishing) onSelect(task.id);
-        }}
+        onClick={select}
+        onKeyDown={pressKeys(select)}
         onContextMenu={(e) => {
           if (vanishing) return;
           e.preventDefault();
@@ -76,12 +85,16 @@ export const TaskRow = memo(function TaskRow({
             to close it.
           */}
           <span
+            role="button"
+            tabIndex={vanishing ? -1 : 0}
+            aria-expanded={open}
+            aria-label="Repos"
             className={`chev${open ? " open" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
-              if (vanishing) return;
-              onToggle(task.id);
+              toggle();
             }}
+            onKeyDown={pressKeys(toggle)}
           >
             <ChevronIcon />
           </span>
@@ -139,12 +152,17 @@ export const TaskRow = memo(function TaskRow({
               <span className="rname">{c.project_name}</span>
               {d > 0 && <span style={{ color: "var(--status-warn-ink)" }}>±{d}</span>}
               <span
+                role="button"
+                tabIndex={0}
                 className="x"
                 title="Remove repo from task"
                 onClick={(e) => {
                   e.stopPropagation();
                   onRemoveRepo(c.id, c.project_name, lose, task.checkouts.length === 1);
                 }}
+                onKeyDown={pressKeys(() =>
+                  onRemoveRepo(c.id, c.project_name, lose, task.checkouts.length === 1),
+                )}
               >
                 <CloseIcon />
               </span>
@@ -153,7 +171,14 @@ export const TaskRow = memo(function TaskRow({
         })}
 
       {open && canAdd && (
-        <div className="repo-row" style={{ cursor: "pointer" }} onClick={() => onAddRepo(task)}>
+        <div
+          role="button"
+          tabIndex={0}
+          className="repo-row"
+          style={{ cursor: "pointer" }}
+          onClick={() => onAddRepo(task)}
+          onKeyDown={pressKeys(() => onAddRepo(task))}
+        >
           <span className="rname">+ add repo</span>
         </div>
       )}

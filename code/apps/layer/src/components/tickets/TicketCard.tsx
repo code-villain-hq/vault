@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { pressKeys } from "../../lib/press";
 import { age } from "../../lib/time";
 import type { Ticket } from "../../lib/types";
 import { useStore } from "../../store";
@@ -33,8 +34,14 @@ export function TicketCard({
   const moving = issue.status_category === "indeterminate";
   // GitHub has no status to move to: starting work assigned it (TKT-18).
   const movable = useStore((s) => s.settings?.tracker === "jira");
+  // Already being worked on: go there rather than offering to start it
+  // a second time on the same branch.
+  const open = () => (taskId ? onSelectTask(taskId) : onOpen());
   return (
+    // A div, not a button: it holds buttons of its own.
     <div
+      role="button"
+      tabIndex={0}
       data-issue-key={issue.key}
       className={
         `ticket${taskId ? " started" : ""}` +
@@ -44,12 +51,8 @@ export function TicketCard({
       }
       title={taskId ? "Open the task already running for this ticket" : undefined}
       onContextMenu={onContextMenu}
-      onClick={() => {
-        // Already being worked on: go there rather than offering to start it
-        // a second time on the same branch.
-        if (taskId) onSelectTask(taskId);
-        else onOpen();
-      }}
+      onClick={open}
+      onKeyDown={pressKeys(open)}
     >
       <div className="top">
         <IssueTypeIcon types={types} name={issue.issue_type} />

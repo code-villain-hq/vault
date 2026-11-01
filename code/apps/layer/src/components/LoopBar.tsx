@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { paneName } from "../lib/derive";
 import { read, write } from "../lib/persist";
+import { pressKeys } from "../lib/press";
 import type { AcpSetting, LoopCheckRun, LoopView, PaneInfo, TaskView } from "../lib/types";
 import { useStore } from "../store";
 import { LoopIcon } from "./icons";
@@ -329,8 +330,12 @@ function Run({ run, n }: { run: LoopCheckRun; n: number }) {
       {run.results.map((r) => (
         <div key={r.repo}>
           <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={shown === r.repo}
             className={`loop-result ${r.passed ? "pass" : "fail"}`}
             onClick={() => setShown((s) => (s === r.repo ? null : r.repo))}
+            onKeyDown={pressKeys(() => setShown((s) => (s === r.repo ? null : r.repo)))}
           >
             <span className="mark">{r.passed ? "✓" : "✗"}</span>
             <span>{r.repo}/</span>

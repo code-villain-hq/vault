@@ -3,6 +3,7 @@ import { api } from "../../lib/api";
 import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, type SubTaskState } from "../../lib/epicState";
 import { useTaskAgents } from "../../lib/panes";
+import { pressKeys } from "../../lib/press";
 import { trackerOfKey } from "../../lib/tracker";
 import type { EpicView, SubTaskView, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
@@ -97,14 +98,21 @@ function SubTaskRow({ sub, all }: { sub: SubTaskView; all: SubTaskView[] }) {
   );
   const select = useStore((s) => s.select);
   const dot = state === "waits" ? "queued" : agents.waiting ? "idle" : agents.busy ? "live" : "";
-  const open = () => {
-    if (sub.task_id) select(sub.task_id);
-  };
+  // One filed opens its task: a div, not a button, as it holds Start.
+  const id = sub.task_id;
+  const opens = id
+    ? {
+        role: "button",
+        tabIndex: 0,
+        onClick: () => select(id),
+        onKeyDown: pressKeys(() => select(id)),
+      }
+    : {};
 
   return (
     <div
       className={`epic-row${sub.task_id ? "" : " proposed"}${state === "waits" ? " queued" : ""}`}
-      onClick={open}
+      {...opens}
     >
       <span className="key">{sub.key ?? "new"}</span>
       <span className="title">
@@ -180,6 +188,7 @@ function StartSubTask({ sub, waits }: { sub: SubTaskView; waits: string[] }) {
   }
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- not a control: it keeps Start's clicks, and its confirm's, from opening the row
     <span onClick={(e) => e.stopPropagation()}>
       <button
         className="ui-button"

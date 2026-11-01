@@ -158,6 +158,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
       : [];
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- not a control: it hears Esc from anything in the pane
     <div
       className={`acp${visible ? "" : " hidden"}`}
       // Every size in the conversation is a multiple of this (ACP-15).

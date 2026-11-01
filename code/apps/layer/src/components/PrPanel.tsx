@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
 import { useRunningAgentsOf } from "../lib/panes";
+import { pressKeys } from "../lib/press";
 import { reportRepoResults } from "../lib/report";
 import { trackerOfKey } from "../lib/tracker";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
@@ -585,13 +586,21 @@ export function PrPanel({
         // collapsed with no chevron left to open it.
         const foldable = live.length > 1;
         const shown = !foldable || (cards[key] ?? false);
+        const toggle = () => setCards((c) => ({ ...c, [key]: !shown }));
+        // Only a heading that folds is a button; it holds buttons of its own.
+        const fold = foldable
+          ? {
+              role: "button",
+              tabIndex: 0,
+              "aria-expanded": shown,
+              style: { cursor: "pointer" },
+              onClick: toggle,
+              onKeyDown: pressKeys(toggle),
+            }
+          : {};
         return (
           <div key={key} className="card">
-            <div
-              className="row"
-              style={foldable ? { cursor: "pointer" } : undefined}
-              onClick={foldable ? () => setCards((c) => ({ ...c, [key]: !shown })) : undefined}
-            >
+            <div className="row" {...fold}>
               {foldable && (
                 <span className={`chev${shown ? " open" : ""}`}>
                   <ChevronIcon />
@@ -737,7 +746,15 @@ export function PrPanel({
 
       {earlier.length > 0 && (
         <div className="card">
-          <div className="row" style={{ cursor: "pointer" }} onClick={() => setShowPast((v) => !v)}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={showPast}
+            className="row"
+            style={{ cursor: "pointer" }}
+            onClick={() => setShowPast((v) => !v)}
+            onKeyDown={pressKeys(() => setShowPast((v) => !v))}
+          >
             <span className={`chev${showPast ? " open" : ""}`}>
               <ChevronIcon />
             </span>

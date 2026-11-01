@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { api } from "../../lib/api";
-import { dragGrip } from "../../lib/drag";
+import { dragGrip, gripMove } from "../../lib/drag";
 import { read, write } from "../../lib/persist";
 import type { TaskView } from "../../lib/types";
 import { useStore } from "../../store";
@@ -55,8 +55,24 @@ export function EpicChat({ epic }: { epic: TaskView }) {
   return (
     <>
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the epic's chat"
+        aria-valuenow={Math.round(share * 100)}
+        aria-valuemin={20}
+        aria-valuemax={75}
+        tabIndex={0}
         className="diff-grip"
         title="Drag to resize"
+        onKeyDown={(e) => {
+          const by = gripMove(e);
+          const room = e.currentTarget.parentElement?.clientWidth;
+          if (by === null || !room) return;
+          // The side is right of the edge: moving it left widens the side.
+          const next = Math.min(0.75, Math.max(0.2, share - by / room));
+          setShare(next);
+          write("epicChatShare", next);
+        }}
         onMouseDown={(e) => {
           const box = e.currentTarget.parentElement?.getBoundingClientRect();
           if (!box) return;

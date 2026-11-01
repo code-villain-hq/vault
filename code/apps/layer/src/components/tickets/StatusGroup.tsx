@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { pressKeys } from "../../lib/press";
 import { ChevronIcon } from "../icons";
 import { statusClass } from "./status";
 
@@ -20,7 +21,14 @@ export function StatusGroup({
 }) {
   return (
     <div className="epic">
-      <div className="epic-head" onClick={onToggle}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!closed}
+        className="epic-head"
+        onClick={onToggle}
+        onKeyDown={pressKeys(onToggle)}
+      >
         <span className={`chev${closed ? "" : " open"}`}>
           <ChevronIcon />
         </span>
