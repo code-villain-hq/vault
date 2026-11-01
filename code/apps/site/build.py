@@ -53,6 +53,8 @@ class Links(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.urls.extend(value for name, value in attrs if name in {'href', 'src'} and value)
+        if tag == 'meta' and ('property', 'og:image') in attrs:
+            self.urls.extend(value for name, value in attrs if name == 'content' and value)
 
 
 def validate() -> None:
@@ -118,7 +120,7 @@ def main() -> None:
         for before, after in REPLACEMENTS.items():
             text = text.replace(before, after)
         (OUTPUT / relative).write_text(text)
-    for name in ['site.css', 'home.css', 'product.css', 'menu.js', 'favicon.ico', 'apple-touch-icon.png']:
+    for name in ['site.css', 'home.css', 'product.css', 'menu.js', 'favicon.ico', 'apple-touch-icon.png', 'mark.png']:
         copy(SITE / name, name)
     for path in (SITE / 'assets/fonts').iterdir():
         if path.suffix in {'.ttf', '.css', '.txt'}:

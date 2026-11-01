@@ -132,8 +132,15 @@ def page(product: Product, template: Template) -> str:
         f'\n      <li><strong>{html.escape(point["title"])}</strong> {html.escape(point["text"])}</li>'
         for point in data.get('point', [])
     )
+    # The hero's first capture is what a shared link shows.
+    preview = data['hero']['captures'][0]
+    width, height = size(preview['src'])
     return template.substitute(
         slug=product.slug,
+        image=preview['src'],
+        image_width=width * 2,
+        image_height=height * 2,
+        image_alt=html.escape(preview['alt'], quote=True),
         name=html.escape(product.name),
         line=html.escape(product.line),
         description=html.escape(data['lead'], quote=True),
