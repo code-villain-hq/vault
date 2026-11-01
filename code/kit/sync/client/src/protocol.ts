@@ -44,7 +44,9 @@ export type SyncEntry<M extends string = string> = {
 
 export type ServerMessage<M extends string = string> =
   | { type: "delta"; entries: SyncEntry<M>[]; sync_id: number }
-  | { type: "resync" };
+  | { type: "resync" }
+  /** The feed is still there, with every heartbeat (about every 25 seconds). */
+  | { type: "alive" };
 
 /** The body of every error response. */
 export type ApiError = { code: string; message: string };

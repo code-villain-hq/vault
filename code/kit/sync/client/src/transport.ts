@@ -39,6 +39,16 @@ export class RejectedError extends Error {
 /** Statuses worth retrying: signed out (until signed in again), timeouts, rate limits. */
 const RETRYABLE = new Set([401, 408, 425, 429]);
 
+/** How long sending a transaction may take before it's tried again. */
+const SEND_FOR = 30_000;
+/** How long the feed may take to open before it's tried again. */
+const OPEN_FOR = 15_000;
+/**
+ * How long a feed that says it's alive may then say nothing before it
+ * counts as gone: two of the server's heartbeats and some.
+ */
+const SILENT_FOR = 60_000;
+
 export interface HttpTransportOptions {
   workspaceId: string;
   /** Empty for the same origin. */
@@ -51,6 +61,10 @@ export interface HttpTransportOptions {
   headers?: () => Record<string, string>;
   /** WebSocket subprotocols, which is how a socket can carry a token. */
   protocols?: () => string[] | undefined;
+  /** How long a feed may take to open, for tests. */
+  openFor?: number;
+  /** How long a feed may be silent before it counts as gone, for tests. */
+  silentFor?: number;
 }
 
 export class HttpTransport implements Transport {
@@ -90,6 +104,9 @@ export class HttpTransport implements Transport {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(transaction),
+        // A request the network dropped can hang for minutes; the same
+        // transaction sent again applies once.
+        signal: AbortSignal.timeout(SEND_FOR),
       }),
     );
     this.#check(response);
@@ -113,23 +130,48 @@ export class HttpTransport implements Transport {
 
     const socket = new WebSocket(url, this.#options.protocols?.());
     let opened = false;
+    // A connection that dies without closing (the network gone, the Mac
+    // asleep) looks open for minutes. Once the server has said it's alive,
+    // a while with nothing from it means it's gone. A server that never
+    // says so is older, and waited for as before.
+    let silence: ReturnType<typeof setTimeout> | undefined;
+    // A server that can't be reached may not refuse the connection either.
+    const opening = setTimeout(() => gone(), this.#options.openFor ?? OPEN_FOR);
+    const close = () => {
+      clearTimeout(opening);
+      clearTimeout(silence);
+      socket.onclose = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.close();
+    };
+    const gone = () => {
+      close();
+      handlers.close();
+    };
     socket.onopen = () => {
+      clearTimeout(opening);
       opened = true;
       handlers.open();
     };
-    socket.onmessage = (event) => handlers.message(JSON.parse(event.data));
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data) as ServerMessage;
+      if (message.type === "alive" || silence !== undefined) {
+        clearTimeout(silence);
+        silence = setTimeout(gone, this.#options.silentFor ?? SILENT_FOR);
+      }
+      handlers.message(message);
+    };
     socket.onclose = () => {
+      clearTimeout(opening);
+      clearTimeout(silence);
       // A refused handshake looks like any other failure; ask whether the
       // session has ended.
       if (!opened) void this.#checkSession();
       handlers.close();
     };
     socket.onerror = () => socket.close();
-    return () => {
-      socket.onclose = null;
-      socket.onmessage = null;
-      socket.close();
-    };
+    return close;
   }
 
   async #checkSession(): Promise<void> {

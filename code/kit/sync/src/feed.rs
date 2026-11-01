@@ -21,8 +21,8 @@ use crate::{Actor, Rules, ServerMessage, current_sync_id, entries_after, workspa
 
 /// How many log entries to read at a time.
 const PAGE: i64 = 500;
-/// How often to ping, check the session is still valid, and look for changes
-/// in case a notification was missed.
+/// How often to ping, say the feed is alive, check the session is still
+/// valid, and look for changes in case a notification was missed.
 const HEARTBEAT: Duration = Duration::from_secs(25);
 
 /// Where a client's copy is: the last sync id it has seen, in which epoch.
@@ -112,6 +112,7 @@ where
             },
             _ = heartbeat.tick() => {
                 sender.send(Message::Ping(Default::default())).await?;
+                send::<R>(&mut sender, &ServerMessage::Alive).await?;
             }
             incoming = receiver.next() => match incoming {
                 Some(Ok(Message::Close(_))) | None => return Ok(()),

@@ -88,6 +88,10 @@ pub enum ServerMessage<M> {
     /// The client's copy can't be caught up (for example, the server's
     /// history started over). Download a new snapshot.
     Resync,
+    /// The feed is still there, with every heartbeat: a client that hears
+    /// nothing for a while knows the connection is gone, which a page can't
+    /// tell from pings.
+    Alive,
 }
 
 /// The body of every error response.

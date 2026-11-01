@@ -237,7 +237,8 @@ export class SyncClient<S extends SchemaShape> {
 
   async #open(): Promise<void> {
     if (this.#stopped || !this.#loaded || this.#closeFeed) return;
-    this.#setStatus({ connection: "connecting" });
+    // Trying again is still offline until the server answers.
+    if (this.#status.connection !== "offline") this.#setStatus({ connection: "connecting" });
     try {
       if (this.#epoch === null) await this.#bootstrap();
     } catch {
