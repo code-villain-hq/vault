@@ -1,0 +1,343 @@
+#!/usr/bin/env bun
+/**
+ * An Almanac release, built on this Mac and published on the vault's
+ * Forgejo, as Layer's is (code/apps/layer/docs/releasing.md says how, and
+ * what each Mac needs once).
+ *
+ *     bun run release           check, build, and draft the almanac-v<version>
+ *                               release (Forgejo makes the tag on publish) with its .dmg
+ *     bun run release:publish   publish that draft, put its .dmg on the
+ *                               GitHub mirror's release, and put it in
+ *                               the Homebrew tap
+ *
+ * The draft is there to be read before anyone can download it. Apple silicon
+ * only. Signed ad hoc, unless APPLE_SIGNING_IDENTITY, APPLE_ID,
+ * APPLE_PASSWORD and APPLE_TEAM_ID are all set: then it is signed with the
+ * Developer ID in the keychain and notarised.
+ *
+ * The Forgejo token is read from the keychain (service git.codevillain.eu,
+ * account release), never from a file or the environment.
+ */
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+process.chdir(new URL("..", import.meta.url).pathname);
+
+const FORGEJO = "https://git.codevillain.eu";
+const REPO = "code-villain/vault";
+const TAP = "git.codevillain.eu:code-villain/homebrew-tap.git";
+/** Where brew downloads the .dmg from: the vault's public mirror (see `mirror`). */
+const MIRROR = "code-villain-hq/vault";
+const CASK = "almanac";
+const SIGNING = ["APPLE_SIGNING_IDENTITY", "APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"];
+const BUNDLE = "target/release/bundle";
+
+function fail(message: string): never {
+  console.error(`\nrelease: ${message}`);
+  process.exit(1);
+}
+
+function run(
+  cmd: string[],
+  options: { cwd?: string; env?: Record<string, string | undefined> } = {},
+) {
+  console.log(`\n$ ${cmd.join(" ")}`);
+  const done = Bun.spawnSync(cmd, {
+    cwd: options.cwd,
+    env: options.env ?? process.env,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  if (done.exitCode !== 0) fail(`${cmd.slice(0, 2).join(" ")} failed.`);
+}
+
+function read(cmd: string[], cwd?: string): string {
+  const done = Bun.spawnSync(cmd, { cwd });
+  if (done.exitCode !== 0) fail(`${cmd.join(" ")}: ${done.stderr.toString().trim()}`);
+  return done.stdout.toString().trim();
+}
+
+// The bundle is named after tauri.conf.json's version, the server and the
+// app's crates after the workspace's: a release needs them alike.
+const version: string =
+  JSON.parse(readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8")).version ??
+  fail("apps/desktop/src-tauri/tauri.conf.json has no version.");
+const crates = readFileSync("Cargo.toml", "utf8").match(/^version = "(.+)"$/m)?.[1];
+if (crates !== version) {
+  fail(`tauri.conf.json says ${version} and Cargo.toml ${crates}. Bump both to the same version.`);
+}
+const tag = `almanac-v${version}`;
+const dmgName = `Almanac-${version}-macos-arm64.dmg`;
+
+let cachedToken: string | undefined;
+function token(): string {
+  if (cachedToken) return cachedToken;
+  const found = Bun.spawnSync([
+    "security",
+    "find-generic-password",
+    "-s",
+    "git.codevillain.eu",
+    "-a",
+    "release",
+    "-w",
+  ]);
+  if (found.exitCode !== 0) {
+    fail(
+      "there is no Forgejo token in the keychain. Make one (code/apps/layer/docs/releasing.md) and store it with\n" +
+        "  security add-generic-password -s git.codevillain.eu -a release -w",
+    );
+  }
+  cachedToken = found.stdout.toString().trim();
+  return cachedToken;
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Forgejo's answers, read for a few fields
+async function api(method: string, path: string, body?: BodyInit, json = true): Promise<any> {
+  const headers: Record<string, string> = { Authorization: `token ${token()}` };
+  if (body && json) headers["Content-Type"] = "application/json";
+  const res = await fetch(`${FORGEJO}/api/v1/repos/${REPO}${path}`, { method, headers, body });
+  if (!res.ok) fail(`Forgejo answered ${method} ${path} with ${res.status}: ${await res.text()}`);
+  return res.status === 204 ? null : res.json();
+}
+
+/** The one .dmg of this version the build made. */
+function builtDmg(): string {
+  const dir = `${BUNDLE}/dmg`;
+  const built = readdirSync(dir).filter((f) => f.endsWith(".dmg") && f.includes(version));
+  if (built.length !== 1) fail(`expected one ${version} .dmg in ${dir}, found ${built.length}.`);
+  return join(dir, built[0]);
+}
+
+// ---------------------------------------------------------------------------
+// bun run release
+
+async function draft() {
+  if (process.arch !== "arm64")
+    fail("the release is built for Apple silicon; run it on an Apple silicon Mac.");
+  token();
+
+  // What is released is what everyone can read on main.
+  if (read(["git", "branch", "--show-current"]) !== "main") fail("switch to main first.");
+  if (read(["git", "status", "--porcelain"]))
+    fail("the vault has uncommitted changes. Commit or stash them first.");
+  run(["git", "fetch", "--quiet", "--tags", "origin", "main"]);
+  if (read(["git", "rev-parse", "HEAD"]) !== read(["git", "rev-parse", "origin/main"])) {
+    fail(
+      "main and origin/main differ. Push or pull first: a release is cut from a commit that is on Forgejo.",
+    );
+  }
+  if (read(["git", "ls-remote", "--tags", "origin", `refs/tags/${tag}`])) {
+    fail(`${tag} already exists. Bump the version first.`);
+  }
+  // biome-ignore lint/suspicious/noExplicitAny: Forgejo's releases
+  const releases: any[] = await api("GET", "/releases?limit=50");
+  if (releases.some((r) => r.tag_name === tag)) {
+    fail(
+      `there is already a release for ${tag} on Forgejo. Delete the draft there, or bump the version.`,
+    );
+  }
+
+  const set = SIGNING.filter((name) => process.env[name]);
+  const env: Record<string, string | undefined> = { ...process.env };
+  for (const name of SIGNING) if (!env[name]) delete env[name];
+  let signing: "developer-id" | "ad-hoc";
+  if (set.length === SIGNING.length) {
+    signing = "developer-id";
+  } else if (set.length === 0) {
+    // Ad hoc, not unsigned: macOS offers Open Anyway for an app it cannot
+    // check, but calls an unsigned download "damaged".
+    env.APPLE_SIGNING_IDENTITY = "-";
+    signing = "ad-hoc";
+  } else {
+    // Signed but not notarised is stopped by Gatekeeper all the same.
+    fail(
+      `${set.length} of ${SIGNING.join(", ")} are set. Set all of them to sign and notarise, or none to sign ad hoc.`,
+    );
+  }
+
+  run(["bun", "run", "check"]);
+  run(["bun", "run", "--cwd", "apps/web", "build"]);
+  run(["bun", "run", "--cwd", "apps/desktop", "tauri", "build", "--bundles", "app,dmg"], { env });
+
+  if (signing === "developer-id") {
+    // What a Mac that downloads it will check.
+    const app = `${BUNDLE}/macos/Almanac.app`;
+    run(["codesign", "--verify", "--deep", "--strict", "--verbose=2", app]);
+    run(["xcrun", "stapler", "validate", app]);
+    run(["spctl", "--assess", "--type", "execute", "--verbose=4", app]);
+  }
+
+  const out = mkdtempSync(join(tmpdir(), "almanac-release-"));
+  copyFileSync(builtDmg(), join(out, dmgName));
+  writeFileSync(join(out, "SHA256SUMS.txt"), `${read(["shasum", "-a", "256", dmgName], out)}\n`);
+
+  const previous = read(["git", "tag", "--list", "almanac-v*", "--sort=-v:refname"])
+    .split("\n")
+    .filter(Boolean)[0];
+  const changes = previous
+    ? read(["git", "log", "--format=- %s", `${previous}..HEAD`, "--", "."])
+    : "";
+  const notes = [
+    "For Macs with Apple silicon.",
+    "",
+    "Open the .dmg and drag Almanac to Applications. It keeps your topics on this Mac,",
+    "in a database of its own, and answers with Claude Code as you're signed in to it,",
+    "through its adapter: `npm install -g @agentclientprotocol/claude-agent-acp`.",
+    ...(signing === "ad-hoc"
+      ? [
+          "",
+          'This build is not notarised by Apple, so macOS stops it the first time with "Apple',
+          'could not verify…". Choose Done, then System Settings → Privacy & Security → Open',
+          "Anyway.",
+        ]
+      : []),
+    ...(changes ? ["", `## Since ${previous}`, "", changes] : []),
+  ].join("\n");
+
+  // No tag is pushed: Forgejo publishes a release at once when its tag
+  // already exists, draft or not. A draft names the commit instead, and
+  // Forgejo makes the tag when it is published.
+  const release = await api(
+    "POST",
+    "/releases",
+    JSON.stringify({
+      tag_name: tag,
+      target_commitish: read(["git", "rev-parse", "HEAD"]),
+      name: `Almanac ${version}`,
+      body: notes,
+      draft: true,
+      prerelease: false,
+    }),
+  );
+  if (!release.draft)
+    fail(
+      `Forgejo published ${tag} instead of drafting it. Check it on Forgejo before anything else.`,
+    );
+  for (const name of [dmgName, "SHA256SUMS.txt"]) {
+    const form = new FormData();
+    form.append("attachment", Bun.file(join(out, name)), name);
+    await api(
+      "POST",
+      `/releases/${release.id}/assets?name=${encodeURIComponent(name)}`,
+      form,
+      false,
+    );
+    console.log(`Uploaded ${name}.`);
+  }
+
+  console.log(`\nDrafted Almanac ${version} (${signing}): ${FORGEJO}/${REPO}/releases`);
+  console.log("Read it there, then run: bun run release:publish");
+}
+
+// ---------------------------------------------------------------------------
+// bun run release:publish
+
+async function publish() {
+  // `?draft=true` filters drafts out rather than in, so read them all.
+  // biome-ignore lint/suspicious/noExplicitAny: Forgejo's releases
+  const releases: any[] = await api("GET", "/releases?limit=50");
+  const release =
+    releases.find((r) => r.tag_name === tag) ??
+    fail(`there is no draft for ${tag}. Run bun run release first.`);
+  if (release.draft) {
+    await api("PATCH", `/releases/${release.id}`, JSON.stringify({ draft: false }));
+    console.log(`Published Almanac ${version}: ${FORGEJO}/${REPO}/releases/tag/${tag}`);
+  }
+  run(["git", "fetch", "--quiet", "--tags", "origin"]);
+  // A prerelease would be what everyone gets from `brew upgrade`.
+  if (release.prerelease) return console.log("A prerelease is not put in the tap.");
+
+  const sums =
+    // biome-ignore lint/suspicious/noExplicitAny: a release's asset
+    release.assets.find((a: any) => a.name === "SHA256SUMS.txt") ??
+    fail(`${tag} has no SHA256SUMS.txt.`);
+  const listed = await (await fetch(sums.browser_download_url)).text();
+  const sha = listed
+    .split("\n")
+    .find((line) => line.trim().endsWith(dmgName))
+    ?.split(/\s+/)[0];
+  if (!sha) fail(`${tag}'s SHA256SUMS.txt has no line for ${dmgName}.`);
+  mirror(sha);
+  const cask = readFileSync(`packaging/homebrew/${CASK}.rb`, "utf8")
+    .replace("@VERSION@", version)
+    .replace("@SHA256@", sha);
+
+  // What `brew install` will read: its style, and --online downloads the
+  // .dmg and checks it against the SHA-256.
+  const check = "code-villain/check";
+  Bun.spawnSync(["brew", "untap", "--force", check]);
+  run(["brew", "tap-new", "--no-git", check]);
+  const casks = join(read(["brew", "--repository", check]), "Casks");
+  mkdirSync(casks, { recursive: true });
+  writeFileSync(join(casks, `${CASK}.rb`), cask);
+  run(["brew", "trust", "--cask", `${check}/${CASK}`]);
+  run(["brew", "style", "--cask", `${check}/${CASK}`]);
+  run(["brew", "audit", "--cask", "--online", `${check}/${CASK}`]);
+  run(["brew", "untap", "--force", check]);
+
+  const tap = mkdtempSync(join(tmpdir(), "almanac-tap-"));
+  run(["git", "clone", "--quiet", TAP, tap]);
+  mkdirSync(join(tap, "Casks"), { recursive: true });
+  writeFileSync(join(tap, `Casks/${CASK}.rb`), cask);
+  run(["git", "add", `Casks/${CASK}.rb`], { cwd: tap });
+  if (Bun.spawnSync(["git", "diff", "--cached", "--quiet"], { cwd: tap }).exitCode === 0) {
+    return console.log("The tap already has this cask.");
+  }
+  // As the vault's author, not whoever the global git config names.
+  const author = ["user.name", "user.email"].flatMap((key) => [
+    "-c",
+    `${key}=${read(["git", "config", key])}`,
+  ]);
+  run(["git", ...author, "commit", "--quiet", "-m", `${CASK} ${version}`], { cwd: tap });
+  run(["git", "push", "--quiet"], { cwd: tap });
+  console.log(`The tap has Almanac ${version}.`);
+}
+
+/**
+ * Put the released .dmg on the same tag's release on GitHub's mirror, which
+ * the cask downloads from: Uberspace's proxy cuts any transfer at about
+ * 48 s, and the .dmg, with Postgres in it, takes longer. The file is the
+ * one built here, checked against the SHA-256 that Forgejo's release lists.
+ */
+function mirror(sha: string) {
+  if (Bun.spawnSync(["gh", "release", "view", tag, "--repo", MIRROR]).exitCode === 0) {
+    return console.log(`${MIRROR} already has ${tag}.`);
+  }
+  if (Bun.spawnSync(["gh", "api", `repos/${MIRROR}/git/refs/tags/${tag}`]).exitCode !== 0) {
+    fail(`${tag} has not reached ${MIRROR} yet. Run this again once the mirror has synced.`);
+  }
+  const dmg = builtDmg();
+  if (read(["shasum", "-a", "256", dmg]).split(/\s+/)[0] !== sha) {
+    fail(`${dmg} is not the one released. Publish where the release was built.`);
+  }
+  const out = mkdtempSync(join(tmpdir(), "almanac-mirror-"));
+  copyFileSync(dmg, join(out, dmgName));
+  writeFileSync(join(out, "SHA256SUMS.txt"), `${sha}  ${dmgName}\n`);
+  run([
+    "gh",
+    "release",
+    "create",
+    tag,
+    "--repo",
+    MIRROR,
+    "--verify-tag",
+    "--title",
+    `Almanac ${version}`,
+    "--notes",
+    `The release, with its notes, is on Forgejo: ${FORGEJO}/${REPO}/releases/tag/${tag}. This copy of its .dmg is what Homebrew downloads.`,
+    join(out, dmgName),
+    join(out, "SHA256SUMS.txt"),
+  ]);
+}
+
+if (process.argv[2] === "publish") await publish();
+else if (process.argv[2] === undefined) await draft();
+else fail(`unknown command ${process.argv[2]}. Run it with no argument to draft, or with publish.`);

@@ -18,6 +18,30 @@ Almanac keeps it by topic.
   kept. Chat is for asking and adding; past talks are behind an icon.
   Projects in Claude or ChatGPT give each topic a bot, but open on a chat.
 
+## Install it
+
+On a Mac with Apple silicon and macOS 26:
+
+```bash
+brew tap code-villain/tap https://git.codevillain.eu/code-villain/homebrew-tap
+brew trust --cask code-villain/tap/almanac
+brew install --cask almanac
+```
+
+It isn't notarised by Apple yet: the first start, choose Done, then
+System Settings → Privacy & Security → Open Anyway. It answers with Claude
+Code through its adapter (below).
+
+## Releasing
+
+As Layer, from main with nothing uncommitted ([Layer's
+releasing.md](../layer/docs/releasing.md) says what a Mac needs once):
+bump the version in `Cargo.toml` and `apps/desktop/src-tauri/tauri.conf.json`
+alike, commit and push, then `bun run release` drafts `almanac-v<version>`
+on Forgejo with its .dmg, and `bun run release:publish`, run where it was
+built, publishes it, puts the .dmg on the GitHub mirror and the cask
+(`packaging/homebrew/almanac.rb`) in the tap.
+
 ## Run it
 
 ```bash

@@ -38,6 +38,10 @@ Run `bun run design:sync` after changing them in the vault.
   own Postgres (7786) and server (7785), for the workspaces on this Mac,
   and signs in to servers (the Rust port, 7780, not Vite's) for the
   others. Its data is in `~/Library/Application Support/eu.codevillain.almanac`.
+- `bun run release`, then `bun run release:publish`: a release of the
+  desktop app on Forgejo and in the Homebrew tap, as Layer's
+  (`scripts/release.ts`, the cask in `packaging/homebrew/almanac.rb`).
+  The README says how.
 - `bun run app`: the whole app in Docker at http://localhost:7790 (one image:
   server plus built web app), with the settings in `.env`. `bun run app:logs`
   follows it.
