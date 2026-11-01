@@ -27,6 +27,9 @@ The studio website is [www.codevillain.eu](https://www.codevillain.eu/). Naming 
 
 Each app keeps its own tooling. Run its commands from its own folder.
 
+[Architecture](ARCHITECTURE.md) maps the repository and the shared web, desktop,
+identity and sync runtime.
+
 ## Contributing
 
 The vault lives on Forgejo at [git.codevillain.eu/code-villain/vault](https://git.codevillain.eu/code-villain/vault). [github.com/code-villain-hq/vault](https://github.com/code-villain-hq/vault) mirrors it, and pull requests are welcome there. Each one is reviewed and merged on Forgejo with its commits and authors unchanged. The GitHub pull request then shows as merged. Read the app's `AGENTS.md` before working in it. `git config core.hooksPath .githooks`, once per clone, runs each app's pre-commit check when a commit touches it.
