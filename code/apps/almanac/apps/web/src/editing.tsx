@@ -164,6 +164,9 @@ function Options({
       aria-label={field.name}
       className="m-0 flex min-w-0 flex-wrap gap-1 border-0 p-0"
       onKeyDown={(e) => e.key === "Escape" && onDone()}
+      // WebKit doesn't focus a clicked button: pressing one would blur the
+      // options away before its click. Focus stays put while one is pressed.
+      onMouseDown={(e) => e.preventDefault()}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDone();
       }}
