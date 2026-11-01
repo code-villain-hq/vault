@@ -1485,7 +1485,15 @@ to fix on Repos. A running agent or chat is a live dot.
   skeleton while it waits: it shows its content once it has it
   (`studio/design/behaviour.md`, "Empty and loading").
 
-Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Confirm`), `Splash.tsx`, `src-tauri/capabilities/default.json`.
+- **WIN-6** A dialog MUST take the focus when it opens: its first field,
+  or else its first button (a confirmation's Cancel, WIN-3). While it is
+  open, Tab and ⇧Tab go round its controls, buttons included, and never
+  reach the window behind it. Closed with keys, it gives the focus back to
+  what opened it, so they go on from there; closed with a click, only to a
+  field or terminal you were typing in, so no ring is left on a row
+  (`studio/design/behaviour.md`, "Keys").
+
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Modal`, `Confirm`), `lib/modalFocus.ts`, `Splash.tsx`, `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 

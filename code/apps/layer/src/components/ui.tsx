@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { failureText } from "../lib/api";
+import { useModalFocus } from "../lib/modalFocus";
 import { useStore } from "../store";
 import { CloseIcon, PanelIcon } from "./icons";
 
@@ -23,6 +24,8 @@ export function Modal({
   /** Fixed height, so switching sections does not resize the window. */
   tall?: boolean;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  useModalFocus(box);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -33,6 +36,7 @@ export function Modal({
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- the backdrop, not a control: Esc and ✕ close it from the keyboard
     <div className="ui-backdrop overlay" onMouseDown={onClose}>
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-label={title}
