@@ -2,7 +2,8 @@
 //! (`POST /api/mcp/read`): its topics, a topic's page, and a search of what
 //! the pages keep. Nothing here writes. A member makes the token in
 //! Settings → Claude (`read_tokens`, one each, shown once), and it reads
-//! what they may read for as long as they're in the workspace.
+//! what they may read for as long as they're in the workspace and not a
+//! guest, who sees no topics.
 
 use almanac_domain::{Actor, ReadToken, ReadTokenInfo};
 use axum::Json;
@@ -27,10 +28,11 @@ const MAKE: &str = "INSERT INTO read_tokens (workspace_id, user_id, token_hash) 
      ON CONFLICT (workspace_id, user_id) DO UPDATE \
      SET token_hash = excluded.token_hash, made_at = now(), used_at = NULL";
 const REVOKE: &str = "DELETE FROM read_tokens WHERE workspace_id = $1 AND user_id = $2";
-/// Whose token it is, while they're still in its workspace.
+/// Whose token it is, while they're still in its workspace and see its topics.
 const READER: &str = "UPDATE read_tokens r SET used_at = now() \
      FROM workspace_members m \
      WHERE r.token_hash = $1 AND m.workspace_id = r.workspace_id AND m.user_id = r.user_id \
+       AND m.role <> 'guest' \
      RETURNING r.workspace_id, r.user_id";
 const TOPIC_NAMED: &str = "SELECT id FROM topics \
      WHERE workspace_id = $1 AND kind = 'topic' AND lower(name) = lower($2) \
@@ -53,6 +55,7 @@ pub async fn show(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<ReadTokenInfo>, AppError> {
+    member.require_not_guest()?;
     let made: Option<(DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(SHOW)
         .bind(member.actor.workspace_id)
         .bind(member.actor.user_id)
@@ -69,6 +72,7 @@ pub async fn make(
     State(state): State<AppState>,
     member: Member,
 ) -> Result<Json<ReadToken>, AppError> {
+    member.require_not_guest()?;
     let token = new_token();
     sqlx::query(MAKE)
         .bind(member.actor.workspace_id)

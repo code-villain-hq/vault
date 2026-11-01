@@ -9,7 +9,7 @@ import { apiUrl } from "./server";
 import { loadSession, signedIn, signOut } from "./session";
 import { BlockGallery } from "./topic";
 import { Button, ErrorMessage, Section } from "./ui";
-import { useIsAdmin, useWorkspace } from "./workspace";
+import { useIsAdmin, useIsGuest, useWorkspace } from "./workspace";
 
 /** A guest sees no topics yet: there's nothing to add them to. */
 export const TOPIC_ACCESS: AccessConfig = { noun: "topic", plural: "topics", useOptions: () => [] };
@@ -32,6 +32,7 @@ export const { MembersPage, AccountPage } = accountPages({
  */
 export function ClaudePage() {
   const { workspace, place } = useWorkspace();
+  const guest = useIsGuest();
   const path = `/api/w/${workspace.id}/claude`;
   const { data, error, reload } = useApi<ClaudeKeyInfo>(path);
   return (
@@ -47,7 +48,8 @@ export function ClaudePage() {
         ) : (
           <TheKey data={data} path={path} reload={reload} />
         )}
-        <Reading />
+        {/* A guest sees no topics, so there's nothing to read. */}
+        {!guest && <Reading />}
       </PageBody>
     </>
   );

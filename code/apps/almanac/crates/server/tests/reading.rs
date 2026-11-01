@@ -114,3 +114,31 @@ async fn a_token_reads_the_workspace_until_it_goes(pool: PgPool) {
         .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_guest_reads_nothing(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let reading = format!("/api/w/{home}/reading");
+    let gus = app
+        .join("Gus", &app.invite(&ada, &home, "guest").await)
+        .await;
+    let made = app.post(&reading, Some(&gus), json!({})).await;
+    assert_eq!(made.status, StatusCode::FORBIDDEN);
+
+    // A member's token stops reading when they become a guest.
+    let max = app
+        .join("Max", &app.invite(&ada, &home, "member").await)
+        .await;
+    let token = app.post(&reading, Some(&max), json!({})).await.body["token"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let list = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" });
+    assert_eq!(app.read_mcp(&token, list.clone()).await.0, StatusCode::OK);
+    sqlx::query("UPDATE workspace_members SET role = 'guest' WHERE user_id = (SELECT id FROM users WHERE name = 'Max')")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(app.read_mcp(&token, list).await.0, StatusCode::UNAUTHORIZED);
+}
