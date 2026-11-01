@@ -231,7 +231,8 @@ What they do:
     paragraph keeps what they mean. A row named as a share of the one
     above ("davon …", "of which …", `isPart`) sits indented under it
     and stays out of a total (`sumOf`); the keep prompt names shares so.
-    Only fields its rows fill count. View as offers the others its fields
+    Only fields its rows fill count, but a table shows anyone who can
+    fill them every field, one no row fills yet too. View as offers the others its fields
     allow (`picturesFor`). A callout is a warning when a point's `look` is `warn`.
     A block draws one way of its own; only a collection has more, its
     pictures, and only a person picks among them. A paragraph is prose:

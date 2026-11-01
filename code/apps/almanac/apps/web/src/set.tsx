@@ -733,7 +733,10 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
  * fields pick it, or a person did with View as.
  */
 function Picture({ block, rows }: { block: Block; rows: Point[] }) {
+  const guest = useIsGuest();
   const fields = filled(block, rows);
+  // A table offers who can fill them a column for every field, one no row fills yet too.
+  const columns = guest ? fields : block.fields;
   const of = (...kinds: string[]) => fields.find((f) => kinds.includes(f.kind));
   const day = of("day");
   const number = of("number");
@@ -810,7 +813,7 @@ function Picture({ block, rows }: { block: Block; rows: Point[] }) {
           block.view === "cards" ? (
             <RowCards rows={shown} fields={rest(fields)} />
           ) : block.view === "table" ? (
-            <RowTable block={block} rows={shown} fields={rest(fields)} />
+            <RowTable block={block} rows={shown} fields={rest(columns)} />
           ) : (
             <RowList rows={shown} fields={rest(fields)} />
           )
@@ -1241,7 +1244,7 @@ function RowCards({ rows, fields }: { rows: Point[]; fields: Field[] }) {
   );
 }
 
-/** A table: a row per row, its name first, a column per field it fills. Photos stay on cards. */
+/** A table: a row per row, its name first, a column per field `fields` names. Photos stay on cards. */
 function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields: Field[] }) {
   const columns = fields.filter((f) => f.kind !== "photo");
   // A number's bar is on its column's largest, so the column reads at a glance.
@@ -1254,7 +1257,13 @@ function RowTable({ block, rows, fields }: { block: Block; rows: Point[]; fields
   // a part of the one above ("davon …") is in that one's already.
   const sums = new Map(
     columns
-      .filter((f) => f.kind === "number" && f.unit && rows.filter((r) => !isPart(r)).length > 1)
+      .filter(
+        (f) =>
+          f.kind === "number" &&
+          f.unit &&
+          rows.filter((r) => !isPart(r)).length > 1 &&
+          rows.some((r) => numberOf(r, f) !== null),
+      )
       .map((f) => [f.name, sumOf(rows, f)]),
   );
   const cell = "h-[34px] border-line border-r border-b px-3 last:border-r-0";
