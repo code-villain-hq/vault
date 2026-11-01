@@ -152,22 +152,23 @@ async fn start(dir: &Path, app: &AppHandle) -> Result<Running, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    // Claude Code answers, as you're signed in to it, in an empty folder of
-    // its own, with Almanac's tools on this server. No key. ChatGPT answers
-    // instead when Settings says so, from a Codex home of its own.
-    let mcp = format!("http://127.0.0.1:{SERVER_PORT}/api/mcp");
-    let claude_code = Adapter::new(Kind::ClaudeCode, dir.join("claude"), &mcp);
-    let chatgpt = Adapter::new(Kind::Chatgpt, dir.join("chatgpt"), &mcp);
-    let mut state = AppState::new(pool.clone(), false, Claude::new(None))
-        .on_this_mac()
-        .with_claude_code(claude_code)
-        .with_chatgpt(chatgpt);
+    let mut state = AppState::new(pool.clone(), false, Claude::new(None)).on_this_mac();
     notify(app.clone(), &state);
     if cfg!(debug_assertions) {
         // `bun run dev:desktop` shows the web app from Vite.
         state = state.allowing_origin("http://localhost:5177");
     }
-    let server = LocalServer::spawn(SERVER_PORT, |listener, shutdown| {
+    let folder = dir.to_path_buf();
+    let server = LocalServer::spawn(SERVER_PORT, move |listener, shutdown| {
+        // Claude Code answers, as you're signed in to it, in an empty folder
+        // of its own, with Almanac's tools on this server, at the port it
+        // got. No key. ChatGPT answers instead when Settings says so, from a
+        // Codex home of its own.
+        let port = listener.local_addr().map_or(SERVER_PORT, |a| a.port());
+        let mcp = format!("http://127.0.0.1:{port}/api/mcp");
+        let state = state
+            .with_claude_code(Adapter::new(Kind::ClaudeCode, folder.join("claude"), &mcp))
+            .with_chatgpt(Adapter::new(Kind::Chatgpt, folder.join("chatgpt"), &mcp));
         almanac_server::serve(state, None, listener, shutdown)
     })
     .await
