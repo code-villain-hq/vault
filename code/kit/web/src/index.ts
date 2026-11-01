@@ -32,6 +32,7 @@ export {
   CreateDialog,
   chip,
   MoreMenu,
+  type MoreMenuAction,
   type MoreMenuItem,
   NewButton,
   RowAction,

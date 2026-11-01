@@ -2,7 +2,7 @@
 // that opens a New dialog, a ⋯ menu for rare actions, and quiet chips.
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
-import { Ellipsis, Plus } from "lucide-react";
+import { ChevronRight, Ellipsis, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 
@@ -54,18 +54,29 @@ export function CreateDialog({
   );
 }
 
+/** An action in a ⋯ menu, with its icon when the menu shows icons. */
+export type MoreMenuAction = {
+  label: string;
+  icon?: ReactNode;
+  danger?: boolean;
+  onSelect: () => void;
+};
+
 /**
- * A row of a ⋯ menu: an action, or a choice of one of a few, side by side
- * (Width ¼ ⅓ ½), which changes as it's picked and leaves the menu open.
+ * A row of a ⋯ menu: an action; a choice of one of a few, side by side
+ * (Width ¼ ⅓ ½), which changes as it's picked and leaves the menu open; or
+ * a menu of its own beside it (Add below ›), its actions in groups with a
+ * line between them.
  */
 export type MoreMenuItem =
-  | { label: string; danger?: boolean; onSelect: () => void }
+  | MoreMenuAction
   | {
       label: string;
       choices: { value: string; label: string; title: string }[];
       value: string;
       onChoose: (value: string) => void;
-    };
+    }
+  | { label: string; groups: MoreMenuAction[][] };
 
 /** A "⋯" button with a short menu of a page's rarer actions. */
 export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[] }) {
@@ -103,20 +114,55 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
                     ))}
                   </Menu.RadioGroup>
                 </Menu.Group>
+              ) : "groups" in item ? (
+                <Menu.SubmenuRoot key={item.label}>
+                  <Menu.SubmenuTrigger className={`${option} justify-between gap-4`}>
+                    {item.label}
+                    <ChevronRight
+                      size={14}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                      className="text-faint"
+                    />
+                  </Menu.SubmenuTrigger>
+                  <Menu.Portal>
+                    <Menu.Positioner className="z-50 outline-none" sideOffset={4} alignOffset={-5}>
+                      <Menu.Popup className="ui-menu min-w-40 p-1 outline-none">
+                        {item.groups.map((group, n) => (
+                          <Menu.Group key={group[0]?.label ?? n}>
+                            {n > 0 && <div role="separator" className="mx-1 my-1 h-px bg-line" />}
+                            {group.map((action) => (
+                              <MoreMenuOption key={action.label} action={action} />
+                            ))}
+                          </Menu.Group>
+                        ))}
+                      </Menu.Popup>
+                    </Menu.Positioner>
+                  </Menu.Portal>
+                </Menu.SubmenuRoot>
               ) : (
-                <Menu.Item
-                  key={item.label}
-                  onClick={item.onSelect}
-                  className={`ui-option flex cursor-default items-center px-2 py-1.5 outline-none select-none ${item.danger ? "text-danger-ink" : ""}`}
-                >
-                  {item.label}
-                </Menu.Item>
+                <MoreMenuOption key={item.label} action={item} />
               ),
             )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
     </Menu.Root>
+  );
+}
+
+/** How a ⋯ menu's row looks. */
+const option = "ui-option flex cursor-default items-center px-2 py-1.5 outline-none select-none";
+
+function MoreMenuOption({ action }: { action: MoreMenuAction }) {
+  return (
+    <Menu.Item
+      onClick={action.onSelect}
+      className={`${option} gap-2.5 ${action.danger ? "text-danger-ink" : ""}`}
+    >
+      {action.icon && <span className="flex shrink-0 text-muted">{action.icon}</span>}
+      {action.label}
+    </Menu.Item>
   );
 }
 

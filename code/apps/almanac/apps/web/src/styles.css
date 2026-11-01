@@ -211,6 +211,31 @@
 }
 
 /*
+ * Words written in place read as they will on the page, in the type around
+ * them, with the focus ring a field has round them.
+ */
+.writing {
+  display: block;
+  width: calc(100% + 1rem);
+  margin: -0.25rem -0.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.writing::placeholder {
+  color: var(--faint);
+}
+
+/*
  * View as: each view its icon, and the one showing its name too, in the
  * selected tint, so a glance says which it is.
  */
