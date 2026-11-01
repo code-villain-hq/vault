@@ -122,10 +122,12 @@ body {
   letter-spacing: normal;
   line-height: var(--type-small-leading);
 }
-.products-menu li a { display: flex; gap: 0.75rem; align-items: center; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); }
+.products-menu li a { display: flex; gap: 0.75rem; align-items: start; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); }
 .products-menu li a:hover, .products-menu li a:focus-visible { background: var(--hover); }
 .products-menu li a[aria-current] { background: var(--selected); }
-.products-menu img { flex-shrink: 0; }
+/* The 32px icon centres on the name and the first line under it, so it sits
+   level in every row, however far the line wraps. */
+.products-menu img { flex-shrink: 0; margin-top: calc((var(--type-body-size) + var(--type-small-size)) * var(--type-small-leading) / 2 - 1rem); }
 .products-menu b { display: block; color: var(--fg); font-weight: var(--type-label-weight); }
 .products-menu b + span { display: block; color: var(--muted); font-size: var(--type-small-size); }
 @media (max-width: 600px) {

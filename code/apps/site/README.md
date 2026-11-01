@@ -34,8 +34,8 @@ Page titles, descriptions, canonical links, and Open Graph metadata use Code Vil
 
 ## Build and host
 
-Run `python3 build.py` from this folder. The `dist/` folder contains only the public HTML, styles, fonts and licenses, outlined marks, product icons, blog illustrations, and `.htaccess`. The builder checks every local HTML and CSS dependency. Vault source, internal design documents, app code, and brand drafts stay out of the upload. The `/design/` URL space returns 404.
+Run `python3 build.py` from this folder. The `dist/` folder contains only the public HTML, styles, fonts and licenses, outlined marks, product icons, blog illustrations, and `.htaccess`. The builder checks every local HTML and CSS dependency, and gives each page's styles and scripts their content's hash (`site.css?v=…`), so a browser that kept the last deploy's fetches the new ones. Vault source, internal design documents, app code, and brand drafts stay out of the upload. The `/design/` URL space returns 404.
 
-`uberspace.htaccess` becomes the site's `.htaccess`. It sends the bare domain to `https://www.codevillain.eu/`, answers `/design/` with 404, and redirects old Forgejo paths that match no site file to `https://git.codevillain.eu/`, keeping Git HTTP request methods.
+`uberspace.htaccess` becomes the site's `.htaccess`. It sends the bare domain to `https://www.codevillain.eu/`, has browsers ask for a page again on every visit, answers `/design/` with 404, and redirects old Forgejo paths that match no site file to `https://git.codevillain.eu/`, keeping Git HTTP request methods.
 
 Where the site is hosted and how a build is deployed lives in the private `infra` repository, not here. Never upload a vault checkout into a public document root.

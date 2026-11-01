@@ -7,6 +7,14 @@ RewriteBase /
 RewriteCond %{HTTP_HOST} ^codevillain\.eu$ [NC]
 RewriteRule ^ https://www.codevillain.eu%{REQUEST_URI} [R=308,L,NE]
 
+# A browser asks again for a page on every visit (304 when it is unchanged),
+# so it never shows a page from before a deploy with that deploy's styles.
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
 # Internal design documents are not part of the public site.
 RewriteRule ^design(?:/|$) - [R=404,L]
 

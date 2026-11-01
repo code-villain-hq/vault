@@ -2,6 +2,7 @@
 """Package the static website and its explicit public dependencies for Uberspace."""
 from __future__ import annotations
 
+import hashlib
 from html.parser import HTMLParser
 from pathlib import Path
 import re
@@ -79,6 +80,23 @@ def validate() -> None:
         raise SystemExit('Missing public dependencies:\n' + '\n'.join(missing))
 
 
+def stamp(pages: list[str]) -> None:
+    """Ask for each style and script by its content, so a browser that kept
+    the last deploy's never pairs it with a new page."""
+    for relative in pages:
+        page = OUTPUT / relative
+        base = 'https://www.codevillain.eu/' + relative
+
+        def versioned(match: re.Match[str]) -> str:
+            url = urlsplit(urljoin(base, match[2]))
+            path = OUTPUT / unquote(url.path).lstrip('/')
+            if url.netloc != 'www.codevillain.eu' or url.query or not path.is_file():
+                return match[0]
+            return f'{match[1]}{match[2]}?v={hashlib.sha256(path.read_bytes()).hexdigest()[:10]}"'
+
+        page.write_text(re.sub(r'((?:href|src)=")([^"]+\.(?:css|js))"', versioned, page.read_text()))
+
+
 def main() -> None:
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
@@ -126,6 +144,7 @@ def main() -> None:
     }.items():
         copy(VAULT / path, f'assets/products/{product}.svg')
     copy(SITE / 'uberspace.htaccess', '.htaccess')
+    stamp(pages)
     validate()
     files = [p for p in OUTPUT.rglob('*') if p.is_file()]
     print(f'Built {len(files)} public files ({sum(p.stat().st_size for p in files):,} bytes) in {OUTPUT}')
