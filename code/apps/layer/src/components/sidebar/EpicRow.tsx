@@ -4,7 +4,7 @@ import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, useEpicViews } from "../../lib/epicState";
 import type { EpicOf } from "../../lib/grouping";
 import { useTaskAgents } from "../../lib/panes";
-import { pressKeys } from "../../lib/press";
+import { menuKeys, pressKeys } from "../../lib/press";
 import type { TaskView } from "../../lib/types";
 import { useStore } from "../../store";
 import { ChevronIcon } from "../icons";
@@ -75,7 +75,7 @@ export const EpicRow = memo(function EpicRow({
         tabIndex={0}
         className={`ws${selected === epic.id ? " active" : ""}`}
         onClick={() => onSelect(epic.id)}
-        onKeyDown={pressKeys(() => onSelect(epic.id))}
+        onKeyDown={menuKeys(pressKeys(() => onSelect(epic.id)))}
         onContextMenu={(e) => {
           e.preventDefault();
           onMenu(e.clientX, e.clientY, epic);
@@ -239,7 +239,7 @@ function SubLine({
       tabIndex={0}
       className={`sub-row${selected ? " active" : ""}`}
       onClick={() => onSelect(task.id)}
-      onKeyDown={pressKeys(() => onSelect(task.id))}
+      onKeyDown={menuKeys(pressKeys(() => onSelect(task.id)))}
       onContextMenu={(e) => {
         e.preventDefault();
         onMenu(e.clientX, e.clientY, task);

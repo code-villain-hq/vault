@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
+import { byKeys } from "../lib/press";
 
 export interface MenuItem {
   label: string;
@@ -78,6 +79,10 @@ export function Floating({
     // and leaves it where the measuring put it, 100px from the corner.
     el.style.left = `${placed.left}px`;
     el.style.top = `${placed.top}px`;
+    // Shown now, not on the next render: a menu opened from the keyboard
+    // focuses its first item in its own effect, which runs after this one,
+    // and a hidden element can't take the focus.
+    el.style.visibility = "visible";
     setPos(placed);
   }, [x, y, align, above, measureKey]);
 
@@ -115,7 +120,13 @@ export function Floating({
   );
 }
 
-/** A right-click menu anchored at the cursor. */
+/**
+ * A right-click menu anchored at the cursor, or at what opened it from the
+ * keyboard (`menuKeys`, a button's Enter). ↑/↓ move through its items and
+ * Enter picks one, as in macOS's menus. Closed with keys (Esc, or an item
+ * picked with Enter), it gives the focus back to what opened it
+ * (`studio/design/behaviour.md`, "Keys").
+ */
 export function ContextMenu({
   x,
   y,
@@ -129,6 +140,56 @@ export function ContextMenu({
   onClose: () => void;
   ignore?: RefObject<HTMLElement | null>;
 }) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const opener = useRef<HTMLElement | null>(null);
+
+  // Opened again somewhere else (⇧F10 on another row while one is open) is
+  // a new opening. What has the focus then opened it, unless it is one of
+  // the items: StrictMode runs this twice, the second time after the first
+  // has focused one.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && !buttons.current.includes(active as HTMLButtonElement)) {
+      opener.current = active;
+    }
+    // From the keyboard, the first item takes the focus, so the arrows and
+    // Enter work at once. From the mouse nothing is chosen until an arrow
+    // is pressed, as in macOS.
+    if (byKeys()) {
+      buttons.current.find((b) => b && !b.disabled)?.focus();
+    }
+  }, [x, y]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const enabled = buttons.current.filter((b): b is HTMLButtonElement => !!b && !b.disabled);
+      const at = enabled.indexOf(document.activeElement as HTMLButtonElement);
+      if (e.key === "Escape") {
+        opener.current?.focus();
+      } else if (e.key === "Tab" && at >= 0) {
+        // macOS's menus take no Tab; it would leave the menu open behind it.
+        e.preventDefault();
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const down = e.key === "ArrowDown";
+        // Nothing chosen yet: ↓ starts at the top, ↑ at the bottom. At either
+        // end it stays, as macOS's menus do.
+        const next =
+          at < 0
+            ? down
+              ? 0
+              : enabled.length - 1
+            : Math.max(0, Math.min(enabled.length - 1, at + (down ? 1 : -1)));
+        enabled[next]?.focus();
+      }
+    };
+    // Capture, ahead of Floating's own Esc: once that has closed the menu,
+    // React takes it out between the two listeners, this one with it, and
+    // the focus was left on nothing.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+
   return (
     <Floating
       x={x}
@@ -144,12 +205,26 @@ export function ContextMenu({
         <button
           // oxlint-disable-next-line react/no-array-index-key -- a menu's items, in order; a label can repeat
           key={i}
+          ref={(b) => {
+            buttons.current[i] = b;
+          }}
           className={`ctx-item ui-option${item.danger ? " danger" : ""}${
             item.separated ? " separated" : ""
           }`}
           disabled={item.disabled}
-          onClick={() => {
+          // Once the keys have chosen an item, the pointer chooses too, so
+          // only one is ever lit (styles.css, .ctx-item).
+          onMouseMove={(e) => {
+            if (buttons.current.includes(document.activeElement as HTMLButtonElement)) {
+              e.currentTarget.focus();
+            }
+          }}
+          onClick={(e) => {
             onClose();
+            // Picked with Enter or Space (a click with no pointer behind it):
+            // the focus goes back before the item runs, so a dialog it opens
+            // can still take it.
+            if (e.detail === 0) opener.current?.focus();
             item.onSelect();
           }}
         >

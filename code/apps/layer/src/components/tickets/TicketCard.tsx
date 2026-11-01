@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { pressKeys } from "../../lib/press";
+import { menuKeys, pressKeys } from "../../lib/press";
 import { age } from "../../lib/time";
 import type { Ticket } from "../../lib/types";
 import { useStore } from "../../store";
@@ -52,7 +52,7 @@ export function TicketCard({
       title={taskId ? "Open the task already running for this ticket" : undefined}
       onContextMenu={onContextMenu}
       onClick={open}
-      onKeyDown={pressKeys(open)}
+      onKeyDown={menuKeys(pressKeys(open))}
     >
       <div className="top">
         <IssueTypeIcon types={types} name={issue.issue_type} />

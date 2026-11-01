@@ -2,7 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type MouseEvent } from "react";
 import { api } from "../lib/api";
 import { goTo } from "../lib/goto";
-import { pressKeys } from "../lib/press";
+import { menuKeys, pressKeys } from "../lib/press";
 import { ago } from "../lib/time";
 import type { AuthoredPr, ReviewRequest } from "../lib/types";
 import { useStore } from "../store";
@@ -43,7 +43,7 @@ export function ReviewCard({
       className={`review-card${focused ? " focused" : ""}`}
       data-review={identity(pr)}
       onClick={open}
-      onKeyDown={pressKeys(open)}
+      onKeyDown={menuKeys(pressKeys(open))}
       onContextMenu={onContextMenu}
       title={pr.url}
     >
@@ -172,7 +172,7 @@ export function AuthoredCard({
       onClick={(e) => {
         if (!(e.target as Element).closest(".error-message")) open();
       }}
-      onKeyDown={pressKeys(open)}
+      onKeyDown={menuKeys(pressKeys(open))}
       onContextMenu={onContextMenu}
       title={task ? `Open ${task.name}` : pr.url}
     >

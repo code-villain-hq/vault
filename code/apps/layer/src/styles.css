@@ -2770,14 +2770,25 @@ body.dragging * {
   white-space: nowrap;
   width: 100%;
 }
-.ctx-item:hover:not(:disabled) {
+/* The item the arrow keys are on is lit as the pointer's is, with no ring:
+   the shared recipe's highlighted option (.ui-option). */
+.ctx-item:hover:not(:disabled),
+.ctx-item:focus-visible {
   background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
+  outline: none;
 }
 .ctx-item.danger {
   color: var(--status-danger-ink);
 }
-.ctx-item.danger:hover:not(:disabled) {
+.ctx-item.danger:hover:not(:disabled),
+.ctx-item.danger:focus-visible {
   background: color-mix(in srgb, var(--danger) var(--highlight-tint), transparent);
+}
+/* While the keys are on an item, a pointer resting on another doesn't light
+   it too: only one is ever lit. Moving the pointer moves the keys' item
+   (ContextMenu). */
+.ctx-menu:has(.ctx-item:focus-visible) .ctx-item:hover:not(:focus-visible) {
+  background: transparent;
 }
 .ctx-item.separated {
   margin-top: 5px;

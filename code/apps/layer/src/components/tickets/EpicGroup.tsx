@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
-import { pressKeys } from "../../lib/press";
+import { menuKeys, pressKeys } from "../../lib/press";
 import type { Ticket } from "../../lib/types";
 import { ChevronIcon } from "../icons";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
@@ -45,7 +45,7 @@ export function EpicGroup({
         aria-expanded={!closed}
         className="epic-head"
         onClick={onToggle}
-        onKeyDown={pressKeys(onToggle)}
+        onKeyDown={menuKeys(pressKeys(onToggle))}
         onContextMenu={onContextMenu}
       >
         <span className={`chev${closed ? "" : " open"}`}>

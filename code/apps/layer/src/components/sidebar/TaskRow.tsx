@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { taskTotals, type TaskReview } from "../../lib/derive";
 import { useTaskAgents } from "../../lib/panes";
-import { pressKeys } from "../../lib/press";
+import { menuKeys, pressKeys } from "../../lib/press";
 import type { TaskView } from "../../lib/types";
 import { ChevronIcon, CloseIcon } from "../icons";
 import { Spinner } from "../ui";
@@ -69,7 +69,7 @@ export const TaskRow = memo(function TaskRow({
         tabIndex={vanishing ? -1 : 0}
         className={`ws${selected ? " active" : ""}${vanishing ? " deleting" : ""}`}
         onClick={select}
-        onKeyDown={pressKeys(select)}
+        onKeyDown={menuKeys(pressKeys(select))}
         onContextMenu={(e) => {
           if (vanishing) return;
           e.preventDefault();

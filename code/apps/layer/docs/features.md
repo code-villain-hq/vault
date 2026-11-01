@@ -1485,6 +1485,16 @@ to fix on Repos. A running agent or chat is a live dot.
   skeleton while it waits: it shows its content once it has it
   (`studio/design/behaviour.md`, "Empty and loading").
 
+- **WIN-5** Everything with a right-click menu MUST open it from the
+  keyboard too, as macOS does: ⇧F10 or the context-menu key on the
+  focused row opens its menu at the row's foot. That is the sidebar's
+  task, epic and sub-task rows, ticket cards and epic heads in Tickets,
+  and the cards in Reviews. In any menu, ↑/↓ move through the items,
+  Enter picks one and Esc closes it. Opened from the keyboard, the first
+  item is chosen; opened with the mouse, nothing is until an arrow is
+  pressed. Closed with keys, the menu gives the focus back to what opened
+  it (`studio/design/behaviour.md`, "Keys").
+
 - **WIN-6** A dialog MUST take the focus when it opens: its first field,
   or else its first button (a confirmation's Cancel, WIN-3). While it is
   open, Tab and ⇧Tab go round its controls, buttons included, and never
@@ -1493,7 +1503,7 @@ to fix on Repos. A running agent or chat is a live dot.
   field or terminal you were typing in, so no ring is left on a row
   (`studio/design/behaviour.md`, "Keys").
 
-Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Modal`, `Confirm`), `lib/modalFocus.ts`, `Splash.tsx`, `src-tauri/capabilities/default.json`.
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Modal`, `Confirm`), `menu.tsx` (`ContextMenu`), `lib/modalFocus.ts`, `lib/press.ts` (`menuKeys`), `Splash.tsx`, `src-tauri/capabilities/default.json`.
 
 ## 16. Repo notes
 
