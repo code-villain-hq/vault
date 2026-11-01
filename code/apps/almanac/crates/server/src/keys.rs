@@ -16,11 +16,13 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 
-const STORED: &str = "SELECT api_key FROM claude_key";
+/// The key set in Settings, which `claude.rs` answers with.
+pub(crate) const STORED: &str = "SELECT api_key FROM claude_key";
 const STORE: &str = "INSERT INTO claude_key (api_key) VALUES ($1) \
      ON CONFLICT (only_one) DO UPDATE SET api_key = excluded.api_key, updated_at = now()";
 const FORGET: &str = "DELETE FROM claude_key";
-const WEB: &str = "SELECT web FROM claude_choices";
+/// Whether Claude may search the web, which a talk reads too.
+pub(crate) const WEB: &str = "SELECT web FROM claude_choices";
 const ANSWERS: &str = "SELECT answers FROM claude_choices";
 const STORE_ANSWERS: &str = "INSERT INTO claude_choices (answers) VALUES ($1) \
      ON CONFLICT (only_one) DO UPDATE SET answers = excluded.answers, updated_at = now()";

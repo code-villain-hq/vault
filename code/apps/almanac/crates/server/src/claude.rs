@@ -19,8 +19,6 @@ const API_VERSION: &str = "2026-10-21";
 const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
 const MESSAGES_URL: &str = "https://api.anthropic.com/v1/messages";
 
-const STORED_KEY: &str = "SELECT api_key FROM claude_key";
-
 /// Why Claude gave no answer, in words for the talk.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Problem(pub String);
@@ -50,8 +48,15 @@ pub struct Claude {
 impl Claude {
     /// `from_settings` is the key the server's settings name, if any.
     pub fn new(from_settings: Option<String>) -> Self {
+        // A stalled answer ends: ten minutes with nothing from the API, as
+        // its own SDKs wait.
+        let http = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .read_timeout(std::time::Duration::from_secs(600))
+            .build()
+            .unwrap_or_default();
         Claude {
-            http: reqwest::Client::new(),
+            http,
             url: MESSAGES_URL.into(),
             from_settings: from_settings.filter(|k| !k.trim().is_empty()),
         }
@@ -66,7 +71,9 @@ impl Claude {
     /// The key to call Claude with: the one set in Settings, else the
     /// settings file's.
     pub async fn key(&self, pool: &PgPool) -> Result<Option<String>, sqlx::Error> {
-        let stored: Option<String> = sqlx::query_scalar(STORED_KEY).fetch_optional(pool).await?;
+        let stored: Option<String> = sqlx::query_scalar(crate::keys::STORED)
+            .fetch_optional(pool)
+            .await?;
         Ok(stored.or_else(|| self.from_settings.clone()))
     }
 

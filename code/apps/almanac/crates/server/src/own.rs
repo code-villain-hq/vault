@@ -63,7 +63,8 @@ pub async fn ensure(db: &mut PgConnection, actor: Actor) -> Result<(), AppError>
 }
 
 /// [`ensure`] in a transaction of its own. Two clients starting at once may
-/// both try; the one that loses finds it made.
+/// both try; the one that loses is refused by the one-own-topic index and
+/// only logs it.
 pub async fn ensure_alone(pool: &PgPool, actor: Actor) {
     let made = async {
         let mut db = pool.begin().await?;

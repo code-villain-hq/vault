@@ -32,6 +32,7 @@ use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
 use crate::kept::{Answering, FieldArg, ItemArg, Kept, PointChange, RowArg, fields, reminder};
+use crate::keys::WEB;
 use crate::mcp::{Asking, Mode};
 use crate::page::{Page, Workspace};
 use crate::photos::{self, Image};
@@ -50,7 +51,6 @@ const TITLE_AND_QUESTION: &str = "SELECT t.title, coalesce((SELECT m.text FROM m
      WHERE m.talk_id = t.id AND m.role = 'you' ORDER BY m.created_at LIMIT 1), '') \
      FROM talks t WHERE t.id = $1 AND t.workspace_id = $2";
 const KIND: &str = "SELECT kind FROM topics WHERE id = $1 AND workspace_id = $2";
-const WEB: &str = "SELECT web FROM claude_choices";
 
 const ANSWER: &str = "You are Almanac, a notebook that keeps what someone learns, one topic at a \
 time. You answer in a talk inside one topic; the page beside the talk keeps what's worth knowing \
