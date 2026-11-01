@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: the page, three ways</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1040px; margin: 0 auto; display: grid; gap: 64px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 76ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.why { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.why li { padding-left: 14px; position: relative; }
+.why li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.why b { color: var(--fg); font-weight: 600; }
+
+/* The middle of the window: the topic's page and its ask bar. */
+.mid { background: var(--panel); border-radius: var(--radius-lg); padding: 28px 40px 18px; display: flex; flex-direction: column; gap: 26px; }
+.thead h1 { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); display: flex; gap: 10px; align-items: center; }
+.thead h1 svg { color: var(--muted); }
+.thead p { color: var(--muted); margin-top: 4px; }
+.label { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 8px; }
+.label .tools { margin-left: auto; display: flex; }
+.askbox { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 6px 0 14px; }
+.askbox .ph { color: var(--faint); flex: 1; }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.more { color: var(--faint); font-size: var(--type-ui-small-size); }
+.ui-live-dot { flex: none; }
+
+/* The week, as today. */
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day { border-radius: var(--radius-md); padding: 8px; min-height: 74px; display: flex; flex-direction: column; gap: 6px; }
+.day .dl { color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 2px; }
+.day .dl b { color: var(--muted); font-weight: 600; }
+.day.today { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.day.today .dl, .day.today .dl b { color: var(--fg); font-weight: 700; }
+.ev { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: var(--radius-md); background: var(--surface); font-size: var(--type-ui-small-size); line-height: 1.3; }
+.ev svg { color: var(--muted); flex: none; }
+.ev.done { background: none; color: var(--faint); }
+
+/* 1: the routine leads. */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stepcard { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start; }
+.stepcard .num { font-size: 26px; font-weight: 700; line-height: 1; color: var(--muted); grid-row: 1 / 3; }
+.stepcard .thing { font-weight: 700; }
+.stepcard p { grid-column: 2; color: var(--muted); font-size: var(--type-ui-small-size); }
+.tick { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.75px color-mix(in srgb, var(--fg) 35%, transparent); grid-column: 3; grid-row: 1; }
+.folds { display: grid; gap: 2px; }
+.fold { display: flex; align-items: baseline; gap: 14px; padding: 8px 10px; border-radius: var(--radius-md); }
+.fold .name { font-weight: 700; width: 110px; flex: none; display: flex; gap: 6px; align-items: center; }
+.fold .name svg { color: var(--faint); }
+.fold .gist { color: var(--muted); flex: 1; }
+.fold .count { color: var(--faint); font-size: var(--type-ui-small-size); white-space: nowrap; }
+.fold.open { background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); flex-wrap: wrap; }
+.fold.open .name svg { rotate: 90deg; }
+.fold ul { flex-basis: 100%; padding: 6px 0 4px 124px; display: grid; gap: 6px; }
+.fold li { display: flex; gap: 10px; align-items: baseline; }
+.fold li .src { margin-left: auto; white-space: nowrap; }
+
+/* 2: you, your shelf, the advice. */
+.you { display: flex; flex-wrap: wrap; gap: 6px; }
+.you .ui-chip { padding: 4px 10px; }
+.you .ui-chip b { color: var(--fg); font-weight: 600; }
+.shelf { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.bottle { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.bottle .kind { color: var(--faint); font-size: var(--type-ui-small-size); }
+.bottle h4 { font-weight: 700; line-height: 1.3; }
+.bottle .when { display: flex; gap: 6px; align-items: center; font-size: var(--type-ui-small-size); color: var(--muted); }
+.bottle .when svg { color: var(--faint); }
+.bottle .how { font-size: var(--type-ui-small-size); }
+.bottle .more { margin-top: auto; }
+.tips { display: grid; gap: 2px; }
+.tip { display: flex; gap: 16px; align-items: baseline; padding: 5px 10px; }
+.tip .src { margin-left: auto; white-space: nowrap; }
+
+/* 3: one quiet list. */
+.next { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-lg); background: var(--surface); }
+.next svg { color: var(--muted); }
+.next b { font-weight: 700; }
+.next .then { color: var(--muted); }
+.next .tools { margin-left: auto; display: flex; gap: 2px; }
+.outline { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 40px; }
+.outline h3 { font-weight: 700; padding: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
+.outline h3 span { color: var(--faint); font-weight: 400; font-size: var(--type-ui-small-size); }
+.outline ul { display: grid; gap: 1px; }
+.outline li { padding: 5px 10px; border-radius: var(--radius-md); display: flex; gap: 10px; align-items: baseline; }
+.outline li.hover { background: var(--hover); }
+.outline li .src { margin-left: auto; white-space: nowrap; visibility: hidden; }
+.outline li.hover .src { visibility: visible; }
+.outline .more { padding: 5px 10px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>The page, three ways</h1>
+  <p>Haar-Routine as it is today, laid out three ways: only the middle of the window, night only. The points are the page's own, as short as the new keeping writes them. In all three the week is the only place reminders show: the reminder rows inside the Scalp card go.</p>
+</header>
+
+<!-- Picked -->
+<section class="step">
+  <h2><span class="n">1 + 2</span>The routine, then you, your shelf, the advice</h2>
+  <ul class="why">
+    <li>The steps and the week from 1, then the facts, the shelf and the advice from 2. Nothing is folded under a theme any more.</li>
+    <li>A shelf item's days come from its reminders; Apoliva has none, so it says how it's used instead.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="shower" data-s="18"></i>Haar-Routine</h1><p>Haarpflege-Routine: Produkte, Waschrhythmus, Behandlungen und Pflegetipps.</p></div>
+
+    <div style="display:grid;gap:8px">
+      <div class="label"><b style="color:var(--fg);font-weight:700;font-size:var(--type-ui-size)">Today, Elvital wash</b></div>
+      <div class="steps">
+        <div class="stepcard"><span class="num">1</span><span class="thing">Elvital shampoo</span><span class="tick"></span><p>On the scalp, lukewarm water.</p></div>
+        <div class="stepcard"><span class="num">2</span><span class="thing">Elvital conditioner</span><span class="tick"></span><p>From the ears down only.</p></div>
+        <div class="stepcard"><span class="num">3</span><span class="thing">Apoliva Anti-Frizz</span><span class="tick"></span><p>A pea-sized bit, on damp ends.</p></div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:6px">
+      <div class="label">Oct 26 – Nov 1<span class="tools"><button class="ui-button ui-icon-button" aria-label="The week before"><i data-i="left"></i></button><button class="ui-button ui-icon-button" aria-label="The week after"><i data-i="right"></i></button></span></div>
+      <div class="week">
+        <div class="day"><div class="dl">Mon <b>26</b></div></div>
+        <div class="day"><div class="dl">Tue <b>27</b></div></div>
+        <div class="day today"><div class="dl">Wed <b>28</b></div><div class="ev"><i data-i="shower" data-s="12"></i>Elvital</div></div>
+        <div class="day"><div class="dl">Thu <b>29</b></div></div>
+        <div class="day"><div class="dl">Fri <b>30</b></div><div class="ev"><i data-i="shower" data-s="12"></i>Elvital</div></div>
+        <div class="day"><div class="dl">Sat <b>31</b></div></div>
+        <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><i data-i="shower" data-s="12"></i>H&amp;S</div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:8px">
+      <div class="label">You</div>
+      <div class="you">
+        <span class="ui-chip"><b>Long</b>, never coloured</span>
+        <span class="ui-chip"><b>Flat</b> at the roots</span>
+        <span class="ui-chip"><b>Oily</b> within a day</span>
+        <span class="ui-chip"><b>Low porosity</b>, by the float test</span>
+        <span class="ui-chip"><b>3 washes</b> a week</span>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:8px">
+      <div class="label">Your shelf</div>
+      <div class="shelf">
+        <div class="bottle">
+          <span class="kind">Shampoo and conditioner</span>
+          <h4>Elvital Hyaluron Plump</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>Wed and Fri</span>
+          <p class="how">Conditioner from the ears down only.</p>
+          <span class="more">4 notes</span>
+        </div>
+        <div class="bottle">
+          <span class="kind">Anti-dandruff shampoo</span>
+          <h4>Head &amp; Shoulders Pro-Expert 7</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>Sun</span>
+          <p class="how">Wash twice, leave on 2–3 minutes.</p>
+          <span class="more">3 notes</span>
+        </div>
+        <div class="bottle">
+          <span class="kind">Leave-in</span>
+          <h4>Apoliva Anti-Frizz</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>After every wash</span>
+          <p class="how">A pea-sized bit, on damp ends.</p>
+          <span class="more">2 notes</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:4px">
+      <div class="label">Advice</div>
+      <div class="tips">
+        <div class="tip ui-row">Washing often doesn't make an oily scalp oilier.<span class="src">Dermatology advice</span></div>
+        <div class="tip ui-row">If flakes return, swap one Elvital wash for H&amp;S for 2–3 weeks.<span class="src">Dermatology advice</span></div>
+        <div class="tip ui-row">For root volume, blow-dry the roots upside down.<span class="src">Hair care advice</span></div>
+        <div class="tip more">3 more</div>
+      </div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Haar-Routine, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="step">
+  <h2><span class="n">1</span>The routine leads</h2>
+  <ul class="why">
+    <li><b>Lead with the action the state needs:</b> on a wash day, the steps, in order, ticked off as you go. On other days, the next wash day's.</li>
+    <li><b>Show less:</b> each theme is one line, what it says in a few words, with its points folded under it. One is open here.</li>
+    <li>It's the storyboard's Haare. Every topic would need its own "what leads", which Almanac picks with the shape.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="shower" data-s="18"></i>Haar-Routine</h1><p>Haarpflege-Routine: Produkte, Waschrhythmus, Behandlungen und Pflegetipps.</p></div>
+
+    <div style="display:grid;gap:8px">
+      <div class="label"><b style="color:var(--fg);font-weight:700;font-size:var(--type-ui-size)">Today, wash day</b>Wednesdays and Fridays Elvital, Sundays Head &amp; Shoulders</div>
+      <div class="steps">
+        <div class="stepcard"><span class="num">1</span><span class="thing">Elvital shampoo</span><span class="tick"></span><p>On the scalp, lukewarm water.</p></div>
+        <div class="stepcard"><span class="num">2</span><span class="thing">Elvital conditioner</span><span class="tick"></span><p>From the ears down only.</p></div>
+        <div class="stepcard"><span class="num">3</span><span class="thing">Apoliva Anti-Frizz</span><span class="tick"></span><p>A pea-sized bit, on damp ends.</p></div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:6px">
+      <div class="label">Oct 26 – Nov 1<span class="tools"><button class="ui-button ui-icon-button" aria-label="The week before"><i data-i="left"></i></button><button class="ui-button ui-icon-button" aria-label="The week after"><i data-i="right"></i></button></span></div>
+      <div class="week">
+        <div class="day"><div class="dl">Mon <b>26</b></div></div>
+        <div class="day"><div class="dl">Tue <b>27</b></div></div>
+        <div class="day today"><div class="dl">Wed <b>28</b></div><div class="ev"><i data-i="shower" data-s="12"></i>Elvital</div></div>
+        <div class="day"><div class="dl">Thu <b>29</b></div></div>
+        <div class="day"><div class="dl">Fri <b>30</b></div><div class="ev"><i data-i="shower" data-s="12"></i>Elvital</div></div>
+        <div class="day"><div class="dl">Sat <b>31</b></div></div>
+        <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><i data-i="shower" data-s="12"></i>H&amp;S</div></div>
+      </div>
+    </div>
+
+    <div class="folds">
+      <div class="fold ui-row"><span class="name"><i data-i="right" data-s="13"></i>Products</span><span class="gist">Elvital Hyaluron Plump, Head &amp; Shoulders Pro-Expert 7, Apoliva Anti-Frizz</span><span class="count">9 points</span></div>
+      <div class="fold open"><span class="name"><i data-i="right" data-s="13"></i>Scalp</span><span class="gist">Oily within a day; much better since weekly H&amp;S</span><span class="count">7 points</span>
+        <ul>
+          <li><span class="ui-live-dot"></span>Wednesday and Friday Elvital, Sunday H&amp;S.<span class="src">From the talk</span></li>
+          <li>Gets greasy about a day after washing.<span class="src">You said</span></li>
+          <li>Much better after a month of weekly H&amp;S.<span class="src">You said</span></li>
+          <li>Leave H&amp;S on 2–3 minutes before rinsing.<span class="src">Dermatology advice</span></li>
+          <li>If flakes return, swap one Elvital wash for H&amp;S for 2–3 weeks.<span class="src">Dermatology advice</span></li>
+          <li class="more">2 more</li>
+        </ul>
+      </div>
+      <div class="fold ui-row"><span class="name"><i data-i="right" data-s="13"></i>Hair type</span><span class="gist">Long, flat at the roots, low porosity</span><span class="count">8 points</span></div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Haar-Routine, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="step">
+  <h2><span class="n">2</span>You, your shelf, the advice</h2>
+  <ul class="why">
+    <li><b>Hierarchy by kind, not by theme:</b> what's true of you is a row of facts, what you use is a shelf, and what to do is a short list. Today all three are mixed in every card.</li>
+    <li>Each bottle says when and how you use it; what's in it (ingredients, links) is behind its "notes".</li>
+    <li><b>Tone, not lines:</b> facts are chips, bottles are surfaces, advice is plain text with the source dimmed.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="shower" data-s="18"></i>Haar-Routine</h1><p>Haarpflege-Routine: Produkte, Waschrhythmus, Behandlungen und Pflegetipps.</p></div>
+
+    <div style="display:grid;gap:8px">
+      <div class="label">You</div>
+      <div class="you">
+        <span class="ui-chip"><b>Long</b>, never coloured</span>
+        <span class="ui-chip"><b>Flat</b> at the roots</span>
+        <span class="ui-chip"><b>Oily</b> within a day</span>
+        <span class="ui-chip"><b>Low porosity</b>, by the float test</span>
+        <span class="ui-chip"><b>3 washes</b> a week</span>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:8px">
+      <div class="label">Your shelf</div>
+      <div class="shelf">
+        <div class="bottle">
+          <span class="kind">Shampoo and conditioner</span>
+          <h4>Elvital Hyaluron Plump</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>Wed and Fri · next today</span>
+          <p class="how">Conditioner from the ears down only.</p>
+          <span class="more">4 notes</span>
+        </div>
+        <div class="bottle">
+          <span class="kind">Anti-dandruff shampoo</span>
+          <h4>Head &amp; Shoulders Pro-Expert 7</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>Sun · next in 4 days</span>
+          <p class="how">Wash twice, leave on 2–3 minutes.</p>
+          <span class="more">3 notes</span>
+        </div>
+        <div class="bottle">
+          <span class="kind">Leave-in</span>
+          <h4>Apoliva Anti-Frizz</h4>
+          <span class="when"><i data-i="calendar" data-s="12"></i>After every wash</span>
+          <p class="how">A pea-sized bit, on damp ends.</p>
+          <span class="more">2 notes</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:4px">
+      <div class="label">Advice</div>
+      <div class="tips">
+        <div class="tip ui-row">Washing often doesn't make an oily scalp oilier.<span class="src">Dermatology advice</span></div>
+        <div class="tip ui-row">If flakes return, swap one Elvital wash for H&amp;S for 2–3 weeks.<span class="src">Dermatology advice</span></div>
+        <div class="tip ui-row">For root volume, blow-dry the roots upside down.<span class="src">Hair care advice</span></div>
+        <div class="tip more">3 more</div>
+      </div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Haar-Routine, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="step">
+  <h2><span class="n">3</span>One quiet list</h2>
+  <ul class="why">
+    <li><b>Show less:</b> the week becomes one line, what's next and after. The full week is in Calendar, or a click on the line.</li>
+    <li>The cards go: themes are headings over plain rows, the three newest showing and the rest folded. Sources show on hover, as on the row under the pointer.</li>
+    <li>Works for every topic the same, cards or not; it's the calmest, and does least for a routine.</li>
+  </ul>
+  <div class="mid">
+    <div class="thead"><h1><i data-i="shower" data-s="18"></i>Haar-Routine</h1><p>Haarpflege-Routine: Produkte, Waschrhythmus, Behandlungen und Pflegetipps.</p></div>
+
+    <div class="next"><i data-i="shower" data-s="15"></i><b>Today: Elvital wash</b><span class="then">· Fri Elvital · Sun Head &amp; Shoulders</span><span class="tools"><button class="ui-button ui-icon-button" aria-label="The week"><i data-i="calendar"></i></button></span></div>
+
+    <div class="outline">
+      <div>
+        <h3>Scalp <span>7</span></h3>
+        <ul>
+          <li><span class="ui-live-dot"></span>Wednesday and Friday Elvital, Sunday H&amp;S.<span class="src">From the talk</span></li>
+          <li class="hover">Much better after a month of weekly H&amp;S.<span class="src">You said</span></li>
+          <li>Gets greasy about a day after washing.<span class="src">You said</span></li>
+          <li class="more">4 more</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Products <span>9</span></h3>
+        <ul>
+          <li>Elvital Hyaluron Plump shampoo and conditioner.<span class="src">You said</span></li>
+          <li>Head &amp; Shoulders Pro-Expert 7, once a week.<span class="src">You said</span></li>
+          <li>Apoliva Anti-Frizz leave-in, on the ends only.<span class="src">You said</span></li>
+          <li class="more">6 more</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Hair type <span>8</span></h3>
+        <ul>
+          <li>Long, not curly, never coloured.<span class="src">You said</span></li>
+          <li>Flat at the roots; ends fine to slightly dry.<span class="src">You said</span></li>
+          <li>Low porosity, by the float test.<span class="src">You said</span></li>
+          <li class="more">5 more</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="askbox ui-field"><span class="ph">Ask Haar-Routine, or tell it something</span><button class="ui-button ui-icon-button" aria-label="Add a photo"><i data-i="image"></i></button></div>
+  </div>
+</section>
+
+</div>
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  shower: '<path d="m4 4 2.5 2.5"/><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7"/><path d="M15 5 5 15"/><path d="M14 17v.01"/><path d="M10 16v.01"/><path d="M13 13v.01"/><path d="M16 10v.01"/><path d="M11 20v.01"/><path d="M17 14v.01"/><path d="M20 11v.01"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  image: '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+};
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 15;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>

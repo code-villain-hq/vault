@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240">
+  <title>A snake plant in a grey pot</title>
+  <rect width="320" height="240" fill="#eef1f4"/>
+  <rect y="196" width="320" height="44" fill="#dde2e8"/>
+  <g stroke="#c9b458" stroke-width="3" stroke-linejoin="round">
+    <path d="M150 176c-12-50-10-110 2-150 10 44 12 104 6 150z" fill="#3d6e47"/>
+    <path d="M168 176c4-46 18-96 40-126-2 46-14 96-30 126z" fill="#4c8156"/>
+    <path d="M140 176c-14-36-34-70-58-92 6 40 26 72 46 92z" fill="#4c8156"/>
+    <path d="M176 176c14-26 36-44 62-52-12 26-32 44-52 52z" fill="#3d6e47"/>
+  </g>
+  <path d="M122 172h76l-8 52h-60z" fill="#8a9bb0"/>
+  <rect x="116" y="166" width="88" height="12" rx="3" fill="#7a8ba0"/>
+</svg>

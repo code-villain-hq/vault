@@ -51,7 +51,13 @@
     "status-ok-ink": "#5CC9A7",
     "status-warn-ink": "#E9AE45",
     "status-info-ink": "#7AAEF5",
-    "status-neutral-ink": "#9B9B9B"
+    "status-neutral-ink": "#9B9B9B",
+    "data-1": "#BAB4FB",
+    "data-2": "#68CFE4",
+    "data-3": "#F3A3BC",
+    "data-4": "#94C0FE",
+    "data-5": "#E1B671",
+    "data-6": "#76D3B4"
   },
   "day": {
     "bg": "#F5F5F5",
@@ -81,6 +87,12 @@
     "status-ok-ink": "#006A53",
     "status-warn-ink": "#7D5600",
     "status-info-ink": "#2E5E9E",
-    "status-neutral-ink": "#555555"
+    "status-neutral-ink": "#555555",
+    "data-1": "#5B5197",
+    "data-2": "#006979",
+    "data-3": "#8D3F5C",
+    "data-4": "#305D9A",
+    "data-5": "#7B5500",
+    "data-6": "#006E55"
   }
 }

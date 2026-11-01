@@ -1,0 +1,470 @@
+// Sample blocks for Settings → Blocks: every kind of the one set a page is
+// made of, with a few points each, drawn by the page's own components, and a
+// collection once for each picture its fields pick and each way a picture
+// can look. Nothing here syncs; a photo is a file of the app's own, not one
+// the server keeps.
+
+import type { Block, Field, Point, Topic } from "@almanac/types";
+import { addDays, today } from "./format";
+import calathea from "./samples/calathea.svg";
+import fingerTest from "./samples/finger-test.svg";
+import light from "./samples/light.svg";
+import monstera from "./samples/monstera.svg";
+import nextWord from "./samples/next-word.svg";
+import snakePlant from "./samples/snake-plant.svg";
+
+/** A kind of block, as the gallery shows it: what it's called and for, and a page that has one. */
+export interface Sample {
+  name: string;
+  says: string;
+  topic: Topic;
+  block: Block;
+  points: Point[];
+}
+
+const AT = "2026-10-01T09:00:00Z";
+const BASE = { workspace_id: "sample", created_at: AT, updated_at: AT };
+
+function topic(name: string, icon: string): Topic {
+  return {
+    ...BASE,
+    id: `sample-${name}`,
+    name,
+    sticks_to: "",
+    icon,
+    group_name: "",
+    parent_id: null,
+    cover: null,
+    starters: [],
+    position: 0,
+    kind: "topic",
+  };
+}
+
+/** The samples, their days counted from today. */
+export function samples(): Sample[] {
+  let n = 0;
+  const next = () => {
+    n += 1;
+    return n;
+  };
+  const now = today();
+
+  /** A block of the sample, with the points `add` gives it. */
+  const sample = (
+    name: string,
+    says: string,
+    of: Topic,
+    kind: string,
+    title: string,
+    add: (point: (theme: string, text: string, more?: Partial<Point>) => Point) => Point[],
+    { fields = [], view = "" }: { fields?: Field[]; view?: string } = {},
+  ): Sample => {
+    const block: Block = {
+      ...BASE,
+      id: `sample-block-${kind}-${next()}`,
+      topic_id: of.id,
+      kind,
+      title,
+      facets: [],
+      fields,
+      width: "",
+      view,
+      row_id: null,
+      position: 0,
+    };
+    const point = (theme: string, text: string, more: Partial<Point> = {}): Point => ({
+      ...BASE,
+      id: `sample-point-${next()}`,
+      topic_id: of.id,
+      block_id: block.id,
+      theme,
+      text,
+      happened: "",
+      facet: "",
+      look: "",
+      amount: null,
+      note: "",
+      done: false,
+      cells: {},
+      source: null,
+      source_url: null,
+      talk_id: null,
+      seen: true,
+      position: n,
+      ...more,
+    });
+    return { name, says, topic: of, block, points: add(point) };
+  };
+
+  const running = topic("Running", "bike");
+  const plants = topic("Plants", "sprout");
+  const cat = topic("Cat", "cat");
+  const history = topic("History", "globe");
+  const career = topic("Career", "briefcase");
+  const spanish = topic("Spanish", "languages");
+  const ai = topic("AI", "cpu");
+  const home = topic("Home", "home");
+  const field = (name: string, kind: string, more: Partial<Field> = {}): Field => ({
+    name,
+    kind,
+    unit: "",
+    goal: null,
+    options: [],
+    ...more,
+  });
+
+  return [
+    sample(
+      "You",
+      "What you tell it about yourself, which its answers go by. The topic's About shows it, not its page.",
+      career,
+      "you",
+      "You",
+      (p) => [
+        p("", "Lives in Stockholm, works remote"),
+        p("", "Ten years of TypeScript, React for eight"),
+      ],
+    ),
+    sample(
+      "Heading",
+      "A title that starts a part of the page, for the blocks under it. It keeps no points.",
+      cat,
+      "heading",
+      "Care",
+      () => [],
+    ),
+    sample(
+      "Paragraph",
+      "Writing that explains, a paragraph a point, at a measure that reads well. Where it's from shows once, under it.",
+      history,
+      "paragraph",
+      "Why it lasted",
+      (p) => [
+        p(
+          "",
+          "The Congress of Vienna drew borders that held, more or less, for a century: no great power left the table wanting another war.",
+          {
+            source: "Britannica",
+            source_url: "https://www.britannica.com/event/Congress-of-Vienna",
+          },
+        ),
+        p(
+          "",
+          "It met again whenever a crisis came up, so the great powers talked before they fought.",
+          {
+            source: "Britannica",
+            source_url: "https://www.britannica.com/event/Congress-of-Vienna",
+          },
+        ),
+      ],
+    ),
+    sample(
+      "Callout",
+      "What to keep in mind, in a box that stands out.",
+      cat,
+      "callout",
+      "",
+      (p) => [p("", "Cats sleep 12 to 16 hours a day, a kitten even more.")],
+    ),
+    sample(
+      "Warning",
+      "A callout with a warning sign, when what it says is a risk.",
+      cat,
+      "callout",
+      "",
+      (p) => [p("", "Lilies are poisonous to cats, even the pollen.", { look: "warn" })],
+    ),
+    sample(
+      "Picture",
+      "A diagram, a sketch or a screenshot that explains by itself, with a caption or none. Drop one on the page, or a talk keeps one.",
+      ai,
+      "picture",
+      "",
+      (p) => [
+        p("", "A model writes a word at a time, each the likeliest after the words so far.", {
+          cells: { photo: nextWord },
+        }),
+      ],
+    ),
+    sample(
+      "Pictures",
+      "Two pictures or more take the whole page, side by side.",
+      plants,
+      "picture",
+      "",
+      (p) => [
+        p("", "Bright, indirect light: a metre or two from a window, out of the midday sun.", {
+          cells: { photo: light },
+        }),
+        p("", "Water when the top two centimetres are dry.", { cells: { photo: fingerTest } }),
+      ],
+    ),
+    sample(
+      "Line",
+      "A day with a number draws a line, the goal dashed.",
+      cat,
+      "collection",
+      "Weight",
+      (p) => [
+        p("", "Weighing", { cells: { Day: addDays(now, -65), Weight: 3.6 } }),
+        p("", "Weighing", { cells: { Day: addDays(now, -34), Weight: 3.5 } }),
+        p("", "Weighing", { cells: { Day: addDays(now, -4), Weight: 3.4 } }),
+      ],
+      { fields: [field("Day", "day"), field("Weight", "number", { unit: "kg", goal: 3.3 })] },
+    ),
+    sample(
+      "Lines",
+      "Names measured again, day after day, draw a line each: a price a shop.",
+      running,
+      "collection",
+      "Pegasus 41",
+      (p) => [
+        p("", "Runners Point", { cells: { Day: addDays(now, -21), Price: 139.95 } }),
+        p("", "Runners Point", { cells: { Day: addDays(now, -12), Price: 119.95 } }),
+        p("", "Runners Point", { cells: { Day: addDays(now, -2), Price: 99.95 } }),
+        p("", "Sportscheck", { cells: { Day: addDays(now, -21), Price: 129.99 } }),
+        p("", "Sportscheck", { cells: { Day: addDays(now, -12), Price: 129.99 } }),
+        p("", "Sportscheck", { cells: { Day: addDays(now, -2), Price: 109.99 } }),
+      ],
+      { fields: [field("Day", "day"), field("Price", "number", { unit: "€" })] },
+    ),
+    sample(
+      "Checklist",
+      "A check, with a day at most besides, draws a checklist: a row a line to tick. What's done goes faint and stays.",
+      career,
+      "collection",
+      "Before applying",
+      (p) => [
+        p("", "Bring the CV up to date", { cells: { Done: true } }),
+        p("", "Write to two people who work there"),
+        p("", "Read the last three posts on their blog"),
+      ],
+      { fields: [field("Done", "check")] },
+    ),
+    sample(
+      "Steps",
+      "Rows in their order can be viewed as steps, numbered: with a check, what's done is ticked and the next one marked.",
+      cat,
+      "collection",
+      "Changing food",
+      (p) => [
+        p("", "Keep the old food as the base", { cells: { Done: true } }),
+        p("", "Mix in a spoon of the new"),
+        p("", "A little more each week"),
+        p("", "Only the new food, after a month"),
+      ],
+      { fields: [field("Done", "check")], view: "steps" },
+    ),
+    sample(
+      "Board",
+      "A status draws a board: a lane per step, the first still open and the last done.",
+      career,
+      "collection",
+      "Applications",
+      (p) => [
+        p("", "Northwind", { cells: { Status: "Applied", Role: "Lead engineer" } }),
+        p("", "Globex", { cells: { Status: "To apply", Role: "Staff engineer" } }),
+        p("", "Initech", { cells: { Status: "Interview", Role: "Senior engineer" } }),
+        p("", "Umbrella", { cells: { Status: "To apply", Role: "Engineering manager" } }),
+      ],
+      {
+        fields: [
+          field("Status", "status", { options: ["To apply", "Applied", "Interview", "Offer"] }),
+          field("Role", "text"),
+        ],
+      },
+    ),
+    sample(
+      "Figures",
+      "A few names, each with a short value, draw figures: a tile each, the value large.",
+      cat,
+      "collection",
+      "At a glance",
+      (p) => [
+        p("", "Age", { cells: { Value: "3½ years" } }),
+        p("", "Weight", { cells: { Value: "3,4 kg" } }),
+        p("", "Sleep", { cells: { Value: "12–16 h a day" } }),
+      ],
+      { fields: [field("Value", "text")] },
+    ),
+    sample(
+      "Swatches",
+      "Figures whose values are colours, written #a78bfa, show as swatches.",
+      home,
+      "collection",
+      "Living room",
+      (p) => [
+        p("", "Walls", { cells: { Colour: "#e8e1d5" } }),
+        p("", "Sofa", { cells: { Colour: "#5b6b5a" } }),
+        p("", "Rug", { cells: { Colour: "#b5653a" } }),
+        p("", "Shelves", { cells: { Colour: "#8a6a4b" } }),
+      ],
+      { fields: [field("Colour", "text")] },
+    ),
+    sample(
+      "Cards",
+      "A photo draws cards, a card per row, tinted by its choice.",
+      plants,
+      "collection",
+      "Plants",
+      (p) => [
+        p("", "Monstera", {
+          cells: { Photo: monstera, Light: "Bright, indirect", Water: "Weekly" },
+        }),
+        p("", "Snake plant", { cells: { Photo: snakePlant, Light: "Any", Water: "Monthly" } }),
+        p("", "Calathea", { cells: { Photo: calathea, Light: "Shade", Water: "Twice a week" } }),
+      ],
+      {
+        fields: [
+          field("Photo", "photo"),
+          field("Light", "choice", { options: ["Bright, indirect", "Shade", "Any"] }),
+          field("Water", "text"),
+        ],
+      },
+    ),
+    sample(
+      "Timeline",
+      "Days or spans that are past draw a timeline, oldest first: a lane per choice, which a click picks.",
+      history,
+      "collection",
+      "Europe after Napoleon",
+      (p) => [
+        p("", "French Revolution", { cells: { When: "1789–1799", Where: "France" } }),
+        p("", "Napoleon's wars", { cells: { When: "1803–1815", Where: "Europe" } }),
+        p("", "Revolutions across Europe", { cells: { When: "1848", Where: "Europe" } }),
+        p("", "Congress of Vienna", { cells: { When: "1814–1815", Where: "Europe" } }),
+        p("", "July Revolution", { cells: { When: "1830", Where: "France" } }),
+        p("", "Unification of Germany", { cells: { When: "1871", Where: "Germany" } }),
+      ],
+      { fields: [field("When", "day"), field("Where", "choice")] },
+    ),
+    sample(
+      "Short timeline",
+      "A few rows, or a few years, are a timeline as a list, oldest first.",
+      career,
+      "collection",
+      "Jobs",
+      (p) => [
+        p("", "Globex", { cells: { When: "2019–2023", Role: "Senior engineer" } }),
+        p("", "Northwind", { cells: { When: "2016–2019", Role: "Engineer" } }),
+        p("", "Initech", { cells: { When: "2023–2025", Role: "Staff engineer" } }),
+      ],
+      { fields: [field("When", "day"), field("Role", "text")] },
+    ),
+    sample(
+      "Week",
+      "Days still to come draw a week from today, with what comes after it below.",
+      running,
+      "collection",
+      "Runs",
+      (p) => [
+        p("", "Long run", { cells: { Day: addDays(now, 2) } }),
+        p("", "Intervals", { cells: { Day: addDays(now, 4) } }),
+        p("", "City 10 km", { cells: { Day: addDays(now, 12) } }),
+      ],
+      { fields: [field("Day", "day")] },
+    ),
+    sample(
+      "Bars",
+      "A name with a number draws bars on one scale, the rest beside them.",
+      running,
+      "collection",
+      "Shoes",
+      (p) => [
+        p("", "Pegasus 41", { cells: { Price: 89, Shop: "Runners Point" } }),
+        p("", "Ghost 16", { cells: { Price: 119, Shop: "Sportscheck" } }),
+        p("", "Clifton 9", { cells: { Price: 105 } }),
+      ],
+      { fields: [field("Price", "number", { unit: "€" }), field("Shop", "text")] },
+    ),
+    sample(
+      "Table",
+      "A name and two fields or more draw a table, a column per field: a number with a bar on its column's largest, a check as its name.",
+      plants,
+      "collection",
+      "Plants",
+      (p) => [
+        p("", "Monstera", {
+          cells: {
+            Light: "Bright, indirect",
+            Water: "Weekly",
+            Height: 120,
+            "Safe for cats": false,
+          },
+        }),
+        p("", "Spider plant", {
+          cells: { Light: "Bright, indirect", Water: "Weekly", Height: 30, "Safe for cats": true },
+        }),
+        p("", "Snake plant", {
+          cells: { Light: "Any", Water: "Monthly", Height: 70, "Safe for cats": false },
+        }),
+      ],
+      {
+        fields: [
+          field("Light", "choice", { options: ["Bright, indirect", "Shade", "Any"] }),
+          field("Water", "text"),
+          field("Height", "number", { unit: "cm" }),
+          field("Safe for cats", "check"),
+        ],
+      },
+    ),
+    sample(
+      "Totals",
+      "Amounts with a unit add up under their column. A row named “of which …” sits under the one above and isn't counted twice. Four rows or more with a choice are tallied over the picture, and a click on its word picks them.",
+      home,
+      "collection",
+      "Every month",
+      (p) => [
+        p("", "Rent", { cells: { Amount: 1250, Account: "Joint", On: "1st" } }),
+        p("", "Groceries", { cells: { Amount: 480, Account: "Joint", On: "Weekly" } }),
+        p("", "of which organic", { cells: { Amount: 120, Account: "Joint", On: "Weekly" } }),
+        p("", "Internet", { cells: { Amount: 39.9, Account: "Joint", On: "15th" } }),
+        p("", "Gym", { cells: { Amount: 34.9, Account: "Mine", On: "1st" } }),
+      ],
+      {
+        fields: [
+          field("Amount", "number", { unit: "€" }),
+          field("Account", "choice", { options: ["Joint", "Mine"] }),
+          field("On", "text"),
+        ],
+      },
+    ),
+    sample(
+      "List",
+      "Anything else is a list: the name, then the rest.",
+      spanish,
+      "collection",
+      "Words",
+      (p) => [
+        p("", "madrugada", { cells: { Means: "the hours after midnight" } }),
+        p("", "sobremesa", { cells: { Means: "staying at the table to talk" } }),
+        p("", "estrenar", { cells: { Means: "to wear or use for the first time" } }),
+      ],
+      { fields: [field("Means", "text")] },
+    ),
+    sample(
+      "Terms",
+      "Terms with what they mean are rows: the term, and a sentence or two under it. View as draws them as a table or cards too.",
+      history,
+      "collection",
+      "How it held",
+      (p) => [
+        p("", "Borders", {
+          cells: {
+            Text: "Drawn in Vienna, they held for a century: no great power left the table wanting another war.",
+          },
+        }),
+        p("", "Talks", {
+          cells: { Text: "Came before fights: the powers met again whenever a crisis came up." },
+        }),
+        p("", "Revolutions", {
+          cells: {
+            Text: "Shook it in 1848, but the order held until Germany and Italy were unified.",
+          },
+        }),
+      ],
+      { fields: [field("Text", "text")] },
+    ),
+  ];
+}

@@ -1,0 +1,289 @@
+@import "tailwindcss";
+
+@import "./design/color.css";
+@import "./design/type.css";
+@import "./design/shape.css";
+@import "./design/fonts/fonts.css";
+@import "./design/components.css";
+/* The shared kit's classes, which Tailwind wouldn't find outside this app. */
+@source "../../../../../kit/web/src";
+
+/* Almanac-specific roles derived from Nightshade's shared tokens. */
+:root {
+  --band: var(--surface);
+  --line-strong: var(--faint);
+  /* A topic's hue and its choices' (hues.ts); a page sets its own. */
+  --hue: var(--data-1);
+  --choice-1: var(--data-2);
+  --choice-2: var(--data-3);
+  --choice-3: var(--data-4);
+  --choice-4: var(--data-5);
+  --choice-5: var(--data-6);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-hover: var(--hover);
+  /* Translucent, so the active option shows on any host, dialogs included. */
+  --color-highlight: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent);
+  /* The quiet chip tint, for initials and other detail that isn't a signal. */
+  --color-chip: color-mix(in srgb, var(--fg) var(--chip-tint), transparent);
+  --color-band: var(--band);
+  --color-accent: var(--accent);
+  --color-signal: var(--signal);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-selected: var(--selected);
+  --color-line-strong: var(--line-strong);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  /* Content that tells things apart: a topic's hue, a choice's options. Never chrome. */
+  --color-hue: var(--hue);
+  --color-choice-1: var(--choice-1);
+  --color-choice-2: var(--choice-2);
+  --color-choice-3: var(--choice-3);
+  --color-choice-4: var(--choice-4);
+  --color-choice-5: var(--choice-5);
+  /* Status text: checked on the status tint as well as on plain tones. */
+  --color-danger-ink: var(--status-danger-ink);
+  --color-ok-ink: var(--status-ok-ink);
+  --color-warn-ink: var(--status-warn-ink);
+  --color-info-ink: var(--status-info-ink);
+  --font-sans: var(--font-reading);
+  /* Secondary text: 13px, a step under the 14px body. */
+  --text-xs: var(--type-ui-small-size);
+  --text-xs--line-height: var(--type-ui-small-leading);
+  --text-sm: var(--type-ui-size);
+  --text-sm--line-height: var(--type-ui-leading);
+  --text-wordmark: var(--type-wordmark-size);
+  --text-wordmark--line-height: var(--type-wordmark-leading);
+  --text-title: var(--type-title-size);
+  --text-title--line-height: var(--type-title-leading);
+  --text-query: var(--type-query-size);
+  --text-query--line-height: var(--type-query-leading);
+  /* Reading: a document's paragraphs, at the reading size and measure. */
+  --text-body: var(--type-body-size);
+  --text-body--line-height: var(--type-body-leading);
+  --container-measure: var(--type-body-measure);
+  --font-weight-medium: var(--type-control-weight);
+  --font-weight-semibold: var(--type-title-weight);
+}
+
+/* Loading: the mark breathes in size, never fading the strike below full strength. */
+@theme {
+  --animate-breathe: breathe 1.6s ease-in-out infinite;
+  @keyframes breathe {
+    50% {
+      transform: scale(0.9);
+    }
+  }
+}
+
+/* A card tinted by its choice's colour (`--tint`), over the surface it sits on. */
+@utility bg-tinted {
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+.app-topbar {
+  --field: var(--panel);
+  background: var(--bg);
+}
+:where(.workspace-content) > :where(main, div, p, section) {
+  background: var(--panel);
+}
+/* The first content region owns the corner; the frame shows behind its radius. */
+:where(.workspace-content) > h1 + :where(main, div, p, section) {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.app-sidebar .nav-link.active .nav-count {
+  display: none;
+}
+.app-sidebar {
+  --field: var(--panel);
+}
+
+/* The shared frame becomes a horizontal navigation row below 560px. */
+@media (width < 560px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .app-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+  }
+  .sidebar-navigation {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .app-sidebar nav {
+    display: contents;
+  }
+  .app-sidebar .nav-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .app-brand,
+  .sidebar-group-label,
+  .app-sidebar nav > span {
+    display: none;
+  }
+  .workspace-switcher {
+    flex: 0 0 auto;
+    max-width: 9rem;
+  }
+  .sidebar-footer {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0 0.5rem;
+    background: var(--bg);
+  }
+  .sidebar-footer .sync-label {
+    max-inline-size: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workspace-content {
+    margin-inline: 0.5rem;
+  }
+  .app-topbar {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+  }
+  .app-topbar > nav {
+    max-width: 100%;
+  }
+  .app-topbar > div {
+    width: 100%;
+    margin-left: 0;
+  }
+  .workspace-content > .page-content > div,
+  .workspace-content > .page-content > article {
+    padding-inline: 1rem;
+  }
+}
+
+/*
+ * A topic's page is a grid of twelve columns. A block takes a share of a
+ * row (data-width), a row's blocks grow to fill it, and a block that would
+ * get narrower than its kind reads at (--min) takes a row of its own.
+ */
+.page-grid {
+  --gap: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem var(--gap);
+}
+.page-grid > * {
+  --w: 1;
+  --min: 28rem;
+  flex: 1 1 calc(100% * var(--w) - var(--gap) * (1 - var(--w)));
+  min-width: min(var(--min), 100%);
+}
+.page-grid > [data-width="1/2"] {
+  --w: calc(1 / 2);
+}
+/* A block on its own, as Settings → Blocks shows it: just its share. */
+.page-grid[data-alone] > * {
+  flex-grow: 0;
+}
+
+/*
+ * Words written in place read as they will on the page, in the type around
+ * them, with the focus ring a field has round them.
+ */
+.writing {
+  display: block;
+  width: calc(100% + 1rem);
+  margin: -0.25rem -0.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}
+.writing:focus {
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.writing::placeholder {
+  color: var(--faint);
+}
+
+/*
+ * View as: each view its icon, and the one showing its name too, in the
+ * selected tint, so a glance says which it is.
+ */
+.view-as .ui-segment {
+  gap: 0.35rem;
+  padding-inline: 0.4rem;
+}
+.view-as .ui-segment[aria-pressed="true"] {
+  padding-inline: 0.5rem 0.6rem;
+  background: var(--selected);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-breathe {
+    animation: none;
+  }
+  [role="dialog"],
+  [role="alertdialog"],
+  [role="menu"] {
+    transition: opacity 0.1s;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-size);
+  font-weight: var(--type-ui-weight);
+  line-height: var(--type-ui-leading);
+  caret-color: var(--fg);
+  scrollbar-color: var(--line-strong) var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Neutral, so the text stays readable by night and day; poison never backs text. */
+::selection {
+  background: color-mix(in srgb, var(--fg) 25%, transparent);
+  color: var(--fg);
+}

@@ -1,0 +1,54 @@
+name: code-villain-almanac
+
+# Almanac's local database (`bun run db`), and the whole app (`bun run app`).
+services:
+  postgres:
+    image: postgres:18
+    # Come back after Docker restarts, unless stopped on purpose.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: almanac
+      POSTGRES_PASSWORD: almanac
+      POSTGRES_DB: almanac
+    ports:
+      # 5437 on this machine only: Forge has 5433, Glyph 5434.
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - almanac-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U almanac"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # The whole app, as a company uses it: `bun run app`, then http://localhost:7790.
+  almanac:
+    profiles: ["app"]
+    # From code/, so the image can use the studio's kit (code/kit).
+    build:
+      context: ../..
+      dockerfile: apps/almanac/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # This machine only by default. For others, put it behind https and
+      # set ALMANAC_LISTEN, e.g. 0.0.0.0:7790 (and drop ALMANAC_COOKIE_SECURE).
+      - "${ALMANAC_LISTEN:-127.0.0.1:7790}:7780"
+    environment:
+      DATABASE_URL: postgres://almanac:almanac@postgres:5432/almanac
+      # Plain http on this machine; use https and drop this anywhere else.
+      ALMANAC_COOKIE_SECURE: "0"
+      # The company Almanac runs for, its account (OpenID Connect and SCIM) and
+      # its address: required. They come from your shell or a `.env` file
+      # next to this one. See almanac.example.toml.
+      ALMANAC_COMPANY: ${ALMANAC_COMPANY:-}
+      ALMANAC_OIDC_ISSUER: ${ALMANAC_OIDC_ISSUER:-}
+      ALMANAC_OIDC_CLIENT_ID: ${ALMANAC_OIDC_CLIENT_ID:-}
+      ALMANAC_OIDC_CLIENT_SECRET: ${ALMANAC_OIDC_CLIENT_SECRET:-}
+      ALMANAC_SCIM_TOKEN: ${ALMANAC_SCIM_TOKEN:-}
+      ALMANAC_PUBLIC_URL: ${ALMANAC_PUBLIC_URL:-http://localhost:7790}
+
+volumes:
+  almanac-db:

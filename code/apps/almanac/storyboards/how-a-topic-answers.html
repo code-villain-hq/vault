@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: how a topic answers</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* The window. */
+.win { display: grid; grid-template-columns: 172px 1fr; grid-template-rows: 44px 1fr; height: 520px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; }
+.win.talking { grid-template-columns: 172px 1fr 340px; height: 600px; }
+.win.talking .top { grid-column: 2 / 4; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+.toprow { height: 44px; display: flex; align-items: center; padding-left: 8px; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.nav { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 8px; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 12px 8px 4px; }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 2px; }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; padding: 22px 24px; display: flex; flex-direction: column; gap: 22px; }
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.about { color: var(--muted); margin-top: 4px; }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); margin-bottom: 8px; }
+.list .ui-row { display: flex; gap: 16px; align-items: baseline; padding: 5px 10px; }
+.list .src, .src { color: var(--faint); font-size: var(--type-ui-small-size); margin-left: auto; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.text h3 { font-weight: 700; margin-bottom: 4px; }
+.text p { font-size: var(--type-body-size); line-height: var(--type-body-leading); max-width: 64ch; }
+
+/* The edit dialog. */
+.backdrop { background: color-mix(in srgb, var(--bg) 60%, transparent); border-radius: 12px; padding: 32px 0; display: grid; place-items: center; }
+.dialog { width: 520px; padding: 16px; display: grid; gap: 12px; }
+.dialog .head { color: var(--muted); font-size: var(--type-ui-small-size); }
+.dialog label { display: grid; gap: 6px; }
+.dialog label > span { color: var(--muted); font-size: var(--type-ui-small-size); font-weight: 500; }
+.dialog .ui-field { padding: 8px 12px; color: var(--fg); }
+.dialog .ui-field.one { height: 36px; display: flex; align-items: center; padding: 0 12px; }
+.dialog .brief { height: 236px; overflow: hidden; white-space: pre-line; line-height: 1.45; }
+.dialog .hint { color: var(--faint); font-size: var(--type-ui-small-size); }
+.dialog .foot { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* A talk beside the page. */
+.talk { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; display: flex; flex-direction: column; overflow: hidden; }
+.thd { display: flex; align-items: center; height: 44px; padding: 0 16px; font-weight: 700; }
+.tbody { flex: 1; padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
+.you { align-self: flex-end; max-width: 88%; padding: 8px 12px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.answer { display: grid; gap: 8px; }
+.changes { display: grid; gap: 8px; padding: 8px 12px; border-radius: var(--radius-lg); background: var(--surface); }
+.changes b { font-weight: 600; }
+.changes span { color: var(--muted); }
+.askbox { display: flex; align-items: center; height: 40px; padding: 0 14px; margin: 12px 16px 16px; }
+.askbox .ph { color: var(--faint); }
+.today-shot .content { gap: 18px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>How a topic answers</h1>
+  <p>Each Grok bot had a description, its system prompt: who it is, in which language, how long, what it brings in, what it leaves alone. Grok Bot wrote them when it made a bot and added to them when you said "from now on". Almanac's topics get the same: what a topic sticks to becomes its brief, Almanac writes a full one, and the page stops showing it.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>The page starts with its name</h2>
+  <ul class="choices">
+    <li><b>The brief isn't on the page.</b> It's for the answers, not for reading every time. The page starts with its name, then its blocks.</li>
+    <li><b>My choice:</b> nothing in its place, no "Instructions" link or first line. It lives in Edit topic, where it's changed.</li>
+  </ul>
+  <div class="pair">
+    <div class="mode"><div class="mode-label">Today</div><div data-theme="night" data-use="page-today"></div></div>
+    <div class="mode"><div class="mode-label">Proposed, night</div><div data-theme="night" data-use="page-new"></div></div>
+  </div>
+  <div class="pair">
+    <div class="mode"><div class="mode-label">Proposed, day</div><div data-theme="day" data-use="page-new"></div></div>
+    <div></div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>Almanac writes the brief</h2>
+  <ul class="choices">
+    <li><b>Setting up a topic, Almanac writes a brief like Grok's:</b> what it's about in a sentence or two, then how it answers: language, tone, length, what it brings in, what it checks, what it leaves alone.</li>
+    <li><b>What you wrote stays.</b> A few words of yours ("Zimmerpflanzen, ich schicke Fotos") are kept, all of them, and Almanac fills in the rest around them.</li>
+    <li><b>Up to 4,000 characters</b>, from 1,000. The longest Grok description is 1,618, so Tofu &amp; Mehrwert and Karriere get theirs back in full, without the two rules that were only about Grok.</li>
+    <li><b>Edit topic</b> shows it in a taller field, under the same name, "What it sticks to", with one line saying what it's for.</li>
+  </ul>
+  <div class="pair">
+    <div class="mode"><div class="mode-label">Edit topic, night</div><div data-theme="night" data-use="edit"></div></div>
+    <div class="mode"><div class="mode-label">Edit topic, day</div><div data-theme="day" data-use="edit"></div></div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">3</span>It gets better as you talk</h2>
+  <ul class="choices">
+    <li><b>When you say how it should answer from now on</b>, the answer folds that into the brief, and says so under it with Undo: the same box the workspace's own topic shows when it changes a topic.</li>
+    <li><b>My choice:</b> also when you correct the same thing a second time ("wieder zu lang"), not after the first one, so a passing mood doesn't become a rule.</li>
+    <li><b>A topic's talks change only its own brief.</b> Its name, group and icon stay with Almanac's own topic.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="learns"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="learns"></div></div>
+</section>
+
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="toprow"><div class="lights"><span></span><span></span><span></span></div></div>
+    <div class="nav ui-row"><i data-i="library"></i>Almanac</div>
+    <div class="nav ui-row"><i data-i="calendar"></i>Calendar</div>
+    <div class="group">Lernen</div>
+    <div class="nav ui-row"><i data-i="book"></i>Marx &amp; Engels</div>
+    <div class="nav ui-row is-selected"><i data-i="globe"></i>Geschichte</div>
+    <div class="nav ui-row"><i data-i="leaf"></i>Tofu &amp; Mehrwert</div>
+    <div class="group">Zuhause</div>
+    <div class="nav ui-row"><i data-i="sprout"></i>Pflanzen</div>
+    <div class="nav ui-row"><i data-i="cat"></i>Katzen</div>
+  </aside>
+</template>
+
+<template id="blocks">
+  <div class="list"><div class="btitle">Reading</div>
+    <div class="ui-row">Walter Rodney, How Europe Underdeveloped Africa<span class="src">From Grok</span></div>
+    <div class="ui-row">Eric Williams, Capitalism and Slavery<span class="src">From Grok</span></div>
+  </div>
+  <div><div class="btitle">Terms</div>
+    <div class="chips"><span class="ui-chip">Scramble for Africa, 1881–1914</span><span class="ui-chip">Haitianische Revolution, 1791–1804</span></div>
+  </div>
+  <div class="text"><div class="btitle">What it says</div>
+    <h3>Opiumkriege</h3>
+    <p><b>Opiumkriege</b>: Großbritannien erzwang 1839–42 und 1856–60 den Opiumhandel mit China und öffnete Häfen per Vertrag.</p>
+  </div>
+</template>
+
+<template id="page-today">
+  <div class="win today-shot">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b></div>
+    <main class="content">
+      <div><p class="title">Geschichte</p>
+        <p class="about">Du bist Michaels objektiver Geschichts-Bot. Sprache: immer Deutsch, klar und knapp. Auftrag: Geschichte global und nicht europa-zentriert erklären. Europa und der Westen sind Akteure unter anderen — Kolonialismus, Imperialismus, Sklaverei, Enteignung, Widerstand und die Perspektiven der kolonisierten Regionen ernst nehmen. Nicht apologetisch für Europa, nicht moralisierende Predigt, nicht Mythen („Zivilisierungsmission“) ungeprüft stehen lassen. Methode: Quellen und Perspektiven benennen …</p></div>
+      <slot data-use="blocks"></slot>
+    </main>
+  </div>
+</template>
+
+<template id="page-new">
+  <div class="win">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b></div>
+    <main class="content">
+      <p class="title">Geschichte</p>
+      <slot data-use="blocks"></slot>
+    </main>
+  </div>
+</template>
+
+<template id="edit">
+  <div class="backdrop">
+    <div class="dialog ui-dialog">
+      <div class="head">Edit Geschichte</div>
+      <label><span>Name</span><div class="ui-field one">Geschichte</div></label>
+      <label><span>What it sticks to</span>
+        <div class="ui-field brief">Geschichte global und nicht europa-zentriert erklärt: Europa und der Westen als Akteure unter anderen.
+
+Immer Deutsch, klar und knapp, didaktisch und faktennah: eine klare Antwort, nicht ausfragen.
+
+Kolonialismus, Imperialismus, Sklaverei, Enteignung und Widerstand ernst nehmen, mit den Perspektiven der kolonisierten Regionen. Nicht apologetisch für Europa, keine Predigt, Mythen wie die „Zivilisierungsmission“ nicht ungeprüft stehen lassen.
+
+Quellen und Perspektiven benennen: wer schreibt, aus welcher Lage. Unsicherheit und Forschungsstreit markieren. Keine erfundenen Zitate oder Jahreszahlen.</div>
+        <span class="hint">What it's about and how it answers. Almanac adds to it when you tell it how to answer.</span>
+      </label>
+      <label><span>Group</span><div class="ui-field one">Lernen</div></label>
+      <div class="foot"><button class="ui-button">Cancel</button><button class="ui-button ui-button-primary">Save</button></div>
+    </div>
+  </div>
+</template>
+
+<template id="learns">
+  <div class="win talking">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b></div>
+    <main class="content">
+      <p class="title">Geschichte</p>
+      <slot data-use="blocks"></slot>
+    </main>
+    <aside class="talk">
+      <div class="thd">Die Opiumkriege</div>
+      <div class="tbody">
+        <div class="you">Sag bei Quellen ab jetzt immer dazu, wann sie geschrieben wurden.</div>
+        <div class="answer">
+          <p>Mach ich. Lin Zexus Brief an Königin Victoria etwa ist von 1839, geschrieben als kaiserlicher Kommissar mitten im Streit um das Opium in Kanton.</p>
+          <div class="changes">
+            <p><b>Geschichte</b><span> · Nennt bei jeder Quelle, wann sie geschrieben wurde.</span></p>
+            <div><button class="ui-button">Undo</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="askbox ui-field"><span class="ph">Reply</span></div>
+    </aside>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+};
+// Fill each placeholder from its template; a <slot> is replaced, so a
+// window's sidebar stays a grid item. Templates may use templates.
+let at;
+while ((at = document.querySelector("[data-use]:not([data-filled])"))) {
+  const part = document.getElementById(at.dataset.use).content.cloneNode(true);
+  if (at.tagName === "SLOT") at.replaceWith(part);
+  else {
+    at.dataset.filled = "";
+    at.append(part);
+  }
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 15;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>

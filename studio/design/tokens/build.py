@@ -35,6 +35,13 @@ t = json.load(open("type.json"))
 source = c
 c = generate(c)
 
+# Data hues: the syntax hues, for what an app's content tells apart (a
+# topic, a choice's options, a chart's series). Code and content share them.
+x = resolve(json.load(open("syntax.json")), source, c)
+DATA = ("keyword", "property", "special", "function", "constant", "string")
+for mode in ("night", "day"):
+    c[mode].update({f"data-{n}": x[mode]["syntax"][role] for n, role in enumerate(DATA, 1)})
+
 # Apps that need numerical colour values consume the same resolved aliases as CSS/Swift.
 emit("color.resolved.json", json.dumps(c, indent=2) + "\n")
 
@@ -66,7 +73,6 @@ sw[-1] = "}"
 emit("color.swift", "\n".join(sw) + "\n")
 
 # Code: syntax and editor colours, for the editor themes and code in the apps.
-x = resolve(json.load(open("syntax.json")), source, c)
 emit("syntax.resolved.json", json.dumps(x, indent=2) + "\n")
 css = ['/* Generated from syntax.json. Night is the default; set data-theme="day" for the apps\' light mode. */']
 for mode, selector in (("night", ':root,\n[data-theme="night"]'), ("day", '[data-theme="day"]')):

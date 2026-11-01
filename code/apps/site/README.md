@@ -25,6 +25,7 @@ Captures live in [`assets/captures/`](assets/captures/), taken at 2× in Nightsh
 - Caster: its own window alone, on the card's ground rather than a wallpaper.
 - Glyph: `bun run dev` with `bun run seed`, the made-up strings in `code/apps/glyph/demo`.
 - Raven: `bun run dev` for Acme Inc, with a made-up Acme Shop sending a day of traces and logs over OTLP.
+- Almanac: `bun run dev` for Acme Inc, its made-up Pflanzen topic, written by hand (`almanac-*.png`, not on a page yet).
 - The theme: its specimen, clipped to the editor parts.
 
 Product icons come from each app's existing SVG asset. The theme is called Code Villain, so it takes the studio mark, [`mark.svg`](../../../studio/brand/mark/mark.svg). The pages follow “show less”, “tone, not lines”, and “display for headings” from the shared principles.

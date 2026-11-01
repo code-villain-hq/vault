@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" font-family="-apple-system, Helvetica, Arial, sans-serif">
+  <title>The finger test: water when the top two centimetres are dry</title>
+  <rect width="640" height="300" fill="#ffffff"/>
+  <clipPath id="pot"><path d="M180 90h280l-30 190H210z"/></clipPath>
+  <g clip-path="url(#pot)">
+    <rect x="160" y="90" width="320" height="200" fill="#6b4f36"/>
+    <rect x="160" y="90" width="320" height="44" fill="#d9c3a0"/>
+  </g>
+  <path d="M180 90h280l-30 190H210z" fill="none" stroke="#b0603f" stroke-width="4"/>
+  <rect x="300" y="20" width="40" height="114" rx="20" fill="#f1c9a5" stroke="#c99a74" stroke-width="2"/>
+  <path d="M308 42h24" stroke="#c99a74" stroke-width="2"/>
+  <g stroke="#5b6470" stroke-width="1.6">
+    <path d="M150 90v44M142 90h16M142 134h16"/>
+  </g>
+  <text x="132" y="117" font-size="15" fill="#1f2328" text-anchor="end">2 cm</text>
+  <text x="490" y="108" font-size="15" fill="#1f2328" font-weight="600">dry: water now</text>
+  <text x="490" y="128" font-size="12" fill="#5b6470">light and crumbly</text>
+  <text x="470" y="210" font-size="15" fill="#1f2328" font-weight="600">still moist</text>
+  <text x="470" y="230" font-size="12" fill="#5b6470">dark: wait a day or two</text>
+</svg>

@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: the page at a glance</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* A 1600-wide window, drawn at its real size and scaled to the page. */
+.scaled { zoom: 0.7375; }
+.win { display: grid; grid-template-columns: 224px 1fr; grid-template-rows: 48px 1fr; width: 1600px; height: 900px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; position: relative; }
+.win.fit { height: auto; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.toprow { height: 48px; display: flex; align-items: center; padding-left: 8px; flex: none; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.ws { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; margin-bottom: 10px; font-weight: 600; }
+.ws .av { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; white-space: nowrap; overflow: hidden; }
+.nav span { overflow: hidden; text-overflow: ellipsis; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 14px 8px 4px; }
+.foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.foot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 16px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 16px; color: var(--muted); }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; position: relative; }
+.col { display: flex; flex-direction: column; gap: 32px; padding: 24px 40px 0; }
+.askbox { position: absolute; bottom: 16px; left: 40px; right: 40px; display: flex; align-items: center; height: 46px; padding: 0 16px; }
+.askbox .ph { color: var(--faint); }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 110px; background: linear-gradient(transparent, var(--panel) 55%); }
+
+/* What the page has today. */
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); display: flex; align-items: center; gap: 4px; }
+.title > svg { color: var(--faint); }
+.block { display: grid; gap: 8px; position: relative; }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.btitle.lead { color: var(--fg); font-weight: 700; font-size: var(--type-ui-size); }
+.btitle .aside { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.btitle .ui-button { height: 26px; padding: 0 10px; color: var(--fg); font-size: var(--type-ui-small-size); }
+.fill { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.stepcard { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start; }
+.stepcard .num { font-size: 26px; font-weight: 700; line-height: 1; color: var(--muted); grid-row: 1 / 3; }
+.stepcard .thing { font-weight: 700; }
+.stepcard p { grid-column: 2; color: var(--muted); font-size: var(--type-ui-small-size); }
+.tick { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.75px color-mix(in srgb, var(--fg) 35%, transparent); flex: none; display: grid; place-items: center; }
+.stepcard .tick { grid-column: 3; grid-row: 1; }
+.tick.done { background: var(--muted); box-shadow: none; color: var(--panel); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day { border-radius: var(--radius-md); padding: 8px; min-height: 74px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.day .dl { color: var(--faint); font-size: var(--type-ui-small-size); padding: 0 2px; }
+.day .dl b { color: var(--muted); font-weight: 600; }
+.day.today { background: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.day.today .dl, .day.today .dl b { color: var(--fg); font-weight: 700; }
+.ev { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: var(--radius-md); background: var(--surface); font-size: var(--type-ui-small-size); line-height: 1.3; min-width: 0; }
+.ev span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev svg { color: var(--muted); flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.chips b { font-weight: 700; color: var(--fg); }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.list { display: flex; flex-direction: column; max-width: 86ch; }
+.list .ui-row { display: flex; gap: 12px; align-items: center; padding: 5px 10px; min-height: 32px; }
+.list .src { margin-left: auto; white-space: nowrap; }
+.list .done .txt { color: var(--faint); }
+.list .tick { width: 18px; height: 18px; }
+.text { display: grid; gap: 22px; max-width: 70ch; }
+.text section { display: grid; gap: 8px; }
+.text h3 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.text h3 svg, .tl svg { color: var(--faint); }
+.text p { font-size: var(--type-body-size); line-height: var(--type-body-leading); padding-left: 18px; }
+.text b { font-weight: 700; }
+.text .src { padding-left: 18px; margin-top: -4px; }
+.text .ui-disclosure { padding-left: 4px; }
+.pts { display: grid; gap: 10px; }
+.pts li { padding-left: 18px; position: relative; }
+.pts li::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.pts .src { margin-left: 4px; }
+.oldcard { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+.oldcard h4 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.oldcard h4 svg { color: var(--faint); }
+.oldcard .last { margin-top: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+.oldcard .ui-disclosure { align-self: start; }
+.tl { display: grid; grid-template-columns: 88px 14px 1fr; column-gap: 12px; max-width: 86ch; }
+.tl > div { display: contents; }
+.tl .y { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding: 5px 0; white-space: nowrap; }
+.tl .e { padding: 5px 0; display: flex; align-items: center; gap: 4px; }
+.tl .c { color: var(--faint); font-size: var(--type-ui-small-size); margin-left: 6px; }
+.rail { position: relative; }
+.rail::before { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 1.5px; background: var(--line); }
+.rail::after { content: ""; position: absolute; left: 3px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.rail.span::after { height: 14px; top: 9px; border-radius: 4px; }
+.tl > div:first-child .rail::before { top: 14px; }
+.tl > div:last-child .rail::before { bottom: auto; height: 14px; }
+
+/* Proposed: a section is a tile, its first sentence and how much it keeps. */
+.sections { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); }
+.sec { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.sec h4 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.sec h4 svg { color: var(--faint); }
+.sec p { color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sec .meta { margin-top: auto; padding-top: 4px; color: var(--faint); font-size: var(--type-ui-small-size); }
+.sec ul { display: grid; gap: 4px; }
+.sec li { padding-left: 12px; position: relative; }
+.sec li::before { content: "·"; position: absolute; left: 1px; color: var(--faint); }
+
+/* Proposed: Bars, a number per thing. A row opens what it counted. */
+.barsets { display: grid; grid-template-columns: repeat(auto-fill, minmax(34rem, 1fr)); gap: 12px 48px; max-width: 1180px; }
+.barset { display: grid; gap: 6px; align-content: start; }
+.barset .cap { color: var(--muted); font-size: var(--type-ui-small-size); }
+.bars { display: grid; grid-template-columns: max-content minmax(0, 1fr) 5.5em max-content; column-gap: 14px; max-width: 980px; }
+.bars > .r { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: 4px 10px; margin: 0 -10px; border-radius: var(--radius-md); min-height: 30px; }
+.bars > .r.hover { background: var(--hover); }
+.track { display: block; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.bar { display: block; height: 100%; border-radius: 5px; background: color-mix(in srgb, var(--fg) 38%, transparent); min-width: 3px; }
+.bars .val { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.bars .note { color: var(--faint); font-size: var(--type-ui-small-size); white-space: nowrap; }
+.bars .note.gap { color: var(--status-warn-ink); font-weight: 600; }
+.bars .note.none { visibility: hidden; }
+
+/* Proposed: Questions, to rehearse. One opens on its answer. */
+.qs { display: grid; gap: 2px; max-width: 980px; }
+.q { display: grid; grid-template-columns: 20px 1fr auto; gap: 2px 12px; padding: 8px 10px; margin: 0 -10px; border-radius: var(--radius-md); align-items: center; }
+.q .qt { font-weight: 600; }
+.q .who { grid-column: 2; color: var(--faint); font-size: var(--type-ui-small-size); }
+.q > svg { color: var(--faint); grid-row: 1; grid-column: 3; }
+.q.open { background: var(--surface); }
+.q.open > svg { rotate: 90deg; }
+.q .ans { grid-column: 2; display: grid; gap: 6px; margin-top: 8px; max-width: 70ch; }
+.q .ans li { padding-left: 14px; position: relative; font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.q .ans li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.q .ans .src { padding-left: 14px; }
+.q .missing { color: var(--muted); }
+
+/* Proposed: a card's face, a short line per fact, the state only when it needs a look. */
+.cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.card .ch { display: flex; gap: 12px; align-items: center; }
+.pic { width: 40px; height: 40px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); display: grid; place-items: center; color: var(--muted); flex: none; }
+.card h4 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.card h4 svg { color: var(--faint); }
+.card .kind { color: var(--faint); font-size: var(--type-ui-small-size); }
+.card .note { border-radius: var(--radius-md); padding: 6px 10px; font-size: var(--type-ui-small-size); font-weight: 600; }
+.facets { display: grid; gap: 7px; }
+.facets li { display: grid; grid-template-columns: 16px 1fr; gap: 10px; align-items: start; }
+.facets li > svg { color: var(--faint); margin-top: 2px; }
+.facets .when { color: var(--faint); }
+.card .count { margin-top: auto; color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Proposed: one card is a profile. */
+.profile { display: grid; gap: 16px; }
+.profile .ph { display: flex; gap: 16px; align-items: center; }
+.profile .pic { width: 64px; height: 64px; border-radius: var(--radius-lg); }
+.profile h3 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 4px; line-height: 1.2; }
+.profile h3 svg { color: var(--faint); }
+.profile .who { display: grid; gap: 8px; }
+.profile > .ev { justify-self: start; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>The page at a glance</h1>
+  <p>Karriere, Geschichte, Pflanzen and Katzen all read as walls of sentences: each section's first paragraph in full, a source after every line, and a card per thing even when there is one thing. The page is for a glance; a section's page is for reading. Each block shows the shape of what it keeps: a tile per section, a face per card, a bar per number, a question to rehearse, a box to tick.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>Geschichte: a section is a tile</h2>
+  <ul class="choices">
+    <li><b>What it says shows each section as a tile:</b> its name, its first sentence, when it happened and how many points it keeps. The tiles take the window's width; the paragraphs stay on the section's page, which its name opens. Ten sections fit on one screen, not ten screens.</li>
+    <li><b>Sources leave the page.</b> "From Grok" under every paragraph says what every paragraph shares. The section's page keeps each source; the page shows only what you said and links.</li>
+    <li><b>In Zahlen, a Bars block:</b> the figures the sections give, as bars on one scale per set, with the source under it. A bar opens the section it came from. Laid out by a talk ("zeig die Zahlen"), not by itself.</li>
+    <li><b>Reading gets ticks</b>, as decided: what you've read stays, ticked, under what you haven't.</li>
+    <li><b>Terms keeps terms.</b> "Lehnt alle Staaten ab" and "Zählt die USA geschichtlich zu Europa" are your views: they move to About. The Intifada figure moves to In Zahlen.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="geschichte-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night, after ticking one book</div><div class="scaled"><div data-theme="night" data-use="geschichte-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="geschichte-proposed"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>Pflanzen: a card has a face</h2>
+  <ul class="choices">
+    <li><b>A card shows a short line per fact</b>, each with its icon: light, water, place, cutting. The block names the facts its cards have, and Claude keeps each point under one; the sentences stay on the plant's page.</li>
+    <li><b>The state shows only when it needs a look:</b> the Korbmarante's brown edges and the Calathea's fungus gnats in warn, the cutting ready to pot in info. A plant that's fine says nothing.</li>
+    <li><b>Water says when:</b> the next Gießtag from the Week block, on the cards it waters.</li>
+    <li><b>A photo takes the icon's place</b> once a talk has one of the plant. Pflanzen's talks have none yet: its points came over from Grok.</li>
+    <li><b>The foot counts what's kept</b> ("7 points") in place of "Last kept today" on every card.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="pflanzen-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night</div><div class="scaled"><div data-theme="night" data-use="pflanzen-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="pflanzen-proposed"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">3</span>Katzen: one card is a profile</h2>
+  <ul class="choices">
+    <li><b>Cards with a single card show it as a profile:</b> Lisa's picture, her name, and what you'd say first about her as chips: age, weight, breed, coat, and that she's vaccinated, chipped and spayed.</li>
+    <li><b>Her 47 points go into tiles by what they're about</b>: Futter, Spielen und Schlafen, Streicheln, Mit der Tochter, Draußen, Gesundheit, Wesen. Each tile shows its three most useful lines; its name opens the rest.</li>
+    <li><b>No new block:</b> it's how Cards looks with one card. A second cat turns it back into cards, with these tiles inside each one's page.</li>
+    <li><b>Her reminder stays at the top of her profile</b>, as it sits on her card today.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="katzen-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night</div><div class="scaled"><div data-theme="night" data-use="katzen-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="katzen-proposed"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">4</span>Karriere: questions, bars and ticks</h2>
+  <ul class="choices">
+    <li><b>Questions, a new block, to rehearse:</b> a question a row, who asked it, and its answer folded under it, taken from what the page keeps. The tick says you've practised it. Frag mich ab starts a talk that asks them one by one and ticks what you answered well. A question with no answer yet says so.</li>
+    <li><b>Bars, a new block: what the market wants</b>, a bar per skill across the 28 ads, with what you show for it. A gap is in warn. A bar opens the ads that asked for it, so the companies are the evidence, not the page.</li>
+    <li><b>Lücken schließen, a list with ticks:</b> the gaps written as paragraphs today, as things to do, each with the section it came from.</li>
+    <li><b>Trends and the CV stay text, as tiles.</b> The ads stay cards, under the fold; Profil is what Karriere knows about you, so it goes to About, which still shows it whole.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, night</div><div class="scaled"><div data-theme="night" data-use="karriere-today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night, with the pointer on TypeScript</div><div class="scaled"><div data-theme="night" data-use="karriere-proposed"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="karriere-proposed"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">5</span>What changes for Claude</h2>
+  <ul class="choices">
+    <li><b>Two new blocks, Questions and Bars,</b> each described to the layout as what it's for: questions you'd be asked, numbers to compare. Without that, a layout keeps choosing Text, as Karriere's did.</li>
+    <li><b>A Cards block names its facts</b> (Licht, Wasser, Platz, Schneiden), and each point carries the fact it's about. A point that fits none stays a line on the plant's page.</li>
+    <li><b>A section has a first sentence that stands alone:</b> the bold lead and the sentence it starts, which the tile shows.</li>
+    <li><b>Facts about you go to You,</b> however a talk words them: your views, your profile, your hair.</li>
+    <li><b>My order to build:</b> tiles and sources once (1), card faces (2), the profile (3), then Bars, Questions and ticks.</li>
+  </ul>
+</section>
+
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="toprow"><div class="lights"><span></span><span></span><span></span></div></div>
+    <div class="ws"><span class="av">H</span>Home</div>
+    <div class="nav ui-row"><i data-i="library"></i><span>Almanac</span></div>
+    <div class="nav ui-row"><i data-i="calendar"></i><span>Calendar</span></div>
+    <div class="group">Arbeit</div>
+    <div class="nav ui-row"><i data-i="code"></i><span>Code Villain</span></div>
+    <div class="nav ui-row" data-sel="karriere"><i data-i="briefcase"></i><span>Karriere</span></div>
+    <div class="group">Einkaufen</div>
+    <div class="nav ui-row"><i data-i="wallet"></i><span>Preise finden</span></div>
+    <div class="nav ui-row"><i data-i="salad"></i><span>Vegan</span></div>
+    <div class="group">Lernen</div>
+    <div class="nav ui-row" data-sel="geschichte"><i data-i="globe"></i><span>Geschichte</span></div>
+    <div class="nav ui-row"><i data-i="cap"></i><span>Lernen</span></div>
+    <div class="nav ui-row"><i data-i="book"></i><span>Marx &amp; Engels</span></div>
+    <div class="nav ui-row"><i data-i="leaf"></i><span>Tofu &amp; Mehrwert</span></div>
+    <div class="group">Pflege</div>
+    <div class="nav ui-row"><i data-i="shower"></i><span>Haar-Routine</span></div>
+    <div class="group">Zuhause</div>
+    <div class="nav ui-row" data-sel="katzen"><i data-i="cat"></i><span>Katzen</span></div>
+    <div class="nav ui-row" data-sel="pflanzen"><i data-i="sprout"></i><span>Pflanzen</span></div>
+    <div class="nav ui-row"><i data-i="wrench"></i><span>Wohnung reparieren</span></div>
+    <div class="foot"><span class="dot"></span>Synced</div>
+  </aside>
+</template>
+
+<template id="tools">
+  <span class="tools"><i data-i="talks"></i><i data-i="more"></i></span>
+</template>
+
+<!-- Geschichte -->
+
+<template id="g-timeline">
+  <div class="block">
+    <div class="btitle">Zeitleiste</div>
+    <div class="tl">
+      <div><span class="y">1500</span><span class="rail"></span><span class="e">Europas Reichweite<span class="c">1 event</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1816–1953</span><span class="rail span"></span><span class="e">Nie kolonisiert?<span class="c">10 events</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1898–1962</span><span class="rail span"></span><span class="e">Kuba<span class="c">5 events</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1943–2024</span><span class="rail span"></span><span class="e">Wer „Terror“ sagt<span class="c">3 events</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1945</span><span class="rail"></span><span class="e">Neokolonialismus heute<span class="c">1 event</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1945–1990</span><span class="rail span"></span><span class="e">Antideutsche und Nakam<span class="c">2 events</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1973–2021</span><span class="rail span"></span><span class="e">9/11<span class="c">7 events</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1987–2005</span><span class="rail span"></span><span class="e">Intifada<span class="c">5 events</span><i data-i="chevron" data-s="14"></i></span></div>
+      <div><span class="y">1999</span><span class="rail"></span><span class="e">Der Westen und die NATO<span class="c">1 event</span><i data-i="chevron" data-s="14"></i></span></div>
+    </div>
+  </div>
+</template>
+
+<template id="geschichte-today">
+  <div class="win" data-select="geschichte">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Geschichte<i data-i="chevron" data-s="18"></i></p>
+        <div class="block">
+          <div class="btitle">Reading</div>
+          <div class="list">
+            <div class="ui-row">Costs of War Project: Tote der US-Kriege nach 9/11<span class="src">Brown University</span></div>
+            <div class="ui-row">B’Tselem, israelische Menschenrechtsorganisation: Opferzahlen der Intifadas, Vorwürfe zu Gaza<span class="src">B’Tselem</span></div>
+            <div class="ui-row">Stroop-Bericht (1943): der SS-Bericht über die Niederschlagung des Warschauer Ghettoaufstands<span class="src">Jürgen Stroop</span></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="btitle">Terms</div>
+          <div class="chips">
+            <span class="ui-chip"><b>Intifada: arabisch für „Abschütteln“ oder „Aufstand“</b></span>
+            <span class="ui-chip"><b>Erste Intifada: rund 1.100 Palästinenser getötet</b>, über 200 davon minderjährig, und etwa 160 Israelis</span>
+            <span class="ui-chip"><b>Lehnt alle Staaten ab</b>, weder Team NATO noch Team Russland</span>
+            <span class="ui-chip"><b>Zählt die USA geschichtlich zu Europa</b></span>
+          </div>
+        </div>
+        <slot data-use="g-timeline"></slot>
+        <div class="block">
+          <div class="btitle">What it says</div>
+          <div class="text">
+            <section>
+              <h3>Nie kolonisiert?<i data-i="chevron" data-s="14"></i></h3>
+              <p><b>Nicht kolonisiert</b> blieben formal vor allem Thailand, Japan, Äthiopien, Liberia, Afghanistan, Nepal, Iran und der osmanische Kern, die heutige Türkei. Unberührt war keines davon: Es gab ungleiche Verträge, Konzessionen, Einflusssphären und teils Besetzung. Formal kolonisiert wurde nicht jedes Land, aber keines außerhalb Europas blieb außerhalb dieses Machtgefälles.</p>
+              <span class="src">From Grok</span>
+              <button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>8 more</button>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Geschichte, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="geschichte-proposed">
+  <div class="win fit" data-select="geschichte">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Geschichte<i data-i="chevron" data-s="18"></i></p>
+        <div class="block">
+          <div class="btitle">Reading<span class="aside">1 of 3 read</span></div>
+          <div class="list">
+            <div class="ui-row"><span class="tick"></span><span class="txt">B’Tselem, israelische Menschenrechtsorganisation: Opferzahlen der Intifadas, Vorwürfe zu Gaza</span><span class="src">B’Tselem</span></div>
+            <div class="ui-row"><span class="tick"></span><span class="txt">Stroop-Bericht (1943): der SS-Bericht über die Niederschlagung des Warschauer Ghettoaufstands</span><span class="src">Jürgen Stroop</span></div>
+            <div class="ui-row done"><span class="tick done"><i data-i="check" data-s="12"></i></span><span class="txt">Costs of War Project: Tote der US-Kriege nach 9/11</span><span class="src">Brown University</span></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="btitle">Terms</div>
+          <div class="chips"><span class="ui-chip"><b>Intifada</b>: arabisch für „Abschütteln“ oder „Aufstand“</span></div>
+        </div>
+        <slot data-use="g-timeline"></slot>
+        <div class="block">
+          <div class="btitle">What it says</div>
+          <div class="sections">
+            <div class="sec"><h4>Nie kolonisiert?<i data-i="chevron" data-s="14"></i></h4><p>Formal nicht kolonisiert blieben vor allem Thailand, Japan, Äthiopien, Liberia, Afghanistan, Nepal, Iran und die heutige Türkei.</p><span class="meta">1816–1953 · 9 points</span></div>
+            <div class="sec"><h4>Europas Reichweite<i data-i="chevron" data-s="14"></i></h4><p>Europa als „die Bösen“: für die letzten fünfhundert Jahre ja, für zweitausend Jahre nein.</p><span class="meta">ab 1500 · 3 points</span></div>
+            <div class="sec"><h4>Neokolonialismus heute<i data-i="chevron" data-s="14"></i></h4><p>Nach 1945 sind die Flaggen weitgehend weg, die Verträge geblieben.</p><span class="meta">seit 1945 · 5 points</span></div>
+            <div class="sec"><h4>Der Westen und die NATO<i data-i="chevron" data-s="14"></i></h4><p>Die USA sind ein Siedlerstaat europäischer Herkunft: geografisch Amerika, geschichtlich Fortsetzung.</p><span class="meta">1999 · 5 points</span></div>
+            <div class="sec"><h4>Kuba<i data-i="chevron" data-s="14"></i></h4><p>Spanische Kolonie bis 1898, danach formal unabhängig, faktisch US-Protektorat.</p><span class="meta">1898–1962 · 3 points</span></div>
+            <div class="sec"><h4>USA, Iran und der Golf<i data-i="chevron" data-s="14"></i></h4><p>Die USA sind die größte Militär- und Sanktionsmacht, mit den meisten Stützpunkten seit 1945.</p><span class="meta">5 points</span></div>
+            <div class="sec"><h4>Antideutsche und Nakam<i data-i="chevron" data-s="14"></i></h4><p>Antideutsche sind eine linke Strömung aus den 1990ern, nach der Wiedervereinigung entstanden.</p><span class="meta">1945–1990 · 3 points</span></div>
+            <div class="sec"><h4>9/11<i data-i="chevron" data-s="14"></i></h4><p>Am 11. September 2001 starben knapp 3.000 Menschen; die Kriege danach kosteten rund 900.000 das Leben.</p><span class="meta">1973–2021 · 4 points</span></div>
+            <div class="sec"><h4>Intifada<i data-i="chevron" data-s="14"></i></h4><p>Die Erste Intifada, 1987 bis etwa 1993, richtete sich gegen die Besatzung seit 1967.</p><span class="meta">1987–2005 · 4 points</span></div>
+            <div class="sec"><h4>Wer „Terror“ sagt<i data-i="chevron" data-s="14"></i></h4><p>Terror meint meist Gewalt von Gruppen ohne Staat; Staaten geben sich das Wort nicht selbst.</p><span class="meta">1943–2024 · 6 points</span></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="btitle">In Zahlen</div>
+          <div class="barsets">
+            <div class="barset">
+              <span class="cap">9/11 und die Kriege danach</span>
+              <div class="bars">
+                <div class="r"><span>Am 11. September 2001</span><span class="track"><span class="bar" style="width: 0.07%"></span></span><span class="val">3.000</span><span class="note">getötet</span></div>
+                <div class="r"><span>In den Kriegen danach, direkt</span><span class="track"><span class="bar" style="width: 20%"></span></span><span class="val">900.000</span><span class="note">getötet</span></div>
+                <div class="r"><span>Mit den indirekten Folgen</span><span class="track"><span class="bar" style="width: 100%"></span></span><span class="val">4,5 Mio.</span><span class="note">geschätzt</span></div>
+              </div>
+              <span class="src">Costs of War Project, Brown University</span>
+            </div>
+            <div class="barset">
+              <span class="cap">Erste Intifada, 1987–1993</span>
+              <div class="bars">
+                <div class="r"><span>Palästinenser</span><span class="track"><span class="bar" style="width: 100%"></span></span><span class="val">1.100</span><span class="note">über 200 minderjährig</span></div>
+                <div class="r"><span>Israelis</span><span class="track"><span class="bar" style="width: 14.5%"></span></span><span class="val">160</span><span class="note none">·</span></div>
+              </div>
+              <span class="src">B’Tselem</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Geschichte, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<!-- Pflanzen -->
+
+<template id="p-routine">
+  <div class="block">
+    <div class="btitle lead">Today, Gießen</div>
+    <div class="fill">
+      <div class="stepcard"><span class="num">1</span><span class="thing">Vorabend</span><span class="tick"></span><p>Die Gießkanne mit Leitungswasser über Nacht stehen lassen.</p></div>
+      <div class="stepcard"><span class="num">2</span><span class="thing">Prüfen</span><span class="tick"></span><p>Bei jeder Pflanze die obere Erde fühlen und nur gießen, wenn sie trocken ist.</p></div>
+      <div class="stepcard"><span class="num">3</span><span class="thing">Gießen</span><span class="tick"></span><p>Mit dem abgestandenen Wasser, vor allem die Korbmaranten.</p></div>
+      <div class="stepcard"><span class="num">4</span><span class="thing">Untersetzer</span><span class="tick"></span><p>Kein Wasser darin stehen lassen.</p></div>
+      <div class="stepcard"><span class="num">5</span><span class="thing">Ableger</span><span class="tick"></span><p>Das Wasser im Glas wechseln.</p></div>
+    </div>
+  </div>
+  <div class="block">
+    <div class="btitle">Oct 26 – Nov 1</div>
+    <div class="week">
+      <div class="day"><div class="dl">Mon <b>26</b></div></div>
+      <div class="day"><div class="dl">Tue <b>27</b></div></div>
+      <div class="day today"><div class="dl">Wed <b>28</b></div></div>
+      <div class="day"><div class="dl">Thu <b>29</b></div><div class="ev"><span>Gießtag: Erde prüfen, Ableger-Wasser wechseln</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Fri <b>30</b></div></div>
+      <div class="day"><div class="dl">Sat <b>31</b></div></div>
+      <div class="day"><div class="dl">Sun <b>1</b></div></div>
+    </div>
+  </div>
+</template>
+
+<template id="pflanzen-today">
+  <div class="win" data-select="pflanzen">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Pflanzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Pflanzen<i data-i="chevron" data-s="18"></i></p>
+        <slot data-use="p-routine"></slot>
+        <div class="block">
+          <div class="btitle">Pflanzen</div>
+          <div class="fill">
+            <div class="oldcard"><h4>Efeu<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Panaschierter Efeu mit cremefarbenem Blattrand.<span class="src">From Grok</span></li><li>Steht auf einem Tisch, die Ranken hängen über die Kante.<span class="src">From Grok</span></li><li>Hell stellen, aber nicht in die pralle Sonne.<span class="src">From Grok</span></li><li>Gießen, wenn die obere Erde trocken ist; im Winter meist einmal pro Woche.<span class="src">From Grok</span></li></ul><button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>3 more</button><span class="last">Last kept today</span></div>
+            <div class="oldcard"><h4>Anthurie<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Anthurie (Flamingoblume) mit rosa Blüten, sieht gesund aus.<span class="src">From Grok</span></li><li>Steht am Fenster, das passt, aber nicht direkt über der Heizung.<span class="src">From Grok</span></li><li>Gießen, wenn die obere Erde trocken ist; im Winter meist einmal pro Woche.<span class="src">From Grok</span></li><li>Verblühte gelbe Hochblätter samt Stiel unten am Ansatz abschneiden, nicht nur das Blatt abknipsen.<span class="src">From Grok</span></li></ul><span class="last">Last kept today</span></div>
+            <div class="oldcard"><h4>Korbmarante (Ctenanthe)<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Gestreifte Korbmarante, eine Ctenanthe.<span class="src">From Grok</span></li><li>Steht auf einer schmalen Fensterbank, weiter weg vom Glas geht nicht.<span class="src">You said</span></li><li>Bei bewölktem Licht ist der Fensterplatz okay.<span class="src">From Grok</span></li><li>Braune Ränder kommen eher vom Leitungswasser oder zwischendurch zu trockener Erde, nicht von der Heizung.<span class="src">From Grok</span></li></ul><button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>3 more</button><span class="last">Last kept today</span></div>
+            <div class="oldcard"><h4>Calathea lancifolia<i data-i="chevron" data-s="14"></i></h4><ul class="pts"><li>Korbmarante mit dunklen Flecken, eine Calathea lancifolia.<span class="src">From Grok</span></li><li>Hell stellen, aber nicht direkt an die Scheibe.<span class="src">From Grok</span></li><li>Mit abgestandenem Wasser gießen, sobald die Oberfläche trocken ist.<span class="src">From Grok</span></li><li>Ältere Blätter mit braunen Rändern unten am Stiel abschneiden, den Rest lassen.<span class="src">From Grok</span></li></ul><button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>1 more</button><span class="last">Last kept today</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Pflanzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="pflanzen-proposed">
+  <div class="win fit" data-select="pflanzen">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Pflanzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Pflanzen<i data-i="chevron" data-s="18"></i></p>
+        <slot data-use="p-routine"></slot>
+        <div class="block">
+          <div class="btitle">Pflanzen</div>
+          <div class="cards">
+            <div class="card">
+              <div class="ch"><span class="pic"><i data-i="sprout" data-s="20"></i></span><div><h4>Efeu<i data-i="chevron" data-s="14"></i></h4><span class="kind">Panaschiert, cremefarbener Rand</span></div></div>
+              <ul class="facets">
+                <li><i data-i="sun" data-s="14"></i><span>Hell, keine pralle Sonne</span></li>
+                <li><i data-i="droplet" data-s="14"></i><span>Wenn die obere Erde trocken ist <span class="when">· Do</span></span></li>
+                <li><i data-i="pin" data-s="14"></i><span>Tisch, die Ranken hängen über die Kante</span></li>
+                <li><i data-i="scissors" data-s="14"></i><span>Kahle Ranken und Braunes ab</span></li>
+              </ul>
+              <span class="count">7 points</span>
+            </div>
+            <div class="card">
+              <div class="ch"><span class="pic"><i data-i="sprout" data-s="20"></i></span><div><h4>Anthurie<i data-i="chevron" data-s="14"></i></h4><span class="kind">Flamingoblume, rosa Blüten</span></div></div>
+              <ul class="facets">
+                <li><i data-i="sun" data-s="14"></i><span>Fenster, nicht über der Heizung</span></li>
+                <li><i data-i="droplet" data-s="14"></i><span>Wenn die obere Erde trocken ist, im Winter einmal pro Woche <span class="when">· Do</span></span></li>
+                <li><i data-i="scissors" data-s="14"></i><span>Verblühtes samt Stiel am Ansatz ab</span></li>
+              </ul>
+              <span class="count">4 points</span>
+            </div>
+            <div class="card">
+              <div class="ch"><span class="pic"><i data-i="sprout" data-s="20"></i></span><div><h4>Korbmarante<i data-i="chevron" data-s="14"></i></h4><span class="kind">Ctenanthe, gestreift</span></div></div>
+              <span class="note ui-tint-warn">Braune Ränder: eher das Leitungswasser als die Heizung</span>
+              <ul class="facets">
+                <li><i data-i="sun" data-s="14"></i><span>Bei bewölktem Licht ist das Fenster okay</span></li>
+                <li><i data-i="droplet" data-s="14"></i><span>Abgestanden, wenn sie angetrocknet ist <span class="when">· Do</span></span></li>
+                <li><i data-i="pin" data-s="14"></i><span>Schmale Fensterbank <span class="when">· you said</span></span></li>
+              </ul>
+              <span class="count">7 points</span>
+            </div>
+            <div class="card">
+              <div class="ch"><span class="pic"><i data-i="sprout" data-s="20"></i></span><div><h4>Calathea lancifolia<i data-i="chevron" data-s="14"></i></h4><span class="kind">Korbmarante mit dunklen Flecken</span></div></div>
+              <span class="note ui-tint-warn">Trauermücken: die Gelbtafel bleibt, bis nichts mehr klebt</span>
+              <ul class="facets">
+                <li><i data-i="sun" data-s="14"></i><span>Hell, nicht direkt an der Scheibe</span></li>
+                <li><i data-i="droplet" data-s="14"></i><span>Abgestanden, wenn die Oberfläche trocken ist <span class="when">· Do</span></span></li>
+                <li><i data-i="scissors" data-s="14"></i><span>Alte braune Blätter am Stiel ab</span></li>
+              </ul>
+              <span class="count">5 points</span>
+            </div>
+            <div class="card">
+              <div class="ch"><span class="pic"><i data-i="sprout" data-s="20"></i></span><div><h4>Monstera adansonii<i data-i="chevron" data-s="14"></i></h4><span class="kind">Fensterblatt; die Löcher sind normal</span></div></div>
+              <ul class="facets">
+                <li><i data-i="sun" data-s="14"></i><span>Hell am Fenster</span></li>
+                <li><i data-i="droplet" data-s="14"></i><span>Erst, wenn die obere Erde trocken ist <span class="when">· Do</span></span></li>
+              </ul>
+              <span class="count">4 points</span>
+            </div>
+            <div class="card">
+              <div class="ch"><span class="pic"><i data-i="sprout" data-s="20"></i></span><div><h4>Monstera-Ableger<i data-i="chevron" data-s="14"></i></h4><span class="kind">Im Wasserglas</span></div></div>
+              <span class="note ui-tint-info">Die Wurzeln sind lang genug: einpflanzen</span>
+              <ul class="facets">
+                <li><i data-i="pin" data-s="14"></i><span>Bad ohne Fenster, wächst dort langsam <span class="when">· you said</span></span></li>
+                <li><i data-i="droplet" data-s="14"></i><span>Das Wasser einmal pro Woche wechseln <span class="when">· Do</span></span></li>
+              </ul>
+              <span class="count">6 points</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Pflanzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<!-- Katzen -->
+
+<template id="k-routine">
+  <div class="block">
+    <div class="btitle lead">Today, Fütterung</div>
+    <div class="fill">
+      <div class="stepcard"><span class="num">1</span><span class="thing">Mahlzeiten</span><span class="tick"></span><p>2–3 feste Mahlzeiten statt Dauerbuffet, dazwischen bleibt der Napf leer.</p></div>
+      <div class="stepcard"><span class="num">2</span><span class="thing">Mischen</span><span class="tick"></span><p>Felix als Basis, ein paar Löffel des neuen Nassfutters darunter, jede Woche etwas mehr.</p></div>
+      <div class="stepcard"><span class="num">3</span><span class="thing">Wasser</span><span class="tick"></span><p>Immer frisch daneben stellen.</p></div>
+      <div class="stepcard"><span class="num">4</span><span class="thing">Wegräumen</span><span class="tick"></span><p>Nach 30–60 Minuten, auch wenn etwas übrig ist; nichts nachschieben.</p></div>
+      <div class="stepcard"><span class="num">5</span><span class="thing">Bei Protest</span><span class="tick"></span><p>Nicht nachgeben; später dieselbe Mischung nochmal anbieten.</p></div>
+    </div>
+  </div>
+  <div class="block">
+    <div class="btitle">Oct 26 – Nov 1</div>
+    <div class="week">
+      <div class="day"><div class="dl">Mon <b>26</b></div></div>
+      <div class="day"><div class="dl">Tue <b>27</b></div></div>
+      <div class="day today"><div class="dl">Wed <b>28</b></div></div>
+      <div class="day"><div class="dl">Thu <b>29</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Fri <b>30</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Sat <b>31</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+      <div class="day"><div class="dl">Sun <b>1</b></div><div class="ev"><span>Abendrunde mit der Angel, dann füttern</span><i data-i="bell" data-s="12"></i></div><div class="ev"><span>Lisa kämmen</span><i data-i="bell" data-s="12"></i></div></div>
+    </div>
+  </div>
+</template>
+
+<template id="katzen-today">
+  <div class="win" data-select="katzen">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Katzen<i data-i="chevron" data-s="18"></i></p>
+        <slot data-use="k-routine"></slot>
+        <div class="block">
+          <div class="btitle">Katzen</div>
+          <div class="fill">
+            <div class="oldcard">
+              <h4>Lisa<i data-i="chevron" data-s="14"></i></h4>
+              <div class="ev"><i data-i="bell" data-s="12"></i><span>Lisa wiegen (Ziel etwa 3,4 kg)</span></div>
+              <ul class="pts"><li>Etwa 3½ Jahre alt und etwa 3,4 kg schwer.<span class="src">You said</span></li><li>Keine Papiere; vermutlich ein Mix aus Norwegischer oder Sibirischer Waldkatze.<span class="src">You said</span></li><li>Langhaar-Tabby mit dichtem Doppelmantel, Ruff, Ohrenbüscheln und buschigem Schweif.<span class="src">From Grok</span></li><li>Kam von einer anderen Familie, bei der sie mit einem Kind aufgewachsen ist.<span class="src">You said</span></li></ul>
+              <button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>43 more</button>
+              <span class="last">Last kept today</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Katzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="katzen-proposed">
+  <div class="win fit" data-select="katzen">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Katzen</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Katzen<i data-i="chevron" data-s="18"></i></p>
+        <slot data-use="k-routine"></slot>
+        <div class="block profile">
+          <div class="ph">
+            <span class="pic"><i data-i="cat" data-s="28"></i></span>
+            <div class="who">
+              <h3>Lisa<i data-i="chevron" data-s="16"></i></h3>
+              <div class="chips">
+                <span class="ui-chip"><b>3½ Jahre</b></span>
+                <span class="ui-chip"><b>3,4 kg</b></span>
+                <span class="ui-chip"><b>Waldkatzen-Mix</b>, ohne Papiere</span>
+                <span class="ui-chip"><b>Langhaar-Tabby</b>, Ruff und Ohrenbüschel</span>
+                <span class="ui-chip"><b>Geimpft, gechipt, kastriert</b></span>
+              </div>
+            </div>
+          </div>
+          <div class="ev"><i data-i="bell" data-s="12"></i><span>Lisa wiegen, Ziel etwa 3,4 kg · Nov 25</span></div>
+          <div class="sections">
+            <div class="sec"><h4>Futter<i data-i="chevron" data-s="14"></i></h4><ul><li>Kennt Felix nass; trocken kommt Heavenly Sterilised statt Whiskas</li><li>Erst das Nasse umstellen, dann das Trockene, eins auf einmal</li><li>Mag Gourmet Gold nicht; sortiert Whiskas aus</li></ul><span class="meta">11 points</span></div>
+            <div class="sec"><h4>Spielen und Schlafen<i data-i="chevron" data-s="14"></i></h4><ul><li>Mehrmals täglich: Angel, Verstecken, Pfoten-Angriff von hinten</li><li>Schläft 12–16 Stunden; Energie kommt abends</li><li>Baldrian ja, sparsam; Katzenminze nein</li></ul><span class="meta">7 points</span></div>
+            <div class="sec"><h4>Streicheln<i data-i="chevron" data-s="14"></i></h4><ul><li>Am liebsten auf dem Boden, an Wangen, Kinn und Kopf</li><li>Nie tragen; aufs Sofa mit Decke und Leckerli locken</li></ul><span class="meta">4 points</span></div>
+            <div class="sec"><h4>Mit der Tochter<i data-i="chevron" data-s="14"></i></h4><ul><li>Streicheln nur, wenn Lisa von selbst kommt</li><li>Der Kratzturm ist ihr Rückzugsort und tabu</li><li>Angel und Leckerli aus der Hand klappen</li></ul><span class="meta">4 points</span></div>
+            <div class="sec"><h4>Draußen<i data-i="chevron" data-s="14"></i></h4><ul><li>Geht im Hausflur bis zur Treppe, kommt nach 2–3 Minuten zurück</li><li>Leine nur mit Geschirr, erst drinnen üben</li></ul><span class="meta">3 points</span></div>
+            <div class="sec"><h4>Gesundheit<i data-i="chevron" data-s="14"></i></h4><ul><li>Rippen fühlbar, nicht sichtbar: eher schlank halten</li><li>Tierarzt bei Durchfall oder Erbrechen über 1–2 Tage</li><li>Nie länger als 24 Stunden ohne echtes Fressen</li></ul><span class="meta">8 points</span></div>
+            <div class="sec"><h4>Wesen<i data-i="chevron" data-s="14"></i></h4><ul><li>Ausgeglichen; zieht sich bei Stress zum Schlafen zurück</li><li>Mag enge Verstecke und feste Plätze</li><li>Schläft bei euch, laut schnurrend am Fußende</li></ul><span class="meta">5 points</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Katzen, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<!-- Karriere -->
+
+<template id="karriere-today">
+  <div class="win" data-select="karriere">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Karriere</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Karriere<i data-i="chevron" data-s="18"></i></p>
+        <div class="block">
+          <div class="btitle">Interview-Vorbereitung</div>
+          <div class="text">
+            <section>
+              <h3>Typische Fragen<i data-i="chevron" data-s="14"></i></h3>
+              <p><b>Wie wurden AI-Ergebnisse geprüft?</b> will Viaplay für den Senior Fullstack AI Engineer wissen. Spec-First-Runs und der Verify-Loop in villain-layer beantworten das.</p>
+              <span class="src">From Grok</span>
+              <button class="ui-disclosure"><i data-i="chevron" data-s="12"></i>2 more</button>
+            </section>
+            <section>
+              <h3>Verifikation<i data-i="chevron" data-s="14"></i></h3>
+              <p><b>Verifikation</b> heißt, dass das Tool nach einem Agent-Run automatisch prüft, ob das Ergebnis taugt, statt es einfach zu glauben: Tests, Lint und Typecheck, pro Run grün oder rot, mit Diff-Größe und betroffenen Dateien. Ein Run gilt erst als fertig, wenn die Checks grün sind. In villain-layer leisten das das Verify-Command pro Repo und der Loop-Button; das ist die ehrliche Antwort auf „Wie prüfst du AI-Output?“, auch ohne Evals.</p>
+              <span class="src">From Grok</span>
+            </section>
+            <section>
+              <h3>Evals<i data-i="chevron" data-s="14"></i></h3>
+              <p><b>Evals</b> sind automatische Tests für AI-Output: Weil ein LLM nicht jedes Mal gleich antwortet, prüft man, ob die Antwort gut genug ist, nicht ob sie exakt stimmt. Dafür gibt es eine feste Sammlung von Beispiel-Eingaben mit Kriterien, die bei jeder Änderung an Prompt, Modell oder Tool durchläuft und einen Score liefert.</p>
+              <span class="src">From Grok</span>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Karriere, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="karriere-proposed">
+  <div class="win fit" data-select="karriere">
+    <slot data-use="side"></slot>
+    <div class="top">Home <span>›</span> <b>Karriere</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col">
+        <p class="title">Karriere<i data-i="chevron" data-s="18"></i></p>
+        <div class="block">
+          <div class="btitle">Interview-Fragen<span class="aside">2 of 4 practised<button class="ui-button">Frag mich ab</button></span></div>
+          <div class="qs">
+            <div class="q open">
+              <span class="tick done"><i data-i="check" data-s="12"></i></span><span class="qt">Wie prüfst du AI-Ergebnisse?</span><i data-i="chevron" data-s="14"></i>
+              <span class="who">Viaplay, Senior Fullstack AI Engineer</span>
+              <ul class="ans">
+                <li>Nach jedem Agent-Run prüft das Tool selbst, ob das Ergebnis taugt: Tests, Lint und Typecheck, grün oder rot.</li>
+                <li>In villain-layer: das Verify-Command pro Repo und der Loop-Button. Fertig ist ein Run erst, wenn die Checks grün sind.</li>
+                <span class="src">From Verifikation</span>
+              </ul>
+            </div>
+            <div class="q"><span class="tick"></span><span class="qt">Wie misst man, ob LLM-Output gut genug ist?</span><i data-i="chevron" data-s="14"></i><span class="who">Schibsted, Lead Engineer im Product Lab · answer from Evals</span></div>
+            <div class="q"><span class="tick"></span><span class="qt">Erklär einen Trade-off, den du getroffen hast.</span><i data-i="chevron" data-s="14"></i><span class="who">Neko Health, Lead Software Engineer · <span class="missing">no answer yet</span></span></div>
+            <div class="q"><span class="tick done"><i data-i="check" data-s="12"></i></span><span class="qt">Was ist ACP, und warum nutzt villain-layer es?</span><i data-i="chevron" data-s="14"></i><span class="who">From your notes · answer from ACP</span></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="btitle">Was der Markt will<span class="aside">in 28 ads, Stockholm and remote</span></div>
+          <div class="bars">
+            <div class="r"><span>AI/LLM</span><span class="track"><span class="bar" style="width: 89%"></span></span><span class="val">25</span><span class="note">da, sichtbarer machen</span></div>
+            <div class="r hover"><span>TypeScript</span><span class="track"><span class="bar" style="width: 75%"></span></span><span class="val">21</span><span class="note">im CV · 21 ads ›</span></div>
+            <div class="r"><span>Ownership</span><span class="track"><span class="bar" style="width: 71%"></span></span><span class="val">20</span><span class="note">da, sichtbarer machen</span></div>
+            <div class="r"><span>React</span><span class="track"><span class="bar" style="width: 64%"></span></span><span class="val">18</span><span class="note">im CV</span></div>
+            <div class="r"><span>System Design</span><span class="track"><span class="bar" style="width: 50%"></span></span><span class="val">14</span><span class="note gap">Lücke: Notifications-Service</span></div>
+            <div class="r"><span>Testing</span><span class="track"><span class="bar" style="width: 50%"></span></span><span class="val">14</span><span class="note">Scania, 1200+ E2E-Tests</span></div>
+            <div class="r"><span>Performance</span><span class="track"><span class="bar" style="width: 46%"></span></span><span class="val">13</span><span class="note none">·</span></div>
+            <div class="r"><span>AI-Coding-Tools</span><span class="track"><span class="bar" style="width: 46%"></span></span><span class="val">13</span><span class="note">villain-layer</span></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="btitle">Lücken schließen<span class="aside">1 of 7 done</span></div>
+          <div class="list">
+            <div class="ui-row"><span class="tick"></span><span class="txt">Eine Story zu einer selbst getroffenen Produktentscheidung</span><span class="src">Lücken im CV</span></div>
+            <div class="ui-row"><span class="tick"></span><span class="txt">Ein Bullet von der Problemstellung bis zur Messung</span><span class="src">Lücken im CV</span></div>
+            <div class="ui-row"><span class="tick"></span><span class="txt">Das Innenleben des Notifications-Service: Datenmodell, Zustellung, Monitoring</span><span class="src">Lücken im CV</span></div>
+            <div class="ui-row"><span class="tick"></span><span class="txt">Flaggschiff-Repo: README mit Problem, Demo, Stack und Screenshots</span><span class="src">Portfolio aufstellen</span></div>
+            <div class="ui-row"><span class="tick"></span><span class="txt">AI-Review-Schritt in villain-layer</span><span class="src">villain-layer: was noch fehlt</span></div>
+            <div class="ui-row"><span class="tick"></span><span class="txt">Mini-Eval mit etwa 20 echten Tickets</span><span class="src">villain-layer: was noch fehlt</span></div>
+            <div class="ui-row done"><span class="tick done"><i data-i="check" data-s="12"></i></span><span class="txt">Code Villain als eigenes Projekt im CV</span><span class="src">Code Villain im CV</span></div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="btitle">Markt und CV</div>
+          <div class="sections">
+            <div class="sec"><h4>Agents in der Delivery<i data-i="chevron" data-s="14"></i></h4><p>AI ist in den Anzeigen Arbeitsalltag: Agents beim Planen, Testen, Reviewen und Verifizieren.</p><span class="meta">1 point</span></div>
+            <div class="sec"><h4>TypeScript im Backend<i data-i="chevron" data-s="14"></i></h4><p>Reicht für einen großen Teil der Zielrollen: Ashby, duvo.ai, Sinch, Viaplay, Tibber, Mentimeter.</p><span class="meta">1 point</span></div>
+            <div class="sec"><h4>Tech-CVs 2026<i data-i="chevron" data-s="14"></i></h4><p>Der CV ist ein Filter, kein Beweis; austauschbare Texte fallen durch.</p><span class="meta">1 point</span></div>
+            <div class="sec"><h4>Stand des CV<i data-i="chevron" data-s="14"></i></h4><p>Zwei Seiten A4, schlicht und ATS-tauglich, als Senior Product Engineer, Frontend-strong fullstack.</p><span class="meta">2 points</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Karriere, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+  briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  salad: '<path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1"/><path d="m13 12 4-4"/><path d="M10.9 7.25A3.99 3.99 0 0 0 4 10c0 .73.2 1.41.54 2"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  cap: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  shower: '<path d="m4 4 2.5 2.5"/><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7"/><path d="M15 5 5 15"/><path d="M14 17v.01"/><path d="M10 16v.01"/><path d="M13 13v.01"/><path d="M16 10v.01"/><path d="M11 20v.01"/><path d="M17 14v.01"/><path d="M20 11v.01"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+  pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  talks: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+};
+// Fill each placeholder from its template; a <slot> is replaced, so a
+// window's sidebar stays a grid item. Templates may use templates.
+let at;
+while ((at = document.querySelector("[data-use]:not([data-filled])"))) {
+  const part = document.getElementById(at.dataset.use).content.cloneNode(true);
+  if (at.tagName === "SLOT") at.replaceWith(part);
+  else {
+    at.dataset.filled = "";
+    at.append(part);
+  }
+}
+for (const win of document.querySelectorAll(".win[data-select]")) {
+  win.querySelector(`[data-sel="${win.dataset.select}"]`)?.classList.add("is-selected");
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 16;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+// A tall window ends where its page does, with room for the ask box.
+for (const win of document.querySelectorAll(".win.fit")) {
+  win.style.height = `${48 + win.querySelector(".col").scrollHeight + 104}px`;
+}
+</script>
+</body>
+</html>

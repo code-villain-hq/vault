@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: the page fills the window</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* A 1600 × 900 window, drawn at its real size and scaled to the page. */
+.scaled { zoom: 0.7375; }
+.win { display: grid; grid-template-columns: var(--side, 224px) 1fr; grid-template-rows: 48px 1fr; width: 1600px; height: 900px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; position: relative; }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.toprow { height: 48px; display: flex; align-items: center; padding-left: 8px; flex: none; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.ws { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; margin-bottom: 10px; font-weight: 600; }
+.ws .av { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; white-space: nowrap; overflow: hidden; }
+.nav span { overflow: hidden; text-overflow: ellipsis; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 14px 8px 4px; }
+.foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.foot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 16px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.top .tools { margin-left: auto; display: flex; gap: 16px; color: var(--muted); }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; position: relative; }
+
+/* The page column: today a centred 56rem, proposed the panel's width. */
+.col { display: flex; flex-direction: column; gap: 32px; padding: 24px 40px 0; }
+.col.today { max-width: 896px; margin: 0 auto; padding: 24px 24px 0; }
+.title { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); margin-bottom: 10px; }
+.askbox { position: absolute; bottom: 16px; display: flex; align-items: center; height: 46px; padding: 0 16px; }
+.askbox .ph { color: var(--faint); }
+.today ~ .askbox { left: calc(50% - 424px); width: 848px; }
+.full ~ .askbox { left: 40px; right: 40px; }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 110px; background: linear-gradient(transparent, var(--panel) 55%); }
+
+/* Cards: today two columns; proposed as many as fit, each at least 18rem. */
+.cards { display: grid; gap: 12px; align-items: start; grid-template-columns: repeat(2, 1fr); }
+.full .cards { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: 16px; display: grid; gap: 12px; }
+.card h4 { font-weight: 700; display: flex; gap: 4px; align-items: center; }
+.card h4 svg { color: var(--faint); }
+.card ul { display: grid; gap: 6px; }
+.card li { font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+.card li .src { margin-left: 4px; }
+.card .kept { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* What's read keeps its line length, at the page's left edge. */
+.measure { max-width: var(--type-body-measure); }
+.wide { max-width: 86ch; }
+.list .ui-row { display: flex; gap: 16px; align-items: baseline; padding: 5px 10px; }
+.list .src { margin-left: auto; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .ui-chip { padding: 4px 10px; }
+.text section { display: grid; gap: 10px; }
+.text h3 { font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.text h3 svg { color: var(--faint); }
+.text p { font-size: var(--type-body-size); line-height: var(--type-body-leading); }
+.text b { font-weight: 700; }
+.tl { display: grid; grid-template-columns: 88px 14px 1fr; column-gap: 12px; }
+.tl > div { display: contents; }
+.tl .y { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; padding: 5px 0; }
+.tl .e { padding: 5px 0; display: flex; align-items: center; gap: 4px; }
+.tl .e svg { color: var(--faint); }
+.tl .c { color: var(--faint); font-size: var(--type-ui-small-size); margin-left: 6px; }
+.rail { position: relative; }
+.rail::before { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 1.5px; background: var(--line); }
+.rail::after { content: ""; position: absolute; left: 3px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.rail.span::after { height: 14px; top: 9px; border-radius: 4px; }
+.tl > div:first-child .rail::before { top: 14px; }
+.tl > div:last-child .rail::before { bottom: auto; height: 14px; }
+
+/* The sidebar's edge, as the pointer finds it: a line down the seam. */
+.edge { position: absolute; top: 0; bottom: 0; left: calc(var(--side) - 1px); width: 2px; background: var(--faint); }
+.pointer { position: absolute; left: calc(var(--side) - 12px); top: 430px; width: 24px; height: 24px; color: var(--fg); filter: drop-shadow(0 0 2px var(--bg)); }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>The page fills the window</h1>
+  <p>Preise finden's cards sit in a column 56rem wide, in the middle of a wide window, with as much empty on each side. Here the page runs from the sidebar to the window's edge: the cards take as many columns as fit, and what you read keeps its line length. The sidebar's edge can be dragged, so long topic names fit.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span>The page runs the width of the window</h2>
+  <ul class="choices">
+    <li><b>The page starts at the panel's left, 40px in, and ends 40px from its right</b>, with the title and every block lined up on that left edge. Nothing is centred.</li>
+    <li><b>Cards and shelf tiles take as many columns as fit</b>, each at least 18rem: four in this window, three or two with the talk open beside it, one on a phone.</li>
+    <li><b>The ask bar spans the page</b>, as wide as the blocks above it.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Today, a 1600px window</div><div class="scaled"><div data-theme="night" data-use="today"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, night</div><div class="scaled"><div data-theme="night" data-use="full"></div></div></div>
+  <div class="mode"><div class="mode-label">Proposed, day</div><div class="scaled"><div data-theme="day" data-use="full"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span>What you read keeps its line length</h2>
+  <ul class="choices">
+    <li><b>Writing stays at the measure, 66 characters a line</b>, at the page's left edge: a passage across 1300px is hard to follow back to the next line.</li>
+    <li><b>Lists and timelines stay at 86 characters</b>, so a source or a count isn't a window's width from its line. Chips wrap across the page.</li>
+    <li><b>My choice: the measure over everything full width.</b> The room goes to what's laid side by side, the cards, not to longer lines.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Geschichte, proposed, night</div><div class="scaled"><div data-theme="night" data-use="study"></div></div></div>
+</section>
+
+<section class="step">
+  <h2><span class="n">3</span>The sidebar's edge can be dragged</h2>
+  <ul class="choices">
+    <li><b>Drag the edge between the sidebar and the page</b>, from 180px to 360px; under the pointer it shows as a line down the seam. Double-click it to go back to 224px.</li>
+    <li><b>The width stays on this Mac</b>, for every workspace, and isn't synced: another screen may want another width. With the edge focused, ← and → move it too.</li>
+    <li><b>It doesn't fold away:</b> narrower than 180px, it stops. Hiding the sidebar is a feature of its own.</li>
+    <li><b>My choice: it goes into the frame every app shares</b> (<code>studio/design/layouts/app-window.md</code>, built once in <code>code/kit/web</code>). Almanac takes it now; Forge, Glyph and Raven when they next change their frame.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Dragged to 340px, night</div><div class="scaled"><div data-theme="night" data-use="resized"></div></div></div>
+</section>
+
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="toprow"><div class="lights"><span></span><span></span><span></span></div></div>
+    <div class="ws"><span class="av">H</span>Home</div>
+    <div class="nav ui-row"><i data-i="library"></i><span>Almanac</span></div>
+    <div class="nav ui-row"><i data-i="calendar"></i><span>Calendar</span></div>
+    <div class="group">Einkaufen</div>
+    <div class="nav ui-row" data-sel="preise"><i data-i="tag"></i><span>Preise finden</span></div>
+    <div class="nav ui-row"><i data-i="cart"></i><span>Wocheneinkauf beim Lidl und auf dem Markt</span></div>
+    <div class="group">Lernen</div>
+    <div class="nav ui-row"><i data-i="book"></i><span>Marx &amp; Engels</span></div>
+    <div class="nav ui-row"><i data-i="leaf"></i><span>Tofu &amp; Mehrwert</span></div>
+    <div class="nav ui-row" data-sel="geschichte"><i data-i="globe"></i><span>Geschichte</span></div>
+    <div class="group">Zuhause</div>
+    <div class="nav ui-row"><i data-i="sprout"></i><span>Pflanzen</span></div>
+    <div class="nav ui-row"><i data-i="cat"></i><span>Katzen: Futter, Tierarzt und Impfungen</span></div>
+    <div class="foot"><span class="dot"></span>Synced</div>
+  </aside>
+</template>
+
+<template id="tools">
+  <span class="tools"><i data-i="talks"></i><i data-i="more"></i></span>
+</template>
+
+<template id="products">
+  <div><div class="btitle">Produkte</div>
+    <div class="cards">
+      <div class="card"><h4>Haglöfs Vassi Mid Hood<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Im Outlet für 1.400 kr in Oak Brown; das ist auch der Sale-Preis bei Haglöfs selbst.<span class="src">From Grok</span></li>
+        <li>Bei Haglöfs Schweden in S bis XXL ausverkauft, kein anderer schwedischer Shop hat Oak Brown.<span class="src">From Grok</span></li>
+        <li>Vegan-freundlich: Polyester-Fleece, großteils recycelt, ohne Wolle, Daunen oder Leder.<span class="src">From Grok</span></li>
+        <li>Fazit: im Laden kaufen, wenn XL passt.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>Skechers BOBS Sport B Flex Rainy Edge<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Im Laden 979 kr, der beste Preis; laut Skechers aus 100 % veganen Materialien.<span class="src">From Grok</span></li>
+        <li>Spartoo.se hat EU 43 und 44 für 1.094 kr, aber Drittanbieter mit oft 14 Tagen Rückgabe auf eigene Kosten.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>ECCO Track 25 GTX Boot<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Nicht vegan: Obermaterial Nubukleder, und die Innensohle „vegetable tanned“ ist ebenfalls Leder.<span class="src">From Grok</span></li>
+        <li>1.800 kr statt 2.599 kr; „Quality: 2“ auf dem Etikett heißt meist zweite Wahl mit kleinem Fehler.<span class="src">From Grok</span></li>
+        <li>ECCO hat keine Vegan-Linie; der Terracruise II Textile GTX ist Textil, aber nicht vegan zertifiziert.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>ECCO Byway Tred<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Nubuk- und Wildleder, also nicht vegan; Vorbild für die Suche nach einem veganen Gegenstück.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>Saola Quito Mid Waterproof<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Optisch am nächsten am ECCO Byway Tred: grau, wasserdicht, laut Saola 100 % vegan, EU 44 da.<span class="src">From Grok</span></li>
+        <li>Bei Bergfreunde ca. 1.790 kr (€159,95); 100 Tage Rückgabe, aber €9,95 gehen von der Erstattung ab.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>Palladium Pampa SP20 Cuff WP+<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Grau bei Zalando für 1.150 kr in EU 43 und 44, wasserdicht und PETA-zertifiziert vegan.<span class="src">From Grok</span></li>
+        <li>Auch in Woodlin für 1.150 kr und in Schwarz für 1.264 kr, Schwarz in 43 ausverkauft.<span class="src">From Grok</span></li>
+        <li>Lange der Favorit, dann gestrichen: das Canvas-Obermaterial wird schnell fleckig.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>Puma Desierto V3 PureTex<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>1.009 kr bei Zalando, mit Code SUPER20 ca. 807 kr; nur wasserabweisend, und hell zeigt er Matsch.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+      <div class="card"><h4>Didriksons Vinga<i data-i="chevron" data-s="14"></i></h4><ul>
+        <li>Gummistiefel für 600 kr, in EU 43 und 44 ausverkauft, nur noch 41.<span class="src">From Grok</span></li>
+      </ul><span class="kept">Last kept today</span></div>
+    </div>
+  </div>
+</template>
+
+<template id="today">
+  <div class="win">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Preise finden</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col today"><p class="title">Preise finden</p><slot data-use="products"></slot></div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Preise finden, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="full">
+  <div class="win">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Preise finden</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col full"><p class="title">Preise finden</p><slot data-use="products"></slot></div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Preise finden, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="study">
+  <div class="win" data-select="geschichte">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Geschichte</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col full">
+        <p class="title">Geschichte</p>
+        <div class="list wide"><div class="btitle">Reading</div>
+          <div class="ui-row">Costs of War Project: Tote der US-Kriege nach 9/11<span class="src">Brown University</span></div>
+          <div class="ui-row">B’Tselem, israelische Menschenrechtsorganisation: Opferzahlen der Intifadas<span class="src">B’Tselem</span></div>
+          <div class="ui-row">Stroop-Bericht (1943): der SS-Bericht über die Niederschlagung des Warschauer Ghettoaufstands<span class="src">Jürgen Stroop</span></div>
+        </div>
+        <div><div class="btitle">Terms</div>
+          <div class="chips"><span class="ui-chip">Intifada: arabisch für „Abschütteln“ oder „Aufstand“</span><span class="ui-chip">Erste Intifada: rund 1.100 Palästinenser getötet, über 200 davon minderjährig, und etwa 160 Israelis</span><span class="ui-chip">Lehnt alle Staaten ab, weder Team NATO noch Team Russland</span><span class="ui-chip">Zählt die USA geschichtlich zu Europa</span><span class="ui-chip">Nakam: jüdische Rachegruppe nach der Shoah</span></div>
+        </div>
+        <div class="wide"><div class="btitle">Zeitleiste</div>
+          <div class="tl">
+            <div><span class="y">1500</span><span class="rail"></span><span class="e">Europas Reichweite<span class="c">1 event</span><i data-i="chevron" data-s="14"></i></span></div>
+            <div><span class="y">1816–1953</span><span class="rail span"></span><span class="e">Nie kolonisiert?<span class="c">10 events</span><i data-i="chevron" data-s="14"></i></span></div>
+            <div><span class="y">1898–1962</span><span class="rail span"></span><span class="e">Kuba<span class="c">5 events</span><i data-i="chevron" data-s="14"></i></span></div>
+            <div><span class="y">1967–2005</span><span class="rail span"></span><span class="e">Intifada<span class="c">5 events</span><i data-i="chevron" data-s="14"></i></span></div>
+            <div><span class="y">1973–2021</span><span class="rail span"></span><span class="e">9/11<span class="c">5 events</span><i data-i="chevron" data-s="14"></i></span></div>
+          </div>
+        </div>
+        <div class="text measure"><div class="btitle">What it says</div>
+          <section><h3>Intifada<i data-i="chevron" data-s="14"></i></h3><p><b>Die Erste Intifada</b> (1987 bis etwa 1993) begann nach einem Verkehrsunfall in Gaza, bei dem ein israelischer Lastwagen vier Palästinenser tötete, und richtete sich gegen die Besatzung von Westjordanland, Gazastreifen und Ostjerusalem seit 1967. Am Ende standen die Oslo-Abkommen, die keinen eigenen Staat brachten.</p><span class="src">From Grok</span></section>
+        </div>
+      </div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Geschichte, or tell it something</span></div>
+    </main>
+  </div>
+</template>
+
+<template id="resized">
+  <div class="win" style="--side: 340px">
+    <slot data-use="side"></slot>
+    <div class="top">Almanac <span>›</span> <b>Preise finden</b><slot data-use="tools"></slot></div>
+    <main class="content">
+      <div class="col full"><p class="title">Preise finden</p><slot data-use="products"></slot></div>
+      <div class="fade"></div>
+      <div class="askbox ui-field"><span class="ph">Ask Preise finden, or tell it something</span></div>
+    </main>
+    <span class="edge"></span>
+    <i class="pointer" data-i="resize" data-s="24"></i>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+  cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  talks: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  resize: '<path d="m18 8 4 4-4 4"/><path d="M2 12h20"/><path d="m6 8-4 4 4 4"/>',
+};
+// Fill each placeholder from its template; a <slot> is replaced, so a
+// window's sidebar stays a grid item. Templates may use templates.
+let at;
+while ((at = document.querySelector("[data-use]:not([data-filled])"))) {
+  const part = document.getElementById(at.dataset.use).content.cloneNode(true);
+  if (at.tagName === "SLOT") at.replaceWith(part);
+  else {
+    at.dataset.filled = "";
+    at.append(part);
+  }
+}
+// Each window selects its own topic in the sidebar.
+for (const win of document.querySelectorAll(".win")) {
+  const name = win.dataset.select || "preise";
+  win.querySelector(`[data-sel="${name}"]`)?.classList.add("is-selected");
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  const s = i.dataset.s || 16;
+  i.outerHTML = `<svg class="${i.className}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>

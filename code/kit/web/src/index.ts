@@ -24,11 +24,19 @@ export {
   Splash,
   TextField,
 } from "./controls";
-export { useDialogFocus } from "./dialog-focus";
+export { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 export { ago, lasted } from "./format";
 export { GroupSelect, useGroups } from "./groups";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";
-export { CreateDialog, chip, MoreMenu, NewButton, RowAction } from "./page-parts";
+export {
+  CreateDialog,
+  chip,
+  MoreMenu,
+  type MoreMenuAction,
+  type MoreMenuItem,
+  NewButton,
+  RowAction,
+} from "./page-parts";
 export {
   type AppConfig,
   apiUrl,
@@ -70,6 +78,15 @@ export {
   workspaceEntries,
 } from "./session";
 export { type GoTo, openShortcuts, type ShortcutSection, Shortcuts } from "./shortcuts";
-export { SearchButton, ShortcutsButton } from "./sidebar";
+export {
+  SearchButton,
+  ShortcutsButton,
+  SIDEBAR_WIDTH,
+  SidebarEdge,
+  useKeptWidth,
+  useSidebarWidth,
+  WidthEdge,
+  type Widths,
+} from "./sidebar";
 export { SyncIndicator, type SyncState } from "./sync-indicator";
 export { AppVersion } from "./version";

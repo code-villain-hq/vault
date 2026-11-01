@@ -4,6 +4,7 @@ import { Select } from "@base-ui/react/select";
 import { ChevronsUpDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { RequestError } from "./api";
+import { focusBackAfterKeys } from "./dialog-focus";
 
 /**
  * The company's groups, without their `-users`, `-admins` and `-guests`, for
@@ -73,7 +74,10 @@ export function GroupSelect({
           align="start"
           alignItemWithTrigger={false}
         >
-          <Select.Popup className="ui-menu max-h-80 min-w-44 overflow-y-auto p-1 outline-none">
+          <Select.Popup
+            finalFocus={focusBackAfterKeys}
+            className="ui-menu max-h-80 min-w-44 overflow-y-auto p-1 outline-none"
+          >
             <Select.List>
               {items.map((item) => (
                 <Select.Item

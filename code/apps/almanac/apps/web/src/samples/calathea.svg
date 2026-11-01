@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240">
+  <title>A calathea in a pale pot</title>
+  <rect width="320" height="240" fill="#f1f0ea"/>
+  <rect y="196" width="320" height="44" fill="#e2e0d6"/>
+  <g stroke="#4f7a4c" stroke-width="2.5" fill="none" stroke-linecap="round">
+    <path d="M160 176c-6-30-24-58-50-74"/>
+    <path d="M160 176c0-40 4-80 6-110"/>
+    <path d="M160 176c8-28 28-52 56-64"/>
+  </g>
+  <g fill="#8fb487" stroke="#4f7a4c" stroke-width="2">
+    <ellipse cx="94" cy="92" rx="40" ry="20" transform="rotate(-30 94 92)"/>
+    <ellipse cx="168" cy="48" rx="20" ry="40"/>
+    <ellipse cx="234" cy="102" rx="40" ry="20" transform="rotate(24 234 102)"/>
+  </g>
+  <g stroke="#4f7a4c" stroke-width="2" stroke-linecap="round">
+    <path d="M62 108l64-34M80 82l8 12M96 74l8 12M100 104l-6-12M84 112l-6-12"/>
+    <path d="M168 12v72M158 30l10 8M178 30l-10 8M156 54l12 8M180 54l-12 8"/>
+    <path d="M200 86l68 32M220 88l-6 12M238 96l-6 12M232 116l8-10M250 120l6-10"/>
+  </g>
+  <path d="M124 172h72l-8 52h-56z" fill="#e6dccb"/>
+  <rect x="118" y="166" width="84" height="12" rx="3" fill="#d6cab5"/>
+</svg>

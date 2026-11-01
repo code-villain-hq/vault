@@ -1,0 +1,44 @@
+# Almanac's settings for one company. Copy to almanac.toml (or pass
+# `almanac-server --config <file>`, or set ALMANAC_CONFIG). Every setting can
+# also come from the environment, which wins: `[oidc] issuer` is
+# ALMANAC_OIDC_ISSUER, `public_url` is ALMANAC_PUBLIC_URL. A setting Almanac
+# doesn't know stops it, naming the setting.
+
+# Required.
+
+company = "Acme Inc"                    # names the workspace and the sign-in button
+public_url = "https://almanac.acme.org"   # where people reach Almanac
+
+[database]
+url = "postgres://almanac@localhost/almanac"   # or DATABASE_URL
+
+# The company's account signs people in (OpenID Connect). Register Almanac as a
+# confidential client with the callback <public_url>/api/auth/oidc/callback.
+[oidc]
+issuer = "https://id.acme.org"
+client_id = "almanac"
+client_secret = "…"
+
+# The account sends its people and groups to <public_url>/api/scim/v2 with
+# this token (SCIM), and they're in Almanac as its groups say.
+[scim]
+token = "…"
+
+# Optional.
+
+# The groups whose people are in Almanac, and as what.
+[groups]
+users = "almanac-users"
+admins = "almanac-admins"
+guests = "almanac-guests"
+
+# addr = "0.0.0.0:7780"           # where the server listens (ALMANAC_ADDR)
+# web_dir = "/srv/almanac/web"      # the built web app, served beside the API
+# cookie_secure = true            # false only on plain http
+# version = "1.2.0"               # what Almanac's own calls say it runs
+
+# The Claude API key Almanac answers with. Admins can set it in
+# Settings → Claude instead, or it comes from ANTHROPIC_API_KEY.
+# [claude]
+# api_key = "…"
+# url = "https://gateway.acme.org/v1/messages"   # a gateway in front of Anthropic's Messages API
