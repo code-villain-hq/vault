@@ -91,7 +91,7 @@ export function FieldsDialog({
     const filled = field.was ? filledIn(rows, field.was) : 0;
     const gone = () => setFields((now) => now.filter((f) => f.key !== field.key));
     if (!filled) return gone();
-    const name = field.was ?? field.name;
+    const name = field.name.trim() || field.was;
     setConfirmation({
       title: `Remove ${name}?`,
       body: `${name} is filled in ${filled} ${filled === 1 ? "row" : "rows"}. This can't be undone.`,
@@ -153,7 +153,7 @@ export function FieldsDialog({
   };
 
   const box = "ui-field h-8 min-w-0 rounded-md px-2 text-sm";
-  const line = "grid grid-cols-[1.25rem_minmax(0,1fr)_7.5rem_1.75rem] items-center gap-2";
+  const line = "grid grid-cols-[1.25rem_minmax(0,1fr)_8.5rem_1.75rem] items-center gap-2";
   return (
     <CreateDialog open onClose={onClose} width="30rem">
       <form
@@ -171,8 +171,10 @@ export function FieldsDialog({
         <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto px-4 py-3">
           <div className={line}>
             <span />
-            <span className={`${box} flex items-center text-muted`}>Name</span>
-            <span className={`${box} flex items-center text-faint`}>Each row's name</span>
+            <span className="flex h-8 items-center px-2 text-sm text-muted">Name</span>
+            <span className="flex h-8 items-center px-2 text-sm whitespace-nowrap text-faint">
+              Each row's name
+            </span>
             <span />
           </div>
           {fields.map((field, at) => (
@@ -309,7 +311,7 @@ function Words({ field, onChange }: { field: Field; onChange: (options: string[]
   return (
     <div className="col-span-3 flex flex-wrap items-center gap-1.5">
       {field.options.map((option) => (
-        <span key={option} className="ui-chip gap-1 pr-1">
+        <span key={option} className="ui-chip inline-flex h-6 items-center gap-1 pr-1 pl-2.5">
           {option}
           <button
             type="button"

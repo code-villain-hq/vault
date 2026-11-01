@@ -141,13 +141,16 @@ export function useAdder() {
 /**
  * A field that opens from a menu or ⌘K takes focus before the popup, as it
  * closes, hands it back to what opened it. For a moment after it opens, the
- * field takes it back instead of hearing it leave: true when it did.
+ * field takes it back instead of hearing it leave: true when it did. Focus
+ * moved on within the draft, as Enter in a title does, stays where it went.
  */
 export function useOpening() {
   const at = useRef(performance.now());
   return (e: FocusEvent<HTMLElement>) => {
     if (performance.now() - at.current > 500) return false;
     const field = e.currentTarget;
+    const to = e.relatedTarget;
+    if (to instanceof Node && field.closest("form")?.contains(to)) return false;
     setTimeout(() => field.isConnected && field.focus());
     return true;
   };
@@ -325,7 +328,7 @@ export function EditHeading({ block }: { block: Block }) {
         type="button"
         title="Write in it"
         onClick={() => setWriting(true)}
-        className="-mx-1 max-w-full cursor-text truncate rounded px-1 text-left hover:bg-hover"
+        className="-mx-1 max-w-[calc(100%+0.5rem)] cursor-text truncate rounded px-1 text-left hover:bg-hover"
       >
         {block.title}
       </button>

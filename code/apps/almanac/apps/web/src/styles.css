@@ -227,6 +227,8 @@
   resize: none;
   overflow: hidden;
   outline: none;
+}
+.writing:focus {
   box-shadow:
     0 0 0 1px var(--accent),
     0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);

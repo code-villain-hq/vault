@@ -1494,7 +1494,7 @@ function BlockFrame({
           ))}
         {aside && <span className="ml-auto shrink-0">{aside}</span>}
         {/* Over the line on hover, so a half block's title keeps its room. */}
-        <span className="absolute inset-y-0 right-0 flex items-center gap-3 bg-bg pl-3 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 has-[[data-stays]]:opacity-100">
+        <span className="absolute inset-y-0 right-0 flex items-center gap-3 bg-panel pl-3 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 has-[[data-stays]]:opacity-100">
           <ViewAs block={block} />
           <BlockMenu block={block} blocks={blocks} className="group-hover/block:opacity-100" />
         </span>
