@@ -598,6 +598,19 @@ pub struct StartTopicRequest {
     pub here: Option<bool>,
 }
 
+/// Sets up a topic the app made itself, through sync, as starting one does:
+/// what it sticks to becomes a brief, Claude picks what wasn't set by then,
+/// and the page is laid out when it's still empty.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct SetUpTopicRequest {
+    /// The one of [`TEMPLATE_NAMES`] its blocks started from, if picked.
+    pub template: Option<String>,
+    /// As [`StartTopicRequest::here`].
+    pub here: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, optional_fields)]
 pub struct StartedTopic {

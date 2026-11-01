@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { Place } from "./server";
 import { loadSession } from "./session";
+import { followSetUps } from "./starting";
 import { createSyncClient, type Schema } from "./sync";
 
 interface WorkspaceContext {
@@ -69,10 +70,12 @@ export function WorkspaceProvider({
     });
     setConnection({ sync, refusals, opened: `${place.id} ${userId} ${workspaceId}` });
     void sync.start();
+    const stopSetUps = followSetUps(sync, place, workspaceId);
     const online = () => sync.retryNow();
     window.addEventListener("online", online);
     return () => {
       window.removeEventListener("online", online);
+      stopSetUps();
       sync.stop();
     };
   }, [place, userId, workspaceId]);

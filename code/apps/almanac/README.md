@@ -106,7 +106,8 @@ topics.
   changed, and offers Undo. It can be renamed, not deleted.
 - **Starting a topic**: a name, what it sticks to, which may stay short
   or empty, and what it starts as: Routine, Collection, Study, or
-  Almanac's pick. Once Claude answers, Almanac writes the rest in the
+  Almanac's pick. It starts at once, offline too. Once the server has it
+  and Claude answers, Almanac writes the rest in the
   background: the brief, what the topic is about and how it answers,
   after what you wrote, which it keeps word for word; the icon, the
   group, the template when you left it to Almanac, and the first

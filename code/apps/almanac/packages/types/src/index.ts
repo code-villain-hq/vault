@@ -42,6 +42,7 @@ export type * from "./generated/Role";
 export type * from "./generated/SetAnswersRequest";
 export type * from "./generated/SetClaudeKeyRequest";
 export type * from "./generated/SetClaudeWebRequest";
+export type * from "./generated/SetUpTopicRequest";
 export type * from "./generated/Source";
 export type * from "./generated/StartTopicRequest";
 export type * from "./generated/StartedTopic";

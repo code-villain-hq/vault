@@ -68,6 +68,16 @@ impl Rules for Almanac {
             } if data.contains_key("notified_for") => Err(SyncError::Forbidden(
                 "Only Almanac says when it told the Mac.".into(),
             )),
+            // The workspace's own topic comes with the workspace.
+            Operation::Create {
+                model: ModelKind::Topic,
+                data,
+                ..
+            } if matches!(data.get("kind").and_then(Value::as_str), Some(kind) if kind != "topic") => {
+                Err(SyncError::Forbidden(
+                    "Only Almanac makes its own topic.".into(),
+                ))
+            }
             // A topic sits under another one level deep, and never under
             // itself or the workspace's own topic.
             Operation::Create {

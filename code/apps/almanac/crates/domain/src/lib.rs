@@ -35,7 +35,7 @@ pub use topic::{
     BLOCK_VIEWS, BLOCK_WIDTHS, Block, BlockCreate, BlockPatch, Cell, FACET_ICONS, FIELD_KINDS,
     Facet, Field, ICONS, KINDS, LOOKS, MOST_FACETS, MOST_FIELDS, PICTURE_CELL, Point, PointCreate,
     PointPatch, Question, QuestionCreate, QuestionPatch, Reminder, ReminderCreate, ReminderPatch,
-    SET_KINDS, STICKS_TO_MAX, StartTopicRequest, StartedTopic, TEMPLATE_NAMES, TEMPLATES, Topic,
-    TopicCreate, TopicPatch, template,
+    SET_KINDS, STICKS_TO_MAX, SetUpTopicRequest, StartTopicRequest, StartedTopic, TEMPLATE_NAMES,
+    TEMPLATES, Topic, TopicCreate, TopicPatch, template,
 };
 pub use user::User;

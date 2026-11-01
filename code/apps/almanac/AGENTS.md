@@ -68,10 +68,11 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
 `Point`, `Question` and `Reminder`, and the members (`User`). Who writes what
 (`crates/sync/src/rules.rs`):
 
-- The server makes topics (`POST /api/w/{id}/topics`), talks and messages
-  (`POST /api/w/{id}/topics/{topic}/ask`). Clients may change and delete a
-  topic and delete a talk; deleting a topic takes what it kept with it, and
-  a talk its messages.
+- Clients make topics, offline too (`starting.ts`), with `kind` `topic`
+  only; the server makes talks and messages (`POST
+  /api/w/{id}/topics/{topic}/ask`). Clients may change and delete a topic
+  and delete a talk; deleting a topic takes what it kept with it, and a
+  talk its messages.
 - Every workspace has one topic of its own, `kind` `almanac` (`own.rs`),
   which the server makes with the workspace. Clients may rename it and
   change what it sticks to, not delete it.
@@ -338,13 +339,19 @@ What they do:
   made at once and kept on the message for Undo.
 - **Starting a topic** (`topics.rs`): a template (`TEMPLATES` in
   `crates/domain`: `routine`, `collection`, `study`) names the blocks it
-  starts with; the blocks are the topic's from then on. A picked template
-  lays the page out at once. In the background, Almanac writes the
+  starts with; the blocks are the topic's from then on. The app makes the
+  topic and a picked template's blocks through sync (`startTopic` in
+  `starting.ts`, which copies `TEMPLATES`), offline too, and keeps it on
+  this device until the server has it; then `POST
+  /api/w/{id}/topics/{topic}/set_up` sets it up (`followSetUps`), with
+  `here` as an ask. `POST /api/w/{id}/topics` still starts one on the
+  server, as a proposal does (`from_message`). In the background, Almanac writes the
   brief, with what was written kept word for word at its start
   (`with_theirs`), picks an icon (`ICONS`), a group, the
   template when none was picked, a collection's card title, and the first
   questions (set_up_topic, or structured output). When Claude can't
-  answer, the topic keeps its defaults and starts as a collection.
+  answer, the topic keeps its defaults and, its page still empty, starts
+  as a collection. What was set before the server had it stays.
 
 Change the prompts in the same commit as what reads their answers. A
 prompt says what to do and why, in plain sentences; the schema says the

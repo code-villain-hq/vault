@@ -7,6 +7,7 @@ import { CreateDialog, messageOf } from "@code-villain/web";
 import { BookOpen, CalendarDays, type LucideIcon, Sparkles, Sprout } from "lucide-react";
 import { useState } from "react";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
+import { TEMPLATE_BLOCKS } from "./starting";
 import { Button, ErrorMessage } from "./ui";
 
 /** What the form changes. */
@@ -19,6 +20,13 @@ export interface TopicFields {
   template?: string;
 }
 
+/** A template's blocks, as its page shows them: You shows on About only. */
+const blocksOf = (name: string) =>
+  (TEMPLATE_BLOCKS[name] ?? [])
+    .filter(([kind]) => kind !== "you")
+    .map(([, title]) => title)
+    .join(" · ");
+
 /** What a topic may start as, with the blocks each gives it. */
 const TEMPLATES: { value: string; label: string; blocks: string; Icon: LucideIcon }[] = [
   {
@@ -30,11 +38,11 @@ const TEMPLATES: { value: string; label: string; blocks: string; Icon: LucideIco
   {
     value: "routine",
     label: "Routine",
-    blocks: "Routine · Your shelf · Advice",
+    blocks: blocksOf("routine"),
     Icon: CalendarDays,
   },
-  { value: "collection", label: "Collection", blocks: "To do · Notes", Icon: Sprout },
-  { value: "study", label: "Study", blocks: "Reading · Terms · What it says", Icon: BookOpen },
+  { value: "collection", label: "Collection", blocks: blocksOf("collection"), Icon: Sprout },
+  { value: "study", label: "Study", blocks: blocksOf("study"), Icon: BookOpen },
 ];
 
 /** "Starts as": a template, or Almanac's pick when `picks`. */

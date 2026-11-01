@@ -8,8 +8,9 @@
 //! proposed takes what it names from the parent's page: it moves there.
 
 use almanac_domain::{
-    Actor, Answered, Field, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX,
-    StartTopicRequest, StartedTopic, TEMPLATE_NAMES, TopicChange, Transaction, template,
+    Actor, Answered, Field, HandedQuestion, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX,
+    SetUpTopicRequest, StartTopicRequest, StartedTopic, TEMPLATE_NAMES, TopicChange, Transaction,
+    template,
 };
 use almanac_sync::Origin;
 use axum::Json;
@@ -30,6 +31,17 @@ use crate::page::Page;
 use crate::state::AppState;
 
 const TOPIC: &str = "SELECT name, sticks_to FROM topics WHERE id = $1 AND workspace_id = $2";
+/// What a topic the app made has by the time it's set up.
+const MADE: &str = "SELECT kind, sticks_to, icon, group_name FROM topics \
+     WHERE id = $1 AND workspace_id = $2";
+/// The icon a topic has until one is picked (migration 0002).
+const NO_ICON: &str = "book";
+/// Whether a topic's page has a block yet.
+const LAID_OUT: &str = "SELECT EXISTS (SELECT 1 FROM blocks \
+     WHERE topic_id = $1 AND workspace_id = $2 AND row_id IS NULL)";
+/// The collection a template's rows go in, while it has the template's title.
+const CARDS: &str = "SELECT id FROM blocks WHERE topic_id = $1 AND workspace_id = $2 \
+     AND row_id IS NULL AND kind = 'collection' AND title = $3 ORDER BY position LIMIT 1";
 /// What a sub-topic takes, as the parent's page has it: a block on the
 /// page, or a row with a page of its own.
 const TAKEN_BLOCK: &str = "SELECT to_jsonb(b) FROM blocks b \
@@ -305,11 +317,90 @@ pub async fn start(
         _ => None,
     };
     write(&state, actor, operations).await?;
-    // On a server, the desktop app sets it up with Claude Code on the
-    // asker's Mac: the question goes back with the topic.
+    let handed = match proposed {
+        Some(_) => None,
+        None => begin_set_up(state, actor, id, given, picked, request.here == Some(true)).await?,
+    };
+    Ok((
+        StatusCode::CREATED,
+        Json(StartedTopic { id, set_up: handed }),
+    ))
+}
+
+/// `POST /api/w/{id}/topics/{topic_id}/set_up`: sets up a topic the app
+/// made itself, through sync, as one started here is: the app makes it
+/// offline too, and asks for this once the server has it. What was set by
+/// then stays, and a template that was picked named its blocks already.
+pub async fn set_up_made(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<SetUpTopicRequest>,
+) -> Result<Json<StartedTopic>, AppError> {
+    member.require_not_guest()?;
+    let actor = member.actor;
+    let (kind, sticks_to, icon, group_name): (String, String, String, String) =
+        sqlx::query_as(MADE)
+            .bind(id)
+            .bind(actor.workspace_id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| AppError::not_found("topic not found"))?;
+    if kind != "topic" {
+        return Err(AppError::invalid("Almanac's own topic is set up already."));
+    }
+    let picked = match request.template.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(name) => {
+            let blocks = template(name).ok_or_else(|| {
+                AppError::invalid(format!("A topic starts as one of {TEMPLATE_NAMES:?}."))
+            })?;
+            let cards = blocks
+                .iter()
+                .find(|(kind, _, check)| *kind == "collection" && check.is_empty())
+                .map(|(_, title, _)| *title);
+            let block: Option<Uuid> = match cards {
+                Some(title) => {
+                    sqlx::query_scalar(CARDS)
+                        .bind(id)
+                        .bind(actor.workspace_id)
+                        .bind(title)
+                        .fetch_optional(&state.pool)
+                        .await?
+                }
+                None => None,
+            };
+            Some((name.to_string(), block))
+        }
+    };
+    let mut given = Vec::new();
+    if !sticks_to.trim().is_empty() {
+        given.push("sticks_to");
+    }
+    if icon != NO_ICON {
+        given.push("icon");
+    }
+    if !group_name.is_empty() {
+        given.push("group_name");
+    }
+    let handed = begin_set_up(state, actor, id, given, picked, request.here == Some(true)).await?;
+    Ok(Json(StartedTopic { id, set_up: handed }))
+}
+
+/// Sets a new topic up in the background. On a server, when the desktop
+/// app asked (`here`), Claude Code on the asker's Mac sets it up: the
+/// question it answers there goes back.
+async fn begin_set_up(
+    state: AppState,
+    actor: Actor,
+    id: Uuid,
+    given: Vec<&'static str>,
+    picked: Option<(String, Option<Uuid>)>,
+    here: bool,
+) -> Result<Option<HandedQuestion>, AppError> {
     let mut handed = None;
-    let their_mac = match proposed.is_none() && request.here == Some(true) {
-        true if state.claude_code.is_none() => {
+    let their_mac = match here && state.claude_code.is_none() {
+        true => {
             let (name, sticks_to): (String, String) = sqlx::query_as(TOPIC)
                 .bind(id)
                 .bind(actor.workspace_id)
@@ -329,19 +420,14 @@ pub async fn start(
             }));
             Some((open, answered))
         }
-        _ => None,
+        false => None,
     };
-    if proposed.is_none() {
-        tokio::spawn(async move {
-            if let Err(error) = set_up(&state, actor, id, &given, picked, their_mac).await {
-                tracing::warn!(%error, topic = %id, "couldn't set up the topic");
-            }
-        });
-    }
-    Ok((
-        StatusCode::CREATED,
-        Json(StartedTopic { id, set_up: handed }),
-    ))
+    tokio::spawn(async move {
+        if let Err(error) = set_up(&state, actor, id, &given, picked, their_mac).await {
+            tracing::warn!(%error, topic = %id, "couldn't set up the topic");
+        }
+    });
+    Ok(handed)
 }
 
 /// `POST /api/w/{id}/messages/{message_id}/undo`: puts back what an answer
@@ -415,9 +501,9 @@ type TheirMac = (Open, oneshot::Receiver<Answered>);
 
 /// Has Claude write the rest of a new topic, leaving what you `given` as
 /// it is: what it sticks to becomes a brief with all of yours in it. A template you `picked` laid out its page already, its cards
-/// block named once Claude says what the cards are; otherwise the page
-/// starts as the template Claude picks, or a collection when Claude can't
-/// answer. With no Claude the topic keeps what it started with.
+/// block named once Claude says what the cards are; otherwise a page still
+/// empty starts as the template Claude picks, or a collection when Claude
+/// can't answer. With no Claude the topic keeps what it started with.
 async fn set_up(
     state: &AppState,
     actor: Actor,
@@ -463,6 +549,8 @@ async fn set_up(
             }
         }
         Some((_, None)) => {}
+        // A page written on meanwhile keeps what it has.
+        None if laid_out(state, actor, id).await? => {}
         None => {
             let name = set_up
                 .as_ref()
@@ -502,6 +590,15 @@ async fn set_up(
         });
     }
     write(state, actor, operations).await
+}
+
+/// Whether a topic's page has a block yet.
+async fn laid_out(state: &AppState, actor: Actor, id: Uuid) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(LAID_OUT)
+        .bind(id)
+        .bind(actor.workspace_id)
+        .fetch_one(&state.pool)
+        .await
 }
 
 /// The brief Claude wrote, with all of what they wrote in it: theirs comes

@@ -1,18 +1,17 @@
 // Starting a topic: a name, what it sticks to if you know, the topic it
-// sits under if any, and the blocks it starts with if you'd pick them. The server makes it at once, and
-// Claude writes the rest while its page opens.
+// sits under if any, and the blocks it starts with if you'd pick them. It's
+// made at once, offline too (`starting.ts`), and Claude writes the rest
+// once the server has it.
 
-import type { StartedTopic, StartTopicRequest } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
-import { CreateDialog, messageOf, shortcutFree } from "@code-villain/web";
+import { CreateDialog, shortcutFree } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { api } from "./api";
-import { answerHere, asksHere } from "./here";
 import { topicIcon } from "./icons";
 import { isOwn, parentOf, useTopics } from "./layout";
+import { startTopic } from "./starting";
 import { StartsAs } from "./topic-dialog";
-import { Button, ErrorMessage } from "./ui";
+import { Button } from "./ui";
 import { useIsGuest, useWorkspace } from "./workspace";
 
 /** "C" anywhere in the workspace starts a topic. */
@@ -48,7 +47,7 @@ export function NewTopicDialog({ name, onClose }: { name: string | null; onClose
 }
 
 function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) {
-  const { workspace, place } = useWorkspace();
+  const { workspace, sync } = useWorkspace();
   const navigate = useNavigate();
   const [name, setName] = useState(first);
   const [sticksTo, setSticksTo] = useState("");
@@ -56,43 +55,34 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
   const [parent, setParent] = useState<string | null>(null);
   const topics = useTopics();
   const parents = topics.filter((t) => !isOwn(t) && !parentOf(t, topics));
-  const [error, setError] = useState("");
-  const [starting, setStarting] = useState(false);
+  const [started, setStarted] = useState(false);
 
-  const start = async () => {
-    if (!name.trim() || starting) return;
-    setStarting(true);
-    setError("");
-    try {
-      const body: StartTopicRequest = { name: name.trim() };
-      if (sticksTo.trim()) body.sticks_to = sticksTo.trim();
-      if (template) body.template = template;
-      if (parent) body.parent_id = parent;
-      if (asksHere(place)) body.here = true;
-      const { id, set_up } = await api<StartedTopic>("POST", `/api/w/${workspace.id}/topics`, body);
-      // Claude Code on this Mac sets it up, as the topic opens.
-      if (set_up) void answerHere(place, set_up);
-      onDone();
-      await navigate({
-        to: "/$workspace/topics/$topic",
-        params: { workspace: workspace.url_key, topic: id },
-      });
-    } catch (e) {
-      setError(messageOf(e));
-      setStarting(false);
-    }
+  const start = () => {
+    if (!name.trim() || started) return;
+    setStarted(true);
+    const id = startTopic(sync, workspace.id, {
+      name: name.trim(),
+      sticks_to: sticksTo.trim() || undefined,
+      template: template || undefined,
+      parent_id: parent ?? undefined,
+    });
+    onDone();
+    void navigate({
+      to: "/$workspace/topics/$topic",
+      params: { workspace: workspace.url_key, topic: id },
+    });
   };
 
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        void start();
+        start();
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
-          void start();
+          start();
         }
       }}
     >
@@ -146,13 +136,12 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
         <p className="text-xs text-faint">
           Almanac picks an icon and a group. You can change both later.
         </p>
-        <ErrorMessage>{error}</ErrorMessage>
       </div>
       <div className="flex items-center justify-end gap-2 px-4 pb-4">
         <Button variant="secondary" onClick={onDone}>
           Cancel
         </Button>
-        <Button type="submit" disabled={!name.trim() || starting} title="Start topic (⌘↩)">
+        <Button type="submit" disabled={!name.trim() || started} title="Start topic (⌘↩)">
           Start topic
         </Button>
       </div>

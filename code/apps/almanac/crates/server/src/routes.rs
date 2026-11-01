@@ -42,6 +42,7 @@ pub fn router(state: AppState) -> Router {
             patch(members::update).delete(members::remove),
         )
         .route("/topics", post(topics::start))
+        .route("/topics/{topic_id}/set_up", post(topics::set_up_made))
         .route(
             "/topics/{topic_id}/ask",
             // A question may come with photos, a few MB each.

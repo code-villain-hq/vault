@@ -80,10 +80,9 @@ impl ModelKind {
     /// membership changes go through the account API.
     pub fn client_may(self, write: Write) -> bool {
         match self {
-            ModelKind::Topic => write != Write::Create,
             ModelKind::Talk => write == Write::Delete,
             ModelKind::Message | ModelKind::User => false,
-            ModelKind::Block | ModelKind::Point | ModelKind::Reminder => true,
+            ModelKind::Topic | ModelKind::Block | ModelKind::Point | ModelKind::Reminder => true,
             ModelKind::Question => write != Write::Create,
         }
     }
@@ -198,7 +197,7 @@ mod tests {
         for write in [Write::Create, Write::Update, Write::Delete] {
             assert!(!ModelKind::Message.client_may(write));
         }
-        assert!(!ModelKind::Topic.client_may(Write::Create));
+        assert!(ModelKind::Topic.client_may(Write::Create));
         assert!(ModelKind::Topic.client_may(Write::Update));
         let point = map(
             json!({ "topic_id": uuid::Uuid::nil(), "block_id": uuid::Uuid::nil(), "theme": "Monstera", "text": "Erst gießen, wenn die Erde trocken ist." }),
