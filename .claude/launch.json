@@ -60,6 +60,20 @@
       "port": 5174
     },
     {
+      "name": "glyph-dev-fake-model",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "GLYPH_OIDC_ISSUER=",
+        "GLYPH_PUBLIC_URL=",
+        "bun",
+        "run",
+        "--cwd",
+        "code/apps/glyph",
+        "dev:fake-model"
+      ],
+      "port": 5174
+    },
+    {
       "name": "raven-dev",
       "runtimeExecutable": "bun",
       "runtimeArgs": [
@@ -77,6 +91,19 @@
         "run",
         "--cwd",
         "code/apps/almanac",
+        "dev"
+      ],
+      "port": 5177
+    },
+    {
+      "name": "almanac-mac",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "ALMANAC_API=http://127.0.0.1:7785",
+        "bun",
+        "run",
+        "--cwd",
+        "code/apps/almanac/apps/web",
         "dev"
       ],
       "port": 5177
