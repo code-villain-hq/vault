@@ -118,7 +118,7 @@ def main() -> None:
         for before, after in REPLACEMENTS.items():
             text = text.replace(before, after)
         (OUTPUT / relative).write_text(text)
-    for name in ['site.css', 'home.css', 'product.css', 'menu.js']:
+    for name in ['site.css', 'home.css', 'product.css', 'menu.js', 'favicon.ico', 'apple-touch-icon.png']:
         copy(SITE / name, name)
     for path in (SITE / 'assets/fonts').iterdir():
         if path.suffix in {'.ttf', '.css', '.txt'}:
