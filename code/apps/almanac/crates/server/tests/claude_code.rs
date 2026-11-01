@@ -23,8 +23,9 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 /// An app whose Claude is the stand-in, with Almanac's MCP endpoint on a
-/// real port for it to call. Returns the file its sessions are logged to.
-async fn with_claude_code(pool: PgPool, dir: &Path) -> (App, PathBuf) {
+/// real port for it to call. Returns the file its sessions are logged to,
+/// and the server, which stops when the test lets go of it.
+async fn with_claude_code(pool: PgPool, dir: &Path) -> (App, PathBuf, Serving) {
     let bun = std::env::split_paths(&std::env::var("PATH").unwrap())
         .map(|dir| dir.join("bun"))
         .find(|bun| bun.is_file())
@@ -71,8 +72,20 @@ async fn with_claude_code(pool: PgPool, dir: &Path) -> (App, PathBuf) {
         .with_claude_code(claude_code)
         .with_chatgpt(chatgpt);
     let service = router(state.clone()).into_make_service_with_connect_info::<SocketAddr>();
-    tokio::spawn(async move { axum::serve(listener, service).await });
-    (App::with_state(state), log)
+    let server = tokio::spawn(async move { axum::serve(listener, service).await });
+    (App::with_state(state), log, Serving(server.abort_handle()))
+}
+
+/// The test's server, stopped when the test ends. Its state holds the
+/// test's pool, whose connections sqlx lends from one pool every test
+/// shares and takes back only once nothing holds it: a server left running
+/// keeps them past the test, and the tests still running wait.
+struct Serving(tokio::task::AbortHandle);
+
+impl Drop for Serving {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 fn sessions(log: &Path) -> Vec<Value> {
@@ -119,7 +132,7 @@ async fn ask(app: &App, session: &str, workspace: &str, topic: &str, text: &str)
 #[sqlx::test(migrations = "../../migrations")]
 async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool, dir.path()).await;
+    let (app, log, _serving) = with_claude_code(pool, dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
 
     let claude = app.get(&format!("/api/w/{home}/claude"), &ada).await;
@@ -213,7 +226,7 @@ async fn almanac_proposes_a_topic_and_changes_one_with_undo(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_topic_sets_itself_up_and_keeps_a_point_without_the_web(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (app, log, _serving) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
 
     let off = app
@@ -286,7 +299,7 @@ async fn a_topic_sets_itself_up_and_keeps_a_point_without_the_web(pool: PgPool) 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_talk_changes_the_page_and_undo_puts_it_back(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (app, log, _serving) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let started = app
         .post(
@@ -469,7 +482,7 @@ async fn a_topic_sits_under_another_one_level_deep(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_topic_keeps_what_you_wrote_and_learns_how_to_answer(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, _) = with_claude_code(pool.clone(), dir.path()).await;
+    let (app, _, _serving) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
 
     let started = app
@@ -523,7 +536,7 @@ async fn a_topic_keeps_what_you_wrote_and_learns_how_to_answer(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_start_that_hangs_is_tried_again(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool, dir.path()).await;
+    let (app, log, _serving) = with_claude_code(pool, dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let claude = app.get(&format!("/api/w/{home}/claude"), &ada).await;
     assert_eq!(claude.body["claude_code"]["state"], "ready");
@@ -550,7 +563,7 @@ async fn a_start_that_hangs_is_tried_again(pool: PgPool) {
 async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
     use base64::Engine;
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool.clone(), dir.path()).await;
+    let (app, log, _serving) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let started = app
         .post(
@@ -650,7 +663,7 @@ async fn photos_go_with_the_questions_of_their_talk(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn an_item_rings_and_a_tick_ticks_its_reminder(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, _) = with_claude_code(pool.clone(), dir.path()).await;
+    let (app, _, _serving) = with_claude_code(pool.clone(), dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let started = app
         .post(
@@ -716,7 +729,7 @@ async fn an_item_rings_and_a_tick_ticks_its_reminder(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, _) = with_claude_code(pool, dir.path()).await;
+    let (app, _, _serving) = with_claude_code(pool, dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let topics = format!("/api/w/{home}/topics");
     let start = |name: &str, parent: Value| {
@@ -832,7 +845,7 @@ async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_talk_renames_its_sub_topic_but_no_other_topic(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, _) = with_claude_code(pool, dir.path()).await;
+    let (app, _, _serving) = with_claude_code(pool, dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let topics = format!("/api/w/{home}/topics");
     let start = |name: &str, parent: Value| {
@@ -876,7 +889,7 @@ async fn a_talk_renames_its_sub_topic_but_no_other_topic(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_talk_changes_its_sub_topics_pages_but_no_other(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, _) = with_claude_code(pool, dir.path()).await;
+    let (app, _, _serving) = with_claude_code(pool, dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
     let topics = format!("/api/w/{home}/topics");
     let start = |name: &str, parent: Value| {
@@ -950,7 +963,7 @@ async fn a_talk_changes_its_sub_topics_pages_but_no_other(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn chatgpt_answers_once_it_is_chosen(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
-    let (app, log) = with_claude_code(pool, dir.path()).await;
+    let (app, log, _serving) = with_claude_code(pool, dir.path()).await;
     let (ada, home) = app.signup("Ada", "Home").await;
 
     let shown = app
@@ -1020,10 +1033,22 @@ async fn chatgpt_answers_once_it_is_chosen(pool: PgPool) {
         last["home"].as_str().unwrap().ends_with("chatgpt/codex"),
         "a Codex home of Almanac's own: {last}"
     );
-    let left: Vec<_> = std::fs::read_dir(dir.path().join("chatgpt/codex"))
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().is_some_and(|x| x == "md"))
-        .collect();
-    assert!(left.is_empty(), "the prompt's file goes once it's answered");
+    // The set-up's session may still be answering; its file goes with it.
+    let mut left = Vec::new();
+    for _ in 0..200 {
+        left = std::fs::read_dir(dir.path().join("chatgpt/codex"))
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "md"))
+            .collect();
+        if left.is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(
+        left.is_empty(),
+        "the prompt's file goes once it's answered: {left:?}"
+    );
 }
