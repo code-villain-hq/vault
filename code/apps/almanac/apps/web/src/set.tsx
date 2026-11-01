@@ -222,13 +222,27 @@ export function RemovePoint({ point }: { point: Point }) {
   );
 }
 
-/** A dot on what a talk added since you last looked. */
-function NewDot({ point, className = "" }: { point: Point; className?: string }) {
-  if (point.seen) return null;
+/**
+ * A dot on what a talk added since you last looked. With `room`, a row
+ * you've seen keeps its place, so the names beside new ones line up.
+ */
+function NewDot({
+  point,
+  room = false,
+  className = "",
+}: {
+  point: Point;
+  room?: boolean;
+  className?: string;
+}) {
+  if (point.seen) {
+    return room ? <span aria-hidden="true" className={`size-1.5 shrink-0 ${className}`} /> : null;
+  }
   return (
     <span
       role="img"
       aria-label="New"
+      title="New since you last looked"
       className={`size-1.5 shrink-0 rounded-full bg-accent ${className}`}
     />
   );
@@ -1633,19 +1647,15 @@ const BESIDE_MOST = 60;
 
 /** A list: a row a line, its name, then its other cells. */
 function RowList({ rows, fields }: { rows: Point[]; fields: Field[] }) {
+  // The one dot a line has says it's new; the rest keep its place.
+  const fresh = rows.some((row) => !row.seen);
   return (
     <ul className={`flex flex-col ${LINES}`}>
       {rows.map((row) => {
         const words = rest(fields, row);
         return (
           <li key={row.id} className="group flex items-baseline gap-2 rounded-md px-2.5 py-1.5">
-            <NewDot point={row} className="self-center" />
-            {!fields.some((f) => f.kind === "photo") && (
-              <span
-                aria-hidden="true"
-                className="size-1.5 shrink-0 translate-y-[-2px] rounded-full bg-hue"
-              />
-            )}
+            {fresh && <NewDot point={row} room className="translate-y-[-2px]" />}
             <Thumb row={row} fields={fields} className="size-8 self-center" />
             <p className="min-w-0 flex-1">
               {/* A name alone is the line; beside its cells it leads. */}

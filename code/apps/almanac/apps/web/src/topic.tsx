@@ -647,7 +647,7 @@ function RowFields({ row }: { row: Point }) {
             .map((field) => (
               <div
                 key={field.name}
-                className="flex min-w-0 flex-col-reverse justify-end gap-1 rounded-lg bg-surface px-4 py-3"
+                className="flex min-w-0 flex-col-reverse justify-between gap-1 rounded-lg bg-surface px-4 py-3"
               >
                 <dt className="text-xs text-muted">{field.name}</dt>
                 <dd className="flex min-w-0 flex-col gap-2">
@@ -663,11 +663,18 @@ function RowFields({ row }: { row: Point }) {
   );
 }
 
+/** A value's size on its tile: large, unless it's long or has a word too long for a narrow tile. */
+function tileSize(words: string): string {
+  const longest = Math.max(...words.split(/\s+/).map((word) => [...word].length));
+  return [...words].length > 12 || longest > 8 ? "text-lg" : "text-2xl";
+}
+
 /** One field of a row, large: a number with its bar, a status with its steps, a choice its pill. */
 function FieldValue({ field, row, rows }: { field: Field; row: Point; rows: Point[] }) {
   const cell = cellOf(row, field);
   if (cell === undefined) return <span className="text-faint">—</span>;
-  if (field.kind === "check") return <span className="text-2xl">{cell === true ? "✓" : "–"}</span>;
+  if (field.kind === "check")
+    return <span className="text-2xl leading-tight">{cell === true ? "✓" : "–"}</span>;
   if (typeof cell === "string" && (field.kind === "status" || field.kind === "choice")) {
     const lanes = lanesOf(field, rows);
     const at = lanes.indexOf(cell);
@@ -680,9 +687,7 @@ function FieldValue({ field, row, rows }: { field: Field; row: Point; rows: Poin
               className={`size-2.5 shrink-0 rounded-full ${choiceDot(field, cell)}`}
             />
           )}
-          <span
-            className={`break-words font-semibold leading-tight ${[...cell].length > 12 ? "text-lg" : "text-2xl"}`}
-          >
+          <span className={`min-w-0 font-semibold leading-tight wrap-anywhere ${tileSize(cell)}`}>
             {cell}
           </span>
         </span>
@@ -707,9 +712,7 @@ function FieldValue({ field, row, rows }: { field: Field; row: Point; rows: Poin
   const most = Math.max(...rows.map((r) => Math.abs(numberOf(r, field) ?? 0)));
   return (
     <>
-      <span
-        className={`font-semibold tabular-nums leading-tight ${[...words].length > 12 ? "text-lg" : "text-2xl"} break-words`}
-      >
+      <span className={`font-semibold tabular-nums leading-tight wrap-anywhere ${tileSize(words)}`}>
         {words || "—"}
       </span>
       {typeof cell === "number" && rows.length > 1 && most > 0 && (
@@ -2101,6 +2104,7 @@ function Points({ points, passages = false }: { points: Point[]; passages?: bool
               <span
                 role="img"
                 aria-label="New"
+                title="New since you last looked"
                 className={`${dot} size-1.5 shrink-0 rounded-full bg-accent`}
               />
             )}
