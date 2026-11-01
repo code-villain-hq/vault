@@ -1,7 +1,7 @@
 name = "Almanac"
 line = "Keeps what you learn, by topic"
 order = 5
-lead = "Keeps what you learn, by topic. Ask a topic things in a talk beside its page, and the page keeps what’s worth keeping, with its sources."
+lead = "Keeps what you learn, by topic. Talk to a topic beside its page, and it keeps what’s worth keeping there, with its sources."
 fact = "Web and desktop app · runs for a company or on one Mac"
 
 [[get]]
@@ -10,9 +10,9 @@ href = "https://git.codevillain.eu/code-villain/vault/src/branch/main/code/apps/
 
 [hero]
 captures = [
-  { src = "almanac-page.png", alt = "Almanac's page for the topic Pflanzen: Dünger as a table with a total of 15 ml, notes on watering beside the checklist Pflege im Herbst, a callout never to fertilise dry soil, and the field to ask Pflanzen something." },
+  { src = "almanac-talk.png", alt = "Almanac's page for the topic Laufen with a talk beside it. Told “Heute 5 km in 28:12 gelaufen. Wie komme ich unter 27?”, the talk answers with a plan and says “Kept a point under 5 km.”, with Undo; on the page, the 5 km line now ends at 28.2 min on Nov 1, above the goal of 27." },
 ]
-caption = "A topic’s page in Almanac · made-up topic for Acme Inc"
+caption = "A talk with Laufen keeps today’s run on its page · made-up topic for Acme Inc"
 
 [[feature]]
 title = "A topic is its blocks."
