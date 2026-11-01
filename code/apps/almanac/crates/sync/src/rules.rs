@@ -208,8 +208,9 @@ impl Rules for Almanac {
     }
 }
 
-/// Whether `topic` may sit under `parent`: one level deep, and never under
-/// itself or the workspace's own topic.
+/// Whether `topic` may sit under `parent`: one level deep, never under
+/// itself or the workspace's own topic, and never the workspace's own
+/// topic under another.
 pub async fn may_sit_under(
     db: &mut PgConnection,
     workspace_id: Uuid,
@@ -226,9 +227,16 @@ pub async fn may_sit_under(
         .bind(workspace_id)
         .fetch_one(&mut *db)
         .await?;
-    if parent == topic || !can || has {
+    let own: bool = sqlx::query_scalar(OWN_TOPIC)
+        .bind(topic)
+        .bind(workspace_id)
+        .fetch_one(&mut *db)
+        .await?;
+    if parent == topic || !can || has || own {
         return Err(SyncError::Invalid(
-            "A topic sits under another one level deep, not under itself or Almanac's own.".into(),
+            "A topic sits under another one level deep, not under itself or Almanac's own, \
+             and Almanac's own sits under none."
+                .into(),
         ));
     }
     Ok(())
