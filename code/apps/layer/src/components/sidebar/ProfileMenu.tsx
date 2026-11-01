@@ -5,7 +5,8 @@ import type { ProfileView } from "../../lib/types-profiles";
 import { useSession } from "../../lib/workspace-sync";
 import { useStore } from "../../store";
 import { ChevronIcon } from "../icons";
-import { Confirm, ErrorMessage, Floating, Modal, useFailure } from "../ui";
+import { Floating } from "../menu";
+import { Confirm, ErrorMessage, Modal, useFailure } from "../ui";
 import { NewWorkspace } from "./NewWorkspace";
 
 /**

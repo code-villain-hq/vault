@@ -614,8 +614,8 @@ middleware on every route), then a paired phone's bearer token (the
   switch, so per-task state cannot leak into the next task.
 - **UI kit**: `ui.tsx`. `Modal` (Esc and backdrop close it, `busy` blocks
   that), `Field`, `Combo`, `Confirm` (never `window.confirm`: the webview
-  returns true without drawing anything), `ContextMenu`, `Switch`,
-  `Spinner`, `BusyOverlay`. Stylesheets `styles*.css` with plain
+  returns true without drawing anything), `Switch`, `Spinner`,
+  `BusyOverlay`; menus in `menu.tsx` (`Floating`, `ContextMenu`). Stylesheets `styles*.css` with plain
   kebab-case classes, drawn in the studio's colour, type and radius names:
   `theme.css` imports them from `src/design/` (the vault's `studio/design/tokens`
   and fonts, copied by `bun run design:sync`) and fills them for the other

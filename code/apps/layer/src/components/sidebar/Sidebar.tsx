@@ -11,17 +11,9 @@ import { trackerOfKey } from "../../lib/tracker";
 import type { JiraTransition, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
 import { FinishTask } from "../FinishTask";
+import { ContextMenu, type MenuItem } from "../menu";
 import { RepoPicker } from "../RepoPicker";
-import {
-  BusyOverlay,
-  Confirm,
-  ContextMenu,
-  ErrorMessage,
-  Field,
-  Modal,
-  useFailure,
-  type MenuItem,
-} from "../ui";
+import { BusyOverlay, Confirm, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { DeleteTask } from "./DeleteTask";
 import { EpicsSection, useEpicSections } from "./EpicsSection";
 import { ProfileMenu } from "./ProfileMenu";

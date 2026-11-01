@@ -5,7 +5,8 @@ import { ago } from "../lib/time";
 import type { Message } from "../lib/types";
 import { useNow, useStore } from "../store";
 import { BellIcon } from "./icons";
-import { Confirm, Floating } from "./ui";
+import { Floating } from "./menu";
+import { Confirm } from "./ui";
 
 /**
  * The message center (MSG-5): the bell left of Settings, in the top bar, with the unread

@@ -14,10 +14,10 @@ import { ChatLink } from "./ChatLink";
 import { useHandoff } from "./Handoff";
 import { CloseIcon, PlusIcon, SwapIcon } from "./icons";
 import { LoopBar, LoopButton } from "./LoopBar";
+import { ContextMenu, type MenuItem } from "./menu";
 import { PaneNotice } from "./PaneNotice";
 import { PaneExited, RestartButton, useRestart } from "./Restart";
-import { ContextMenu, ErrorMessage, Field, Modal, Spinner, Switch, useFailure } from "./ui";
-import type { MenuItem } from "./ui";
+import { ErrorMessage, Field, Modal, Spinner, Switch, useFailure } from "./ui";
 import { WaitingTaskPanes } from "./WaitingPanes";
 
 /**

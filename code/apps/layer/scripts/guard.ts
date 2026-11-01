@@ -721,9 +721,8 @@ const CEILINGS: Record<string, number> = {
   // how a conversation opens over seven lines: 601.
   "src-tauri/src/acp/conn.rs": 620,
   // Oxfmt broke these files' long lines and took them past the default, with
-  // no new code: TicketsView 637, ui 608, types 613.
+  // no new code: TicketsView 637, types 613.
   "src/components/tickets/TicketsView.tsx": 660,
-  "src/components/ui.tsx": 640,
   "src/lib/types.ts": 640,
 };
 

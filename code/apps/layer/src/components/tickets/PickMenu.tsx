@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ContextMenu } from "../ui";
+import { ContextMenu } from "../menu";
 
 /// A labelled button that opens a menu of choices, the current one ticked:
 /// Sort and Group in the Tickets header.

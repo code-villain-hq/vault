@@ -11,10 +11,10 @@ import { PaneView } from "./AcpPane";
 import { BrowserSide, BrowserToggle, useBrowserSide } from "./BrowserSide";
 import { ChatItem, SlackChats, useSlackFold } from "./ChatList";
 import { PlusIcon } from "./icons";
+import { ContextMenu, type MenuItem } from "./menu";
 import { PaneExited, useRestart } from "./Restart";
 import { SidebarGrip } from "./sidebar/SidebarGrip";
-import { ContextMenu, Confirm, ErrorMessage, useFailure } from "./ui";
-import type { MenuItem } from "./ui";
+import { Confirm, ErrorMessage, useFailure } from "./ui";
 import { WaitingChats } from "./WaitingPanes";
 
 /**

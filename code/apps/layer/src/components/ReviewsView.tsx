@@ -18,8 +18,9 @@ import { readOneOf, write } from "../lib/persist";
 import type { AuthoredPr, ReviewRequest, TeamReviews } from "../lib/types";
 import { useStore } from "../store";
 import { ChevronIcon } from "./icons";
+import { ContextMenu, type MenuItem } from "./menu";
 import { AuthoredCard, identity, ReviewCard } from "./ReviewCards";
-import { BusyLabel, ContextMenu, type MenuItem } from "./ui";
+import { BusyLabel } from "./ui";
 
 /** `@fe` when that is all we know; the team's own name when GitHub sent one. */
 function teamLabel(team: TeamReviews): string {

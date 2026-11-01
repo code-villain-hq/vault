@@ -270,7 +270,8 @@ build does the same.
 | `src/lib/derive.ts` | pure helpers over that state (`paneState`, `needsYou`, …) |
 | `src/lib/target.ts`, `goto.ts` | where a click on a banner, toast or message lands (`target.rs` writes them) |
 | `src/lib/api.ts` / `src/lib/types.ts` | the IPC surface, and the Rust types mirrored (GitHub's in `types-github.ts`, re-exported) |
-| `src/components/ui.tsx` | `Modal`, `Field`, `Combo`, `Confirm`, `ContextMenu`, `Switch`, … |
+| `src/components/ui.tsx` | `Modal`, `Field`, `Combo`, `Confirm`, `Switch`, … |
+| `src/components/menu.tsx` | `Floating` (what floats over the window at a point) and `ContextMenu` |
 | `src/components/` | one file per view or dialog; `sidebar/`, `tickets/` for those areas |
 | `src/__mock__/`, `mock.html` | the UI against a fake backend, for looking and clicking |
 | `scripts/guard.ts` | the guard |
