@@ -348,7 +348,67 @@ function wezterm(mode: Mode) {
   ].join("\n");
 }
 
+/** Thunderbird: one theme add-on. `theme` is day and `dark_theme` is night, so it follows the system. */
+function thunderbird(mode: Mode) {
+  const u: Record<string, string> = syntax[mode].ui;
+  const t: Record<string, string> = color[mode];
+  return {
+    colors: {
+      // The frame: toolbars on bg, the folder and message lists on panel.
+      frame: t.bg,
+      frame_inactive: t.bg,
+      toolbar: t.bg,
+      toolbar_text: t.fg,
+      toolbar_top_separator: "transparent",
+      toolbar_bottom_separator: t.line,
+      toolbar_vertical_separator: t.line,
+      icons: t.muted,
+      icons_attention: t.signal,
+      button_background_hover: t.hover,
+      button_background_active: t.line,
+      tab_selected: t.panel,
+      tab_text: t.fg,
+      tab_background_text: t.muted,
+      tab_background_separator: "transparent",
+      tab_line: t.signal,
+      tab_loading: t.signal,
+      toolbar_field: t.field,
+      toolbar_field_text: t.fg,
+      toolbar_field_border: "transparent",
+      toolbar_field_focus: t["field-hover"],
+      toolbar_field_text_focus: t.fg,
+      toolbar_field_border_focus: t.accent,
+      toolbar_field_highlight: u.selection,
+      toolbar_field_highlight_text: t.fg,
+      popup: t.dialog,
+      popup_text: t.fg,
+      popup_border: t.line,
+      popup_highlight: t.hover,
+      popup_highlight_text: t.fg,
+      sidebar: t.panel,
+      sidebar_text: t.fg,
+      sidebar_border: t.line,
+      sidebar_highlight: t.selected,
+      sidebar_highlight_text: t.fg,
+      sidebar_highlight_border: t.selected,
+    },
+  };
+}
+
+function thunderbirdManifest() {
+  return {
+    manifest_version: 2,
+    name: "Code Villain",
+    description: "Code Villain's Nightshade theme for Thunderbird, in night and day, generated from the vault's design tokens.",
+    version: "0.1.0",
+    browser_specific_settings: { gecko: { id: "code-villain-theme@codevillain.eu" } },
+    theme: thunderbird("day"),
+    dark_theme: thunderbird("night"),
+  };
+}
+
 const outputs: [string, string][] = [
+  ["thunderbird/manifest.json", `${JSON.stringify(thunderbirdManifest(), null, 2)}\n`],
   ...modes.map((mode): [string, string] => [`vscode/themes/code-villain-${mode}.json`, `${JSON.stringify(vscode(mode), null, 2)}\n`]),
   ["nvim/lua/code-villain/palette.lua", lua()],
   ...modes.map((mode): [string, string] => [`wezterm/code-villain-${mode}.toml`, wezterm(mode)]),
@@ -367,5 +427,5 @@ if (process.argv.includes("--check")) {
   }
 } else {
   for (const [path, text] of outputs) await Bun.write(new URL(path, here), text);
-  console.log("Built the Code Villain theme for VS Code, Neovim and WezTerm from studio/design/tokens.");
+  console.log("Built the Code Villain theme for VS Code, Neovim, WezTerm and Thunderbird from studio/design/tokens.");
 }

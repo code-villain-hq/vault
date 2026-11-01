@@ -1,11 +1,11 @@
 # Code Villain theme: notes for coding agents
 
-The studio's editor and terminal theme, in night and day: a VS Code (and Cursor) extension, a Neovim colorscheme, WezTerm colour schemes, and a starship prompt. Its colours are the Nightshade palette for code. Run commands from this folder.
+The studio's editor and terminal theme, in night and day: a VS Code (and Cursor) extension, a Neovim colorscheme, WezTerm colour schemes, a starship prompt, and a Thunderbird theme. Its colours are the Nightshade palette for code. Run commands from this folder.
 
-The colours are generated from the vault's tokens: `studio/design/tokens/syntax.resolved.json` for code and `color.resolved.json` for the editor's frame. Never edit `vscode/themes/*.json`, `nvim/lua/code-villain/palette.lua` or `wezterm/*.toml` by hand. To change colours or which scopes get which colour, edit `studio/design/tokens/syntax.json`, run `python3 build.py` there, then:
+The colours are generated from the vault's tokens: `studio/design/tokens/syntax.resolved.json` for code and `color.resolved.json` for the editor's frame. Never edit `vscode/themes/*.json`, `nvim/lua/code-villain/palette.lua`, `wezterm/*.toml` or `thunderbird/manifest.json` by hand. To change colours or which scopes get which colour, edit `studio/design/tokens/syntax.json`, run `python3 build.py` there, then:
 
 ```sh
-bun build.ts           # write the VS Code themes, the Neovim palette and the WezTerm schemes
+bun build.ts           # write the VS Code themes, the Neovim palette, the WezTerm schemes and the Thunderbird theme
 bun build.ts --check   # write nothing; fail if an output has drifted (CI runs this)
 bun install && bun specimen.ts   # draw the vault's own code in both modes, for review
 ```
@@ -38,5 +38,7 @@ config.color_scheme = wezterm.gui.get_appearance():find("Dark") and "Code Villai
 ```
 
 The shell prompt: `starship/code-villain.toml` is a starship theme (zephyr's layout) written only in ANSI colour names, so the terminal's scheme colours it in night and day, and green is poison. It is written by hand, since it has no colours of its own to generate. Link it as `~/.config/starship/code-villain.toml`, then with zephyr's prompt plugin set `zstyle ':zephyr:plugin:prompt' theme starship code-villain` (or point `STARSHIP_CONFIG` at it).
+
+Thunderbird: `thunderbird/manifest.json` is one theme add-on, day as `theme` and night as `dark_theme`, so it follows the system. Zip it (`cd thunderbird && zip code-villain.xpi manifest.json`) and install it from Add-ons and Themes, gear, Install Add-on From File. Release builds refuse an unsigned add-on; until it is signed, load `manifest.json` from Add-ons and Themes, gear, Debug Add-ons, Load Temporary Add-on (it lasts until Thunderbird quits).
 
 For Cursor, reload the window and pick "Code Villain Night" or "Code Villain Day" with ⌘K ⌘T. After a rebuild, raise `version` in `vscode/package.json` and install again.
