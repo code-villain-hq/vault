@@ -39,10 +39,15 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
         setPicked(new Set(found.filter((i) => i.verdict === "safe").map((i) => i.id)));
       },
       (e) => {
-        if (live) setBroken(failureText(`Couldn't look through the task folders and copies: ${errMessage(e)}`));
+        if (live)
+          setBroken(
+            failureText(`Couldn't look through the task folders and copies: ${errMessage(e)}`),
+          );
       },
     );
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, []);
 
   function toggle(id: string, on: boolean) {
@@ -75,12 +80,20 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
         Removed {removed} of {Object.keys(results).length}.
       </span>
       <div className="spacer" />
-      <button className="ui-button ui-button-primary" onClick={onClose}>Done</button>
+      <button className="ui-button ui-button-primary" onClick={onClose}>
+        Done
+      </button>
     </>
   ) : (
     <>
-      <button className="ui-button" disabled={running} onClick={onClose}>Cancel</button>
-      <button className="ui-button ui-button-danger" disabled={running || picked.size === 0} onClick={() => void run()}>
+      <button className="ui-button" disabled={running} onClick={onClose}>
+        Cancel
+      </button>
+      <button
+        className="ui-button ui-button-danger"
+        disabled={running || picked.size === 0}
+        onClick={() => void run()}
+      >
         <BusyLabel busy={running} idle={`Remove ${picked.size}`} working="Removing…" />
       </button>
     </>
@@ -92,7 +105,9 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
       wide
       tall
       // Not dismissable mid-flight: closing would only hide that it runs.
-      onClose={() => { if (!running) onClose(); }}
+      onClose={() => {
+        if (!running) onClose();
+      }}
       footer={items && items.length > 0 ? footer : undefined}
     >
       {broken ? (
@@ -102,9 +117,8 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
       ) : (
         <>
           <div className="cleanup-intro">
-            Nothing goes until you press Remove. Ticked: loses nothing. Amber: may
-            lose what it says, so it is left for you to tick. Greyed: not something
-            the app can remove for you.
+            Nothing goes until you press Remove. Ticked: loses nothing. Amber: may lose what it
+            says, so it is left for you to tick. Greyed: not something the app can remove for you.
           </div>
           {SECTIONS.map(({ kind, title }) => {
             const rows = items.filter((i) => i.kind === kind);
@@ -115,6 +129,7 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
                 {rows.map((i) => {
                   const result = results?.[i.id];
                   return (
+                    // oxlint-disable-next-line jsx-a11y/label-has-associated-control -- its text is the row's title, beside the box
                     <label key={i.id} className={`cleanup-item ${i.verdict}`}>
                       <input
                         type="checkbox"
@@ -127,11 +142,16 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
                           {/* A name to recognise, except the records, which have none. */}
                           {i.kind === "records" ? <span>{i.title}</span> : <code>{i.title}</code>}
                           {i.repo && <span className="ui-chip">{i.repo}</span>}
-                          {result && (result.ok
-                            ? <span className="ui-status">removed</span>
-                            : <span className="ui-status ui-status-danger">not removed</span>)}
+                          {result &&
+                            (result.ok ? (
+                              <span className="ui-status">removed</span>
+                            ) : (
+                              <span className="ui-status ui-status-danger">not removed</span>
+                            ))}
                         </div>
-                        <div className="cleanup-detail">{result && !result.ok ? result.detail : i.detail}</div>
+                        <div className="cleanup-detail">
+                          {result && !result.ok ? result.detail : i.detail}
+                        </div>
                       </div>
                     </label>
                   );

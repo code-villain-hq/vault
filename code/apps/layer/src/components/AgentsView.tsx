@@ -1,9 +1,8 @@
 import { Fragment, memo, useCallback, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-
 import { api } from "../lib/api";
-import { markStopping, useStore } from "../store";
 import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
+import { markStopping, useStore } from "../store";
 import { Ago } from "./Ago";
 import { BusyLabel, ErrorMessage, SidebarToggle, useFailure } from "./ui";
 
@@ -20,18 +19,23 @@ export function AgentsView() {
   // A Stop that failed says so under its card (NOTE-6). Drawn here rather
   // than in the card, which is handed `stop` once and stays as it is.
   const failure = useFailure();
+  const { clear, fail } = failure;
   const [failedOn, setFailedOn] = useState<string | null>(null);
   // What needs you first, so the dock's count is the top of this list.
-  const ids = useStore(useShallow((s) =>
-    s.panes
-      .filter((p) => p.kind === "agent")
-      .sort((a, b) => Number(needsYou(b)) - Number(needsYou(a)))
-      .map((p) => p.id),
-  ));
-  const { live, waiting } = useStore(useShallow((s) => ({
-    live: s.panes.filter((p) => p.kind === "agent" && p.running).length,
-    waiting: s.panes.filter(needsYou).length,
-  })));
+  const ids = useStore(
+    useShallow((s) =>
+      s.panes
+        .filter((p) => p.kind === "agent")
+        .sort((a, b) => Number(needsYou(b)) - Number(needsYou(a)))
+        .map((p) => p.id),
+    ),
+  );
+  const { live, waiting } = useStore(
+    useShallow((s) => ({
+      live: s.panes.filter((p) => p.kind === "agent" && p.running).length,
+      waiting: s.panes.filter(needsYou).length,
+    })),
+  );
 
   /// Stopping asks the agent to exit and waits up to five seconds for it to
   /// save, so the row does not change until then. Say which one is stopping.
@@ -43,25 +47,28 @@ export function AgentsView() {
   const stoppingNow = useRef(stopping);
   stoppingNow.current = stopping;
 
-  const stop = useCallback(async (paneId: string) => {
-    if (stoppingNow.current.has(paneId)) return;
-    setStopping((s) => new Set(s).add(paneId));
-    markStopping(paneId);
-    failure.clear();
-    setFailedOn(paneId);
-    try {
-      await api.killPane(paneId);
-      await refreshPanes();
-    } catch (e) {
-      failure.fail(e);
-    } finally {
-      setStopping((s) => {
-        const next = new Set(s);
-        next.delete(paneId);
-        return next;
-      });
-    }
-  }, [refreshPanes, failure.clear, failure.fail]);
+  const stop = useCallback(
+    async (paneId: string) => {
+      if (stoppingNow.current.has(paneId)) return;
+      setStopping((s) => new Set(s).add(paneId));
+      markStopping(paneId);
+      clear();
+      setFailedOn(paneId);
+      try {
+        await api.killPane(paneId);
+        await refreshPanes();
+      } catch (e) {
+        fail(e);
+      } finally {
+        setStopping((s) => {
+          const next = new Set(s);
+          next.delete(paneId);
+          return next;
+        });
+      }
+    },
+    [refreshPanes, clear, fail],
+  );
 
   return (
     <div className="wide">
@@ -70,21 +77,24 @@ export function AgentsView() {
         <h2>Agents</h2>
         <span className="sub">
           {waiting > 0 && (
-            <span style={{ color: "var(--status-warn-ink)" }}>{waiting} need{waiting === 1 ? "s" : ""} you · </span>
+            <span style={{ color: "var(--status-warn-ink)" }}>
+              {waiting} need{waiting === 1 ? "s" : ""} you ·{" "}
+            </span>
           )}
-          {live} running · {ids.length - live} exited — pick a task
-          on the left to work on one
+          {live} running · {ids.length - live} exited — pick a task on the left to work on one
         </span>
         <div className="spacer" />
-        <button className="ui-button" onClick={() => void refreshPanes()}>Refresh</button>
+        <button className="ui-button" onClick={() => void refreshPanes()}>
+          Refresh
+        </button>
       </div>
 
       {ids.length === 0 && (
         <div className="card">
           <div className="muted" style={{ lineHeight: 1.6 }}>
-            Nothing running yet. Pick a task on the left, create one with <b>+</b>, or
-            open the Tickets tab and start straight from a Jira issue. A task can span
-            as many repositories as the change needs.
+            Nothing running yet. Pick a task on the left, create one with <b>+</b>, or open the
+            Tickets tab and start straight from a Jira issue. A task can span as many repositories
+            as the change needs.
           </div>
         </div>
       )}
@@ -142,9 +152,7 @@ const AgentCard = memo(function AgentCard({
       </div>
 
       <div className="ctx">
-        <div className="task">
-          {isChat ? "Chat" : task?.name ?? "(task removed)"}
-        </div>
+        <div className="task">{isChat ? "Chat" : (task?.name ?? "(task removed)")}</div>
         <div className="branch">
           {isChat ? pane.cwd : `${task?.branch ?? "?"} · ${paneScope(pane) ?? ""}`}
         </div>

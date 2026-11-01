@@ -18,7 +18,9 @@
   cursor: pointer;
 }
 .profile-button:hover:not(:disabled),
-.profile-button.active { background: var(--hover); }
+.profile-button.active {
+  background: var(--hover);
+}
 .profile-name {
   flex: 1;
   min-width: 0;
@@ -27,8 +29,13 @@
   white-space: nowrap;
   font-weight: 600;
 }
-.profile-chev { color: var(--faint); display: inline-flex; }
-.profile-chev svg { transform: rotate(-90deg); }
+.profile-chev {
+  color: var(--faint);
+  display: inline-flex;
+}
+.profile-chev svg {
+  transform: rotate(-90deg);
+}
 
 .profile-initial {
   display: inline-flex;
@@ -43,7 +50,9 @@
   font-weight: 700;
   line-height: 1;
 }
-.profile-menu { min-width: 240px; }
+.profile-menu {
+  min-width: 240px;
+}
 .profile-menu-head {
   padding: 6px 10px 4px;
   color: var(--muted);
@@ -52,11 +61,31 @@
   font-weight: 600;
 }
 /* A server's workspaces under this Mac's (PROF-15). */
-.profile-menu-group + .profile-menu-group { margin-top: 4px; }
-.ctx-item.profile-item { display: flex; align-items: center; gap: 8px; }
-.profile-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profile-state { color: var(--muted); font-size: var(--type-ui-small-size); margin-left: 8px; }
-.profile-rows { display: flex; flex-direction: column; gap: 8px; }
+.profile-menu-group + .profile-menu-group {
+  margin-top: 4px;
+}
+.ctx-item.profile-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-state {
+  color: var(--muted);
+  font-size: var(--type-ui-small-size);
+  margin-left: 8px;
+}
+.profile-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .profile-row {
   display: flex;
   align-items: center;
@@ -73,7 +102,9 @@
   font-size: var(--type-ui-size);
   font-weight: 600;
 }
-.profile-row .profile-state { font-weight: 400; }
+.profile-row .profile-state {
+  font-weight: 400;
+}
 
 /* The initial in Manage profiles: bigger, and a button that recolours it. */
 .profile-recolour {
@@ -84,10 +115,16 @@
   background: none;
   cursor: pointer;
 }
-.profile-recolour .profile-initial { width: 34px; height: 34px; font-size: var(--type-ui-size); }
+.profile-recolour .profile-initial {
+  width: 34px;
+  height: 34px;
+  font-size: var(--type-ui-size);
+}
 .profile-recolour:hover .profile-initial,
 .profile-recolour:focus-visible .profile-initial {
-  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--line);
+  box-shadow:
+    0 0 0 2px var(--panel),
+    0 0 0 4px var(--line);
 }
 
 .profile-colours {
@@ -105,9 +142,20 @@
   border-radius: 50%;
   cursor: pointer;
 }
-.profile-swatch:hover { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--line); }
-.profile-swatch.chosen { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--fg); }
-.profile-rename { flex: 1; min-width: 0; }
+.profile-swatch:hover {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--line);
+}
+.profile-swatch.chosen {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--fg);
+}
+.profile-rename {
+  flex: 1;
+  min-width: 0;
+}
 
 /* The sync status (PROF-19): the kit's SyncIndicator, in this window's CSS. */
 .sidebar-foot {
@@ -133,11 +181,24 @@
   margin-top: 6px;
   border-radius: var(--radius-full);
 }
-.sync-dot.ok { background: var(--signal); }
-.sync-dot.warn { background: var(--status-warn-ink); }
-.sync-dot.danger { background: var(--status-danger-ink); }
-.sync-dot.muted { background: var(--faint); animation: sync-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-@keyframes sync-pulse { 50% { opacity: 0.5; } }
+.sync-dot.ok {
+  background: var(--signal);
+}
+.sync-dot.warn {
+  background: var(--status-warn-ink);
+}
+.sync-dot.danger {
+  background: var(--status-danger-ink);
+}
+.sync-dot.muted {
+  background: var(--faint);
+  animation: sync-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes sync-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
 .sync-label {
   max-inline-size: 10rem;
   overflow: hidden;

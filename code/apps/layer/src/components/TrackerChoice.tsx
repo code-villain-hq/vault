@@ -1,12 +1,15 @@
-import { useState } from "react";
 import type { TrackerKind } from "@layer/types";
+import { useState } from "react";
 import { api } from "../lib/api";
 import { trackerName } from "../lib/tracker";
 import { useStore } from "../store";
-import { Confirm, ErrorMessage, Field, useFailure } from "./ui";
 import { useWorkspace } from "./SharedSettings";
+import { Confirm, ErrorMessage, Field, useFailure } from "./ui";
 
-const TRACKERS: [TrackerKind, string][] = [["jira", "Jira"], ["github", "GitHub Issues"]];
+const TRACKERS: [TrackerKind, string][] = [
+  ["jira", "Jira"],
+  ["github", "GitHub Issues"],
+];
 
 /**
  * Where the workspace's tickets come from (TKT-15): the workspace's, so only
@@ -40,7 +43,10 @@ export function TrackerChoice() {
   }
 
   return (
-    <Field label="Tickets come from" hint={admin ? undefined : `${workspace?.name ?? "The workspace"}'s choice: admins change it.`}>
+    <Field
+      label="Tickets come from"
+      hint={admin ? undefined : `${workspace?.name ?? "The workspace"}'s choice: admins change it.`}
+    >
       <div className="ui-segmented">
         {TRACKERS.map(([kind, label]) => (
           <button
@@ -64,9 +70,9 @@ export function TrackerChoice() {
           title={`Take tickets from ${trackerName(asking)}?`}
           body={
             <>
-              {keeping} task{keeping === 1 ? " has a ticket" : "s have tickets"} in {trackerName(chosen)}.{" "}
-              {keeping === 1 ? "It keeps it" : "They keep them"} as a link, but the app stops reading and moving{" "}
-              {keeping === 1 ? "it" : "them"}.
+              {keeping} task{keeping === 1 ? " has a ticket" : "s have tickets"} in{" "}
+              {trackerName(chosen)}. {keeping === 1 ? "It keeps it" : "They keep them"} as a link,
+              but the app stops reading and moving {keeping === 1 ? "it" : "them"}.
             </>
           }
           confirmLabel={`Use ${trackerName(asking)}`}

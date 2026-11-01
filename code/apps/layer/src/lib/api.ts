@@ -1,3 +1,4 @@
+import type { Operation, TrackerKind } from "@layer/types";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   AcpView,
@@ -69,12 +70,17 @@ import type {
   LogSource,
   S3Found,
 } from "./types";
-import type { RunLog } from "./types-runs";
 import type { EpicView, Filed, StartedSubTask } from "./types-epic";
-import type { Operation, TrackerKind } from "@layer/types";
 import type {
-  Elsewhere, ProfileView, ServerSignedIn, ServerWays, SetupApplied, SetupSnapshot, WorkspacePlace,
+  Elsewhere,
+  ProfileView,
+  ServerSignedIn,
+  ServerWays,
+  SetupApplied,
+  SetupSnapshot,
+  WorkspacePlace,
 } from "./types-profiles";
+import type { RunLog } from "./types-runs";
 
 export const api = {
   // projects
@@ -86,8 +92,7 @@ export const api = {
   scanRepos: (root: string, maxDepth?: number) =>
     invoke<FoundRepo[]>("scan_repos", { root, maxDepth: maxDepth ?? null }),
   removeProject: (id: string) => invoke<void>("remove_project", { id }),
-  projectBranches: (projectId: string) =>
-    invoke<string[]>("project_branches", { projectId }),
+  projectBranches: (projectId: string) => invoke<string[]>("project_branches", { projectId }),
   repoHealth: () => invoke<RepoHealth[]>("repo_health"),
   locateProject: (projectId: string, path: string) =>
     invoke<Project>("locate_project", { projectId, path }),
@@ -113,15 +118,13 @@ export const api = {
   deleteRepoNote: (id: string) => invoke<void>("delete_repo_note", { id }),
 
   // tasks
-  listTasks: (focus?: string | null) =>
-    invoke<TaskView[]>("list_tasks", { focus: focus ?? null }),
+  listTasks: (focus?: string | null) => invoke<TaskView[]>("list_tasks", { focus: focus ?? null }),
   /** The task for one of your pull requests, made on its branch if there is none (REV-7). */
   taskForPr: (repo: string, head: string, base: string, title: string) =>
     invoke<Task>("task_for_pr", { repo, head, base, title }),
   /** Per repo, the commits a push would send and the leftovers they add (PR-11). */
   taskOutgoing: (taskId: string) => invoke<RepoOutgoing[]>("task_outgoing", { taskId }),
-  deleteTask: (id: string, force = false) =>
-    invoke<RepoResult[]>("delete_task", { id, force }),
+  deleteTask: (id: string, force = false) => invoke<RepoResult[]>("delete_task", { id, force }),
   /**
    * Worktrees, then local branches, then the ticket. `landed` is each
    * checkout's merged PR head; a branch it does not contain is kept.
@@ -145,11 +148,21 @@ export const api = {
     invoke<PaneInfo>("spawn_shell", { taskId, checkoutId: checkoutId ?? null }),
   /** `acp`: as a conversation over ACP rather than in a terminal (§20). */
   spawnAgent: (
-    taskId: string, agentId: string,
-    checkoutId?: string | null, prompt?: string | null, resume = false, acp = false,
-  ) => invoke<PaneInfo>("spawn_agent", {
-    taskId, agentId, checkoutId: checkoutId ?? null, prompt: prompt ?? null, resume, acp,
-  }),
+    taskId: string,
+    agentId: string,
+    checkoutId?: string | null,
+    prompt?: string | null,
+    resume = false,
+    acp = false,
+  ) =>
+    invoke<PaneInfo>("spawn_agent", {
+      taskId,
+      agentId,
+      checkoutId: checkoutId ?? null,
+      prompt: prompt ?? null,
+      resume,
+      acp,
+    }),
   /** Panes the last launch did not put back, waiting for the user (PANE-7). */
   waitingPanes: () => invoke<WaitingPane[]>("waiting_panes"),
   reopenWaitingPane: (id: string) => invoke<PaneInfo>("reopen_waiting_pane", { id }),
@@ -200,20 +213,14 @@ export const api = {
       commit: commit?.sha ?? null,
       checkoutId: commit?.checkoutId ?? null,
     }),
-  diffFile: (
-    checkoutId: string,
-    path: string,
-    scope: DiffScope,
-    commitSha?: string | null,
-  ) =>
+  diffFile: (checkoutId: string, path: string, scope: DiffScope, commitSha?: string | null) =>
     invoke<string>("diff_file", {
       checkoutId,
       path,
       scope,
       commit: commitSha ?? null,
     }),
-  taskCommits: (taskId: string) =>
-    invoke<RepoCommits[]>("task_commits", { taskId }),
+  taskCommits: (taskId: string) => invoke<RepoCommits[]>("task_commits", { taskId }),
   sendReview: (paneId: string, comments: ReviewComment[]) =>
     invoke<string>("send_review", { paneId, comments }),
   commitTask: (taskId: string, message: string) =>
@@ -230,20 +237,21 @@ export const api = {
 
   // jira
   jiraConnect: (
-    baseUrl: string, email: string, token: string,
-    projectKey?: string | null, jql?: string | null,
+    baseUrl: string,
+    email: string,
+    token: string,
+    projectKey?: string | null,
+    jql?: string | null,
   ) => invoke<string>("jira_connect", { baseUrl, email, token, projectKey, jql }),
   ticketsMine: () => invoke<TicketPage>("tickets_mine"),
-  ticketTypes: (refresh = false) =>
-    invoke<TicketType[]>("ticket_types", { refresh }),
+  ticketTypes: (refresh = false) => invoke<TicketType[]>("ticket_types", { refresh }),
   jiraTransitions: (key: string) => invoke<JiraTransition[]>("jira_transitions", { key }),
   jiraTransition: (key: string, transitionId: string) =>
     invoke<void>("jira_transition", { key, transitionId }),
   taskPrompt: (taskId: string, checkoutId?: string | null) =>
     invoke<string>("task_prompt", { taskId, checkoutId: checkoutId ?? null }),
   handoffPrompt: (paneId: string) => invoke<string>("handoff_prompt", { paneId }),
-  draftPrDescription: (taskId: string) =>
-    invoke<string>("draft_pr_description", { taskId }),
+  draftPrDescription: (taskId: string) => invoke<string>("draft_pr_description", { taskId }),
   optimizeIssueDescription: (args: {
     requestId: string;
     summary: string;
@@ -261,8 +269,11 @@ export const api = {
   saveSpecDraft: (taskId: string, part: SpecPart, checkoutId: string | null, text: string | null) =>
     invoke<void>("save_spec_draft", { taskId, part, checkoutId, text }),
   /** Approve files of the spec: written into every repository (tasks into their own), and committed there. */
-  approveSpec: (taskId: string, texts: { part: SpecPart; checkout_id: string | null; text: string }[], kind: SpecKind | null) =>
-    invoke<SpecApproved>("approve_spec", { taskId, texts, kind }),
+  approveSpec: (
+    taskId: string,
+    texts: { part: SpecPart; checkout_id: string | null; text: string }[],
+    kind: SpecKind | null,
+  ) => invoke<SpecApproved>("approve_spec", { taskId, texts, kind }),
   /** Write what was approved back over one repository's copy changed outside the app (SPEC-22). */
   putBackSpec: (taskId: string, part: SpecPart, checkoutId: string) =>
     invoke<TaskSpec>("put_back_spec", { taskId, part, checkoutId }),
@@ -273,11 +284,13 @@ export const api = {
   draftSpec: (taskId: string, part: SpecPart, kind: SpecKind | null, requestId: string) =>
     invoke<void>("draft_spec", { taskId, part, kind, requestId }),
   /** Merge the specs each repository had of its own into drafts of one (SPEC-25). */
-  mergeSpecs: (taskId: string, requestId: string) => invoke<void>("merge_specs", { taskId, requestId }),
+  mergeSpecs: (taskId: string, requestId: string) =>
+    invoke<void>("merge_specs", { taskId, requestId }),
   /** Build the answered open questions into the requirements, streamed as `spec:draft` (SPEC-20). */
   applySpecAnswers: (taskId: string, requestId: string) =>
     invoke<AppliedAnswers>("apply_spec_answers", { taskId, requestId }),
-  checkSpec: (taskId: string, checkoutId: string) => invoke<SpecCheck>("check_spec", { taskId, checkoutId }),
+  checkSpec: (taskId: string, checkoutId: string) =>
+    invoke<SpecCheck>("check_spec", { taskId, checkoutId }),
   /** What Start agent adds to the opening prompt: work through the tasks (SPEC-12). */
   specWorkPrompt: (taskId: string, checkoutId: string | null) =>
     invoke<string>("spec_work_prompt", { taskId, checkoutId }),
@@ -288,16 +301,21 @@ export const api = {
     invoke<void>("set_project_specs", { projectId, inApp, folder }),
   requestPrDescription: (taskId: string, paneId: string) =>
     invoke<string>("request_pr_description", { taskId, paneId }),
-  takePrDescription: (taskId: string) =>
-    invoke<string | null>("take_pr_description", { taskId }),
+  takePrDescription: (taskId: string) => invoke<string | null>("take_pr_description", { taskId }),
   jiraSyncStatus: (key: string) => invoke<string | null>("jira_sync_status", { key }),
   jiraProjectStatuses: (projectKey: string) =>
     invoke<ProjectStatus[]>("jira_project_statuses", { projectKey }),
   setTicketFlow: (projectKey: string, stage: "review" | "merged", status: FlowStatus | null) =>
     invoke<void>("set_ticket_flow", { projectKey, stage, status }),
-  setTicketStart: (projectKey: string, to: StartTo) => invoke<void>("set_ticket_start", { projectKey, to }),
-  ticketsFind: (text: string, whose: string, includeDone: boolean, types: string[], order: string) =>
-    invoke<TicketPage>("tickets_find", { text: text || null, whose, includeDone, types, order }),
+  setTicketStart: (projectKey: string, to: StartTo) =>
+    invoke<void>("set_ticket_start", { projectKey, to }),
+  ticketsFind: (
+    text: string,
+    whose: string,
+    includeDone: boolean,
+    types: string[],
+    order: string,
+  ) => invoke<TicketPage>("tickets_find", { text: text || null, whose, includeDone, types, order }),
   ticketPriorities: () => invoke<string[]>("ticket_priorities"),
   setTracker: (uses: TrackerKind) => invoke<void>("set_tracker", { uses }),
   ticketsByKey: (keys: string[]) => invoke<Ticket[]>("tickets_by_key", { keys }),
@@ -313,19 +331,32 @@ export const api = {
   }) => invoke<Ticket>("file_ticket", { req }),
   /** `epic`: an epic-level ticket, made an epic whose spec makes sub-tasks (EPIC-2). */
   startWorkOnTicket: (
-    key: string, projectIds: string[],
-    agentId?: string | null, branchSuffix?: string | null, base?: string | null, epic = false,
-  ) => invoke<Started>("start_work_on_ticket", {
-    key, projectIds, agentId: agentId ?? null, branchSuffix: branchSuffix ?? null,
-    base: base ?? null, epic,
-  }),
+    key: string,
+    projectIds: string[],
+    agentId?: string | null,
+    branchSuffix?: string | null,
+    base?: string | null,
+    epic = false,
+  ) =>
+    invoke<Started>("start_work_on_ticket", {
+      key,
+      projectIds,
+      agentId: agentId ?? null,
+      branchSuffix: branchSuffix ?? null,
+      base: base ?? null,
+      epic,
+    }),
   // epics (§26)
   epicView: (epicId: string) => invoke<EpicView>("epic_view", { epicId }),
   /** Make tasks whose tickets sit under the epic's in Jira its sub-tasks (EPIC-13). */
-  adoptSubTasks: (epicId: string, taskIds: string[]) => invoke<EpicView>("adopt_sub_tasks", { epicId, taskIds }),
+  adoptSubTasks: (epicId: string, taskIds: string[]) =>
+    invoke<EpicView>("adopt_sub_tasks", { epicId, taskIds }),
   /** File the sub-tasks not filed yet: tickets under the epic, tasks, their spec (EPIC-7). */
-  fileSubTasks: (epicId: string, issueType: string | null, fields: Record<string, unknown> | null) =>
-    invoke<Filed>("file_sub_tasks", { epicId, issueType, fields }),
+  fileSubTasks: (
+    epicId: string,
+    issueType: string | null,
+    fields: Record<string, unknown> | null,
+  ) => invoke<Filed>("file_sub_tasks", { epicId, issueType, fields }),
   /** `anyway`: start one that waits, after the user agreed (EPIC-8). */
   startSubTask: (taskId: string, agentId: string, anyway = false) =>
     invoke<StartedSubTask>("start_sub_task", { taskId, agentId, anyway }),
@@ -338,20 +369,19 @@ export const api = {
   githubAllPrs: () => invoke<TaskPrs[]>("github_all_prs"),
   setCheckoutBase: (checkoutId: string, base: string) =>
     invoke<void>("set_checkout_base", { checkoutId, base }),
-  taskBranchFacts: (taskId: string) =>
-    invoke<RepoBranchFacts[]>("task_branch_facts", { taskId }),
-  checkoutBranches: (checkoutId: string) =>
-    invoke<string[]>("checkout_branches", { checkoutId }),
-  githubRetargetPr: (checkoutId: string) =>
-    invoke<string>("github_retarget_pr", { checkoutId }),
+  taskBranchFacts: (taskId: string) => invoke<RepoBranchFacts[]>("task_branch_facts", { taskId }),
+  checkoutBranches: (checkoutId: string) => invoke<string[]>("checkout_branches", { checkoutId }),
+  githubRetargetPr: (checkoutId: string) => invoke<string>("github_retarget_pr", { checkoutId }),
   /** `skip`: checkout ids left out of this call, neither pushed nor opened. */
   githubOpenPrs: (taskId: string, title: string, body: string, draft: boolean, skip: string[]) =>
     invoke<RepoResult[]>("github_open_prs", { taskId, title, body, draft, skip }),
-  githubPrFeedback: (taskId: string) =>
-    invoke<RepoFeedback[]>("github_pr_feedback", { taskId }),
+  githubPrFeedback: (taskId: string) => invoke<RepoFeedback[]>("github_pr_feedback", { taskId }),
   /** Typed into `paneId` when given; otherwise only returned, to start an agent with. */
   sendPrFeedback: (
-    taskId: string, paneId: string | null, scope: string | null, items: FeedbackItem[],
+    taskId: string,
+    paneId: string | null,
+    scope: string | null,
+    items: FeedbackItem[],
   ) => invoke<string>("send_pr_feedback", { taskId, paneId, scope, items }),
 
   // slack
@@ -365,7 +395,8 @@ export const api = {
   slackBotConnect: (botToken: string, appToken: string, owner: string, agentId: string) =>
     invoke<void>("slack_bot_connect", { botToken, appToken, owner, agentId }),
   setSlackBotOn: (on: boolean) => invoke<void>("set_slack_bot_on", { on }),
-  setSlackBotAgent: (agentId: string, model: string) => invoke<void>("set_slack_bot_agent", { agentId, model }),
+  setSlackBotAgent: (agentId: string, model: string) =>
+    invoke<void>("set_slack_bot_agent", { agentId, model }),
   setSlackBotAuto: (on: boolean) => invoke<void>("set_slack_bot_auto", { on }),
   setSlackBotPersonality: (text: string) => invoke<void>("set_slack_bot_personality", { text }),
   slackBotView: () => invoke<SlackBotView>("slack_bot_view"),
@@ -407,7 +438,8 @@ export const api = {
   createProfile: (name: string) => invoke<ProfileView>("create_profile", { name }),
   renameProfile: (id: string, name: string) => invoke<void>("rename_profile", { id, name }),
   /** One of the eight, `--profile-<n>` (PROF-10). */
-  setProfileColour: (id: string, colour: number) => invoke<void>("set_profile_colour", { id, colour }),
+  setProfileColour: (id: string, colour: number) =>
+    invoke<void>("set_profile_colour", { id, colour }),
   deleteProfile: (id: string) => invoke<void>("delete_profile", { id }),
   /** Once its server has started; null when it did not (PROF-11). */
   workspacePlace: () => invoke<WorkspacePlace | null>("workspace_place"),
@@ -419,14 +451,16 @@ export const api = {
   // A workspace on a server (PROF-15 to PROF-18). `address` is a server's
   // address.
   serverWays: (address: string) => invoke<ServerWays>("server_ways", { address }),
-  serverSignInBrowser: (address: string) => invoke<ServerSignedIn>("server_sign_in_browser", { address }),
+  serverSignInBrowser: (address: string) =>
+    invoke<ServerSignedIn>("server_sign_in_browser", { address }),
   serverSignInCancel: () => invoke<void>("server_sign_in_cancel"),
   serverOpen: (id: string) => invoke<void>("server_open", { id }),
   serverResume: () => invoke<WorkspacePlace>("server_resume"),
   openMembers: () => invoke<void>("open_members"),
   setWorktreeRoot: (path: string | null) => invoke<void>("set_worktree_root", { path }),
   setUiPrefs: (ui: UiPrefs) => invoke<void>("set_ui_prefs", { ui }),
-  disconnect: (which: "jira" | "github" | "slack" | "grafana") => invoke<void>("disconnect", { which }),
+  disconnect: (which: "jira" | "github" | "slack" | "grafana") =>
+    invoke<void>("disconnect", { which }),
   cursorIdeInstalled: () => invoke<boolean>("cursor_ide_installed"),
   openInCursor: (path: string) => invoke<void>("open_in_cursor", { path }),
 
@@ -445,8 +479,13 @@ export const api = {
   browserGo: (taskId: string, to: "back" | "forward" | "reload") =>
     invoke<void>("browser_go", { taskId, to }),
   /** Sizes the tab to the panel and sends its frames, JPEGs, to `frames`. */
-  browserWatch: (taskId: string, width: number, height: number, scale: number, frames: Channel<ArrayBuffer>) =>
-    invoke<void>("browser_watch", { taskId, width, height, scale, frames }),
+  browserWatch: (
+    taskId: string,
+    width: number,
+    height: number,
+    scale: number,
+    frames: Channel<ArrayBuffer>,
+  ) => invoke<void>("browser_watch", { taskId, width, height, scale, frames }),
   browserUnwatch: (taskId: string) => invoke<void>("browser_unwatch", { taskId }),
   browserInput: (taskId: string, input: BrowserInput) =>
     invoke<void>("browser_input", { taskId, input }),
@@ -454,13 +493,17 @@ export const api = {
   /** The tab on the clipboard, or with `save` in Downloads: the saved file's name (BRW-22). */
   browserScreenshot: (taskId: string, save: boolean) =>
     invoke<string | null>("browser_screenshot", { taskId, save }),
-  browserAnswerSite: (id: number, allow: boolean) => invoke<void>("browser_answer_site", { id, allow }),
+  browserAnswerSite: (id: number, allow: boolean) =>
+    invoke<void>("browser_answer_site", { id, allow }),
   browserHold: (taskId: string, held: boolean) => invoke<void>("browser_hold", { taskId, held }),
   /** A new tab beside the active one, made active (BRW-16). */
-  browserNewTab: (taskId: string, url?: string) => invoke<void>("browser_new_tab", { taskId, url: url ?? null }),
-  browserSwitchTab: (taskId: string, tab: string) => invoke<void>("browser_switch_tab", { taskId, tab }),
+  browserNewTab: (taskId: string, url?: string) =>
+    invoke<void>("browser_new_tab", { taskId, url: url ?? null }),
+  browserSwitchTab: (taskId: string, tab: string) =>
+    invoke<void>("browser_switch_tab", { taskId, tab }),
   /** The last tab is left open, empty. */
-  browserCloseTab: (taskId: string, tab: string) => invoke<void>("browser_close_tab", { taskId, tab }),
+  browserCloseTab: (taskId: string, tab: string) =>
+    invoke<void>("browser_close_tab", { taskId, tab }),
   addBrowserSignIn: (site: string, username: string, password: string) =>
     invoke<SavedSignIn>("add_browser_sign_in", { site, username, password }),
   forgetBrowserSignIn: (id: string) => invoke<void>("forget_browser_sign_in", { id }),

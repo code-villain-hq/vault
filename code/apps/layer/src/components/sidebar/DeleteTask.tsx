@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, errMessage } from "../../lib/api";
+import { taskTotals } from "../../lib/derive";
 import type { JiraTransition, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
-import { taskTotals } from "../../lib/derive";
 import { flowOf, mergedTransition } from "../TicketFlow";
 import { Modal } from "../ui";
 
@@ -13,7 +13,11 @@ import { Modal } from "../ui";
  * Either way the choice is on screen. Deleting used to leave tickets In
  * Progress for work merged weeks before.
  */
-export function DeleteTask({ task, onCancel, onDelete }: {
+export function DeleteTask({
+  task,
+  onCancel,
+  onDelete,
+}: {
   task: TaskView;
   onCancel: () => void;
   onDelete: (force: boolean, ticket: JiraTransition | null) => void;
@@ -44,7 +48,10 @@ export function DeleteTask({ task, onCancel, onDelete }: {
         setTicketError(errMessage(e));
       },
     );
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
+    // oxlint-disable-next-line react/exhaustive-deps -- `merged` and `settings` as it opens
   }, [key]);
 
   // Staged counts too: git refuses those as surely as unstaged ones, and
@@ -60,7 +67,9 @@ export function DeleteTask({ task, onCancel, onDelete }: {
       onClose={onCancel}
       footer={
         <>
-          <button className="ui-button" onClick={onCancel}>Cancel</button>
+          <button className="ui-button" onClick={onCancel}>
+            Cancel
+          </button>
           <button
             className="ui-button ui-button-danger"
             autoFocus
@@ -84,19 +93,30 @@ export function DeleteTask({ task, onCancel, onDelete }: {
         )}
         {key && (
           <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
-            <label>Ticket {key}{issue ? ` · ${issue.status}` : ""}</label>
+            <label>
+              Ticket {key}
+              {issue ? ` · ${issue.status}` : ""}
+            </label>
             {transitions === null ? (
               <div className="muted">Asking Jira where it can go…</div>
             ) : (
               <select className="ui-field" value={pick} onChange={(e) => setPick(e.target.value)}>
                 <option value="">Leave it as it is</option>
                 {transitions.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name} → {t.to_status}</option>
+                  <option key={t.id} value={t.id}>
+                    {t.name} → {t.to_status}
+                  </option>
                 ))}
               </select>
             )}
-            {ticketError && <div className="hint" style={{ color: "var(--status-danger-ink)" }}>{ticketError}</div>}
-            {merged && !ticketError && <div className="hint">A pull request of this task has merged.</div>}
+            {ticketError && (
+              <div className="hint" style={{ color: "var(--status-danger-ink)" }}>
+                {ticketError}
+              </div>
+            )}
+            {merged && !ticketError && (
+              <div className="hint">A pull request of this task has merged.</div>
+            )}
           </div>
         )}
       </div>

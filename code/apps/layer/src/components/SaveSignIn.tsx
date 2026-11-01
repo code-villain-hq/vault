@@ -65,10 +65,14 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
       {form && (
         <Modal
           title="Save sign-in"
-          onClose={() => { if (!busy) setForm(null); }}
+          onClose={() => {
+            if (!busy) setForm(null);
+          }}
           footer={
             <>
-              <button className="ui-button" disabled={busy} onClick={() => setForm(null)}>Cancel</button>
+              <button className="ui-button" disabled={busy} onClick={() => setForm(null)}>
+                Cancel
+              </button>
               <button
                 className="ui-button ui-button-primary"
                 disabled={busy || !site.trim() || !username.trim()}
@@ -83,13 +87,28 @@ export function SaveSignIn({ taskId, disabled }: { taskId: string; disabled: boo
             label="Site"
             hint="localhost alone is every port of this machine; a site elsewhere is that host only."
           >
-            <input className="ui-field" value={site} onChange={(e) => setSite(e.target.value)} spellCheck={false} />
+            <input
+              className="ui-field"
+              value={site}
+              onChange={(e) => setSite(e.target.value)}
+              spellCheck={false}
+            />
           </Field>
           <Field
             label="Username"
-            hint={form.username ? undefined : "The form has none: a login that asks for it on the step before."}
+            hint={
+              form.username
+                ? undefined
+                : "The form has none: a login that asks for it on the step before."
+            }
           >
-            <input className="ui-field" value={username} onChange={(e) => setUsername(e.target.value)} spellCheck={false} autoFocus={!form.username} />
+            <input
+              className="ui-field"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              spellCheck={false}
+              autoFocus={!form.username}
+            />
           </Field>
           <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
             The password is the one typed into the page's password field. It goes to the keychain;

@@ -31,14 +31,12 @@ export function renameNamespace(
   return [
     ...translations
       .filter((t) => t.namespace === from)
-      .map(
-        (t): Operation => ({
-          action: "update",
-          model: "Translation",
-          id: t.id,
-          data: { namespace: to },
-        }),
-      ),
+      .map((t): Operation => ({
+        action: "update",
+        model: "Translation",
+        id: t.id,
+        data: { namespace: to },
+      })),
     ...suggestions
       .filter((s) => s.namespace === from)
       .map((s): Operation => ({ action: "delete", model: "Suggestion", id: s.id })),

@@ -30,10 +30,13 @@ function setSession(next: typeof session) {
   for (const tell of watching) tell();
 }
 export function useSession() {
-  return useSyncExternalStore((tell) => {
-    watching.add(tell);
-    return () => void watching.delete(tell);
-  }, () => session);
+  return useSyncExternalStore(
+    (tell) => {
+      watching.add(tell);
+      return () => void watching.delete(tell);
+    },
+    () => session,
+  );
 }
 export function signedInAgain() {
   setSession({ signedOut: false, turn: session.turn + 1 });
@@ -58,15 +61,24 @@ const UNREACHABLE: SyncState = { connection: "offline", pending: 0, ready: false
 let sync = CONNECTING;
 const watchingSync = new Set<() => void>();
 function setSync(next: SyncState) {
-  if (next.connection === sync.connection && next.pending === sync.pending && next.ready === sync.ready && next.storageError === sync.storageError) return;
+  if (
+    next.connection === sync.connection &&
+    next.pending === sync.pending &&
+    next.ready === sync.ready &&
+    next.storageError === sync.storageError
+  )
+    return;
   sync = next;
   for (const tell of watchingSync) tell();
 }
 export function useSyncState() {
-  return useSyncExternalStore((tell) => {
-    watchingSync.add(tell);
-    return () => void watchingSync.delete(tell);
-  }, () => sync);
+  return useSyncExternalStore(
+    (tell) => {
+      watchingSync.add(tell);
+      return () => void watchingSync.delete(tell);
+    },
+    () => sync,
+  );
 }
 /** Raises "refused", with the workspace's reason, when it turns a change down. */
 export const refusals = new EventTarget();
@@ -92,7 +104,8 @@ export async function startWorkspaceSync(hooks: {
   // Stopped for good once the server stops taking the session: offline from
   // then on, with what waits still counted.
   let shut = false;
-  const tellSync = () => setSync(shut ? { ...client.status(), connection: "offline" } : client.status());
+  const tellSync = () =>
+    setSync(shut ? { ...client.status(), connection: "offline" } : client.status());
   const client = new SyncClient<Schema>({
     store: new IndexedDbStore(`layer-${place.user_id}-${place.workspace_id}`),
     transport: new HttpTransport({
@@ -128,10 +141,14 @@ export async function startWorkspaceSync(hooks: {
       while (!shut && client.status().ready) {
         if (!(await transferSetupWrites(api.readSetupWrites, api.ackSetupWrites, client))) break;
       }
-    })().catch((e) => {
-      hooks.onRefused(e instanceof Error ? e.message : String(e));
-      if (!shut) retry = setTimeout(() => void take(), 5000);
-    }).finally(() => { taking = undefined; });
+    })()
+      .catch((e) => {
+        hooks.onRefused(e instanceof Error ? e.message : String(e));
+        if (!shut) retry = setTimeout(() => void take(), 5000);
+      })
+      .finally(() => {
+        taking = undefined;
+      });
     return taking;
   };
 

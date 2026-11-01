@@ -29,10 +29,12 @@ it does, feature by feature, is in
    what exists over adding a parallel version of it: one helper, one store
    action, one way to run blocking work.
 4. **Prove it.** `bun run check` must pass. It runs the guard, the
-   design copies' check, the frontend's tests, tsc, the frontend build,
+   design copies' check, the frontend's tests, Vite+ (Oxfmt, Oxlint and
+   the type check, for the app and the web app), the frontend build,
    rustfmt, clippy, the app's and the server's Rust tests,
-   the generated types' check, then the web app's Biome, tsc, tests and
-   build (`scripts/check.ts`; `bun run db` first).
+   the generated types' check, then the web app's tests and build
+   (`scripts/check.ts`; `bun run db` first). `bun run format` formats
+   and fixes what Vite+ can.
    A UI change is looked at and
    clicked through in the mock harness ([`docs/testing.md`](docs/testing.md)).
    A bug fix comes with a test that fails without it.

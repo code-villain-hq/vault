@@ -23,6 +23,7 @@ export async function call(path: string, body: unknown, cookie?: string, method 
   const response = await fetch(`${BASE}${path}`, {
     method,
     headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+    // oxlint-disable-next-line unicorn/no-invalid-fetch-options -- a GET passes no body
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: response.status, body: await response.json().catch(() => null) };
@@ -47,13 +48,30 @@ async function until<T>(what: string, check: () => Promise<T | undefined>) {
 }
 
 type Meta = { confidence?: number; translated_by?: string; context?: string };
+/** A demo string, as a Translation takes it. */
+type Row = {
+  lang: string;
+  namespace: string;
+  key: string;
+  value: string;
+  confidence: number | null;
+  translated_by: string;
+  context: string;
+};
+/** A term in demo/glossary.json, as a GlossaryEntry takes it. */
+type Term = {
+  source_lang: string;
+  target_lang: string;
+  source_term: string;
+  [field: string]: unknown;
+};
 
 /** The demo strings as rows: every language folder, every namespace file. */
 async function demoTranslations() {
   const meta: Record<string, Record<string, Record<string, Meta>>> = (
     await Bun.file(`${demo}translations/translations.meta.json`).json()
   ).translations;
-  const rows: Record<string, unknown>[] = [];
+  const rows: Row[] = [];
   const langs = (await readdir(`${demo}translations`, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -110,7 +128,8 @@ if (import.meta.main) {
     const records = await bootstrap();
     return records.Language?.length ? records : undefined;
   });
-  const have = (model: string, key: (row: Record<string, unknown>) => string) =>
+  // Keys are made of the records' text fields.
+  const have = (model: string, key: (row: Record<string, string>) => string) =>
     new Set<string>((current[model] ?? []).map(key));
 
   const { langs, rows } = await demoTranslations();
@@ -120,7 +139,7 @@ if (import.meta.main) {
   const terms = have("GlossaryEntry", (g) =>
     `${g.source_lang}_${g.target_lang}/${g.source_term}`.toLowerCase(),
   );
-  const glossary: Record<string, unknown>[] = await Bun.file(`${demo}glossary.json`).json();
+  const glossary: Term[] = await Bun.file(`${demo}glossary.json`).json();
 
   const operations: Operation[] = [
     ...langs.filter((code) => !languages.has(code)).map((code) => create("Language", { code })),

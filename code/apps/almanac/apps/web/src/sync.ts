@@ -59,7 +59,6 @@ export function createSyncClient(options: {
       protocols: () => socketProtocols(options.place),
     }),
     // What the server would fill in, so new records look complete at once.
-    // biome-ignore-start lint/correctness/noComponentHookFactories: named after models, and they make records, not components
     defaults: {
       Block: () => ({
         title: "",
@@ -92,7 +91,6 @@ export function createSyncClient(options: {
         ...timestamps(),
       }),
     },
-    // biome-ignore-end lint/correctness/noComponentHookFactories: the defaults end here
     onReject: (_transaction, error) => options.onRefused(error.message),
   });
 }

@@ -288,7 +288,7 @@ export function SpecChangeSummary({
         </p>
       )}
       {parts.map((part, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: parts follow the change's order of specs
+        // oxlint-disable-next-line react/no-array-index-key -- parts follow the change's order of specs
         <SpecPart key={index} part={part} verb={verb} />
       ))}
       {replaced.length > 0 && (
@@ -299,7 +299,7 @@ export function SpecChangeSummary({
           </h3>
           <ul className="flex flex-col gap-1 text-sm">
             {replaced.map((decision, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a deleted decision has no record
+              // oxlint-disable-next-line react/no-array-index-key -- a deleted decision has no record
               <li key={index}>{decision ? `“${decision.title}”` : "A decision since deleted"}</li>
             ))}
           </ul>

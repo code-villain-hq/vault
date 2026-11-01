@@ -200,7 +200,9 @@ export function IssueList({
       const on = !next.has(issue.id);
       for (let i = Math.min(from, index); i <= Math.max(from, index); i++) {
         const id = list[i]?.id;
-        if (id) on ? next.add(id) : next.delete(id);
+        if (!id) continue;
+        if (on) next.add(id);
+        else next.delete(id);
       }
       return next;
     });
@@ -210,7 +212,8 @@ export function IssueList({
   const fold = (id: string, open: boolean) =>
     setExpanded((previous) => {
       const next = new Set(previous);
-      open ? next.add(id) : next.delete(id);
+      if (open) next.add(id);
+      else next.delete(id);
       return next;
     });
 
@@ -387,7 +390,7 @@ function IssueRow({
   const progress = subIssues && `${subIssues.done}/${subIssues.total}`;
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: rows are reached with j/k and opened with Enter
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- rows are reached with j/k and opened with Enter
     <li
       data-index={index}
       onClick={onOpen}

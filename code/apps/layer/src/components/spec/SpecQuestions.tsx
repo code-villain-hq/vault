@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { questions, sameAnswer, setAnswer, type Question } from "../../lib/questions";
 import { editorText, useSpecs } from "../../lib/specs";
-import { useStore } from "../../store";
 import type { AppliedAnswers, TaskView } from "../../lib/types";
+import { useStore } from "../../store";
 import { Spinner } from "../ui";
 
 /**
@@ -32,12 +32,19 @@ export function SpecQuestions({ task }: { task: TaskView }) {
     <section className="spec-questions">
       <h3>
         Open questions
-        {qs.length > 0 && <span className="muted"> · {open === 0 ? "all answered" : `${open} of ${qs.length} unanswered`}</span>}
+        {qs.length > 0 && (
+          <span className="muted">
+            {" "}
+            · {open === 0 ? "all answered" : `${open} of ${qs.length} unanswered`}
+          </span>
+        )}
       </h3>
       {applied && (
         <div className="spec-applied">
           <span>{appliedSummary(applied.results)}</span>
-          <button className="ui-button" disabled={!!drafting} onClick={() => undoAnswers(task.id)}>Undo</button>
+          <button className="ui-button" disabled={!!drafting} onClick={() => undoAnswers(task.id)}>
+            Undo
+          </button>
         </div>
       )}
       {qs.map((q) => (
@@ -45,7 +52,9 @@ export function SpecQuestions({ task }: { task: TaskView }) {
           key={q.id}
           question={q}
           disabled={!!drafting}
-          onAnswer={(answer) => edit(task.id, { part: "requirements", checkoutId: null }, setAnswer(text, q.id, answer))}
+          onAnswer={(answer) =>
+            edit(task.id, { part: "requirements", checkoutId: null }, setAnswer(text, q.id, answer))
+          }
         />
       ))}
       {qs.length > 0 && (
@@ -53,9 +62,11 @@ export function SpecQuestions({ task }: { task: TaskView }) {
           <button
             className="ui-button"
             disabled={!anyAnswered || !!drafting}
-            title={anyAnswered
-              ? "Rewrite the requirements the answers decide, and take the answered questions out"
-              : "Answer a question first"}
+            title={
+              anyAnswered
+                ? "Rewrite the requirements the answers decide, and take the answered questions out"
+                : "Answer a question first"
+            }
             onClick={() => void applyAnswers(task.id).catch(fail)}
           >
             Apply answers
@@ -67,7 +78,11 @@ export function SpecQuestions({ task }: { task: TaskView }) {
   );
 }
 
-function QuestionCard({ question, disabled, onAnswer }: {
+function QuestionCard({
+  question,
+  disabled,
+  onAnswer,
+}: {
   question: Question;
   disabled: boolean;
   onAnswer: (answer: string) => void;
@@ -87,7 +102,11 @@ function QuestionCard({ question, disabled, onAnswer }: {
       <div className="spec-question-text">
         <b>{question.id}</b>
         <span>{question.text}</span>
-        {question.answer && <span className="spec-question-done" aria-label="Answered">✓</span>}
+        {question.answer && (
+          <span className="spec-question-done" aria-label="Answered">
+            ✓
+          </span>
+        )}
       </div>
       {question.options.length > 0 && (
         <div className="spec-options">
@@ -107,7 +126,8 @@ function QuestionCard({ question, disabled, onAnswer }: {
           })}
         </div>
       )}
-      <input className="ui-field"
+      <input
+        className="ui-field"
         value={own}
         disabled={disabled}
         placeholder={question.options.length > 0 ? "Or your own answer" : "Your answer"}

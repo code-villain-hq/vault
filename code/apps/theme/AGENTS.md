@@ -6,7 +6,9 @@ The colours are generated from the vault's tokens: `studio/design/tokens/syntax.
 
 ```sh
 bun build.ts           # write the VS Code themes, the Neovim palette, the WezTerm schemes and the Thunderbird theme
-bun build.ts --check   # write nothing; fail if an output has drifted (CI runs this)
+bun build.ts --check   # write nothing; fail if an output has drifted
+bun run check          # that, then Vite+ over the scripts: Oxfmt, Oxlint, the type check (CI runs this)
+bun run format         # format and fix the scripts
 bun install && bun specimen.ts   # draw the vault's own code in both modes, for review
 ```
 

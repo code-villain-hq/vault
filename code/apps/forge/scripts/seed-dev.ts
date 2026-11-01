@@ -14,6 +14,7 @@ export async function call(path: string, body: unknown, cookie?: string, method 
   const response = await fetch(`${BASE}${path}`, {
     method,
     headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+    // oxlint-disable-next-line unicorn/no-invalid-fetch-options -- a GET passes no body
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: response.status, body: await response.json().catch(() => null) };

@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useMemo, useState } from "react";
 import { api, failureText } from "../lib/api";
-import { useStore } from "../store";
 import type { FoundRepo } from "../lib/types";
+import { useStore } from "../store";
 import { Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 
 /**
@@ -100,13 +100,17 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
       footer={
         found ? (
           <>
-            <button className="ui-button" onClick={onClose}>Cancel</button>
+            <button className="ui-button" onClick={onClose}>
+              Cancel
+            </button>
             <button
               className="ui-button ui-button-primary"
               disabled={busy || picked.length === 0}
               onClick={() => void register(picked)}
             >
-              {busy ? "Adding…" : `Add ${picked.length} repositor${picked.length === 1 ? "y" : "ies"}`}
+              {busy
+                ? "Adding…"
+                : `Add ${picked.length} repositor${picked.length === 1 ? "y" : "ies"}`}
             </button>
           </>
         ) : undefined
@@ -122,7 +126,11 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
             >
               {scanning ? "Scanning…" : "Scan a folder…"}
             </button>
-            <button className="ui-button" disabled={busy} onClick={() => void pickFolders().catch(fail)}>
+            <button
+              className="ui-button"
+              disabled={busy}
+              onClick={() => void pickFolders().catch(fail)}
+            >
               Pick folders…
             </button>
             {scanning && <Spinner />}
@@ -132,9 +140,10 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
             repository up to three levels down, so a whole stack goes in at once.
             <br />
             <b>Pick</b> selects specific repository folders; hold ⌘ to choose several.
-            <br /><br />
-            Repositories must already be cloned locally. A task later picks whichever of
-            them its change touches.
+            <br />
+            <br />
+            Repositories must already be cloned locally. A task later picks whichever of them its
+            change touches.
           </div>
         </>
       )}
@@ -143,17 +152,19 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
         <>
           <div className="row" style={{ marginBottom: 10 }}>
             <span className="muted">
-              {found.length === 0 ? "No git repositories" : `${found.length} found`} under <code>{scanned}</code>
+              {found.length === 0 ? "No git repositories" : `${found.length} found`} under{" "}
+              <code>{scanned}</code>
             </span>
             <div className="spacer" />
-            <button
-              className="ui-button"
-              onClick={() => setPicked(selectable.map((r) => r.path))}
-            >
+            <button className="ui-button" onClick={() => setPicked(selectable.map((r) => r.path))}>
               All
             </button>
-            <button className="ui-button" onClick={() => setPicked([])}>None</button>
-            <button className="ui-button" onClick={() => setFound(null)}>Back</button>
+            <button className="ui-button" onClick={() => setPicked([])}>
+              None
+            </button>
+            <button className="ui-button" onClick={() => setFound(null)}>
+              Back
+            </button>
           </div>
 
           <Field
@@ -189,7 +200,9 @@ export function AddRepos({ onClose }: { onClose: () => void }) {
                 <span style={{ flex: 1 }}>{r.name}</span>
                 {r.branch && <span className="ui-chip">{r.branch}</span>}
                 {r.registered && <span className="ui-status">added</span>}
-                <span className="path" style={{ maxWidth: 240 }}>{r.path}</span>
+                <span className="path" style={{ maxWidth: 240 }}>
+                  {r.path}
+                </span>
               </label>
             ))}
           </div>

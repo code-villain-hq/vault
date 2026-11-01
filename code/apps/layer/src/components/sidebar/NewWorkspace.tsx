@@ -18,7 +18,9 @@ type Step =
  * workspace is on, it signs in again instead (PROF-16).
  */
 export function NewWorkspace({
-  again, onClose, onOpened,
+  again,
+  onClose,
+  onOpened,
 }: {
   again?: string;
   onClose: () => void;
@@ -37,7 +39,10 @@ export function NewWorkspace({
   function run<T>(work: Promise<T>, then: (value: T) => void) {
     setBusy(true);
     failure.clear();
-    work.then(then).catch(failure.fail).finally(() => setBusy(false));
+    work
+      .then(then)
+      .catch(failure.fail)
+      .finally(() => setBusy(false));
   }
 
   function makeHere() {
@@ -47,7 +52,11 @@ export function NewWorkspace({
 
   /** Signed in: on with this window's workspace, the company's, or a choice. */
   function signedIn(signed: ServerSignedIn) {
-    if (again) return run(api.serverResume(), () => { signedInAgain(); onClose(); });
+    if (again)
+      return run(api.serverResume(), () => {
+        signedInAgain();
+        onClose();
+      });
     if (signed.workspaces.length === 1) return open(signed, signed.workspaces[0].id);
     setStep({ at: "choose", signed });
   }
@@ -63,9 +72,13 @@ export function NewWorkspace({
       if (!ways.oidc) return failure.fail("That server signs nobody in. It's another Mac's own.");
       setStep({ at: "browser", company: ways.company ?? "the server's company" });
       setBusy(true);
-      api.serverSignInBrowser(address)
+      api
+        .serverSignInBrowser(address)
         .then(signedIn)
-        .catch((e) => { setStep({ at: "where" }); failure.fail(e); })
+        .catch((e) => {
+          setStep({ at: "where" });
+          failure.fail(e);
+        })
         .finally(() => setBusy(false));
     });
   }
@@ -76,23 +89,37 @@ export function NewWorkspace({
     setStep({ at: "where" });
   }
 
-  const cancel = <button className="ui-button" onClick={onClose}>Cancel</button>;
+  const cancel = (
+    <button className="ui-button" onClick={onClose}>
+      Cancel
+    </button>
+  );
   const footer =
     step.at === "choose" ? (
       cancel
     ) : step.at === "browser" ? (
-      <button className="ui-button" onClick={back}>Cancel</button>
+      <button className="ui-button" onClick={back}>
+        Cancel
+      </button>
     ) : onServer ? (
       <>
         {cancel}
-        <button className="ui-button ui-button-primary" disabled={!address.trim() || busy} onClick={signIn}>
+        <button
+          className="ui-button ui-button-primary"
+          disabled={!address.trim() || busy}
+          onClick={signIn}
+        >
           {busy ? "Signing in…" : "Sign in"}
         </button>
       </>
     ) : (
       <>
         {cancel}
-        <button className="ui-button ui-button-primary" disabled={!name.trim() || busy} onClick={makeHere}>
+        <button
+          className="ui-button ui-button-primary"
+          disabled={!name.trim() || busy}
+          onClick={makeHere}
+        >
           {busy ? "Opening…" : "Create and open"}
         </button>
       </>
@@ -103,10 +130,24 @@ export function NewWorkspace({
       {step.at === "where" && !again && (
         <Field label="Where">
           <div className="ui-segmented">
-            <button className="ui-segment" aria-pressed={!onServer} onClick={() => { setOnServer(false); failure.clear(); }}>
+            <button
+              className="ui-segment"
+              aria-pressed={!onServer}
+              onClick={() => {
+                setOnServer(false);
+                failure.clear();
+              }}
+            >
               This Mac
             </button>
-            <button className="ui-segment" aria-pressed={onServer} onClick={() => { setOnServer(true); failure.clear(); }}>
+            <button
+              className="ui-segment"
+              aria-pressed={onServer}
+              onClick={() => {
+                setOnServer(true);
+                failure.clear();
+              }}
+            >
               A server
             </button>
           </div>
@@ -118,7 +159,8 @@ export function NewWorkspace({
           label="Name"
           hint="A Layer of its own, empty: its own repositories, tasks, connections and tokens. It opens in a new window, beside this one."
         >
-          <input className="ui-field"
+          <input
+            className="ui-field"
             value={name}
             maxLength={40}
             autoFocus
@@ -132,13 +174,14 @@ export function NewWorkspace({
       {step.at === "where" && onServer && (
         <Field
           label="Server"
-          hint={again
-            ? "Layer stopped being signed in to this server. What changed here waits, and goes once you're back."
-            : (
-              "Opens your company's sign-in in your browser. Your repositories and notes are shared with the workspace; tasks and agents stay on this Mac."
-            )}
+          hint={
+            again
+              ? "Layer stopped being signed in to this server. What changed here waits, and goes once you're back."
+              : "Opens your company's sign-in in your browser. Your repositories and notes are shared with the workspace; tasks and agents stay on this Mac."
+          }
         >
-          <input className="ui-field"
+          <input
+            className="ui-field"
             value={address}
             autoFocus={!again}
             disabled={Boolean(again)}
@@ -151,11 +194,14 @@ export function NewWorkspace({
 
       {step.at === "browser" && (
         <p className="hint">
-          Finish signing in with {step.company} in your browser. Layer waits for it here, for up to five minutes.
+          Finish signing in with {step.company} in your browser. Layer waits for it here, for up to
+          five minutes.
         </p>
       )}
 
-      {step.at === "choose" && <Choose signed={step.signed} busy={busy} onOpen={(id) => open(step.signed, id)} />}
+      {step.at === "choose" && (
+        <Choose signed={step.signed} busy={busy} onOpen={(id) => open(step.signed, id)} />
+      )}
 
       <ErrorMessage>{failure.error}</ErrorMessage>
     </Modal>
@@ -163,23 +209,35 @@ export function NewWorkspace({
 }
 
 /** The person's workspaces on the server, each opened in its own window. */
-function Choose({ signed, busy, onOpen }: { signed: ServerSignedIn; busy: boolean; onOpen: (id: string) => void }) {
+function Choose({
+  signed,
+  busy,
+  onOpen,
+}: {
+  signed: ServerSignedIn;
+  busy: boolean;
+  onOpen: (id: string) => void;
+}) {
   if (signed.workspaces.length === 0) {
     return (
       <p className="hint">
-        Signed in to {signed.host} as {signed.email}, and in no workspace there yet. Ask {signed.company}'s admin to
-        add you.
+        Signed in to {signed.host} as {signed.email}, and in no workspace there yet. Ask{" "}
+        {signed.company}'s admin to add you.
       </p>
     );
   }
   return (
     <>
-      <p className="hint">Signed in to {signed.host} as {signed.email}. Open a workspace in a window of its own.</p>
+      <p className="hint">
+        Signed in to {signed.host} as {signed.email}. Open a workspace in a window of its own.
+      </p>
       <div className="profile-rows">
         {signed.workspaces.map((w) => (
           <div key={w.id} className="profile-row">
             <span className="profile-row-name">{w.name}</span>
-            <button className="ui-button" disabled={busy} onClick={() => onOpen(w.id)}>Open</button>
+            <button className="ui-button" disabled={busy} onClick={() => onOpen(w.id)}>
+              Open
+            </button>
           </div>
         ))}
       </div>

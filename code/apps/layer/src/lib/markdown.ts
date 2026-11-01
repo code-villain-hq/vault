@@ -31,7 +31,12 @@ export type Block =
   | { t: "hr" };
 
 export function parse(src: string): Block[] {
-  return blocks(src.replace(/\r\n?/g, "\n").replace(/<!--[\s\S]*?-->/g, "").split("\n"));
+  return blocks(
+    src
+      .replace(/\r\n?/g, "\n")
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .split("\n"),
+  );
 }
 
 // ------------------------------------------------------------------ blocks
@@ -53,12 +58,24 @@ const blank = (line: string) => line.replace(TAG, "").trim() === "";
 const indentOf = (line: string) => line.length - line.trimStart().length;
 
 function isTable(lines: string[], i: number): boolean {
-  return lines[i].includes("|") && i + 1 < lines.length && lines[i + 1].includes("-") && TABLE_SEP.test(lines[i + 1]);
+  return (
+    lines[i].includes("|") &&
+    i + 1 < lines.length &&
+    lines[i + 1].includes("-") &&
+    TABLE_SEP.test(lines[i + 1])
+  );
 }
 
 function startsBlock(lines: string[], i: number): boolean {
   const l = lines[i];
-  return FENCE.test(l) || HEADING.test(l) || RULE.test(l) || QUOTE.test(l) || ITEM.test(l) || isTable(lines, i);
+  return (
+    FENCE.test(l) ||
+    HEADING.test(l) ||
+    RULE.test(l) ||
+    QUOTE.test(l) ||
+    ITEM.test(l) ||
+    isTable(lines, i)
+  );
 }
 
 function blocks(lines: string[]): Block[] {
@@ -92,14 +109,21 @@ function blocks(lines: string[]): Block[] {
     }
     if (QUOTE.test(line)) {
       const inner: string[] = [];
-      while (i < lines.length && QUOTE.test(lines[i])) inner.push(lines[i++].replace(/^\s{0,3}>\s?/, ""));
+      while (i < lines.length && QUOTE.test(lines[i]))
+        inner.push(lines[i++].replace(/^\s{0,3}>\s?/, ""));
       out.push({ t: "quote", c: blocks(inner) });
       continue;
     }
     if (isTable(lines, i)) {
       const head = cells(line);
       const align = cells(lines[i + 1]).map((c): Align =>
-        c.startsWith(":") && c.endsWith(":") ? "center" : c.endsWith(":") ? "right" : c.startsWith(":") ? "left" : null,
+        c.startsWith(":") && c.endsWith(":")
+          ? "center"
+          : c.endsWith(":")
+            ? "right"
+            : c.startsWith(":")
+              ? "left"
+              : null,
       );
       i += 2;
       const rows: Inline[][][] = [];
@@ -116,7 +140,8 @@ function blocks(lines: string[]): Block[] {
     // A paragraph runs to a blank line or the start of another block.
     const para = [line.trim()];
     i++;
-    while (i < lines.length && !blank(lines[i]) && !startsBlock(lines, i)) para.push(lines[i++].trim());
+    while (i < lines.length && !blank(lines[i]) && !startsBlock(lines, i))
+      para.push(lines[i++].trim());
     const c: Inline[] = [];
     para.forEach((l, n) => {
       if (n > 0) c.push({ t: "br" });

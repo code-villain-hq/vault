@@ -2,11 +2,27 @@ import { describe, expect, test } from "bun:test";
 import { heldConversation, holdConversation, pruneConversations } from "../src/lib/acpPool";
 import type { AcpEntry, AcpView } from "../src/lib/types";
 
-const say = (index: number, text: string, rev = index): AcpEntry => ({ index, rev, kind: "agent", text });
+const say = (index: number, text: string, rev = index): AcpEntry => ({
+  index,
+  rev,
+  kind: "agent",
+  text,
+});
 const view = (rev: number, entries: AcpEntry[], reset = false, base = 0): AcpView => ({
-  rev, base, len: base + entries.length, reset, entries,
-  agent: "Agent 1.0", ready: true, busy: false, queued: 0, images: false,
-  settings: [], commands: [], usage: null, exited: false,
+  rev,
+  base,
+  len: base + entries.length,
+  reset,
+  entries,
+  agent: "Agent 1.0",
+  ready: true,
+  busy: false,
+  queued: 0,
+  images: false,
+  settings: [],
+  commands: [],
+  usage: null,
+  exited: false,
 });
 
 describe("a conversation kept while its pane is off screen (ACP-7)", () => {

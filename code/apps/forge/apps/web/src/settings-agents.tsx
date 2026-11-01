@@ -137,7 +137,6 @@ export function AgentsSettingsPage() {
                 </div>
                 <div className="flex flex-col gap-2 px-4 py-3">
                   <input
-                    // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
                     autoFocus
                     value={name}
                     onChange={(e) => setTyped(e.target.value)}
@@ -274,7 +273,6 @@ function AgentRow({
         ) : (
           <input
             aria-label="Agent name"
-            // biome-ignore lint/a11y/noAutofocus: opened by pressing Rename
             autoFocus
             value={renaming}
             onChange={(e) => setRenaming(e.target.value)}
@@ -404,7 +402,6 @@ function Runner({
       <form onSubmit={save} className="ml-9 flex items-center gap-2 text-xs">
         <input
           aria-label="Runner URL"
-          // biome-ignore lint/a11y/noAutofocus: opened by pressing a button
           autoFocus
           placeholder="http://localhost:4100/wake"
           value={editing}

@@ -22,19 +22,36 @@ describe("a comment as GitHub shows it", () => {
       t: "list",
       ordered: false,
       start: 1,
-      items: [{
-        task: null,
-        c: [{ t: "p", c: [{ t: "link", href: "https://acme-123.preview.example.com", c: [{ t: "text", v: "https://acme-123.preview.example.com" }] }] }],
-      }],
+      items: [
+        {
+          task: null,
+          c: [
+            {
+              t: "p",
+              c: [
+                {
+                  t: "link",
+                  href: "https://acme-123.preview.example.com",
+                  c: [{ t: "text", v: "https://acme-123.preview.example.com" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     });
   });
 
   test("a single newline breaks the line, as in GitHub comments", () => {
-    expect(parse("one\ntwo")).toEqual([{ t: "p", c: [{ t: "text", v: "one" }, { t: "br" }, { t: "text", v: "two" }] }]);
+    expect(parse("one\ntwo")).toEqual([
+      { t: "p", c: [{ t: "text", v: "one" }, { t: "br" }, { t: "text", v: "two" }] },
+    ]);
   });
 
   test("code is left as written", () => {
-    expect(parse("```ts\nconst a = b * c * d;\n```")).toEqual([{ t: "pre", lang: "ts", v: "const a = b * c * d;" }]);
+    expect(parse("```ts\nconst a = b * c * d;\n```")).toEqual([
+      { t: "pre", lang: "ts", v: "const a = b * c * d;" },
+    ]);
     expect(inline("`a*b*c` and snake_case_name")).toEqual([
       { t: "code", v: "a*b*c" },
       { t: "text", v: " and snake_case_name" },
@@ -58,7 +75,9 @@ describe("a comment as GitHub shows it", () => {
 
 describe("what a comment cannot do", () => {
   test("HTML is never markup: tags go, their text stays, markers vanish", () => {
-    const tree = parse("<!-- Sticky Pull Request Comment -->\n<details>\n<summary>Coverage</summary>\n\n<script>alert(1)</script> fine\n</details>");
+    const tree = parse(
+      "<!-- Sticky Pull Request Comment -->\n<details>\n<summary>Coverage</summary>\n\n<script>alert(1)</script> fine\n</details>",
+    );
     const text = JSON.stringify(tree);
     expect(text).not.toContain("Sticky");
     expect(text).not.toContain("<details>");
@@ -69,6 +88,8 @@ describe("what a comment cannot do", () => {
 
   test("a javascript: link is text, and images are not loaded", () => {
     expect(inline("[click](javascript:alert(1))")).toEqual([{ t: "text", v: "click" }]);
-    expect(inline("![logo](https://tracker.example/pixel.png)")).toEqual([{ t: "text", v: "[image: logo]" }]);
+    expect(inline("![logo](https://tracker.example/pixel.png)")).toEqual([
+      { t: "text", v: "[image: logo]" },
+    ]);
   });
 });

@@ -1,26 +1,40 @@
-import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
-import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
-import { TicketFlowSettings } from "./TicketFlow";
-import { TrackerChoice } from "./TrackerChoice";
-import { PhoneSettings } from "./PhoneSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { BrowserSettings } from "./BrowserSettings";
 import { ObservabilitySettings } from "./ObservabilitySettings";
-import { SlackSettings } from "./SlackSettings";
-import { AppearanceSettings } from "./AppearanceSettings";
+import { PhoneSettings } from "./PhoneSettings";
 import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
+import { SlackSettings } from "./SlackSettings";
+import { TicketFlowSettings } from "./TicketFlow";
+import { TrackerChoice } from "./TrackerChoice";
+import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
 
-type Section = "appearance" | "jira" | "github" | "slack" | "observability" | "phone" | "browser" | "general";
+const ATLASSIAN_TOKENS = "https://id.atlassian.com/manage-profile/security/api-tokens";
+
+type Section =
+  | "appearance"
+  | "jira"
+  | "github"
+  | "slack"
+  | "observability"
+  | "phone"
+  | "browser"
+  | "general";
 
 export function Settings() {
   const settings = useStore((s) => s.settings);
   const [version, setVersion] = useState<string | null>(null);
-  useEffect(() => { void getVersion().then(setVersion).catch(() => {}); }, []);
+  useEffect(() => {
+    void getVersion()
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
   const agents = useStore((s) => s.agents);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const refreshSettings = useStore((s) => s.refreshSettings);
@@ -84,7 +98,11 @@ export function Settings() {
     setGhWeb(ghWebNow ?? "https://github.com");
     setGhTeam(ghTeamNow ?? "");
   }, [loaded, ghApiNow, ghWebNow, ghTeamNow]);
-  const rootSaved = settings ? (settings.worktree_root_is_default ? "" : settings.worktree_root) : null;
+  const rootSaved = settings
+    ? settings.worktree_root_is_default
+      ? ""
+      : settings.worktree_root
+    : null;
   useEffect(() => {
     if (rootSaved !== null) setWorktreeRoot(rootSaved);
   }, [rootSaved]);
@@ -95,8 +113,11 @@ export function Settings() {
     try {
       // The connected row names who it signed in as: no toast (studio/design/behaviour.md).
       await api.jiraConnect(
-        jiraUrl.trim(), jiraEmail.trim(), jiraToken.trim(),
-        jiraProject.trim() || null, jiraJql.trim() || null,
+        jiraUrl.trim(),
+        jiraEmail.trim(),
+        jiraToken.trim(),
+        jiraProject.trim() || null,
+        jiraJql.trim() || null,
       );
       setJiraToken("");
       await refreshSettings();
@@ -112,9 +133,7 @@ export function Settings() {
     setBusy(true);
     github.clear();
     try {
-      await api.githubConnect(
-        ghApi.trim(), ghWeb.trim(), ghToken.trim(), ghTeam.trim() || null,
-      );
+      await api.githubConnect(ghApi.trim(), ghWeb.trim(), ghToken.trim(), ghTeam.trim() || null);
       setGhToken("");
       await refreshSettings();
       // The PR tabs still hold what the old token was told.
@@ -163,20 +182,27 @@ export function Settings() {
       toolbar={
         <div className="ui-tabs section-tabs" role="tablist">
           {/* Named for what each does, not the product behind it (SET-6). */}
-          {([
-            ["appearance", "Appearance"],
-            ["jira", "Tickets"],
-            ["github", "Code"],
-            ["slack", "Messaging"],
-            ["observability", "Observability"],
-            ["phone", "Remote access"],
-            ["browser", "Browser"],
-            ["general", "General"],
-          ] as [Section, string][]).map(([id, label]) => (
+          {(
+            [
+              ["appearance", "Appearance"],
+              ["jira", "Tickets"],
+              ["github", "Code"],
+              ["slack", "Messaging"],
+              ["observability", "Observability"],
+              ["phone", "Remote access"],
+              ["browser", "Browser"],
+              ["general", "General"],
+            ] as [Section, string][]
+          ).map(([id, label]) => (
             <button
               key={id}
-              className="ui-tab" role="tab" aria-selected={section === id}
-              onClick={() => { unlink.clear(); setSection(id); }}
+              className="ui-tab"
+              role="tab"
+              aria-selected={section === id}
+              onClick={() => {
+                unlink.clear();
+                setSection(id);
+              }}
             >
               {label}
             </button>
@@ -184,7 +210,6 @@ export function Settings() {
         </div>
       }
     >
-
       {section === "appearance" && <AppearanceSettings />}
 
       {section === "slack" && <SlackSettings />}
@@ -195,25 +220,39 @@ export function Settings() {
           {settings?.tracker_chosen === "github" ? (
             <>
               <p className="muted">
-                Issues come from the workspace's repositories on GitHub: the open ones assigned to you, each
-                started as a task, and closed when its pull request merges. They use the token under Code.
+                Issues come from the workspace's repositories on GitHub: the open ones assigned to
+                you, each started as a task, and closed when its pull request merges. They use the
+                token under Code.
               </p>
-              {settings.github_connected
-                ? <div className="row"><span className="ui-status">connected</span><span className="muted">{settings.github?.web_url}</span></div>
-                : <button className="ui-button ui-button-primary" onClick={() => setSection("github")}>Connect GitHub</button>}
+              {settings.github_connected ? (
+                <div className="row">
+                  <span className="ui-status">connected</span>
+                  <span className="muted">{settings.github?.web_url}</span>
+                </div>
+              ) : (
+                <button
+                  className="ui-button ui-button-primary"
+                  onClick={() => setSection("github")}
+                >
+                  Connect GitHub
+                </button>
+              )}
             </>
           ) : (
             <>
               <p className="muted">
-                Tickets come from Jira: the ones assigned to you, each started as a task, and moved along as the
-                work goes.
+                Tickets come from Jira: the ones assigned to you, each started as a task, and moved
+                along as the work goes.
               </p>
               {settings?.jira_connected && (
                 <div className="row" style={{ marginBottom: 14 }}>
                   <span className="ui-status">connected</span>
                   <span className="muted">{settings.jira?.email}</span>
                   <div className="spacer" />
-                  <button className="ui-button ui-button-danger" onClick={() => void disconnect("jira")}>
+                  <button
+                    className="ui-button ui-button-danger"
+                    onClick={() => void disconnect("jira")}
+                  >
                     Disconnect
                   </button>
                 </div>
@@ -222,24 +261,34 @@ export function Settings() {
               <Theirs
                 kind="jira"
                 what="Jira"
-                rows={[["Site", jiraUrl], ["Project", jiraProject], ["Query", jiraJql, true]]}
+                rows={[
+                  ["Site", jiraUrl],
+                  ["Project", jiraProject],
+                  ["Query", jiraJql, true],
+                ]}
               >
                 <Field label="Site URL">
-                  <input className="ui-field"
+                  <input
+                    className="ui-field"
                     value={jiraUrl}
                     onChange={(e) => setJiraUrl(e.target.value)}
                     placeholder="https://your-team.atlassian.net"
                   />
                 </Field>
                 <Field label="Project key" hint="Optional. Scopes the default task query.">
-                  <input className="ui-field"
+                  <input
+                    className="ui-field"
                     value={jiraProject}
                     onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
                     placeholder="ACME"
                   />
                 </Field>
-                <Field label="JQL" hint="Optional. Overrides the default 'assigned to me, not done' query.">
-                  <input className="ui-field"
+                <Field
+                  label="JQL"
+                  hint="Optional. Overrides the default 'assigned to me, not done' query."
+                >
+                  <input
+                    className="ui-field"
                     value={jiraJql}
                     onChange={(e) => setJiraJql(e.target.value)}
                     placeholder="assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
@@ -247,55 +296,69 @@ export function Settings() {
                 </Field>
               </Theirs>
               <Yours>
-              <Field label="Account email">
-                <input className="ui-field" value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} />
-              </Field>
-              <Field
-                label="API token"
-                hint={
-                  <>
-                    Stored in your macOS keychain, never in config files.{" "}
-                    <a
-                      className="ui-link"
-                      href="#"
-                 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        void openUrl("https://id.atlassian.com/manage-profile/security/api-tokens");
-                      }}
-                    >
-                      Create one ↗
-                    </a>
-                  </>
-                }
-              >
-                <input className="ui-field"
-                  type="password"
-                  value={jiraToken}
-                  onChange={(e) => setJiraToken(e.target.value)}
-                  placeholder={settings?.jira_connected ? "•••••••• (leave blank to keep)" : ""}
-                />
-              </Field>
+                <Field label="Account email">
+                  <input
+                    className="ui-field"
+                    value={jiraEmail}
+                    onChange={(e) => setJiraEmail(e.target.value)}
+                  />
+                </Field>
+                <Field
+                  label="API token"
+                  hint={
+                    <>
+                      Stored in your macOS keychain, never in config files.{" "}
+                      <a
+                        className="ui-link"
+                        href={ATLASSIAN_TOKENS}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void openUrl(ATLASSIAN_TOKENS);
+                        }}
+                      >
+                        Create one ↗
+                      </a>
+                    </>
+                  }
+                >
+                  <input
+                    className="ui-field"
+                    type="password"
+                    value={jiraToken}
+                    onChange={(e) => setJiraToken(e.target.value)}
+                    placeholder={settings?.jira_connected ? "•••••••• (leave blank to keep)" : ""}
+                  />
+                </Field>
               </Yours>
               <button
                 className="ui-button ui-button-primary"
                 // A blank token keeps the stored one, so once connected the
                 // project key and JQL can be changed without pasting it again.
                 disabled={
-                  busy || !jiraUrl.trim() || !jiraEmail.trim() ||
+                  busy ||
+                  !jiraUrl.trim() ||
+                  !jiraEmail.trim() ||
                   (!jiraToken.trim() && !settings?.jira_connected)
                 }
                 onClick={() => void connectJira()}
               >
                 {/* One button, named by what it does (SET-12). */}
-                <BusyLabel busy={busy} idle={settings?.jira_connected ? "Reconnect" : "Connect"} working="Connecting…" />
+                <BusyLabel
+                  busy={busy}
+                  idle={settings?.jira_connected ? "Reconnect" : "Connect"}
+                  working="Connecting…"
+                />
               </button>
               <ErrorMessage>{jira.error}</ErrorMessage>
               {settings?.jira_connected && (
                 // Where tickets go is the workspace's too (SET-7).
                 <fieldset className="settings-locked" disabled={flowLocked}>
                   <TicketFlowSettings />
-                  {flowLocked && <p className="settings-alone">How tickets follow the work is {workspace.name}'s: admins change it.</p>}
+                  {flowLocked && (
+                    <p className="settings-alone">
+                      How tickets follow the work is {workspace.name}'s: admins change it.
+                    </p>
+                  )}
                 </fieldset>
               )}
             </>
@@ -310,12 +373,17 @@ export function Settings() {
           </p>
           {settings?.github_connected && (
             <div className="row" style={{ marginBottom: 14 }}>
-              {ghRejected
-                ? <span className="ui-status ui-status-danger">token rejected</span>
-                : <span className="ui-status">connected</span>}
+              {ghRejected ? (
+                <span className="ui-status ui-status-danger">token rejected</span>
+              ) : (
+                <span className="ui-status">connected</span>
+              )}
               <span className="muted">{settings.github?.api_url}</span>
               <div className="spacer" />
-              <button className="ui-button ui-button-danger" onClick={() => void disconnect("github")}>
+              <button
+                className="ui-button ui-button-danger"
+                onClick={() => void disconnect("github")}
+              >
                 Disconnect
               </button>
             </div>
@@ -324,49 +392,62 @@ export function Settings() {
           <Theirs
             kind="github"
             what="GitHub"
-            rows={[["API URL", ghApi], ["Web URL", ghWeb], ["Review team", ghTeam]]}
+            rows={[
+              ["API URL", ghApi],
+              ["Web URL", ghWeb],
+              ["Review team", ghTeam],
+            ]}
           >
-          <Field
-            label="API URL"
-            hint="github.com uses https://api.github.com. Enterprise Server uses https://ghe.example.com/api/v3."
-          >
-            <input className="ui-field" value={ghApi} onChange={(e) => setGhApi(e.target.value)} />
-          </Field>
-          <Field label="Web URL" hint="Used for building links back to the browser.">
-            <input className="ui-field" value={ghWeb} onChange={(e) => setGhWeb(e.target.value)} />
-          </Field>
-          <Field
-            label="Review team"
-            hint="Optional. A second list of pull requests requested of this team, as @fe or org/fe. A bare name is looked up from the teams you belong to, which needs the read:org scope; org/fe does not."
-          >
-            <input className="ui-field"
-              value={ghTeam}
-              onChange={(e) => setGhTeam(e.target.value)}
-              placeholder="@fe"
-            />
-          </Field>
+            <Field
+              label="API URL"
+              hint="github.com uses https://api.github.com. Enterprise Server uses https://ghe.example.com/api/v3."
+            >
+              <input
+                className="ui-field"
+                value={ghApi}
+                onChange={(e) => setGhApi(e.target.value)}
+              />
+            </Field>
+            <Field label="Web URL" hint="Used for building links back to the browser.">
+              <input
+                className="ui-field"
+                value={ghWeb}
+                onChange={(e) => setGhWeb(e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Review team"
+              hint="Optional. A second list of pull requests requested of this team, as @fe or org/fe. A bare name is looked up from the teams you belong to, which needs the read:org scope; org/fe does not."
+            >
+              <input
+                className="ui-field"
+                value={ghTeam}
+                onChange={(e) => setGhTeam(e.target.value)}
+                placeholder="@fe"
+              />
+            </Field>
           </Theirs>
           <Yours>
-          <Field
-            label="Personal access token"
-            hint="Needs repo scope. Stored in your keychain."
-          >
-            <input className="ui-field"
-              type="password"
-              value={ghToken}
-              onChange={(e) => setGhToken(e.target.value)}
-              placeholder={settings?.github_connected ? "•••••••• (leave blank to keep)" : ""}
-            />
-          </Field>
+            <Field label="Personal access token" hint="Needs repo scope. Stored in your keychain.">
+              <input
+                className="ui-field"
+                type="password"
+                value={ghToken}
+                onChange={(e) => setGhToken(e.target.value)}
+                placeholder={settings?.github_connected ? "•••••••• (leave blank to keep)" : ""}
+              />
+            </Field>
           </Yours>
           <button
             className="ui-button ui-button-primary"
-            disabled={
-              busy || !ghApi.trim() || (!ghToken.trim() && !settings?.github_connected)
-            }
+            disabled={busy || !ghApi.trim() || (!ghToken.trim() && !settings?.github_connected)}
             onClick={() => void connectGithub()}
           >
-            <BusyLabel busy={busy} idle={settings?.github_connected ? "Reconnect" : "Connect"} working="Connecting…" />
+            <BusyLabel
+              busy={busy}
+              idle={settings?.github_connected ? "Reconnect" : "Connect"}
+              working="Connecting…"
+            />
           </button>
           <ErrorMessage>{github.error}</ErrorMessage>
         </>
@@ -382,20 +463,23 @@ export function Settings() {
             label="Task folder location"
             hint={
               <>
-                Each task gets a folder here, holding one worktree per repository
-                it touches. Currently <code>{settings?.worktree_root}</code>
+                Each task gets a folder here, holding one worktree per repository it touches.
+                Currently <code>{settings?.worktree_root}</code>
                 {settings?.worktree_root_is_default ? " (default)" : ""}.
               </>
             }
           >
             <div className="row">
-              <input className="ui-field"
+              <input
+                className="ui-field"
                 value={worktreeRoot}
                 placeholder="(default: ~/.villain-worktrees)"
                 onChange={(e) => setWorktreeRoot(e.target.value)}
                 onBlur={() => void saveWorktreeRoot(worktreeRoot)}
               />
-              <button className="ui-button" onClick={() => void pickWorktreeRoot()}>Browse…</button>
+              <button className="ui-button" onClick={() => void pickWorktreeRoot()}>
+                Browse…
+              </button>
             </div>
             <ErrorMessage>{general.error}</ErrorMessage>
           </Field>
@@ -405,7 +489,13 @@ export function Settings() {
                 <div key={a.id} className="row" style={{ fontSize: "var(--type-ui-small-size)" }}>
                   <span className={`dot ${a.installed ? "live" : ""}`} />
                   <span style={{ width: 110 }}>{a.name}</span>
-                  <span className="muted" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--type-ui-small-size)" }}>
+                  <span
+                    className="muted"
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "var(--type-ui-small-size)",
+                    }}
+                  >
                     {a.path ?? "not found on PATH"}
                   </span>
                 </div>
@@ -418,7 +508,10 @@ export function Settings() {
       {/* Settings ends with the app's name and version, on every page
           (SET-11, studio/design/behaviour.md). */}
       {version && (
-        <p className="settings-version" title="Name this in a bug report. A crash is written to ~/Library/Logs/villain-layer/panic.log.">
+        <p
+          className="settings-version"
+          title="Name this in a bug report. A crash is written to ~/Library/Logs/villain-layer/panic.log."
+        >
           Layer {version}
         </p>
       )}

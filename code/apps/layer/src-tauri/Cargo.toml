@@ -24,17 +24,35 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process", "io-util", "net"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "sync",
+  "time",
+  "process",
+  "io-util",
+  "net",
+] }
 axum = "0.8"
 portable-pty = "0.9"
 
 # 0.13.5, for the bundled Postgres's download (`postgresql_archive`). Its
 # `rustls` checks certificates with macOS's own trust store, as the
 # `rustls-native-certs` it replaced did with the system's roots.
-reqwest = { version = "0.13.5", default-features = false, features = ["json", "query", "rustls", "http2", "charset", "system-proxy"] }
+reqwest = { version = "0.13.5", default-features = false, features = [
+  "json",
+  "query",
+  "rustls",
+  "http2",
+  "charset",
+  "system-proxy",
+] }
 # The Slack bot's Socket Mode connection (BOT-1): reqwest has no
 # websocket client. rustls with the system's roots.
-tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = [
+  "connect",
+  "rustls-tls-native-roots",
+] }
 
 keyring = "4"
 
@@ -52,8 +70,29 @@ notify-rust = "4"
 # no new crates: only these classes' bindings are added. NSPasteboard and
 # NSData put the browser's screenshot on the clipboard as a PNG (BRW-22).
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSDictionary", "NSGeometry", "NSAttributedString", "NSData"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSRunningApplication", "NSImage", "NSBezierPath", "NSColor", "NSFont", "NSStringDrawing", "NSAttributedString", "NSPasteboard", "objc2-core-foundation", "libc"] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSString",
+  "NSDictionary",
+  "NSGeometry",
+  "NSAttributedString",
+  "NSData",
+] }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSApplication",
+  "NSResponder",
+  "NSRunningApplication",
+  "NSImage",
+  "NSBezierPath",
+  "NSColor",
+  "NSFont",
+  "NSStringDrawing",
+  "NSAttributedString",
+  "NSPasteboard",
+  "objc2-core-foundation",
+  "libc",
+] }
 # Workspaces (§25): each runs Layer's server on its own Postgres, bundled
 # in the app (`workspace.rs`), and keeps its shared setup there.
 code-villain-desktop = { workspace = true }

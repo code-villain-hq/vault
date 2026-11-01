@@ -124,7 +124,6 @@ export function TalkPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll as the talk grows
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
   }, [messages.length, mine?.text, showQuestion]);
@@ -263,7 +262,6 @@ export function TalkPanel({
             <PickedPhotos picking={picking} />
             <textarea
               ref={field}
-              // biome-ignore lint/a11y/noAutofocus: the panel opens to ask
               autoFocus
               value={text}
               onChange={(e) => setText(e.target.value)}

@@ -59,7 +59,9 @@ function Fallback({ level, size }: { level: number; size: number }) {
 }
 
 export function IssueTypeIcon({
-  types, name, size = 16,
+  types,
+  name,
+  size = 16,
 }: {
   types: TypeMap;
   name: string;

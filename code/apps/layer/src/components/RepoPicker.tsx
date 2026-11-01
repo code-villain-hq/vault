@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { groupProjects } from "../lib/derive";
-import { ChevronIcon } from "./icons";
 import type { Project } from "../lib/types";
+import { ChevronIcon } from "./icons";
 
 /**
  * Multi-select over the registered repositories. Past ~10 repos a flat
@@ -9,7 +9,10 @@ import type { Project } from "../lib/types";
  * select-all, and saved sets for combinations that recur.
  */
 export function RepoPicker({
-  projects, picked, onChange, reason,
+  projects,
+  picked,
+  onChange,
+  reason,
 }: {
   projects: Project[];
   picked: string[];
@@ -17,7 +20,6 @@ export function RepoPicker({
   /** Why these were preselected, surfaced so the guess is auditable. */
   reason?: string | null;
 }) {
-
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -47,23 +49,30 @@ export function RepoPicker({
 
   return (
     <div className="picker">
-      {reason && (
-        <div className="picker-reason">Preselected from {reason} — change freely.</div>
-      )}
+      {reason && <div className="picker-reason">Preselected from {reason} — change freely.</div>}
 
       {total > 6 && (
         <div className="picker-top">
-          <input className="ui-field"
+          <input
+            className="ui-field"
             type="text"
             placeholder={`Filter ${total} repositories…`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <span className="muted" style={{ whiteSpace: "nowrap", fontSize: "var(--type-ui-small-size)" }}>
+          <span
+            className="muted"
+            style={{ whiteSpace: "nowrap", fontSize: "var(--type-ui-small-size)" }}
+          >
             {picked.length} selected
           </span>
           {picked.length > 0 && (
-            <button className="ui-button ui-icon-button" title="Clear selection" aria-label="Clear selection" onClick={() => onChange([])}>
+            <button
+              className="ui-button ui-icon-button"
+              title="Clear selection"
+              aria-label="Clear selection"
+              onClick={() => onChange([])}
+            >
               ✕
             </button>
           )}
@@ -72,7 +81,9 @@ export function RepoPicker({
 
       <div className="picker-list">
         {groups.length === 0 && (
-          <div className="muted" style={{ padding: 12 }}>Nothing matches “{query}”.</div>
+          <div className="muted" style={{ padding: 12 }}>
+            Nothing matches “{query}”.
+          </div>
         )}
         {groups.map((g) => {
           const ids = g.projects.map((p) => p.id);
@@ -84,7 +95,9 @@ export function RepoPicker({
                 className="group-head"
                 onClick={() => setCollapsed((c) => ({ ...c, [g.group]: !isCollapsed }))}
               >
-                <span className={`chev${isCollapsed ? "" : " open"}`}><ChevronIcon /></span>
+                <span className={`chev${isCollapsed ? "" : " open"}`}>
+                  <ChevronIcon />
+                </span>
                 {g.label}
                 <span className="count">{g.projects.length}</span>
                 <div className="spacer" />
@@ -92,17 +105,18 @@ export function RepoPicker({
                   <button onClick={() => setGroup(ids, !all)}>{all ? "none" : "all"}</button>
                 </div>
               </div>
-              {!isCollapsed && g.projects.map((p) => (
-                <label key={p.id} className="repo-pick">
-                  <input
-                    type="checkbox"
-                    checked={picked.includes(p.id)}
-                    onChange={() => toggle(p.id)}
-                  />
-                  <span style={{ flex: 1 }}>{p.name}</span>
-                  <span className="path">{p.path}</span>
-                </label>
-              ))}
+              {!isCollapsed &&
+                g.projects.map((p) => (
+                  <label key={p.id} className="repo-pick">
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(p.id)}
+                      onChange={() => toggle(p.id)}
+                    />
+                    <span style={{ flex: 1 }}>{p.name}</span>
+                    <span className="path">{p.path}</span>
+                  </label>
+                ))}
             </div>
           );
         })}

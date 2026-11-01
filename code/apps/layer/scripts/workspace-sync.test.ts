@@ -16,33 +16,41 @@ let written: () => void = () => {};
 let kept: string[] = [];
 const identities = new WeakMap<Operation, string>();
 
-mock.module("@code-villain/sync-client", () => ({
+void mock.module("@code-villain/sync-client", () => ({
   ...kit,
   IndexedDbStore: kit.MemoryStore,
   HttpTransport: class {
     constructor() {
-      // biome-ignore lint/correctness/noConstructorReturn: the fake's transport stands in
+      // oxlint-disable-next-line no-constructor-return -- the fake's transport stands in
       return server.transport();
     }
   },
 }));
-mock.module("@tauri-apps/api/event", () => ({
+void mock.module("@tauri-apps/api/event", () => ({
   listen: async (_event: string, handler: () => void) => {
     written = handler;
     return () => {};
   },
 }));
-mock.module("../src/lib/api", () => ({
+void mock.module("../src/lib/api", () => ({
   ...real,
   api: {
     ...real.api,
-    workspacePlace: async () => ({ origin: "http://127.0.0.1:7685", token: "t", user_id: "u", workspace_id: "w" }),
-    readSetupWrites: async () => backend.outbox.map((operation) => {
-      const id = identities.get(operation) ?? kit.uuidv7();
-      identities.set(operation, id);
-      return { id, operation };
+    workspacePlace: async () => ({
+      origin: "http://127.0.0.1:7685",
+      token: "t",
+      user_id: "u",
+      workspace_id: "w",
     }),
-    ackSetupWrites: async (ids: string[]) => { backend.outbox = backend.outbox.filter((op) => !ids.includes(identities.get(op) ?? "")); },
+    readSetupWrites: async () =>
+      backend.outbox.map((operation) => {
+        const id = identities.get(operation) ?? kit.uuidv7();
+        identities.set(operation, id);
+        return { id, operation };
+      }),
+    ackSetupWrites: async (ids: string[]) => {
+      backend.outbox = backend.outbox.filter((op) => !ids.includes(identities.get(op) ?? ""));
+    },
     addMessage: async (_kind: string, _level: string, title: string) => void kept.push(title),
     applySetup: async (snapshot: Record<string, { id: string }[]>) => {
       if (backend.outbox.length) return { applied: false, setup: false };
@@ -56,7 +64,12 @@ const { refusals, startWorkspaceSync } = await import("../src/lib/workspace-sync
 
 // The fake server is Forge's: a create needs a title.
 const note = (id: string, text: string): Operation =>
-  ({ action: "create", model: "Note", id, data: { title: "note", repo: "github.com/acme/api", text } }) as Operation;
+  ({
+    action: "create",
+    model: "Note",
+    id,
+    data: { title: "note", repo: "github.com/acme/api", text },
+  }) as Operation;
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -87,7 +100,9 @@ describe("the shared setup between this Mac and its workspace", () => {
     server.change("Note", "n1", { text: "Second." });
     await settled();
     expect(reads).toBe(first + 1);
-    expect((backend.snapshot?.notes[0] as unknown as { text: string }).text).toBe("Second.");
+    expect((backend.snapshot?.notes[0] as unknown as { text: string } | undefined)?.text).toBe(
+      "Second.",
+    );
     stop();
   });
 
@@ -107,8 +122,16 @@ describe("the shared setup between this Mac and its workspace", () => {
     const refused: string[] = [];
     const said = (e: Event) => refused.push((e as CustomEvent<string>).detail);
     refusals.addEventListener("refused", said);
-    backend.outbox.push({ action: "create", model: "Note", id: "n3", data: { text: "No title." } } as Operation);
-    const stop = await startWorkspaceSync({ onSetup: () => {}, onRefused: (m) => refused.push(`here: ${m}`) });
+    backend.outbox.push({
+      action: "create",
+      model: "Note",
+      id: "n3",
+      data: { text: "No title." },
+    } as Operation);
+    const stop = await startWorkspaceSync({
+      onSetup: () => {},
+      onRefused: (m) => refused.push(`here: ${m}`),
+    });
     await settled();
     refusals.removeEventListener("refused", said);
 

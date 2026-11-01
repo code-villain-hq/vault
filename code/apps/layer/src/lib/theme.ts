@@ -39,7 +39,9 @@ function resolve(choice: ThemeChoice, light = systemLight.matches): Theme {
  */
 function remembered(): ThemeChoice {
   // Kept here before Dark and Light became Nightshade's night and day.
-  const old = ({ dark: "night", light: "day" } as Record<string, ThemeChoice>)[read<string>("theme", "")];
+  const old = ({ dark: "night", light: "day" } as Record<string, ThemeChoice>)[
+    read<string>("theme", "")
+  ];
   return old ?? readOneOf("theme", CHOICES, "night");
 }
 

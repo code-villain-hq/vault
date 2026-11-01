@@ -1,12 +1,16 @@
 /* ------------------------------- settings: the workspace's and yours (SET-7) */
 
-.settings-block { margin-bottom: 14px; }
+.settings-block {
+  margin-bottom: 14px;
+}
 .settings-block-title {
   margin: 0 0 8px;
   font-size: var(--type-ui-size);
   font-weight: 700;
 }
-.settings-block-title .muted { font-weight: 400; }
+.settings-block-title .muted {
+  font-weight: 400;
+}
 .settings-alone {
   margin: 0 0 10px;
   color: var(--muted);
@@ -20,7 +24,9 @@
   gap: 4px 24px;
   margin: 0;
 }
-.settings-shared dt { color: var(--muted); }
+.settings-shared dt {
+  color: var(--muted);
+}
 .settings-shared dd {
   margin: 0;
   overflow: hidden;
@@ -28,7 +34,9 @@
   white-space: nowrap;
   color: var(--fg);
 }
-.settings-shared dd.muted { color: var(--faint); }
+.settings-shared dd.muted {
+  color: var(--faint);
+}
 
 /* The last thing in Settings, on every page: "Layer 0.1.0" (SET-11). */
 .settings-version {
@@ -39,4 +47,9 @@
 }
 
 /* A member's look at what admins change: the controls, not to be used. */
-.settings-locked { border: 0; margin: 0; padding: 0; min-width: 0; }
+.settings-locked {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}

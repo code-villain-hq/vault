@@ -4,19 +4,13 @@
 
 import { isDesktop } from "@code-villain/web";
 
-export {
-  isDesktop,
-  onAppLink,
-  openExternalLinksInBrowser,
-  openInBrowser,
-} from "@code-villain/web";
+export { isDesktop, onAppLink, openExternalLinksInBrowser, openInBrowser } from "@code-villain/web";
 
 /** Shows a native notification. Desktop only; does nothing in the browser. */
 export async function notify(title: string, body: string) {
   if (!isDesktop) return;
-  const { isPermissionGranted, requestPermission, sendNotification } = await import(
-    "@tauri-apps/plugin-notification"
-  );
+  const { isPermissionGranted, requestPermission, sendNotification } =
+    await import("@tauri-apps/plugin-notification");
   let granted = await isPermissionGranted();
   if (!granted) granted = (await requestPermission()) === "granted";
   if (granted) sendNotification({ title, body });

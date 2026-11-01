@@ -5,7 +5,10 @@ const byId = (t: { id: string }) => t.id;
 
 describe("a refresh that found nothing new", () => {
   test("hands back the list already held, not an equal copy", () => {
-    const held = [{ id: "a", n: 1 }, { id: "b", n: 2 }];
+    const held = [
+      { id: "a", n: 1 },
+      { id: "b", n: 2 },
+    ];
     expect(reuse(held, structuredClone(held), byId)).toBe(held);
   });
 
@@ -19,8 +22,18 @@ describe("a refresh that found nothing new", () => {
 
 describe("a refresh that changed one item", () => {
   test("is a new list that keeps every other item as it was", () => {
-    const held = [{ id: "a", n: 1 }, { id: "b", n: 2 }];
-    const next = reuse(held, [{ id: "a", n: 1 }, { id: "b", n: 3 }], byId);
+    const held = [
+      { id: "a", n: 1 },
+      { id: "b", n: 2 },
+    ];
+    const next = reuse(
+      held,
+      [
+        { id: "a", n: 1 },
+        { id: "b", n: 3 },
+      ],
+      byId,
+    );
     expect(next).not.toBe(held);
     expect(next[0]).toBe(held[0]);
     expect(next[1]).toEqual({ id: "b", n: 3 });

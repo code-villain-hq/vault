@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { canRestart, paneName } from "../lib/derive";
-import { useStore } from "../store";
 import type { PaneInfo } from "../lib/types";
+import { useStore } from "../store";
 import { ReloadIcon } from "./icons";
 
 /**
@@ -38,14 +38,25 @@ export function useRestart(select: (paneId: string) => void) {
 }
 
 /** Restart, on a pane's tab and on a chat's entry in the list. */
-export function RestartButton({ pane, onRestart }: { pane: PaneInfo; onRestart: (p: PaneInfo) => void }) {
+export function RestartButton({
+  pane,
+  onRestart,
+}: {
+  pane: PaneInfo;
+  onRestart: (p: PaneInfo) => void;
+}) {
   return (
     <span
       className="x"
-      title={pane.running
-        ? "Restart on the same conversation, to run a CLI that has updated itself"
-        : "Resume the conversation"}
-      onClick={(e) => { e.stopPropagation(); onRestart(pane); }}
+      title={
+        pane.running
+          ? "Restart on the same conversation, to run a CLI that has updated itself"
+          : "Resume the conversation"
+      }
+      onClick={(e) => {
+        e.stopPropagation();
+        onRestart(pane);
+      }}
     >
       <ReloadIcon />
     </span>
@@ -57,7 +68,11 @@ export function RestartButton({ pane, onRestart }: { pane: PaneInfo; onRestart: 
  * said how ("Resume this session with: claude --resume …"), and nothing in
  * the app could.
  */
-export function PaneExited({ pane, busy, onResume }: {
+export function PaneExited({
+  pane,
+  busy,
+  onResume,
+}: {
   pane: PaneInfo | undefined;
   busy: boolean;
   onResume: (p: PaneInfo) => void;
@@ -67,11 +82,15 @@ export function PaneExited({ pane, busy, onResume }: {
   return (
     <div className="limit-banner">
       <span>
-        <b>{paneName(pane)}</b> has exited{pane.exit_code ? ` with ${pane.exit_code}` : ""}.
-        Resume picks its conversation up where it stopped.
+        <b>{paneName(pane)}</b> has exited{pane.exit_code ? ` with ${pane.exit_code}` : ""}. Resume
+        picks its conversation up where it stopped.
       </span>
       <div className="spacer" />
-      <button className="ui-button ui-button-primary" disabled={busy} onClick={() => onResume(pane)}>
+      <button
+        className="ui-button ui-button-primary"
+        disabled={busy}
+        onClick={() => onResume(pane)}
+      >
         {busy ? "Resuming…" : "Resume"}
       </button>
     </div>

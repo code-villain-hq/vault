@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
+import { useEffect, useRef, useState } from "react";
 import { decode, TERMINAL_FONT, terminalTheme } from "../lib/terminal";
 import { currentTheme, type Theme } from "../lib/theme";
 import { follow, phoneApi } from "./client";
@@ -46,7 +46,11 @@ function savedMode(): Mode {
  * be scrolled sideways.
  */
 export function PaneView({
-  id, pane, typing, theme, onBack,
+  id,
+  pane,
+  typing,
+  theme,
+  onBack,
 }: {
   id: string;
   pane: PhonePane | null;
@@ -163,7 +167,9 @@ export function PaneView({
   return (
     <div className="screen">
       <header className="bar">
-        <button className="back" onClick={onBack}>‹</button>
+        <button className="back" onClick={onBack}>
+          ‹
+        </button>
         <div className="title">
           <div className="pane-name">{pane?.name ?? "Terminal"}</div>
           {st && (
@@ -180,7 +186,10 @@ export function PaneView({
             Zoom
           </button>
         )}
-        <span className={`dot ${live ? "live" : "gone"}`} title={live ? "Connected" : "Not connected"} />
+        <span
+          className={`dot ${live ? "live" : "gone"}`}
+          title={live ? "Connected" : "Not connected"}
+        />
       </header>
       {mode === "text" && (
         <div
@@ -198,15 +207,20 @@ export function PaneView({
       <div className={`term-wrap${zoom ? " zoomed" : ""}${mode === "text" ? " hidden" : ""}`}>
         <div ref={host} className="term" />
       </div>
-      {exited !== undefined && <div className="note">Exited{exited !== null ? ` with ${exited}` : ""}.</div>}
+      {exited !== undefined && (
+        <div className="note">Exited{exited !== null ? ` with ${exited}` : ""}.</div>
+      )}
       {gone && <div className="note">This terminal was closed on the Mac.</div>}
       {canType ? (
         <Typing id={id} />
       ) : pane?.kind === "shell" ? (
         <div className="note">A shell can only be watched from the phone.</div>
       ) : (
-        pane?.running && !typing && (
-          <div className="note">Watching only. Typing can be turned on in the app's Settings, under Phone.</div>
+        pane?.running &&
+        !typing && (
+          <div className="note">
+            Watching only. Typing can be turned on in the app's Settings, under Phone.
+          </div>
         )
       )}
     </div>

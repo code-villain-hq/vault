@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { useStore } from "../../store";
 import type { TaskSpec, TaskView } from "../../lib/types";
+import { useStore } from "../../store";
 import { Confirm, ErrorMessage, useFailure } from "../ui";
 
 /**
@@ -12,7 +12,13 @@ import { Confirm, ErrorMessage, useFailure } from "../ui";
  * two agents set off on the same steps. So it names the agents already at
  * work in the task, and asks before starting another.
  */
-export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false }: {
+export function SpecStartAgent({
+  task,
+  spec,
+  agentId,
+  setAgentId,
+  quiet = false,
+}: {
   task: TaskView;
   spec: TaskSpec;
   agentId: string | null;
@@ -38,12 +44,18 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
   }, [agentId, firstInstalled, setAgentId]);
 
   const repos = spec.repos;
-  const one = scope === "all" ? null : repos.find((r) => r.checkout_id === scope) ?? null;
+  const one = scope === "all" ? null : (repos.find((r) => r.checkout_id === scope) ?? null);
   const inScope = one ? [one] : repos;
   const total = inScope.reduce((n, r) => n + r.steps.length, 0);
   const left = inScope.reduce((n, r) => n + r.steps.filter((s) => !s.done).length, 0);
   const name = installed.find((a) => a.id === agentId)?.name ?? "an agent";
-  const where = one ? one.folder : repos.length === 1 ? repos[0].folder : repos.length === 2 ? "both repositories" : `all ${repos.length} repositories`;
+  const where = one
+    ? one.folder
+    : repos.length === 1
+      ? repos[0].folder
+      : repos.length === 2
+        ? "both repositories"
+        : `all ${repos.length} repositories`;
   const working = panes.filter((p) => p.task_id === task.id && p.running && p.kind === "agent");
   const nameOf = (agent: string | null) => agents.find((a) => a.id === agent)?.name ?? "An agent";
 
@@ -53,8 +65,16 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
     failure.clear();
     try {
       const checkoutId = one && repos.length > 1 ? one.checkout_id : null;
-      const [prompt, work] = await Promise.all([api.taskPrompt(task.id, checkoutId), api.specWorkPrompt(task.id, checkoutId)]);
-      const pane = await api.spawnAgent(task.id, agentId, checkoutId, [prompt, work].filter(Boolean).join("\n\n"));
+      const [prompt, work] = await Promise.all([
+        api.taskPrompt(task.id, checkoutId),
+        api.specWorkPrompt(task.id, checkoutId),
+      ]);
+      const pane = await api.spawnAgent(
+        task.id,
+        agentId,
+        checkoutId,
+        [prompt, work].filter(Boolean).join("\n\n"),
+      );
       await refreshPanes();
       showPane(pane.id);
       setTab("terminals");
@@ -68,29 +88,68 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
   return (
     <>
       <div className="spec-start-bar">
-        <select className="ui-field" value={agentId ?? ""} disabled={installed.length === 0} onChange={(e) => setAgentId(e.target.value)} aria-label="Agent">
+        <select
+          className="ui-field"
+          value={agentId ?? ""}
+          disabled={installed.length === 0}
+          onChange={(e) => setAgentId(e.target.value)}
+          aria-label="Agent"
+        >
           {installed.length === 0 && <option value="">No agent CLI installed</option>}
-          {installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          {installed.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
         </select>
         {repos.length > 1 && (
-          <select className="ui-field" value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Which repositories">
+          <select
+            className="ui-field"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            aria-label="Which repositories"
+          >
             <option value="all">Every repository, from the task folder</option>
-            {repos.map((r) => <option key={r.checkout_id} value={r.checkout_id}>Only {r.folder}</option>)}
+            {repos.map((r) => (
+              <option key={r.checkout_id} value={r.checkout_id}>
+                Only {r.folder}
+              </option>
+            ))}
           </select>
         )}
         <button
           className={`ui-button${quiet || !agentId || total === 0 || left === 0 ? "" : " ui-button-primary"}`}
           disabled={!agentId || total === 0 || left === 0 || starting}
-          title={total === 0 ? "Approve the tasks first" : left === 0 ? "Every step is done" : "It works through the approved steps in order, ticking each off as it finishes it"}
+          title={
+            total === 0
+              ? "Approve the tasks first"
+              : left === 0
+                ? "Every step is done"
+                : "It works through the approved steps in order, ticking each off as it finishes it"
+          }
           onClick={() => (working.length > 0 ? setConfirming(true) : void start())}
         >
-          {starting ? "Starting…" : total === 0 ? "Start agent" : `Start ${name} on ${where} · ${left} step${left === 1 ? "" : "s"} left`}
+          {starting
+            ? "Starting…"
+            : total === 0
+              ? "Start agent"
+              : `Start ${name} on ${where} · ${left} step${left === 1 ? "" : "s"} left`}
         </button>
         <span className="spacer" />
         {working.length > 0 && (
           <span className="spec-working">
-            {working.length === 1 ? `${nameOf(working[0].agent_id)} is working in this task` : `${working.length} agents are working in this task`}
-            <button className="ui-button" onClick={() => { showPane(working[0].id); setTab("terminals"); }}>Open</button>
+            {working.length === 1
+              ? `${nameOf(working[0].agent_id)} is working in this task`
+              : `${working.length} agents are working in this task`}
+            <button
+              className="ui-button"
+              onClick={() => {
+                showPane(working[0].id);
+                setTab("terminals");
+              }}
+            >
+              Open
+            </button>
           </span>
         )}
         {confirming && (
@@ -99,7 +158,10 @@ export function SpecStartAgent({ task, spec, agentId, setAgentId, quiet = false 
             body={`${working.length === 1 ? `${nameOf(working[0].agent_id)} is` : `${working.length} agents are`} already working in this task. A second agent on the same steps does them again, alongside the first.`}
             confirmLabel="Start another"
             danger={false}
-            onConfirm={() => { setConfirming(false); void start(); }}
+            onConfirm={() => {
+              setConfirming(false);
+              void start();
+            }}
             onCancel={() => setConfirming(false)}
           />
         )}

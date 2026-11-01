@@ -1,12 +1,29 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { CHAT_LIST_DEFAULT, clampSidebar, dragGrip, SIDEBAR_DEFAULT, SIDEBAR_MIN, sidebarMost } from "../../lib/drag";
+import {
+  CHAT_LIST_DEFAULT,
+  clampSidebar,
+  dragGrip,
+  SIDEBAR_DEFAULT,
+  SIDEBAR_MIN,
+  sidebarMost,
+} from "../../lib/drag";
 import { read, write } from "../../lib/persist";
 import { useStore } from "../../store";
 
 /** What each grip resizes: where its width is kept, the property it sets, its usual width. */
 const SIDES = {
-  tasks: { key: "sidebarWidth", prop: "--sidebar-w", usual: SIDEBAR_DEFAULT, label: "Resize the task list" },
-  chats: { key: "chatListWidth", prop: "--chat-list-w", usual: CHAT_LIST_DEFAULT, label: "Resize the chat list" },
+  tasks: {
+    key: "sidebarWidth",
+    prop: "--sidebar-w",
+    usual: SIDEBAR_DEFAULT,
+    label: "Resize the task list",
+  },
+  chats: {
+    key: "chatListWidth",
+    prop: "--chat-list-w",
+    usual: CHAT_LIST_DEFAULT,
+    label: "Resize the chat list",
+  },
 } as const;
 
 /** How far an arrow key moves the edge; with ⇧, four times as far. */
@@ -27,13 +44,16 @@ const scale = () => useStore.getState().settings?.ui.scale ?? 1;
 export function SidebarGrip({ side = "tasks" }: { side?: keyof typeof SIDES }) {
   const { key, prop, usual, label } = SIDES[side];
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(() => clampSidebar(read<unknown>(key, usual), innerWidth, scale(), usual));
+  const [width, setWidth] = useState(() =>
+    clampSidebar(read<unknown>(key, usual), innerWidth, scale(), usual),
+  );
 
   const apply = (w: number) => {
     const el = ref.current;
     el?.parentElement?.style.setProperty(prop, `${w}px`);
     el?.setAttribute("aria-valuenow", String(w));
   };
+  // oxlint-disable-next-line react/exhaustive-deps -- `apply` reads only the ref and this side's property
   useLayoutEffect(() => apply(width), [width]);
 
   const keep = (w: number) => {
@@ -79,13 +99,17 @@ export function SidebarGrip({ side = "tasks" }: { side?: keyof typeof SIDES }) {
         const s = scale();
         let next = width;
         const grip = e.currentTarget;
-        const held = dragGrip(e, (m) => {
-          next = clampSidebar(width + (m.clientX - startX) / s, innerWidth, s, usual);
-          apply(next);
-        }, () => {
-          grip.classList.remove("held");
-          keep(next);
-        });
+        const held = dragGrip(
+          e,
+          (m) => {
+            next = clampSidebar(width + (m.clientX - startX) / s, innerWidth, s, usual);
+            apply(next);
+          },
+          () => {
+            grip.classList.remove("held");
+            keep(next);
+          },
+        );
         if (held) grip.classList.add("held");
       }}
       onKeyDown={onKey}

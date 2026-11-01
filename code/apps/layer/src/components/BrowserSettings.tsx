@@ -31,7 +31,8 @@ export function BrowserSettings() {
     try {
       const kept = await api.setBrowserSites([...sites, site]);
       await refreshSettings();
-      if (kept.length === before) failure.fail(`${site} is not a site, or is already allowed. Give one like github.com.`);
+      if (kept.length === before)
+        failure.fail(`${site} is not a site, or is already allowed. Give one like github.com.`);
       else setAdding("");
     } catch (err) {
       failure.fail(err);
@@ -44,18 +45,19 @@ export function BrowserSettings() {
         label="Sites agents may use"
         hint={
           <>
-            Each task's agents have a browser tab, and open this machine's pages
-            (localhost) in it whenever they like. Anywhere else only as listed here: a
-            page's text is written by whoever runs the site, and an agent reads it as
-            something that may tell it what to do. A site covers its subdomains. An
-            agent can ask for one; the request shows in its task's browser. The browser
-            is Google Chrome with a profile of its own, apart from yours: what you sign in
-            to there stays signed in for every task.
+            Each task's agents have a browser tab, and open this machine's pages (localhost) in it
+            whenever they like. Anywhere else only as listed here: a page's text is written by
+            whoever runs the site, and an agent reads it as something that may tell it what to do. A
+            site covers its subdomains. An agent can ask for one; the request shows in its task's
+            browser. The browser is Google Chrome with a profile of its own, apart from yours: what
+            you sign in to there stays signed in for every task.
           </>
         }
       >
         <div className="col">
-          {sites.length === 0 && <span className="muted">None yet: only this machine's pages.</span>}
+          {sites.length === 0 && (
+            <span className="muted">None yet: only this machine's pages.</span>
+          )}
           {sites.map((s) => (
             <div key={s} className="row site-row">
               <code>{s}</code>
@@ -70,13 +72,16 @@ export function BrowserSettings() {
             </div>
           ))}
           <form className="row" onSubmit={(e) => void add(e)}>
-            <input className="ui-field"
+            <input
+              className="ui-field"
               value={adding}
               placeholder="github.com"
               spellCheck={false}
               onChange={(e) => setAdding(e.target.value)}
             />
-            <button className="ui-button" disabled={!adding.trim()}>Allow</button>
+            <button className="ui-button" disabled={!adding.trim()}>
+              Allow
+            </button>
           </form>
           <ErrorMessage>{failure.error}</ErrorMessage>
         </div>
@@ -128,12 +133,11 @@ function SignIns() {
       label="Saved sign-ins"
       hint={
         <>
-          Agents sign in with these through the app, which types the password into the
-          page's password field itself: an agent never sees it. Passwords are kept in the
-          keychain. <code>localhost</code> alone is every port of this machine; a site
-          elsewhere is that host only. Use test accounts: an agent signed in can do what
-          the account can. You can also save one from the browser, after typing it into a
-          page (the key in its toolbar).
+          Agents sign in with these through the app, which types the password into the page's
+          password field itself: an agent never sees it. Passwords are kept in the keychain.{" "}
+          <code>localhost</code> alone is every port of this machine; a site elsewhere is that host
+          only. Use test accounts: an agent signed in can do what the account can. You can also save
+          one from the browser, after typing it into a page (the key in its toolbar).
         </>
       }
     >
@@ -154,10 +158,35 @@ function SignIns() {
           </div>
         ))}
         <form className="row" onSubmit={(e) => void add(e)}>
-          <input className="ui-field" value={site} placeholder="localhost" spellCheck={false} style={{ width: 140 }} onChange={(e) => setSite(e.target.value)} />
-          <input className="ui-field" value={username} placeholder="username or email" spellCheck={false} onChange={(e) => setUsername(e.target.value)} />
-          <input className="ui-field" type="password" value={password} placeholder="password" autoComplete="off" onChange={(e) => setPassword(e.target.value)} />
-          <button className="ui-button" disabled={busy || !site.trim() || !username.trim() || !password}>Save</button>
+          <input
+            className="ui-field"
+            value={site}
+            placeholder="localhost"
+            spellCheck={false}
+            style={{ width: 140 }}
+            onChange={(e) => setSite(e.target.value)}
+          />
+          <input
+            className="ui-field"
+            value={username}
+            placeholder="username or email"
+            spellCheck={false}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <input
+            className="ui-field"
+            type="password"
+            value={password}
+            placeholder="password"
+            autoComplete="off"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button
+            className="ui-button"
+            disabled={busy || !site.trim() || !username.trim() || !password}
+          >
+            Save
+          </button>
         </form>
         <ErrorMessage>{failure.error}</ErrorMessage>
       </div>

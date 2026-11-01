@@ -31,12 +31,7 @@ export {
   Splash,
   TextField,
 } from "./controls";
-export {
-  isDesktop,
-  onAppLink,
-  openExternalLinksInBrowser,
-  openInBrowser,
-} from "./desktop";
+export { isDesktop, onAppLink, openExternalLinksInBrowser, openInBrowser } from "./desktop";
 export { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 export { ago, lasted } from "./format";
 export { GroupSelect, useGroups } from "./groups";

@@ -197,7 +197,7 @@ function Card({
   const labels = useRecords("Label");
   const chosen = labels.filter((l) => issue.label_ids.includes(l.id));
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: cards are reached with the arrow keys and opened with Enter
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- cards are reached with the arrow keys and opened with Enter
     <article
       data-card={position}
       draggable

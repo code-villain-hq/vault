@@ -19,10 +19,18 @@ const CATEGORY_ORDER = ["indeterminate", "new", "done"];
  * in one category follow the order of their top ticket.
  */
 export function groupByStatus(issues: Ticket[]) {
-  const buckets = new Map<string, { key: string; name: string; category: string; issues: Ticket[] }>();
+  const buckets = new Map<
+    string,
+    { key: string; name: string; category: string; issues: Ticket[] }
+  >();
   for (const issue of issues) {
     const key = `status:${issue.status}`;
-    const bucket = buckets.get(key) ?? { key, name: issue.status, category: issue.status_category, issues: [] };
+    const bucket = buckets.get(key) ?? {
+      key,
+      name: issue.status,
+      category: issue.status_category,
+      issues: [],
+    };
     bucket.issues.push(issue);
     buckets.set(key, bucket);
   }

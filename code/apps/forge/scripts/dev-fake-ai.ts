@@ -56,7 +56,8 @@ Bun.serve({
       });
     }
     if (turns === 0) return reply("list_files", {});
-    const verdicts = requirements(String(body.messages[0]?.content ?? ""));
+    const first = body.messages[0]?.content;
+    const verdicts = requirements(typeof first === "string" ? first : "");
     if (turns === 1 && verdicts.length > 0) return reply("report_verdicts", { verdicts });
     return reply("finish", { summary: "A stand-in model looked at the file list, not Claude." });
   },

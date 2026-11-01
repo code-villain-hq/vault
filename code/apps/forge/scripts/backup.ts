@@ -145,7 +145,7 @@ async function main() {
     }
   } catch (error) {
     console.error(
-      `${error instanceof Error ? error.message : error}\nThe database is saved, the attachments aren't.`,
+      `${error instanceof Error ? error.message : String(error)}\nThe database is saved, the attachments aren't.`,
     );
     process.exit(1);
   }

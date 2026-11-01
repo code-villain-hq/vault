@@ -252,22 +252,50 @@
    */
   .ui-status {
     border-radius: var(--radius-full);
-    background: color-mix(in srgb, var(--status-color, var(--muted)) var(--status-tint), transparent);
+    background: color-mix(
+      in srgb,
+      var(--status-color, var(--muted)) var(--status-tint),
+      transparent
+    );
     color: var(--status-ink, var(--status-neutral-ink));
     font-size: var(--type-control-size);
     font-weight: 700;
     line-height: var(--type-control-leading);
   }
-  .ui-status-ok { --status-color: var(--ok); --status-ink: var(--status-ok-ink); }
-  .ui-status-warn { --status-color: var(--warn); --status-ink: var(--status-warn-ink); }
-  .ui-status-danger { --status-color: var(--danger); --status-ink: var(--status-danger-ink); }
-  .ui-status-info { --status-color: var(--info); --status-ink: var(--status-info-ink); }
+  .ui-status-ok {
+    --status-color: var(--ok);
+    --status-ink: var(--status-ok-ink);
+  }
+  .ui-status-warn {
+    --status-color: var(--warn);
+    --status-ink: var(--status-warn-ink);
+  }
+  .ui-status-danger {
+    --status-color: var(--danger);
+    --status-ink: var(--status-danger-ink);
+  }
+  .ui-status-info {
+    --status-color: var(--info);
+    --status-ink: var(--status-info-ink);
+  }
 
   /* A status-tinted note or diff run: the same recipe on a block. */
-  .ui-tint-ok { background: color-mix(in srgb, var(--ok) var(--status-tint), transparent); color: var(--status-ok-ink); }
-  .ui-tint-warn { background: color-mix(in srgb, var(--warn) var(--status-tint), transparent); color: var(--status-warn-ink); }
-  .ui-tint-danger { background: color-mix(in srgb, var(--danger) var(--status-tint), transparent); color: var(--status-danger-ink); }
-  .ui-tint-info { background: color-mix(in srgb, var(--info) var(--status-tint), transparent); color: var(--status-info-ink); }
+  .ui-tint-ok {
+    background: color-mix(in srgb, var(--ok) var(--status-tint), transparent);
+    color: var(--status-ok-ink);
+  }
+  .ui-tint-warn {
+    background: color-mix(in srgb, var(--warn) var(--status-tint), transparent);
+    color: var(--status-warn-ink);
+  }
+  .ui-tint-danger {
+    background: color-mix(in srgb, var(--danger) var(--status-tint), transparent);
+    color: var(--status-danger-ink);
+  }
+  .ui-tint-info {
+    background: color-mix(in srgb, var(--info) var(--status-tint), transparent);
+    color: var(--status-info-ink);
+  }
 
   /* Row: no dividers; hover and selection are tone steps. */
   .ui-row {

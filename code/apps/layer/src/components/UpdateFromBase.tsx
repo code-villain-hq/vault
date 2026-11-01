@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { useStore } from "../store";
 import { updateByFor } from "../lib/derive";
 import type { RepoUpdate, TaskView, UpdateBy } from "../lib/types";
-import { Combo, ErrorMessage, Modal, Spinner, useFailure } from "./ui";
+import { useStore } from "../store";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
+import { Combo, ErrorMessage, Modal, Spinner, useFailure } from "./ui";
 
 const OUTCOME_DOT: Record<RepoUpdate["outcome"], string> = {
   up_to_date: "var(--faint)",
@@ -52,7 +52,10 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
    * base merged and deleted upstream could not be moved off at all (UPD-8).
    */
   const [branches, setBranches] = useState<Record<string, string[]>>({});
-  const existing = task.checkouts.filter((c) => c.exists).map((c) => c.id).join(",");
+  const existing = task.checkouts
+    .filter((c) => c.exists)
+    .map((c) => c.id)
+    .join(",");
   useEffect(() => {
     let stop = false;
     void (async () => {
@@ -62,7 +65,9 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
       );
       if (!stop) setBranches(Object.fromEntries(ids.map((id, i) => [id, lists[i]])));
     })();
-    return () => { stop = true; };
+    return () => {
+      stop = true;
+    };
   }, [existing]);
 
   const [picked, setPicked] = useState<Set<string>>(
@@ -75,9 +80,12 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
   // was wrong as soon as a task spanned a team that merges and one that
   // rebases.
   const way = (projectId: string) =>
-    updateByFor(projects.find((p) => p.id === projectId), health[projectId]);
-  const [by, setBy] = useState<Record<string, UpdateBy>>(
-    () => Object.fromEntries(task.checkouts.map((c) => [c.id, way(c.project_id).by])),
+    updateByFor(
+      projects.find((p) => p.id === projectId),
+      health[projectId],
+    );
+  const [by, setBy] = useState<Record<string, UpdateBy>>(() =>
+    Object.fromEntries(task.checkouts.map((c) => [c.id, way(c.project_id).by])),
   );
   /** What each repo's result was produced by, for wording it. */
   const [ran, setRan] = useState<Record<string, UpdateBy> | null>(null);
@@ -97,7 +105,10 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
     setBusy(true);
     failure.clear();
     try {
-      const chosen = Object.fromEntries([...picked].map((id) => [id, by[id] ?? "merge"])) as Record<string, UpdateBy>;
+      const chosen = Object.fromEntries([...picked].map((id) => [id, by[id] ?? "merge"])) as Record<
+        string,
+        UpdateBy
+      >;
       const out = await api.updateFromBase(
         task.id,
         Object.entries(chosen).map(([checkout_id, b]) => ({ checkout_id, by: b })),
@@ -125,7 +136,10 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
       await Promise.all([
         refreshTasks().catch(() => {}),
         githubConnected
-          ? api.githubTaskPrs(task.id).then((rows) => setTaskPrs(task.id, rows)).catch(() => {})
+          ? api
+              .githubTaskPrs(task.id)
+              .then((rows) => setTaskPrs(task.id, rows))
+              .catch(() => {})
           : null,
       ]);
     } catch (e) {
@@ -165,53 +179,68 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
     (branches[id]?.length ?? 0) > 0 && !branches[id].includes(base);
 
   const running = at.running.length;
-  const footer = results === null && conflicted.length === 0 ? (
-    <>
-      <div className="spacer" />
-      <button className="ui-button" onClick={onClose} disabled={busy}>Cancel</button>
-      <button
-        className="ui-button ui-button-primary"
-        disabled={busy || picked.size === 0}
-        onClick={() => void update()}
-      >
-        {busy
-          ? only === "rebase" ? "Rebasing…" : only === "merge" ? "Merging…" : "Updating…"
-          : `${only === "rebase" ? "Rebase" : only === "merge" ? "Merge into" : "Update"} ${picked.size} repo${picked.size === 1 ? "" : "s"}`}
-      </button>
-    </>
-  ) : (
-    <>
-      {conflicted.length > 0 && <AgentTargetFields task={task} at={at} disabled={busy} />}
-      <div className="spacer" />
-      <div className="foot-buttons">
-        <button className="ui-button" onClick={onClose} disabled={busy}>Close</button>
-        {conflicted.length > 0 && (
-          <button
-            className="ui-button ui-button-primary"
-            disabled={busy || at.stuck}
-            title={at.stuck ? "Install an agent CLI first" : undefined}
-            onClick={() => void handOff()}
-          >
-            {running === 0 ? "Start & resolve" : "Resolve with agent"}
+  const footer =
+    results === null && conflicted.length === 0 ? (
+      <>
+        <div className="spacer" />
+        <button className="ui-button" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+        <button
+          className="ui-button ui-button-primary"
+          disabled={busy || picked.size === 0}
+          onClick={() => void update()}
+        >
+          {busy
+            ? only === "rebase"
+              ? "Rebasing…"
+              : only === "merge"
+                ? "Merging…"
+                : "Updating…"
+            : `${only === "rebase" ? "Rebase" : only === "merge" ? "Merge into" : "Update"} ${picked.size} repo${picked.size === 1 ? "" : "s"}`}
+        </button>
+      </>
+    ) : (
+      <>
+        {conflicted.length > 0 && <AgentTargetFields task={task} at={at} disabled={busy} />}
+        <div className="spacer" />
+        <div className="foot-buttons">
+          <button className="ui-button" onClick={onClose} disabled={busy}>
+            Close
           </button>
-        )}
-      </div>
-    </>
-  );
+          {conflicted.length > 0 && (
+            <button
+              className="ui-button ui-button-primary"
+              disabled={busy || at.stuck}
+              title={at.stuck ? "Install an agent CLI first" : undefined}
+              onClick={() => void handOff()}
+            >
+              {running === 0 ? "Start & resolve" : "Resolve with agent"}
+            </button>
+          )}
+        </div>
+      </>
+    );
 
   return (
     <Modal title="Update from base" onClose={() => !busy && onClose()} footer={footer}>
       {results === null && conflicted.length === 0 && (
         <>
-          <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}>
-            Fetches each base first.{" "}
-            {only ? HOW[only] : HOW_BOTH} Push afterwards to
-            update the PRs. Each repo starts the way its team updates branches; hover to see why.
+          <p
+            className="muted"
+            style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}
+          >
+            Fetches each base first. {only ? HOW[only] : HOW_BOTH} Push afterwards to update the
+            PRs. Each repo starts the way its team updates branches; hover to see why.
           </p>
           {task.checkouts.map((c) => {
             const edited = (c.status?.staged ?? 0) + (c.status?.unstaged ?? 0);
             return (
-              <label key={c.id} className="fb-item" style={{ cursor: c.exists ? "pointer" : "default" }}>
+              <label
+                key={c.id}
+                className="fb-item"
+                style={{ cursor: c.exists ? "pointer" : "default" }}
+              >
                 <input
                   type="checkbox"
                   disabled={!c.exists || busy}
@@ -228,13 +257,20 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                 <div className="fb-main">
                   <div className="row">
                     <span className="fb-head mono">{c.project_name}</span>
-                    {!c.exists && <span className="ui-status ui-status-danger">worktree missing</span>}
+                    {!c.exists && (
+                      <span className="ui-status ui-status-danger">worktree missing</span>
+                    )}
                     {gone(c.id, c.base) && (
-                      <span className="ui-status ui-status-danger" title="Not among origin's branches at the last fetch — merged and deleted, perhaps. Pick the branch it went into.">
+                      <span
+                        className="ui-status ui-status-danger"
+                        title="Not among origin's branches at the last fetch — merged and deleted, perhaps. Pick the branch it went into."
+                      >
                         not on origin
                       </span>
                     )}
-                    {edited > 0 && <span className="ui-status ui-status-warn">uncommitted changes</span>}
+                    {edited > 0 && (
+                      <span className="ui-status ui-status-warn">uncommitted changes</span>
+                    )}
                     <div className="spacer" />
                     {/* Inside the label, so a click here would tick the repo too. */}
                     <span
@@ -257,7 +293,9 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                     </span>
                   </div>
                   <div className="row" style={{ marginTop: 4 }}>
-                    <span className="muted" style={{ whiteSpace: "nowrap" }}>← origin/</span>
+                    <span className="muted" style={{ whiteSpace: "nowrap" }}>
+                      ← origin/
+                    </span>
                     {/* Inside the label too: picking from the list would tick the repo. */}
                     <span onClick={(e) => e.preventDefault()}>
                       <Combo
@@ -271,7 +309,9 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
                     </span>
                   </div>
                   {edited > 0 && (
-                    <div className="fb-body">Commit or stash them first — this repo will be skipped.</div>
+                    <div className="fb-body">
+                      Commit or stash them first — this repo will be skipped.
+                    </div>
                   )}
                 </div>
               </label>
@@ -289,7 +329,8 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
       {busy && results === null && (
         <div className="row muted" style={{ marginTop: 10 }}>
-          <Spinner /> Fetching and {only === "rebase" ? "rebasing" : only === "merge" ? "merging" : "updating"}…
+          <Spinner /> Fetching and{" "}
+          {only === "rebase" ? "rebasing" : only === "merge" ? "merging" : "updating"}…
         </div>
       )}
 
@@ -306,7 +347,9 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
             <div className="row">
               <span className="name">{r.repo}</span>
               <span className="muted">
-                {aborted.has(r.checkout_id) ? `${ran?.[r.checkout_id] ?? "update"} abandoned` : r.detail}
+                {aborted.has(r.checkout_id)
+                  ? `${ran?.[r.checkout_id] ?? "update"} abandoned`
+                  : r.detail}
               </span>
             </div>
             {r.outcome === "conflicts" && !aborted.has(r.checkout_id) && (
@@ -318,12 +361,15 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
 
       {conflicted.length > 0 && (
         <div style={{ marginTop: results ? 14 : 0 }}>
-          <p className="muted" style={{ lineHeight: 1.55, fontSize: "var(--type-ui-small-size)", marginTop: 0 }}>
+          <p
+            className="muted"
+            style={{ lineHeight: 1.55, fontSize: "var(--type-ui-small-size)", marginTop: 0 }}
+          >
             {results
               ? "What stopped is left in progress where it stopped, so the conflicts can be resolved."
               : "An earlier update is still in progress."}{" "}
-            An agent can resolve them and finish it, or abandon it here to put the branch back as
-            it was.
+            An agent can resolve them and finish it, or abandon it here to put the branch back as it
+            was.
           </p>
           {conflicted.map((c) => (
             <div key={c.id} className="check">

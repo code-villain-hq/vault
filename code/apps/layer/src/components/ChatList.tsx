@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useState, type ReactNode } from "react";
 import { canRestart, paneName, paneState, showsFolded } from "../lib/derive";
 import { read, write } from "../lib/persist";
-import { useStore } from "../store";
 import type { PaneInfo, SlackThreadView } from "../lib/types";
+import { useStore } from "../store";
 import { ChevronIcon } from "./icons";
 import { RestartButton } from "./Restart";
 import { WaitingChats } from "./WaitingPanes";
@@ -12,7 +12,12 @@ function started(unix: string): string {
   const d = new Date(unix);
   return Number.isNaN(d.getTime())
     ? ""
-    : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    : d.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }
 
 interface ItemProps {
@@ -27,13 +32,23 @@ interface ItemProps {
 }
 
 /** One open chat in the Chat view's list. */
-export function ChatItem({ pane: p, active, thread, restarting, onSelect, onRestart, onClose }: ItemProps) {
+export function ChatItem({
+  pane: p,
+  active,
+  thread,
+  restarting,
+  onSelect,
+  onRestart,
+  onClose,
+}: ItemProps) {
   const agents = useStore((s) => s.agents);
   return (
     <div className={`chat-item${active ? " active" : ""}`} onClick={() => onSelect(p.id)}>
       <span className={`dot ${paneState(p).dot}`} title={paneState(p).label} />
       <span className="chat-item-text">
-        <span className="chat-item-title" title={paneName(p)}>{paneName(p)}</span>
+        <span className="chat-item-title" title={paneName(p)}>
+          {paneName(p)}
+        </span>
         <span className="chat-item-sub">
           {/* First, where a narrow list cannot cut it off. */}
           {thread && (
@@ -41,7 +56,10 @@ export function ChatItem({ pane: p, active, thread, restarting, onSelect, onRest
               <span
                 className="ui-link chat-item-slack"
                 title={`Its replies go to the Slack thread in ${thread.label}`}
-                onClick={(e) => { e.stopPropagation(); if (thread.link) void openUrl(thread.link); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (thread.link) void openUrl(thread.link);
+                }}
               >
                 {thread.label} ↗
               </span>
@@ -56,7 +74,10 @@ export function ChatItem({ pane: p, active, thread, restarting, onSelect, onRest
       <span
         className="x"
         title="Close this chat"
-        onClick={(e) => { e.stopPropagation(); onClose(p.id); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose(p.id);
+        }}
       >
         ✕
       </span>
@@ -67,7 +88,11 @@ export function ChatItem({ pane: p, active, thread, restarting, onSelect, onRest
 /** Whether the Slack heading is open, remembered across launches (CHAT-5). */
 export function useSlackFold(): [boolean, () => void] {
   const [open, setOpen] = useState(() => read<boolean>("slackChatsOpen", false) === true);
-  const toggle = () => setOpen((was) => { write("slackChatsOpen", !was); return !was; });
+  const toggle = () =>
+    setOpen((was) => {
+      write("slackChatsOpen", !was);
+      return !was;
+    });
   return [open, toggle];
 }
 
@@ -102,7 +127,9 @@ export function SlackChats({ open, onToggle, panes, rooms, active, item }: Slack
         title={open ? "Fold the Slack bot's chats" : "Show every chat the Slack bot opened"}
         onClick={onToggle}
       >
-        <span className={`chev${open ? " open" : ""}`}><ChevronIcon /></span>
+        <span className={`chev${open ? " open" : ""}`}>
+          <ChevronIcon />
+        </span>
         <span>Slack · {count}</span>
         <span className="spacer" />
         {asking > 0 && <span className="chat-list-asking">{asking} asking</span>}

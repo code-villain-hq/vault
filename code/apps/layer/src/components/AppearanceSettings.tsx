@@ -1,12 +1,18 @@
 import { useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
-import { useStore } from "../store";
 import { THEMES, type Theme } from "../lib/theme";
 import type { ThemeChoice, UiPrefs } from "../lib/types";
+import { useStore } from "../store";
 import { ErrorMessage, Field, Switch, useFailure } from "./ui";
 
 /** Which setting a failed save shows under. */
-type Place = "theme" | "scale" | "notifications" | "terminals" | "terminal-text" | "conversation-text";
+type Place =
+  | "theme"
+  | "scale"
+  | "notifications"
+  | "terminals"
+  | "terminal-text"
+  | "conversation-text";
 
 /** Settings → Appearance: how the app looks, and how its terminals and agents behave. */
 export function AppearanceSettings() {
@@ -15,7 +21,8 @@ export function AppearanceSettings() {
   // A save that fails says so under the setting that was changed (NOTE-6).
   const failure = useFailure();
   const [failedAt, setFailedAt] = useState<Place | null>(null);
-  const failedUnder = (at: Place) => failedAt === at && <ErrorMessage>{failure.error}</ErrorMessage>;
+  const failedUnder = (at: Place) =>
+    failedAt === at && <ErrorMessage>{failure.error}</ErrorMessage>;
 
   /**
    * What the sliders say before it is saved.
@@ -177,7 +184,13 @@ export function AppearanceSettings() {
  * three buttons named Dark, Light and Match the Mac said nothing of what a
  * theme looks like, and the names stop saying it once there are more.
  */
-function ThemePicker({ value, onPick }: { value: ThemeChoice; onPick: (theme: ThemeChoice) => void }) {
+function ThemePicker({
+  value,
+  onPick,
+}: {
+  value: ThemeChoice;
+  onPick: (theme: ThemeChoice) => void;
+}) {
   const tile = (id: ThemeChoice, name: string, shot: ReactNode, note?: string) => (
     <button
       key={id}
@@ -212,14 +225,24 @@ function ThemePicker({ value, onPick }: { value: ThemeChoice; onPick: (theme: Th
 function Preview({ theme, half }: { theme: Theme; half?: boolean }) {
   return (
     <div className={`theme-preview${half ? " left-half" : ""}`} data-theme={theme} aria-hidden>
-      <div className="tp-bar"><i className="on" /><i /><i /></div>
+      <div className="tp-bar">
+        <i className="on" />
+        <i />
+        <i />
+      </div>
       <div className="tp-body">
-        <div className="tp-side"><i className="on" /><i /><i style={{ width: "70%" }} /></div>
+        <div className="tp-side">
+          <i className="on" />
+          <i />
+          <i style={{ width: "70%" }} />
+        </div>
         <div className="tp-main">
           <i className="text" style={{ width: "80%" }} />
           <i style={{ width: "55%" }} />
           <div className="tp-dots">
-            {["ok", "warn", "danger", "info"].map((c) => <b key={c} style={{ background: `var(--status-${c}-ink)` }} />)}
+            {["ok", "warn", "danger", "info"].map((c) => (
+              <b key={c} style={{ background: `var(--status-${c}-ink)` }} />
+            ))}
           </div>
           <span className="tp-button" />
         </div>
@@ -229,7 +252,13 @@ function Preview({ theme, half }: { theme: Theme; half?: boolean }) {
 }
 
 /** A text size in px, 9–24, saved as the slider moves. */
-function TextSize({ label, hint, value, onChange, error }: {
+function TextSize({
+  label,
+  hint,
+  value,
+  onChange,
+  error,
+}: {
   label: string;
   hint: string;
   value: number;
@@ -239,7 +268,14 @@ function TextSize({ label, hint, value, onChange, error }: {
 }) {
   return (
     <Field label={`${label} — ${value}px`} hint={hint}>
-      <input type="range" min={9} max={24} step={1} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <input
+        type="range"
+        min={9}
+        max={24}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
       {error}
     </Field>
   );

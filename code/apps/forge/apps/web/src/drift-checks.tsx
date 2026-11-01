@@ -460,7 +460,8 @@ function Requirements({
   const toggle = (label: string) =>
     setUnfolded((was) => {
       const next = new Set(was);
-      next.has(label) ? next.delete(label) : next.add(label);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
       return next;
     });
   return (
@@ -643,7 +644,9 @@ function Usage({ run }: { run: AiRun }) {
           <table className="w-full text-right text-xs tabular-nums">
             <thead className="text-muted">
               <tr>
-                <th className="py-1 pr-3 text-left font-medium" />
+                <th className="py-1 pr-3 text-left font-medium">
+                  <span className="sr-only">Part</span>
+                </th>
                 {COLUMNS.map((c) => (
                   <th key={c.key} className="py-1 pl-3 font-medium">
                     {c.label}

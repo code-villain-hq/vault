@@ -1,7 +1,7 @@
-import { useStore } from "../store";
-import { goTo } from "../lib/goto";
 import { CHAT_TASK_ID, paneName, paneState } from "../lib/derive";
+import { goTo } from "../lib/goto";
 import type { Task } from "../lib/types";
+import { useStore } from "../store";
 
 /**
  * A task a chat's agent created, and which that agent is working on from the
@@ -12,9 +12,7 @@ import type { Task } from "../lib/types";
  */
 export function ChatLink({ task }: { task: Task }) {
   const pane = useStore((s) =>
-    task.chat
-      ? s.panes.find((p) => p.task_id === CHAT_TASK_ID && p.cwd === task.chat)
-      : undefined,
+    task.chat ? s.panes.find((p) => p.task_id === CHAT_TASK_ID && p.cwd === task.chat) : undefined,
   );
   if (!pane) return null;
   const state = paneState(pane);

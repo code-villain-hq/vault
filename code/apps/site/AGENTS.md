@@ -7,5 +7,5 @@ The Code Villain website at https://www.codevillain.eu/: the homepage, a page pe
 - Product pages come from [`studio/content/products`](../../../studio/content/products) through [`products.py`](products.py); edit the TOML, never the generated `<product>/` folders. The homepage's Products and Extras menus must match `products.menu(0)`.
 - Posts live in [`studio/content/blog`](../../../studio/content/blog). Edit the Markdown, [`templates/`](templates) or [`blog.py`](blog.py), never the generated `blog/`.
 - `python3 build.py` renders the blog and the product pages and writes `dist/`, checking every local dependency. Preview through `vault-static` in the vault's `.claude/launch.json`, at `/apps/site/`.
-- `python3 -m unittest` runs the tests. `uvx ruff format` and `uvx ruff check` format and lint the Python, with the vault's `ruff.toml`; CI runs both.
+- `python3 -m unittest` runs the tests. `uvx ruff format` and `uvx ruff check` format and lint the Python, with the vault's `ruff.toml`. `bun install && bun run check` formats-checks and lints `menu.js` and the CSS with Vite+ (`vite.config.ts`; `bun run format` fixes them). CI runs all of them.
 - Deploying lives in the private `infra` repository. Show a change in the preview and ask before publishing it.

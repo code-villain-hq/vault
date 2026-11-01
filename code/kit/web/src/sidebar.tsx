@@ -123,7 +123,6 @@ export function WidthEdge({
     document.documentElement.style.removeProperty("user-select");
   };
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a focusable separator has no element of its own; <hr> takes no focus.
     <div
       role="separator"
       aria-orientation="vertical"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { RequiredField } from "../../lib/types";
 import { useTrackerName } from "../../lib/tracker";
+import type { RequiredField } from "../../lib/types";
 import { Field } from "../ui";
 
 /**
@@ -19,7 +19,10 @@ export function useRequiredFields(projectKey: string, typeId: string | undefined
   const [extra, setExtra] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
-    if (!projectKey || !typeId) { setNeeded([]); return; }
+    if (!projectKey || !typeId) {
+      setNeeded([]);
+      return;
+    }
     // Only the latest answer lands: switching type quickly otherwise left
     // the previous type's fields on screen, or cleared the spinner early.
     let current = true;
@@ -29,14 +32,24 @@ export function useRequiredFields(projectKey: string, typeId: string | undefined
     // and each letter was a round-trip to Jira for a project that does not
     // exist, and cleared what had been picked.
     const t = window.setTimeout(() => {
-      api.ticketRequiredFields(projectKey, typeId)
-        .then((f) => { if (current) setNeeded(f.filter((x) => x.required)); })
+      api
+        .ticketRequiredFields(projectKey, typeId)
+        .then((f) => {
+          if (current) setNeeded(f.filter((x) => x.required));
+        })
         // A site that will not describe its own form is no reason to block
         // the dialog: Jira still says what is missing if the create is refused.
-        .catch(() => { if (current) setNeeded([]); })
-        .finally(() => { if (current) setLoading(false); });
+        .catch(() => {
+          if (current) setNeeded([]);
+        })
+        .finally(() => {
+          if (current) setLoading(false);
+        });
     }, 300);
-    return () => { current = false; window.clearTimeout(t); };
+    return () => {
+      current = false;
+      window.clearTimeout(t);
+    };
   }, [projectKey, typeId]);
 
   // Required, and a closed set of values, so it can be offered as a choice.
@@ -90,9 +103,9 @@ export function RequiredFieldPickers({
       )}
       {rf.unsupported.length > 0 && (
         <div className="confirm-detail" style={{ marginBottom: 12 }}>
-          This project also requires {rf.unsupported.map((f) => f.name).join(", ")},
-          which this dialog cannot fill in. Jira will refuse {refused} in Jira instead,
-          and it will show up here on the next refresh.
+          This project also requires {rf.unsupported.map((f) => f.name).join(", ")}, which this
+          dialog cannot fill in. Jira will refuse {refused} in Jira instead, and it will show up
+          here on the next refresh.
         </div>
       )}
       {rf.pickable.map((field) => {

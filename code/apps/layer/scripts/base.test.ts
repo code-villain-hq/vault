@@ -25,8 +25,9 @@ describe("the branch a new task starts from", () => {
   test("follows the repos when one suggestion is swapped for another", () => {
     // web alone, then with billing, then billing
     // and search without it: the box stayed on `dev`.
-    expect(pick([["dev"], ["dev", "development"], ["development"], ["development", "development"]]))
-      .toBe("development");
+    expect(
+      pick([["dev"], ["dev", "development"], ["development"], ["development", "development"]]),
+    ).toBe("development");
   });
 
   test("keeps a base typed by hand when another repo is picked", () => {

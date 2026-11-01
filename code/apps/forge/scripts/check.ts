@@ -7,8 +7,7 @@ const root = new URL("..", import.meta.url).pathname;
 const kitClient = `${root}../../kit/sync/client`;
 // The parts every studio web app shares (`code/kit/web`).
 const kitWeb = `${root}../../kit/web`;
-// The dev tooling every app's scripts share (`code/kit/dev-id`).
-const kitDevId = `${root}../../kit/dev-id`;
+const vp = `${root}node_modules/.bin/vp`;
 // FORGE_CHECK_SKIP_DESKTOP leaves the desktop app out, for a quicker check
 // that doesn't wait for Tauri to build.
 const crates = process.env.FORGE_CHECK_SKIP_DESKTOP
@@ -34,12 +33,12 @@ await runChecks([
       await $`bun scripts/sync-design.ts --check`.cwd(root);
     },
   ],
-  ["biome", () => $`bunx biome check .`.cwd(root)],
-  // The kit's client, with its own settings: Biome checks only under its root.
-  ["biome (sync kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitClient)],
-  ["biome (web kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitWeb)],
-  ["biome (dev-id kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitDevId)],
-  ["typecheck", () => $`bun run typecheck`.cwd(root)],
+  // Oxfmt, Oxlint and TypeScript's own errors, as vite.config.ts says.
+  ["vp check", () => $`${vp} check`.cwd(root)],
+  // The kits, each with its own vite.config.ts: Vite+ checks only under
+  // the folder it runs in.
+  ["vp check (sync kit)", () => $`${vp} check`.cwd(kitClient)],
+  ["vp check (web kit)", () => $`${vp} check`.cwd(kitWeb)],
   [
     "bun test",
     async () => {

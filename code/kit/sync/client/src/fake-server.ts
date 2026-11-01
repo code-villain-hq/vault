@@ -83,7 +83,7 @@ export class FakeServer {
       let data: Row | null;
       if (op.action === "create") {
         if (existing) throw new RejectedError(409, "conflict", "id already used");
-        if (!String(op.data.title ?? "").trim()) {
+        if (typeof op.data.title !== "string" || !op.data.title.trim()) {
           throw new RejectedError(422, "invalid", "title can't be empty");
         }
         data = { status: "backlog", priority: 0, description: "", ...op.data, id: op.id };

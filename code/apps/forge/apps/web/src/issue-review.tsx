@@ -164,7 +164,6 @@ export function ReviewBar({ issue }: { issue: Issue }) {
         <div className="flex flex-col gap-2">
           <textarea
             aria-label="What needs to change"
-            // biome-ignore lint/a11y/noAutofocus: opened by pressing Send back
             autoFocus
             placeholder="What needs to change? (⌘↵ to send back)"
             value={feedback}

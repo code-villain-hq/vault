@@ -110,9 +110,7 @@ export function toTree(files: ChangedFile[]): Node[] {
   const sort = (nodes: Node[]): Node[] =>
     nodes
       .map((n) => ({ ...n, children: sort(n.children) }))
-      .sort((a, b) =>
-        !a.file === !b.file ? a.name.localeCompare(b.name) : a.file ? 1 : -1,
-      );
+      .sort((a, b) => (!a.file === !b.file ? a.name.localeCompare(b.name) : a.file ? 1 : -1));
 
   return sort(root.children.map(squash));
 }
@@ -159,7 +157,10 @@ export function wordMarks(lines: DiffLine[]): Map<number, [number, number]> {
   const marks = new Map<number, [number, number]>();
   let i = 0;
   while (i < lines.length) {
-    if (lines[i].kind !== "del") { i++; continue; }
+    if (lines[i].kind !== "del") {
+      i++;
+      continue;
+    }
     const dels: number[] = [];
     while (i < lines.length && lines[i].kind === "del") dels.push(i++);
     const adds: number[] = [];
@@ -174,10 +175,16 @@ export function wordMarks(lines: DiffLine[]): Map<number, [number, number]> {
       let tail = 0;
       while (tail < most - start && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
       while (start > 0 && isWord(a[start - 1]) && (isWord(a[start]) || isWord(b[start]))) start--;
-      while (tail > 0 && isWord(a[a.length - tail]) && (isWord(a[a.length - 1 - tail]) || isWord(b[b.length - 1 - tail]))) tail--;
+      while (
+        tail > 0 &&
+        isWord(a[a.length - tail]) &&
+        (isWord(a[a.length - 1 - tail]) || isWord(b[b.length - 1 - tail]))
+      )
+        tail--;
       const old: [number, number] = [start, a.length - tail];
       const now: [number, number] = [start, b.length - tail];
-      const share = (r: [number, number], line: string) => (r[1] - r[0]) / Math.max(line.trim().length, 1);
+      const share = (r: [number, number], line: string) =>
+        (r[1] - r[0]) / Math.max(line.trim().length, 1);
       if (share(old, a) > 0.6 || share(now, b) > 0.6) continue;
       if (old[1] > old[0]) marks.set(dels[k], old);
       if (now[1] > now[0]) marks.set(adds[k], now);

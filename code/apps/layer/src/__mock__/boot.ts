@@ -1,3 +1,4 @@
+import { emit } from "@tauri-apps/api/event";
 /**
  * The real UI in a plain browser, with the Rust side answered from `world.ts`.
  *
@@ -30,17 +31,30 @@
  * That is the cue to add it to `answer` below.
  */
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import { emit } from "@tauri-apps/api/event";
-import type { BrowserView, Catchup, Cleaned, FlowStatus, LogSource, Message, PaneInfo, PhoneStatus, Project, RepoUpdate, StartTo, Synced, TaskView } from "../lib/types";
 import { sortTickets, type TicketSort } from "../lib/ticket-sort";
-import { ago, SCENARIOS } from "./world";
+import type {
+  BrowserView,
+  Catchup,
+  Cleaned,
+  FlowStatus,
+  LogSource,
+  Message,
+  PaneInfo,
+  PhoneStatus,
+  Project,
+  RepoUpdate,
+  StartTo,
+  Synced,
+  TaskView,
+} from "../lib/types";
 import { acpAnswers, seedAcp } from "./acp";
-import { loopAnswers, seedLoop } from "./loop";
-import { specAnswers } from "./spec";
 import { epicAnswers, seedEpic } from "./epic";
-import { runAnswers } from "./runs";
+import { loopAnswers, seedLoop } from "./loop";
 import { profileAnswers } from "./profiles";
+import { runAnswers } from "./runs";
+import { specAnswers } from "./spec";
 import { githubTracker } from "./tracker";
+import { ago, SCENARIOS } from "./world";
 
 type Args = Record<string, unknown>;
 type Answer = (args: Args) => unknown;
@@ -53,14 +67,16 @@ const world = (scenarios.get(params.get("scenario") ?? "busy") ?? SCENARIOS.busy
 const calls: { cmd: string; args: Args }[] = [];
 const theme = params.get("theme");
 if (theme) world.settings.ui.theme = theme as typeof world.settings.ui.theme;
-if (params.get("role") === "member" && world.settings.workspace) world.settings.workspace.admin = false;
+if (params.get("role") === "member" && world.settings.workspace)
+  world.settings.workspace.admin = false;
 seedEpic(world);
 // After the epic, so its tickets become issues too.
 if (params.get("tracker") === "github") githubTracker(world);
 for (const p of world.panes) if (p.acp) seedAcp(p.id);
 for (const p of world.panes) {
   const phase = params.get("loop");
-  if (phase && p.task_id === params.get("task") && p.kind === "agent" && p.running) seedLoop(p.id, p.task_id, phase);
+  if (phase && p.task_id === params.get("task") && p.kind === "agent" && p.running)
+    seedLoop(p.id, p.task_id, phase);
 }
 const overrides = new Map<string, Answer>();
 /** A site's own names, highest first, as Jira lists them. */
@@ -72,9 +88,27 @@ function placeElsewhere(id: string, path: string): Project {
   const at = world.notHere.findIndex((x) => x.id === id);
   if (at < 0) throw "that repository: it is on this Mac now, or gone from the workspace";
   const [e] = world.notHere.splice(at, 1);
-  const p: Project = { id: `p-${e.name}`, name: e.name, path, default_branch: e.default_branch, group: e.group, store: null };
+  const p: Project = {
+    id: `p-${e.name}`,
+    name: e.name,
+    path,
+    default_branch: e.default_branch,
+    group: e.group,
+    store: null,
+  };
   world.projects.push(p);
-  world.health.push({ project_id: p.id, clone: "ok", origin: `git@${e.remote_key.replace("/", ":")}.git`, store: null, synced_at: null, behind: 0, ahead: 0, found: null, update_guess: null, update_reason: null });
+  world.health.push({
+    project_id: p.id,
+    clone: "ok",
+    origin: `git@${e.remote_key.replace("/", ":")}.git`,
+    store: null,
+    synced_at: null,
+    behind: 0,
+    ahead: 0,
+    found: null,
+    update_guess: null,
+    update_reason: null,
+  });
   return p;
 }
 
@@ -114,8 +148,18 @@ function newPane(args: Args, kind: PaneInfo["kind"], task: string): PaneInfo {
  */
 const browsers = new Map<string, BrowserView>();
 const noTab = (): BrowserView => ({
-  chrome: true, tab: null, url: "", title: "", loading: false, agents_may: false, last_action: null, requests: [],
-  dialog: null, held: false, tabs: [], driver: null,
+  chrome: true,
+  tab: null,
+  url: "",
+  title: "",
+  loading: false,
+  agents_may: false,
+  last_action: null,
+  requests: [],
+  dialog: null,
+  held: false,
+  tabs: [],
+  driver: null,
 });
 if (world.panes.some((p) => p.task_id === "t-login")) {
   browsers.set("t-login", {
@@ -126,17 +170,40 @@ if (world.panes.some((p) => p.task_id === "t-login")) {
     loading: false,
     agents_may: true,
     last_action: { text: "Clicked “Sign in”", x: 160, y: 236, at: Date.now() - 40_000 },
-    requests: [{
-      id: 1, task: "t-login", site: "github.com", at: Date.now() - 20_000,
-      reason: "Read the OAuth app's callback URL settings, to see why the redirect loops",
-    }],
+    requests: [
+      {
+        id: 1,
+        task: "t-login",
+        site: "github.com",
+        at: Date.now() - 20_000,
+        reason: "Read the OAuth app's callback URL settings, to see why the redirect loops",
+      },
+    ],
     dialog: null,
     held: false,
     // Three tabs, the sign-in page active (BRW-16).
     tabs: [
-      { id: "tab-t-login-1", name: "Acme", url: "http://localhost:5173/", active: false, loading: false },
-      { id: "tab-t-login-2", name: "Sign in · Acme", url: "http://localhost:5173/login", active: true, loading: false },
-      { id: "tab-t-login-3", name: "localhost", url: "http://localhost:5173/admin", active: false, loading: true },
+      {
+        id: "tab-t-login-1",
+        name: "Acme",
+        url: "http://localhost:5173/",
+        active: false,
+        loading: false,
+      },
+      {
+        id: "tab-t-login-2",
+        name: "Sign in · Acme",
+        url: "http://localhost:5173/login",
+        active: true,
+        loading: false,
+      },
+      {
+        id: "tab-t-login-3",
+        name: "localhost",
+        url: "http://localhost:5173/admin",
+        active: false,
+        loading: true,
+      },
     ],
     // The login task's Claude, still at work, between browser calls.
     driver: { pane: "pane-claude", agent: "Claude Code", calls: 0, last_at: Date.now() - 5_000 },
@@ -146,7 +213,9 @@ function tabOf(task: string): BrowserView {
   let b = browsers.get(task);
   if (!b) {
     b = { ...noTab(), tab: `tab-${task}-1`, url: "about:blank" };
-    b.tabs = [{ id: `tab-${task}-1`, name: "New tab", url: "about:blank", active: true, loading: false }];
+    b.tabs = [
+      { id: `tab-${task}-1`, name: "New tab", url: "about:blank", active: true, loading: false },
+    ];
     browsers.set(task, b);
     void emit("browser:changed", task);
   }
@@ -166,7 +235,12 @@ function activate(task: string, id: string) {
 let mockTabs = 10;
 
 /** A page as Chrome would draw it into a frame: a sign-in form. */
-async function frameOf(b: BrowserView, width: number, height: number, scale: number): Promise<ArrayBuffer> {
+async function frameOf(
+  b: BrowserView,
+  width: number,
+  height: number,
+  scale: number,
+): Promise<ArrayBuffer> {
   const c = document.createElement("canvas");
   c.width = Math.round(width * scale);
   c.height = Math.round(height * scale);
@@ -210,7 +284,9 @@ const phone: PhoneStatus = {
 
 function phoneAddresses(): PhoneStatus["addresses"] {
   return [
-    ...(phone.tailscale ? [{ way: "tailscale" as const, ip: "100.101.102.103", interface: "utun4" }] : []),
+    ...(phone.tailscale
+      ? [{ way: "tailscale" as const, ip: "100.101.102.103", interface: "utun4" }]
+      : []),
     ...(phone.home ? [{ way: "home" as const, ip: "192.168.8.23", interface: "en0" }] : []),
   ];
 }
@@ -226,17 +302,26 @@ const answer: Record<string, Answer> = {
   take_notices: () => [],
   // Connecting checks the token against the site; here any token will do.
   grafana_connect: (a) => {
-    world.settings.grafana = { base_url: (a.baseUrl as string).replace(/\/+$/, ""), datasource: null };
+    world.settings.grafana = {
+      base_url: (a.baseUrl as string).replace(/\/+$/, ""),
+      datasource: null,
+    };
     world.settings.grafana_connected = true;
     return 2;
   },
   // Grafana Cloud's own: the stack's logs, and the usage insights it adds.
   grafana_list_datasources: () => [
     { uid: "grafanacloud-logs", name: "grafanacloud-acme-logs", type: "loki", isDefault: false },
-    { uid: "grafanacloud-usage-insights", name: "grafanacloud-acme-usage-insights", type: "loki", isDefault: false },
+    {
+      uid: "grafanacloud-usage-insights",
+      name: "grafanacloud-acme-usage-insights",
+      type: "loki",
+      isDefault: false,
+    },
   ],
   grafana_set_datasource: (a) => {
-    if (world.settings.grafana) world.settings.grafana.datasource = (a.uid as string | null) ?? null;
+    if (world.settings.grafana)
+      world.settings.grafana.datasource = (a.uid as string | null) ?? null;
     return null;
   },
   // An AWS setup like a team's: SSO profiles per account, and a request
@@ -250,20 +335,36 @@ const answer: Record<string, Answer> = {
     ],
   }),
   s3_log_source_find: (a) => {
-    if (!/^[a-z0-9.-]{3,63}$/.test(a.bucket as string)) throw new Error(`"${a.bucket}" is not an S3 bucket name`);
-    if (a.profile === "default") throw new Error("the AWS sign-in for profile default has expired: run `aws sso login --profile default` in a terminal, then try again");
+    if (!/^[a-z0-9.-]{3,63}$/.test(a.bucket as string))
+      throw new Error(`"${a.bucket as string}" is not an S3 bucket name`);
+    if (a.profile === "default")
+      throw new Error(
+        "the AWS sign-in for profile default has expired: run `aws sso login --profile default` in a terminal, then try again",
+      );
     return {
       folders: ["checkout-service/", "orders-service/", "search-service/"],
       files: 0,
       more: false,
-      tables: [{
-        database: "prod_request_logs", table: "all_request_logs", location: `s3://${a.bucket}/\${service}/\${source}/\${year}/\${month}/\${day}/`,
-        columns: [{ name: "@timestamp", kind: "string" }, { name: "http_uri", kind: "string" }, { name: "message", kind: "string" }],
-        partition_keys: [{ name: "service", kind: "string" }, { name: "day", kind: "string" }],
-      }],
+      tables: [
+        {
+          database: "prod_request_logs",
+          table: "all_request_logs",
+          location: `s3://${a.bucket as string}/\${service}/\${source}/\${year}/\${month}/\${day}/`,
+          columns: [
+            { name: "@timestamp", kind: "string" },
+            { name: "http_uri", kind: "string" },
+            { name: "message", kind: "string" },
+          ],
+          partition_keys: [
+            { name: "service", kind: "string" },
+            { name: "day", kind: "string" },
+          ],
+        },
+      ],
       // acme-prod may not list workgroups, but sees the one named after the
       // database; default sees none at all.
-      workgroups: a.profile === "acme-prod" ? ["prod-request-logs"] : ["primary", "ci-request-logs"],
+      workgroups:
+        a.profile === "acme-prod" ? ["prod-request-logs"] : ["primary", "ci-request-logs"],
     };
   },
   s3_log_source_save: (a) => {
@@ -298,11 +399,17 @@ const answer: Record<string, Answer> = {
   slack_bot_view: () => structuredClone(world.slackBot),
   slack_bot_connect: (a) => {
     world.settings.slack_bot = {
-      owner: a.owner as string, agent_id: a.agentId as string,
-      bot_user: "UBOT0001", bot_name: "drdoom", enabled: true,
+      owner: a.owner as string,
+      agent_id: a.agentId as string,
+      bot_user: "UBOT0001",
+      bot_name: "drdoom",
+      enabled: true,
       auto: world.settings.slack_bot?.auto ?? true,
       personality: world.settings.slack_bot?.personality ?? "",
-      model: world.settings.slack_bot?.agent_id === a.agentId ? world.settings.slack_bot?.model ?? "" : "",
+      model:
+        world.settings.slack_bot?.agent_id === a.agentId
+          ? (world.settings.slack_bot?.model ?? "")
+          : "",
     };
     world.slackBot.status = { state: "connected", error: null };
     void emit("slackbot:changed");
@@ -310,7 +417,10 @@ const answer: Record<string, Answer> = {
   },
   set_slack_channel: (a) => {
     world.settings.slack = {
-      enabled: true, notify_on_done: true, notify_on_prs: true, allow_agent_posts: true,
+      enabled: true,
+      notify_on_done: true,
+      notify_on_prs: true,
+      allow_agent_posts: true,
       ...world.settings.slack,
       channel: (a.channel as string).trim(),
     };
@@ -318,7 +428,11 @@ const answer: Record<string, Answer> = {
     return null;
   },
   set_slack_prefs: (a) => {
-    if (world.settings.slack) world.settings.slack = { ...(a.prefs as typeof world.settings.slack & object), channel: world.settings.slack.channel };
+    if (world.settings.slack)
+      world.settings.slack = {
+        ...(a.prefs as typeof world.settings.slack & object),
+        channel: world.settings.slack.channel,
+      };
     return null;
   },
   set_slack_bot_agent: (a) => {
@@ -346,9 +460,15 @@ const answer: Record<string, Answer> = {
   add_message: (a) => {
     const id = Math.max(0, ...world.messages.map((m) => m.id)) + 1;
     world.messages.unshift({
-      id, at: Date.now(), kind: a.kind as Message["kind"], level: a.level as Message["level"],
-      title: a.title as string, body: "", target: (a.target as string | null) ?? null,
-      read: false, count: 1,
+      id,
+      at: Date.now(),
+      kind: a.kind as Message["kind"],
+      level: a.level as Message["level"],
+      title: a.title as string,
+      body: "",
+      target: (a.target as string | null) ?? null,
+      read: false,
+      count: 1,
     });
     void emit("messages:changed");
     return id;
@@ -386,7 +506,8 @@ const answer: Record<string, Answer> = {
   resumable_agents: () => [],
   task_prompt: () => "Work on ACME-123: Fix login race.\n\nThe ticket says…",
   // Unanswered, a handoff opened on a null briefing and took the page down.
-  handoff_prompt: () => "Continue ACME-123: Fix login race.\n\nWhat changed so far…\n\nThe last agent's terminal ended with…",
+  handoff_prompt: () =>
+    "Continue ACME-123: Fix login race.\n\nWhat changed so far…\n\nThe last agent's terminal ended with…",
   // Specs (§19). A draft arrives in pieces, as the real one does.
   ...specAnswers(world),
   // Epics (§26).
@@ -431,7 +552,12 @@ const answer: Record<string, Answer> = {
     const old = world.panes[at];
     const p = newPane({ agentId: old.agent_id, checkoutId: old.checkout_id }, "agent", old.task_id);
     world.panes = world.panes.filter((x) => x !== p && x !== old);
-    world.panes.splice(at, 0, { ...p, cwd: old.cwd, title: `${old.title.replace(/ \(resumed\)$/, "")} (resumed)`, started_at: old.started_at });
+    world.panes.splice(at, 0, {
+      ...p,
+      cwd: old.cwd,
+      title: `${old.title.replace(/ \(resumed\)$/, "")} (resumed)`,
+      started_at: old.started_at,
+    });
     world.output[p.id] = `${old.title} resuming the conversation…\r\n`;
     return world.panes[at];
   },
@@ -444,23 +570,42 @@ const answer: Record<string, Answer> = {
     const known = new Set(task?.checkouts.map((c) => c.id));
     const own = task?.checkouts[0];
     return world.changed.map((f) =>
-      known.has(f.checkout_id) || !own ? f : { ...f, checkout_id: own.id, repo: own.project_name });
+      known.has(f.checkout_id) || !own ? f : { ...f, checkout_id: own.id, repo: own.project_name },
+    );
   },
   diff_file: (a) =>
-    `--- a/${a.path}\n+++ b/${a.path}\n@@ -1,3 +1,4 @@\n const retries = config.retries;\n-let attempt = 1;\n+let attempt = 0;\n+// Counted from zero: the first try is not a retry.\n while (attempt < retries) {\n`,
-  task_commits: () => world.tasks.flatMap((t) =>
-    t.checkouts.map((c) => ({ checkout_id: c.id, repo: c.project_name, commits: [] }))),
+    `--- a/${a.path as string}\n+++ b/${a.path as string}\n@@ -1,3 +1,4 @@\n const retries = config.retries;\n-let attempt = 1;\n+let attempt = 0;\n+// Counted from zero: the first try is not a retry.\n while (attempt < retries) {\n`,
+  task_commits: () =>
+    world.tasks.flatMap((t) =>
+      t.checkouts.map((c) => ({ checkout_id: c.id, repo: c.project_name, commits: [] })),
+    ),
   task_branch_facts: () => [],
   task_outgoing: (a) => {
     const task = world.tasks.find((t) => t.id === a.taskId);
     return (task?.checkouts ?? []).map((c, i) => ({
-      checkout_id: c.id, repo: c.project_name, error: null, leftovers_more: false,
-      commits: i === 0
-        ? [{ sha: "a".repeat(40), short: "aaaaaaa", subject: "Count retries from zero" }, { sha: "b".repeat(40), short: "bbbbbbb", subject: "Log the token while debugging" }]
-        : [],
-      leftovers: i === 0
-        ? [{ path: "src/auth.ts", line: 14, kind: "debug", text: "console.log(\"token\", token);" }, { path: "src/auth.ts", line: 22, kind: "todo", text: "// TODO: cap the backoff" }]
-        : [],
+      checkout_id: c.id,
+      repo: c.project_name,
+      error: null,
+      leftovers_more: false,
+      commits:
+        i === 0
+          ? [
+              { sha: "a".repeat(40), short: "aaaaaaa", subject: "Count retries from zero" },
+              { sha: "b".repeat(40), short: "bbbbbbb", subject: "Log the token while debugging" },
+            ]
+          : [],
+      leftovers:
+        i === 0
+          ? [
+              {
+                path: "src/auth.ts",
+                line: 14,
+                kind: "debug",
+                text: 'console.log("token", token);',
+              },
+              { path: "src/auth.ts", line: 22, kind: "todo", text: "// TODO: cap the backoff" },
+            ]
+          : [],
     }));
   },
   // GitHub.
@@ -469,29 +614,55 @@ const answer: Record<string, Answer> = {
     if (had) return had;
     const repo = String(a.repo).split("/").pop() ?? "repo";
     const id = `t-pr-${world.tasks.length}`;
-    const root = `/Users/you/.villain-worktrees/${a.head}`;
+    const root = `/Users/you/.villain-worktrees/${a.head as string}`;
     const task: TaskView = {
-      id, name: String(a.title), root, branch: String(a.head), issue_key: null, issue_url: null,
-      created_at: ago(0), pane_count: 0,
-      checkouts: [{
-        id: `c-${id}`, task_id: id, project_id: `p-${repo}`, project_name: repo, path: `${root}/${repo}`,
-        base: String(a.base), exists: true, broken: null, changed: 0,
-        status: { ahead: 0, behind: 0, staged: 0, unstaged: 0, untracked: 0, conflicted: 0, dirty_files: 0, branch: String(a.head) },
-      }],
+      id,
+      name: String(a.title),
+      root,
+      branch: String(a.head),
+      issue_key: null,
+      issue_url: null,
+      created_at: ago(0),
+      pane_count: 0,
+      checkouts: [
+        {
+          id: `c-${id}`,
+          task_id: id,
+          project_id: `p-${repo}`,
+          project_name: repo,
+          path: `${root}/${repo}`,
+          base: String(a.base),
+          exists: true,
+          broken: null,
+          changed: 0,
+          status: {
+            ahead: 0,
+            behind: 0,
+            staged: 0,
+            unstaged: 0,
+            untracked: 0,
+            conflicted: 0,
+            dirty_files: 0,
+            branch: String(a.head),
+          },
+        },
+      ],
     };
     world.tasks = [...world.tasks, task];
     return task;
   },
   // Copies as well, for the same reason: a status moved in place was kept.
   github_all_prs: () => structuredClone(world.prs),
-  github_task_prs: (a) => structuredClone(world.prs.find((p) => p.task_id === a.taskId)?.rows ?? []),
+  github_task_prs: (a) =>
+    structuredClone(world.prs.find((p) => p.task_id === a.taskId)?.rows ?? []),
   github_review_queue: () => structuredClone(world.reviews),
   github_pr_feedback: () => world.feedback,
   checkout_branches: () => ["main", "develop"],
   set_checkout_base: (a) => {
     const c = world.tasks.flatMap((t) => t.checkouts).find((x) => x.id === a.checkoutId);
     if (c) c.base = String(a.base);
-    for (const r of world.prs.flatMap((p) => p.rows)) if (r.checkout_id === a.checkoutId) r.base = String(a.base);
+    for (const r of world.prs.flatMap((p) => p.rows))
+      if (r.checkout_id === a.checkoutId) r.base = String(a.base);
     return null;
   },
 
@@ -500,17 +671,30 @@ const answer: Record<string, Answer> = {
   ticket_types: () => world.issueTypes,
   // Unanswered, New epic closed on a null epic and never asked for its repositories (EPIC-2).
   file_ticket: (a) => {
-    const req = a.req as { summary: string; issue_type: string; project_key: string | null; parent_key: string | null };
+    const req = a.req as {
+      summary: string;
+      issue_type: string;
+      project_key: string | null;
+      parent_key: string | null;
+    };
     const n = 300 + world.issues.length;
     const github = world.settings.tracker === "github";
     // A GitHub issue is filed in a repository, the parent's when none is named.
     const repo = req.project_key ?? req.parent_key?.split("#")[0] ?? "acme/web";
     const key = github ? `${repo}#${n}` : `${req.project_key ?? "ACME"}-${n}`;
     const made = {
-      ...world.issues[0], key, summary: req.summary, issue_type: github ? "Issue" : req.issue_type,
-      status: github ? "Open" : "To Do", status_id: github ? "open" : "1", status_category: "new",
-      epic_key: req.parent_key, epic_summary: null,
-      url: github ? `https://github.com/${repo}/issues/${n}` : `https://acme.atlassian.net/browse/${key}`,
+      ...world.issues[0],
+      key,
+      summary: req.summary,
+      issue_type: github ? "Issue" : req.issue_type,
+      status: github ? "Open" : "To Do",
+      status_id: github ? "open" : "1",
+      status_category: "new",
+      epic_key: req.parent_key,
+      epic_summary: null,
+      url: github
+        ? `https://github.com/${repo}/issues/${n}`
+        : `https://acme.atlassian.net/browse/${key}`,
     };
     world.issues.push(made);
     return structuredClone(made);
@@ -519,7 +703,8 @@ const answer: Record<string, Answer> = {
   jira_transition: (a) => {
     const t = world.transitions.find((x) => x.id === a.transitionId);
     const i = world.issues.find((x) => x.key === a.key);
-    if (t && i) Object.assign(i, { status: t.to_status, status_id: t.to_id, status_category: t.to_category });
+    if (t && i)
+      Object.assign(i, { status: t.to_status, status_id: t.to_id, status_category: t.to_category });
     return null;
   },
   jira_project_statuses: () => [
@@ -540,7 +725,8 @@ const answer: Record<string, Answer> = {
   set_ticket_start: (a) => {
     const jira = world.settings.jira;
     if (!jira) throw "Jira is not configured";
-    (jira.flow[a.projectKey as string] ??= { review: null, merged: null }).started = a.to as StartTo;
+    (jira.flow[a.projectKey as string] ??= { review: null, merged: null }).started =
+      a.to as StartTo;
     return null;
   },
   delete_task: (a) => {
@@ -549,7 +735,10 @@ const answer: Record<string, Answer> = {
   },
   ticket_required_fields: () => world.requiredFields,
   // Jira orders a search (TKT-13); here the list is sorted as Jira would.
-  tickets_find: (a) => ({ issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES), more: false }),
+  tickets_find: (a) => ({
+    issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES),
+    more: false,
+  }),
   ticket_priorities: () => (world.settings.tracker === "github" ? [] : PRIORITIES),
   set_tracker: (a) => {
     world.settings.tracker_chosen = a.uses as typeof world.settings.tracker;
@@ -562,15 +751,37 @@ const answer: Record<string, Answer> = {
     const key = a.key as string;
     const root = `/Users/you/.villain-worktrees/${key}`;
     const task: TaskView = {
-      id: `t-${key.toLowerCase()}`, name: `${key} ${[...world.issues, ...world.elsewhere].find((i) => i.key === key)?.summary ?? ""}`.trim(),
-      root, branch: key, issue_key: key, issue_url: `https://acme.atlassian.net/browse/${key}`,
-      created_at: new Date().toISOString(), pane_count: 0, epic: !!a.epic,
+      id: `t-${key.toLowerCase()}`,
+      name: `${key} ${[...world.issues, ...world.elsewhere].find((i) => i.key === key)?.summary ?? ""}`.trim(),
+      root,
+      branch: key,
+      issue_key: key,
+      issue_url: `https://acme.atlassian.net/browse/${key}`,
+      created_at: new Date().toISOString(),
+      pane_count: 0,
+      epic: !!a.epic,
       checkouts: (a.projectIds as string[]).map((pid) => {
         const name = world.projects.find((p) => p.id === pid)?.name ?? pid;
         return {
-          id: `c-${key.toLowerCase()}-${name}`, task_id: `t-${key.toLowerCase()}`, project_id: pid, project_name: name,
-          path: `${root}/${name}`, base: "main", exists: true, broken: null, changed: 0,
-          status: { ahead: 0, behind: 0, staged: 0, unstaged: 0, untracked: 0, conflicted: 0, dirty_files: 0, branch: key },
+          id: `c-${key.toLowerCase()}-${name}`,
+          task_id: `t-${key.toLowerCase()}`,
+          project_id: pid,
+          project_name: name,
+          path: `${root}/${name}`,
+          base: "main",
+          exists: true,
+          broken: null,
+          changed: 0,
+          status: {
+            ahead: 0,
+            behind: 0,
+            staged: 0,
+            unstaged: 0,
+            untracked: 0,
+            conflicted: 0,
+            dirty_files: 0,
+            branch: key,
+          },
         };
       }),
     };
@@ -589,14 +800,21 @@ const answer: Record<string, Answer> = {
       const h = world.health.find((x) => x.project_id === id);
       if (!p || !h) return { project_id: id, repo: id, ok: false, detail: "No such repository" };
       if (h.clone !== "ok") {
-        return { project_id: id, repo: p.name, ok: true, detail: `Fetched. The clone is not at ${p.path} any more: Locate it.` };
+        return {
+          project_id: id,
+          repo: p.name,
+          ok: true,
+          detail: `Fetched. The clone is not at ${p.path} any more: Locate it.`,
+        };
       }
-      const moved = h.ahead ? 0 : h.behind ?? 0;
+      const moved = h.ahead ? 0 : (h.behind ?? 0);
       h.synced_at = Math.round(Date.now() / 1000);
       if (moved) h.behind = 0;
       const detail = h.ahead
         ? `Fetched. main has ${h.ahead} commit of its own, so it was left alone.`
-        : moved ? `Fetched. main moved forward ${moved} commits.` : "Fetched. main is up to date.";
+        : moved
+          ? `Fetched. main moved forward ${moved} commits.`
+          : "Fetched. main is up to date.";
       return { project_id: id, repo: p.name, ok: true, detail };
     }),
   // billing is the workspace's, added by Ada, with no clone here (REPO-9).
@@ -624,35 +842,61 @@ const answer: Record<string, Answer> = {
     (a.picks as { checkout_id: string; by: string }[]).map((pick): RepoUpdate => {
       const c = world.tasks.flatMap((t) => t.checkouts).find((x) => x.id === pick.checkout_id);
       return {
-        checkout_id: pick.checkout_id, repo: c?.project_name ?? "?", base: c?.base ?? "main",
-        outcome: "updated", commits: 2, conflicts: [],
+        checkout_id: pick.checkout_id,
+        repo: c?.project_name ?? "?",
+        base: c?.base ?? "main",
+        outcome: "updated",
+        commits: 2,
+        conflicts: [],
         detail: pick.by === "rebase" ? "rebased onto 2 new commits" : "merged 2 commits",
       };
     }),
   cleanup_plan: () => world.cleanup,
   list_repo_notes: () =>
-    world.projects.map((p) => ({ project_id: p.id, notes: structuredClone(world.notes[p.id] ?? []) })),
+    world.projects.map((p) => ({
+      project_id: p.id,
+      notes: structuredClone(world.notes[p.id] ?? []),
+    })),
   add_repo_note: (a) => {
     const list = (world.notes[a.projectId as string] ??= []);
     const at = Date.now();
     list.unshift({
-      id: `n${at}`, repo: "", text: (a.text as string).trim(), paths: a.paths as string[], written_at: at,
-      source: "you", written_commit: null, checked_at: at, checked_commit: null, changed: [],
+      id: `n${at}`,
+      repo: "",
+      text: (a.text as string).trim(),
+      paths: a.paths as string[],
+      written_at: at,
+      source: "you",
+      written_commit: null,
+      checked_at: at,
+      checked_commit: null,
+      changed: [],
     });
     return null;
   },
   edit_repo_note: (a) => {
-    const n = Object.values(world.notes).flat().find((x) => x.id === a.id);
-    if (n) Object.assign(n, { text: (a.text as string).trim(), paths: a.paths, checked_at: Date.now(), changed: [] });
+    const n = Object.values(world.notes)
+      .flat()
+      .find((x) => x.id === a.id);
+    if (n)
+      Object.assign(n, {
+        text: (a.text as string).trim(),
+        paths: a.paths,
+        checked_at: Date.now(),
+        changed: [],
+      });
     return null;
   },
   check_repo_note: (a) => {
-    const n = Object.values(world.notes).flat().find((x) => x.id === a.id);
+    const n = Object.values(world.notes)
+      .flat()
+      .find((x) => x.id === a.id);
     if (n) Object.assign(n, { checked_at: Date.now(), changed: n.paths.length ? [] : null });
     return null;
   },
   delete_repo_note: (a) => {
-    for (const k of Object.keys(world.notes)) world.notes[k] = world.notes[k].filter((x) => x.id !== a.id);
+    for (const k of Object.keys(world.notes))
+      world.notes[k] = world.notes[k].filter((x) => x.id !== a.id);
     return null;
   },
   cleanup_apply: (a) => {
@@ -660,7 +904,9 @@ const answer: Record<string, Answer> = {
     const done: Cleaned[] = ids.map((id) => {
       const item = world.cleanup.find((i) => i.id === id);
       if (!item) return { id, ok: false, detail: "Changed since the list was made. Look again." };
-      return item.verdict === "blocked" ? { id, ok: false, detail: item.detail } : { id, ok: true, detail: "" };
+      return item.verdict === "blocked"
+        ? { id, ok: false, detail: item.detail }
+        : { id, ok: true, detail: "" };
     });
     world.cleanup = world.cleanup.filter((i) => !done.some((d) => d.ok && d.id === i.id));
     return done;
@@ -678,7 +924,8 @@ const answer: Record<string, Answer> = {
     return structuredClone(phone);
   },
   phone_pair: () => {
-    if (!phone.listening) throw "Turn on Tailscale or the home network first, so the phone can reach the app.";
+    if (!phone.listening)
+      throw "Turn on Tailscale or the home network first, so the phone can reach the app.";
     phone.pairing = { code: "482913", seconds_left: 120 };
     return structuredClone(phone.pairing);
   },
@@ -705,13 +952,21 @@ const answer: Record<string, Answer> = {
     const b = tabOf(a.taskId as string);
     const frames = a.frames as { id: number };
     const jpeg = await frameOf(b, a.width as number, a.height as number, a.scale as number);
-    const internals = (window as unknown as { __TAURI_INTERNALS__: { runCallback: (id: number, data: unknown) => void } }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as {
+        __TAURI_INTERNALS__: { runCallback: (id: number, data: unknown) => void };
+      }
+    ).__TAURI_INTERNALS__;
     internals.runCallback(frames.id, { index: 0, message: jpeg });
     return null;
   },
   browser_unwatch: () => null,
   add_browser_sign_in: (a) => {
-    const saved = { id: `si-${Date.now()}`, site: a.site as string, username: a.username as string };
+    const saved = {
+      id: `si-${Date.now()}`,
+      site: a.site as string,
+      username: a.username as string,
+    };
     world.settings.browser_sign_ins.push(saved);
     return saved;
   },
@@ -721,7 +976,11 @@ const answer: Record<string, Answer> = {
   },
   browser_sign_in_form: () => ({ site: "localhost", username: null }),
   browser_save_sign_in: (a) => {
-    const saved = { id: `si-${Date.now()}`, site: a.site as string, username: a.username as string };
+    const saved = {
+      id: `si-${Date.now()}`,
+      site: a.site as string,
+      username: a.username as string,
+    };
     world.settings.browser_sign_ins.push(saved);
     return saved;
   },
@@ -736,7 +995,16 @@ const answer: Record<string, Answer> = {
     const id = `tab-${task}-${++mockTabs}`;
     const url = (a.url as string | null) ?? "about:blank";
     const at = b.tabs.findIndex((t) => t.active) + 1;
-    b.tabs.splice(at, 0, { id, name: url === "about:blank" ? "New tab" : new URL(url.includes("://") ? url : `http://${url}`).hostname, url, active: false, loading: false });
+    b.tabs.splice(at, 0, {
+      id,
+      name:
+        url === "about:blank"
+          ? "New tab"
+          : new URL(url.includes("://") ? url : `http://${url}`).hostname,
+      url,
+      active: false,
+      loading: false,
+    });
     activate(task, id);
     return null;
   },
@@ -769,7 +1037,8 @@ const answer: Record<string, Answer> = {
     for (const [task, b] of browsers) {
       const r = b.requests.find((x) => x.id === a.id);
       if (!r) continue;
-      if (a.allow && !world.settings.browser_sites.includes(r.site)) world.settings.browser_sites.push(r.site);
+      if (a.allow && !world.settings.browser_sites.includes(r.site))
+        world.settings.browser_sites.push(r.site);
       b.requests = b.requests.filter((x) => x !== r);
       void emit("browser:changed", task);
       return null;
@@ -777,9 +1046,20 @@ const answer: Record<string, Answer> = {
     throw "that request was already answered";
   },
   set_browser_sites: (a) => {
-    const kept = [...new Set((a.sites as string[])
-      .map((x) => x.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").split(/[/:?#]/)[0].replace(/^\*\./, ""))
-      .filter((x) => x.includes(".")))].sort();
+    const kept = [
+      ...new Set(
+        (a.sites as string[])
+          .map((x) =>
+            x
+              .trim()
+              .toLowerCase()
+              .replace(/^[a-z]+:\/\//, "")
+              .split(/[/:?#]/)[0]
+              .replace(/^\*\./, ""),
+          )
+          .filter((x) => x.includes(".")),
+      ),
+    ].sort();
     world.settings.browser_sites = kept;
     void emit("browser:changed", "");
     return kept;

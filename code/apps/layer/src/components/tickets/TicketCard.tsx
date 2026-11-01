@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
-import type { Ticket } from "../../lib/types";
 import { age } from "../../lib/time";
+import type { Ticket } from "../../lib/types";
 import { useStore } from "../../store";
 import { IssueTypeIcon, hierarchyClass, isEpicType, type TypeMap } from "../IssueType";
 import { statusClass } from "./status";
@@ -70,7 +70,10 @@ export function TicketCard({
             className="ui-status ui-status-warn sync"
             disabled={syncing}
             title={`Move ${issue.key} into progress in Jira`}
-            onClick={(e) => { e.stopPropagation(); onSync(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSync();
+            }}
           >
             {syncing ? "moving…" : "started here — sync ↑"}
           </button>
@@ -92,11 +95,11 @@ export function TicketCard({
       <div className="bottom">
         <span>{issue.issue_type}</span>
         {issue.priority && <span>· {issue.priority}</span>}
-        <span className={issue.assignee ? "" : "free"}>
-          · {issue.assignee ?? "unassigned"}
-        </span>
+        <span className={issue.assignee ? "" : "free"}>· {issue.assignee ?? "unassigned"}</span>
         {issue.components.map((c) => (
-          <span key={c} className="ui-chip">{c}</span>
+          <span key={c} className="ui-chip">
+            {c}
+          </span>
         ))}
         {issue.created && (
           <span className="age" title={`Created ${new Date(issue.created).toLocaleString()}`}>

@@ -466,7 +466,6 @@ function IconPicker({
               )}
             </div>
             <input
-              // biome-ignore lint/a11y/noAutofocus: the picker opens to search
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -569,7 +568,6 @@ function NewServiceForm({ onDone }: { onDone: () => void }) {
           }}
         />
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -690,6 +688,7 @@ function ServiceProperties({ service }: { service: Service }) {
             />
             <datalist id="forge-repositories">
               {repositories.map((r) => (
+                // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- a suggestion for the field, not a control
                 <option key={r} value={r} />
               ))}
             </datalist>
@@ -1134,7 +1133,6 @@ function NewDomainForm({ onDone }: { onDone: () => void }) {
             }}
           />
           <input
-            // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -1323,7 +1321,6 @@ function NewSpecForm({
       </div>
       <div className="flex flex-col gap-2 px-4 py-3">
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a title
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -1630,7 +1627,7 @@ function SpecHistory({ versions }: { versions: SpecVersion[] | null | undefined 
             <HistoryRow
               // Versions have no id, and two can share a time; newest first, so
               // the oldest keeps its key as new ones arrive.
-              // biome-ignore lint/suspicious/noArrayIndexKey: counted from the oldest, so stable
+              // oxlint-disable-next-line react/no-array-index-key -- counted from the oldest, so stable
               key={versions.length - index}
               entry={entry}
             />
@@ -2064,7 +2061,6 @@ function NewDecisionForm({
       </div>
       <div className="flex flex-col gap-2 px-4 py-3">
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a title
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}

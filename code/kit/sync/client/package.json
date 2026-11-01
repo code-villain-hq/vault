@@ -1,9 +1,11 @@
 {
   "name": "@code-villain/sync-client",
   "private": true,
-  "type": "module",
   "description": "The client side of the studio's sync engine: a local copy of the workspace, instant writes, and an outbox that survives going offline.",
-  "exports": { ".": "./src/index.ts" },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "idb": "8.0.4"
   },

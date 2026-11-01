@@ -199,7 +199,6 @@ function NewPlanForm({ kind, onDone }: { kind: "Project" | "Initiative"; onDone:
       </div>
       <div className="flex flex-col gap-2 px-4 py-3">
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}

@@ -34,7 +34,9 @@ describe("a hunk coloured as code", () => {
       "  return (high + 0.05) / (low + 0.05);",
     ]);
     expect(text(first.new)).toContain("/** WCAG contrast, 1 to 21. */");
-    expect(text(first.new)).not.toContain("  const [low, high] = [luminance(a), luminance(b)].sort();");
+    expect(text(first.new)).not.toContain(
+      "  const [low, high] = [luminance(a), luminance(b)].sort();",
+    );
     expect(text(second.old)).toEqual(["export const FLOOR = 4.5;", "export const CEILING = 21;"]);
   });
 
@@ -46,8 +48,12 @@ describe("a hunk coloured as code", () => {
 
 describe("the changed words of a replaced line", () => {
   test("are what the pair does not share at the start and the end", () => {
-    expect(marked(at("+  const [low, high] = [luminance(a), luminance(b)].sort((x, y) => x - y);"))).toBe("(x, y) => x - y");
-    expect(marked(at("-  const [low, high] = [luminance(a), luminance(b)].sort();"))).toBeUndefined();
+    expect(
+      marked(at("+  const [low, high] = [luminance(a), luminance(b)].sort((x, y) => x - y);")),
+    ).toBe("(x, y) => x - y");
+    expect(
+      marked(at("-  const [low, high] = [luminance(a), luminance(b)].sort();")),
+    ).toBeUndefined();
   });
 
   test("grow to the edge of a word cut in half", () => {

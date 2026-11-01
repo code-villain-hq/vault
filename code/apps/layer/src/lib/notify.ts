@@ -1,7 +1,4 @@
-import {
-  isPermissionGranted,
-  requestPermission,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 
 // The banners themselves are the backend's — `news.rs` for reviews and
 // tickets, `attention.rs` for agents — since a hidden webview's timers are

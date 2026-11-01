@@ -5,7 +5,10 @@ import { FakeServer } from "../../../kit/sync/client/src/fake-server";
 import { MemoryStore } from "../../../kit/sync/client/src/store";
 import { transferSetupWrites, type SetupWrite } from "../src/lib/workspace-handoff";
 
-const write: SetupWrite = { id: "handoff-1", operation: { action: "create", model: "Note", id: "note-1", data: { text: "Keep this note." } } };
+const write: SetupWrite = {
+  id: "handoff-1",
+  operation: { action: "create", model: "Note", id: "note-1", data: { text: "Keep this note." } },
+};
 
 test("a failed disk write keeps the backend queue until it can be saved", async () => {
   class Store extends MemoryStore {
@@ -22,7 +25,9 @@ test("a failed disk write keeps the backend queue until it can be saved", async 
   server.goOffline();
   let queued = [write];
   const read = async () => queued;
-  const ack = async () => { queued = []; };
+  const ack = async () => {
+    queued = [];
+  };
   try {
     await expect(transferSetupWrites(read, ack, client)).rejects.toThrow("Can't save");
     expect(queued).toHaveLength(1);
@@ -34,7 +39,9 @@ test("a failed disk write keeps the backend queue until it can be saved", async 
     expect(queued).toHaveLength(0);
     expect((await store.load()).outbox.map((t) => t.id)).toEqual([write.id]);
     expect(client.status().pending).toBe(1);
-  } finally { client.stop(); }
+  } finally {
+    client.stop();
+  }
 });
 
 test("an interrupted acknowledgement reuses the transaction after a restart", async () => {
@@ -46,13 +53,29 @@ test("an interrupted acknowledgement reuses the transaction after a restart", as
   let queued = [write];
   const read = async () => queued;
   try {
-    await expect(transferSetupWrites(read, async () => { throw new Error("IPC interrupted"); }, client)).rejects.toThrow("IPC interrupted");
+    await expect(
+      transferSetupWrites(
+        read,
+        async () => {
+          throw new Error("IPC interrupted");
+        },
+        client,
+      ),
+    ).rejects.toThrow("IPC interrupted");
     client.stop();
     client = new SyncClient<Schema>({ store, transport: server.transport() });
     await client.start();
-    await transferSetupWrites(read, async () => { queued = []; }, client);
+    await transferSetupWrites(
+      read,
+      async () => {
+        queued = [];
+      },
+      client,
+    );
     expect(queued).toHaveLength(0);
     expect(client.status().pending).toBe(1);
     expect((await store.load()).outbox.map((t) => t.id)).toEqual([write.id]);
-  } finally { client.stop(); }
+  } finally {
+    client.stop();
+  }
 });

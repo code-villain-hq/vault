@@ -1,21 +1,41 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from "react";
-import { api } from "../lib/api";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+} from "react";
 import { heldConversation, holdConversation, pruneConversations } from "../lib/acpPool";
 import { onAcpUpdate } from "../lib/acpUpdates";
+import { api } from "../lib/api";
 import { pastedImages, readImage, type PastedImage } from "../lib/pastedImage";
-import { useStore } from "../store";
 import type { AcpEntry, AcpToolContent, AcpView, PaneInfo } from "../lib/types";
+import { useStore } from "../store";
 import { Markdown } from "./Markdown";
-import { ErrorMessage, useFailure } from "./ui";
 import { TerminalPane } from "./Terminal";
+import { ErrorMessage, useFailure } from "./ui";
+
+/* oxlint-disable react/no-array-index-key -- what an agent sent, in order: its plan's steps, tool output and pasted images have no ids */
 
 /**
  * Where a pane is shown: a conversation for an agent over ACP (§20), its
  * terminal otherwise. Memoised: the store keeps a pane's object until it
  * changes, so one agent's activity redraws its own pane and not the others.
  */
-export const PaneView = memo(function PaneView({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
-  return pane.acp ? <AcpPane pane={pane} visible={visible} /> : <TerminalPane pane={pane} visible={visible} />;
+export const PaneView = memo(function PaneView({
+  pane,
+  visible,
+}: {
+  pane: PaneInfo;
+  visible: boolean;
+}) {
+  return pane.acp ? (
+    <AcpPane pane={pane} visible={visible} />
+  ) : (
+    <TerminalPane pane={pane} visible={visible} />
+  );
 });
 
 /**
@@ -95,7 +115,11 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
     atBottom.current = true;
     failure.clear();
     try {
-      await api.acpPrompt(pane.id, text, sent.map(({ mimeType, data }) => ({ mimeType, data })));
+      await api.acpPrompt(
+        pane.id,
+        text,
+        sent.map(({ mimeType, data }) => ({ mimeType, data })),
+      );
     } catch (e) {
       setDraft(text);
       setImages(sent);
@@ -112,21 +136,26 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
       fail(`${view?.agent ?? "This agent"} doesn't take images.`);
       return;
     }
-    void Promise.all(files.map(readImage)).then((read) => setImages((now) => [...now, ...read])).catch(fail);
+    void Promise.all(files.map(readImage))
+      .then((read) => setImages((now) => [...now, ...read]))
+      .catch(fail);
   };
   const attempt = (work: () => Promise<unknown>) => {
     failure.clear();
     void work().catch(fail);
   };
   const stop = () => attempt(() => api.acpCancel(pane.id));
-  const answer = (entry: number, option: string) => attempt(() => api.acpAnswer(pane.id, entry, option));
-  const set = (setting: string, value: string) => attempt(() => api.acpSet(pane.id, setting, value));
+  const answer = (entry: number, option: string) =>
+    attempt(() => api.acpAnswer(pane.id, entry, option));
+  const set = (setting: string, value: string) =>
+    attempt(() => api.acpSet(pane.id, setting, value));
 
   const busy = view?.busy ?? false;
   const over = !pane.running || (view?.exited ?? false);
-  const commands = draft.startsWith("/") && !draft.includes(" ")
-    ? (view?.commands ?? []).filter((c) => c.name.startsWith(draft.slice(1))).slice(0, 8)
-    : [];
+  const commands =
+    draft.startsWith("/") && !draft.includes(" ")
+      ? (view?.commands ?? []).filter((c) => c.name.startsWith(draft.slice(1))).slice(0, 8)
+      : [];
 
   return (
     <div
@@ -156,8 +185,14 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               <div>{view?.ready ? "Ask it anything. Type / for its commands." : "Starting…"}</div>
             </div>
           )}
-          {entries.map((e) => <Entry key={e.index} entry={e} onAnswer={answer} />)}
-          {busy && <div className="acp-working"><span className="dot live" /> Working · Esc to stop</div>}
+          {entries.map((e) => (
+            <Entry key={e.index} entry={e} onAnswer={answer} />
+          ))}
+          {busy && (
+            <div className="acp-working">
+              <span className="dot live" /> Working · Esc to stop
+            </div>
+          )}
         </div>
       </div>
 
@@ -166,8 +201,13 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
           {commands.length > 0 && (
             <div className="acp-commands">
               {commands.map((c) => (
-                <button key={c.name} className="acp-command" onClick={() => setDraft(`/${c.name} `)}>
-                  <span className="mono">/{c.name}</span> <span className="muted">{c.hint ?? c.description}</span>
+                <button
+                  key={c.name}
+                  className="acp-command"
+                  onClick={() => setDraft(`/${c.name} `)}
+                >
+                  <span className="mono">/{c.name}</span>{" "}
+                  <span className="muted">{c.hint ?? c.description}</span>
                 </button>
               ))}
             </div>
@@ -177,7 +217,7 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
               <div className="acp-images">
                 {images.map((img, i) => (
                   <div key={i} className="acp-image">
-                    <img src={img.url} alt={`Pasted image ${i + 1}`} />
+                    <img src={img.url} alt={`Pasted ${i + 1}`} />
                     <button
                       className="acp-image-remove"
                       title="Remove"
@@ -190,11 +230,18 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
                 ))}
               </div>
             )}
-            <textarea className="ui-field"
+            <textarea
+              className="ui-field"
               rows={3}
               value={draft}
               disabled={over}
-              placeholder={over ? "The agent has exited." : busy ? "Sent when this turn ends…" : "Message the agent · Enter to send, Shift-Enter for a new line"}
+              placeholder={
+                over
+                  ? "The agent has exited."
+                  : busy
+                    ? "Sent when this turn ends…"
+                    : "Message the agent · Enter to send, Shift-Enter for a new line"
+              }
               onChange={(e) => setDraft(e.target.value)}
               onPaste={paste}
               onKeyDown={(e) => {
@@ -206,24 +253,46 @@ function AcpPane({ pane, visible }: { pane: PaneInfo; visible: boolean }) {
             />
             <div className="acp-bar">
               {(view?.settings ?? []).map((s) => (
-                <label key={s.id} className="acp-setting" title={s.options.find((o) => o.value === s.current)?.description ?? s.name}>
+                <label
+                  key={s.id}
+                  className="acp-setting"
+                  title={s.options.find((o) => o.value === s.current)?.description ?? s.name}
+                >
                   <span>{s.name}</span>
-                  <select className="ui-field" value={s.current} disabled={over} onChange={(e) => set(s.id, e.target.value)}>
-                    {s.options.map((o) => <option key={o.value} value={o.value}>{o.name}</option>)}
+                  <select
+                    className="ui-field"
+                    value={s.current}
+                    disabled={over}
+                    onChange={(e) => set(s.id, e.target.value)}
+                  >
+                    {s.options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
               ))}
               <span className="spacer" />
               {view?.usage && (
                 <span className="muted" title="Context used, of the model's window">
-                  {kilo(view.usage.used)} / {kilo(view.usage.size)}{view.usage.cost ? ` · ${view.usage.cost}` : ""}
+                  {kilo(view.usage.used)} / {kilo(view.usage.size)}
+                  {view.usage.cost ? ` · ${view.usage.cost}` : ""}
                 </span>
               )}
               {view?.agent && <span className="muted">{view.agent}</span>}
               {busy ? (
-                <button className="ui-button" onClick={stop}>Stop</button>
+                <button className="ui-button" onClick={stop}>
+                  Stop
+                </button>
               ) : (
-                <button className={`ui-button${over || (!draft.trim() && images.length === 0) ? "" : " ui-button-primary"}`} disabled={over || (!draft.trim() && images.length === 0)} onClick={() => void send()}>Send</button>
+                <button
+                  className={`ui-button${over || (!draft.trim() && images.length === 0) ? "" : " ui-button-primary"}`}
+                  disabled={over || (!draft.trim() && images.length === 0)}
+                  onClick={() => void send()}
+                >
+                  Send
+                </button>
               )}
             </div>
           </div>
@@ -246,71 +315,90 @@ function kilo(n: number): string {
 }
 
 /** One entry. Redrawn only when it changed: a reply streams in token by token. */
-const Entry = memo(function Entry({ entry, onAnswer }: {
-  entry: AcpEntry;
-  onAnswer: (entry: number, option: string) => void;
-}) {
-  switch (entry.kind) {
-    case "user":
-      return (
-        <div className={`acp-user${entry.dropped ? " dropped" : ""}`}>
-          <div className="acp-user-text">{entry.text}</div>
-          {entry.queued && <div className="muted">Waiting for the turn before it to end</div>}
-          {entry.dropped && <div className="muted">Not sent: the turn before it was stopped</div>}
-        </div>
-      );
-    case "agent":
-      return <div className="acp-agent"><Markdown text={entry.text} /></div>;
-    case "thought":
-      return (
-        <details className="acp-thought">
-          <summary>Thinking</summary>
-          <div>{entry.text}</div>
-        </details>
-      );
-    case "tool":
-      return <Tool entry={entry} />;
-    case "plan":
-      return (
-        <div className="acp-plan">
-          <div className="acp-label">Plan</div>
-          {entry.steps.map((s, i) => (
-            <div key={i} className={`acp-step ${s.status}`}>
-              <span className="mark">{s.status === "completed" ? "✓" : s.status === "in_progress" ? "◐" : "○"}</span>
-              {s.content}
-            </div>
-          ))}
-        </div>
-      );
-    case "question": {
-      const chosen = entry.options.find((o) => o.id === entry.answer);
-      return (
-        <div className={`acp-question${entry.answer ? " answered" : ""}`}>
-          <div className="acp-label">Allow {entry.title}?</div>
-          {entry.answer ? (
-            <div className="muted">→ {chosen?.name ?? (entry.answer === "cancelled" ? "Stopped" : entry.answer)}</div>
-          ) : (
-            <div className="row">
-              {entry.options.map((o) => (
-                <button
-                  key={o.id}
-                  className={`ui-button${o.kind === "allow_once" ? " ui-button-primary" : o.kind.startsWith("reject") ? " ui-button-danger" : ""}`}
-                  onClick={() => onAnswer(entry.index, o.id)}
-                >
-                  {o.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      );
+const Entry = memo(
+  function Entry({
+    entry,
+    onAnswer,
+  }: {
+    entry: AcpEntry;
+    onAnswer: (entry: number, option: string) => void;
+  }) {
+    switch (entry.kind) {
+      case "user":
+        return (
+          <div className={`acp-user${entry.dropped ? " dropped" : ""}`}>
+            <div className="acp-user-text">{entry.text}</div>
+            {entry.queued && <div className="muted">Waiting for the turn before it to end</div>}
+            {entry.dropped && <div className="muted">Not sent: the turn before it was stopped</div>}
+          </div>
+        );
+      case "agent":
+        return (
+          <div className="acp-agent">
+            <Markdown text={entry.text} />
+          </div>
+        );
+      case "thought":
+        return (
+          <details className="acp-thought">
+            <summary>Thinking</summary>
+            <div>{entry.text}</div>
+          </details>
+        );
+      case "tool":
+        return <Tool entry={entry} />;
+      case "plan":
+        return (
+          <div className="acp-plan">
+            <div className="acp-label">Plan</div>
+            {entry.steps.map((s, i) => (
+              <div key={i} className={`acp-step ${s.status}`}>
+                <span className="mark">
+                  {s.status === "completed" ? "✓" : s.status === "in_progress" ? "◐" : "○"}
+                </span>
+                {s.content}
+              </div>
+            ))}
+          </div>
+        );
+      case "question": {
+        const chosen = entry.options.find((o) => o.id === entry.answer);
+        return (
+          <div className={`acp-question${entry.answer ? " answered" : ""}`}>
+            <div className="acp-label">Allow {entry.title}?</div>
+            {entry.answer ? (
+              <div className="muted">
+                → {chosen?.name ?? (entry.answer === "cancelled" ? "Stopped" : entry.answer)}
+              </div>
+            ) : (
+              <div className="row">
+                {entry.options.map((o) => (
+                  <button
+                    key={o.id}
+                    className={`ui-button${o.kind === "allow_once" ? " ui-button-primary" : o.kind.startsWith("reject") ? " ui-button-danger" : ""}`}
+                    onClick={() => onAnswer(entry.index, o.id)}
+                  >
+                    {o.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+      case "note":
+        return <div className={`acp-note${entry.error ? " error" : ""}`}>{entry.text}</div>;
     }
-    case "note":
-      return <div className={`acp-note${entry.error ? " error" : ""}`}>{entry.text}</div>;
-  }
-}, (a, b) => a.entry === b.entry);
+  },
+  (a, b) => a.entry === b.entry,
+);
 
-const STATUS_MARK: Record<string, string> = { pending: "○", in_progress: "◐", completed: "✓", failed: "✗" };
+const STATUS_MARK: Record<string, string> = {
+  pending: "○",
+  in_progress: "◐",
+  completed: "✓",
+  failed: "✗",
+};
 
 function Tool({ entry }: { entry: Extract<AcpEntry, { kind: "tool" }> }) {
   // Its output is drawn once it is first opened, not before. A long
@@ -326,7 +414,12 @@ function Tool({ entry }: { entry: Extract<AcpEntry, { kind: "tool" }> }) {
       {entry.tool !== "other" && <span className="acp-tag">{entry.tool}</span>}
     </>
   );
-  if (!detail) return <div className="acp-tool"><div className="acp-tool-head">{head}</div></div>;
+  if (!detail)
+    return (
+      <div className="acp-tool">
+        <div className="acp-tool-head">{head}</div>
+      </div>
+    );
   // Open while an edit waits, so a question about it is answered seeing what
   // it would write; and when it failed, to show why.
   const waiting = entry.status === "pending" && entry.content.some((c) => c.type === "diff");
@@ -335,7 +428,9 @@ function Tool({ entry }: { entry: Extract<AcpEntry, { kind: "tool" }> }) {
     <details
       className="acp-tool"
       open={open || undefined}
-      onToggle={(e) => { if (e.currentTarget.open) setOpened(true); }}
+      onToggle={(e) => {
+        if (e.currentTarget.open) setOpened(true);
+      }}
     >
       <summary className="acp-tool-head">{head}</summary>
       {(open || opened) && (
@@ -343,7 +438,9 @@ function Tool({ entry }: { entry: Extract<AcpEntry, { kind: "tool" }> }) {
           {entry.locations.length > 0 && (
             <div className="acp-locations mono">{entry.locations.join("\n")}</div>
           )}
-          {entry.content.map((c, i) => <ToolOutput key={i} content={c} />)}
+          {entry.content.map((c, i) => (
+            <ToolOutput key={i} content={c} />
+          ))}
         </>
       )}
     </details>
@@ -354,10 +451,15 @@ function ToolOutput({ content }: { content: AcpToolContent }) {
   if (content.type === "text") return <pre className="acp-output">{content.text}</pre>;
   return (
     <div className="acp-diff">
-      <div className="acp-diff-path mono">{content.path}{content.old === null ? " (new)" : ""}</div>
+      <div className="acp-diff-path mono">
+        {content.path}
+        {content.old === null ? " (new)" : ""}
+      </div>
       <pre>
         {changedLines(content.old ?? "", content.new).map((l, i) => (
-          <div key={i} className={l.mark === "+" ? "add" : l.mark === "-" ? "del" : "ctx"}>{l.mark} {l.text}</div>
+          <div key={i} className={l.mark === "+" ? "add" : l.mark === "-" ? "del" : "ctx"}>
+            {l.mark} {l.text}
+          </div>
         ))}
       </pre>
     </div>
@@ -376,12 +478,18 @@ function changedLines(old: string, now: string): { mark: string; text: string }[
   let start = 0;
   while (start < a.length && start < b.length && a[start] === b[start]) start++;
   let end = 0;
-  while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
+  while (
+    end < a.length - start &&
+    end < b.length - start &&
+    a[a.length - 1 - end] === b[b.length - 1 - end]
+  )
+    end++;
   const context = 3;
   const out: { mark: string; text: string }[] = [];
   for (const l of a.slice(Math.max(0, start - context), start)) out.push({ mark: " ", text: l });
   for (const l of a.slice(start, a.length - end)) out.push({ mark: "-", text: l });
   for (const l of b.slice(start, b.length - end)) out.push({ mark: "+", text: l });
-  for (const l of b.slice(b.length - end, Math.min(b.length, b.length - end + context))) out.push({ mark: " ", text: l });
+  for (const l of b.slice(b.length - end, Math.min(b.length, b.length - end + context)))
+    out.push({ mark: " ", text: l });
   return out;
 }

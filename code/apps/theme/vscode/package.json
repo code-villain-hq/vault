@@ -1,15 +1,27 @@
 {
   "name": "code-villain-theme",
   "displayName": "Code Villain",
-  "description": "Code Villain's theme, in night and day, generated from the vault's design tokens.",
   "version": "0.2.1",
+  "description": "Code Villain's theme, in night and day, generated from the vault's design tokens.",
+  "categories": [
+    "Themes"
+  ],
   "publisher": "code-villain",
-  "engines": { "vscode": "^1.80.0" },
-  "categories": ["Themes"],
   "contributes": {
     "themes": [
-      { "label": "Code Villain Night", "uiTheme": "vs-dark", "path": "./themes/code-villain-night.json" },
-      { "label": "Code Villain Day", "uiTheme": "vs", "path": "./themes/code-villain-day.json" }
+      {
+        "label": "Code Villain Night",
+        "uiTheme": "vs-dark",
+        "path": "./themes/code-villain-night.json"
+      },
+      {
+        "label": "Code Villain Day",
+        "uiTheme": "vs",
+        "path": "./themes/code-villain-day.json"
+      }
     ]
+  },
+  "engines": {
+    "vscode": "^1.80.0"
   }
 }

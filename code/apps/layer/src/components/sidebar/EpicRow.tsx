@@ -1,11 +1,11 @@
 import { memo, useEffect, useRef } from "react";
 import { api } from "../../lib/api";
 import { taskReview } from "../../lib/derive";
-import type { EpicOf } from "../../lib/grouping";
 import { openWaits, STATE_COLOR, subTaskState, useEpicViews } from "../../lib/epicState";
+import type { EpicOf } from "../../lib/grouping";
 import { useTaskAgents } from "../../lib/panes";
-import { useStore } from "../../store";
 import type { TaskView } from "../../lib/types";
+import { useStore } from "../../store";
 import { ChevronIcon } from "../icons";
 
 /**
@@ -38,18 +38,26 @@ export const EpicRow = memo(function EpicRow({
   const prs = useStore((s) => s.prs);
   const { waiting, busy } = useTaskAgents(epic.id);
   // Read again when a sub-task is filed or goes, which the task list says.
-  useEffect(() => { void load(epic.id).catch(() => {}); }, [epic.id, subTasks.length, load]);
+  useEffect(() => {
+    void load(epic.id).catch(() => {});
+  }, [epic.id, subTasks.length, load]);
   // Tasks under its ticket in Jira that are not its sub-tasks yet become them
   // (EPIC-13). Each is asked for once: one that will not link must not ask on every draw.
   const asked = useRef(new Set<string>());
-  const unlinked = subTasks.filter((t) => t.sub_task?.epic !== epic.id && !asked.current.has(t.id)).map((t) => t.id);
+  const unlinked = subTasks
+    .filter((t) => t.sub_task?.epic !== epic.id && !asked.current.has(t.id))
+    .map((t) => t.id);
   const adopt = unlinked.join(",");
   useEffect(() => {
     if (!adopt) return;
     const ids = adopt.split(",");
     for (const id of ids) asked.current.add(id);
-    api.adoptSubTasks(epic.id, ids)
-      .then((v) => { put(epic.id, v); return refreshTasks(); })
+    api
+      .adoptSubTasks(epic.id, ids)
+      .then((v) => {
+        put(epic.id, v);
+        return refreshTasks();
+      })
       .catch(() => {});
   }, [adopt, epic.id, put, refreshTasks]);
 
@@ -79,7 +87,9 @@ export const EpicRow = memo(function EpicRow({
             <ChevronIcon />
           </span>
           <span className={`dot ${waiting ? "idle" : busy ? "live" : ""}`} />
-          <span className="label">{epic.issue_key ? epic.name.replace(`${epic.issue_key} `, "") : epic.name}</span>
+          <span className="label">
+            {epic.issue_key ? epic.name.replace(`${epic.issue_key} `, "") : epic.name}
+          </span>
         </div>
         <div className="ws-meta">
           {epic.issue_key && <span className="branch">{epic.issue_key}</span>}
@@ -87,26 +97,29 @@ export const EpicRow = memo(function EpicRow({
           {toFile > 0 ? (
             <span>{toFile} to file</span>
           ) : filed.length > 0 ? (
-            <span>{merged} of {filed.length} merged</span>
+            <span>
+              {merged} of {filed.length} merged
+            </span>
           ) : (
             <span>spec</span>
           )}
         </div>
       </div>
-      {open && filed.map((s) => {
-        const task = subTasks.find((t) => t.id === s.task_id);
-        return task ? (
-          <SubLine
-            key={task.id}
-            title={s.title}
-            waits={openWaits(s, all, prs).length > 0}
-            task={task}
-            selected={selected === task.id}
-            onSelect={onSelect}
-            onMenu={onMenu}
-          />
-        ) : null;
-      })}
+      {open &&
+        filed.map((s) => {
+          const task = subTasks.find((t) => t.id === s.task_id);
+          return task ? (
+            <SubLine
+              key={task.id}
+              title={s.title}
+              waits={openWaits(s, all, prs).length > 0}
+              task={task}
+              selected={selected === task.id}
+              onSelect={onSelect}
+              onMenu={onMenu}
+            />
+          ) : null;
+        })}
     </div>
   );
 });
@@ -139,7 +152,11 @@ export const JiraEpicRow = memo(function JiraEpicRow({
   const id = `jira:${epic.key}`;
   return (
     <div>
-      <div className="ws" title="Not an epic here yet: open it to make it one" onClick={() => onOpen(epic, tasks)}>
+      <div
+        className="ws"
+        title="Not an epic here yet: open it to make it one"
+        onClick={() => onOpen(epic, tasks)}
+      >
         <div className="ws-title">
           <span
             className={`chev${open ? " open" : ""}`}
@@ -156,26 +173,36 @@ export const JiraEpicRow = memo(function JiraEpicRow({
         <div className="ws-meta">
           <span className="branch">{epic.key}</span>
           <div className="spacer" />
-          <span>{merged} of {tasks.length} merged</span>
+          <span>
+            {merged} of {tasks.length} merged
+          </span>
         </div>
       </div>
-      {open && tasks.map((t) => (
-        <SubLine
-          key={t.id}
-          title={t.issue_key ? t.name.replace(`${t.issue_key} `, "") : t.name}
-          waits={false}
-          task={t}
-          selected={selected === t.id}
-          onSelect={onSelect}
-          onMenu={onMenu}
-        />
-      ))}
+      {open &&
+        tasks.map((t) => (
+          <SubLine
+            key={t.id}
+            title={t.issue_key ? t.name.replace(`${t.issue_key} `, "") : t.name}
+            waits={false}
+            task={t}
+            selected={selected === t.id}
+            onSelect={onSelect}
+            onMenu={onMenu}
+          />
+        ))}
     </div>
   );
 });
 
 /** One sub-task, one line: its dot (hollow while it waits), title and state. */
-function SubLine({ title, waits, task, selected, onSelect, onMenu }: {
+function SubLine({
+  title,
+  waits,
+  task,
+  selected,
+  onSelect,
+  onMenu,
+}: {
   title: string;
   waits: boolean;
   task: TaskView;

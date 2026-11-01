@@ -1,16 +1,16 @@
-import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useRef } from "react";
+import { themeTerminals } from "./components/Terminal";
 import { api } from "./lib/api";
-import { prepareNotifications } from "./lib/notify";
-import { exitIsNews, useStore } from "./store";
-import { useSpecs } from "./lib/specs";
 import { CHAT_TASK_ID } from "./lib/derive";
 import { goTo } from "./lib/goto";
-import type { SpecPart, Target } from "./lib/types";
+import { prepareNotifications } from "./lib/notify";
+import { useSpecs } from "./lib/specs";
 import { useTheme } from "./lib/theme";
-import { themeTerminals } from "./components/Terminal";
+import type { SpecPart, Target } from "./lib/types";
 import { startWorkspaceSync, useSession } from "./lib/workspace-sync";
+import { exitIsNews, useStore } from "./store";
 
 /**
  * Tauri emits an unfocused event while the window is still coming up.
@@ -64,11 +64,11 @@ export function Watchers() {
   const sweptAt = useRef({ prs: 0, reviews: 0 });
 
   /** The last PR state each repo was seen in, so only changes are announced. */
-  const seenPrs = useRef(
-    new Map<string, { verdict: string; comments: number; merged: boolean }>(),
-  );
+  const seenPrs = useRef(new Map<string, { verdict: string; comments: number; merged: boolean }>());
 
-  useEffect(() => { void refreshAll().catch(fail); }, [refreshAll, fail]);
+  useEffect(() => {
+    void refreshAll().catch(fail);
+  }, [refreshAll, fail]);
   // The shared setup, to the workspace and back (§25), again after
   // signing in again (PROF-16).
   const { turn } = useSession();
@@ -78,10 +78,12 @@ export function Watchers() {
     void startWorkspaceSync({
       onSetup: () => void useStore.getState().refreshAll().catch(fail),
       onRefused: (text) => fail(`The workspace did not take a change: ${text}`),
-    }).then((s) => {
-      if (gone) s();
-      else stop = s;
-    }).catch(fail);
+    })
+      .then((s) => {
+        if (gone) s();
+        else stop = s;
+      })
+      .catch(fail);
     return () => {
       gone = true;
       stop?.();
@@ -89,7 +91,9 @@ export function Watchers() {
   }, [fail, turn]);
   // Once at launch too, so a repo in trouble shows on the Repos tab before
   // anyone opens it.
-  useEffect(() => { void refreshRepoHealth().catch(fail); }, [refreshRepoHealth, fail]);
+  useEffect(() => {
+    void refreshRepoHealth().catch(fail);
+  }, [refreshRepoHealth, fail]);
 
   // Polls only while the window is in front, and slow down further when the
   // window is focused but nobody has touched it — leaving an 8s full-repo
@@ -182,12 +186,19 @@ export function Watchers() {
 
     void getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => setActive(focused))
-      .then((un) => { if (alive) unFocus = un; else un(); });
+      .then((un) => {
+        if (alive) unFocus = un;
+        else un();
+      });
 
     // Minimize/restore: focus alone does not cover every path on macOS.
     const onVis = () => {
       if (document.visibilityState === "hidden") setActive(false);
-      else void getCurrentWindow().isFocused().then((f) => setActive(f)).catch(() => setActive(true));
+      else
+        void getCurrentWindow()
+          .isFocused()
+          .then((f) => setActive(f))
+          .catch(() => setActive(true));
     };
     // App switch: visibilitychange often does not fire on macOS; blur/focus does.
     const onBlur = () => setActive(false);
@@ -218,7 +229,15 @@ export function Watchers() {
       window.removeEventListener("pointerdown", onInput);
       window.removeEventListener("keydown", onInput);
     };
-  }, [refreshTasks, refreshPanes, refreshPrs, refreshReviewQueue, setAppActive, githubConnected, view]);
+  }, [
+    refreshTasks,
+    refreshPanes,
+    refreshPrs,
+    refreshReviewQueue,
+    setAppActive,
+    githubConnected,
+    view,
+  ]);
 
   // One sweep as soon as GitHub is available; the timer above takes it from
   // there. Kept out of the polling effect on purpose: that one re-runs on
@@ -294,18 +313,22 @@ export function Watchers() {
         // The backend decides whether this kind of message is muted. Worded
         // from the exit code: a crash reported as "finished" is worse than
         // no message.
-        await api.slackNotify(
-          `${pane.title} ${how} — *${owner?.name ?? pane.task_id}*`,
-          owner
-            ? `\`${owner.branch}\`${owner.issue_key ? ` · ${owner.issue_key}` : ""} · ${
-                owner.checkouts.length
-              } repo${owner.checkouts.length === 1 ? "" : "s"}`
-            : undefined,
-          "agent_done",
-        ).catch(() => {});
+        await api
+          .slackNotify(
+            `${pane.title} ${how} — *${owner?.name ?? pane.task_id}*`,
+            owner
+              ? `\`${owner.branch}\`${owner.issue_key ? ` · ${owner.issue_key}` : ""} · ${
+                  owner.checkouts.length
+                } repo${owner.checkouts.length === 1 ? "" : "s"}`
+              : undefined,
+            "agent_done",
+          )
+          .catch(() => {});
       }
     });
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, [refreshPanes, refreshTasks]);
 
   // An agent's own hooks said what it is doing now. Its row, its dot and the
@@ -317,19 +340,32 @@ export function Watchers() {
     const p = listen<string>("pty:activity", async (e) => {
       await refreshPanes().catch(() => {});
       const pane = useStore.getState().panes.find((x) => x.id === e.payload);
-      if (pane?.kind === "agent" && pane.activity !== "working") useSpecs.getState().changed(pane.task_id);
+      if (pane?.kind === "agent" && pane.activity !== "working")
+        useSpecs.getState().changed(pane.task_id);
     });
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, [refreshPanes]);
 
   // A spec being drafted (SPEC-5), into whichever task's editors asked for
   // it, shown or not; and a step an agent ticked (SPEC-13).
   useEffect(() => {
-    const p = listen<{ request_id: string; part: SpecPart; checkout_id: string | null; text: string }>("spec:draft", (e) => {
-      useSpecs.getState().chunk(e.payload.request_id, e.payload.part, e.payload.checkout_id, e.payload.text);
+    const p = listen<{
+      request_id: string;
+      part: SpecPart;
+      checkout_id: string | null;
+      text: string;
+    }>("spec:draft", (e) => {
+      useSpecs
+        .getState()
+        .chunk(e.payload.request_id, e.payload.part, e.payload.checkout_id, e.payload.text);
     });
     const q = listen<string>("spec:changed", (e) => useSpecs.getState().changed(e.payload));
-    return () => { void p.then((un) => un()); void q.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+      void q.then((un) => un());
+    };
   }, []);
 
   // Hitting a usage limit is the one thing worth interrupting for: the agent
@@ -360,7 +396,9 @@ export function Watchers() {
         );
       }
     });
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, [refreshPanes]);
 
   // Startup notices the backend queued before the UI was listening (MCP bind
@@ -375,13 +413,22 @@ export function Watchers() {
         else toast("info", n.text, { record: false });
       }
     };
-    void api.takeNotices().then(show).catch(() => {});
+    void api
+      .takeNotices()
+      .then(show)
+      .catch(() => {});
     const t = setTimeout(() => {
-      void api.takeNotices().then(show).catch(() => {});
+      void api
+        .takeNotices()
+        .then(show)
+        .catch(() => {});
     }, 4000);
     // Anything raised later, by work that outlasted the two looks above.
     const p = listen("app:notices", () => {
-      void api.takeNotices().then(show).catch(() => {});
+      void api
+        .takeNotices()
+        .then(show)
+        .catch(() => {});
     });
     return () => {
       clearTimeout(t);
@@ -393,7 +440,11 @@ export function Watchers() {
   // them before the window listens, so they are read now and once more
   // shortly after, as notices are, and again whenever the list changes.
   useEffect(() => {
-    const read = () => void useStore.getState().refreshWaiting().catch(() => {});
+    const read = () =>
+      void useStore
+        .getState()
+        .refreshWaiting()
+        .catch(() => {});
     read();
     const t = setTimeout(read, 4000);
     const p = listen("panes:waiting", read);
@@ -475,15 +526,23 @@ export function Watchers() {
 
   useEffect(() => {
     const p = listen<Target>("system-notify-click", (e) => goTo(e.payload, { raise: true }));
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, []);
 
   // The message center's log: once now, then whenever the backend changes it.
   useEffect(() => {
-    const refresh = () => void useStore.getState().refreshMessages().catch(() => {});
+    const refresh = () =>
+      void useStore
+        .getState()
+        .refreshMessages()
+        .catch(() => {});
     refresh();
     const p = listen("messages:changed", refresh);
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, []);
 
   return null;

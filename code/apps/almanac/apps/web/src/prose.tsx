@@ -16,7 +16,7 @@ export function Prose({ text }: { text: string }) {
     }
     if (list) {
       const items = list.items.map((item, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: an answer's lines don't move
+        // oxlint-disable-next-line react/no-array-index-key -- an answer's lines don't move
         <li key={i}>{inline(item)}</li>
       ));
       blocks.push(
@@ -75,12 +75,12 @@ export function inline(text: string): ReactNode {
   return text.split(new RegExp(`(${BOLD}|${ITALIC})`)).map((part, i) => {
     if (i % 2 === 0) return linked(part, i);
     return part.startsWith("**") ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
+      // oxlint-disable-next-line react/no-array-index-key -- an answer's words don't move
       <strong key={i} className="font-semibold">
         {inline(part.slice(2, -2))}
       </strong>
     ) : (
-      // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
+      // oxlint-disable-next-line react/no-array-index-key -- an answer's words don't move
       <em key={i}>{linked(part.slice(1, -1), i)}</em>
     );
   });
@@ -96,10 +96,10 @@ function linked(text: string, at: number): ReactNode {
   // The split leaves the words, then each link's name and address.
   return parts.map((part, i) =>
     i % 3 === 0 ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
+      // oxlint-disable-next-line react/no-array-index-key -- an answer's words don't move
       <Fragment key={i}>{swatched(part, at)}</Fragment>
     ) : i % 3 === 1 ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: an answer's words don't move
+      // oxlint-disable-next-line react/no-array-index-key -- an answer's words don't move
       <a key={i} href={parts[i + 1]} target="_blank" rel="noreferrer" className="ui-link">
         {part}
       </a>
@@ -115,7 +115,7 @@ function swatched(text: string, at: number): ReactNode {
     i % 2 === 0 ? (
       part
     ) : (
-      // biome-ignore lint/suspicious/noArrayIndexKey: a point's words don't move
+      // oxlint-disable-next-line react/no-array-index-key -- a point's words don't move
       <span key={`${at}-${i}`} className="whitespace-nowrap">
         <span
           aria-hidden="true"

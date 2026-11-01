@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { CHAT_TASK_ID, showsFolded } from "../lib/derive";
 import { useFocusedPane } from "../lib/goto";
 import { usePanesOf } from "../lib/panes";
 import { read, write } from "../lib/persist";
 import { useSlackBot } from "../lib/slackBot";
+import type { PaneInfo } from "../lib/types";
 import { useStore } from "../store";
-import { CHAT_TASK_ID, showsFolded } from "../lib/derive";
 import { PaneView } from "./AcpPane";
 import { BrowserSide, BrowserToggle, useBrowserSide } from "./BrowserSide";
-import { PlusIcon } from "./icons";
-import { ContextMenu, Confirm, ErrorMessage, useFailure } from "./ui";
-import { PaneExited, useRestart } from "./Restart";
-import { WaitingChats } from "./WaitingPanes";
 import { ChatItem, SlackChats, useSlackFold } from "./ChatList";
+import { PlusIcon } from "./icons";
+import { PaneExited, useRestart } from "./Restart";
 import { SidebarGrip } from "./sidebar/SidebarGrip";
+import { ContextMenu, Confirm, ErrorMessage, useFailure } from "./ui";
 import type { MenuItem } from "./ui";
-import type { PaneInfo } from "../lib/types";
+import { WaitingChats } from "./WaitingPanes";
 
 /**
  * A standing agent with no worktree: for questions, drafting tickets, and
@@ -55,16 +55,17 @@ export function ChatView() {
   // Chats are given fresh ids every launch, so what survives a restart is the
   // position in the list, not the identity of the pane.
   useEffect(() => {
-    if (ids.length === 0) { setActive(null); return; }
+    if (ids.length === 0) {
+      setActive(null);
+      return;
+    }
     if (!active || !ids.includes(active)) {
       // Your newest chat, not the Slack bot's (CHAT-5): which those are is
       // known once the bot's threads have been read.
       if (!slack) return;
       const newest = lastMine ? ids.indexOf(lastMine) : ids.length - 1;
       const want = read<number>("activeChat", newest);
-      const i = Number.isInteger(want) && want >= 0 && want < ids.length
-        ? want
-        : newest;
+      const i = Number.isInteger(want) && want >= 0 && want < ids.length ? want : newest;
       setActive(ids[i]);
     }
   }, [ids, active, slack, lastMine]);
@@ -78,7 +79,9 @@ export function ChatView() {
 
   // Ctrl+Tab moves between chats, as it does between terminals, in the
   // list's order and past none it hides under the folded Slack heading.
-  const order = [...mine, ...bots.filter((p) => slackOpen || showsFolded(p, active))].map((p) => p.id);
+  const order = [...mine, ...bots.filter((p) => slackOpen || showsFolded(p, active))].map(
+    (p) => p.id,
+  );
   const orderKey = order.join("\n");
   useEffect(() => {
     const shown = orderKey ? orderKey.split("\n") : [];
@@ -88,7 +91,7 @@ export function ChatView() {
       e.preventDefault();
       e.stopPropagation();
       const at = active ? shown.indexOf(active) : -1;
-      const from = at < 0 ? 0 : at;
+      const from = Math.max(0, at);
       setActive(shown[(from + (e.shiftKey ? -1 : 1) + shown.length) % shown.length]);
     };
     window.addEventListener("keydown", onKey, true);
@@ -127,11 +130,13 @@ export function ChatView() {
     ? [
         ...installed.map((a) => ({ label: a.name, onSelect: () => void start(a.id) })),
         // The same agents as a conversation the app draws (§20).
-        ...installed.filter((a) => a.acp).map((a, i) => ({
-          label: `${a.name} · conversation (ACP)`,
-          onSelect: () => void start(a.id, true),
-          separated: i === 0,
-        })),
+        ...installed
+          .filter((a) => a.acp)
+          .map((a, i) => ({
+            label: `${a.name} · conversation (ACP)`,
+            onSelect: () => void start(a.id, true),
+            separated: i === 0,
+          })),
       ]
     : [{ label: "No agent CLIs on your PATH", onSelect: () => {}, disabled: true }];
 
@@ -156,7 +161,12 @@ export function ChatView() {
         <div className="chat-list-head">
           Chats
           <div className="spacer" />
-          <BrowserToggle open={browserOpen} view={browser} whose="the chats'" onToggle={() => showBrowser(!browserOpen)} />
+          <BrowserToggle
+            open={browserOpen}
+            view={browser}
+            whose="the chats'"
+            onToggle={() => showBrowser(!browserOpen)}
+          />
           <button
             ref={addRef}
             className="ui-button ui-icon-button btn-add"
@@ -176,53 +186,68 @@ export function ChatView() {
 
         <div className="chat-list-body">
           {mine.map(item)}
-          {panes.length === 0 && (
-            <div className="chat-list-empty">No chats open.</div>
-          )}
+          {panes.length === 0 && <div className="chat-list-empty">No chats open.</div>}
           <WaitingChats keep={(w) => !isSlack(w)} />
-          <SlackChats open={slackOpen} onToggle={toggleSlack} panes={bots} rooms={rooms} active={active} item={item} />
+          <SlackChats
+            open={slackOpen}
+            onToggle={toggleSlack}
+            panes={bots}
+            rooms={rooms}
+            active={active}
+            item={item}
+          />
         </div>
       </div>
       <SidebarGrip side="chats" />
 
       <div className="chat-main">
-      <PaneExited pane={panes.find((p) => p.id === active)} busy={restarting.has(active ?? "")} onResume={restart} />
-      <div className="pane-stack">
-        {panes.map((p) => (
-          <PaneView key={p.id} pane={p} visible={p.id === active} />
-        ))}
-        {panes.length === 0 && (
-          <div className="empty">
-            <h2>Chat</h2>
-            <p>
-              An agent with no worktree attached — for asking questions, drafting a
-              ticket before it exists, or pulling context together from elsewhere.
-            </p>
-            <p style={{ color: "var(--faint)" }}>
-              It starts with a <code>CLAUDE.md</code> describing your repos, the tasks
-              in flight and which integrations the app is connected to — so it knows
-              what you are working on without being told.
-            </p>
-            <p style={{ color: "var(--faint)" }}>
-              It also reaches Jira, Slack and GitHub through this app's own
-              connections, so it can search tickets, file one, or start work on it
-              without you configuring anything separately.
-            </p>
-            <div className="row">
-              {installed.length === 0 && <span>No agent CLIs found on your PATH.</span>}
-              {/* One primary: the first agent; the others are a choice beside it. */}
-              {installed.map((a, i) => (
-                <button key={a.id} className={`ui-button${i === 0 ? " ui-button-primary" : ""}`} onClick={() => void start(a.id)}>
-                  Start {a.name}
-                </button>
-              ))}
+        <PaneExited
+          pane={panes.find((p) => p.id === active)}
+          busy={restarting.has(active ?? "")}
+          onResume={restart}
+        />
+        <div className="pane-stack">
+          {panes.map((p) => (
+            <PaneView key={p.id} pane={p} visible={p.id === active} />
+          ))}
+          {panes.length === 0 && (
+            <div className="empty">
+              <h2>Chat</h2>
+              <p>
+                An agent with no worktree attached — for asking questions, drafting a ticket before
+                it exists, or pulling context together from elsewhere.
+              </p>
+              <p style={{ color: "var(--faint)" }}>
+                It starts with a <code>CLAUDE.md</code> describing your repos, the tasks in flight
+                and which integrations the app is connected to — so it knows what you are working on
+                without being told.
+              </p>
+              <p style={{ color: "var(--faint)" }}>
+                It also reaches Jira, Slack and GitHub through this app's own connections, so it can
+                search tickets, file one, or start work on it without you configuring anything
+                separately.
+              </p>
+              <div className="row">
+                {installed.length === 0 && <span>No agent CLIs found on your PATH.</span>}
+                {/* One primary: the first agent; the others are a choice beside it. */}
+                {installed.map((a, i) => (
+                  <button
+                    key={a.id}
+                    className={`ui-button${i === 0 ? " ui-button-primary" : ""}`}
+                    onClick={() => void start(a.id)}
+                  >
+                    Start {a.name}
+                  </button>
+                ))}
+              </div>
+              <ErrorMessage>{failure.error}</ErrorMessage>
             </div>
-            <ErrorMessage>{failure.error}</ErrorMessage>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-      </div>
-      {browserOpen && <BrowserSide taskId={CHAT_TASK_ID} visible onClose={() => showBrowser(false)} />}
+      {browserOpen && (
+        <BrowserSide taskId={CHAT_TASK_ID} visible onClose={() => showBrowser(false)} />
+      )}
 
       {menu && (
         <ContextMenu

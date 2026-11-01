@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
 
 /**

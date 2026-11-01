@@ -9,7 +9,14 @@
  * that changed nothing or hit a usage limit (LOOP-4). The last three are
  * how it ended.
  */
-export type LoopPhase = "waiting" | "queued" | "checking" | "held" | "passed" | "gave_up" | "stopped";
+export type LoopPhase =
+  | "waiting"
+  | "queued"
+  | "checking"
+  | "held"
+  | "passed"
+  | "gave_up"
+  | "stopped";
 
 export interface LoopCheckResult {
   /** The repository's folder in the task. */

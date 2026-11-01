@@ -19,17 +19,35 @@ export default {
     "color-no-hex": true,
     "color-named": "never",
     // Literal colour functions; color-mix() over var() is the tint recipe.
-    "function-disallowed-list": ["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch"],
+    "function-disallowed-list": [
+      "rgb",
+      "rgba",
+      "hsl",
+      "hsla",
+      "hwb",
+      "lab",
+      "lch",
+      "oklab",
+      "oklch",
+    ],
     "scale-unlimited/declaration-strict-value": [
       ["/color$/", "background", "fill", "stroke", "font-size", "font-family", "border-radius"],
       {
         ignoreValues: [
-          "transparent", "currentColor", "currentcolor", "inherit", "initial", "unset", "none", "0",
+          "transparent",
+          "currentColor",
+          "currentcolor",
+          "inherit",
+          "initial",
+          "unset",
+          "none",
+          "0",
           "/^[0-9.]+(em|%)$/",
         ],
         ignoreFunctions: true,
         disableFix: true,
-        message: "Use a design token (var(--…)) for ${property}, not \"${value}\": studio/design/tokens.",
+        message:
+          'Use a design token (var(--…)) for ${property}, not "${value}": studio/design/tokens.',
       },
     ],
   },

@@ -21,16 +21,50 @@ const ago = (s: number) => new Date(Date.now() - s * 1000).toISOString();
 
 const groups: Group[] = [
   {
-    id: "t-login", name: "ACME-123 Fix the login race", key: "ACME-123",
+    id: "t-login",
+    name: "ACME-123 Fix the login race",
+    key: "ACME-123",
     panes: [
-      { id: "p-ask", name: "Retry the token refresh · api", kind: "agent", agent: "claude", activity: "asking", since: ago(90), notice: null, running: true, waiting: "is asking for your permission" },
-      { id: "p-shell", name: "Shell · web", kind: "shell", agent: null, activity: "idle", since: ago(4000), notice: null, running: true, waiting: null },
+      {
+        id: "p-ask",
+        name: "Retry the token refresh · api",
+        kind: "agent",
+        agent: "claude",
+        activity: "asking",
+        since: ago(90),
+        notice: null,
+        running: true,
+        waiting: "is asking for your permission",
+      },
+      {
+        id: "p-shell",
+        name: "Shell · web",
+        kind: "shell",
+        agent: null,
+        activity: "idle",
+        since: ago(4000),
+        notice: null,
+        running: true,
+        waiting: null,
+      },
     ],
   },
   {
-    id: "t-audit", name: "Audit log for exports", key: "ACME-131",
+    id: "t-audit",
+    name: "Audit log for exports",
+    key: "ACME-131",
     panes: [
-      { id: "p-work", name: "Claude Code", kind: "agent", agent: "claude", activity: "working", since: ago(300), notice: null, running: true, waiting: null },
+      {
+        id: "p-work",
+        name: "Claude Code",
+        kind: "agent",
+        agent: "claude",
+        activity: "working",
+        since: ago(300),
+        notice: null,
+        running: true,
+        waiting: null,
+      },
     ],
   },
   { id: "t-docs", name: "Setup guide typos", key: "ACME-140", panes: [] },
@@ -94,31 +128,49 @@ const json = (v: unknown, status = 200) =>
   new Response(JSON.stringify(v), { status, headers: { "Content-Type": "application/json" } });
 
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const path = typeof input === "string" ? input : input instanceof URL ? input.pathname + input.search : input.url;
-  const body = init?.body ? JSON.parse(String(init.body)) : null;
+  const path =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.pathname + input.search
+        : input.url;
+  // What the page sends: the pairing code and the phone's name, or what was typed.
+  type Sent = { code?: string; name?: string; text?: string; key?: string };
+  const body = (typeof init?.body === "string" ? JSON.parse(init.body) : null) as Sent | null;
   calls.push({ path, body });
   const url = new URL(path, location.origin);
 
   if (url.pathname === "/api/pair") {
-    if (body?.code !== "482913") return json({ error: "That is not the code showing on the Mac." }, 403);
+    if (body?.code !== "482913")
+      return json({ error: "That is not the code showing on the Mac." }, 403);
     paired = true;
     return json({ token: "mock-token", device: "ph-1", name: body.name });
   }
-  if (!paired) return json({ error: "This phone is not paired with the app, or was forgotten." }, 401);
+  if (!paired)
+    return json({ error: "This phone is not paired with the app, or was forgotten." }, 401);
   if (url.pathname === "/api/overview") return json(structuredClone(world));
   if (url.pathname === "/api/changes") return stream("changes", []);
 
   const m = /^\/api\/panes\/([^/]+)\/(output|input)$/.exec(url.pathname);
-  const pane = m && world.groups.flatMap((g) => g.panes).find((p) => p.id === decodeURIComponent(m[1]));
+  const pane =
+    m && world.groups.flatMap((g) => g.panes).find((p) => p.id === decodeURIComponent(m[1]));
   if (!m || !pane) return json({ error: "That terminal is closed." }, 404);
   if (m[2] === "output") {
     const text = pane.id === "p-ask" ? SCREEN : "you@mac web % ";
     end = enc.encode(text).length;
     return stream(pane.id, [{ size: [30, 100] }, { data: b64(text), end, reset: false }]);
   }
-  if (!world.typing) return json({ error: "Typing from the phone is off. Turn it on in the app's Settings, under Phone." }, 403);
-  if (pane.kind !== "agent") return json({ error: "Only agents take typing from the phone, not shells." }, 403);
-  print(pane.id, body.text ? `\r\n\x1b[2m> ${body.text}\x1b[0m\r\n` : `\x1b[2m[${body.key}]\x1b[0m`);
+  if (!world.typing)
+    return json(
+      { error: "Typing from the phone is off. Turn it on in the app's Settings, under Phone." },
+      403,
+    );
+  if (pane.kind !== "agent")
+    return json({ error: "Only agents take typing from the phone, not shells." }, 403);
+  print(
+    pane.id,
+    body?.text ? `\r\n\x1b[2m> ${body.text}\x1b[0m\r\n` : `\x1b[2m[${body?.key}]\x1b[0m`,
+  );
   return new Response(null, { status: 204 });
 };
 

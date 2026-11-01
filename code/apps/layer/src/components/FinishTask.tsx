@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, errMessage, failureText } from "../lib/api";
-import { useStore } from "../store";
 import { taskTotals } from "../lib/derive";
 import type { JiraTransition, TaskView } from "../lib/types";
-import { ErrorMessage, Field, Modal, useFailure } from "./ui";
+import { useStore } from "../store";
 import { flowOf, mergedTransition } from "./TicketFlow";
+import { ErrorMessage, Field, Modal, useFailure } from "./ui";
 
 /**
  * Put away a task whose pull requests have all merged: its terminals, its
@@ -38,7 +38,8 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
   useEffect(() => {
     if (!key) return;
     let stop = false;
-    api.jiraTransitions(key)
+    api
+      .jiraTransitions(key)
       .then((all) => {
         if (stop) return;
         // By category, never by name: "Done", "Closed" and "Erledigt" are all
@@ -56,7 +57,9 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
         setDone([]);
         setTicketError(errMessage(e));
       });
-    return () => { stop = true; };
+    return () => {
+      stop = true;
+    };
   }, [key]);
 
   // Work the merged PRs do not cover: committed after one landed, or in a
@@ -64,7 +67,9 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
   // before rather than after.
   const uncovered = (rows ?? []).filter((r) => r.changed > 0);
   const landed = Object.fromEntries(
-    (rows ?? []).filter((r) => r.pr?.merged && r.pr.head_sha).map((r) => [r.checkout_id, r.pr!.head_sha]),
+    (rows ?? [])
+      .filter((r) => r.pr?.merged && r.pr.head_sha)
+      .map((r) => [r.checkout_id, r.pr!.head_sha]),
   );
   const totals = taskTotals(task);
   const edited = totals.dirty + totals.staged;
@@ -92,7 +97,10 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
       const kept = out.branches.filter((b) => !b.ok);
       // The dialog closes, so a branch kept has nowhere else to be said.
       if (kept.length > 0) {
-        toast("info", `Branch ${task.branch} was kept in ${kept.map((b) => `${b.repo} (${b.detail})`).join(", ")}`);
+        toast(
+          "info",
+          `Branch ${task.branch} was kept in ${kept.map((b) => `${b.repo} (${b.detail})`).join(", ")}`,
+        );
       }
       onClose();
     } catch (e) {
@@ -107,7 +115,9 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
       onClose={() => !busy && onClose()}
       footer={
         <>
-          <button className="ui-button" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="ui-button" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
           <button
             className="ui-button ui-button-primary"
             disabled={busy || done === null}
@@ -118,16 +128,21 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
         </>
       }
     >
-      <p className="muted" style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}>
+      <p
+        className="muted"
+        style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}
+      >
         Every pull request for <code>{task.branch}</code> has merged. This puts the task away:
       </p>
       <ul className="finish-list">
         {paneCount > 0 && (
-          <li>Stops its {paneCount} terminal{paneCount === 1 ? "" : "s"}.</li>
+          <li>
+            Stops its {paneCount} terminal{paneCount === 1 ? "" : "s"}.
+          </li>
         )}
         <li>
-          Removes the worktree{repos.length === 1 ? "" : "s"} for {repos.join(", ")}, and the
-          task folder.
+          Removes the worktree{repos.length === 1 ? "" : "s"} for {repos.join(", ")}, and the task
+          folder.
         </li>
         <li>
           Deletes the local branch <code>{task.branch}</code> in each repository. The pull requests
@@ -137,9 +152,9 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
 
       {uncovered.length > 0 && (
         <div className="confirm-detail" style={{ marginBottom: 12 }}>
-          {uncovered.map((r) => r.repo).join(", ")}{" "}
-          {uncovered.length === 1 ? "has" : "have"} work no merged pull request covers. The
-          worktree still goes, but the branch is kept so the commits are not lost.
+          {uncovered.map((r) => r.repo).join(", ")} {uncovered.length === 1 ? "has" : "have"} work
+          no merged pull request covers. The worktree still goes, but the branch is kept so the
+          commits are not lost.
         </div>
       )}
 
@@ -164,7 +179,8 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
           }
         >
           {done === null ? null : (
-            <select className="ui-field"
+            <select
+              className="ui-field"
               value={transition}
               disabled={busy || done.length === 0}
               onChange={(e) => setTransition(e.target.value)}

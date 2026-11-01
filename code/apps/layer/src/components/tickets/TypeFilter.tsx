@@ -25,11 +25,7 @@ export function TypeFilter({
             <button
               key={t.id}
               className={`ui-chip type-pick${on ? " active" : ""}`}
-              onClick={() =>
-                onChange(
-                  on ? kinds.filter((n) => n !== t.name) : [...kinds, t.name],
-                )
-              }
+              onClick={() => onChange(on ? kinds.filter((n) => n !== t.name) : [...kinds, t.name])}
             >
               <IssueTypeIcon types={types} name={t.name} size={14} />
               {t.name}

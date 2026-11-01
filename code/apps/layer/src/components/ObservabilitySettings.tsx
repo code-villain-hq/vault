@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { GrafanaDatasource } from "../lib/types";
 import { useStore } from "../store";
-import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
 import { S3LogSources } from "./S3LogSources";
 import { heldText, Theirs, useHeld, Yours } from "./SharedSettings";
+import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
 
 /**
  * Settings → Observability: where agents read your services' logs (§23):
@@ -14,8 +14,8 @@ export function ObservabilitySettings() {
   return (
     <>
       <p className="muted" style={{ marginTop: 0 }}>
-        Agents read your services' logs through the app. They never see the tokens or the
-        AWS keys, and nothing is changed where the logs are kept.
+        Agents read your services' logs through the app. They never see the tokens or the AWS keys,
+        and nothing is changed where the logs are kept.
       </p>
       <GrafanaSource />
       <S3LogSources />
@@ -119,41 +119,55 @@ function GrafanaSource() {
         what="Grafana"
         rows={[
           ["Site", url],
-          ["Your services' logs", sources?.find((s) => s.uid === settings?.grafana?.datasource)?.name ?? heldText(held, "datasource")],
+          [
+            "Your services' logs",
+            sources?.find((s) => s.uid === settings?.grafana?.datasource)?.name ??
+              heldText(held, "datasource"),
+          ],
         ]}
       >
-      {sources && sources.length > 1 && (
-        <Field
-          label="Your services' logs"
-          hint="The Loki datasource agents read when they don't name one. Grafana Cloud adds datasources of its own beside yours. One missing here is one the token may not query: give its service account access to it in Grafana."
-        >
-          <select className="ui-field" value={settings?.grafana?.datasource ?? ""} onChange={(e) => void choose(e.target.value)}>
-            <option value="">Not chosen: agents name one each time</option>
-            {sources.map((s) => (
-              <option key={s.uid} value={s.uid}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <ErrorMessage>{choosing.error}</ErrorMessage>
+        {sources && sources.length > 1 && (
+          <Field
+            label="Your services' logs"
+            hint="The Loki datasource agents read when they don't name one. Grafana Cloud adds datasources of its own beside yours. One missing here is one the token may not query: give its service account access to it in Grafana."
+          >
+            <select
+              className="ui-field"
+              value={settings?.grafana?.datasource ?? ""}
+              onChange={(e) => void choose(e.target.value)}
+            >
+              <option value="">Not chosen: agents name one each time</option>
+              {sources.map((s) => (
+                <option key={s.uid} value={s.uid}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <ErrorMessage>{choosing.error}</ErrorMessage>
+          </Field>
+        )}
+        <Field label="Site URL" hint="Where you open Grafana, e.g. https://acme.grafana.net.">
+          <input
+            className="ui-field"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://acme.grafana.net"
+          />
         </Field>
-      )}
-      <Field label="Site URL" hint="Where you open Grafana, e.g. https://acme.grafana.net.">
-        <input className="ui-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://acme.grafana.net" />
-      </Field>
       </Theirs>
       <Yours>
-      <Field
-        label="Service account token"
-        hint="Administration → Users and access → Service accounts. Its role has to read and query datasources. Stored in your keychain."
-      >
-        <input className="ui-field"
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder={connected ? "•••••••• (leave blank to keep)" : "glsa_…"}
-        />
-      </Field>
+        <Field
+          label="Service account token"
+          hint="Administration → Users and access → Service accounts. Its role has to read and query datasources. Stored in your keychain."
+        >
+          <input
+            className="ui-field"
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder={connected ? "•••••••• (leave blank to keep)" : "glsa_…"}
+          />
+        </Field>
       </Yours>
       <button
         className="ui-button ui-button-primary"

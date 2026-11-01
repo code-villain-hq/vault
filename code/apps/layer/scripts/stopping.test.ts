@@ -1,12 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { exitIsNews, markStopping } from "../src/store";
 import type { PaneInfo } from "../src/lib/types";
+import { exitIsNews, markStopping } from "../src/store";
 
 function pane(id: string, over: Partial<PaneInfo> = {}): PaneInfo {
   return {
-    id, task_id: "t", checkout_id: null, kind: "agent", title: "Claude Code", agent_id: "claude",
-    cwd: "/tmp", running: false, exit_code: 143, started_at: "", last_output_at: "",
-    notice: null, activity: "idle", activity_since: "", topic: null, acp: false, ...over,
+    id,
+    task_id: "t",
+    checkout_id: null,
+    kind: "agent",
+    title: "Claude Code",
+    agent_id: "claude",
+    cwd: "/tmp",
+    running: false,
+    exit_code: 143,
+    started_at: "",
+    last_output_at: "",
+    notice: null,
+    activity: "idle",
+    activity_since: "",
+    topic: null,
+    acp: false,
+    ...over,
   };
 }
 

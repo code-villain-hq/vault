@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { api } from "../lib/api";
-import { markStopping, useStore } from "../store";
 import type { PaneInfo, TaskView } from "../lib/types";
+import { markStopping, useStore } from "../store";
 import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
 
 /**
@@ -39,10 +39,17 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
     const asked = ++handoffAsk.current;
     // Only the latest ask lands: a slow briefing for one pane arriving after
     // the dialog was reopened for another replaced what was on screen.
-    api.handoffPrompt(from.id)
-      .then((p) => { if (asked === handoffAsk.current) setHandoffPrompt(p); })
-      .catch((e) => { if (asked === handoffAsk.current) failure.fail(e); })
-      .finally(() => { if (asked === handoffAsk.current) setHandoffLoading(false); });
+    api
+      .handoffPrompt(from.id)
+      .then((p) => {
+        if (asked === handoffAsk.current) setHandoffPrompt(p);
+      })
+      .catch((e) => {
+        if (asked === handoffAsk.current) failure.fail(e);
+      })
+      .finally(() => {
+        if (asked === handoffAsk.current) setHandoffLoading(false);
+      });
   }
 
   /// Spawns the new agent, then spends the grace period stopping the old one.
@@ -92,7 +99,10 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
           <button
             className="ui-button"
             disabled={handoffBusy}
-            onClick={() => { setHandoff(null); setHandoffPrompt(""); }}
+            onClick={() => {
+              setHandoff(null);
+              setHandoffPrompt("");
+            }}
           >
             Cancel
           </button>
@@ -111,19 +121,20 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
       }
     >
       <div className="muted" style={{ marginBottom: 12, lineHeight: 1.6 }}>
-        No agent CLI can resume another's session, so this carries the work rather
-        than the conversation: the ticket, what has changed, and the tail of{" "}
-        {handoff.from.title}'s terminal.
+        No agent CLI can resume another's session, so this carries the work rather than the
+        conversation: the ticket, what has changed, and the tail of {handoff.from.title}'s terminal.
       </div>
 
       <Field label="Continue with">
-        <select className="ui-field"
+        <select
+          className="ui-field"
           value={handoff.agentId}
           onChange={(e) => setHandoff({ ...handoff, agentId: e.target.value })}
         >
           {installed.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.name}{a.id === handoff.from.agent_id ? " (same agent)" : ""}
+              {a.name}
+              {a.id === handoff.from.agent_id ? " (same agent)" : ""}
             </option>
           ))}
         </select>
@@ -133,7 +144,8 @@ export function useHandoff(task: TaskView, setActive: (paneId: string) => void) 
         label="Handoff briefing"
         hint={handoffLoading ? "Gathering the diff and terminal…" : "Edit freely before sending."}
       >
-        <textarea className="ui-field"
+        <textarea
+          className="ui-field"
           rows={14}
           value={handoffPrompt}
           onChange={(e) => setHandoffPrompt(e.target.value)}

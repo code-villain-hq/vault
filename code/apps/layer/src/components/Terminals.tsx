@@ -1,23 +1,23 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { api, errMessage } from "../lib/api";
+import { canRestart, paneScope, paneState } from "../lib/derive";
 import { useFocusedPane } from "../lib/goto";
 import { usePanesOf } from "../lib/panes";
 import { read, write } from "../lib/persist";
 import { ago } from "../lib/time";
-import { useStore } from "../store";
-import { canRestart, paneScope, paneState } from "../lib/derive";
 import type { PaneInfo, Resumable, TaskView } from "../lib/types";
+import { useStore } from "../store";
+import { PaneView } from "./AcpPane";
 import { BrowserSide, BrowserToggle, useBrowserSide } from "./BrowserSide";
 import { ChatLink } from "./ChatLink";
 import { useHandoff } from "./Handoff";
+import { CloseIcon, PlusIcon, SwapIcon } from "./icons";
 import { LoopBar, LoopButton } from "./LoopBar";
 import { PaneNotice } from "./PaneNotice";
 import { PaneExited, RestartButton, useRestart } from "./Restart";
-import { WaitingTaskPanes } from "./WaitingPanes";
-import { PaneView } from "./AcpPane";
-import { CloseIcon, PlusIcon, SwapIcon } from "./icons";
 import { ContextMenu, ErrorMessage, Field, Modal, Spinner, Switch, useFailure } from "./ui";
 import type { MenuItem } from "./ui";
+import { WaitingTaskPanes } from "./WaitingPanes";
 
 /**
  * A task's panes. Memoised: the task header above re-renders for its tab, its
@@ -33,6 +33,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   const fail = useStore((s) => s.fail);
   const start = useFailure();
   const dialog = useFailure();
+  const { clear: clearDialog, fail: failDialog } = dialog;
 
   const [active, setActive] = useState<string | null>(null);
   const { restarting, restart } = useRestart(setActive);
@@ -42,7 +43,10 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   const [promptLoading, setPromptLoading] = useState(false);
   /** Start it as a conversation over ACP (§20); remembered for the next launch. */
   const [asAcp, setAsAcp] = useState(() => read<boolean>("launchAcp", false));
-  const chooseAcp = (v: boolean) => { setAsAcp(v); write("launchAcp", v); };
+  const chooseAcp = (v: boolean) => {
+    setAsAcp(v);
+    write("launchAcp", v);
+  };
   /** Panes whose ✕ was pressed, still waiting on their grace period. */
   const [closing, setClosing] = useState<Set<string>>(new Set());
   /**
@@ -76,7 +80,9 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
 
   const { open: browserOpen, show: showBrowser, view: browser } = useBrowserSide(task.id);
 
-  useEffect(() => { setScope(null); }, [task.id]);
+  useEffect(() => {
+    setScope(null);
+  }, [task.id]);
 
   // Panes die with the app, but the CLIs keep their own transcripts per
   // directory — so a conversation can be picked up even though the process is
@@ -90,10 +96,17 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   const scopeHere = scope && task.checkouts.some((c) => c.id === scope) ? scope : null;
   useEffect(() => {
     let current = true;
-    api.resumableAgents(task.id, scopeHere)
-      .then((r) => { if (current) setResumable(r); })
-      .catch(() => { if (current) setResumable([]); });
-    return () => { current = false; };
+    api
+      .resumableAgents(task.id, scopeHere)
+      .then((r) => {
+        if (current) setResumable(r);
+      })
+      .catch(() => {
+        if (current) setResumable([]);
+      });
+    return () => {
+      current = false;
+    };
   }, [task.id, scopeHere, ids.length]);
 
   // Prefill (and refresh on Start-in change) so the text matches where the
@@ -102,9 +115,10 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
   useEffect(() => {
     if (!launching) return;
     let cancelled = false;
-    dialog.clear();
+    clearDialog();
     setPromptLoading(true);
-    api.taskPrompt(task.id, scope)
+    api
+      .taskPrompt(task.id, scope)
       .then((p) => {
         if (cancelled) return;
         setPrompt((current) => {
@@ -116,22 +130,27 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         });
       })
       .catch((e) => {
-        if (!cancelled) dialog.fail(`Couldn't load the briefing: ${errMessage(e)}`);
+        if (!cancelled) failDialog(`Couldn't load the briefing: ${errMessage(e)}`);
       })
-      .finally(() => { if (!cancelled) setPromptLoading(false); });
-    return () => { cancelled = true; };
-  }, [launching, task.id, scope, dialog.clear, dialog.fail]);
+      .finally(() => {
+        if (!cancelled) setPromptLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [launching, task.id, scope, clearDialog, failDialog]);
 
   // Keep a sensible pane selected as panes come and go. Panes are given fresh
   // ids every launch, so what survives a restart is the position in the bar,
   // not the identity of the pane.
   useEffect(() => {
-    if (ids.length === 0) { setActive(null); return; }
+    if (ids.length === 0) {
+      setActive(null);
+      return;
+    }
     if (!active || !ids.includes(active)) {
       const want = read<number>(`activePane.${task.id}`, ids.length - 1);
-      const i = Number.isInteger(want) && want >= 0 && want < ids.length
-        ? want
-        : ids.length - 1;
+      const i = Number.isInteger(want) && want >= 0 && want < ids.length ? want : ids.length - 1;
       setActive(ids[i]);
     }
   }, [ids, active, task.id]);
@@ -156,7 +175,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
       e.preventDefault();
       e.stopPropagation();
       const at = active ? ids.indexOf(active) : -1;
-      const from = at < 0 ? 0 : at;
+      const from = Math.max(0, at);
       const next = (from + (e.shiftKey ? -1 : 1) + ids.length) % ids.length;
       setActive(ids[next]);
     };
@@ -169,7 +188,7 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
     (r) => !panes.some((p) => p.running && p.agent_id === r.agent_id),
   );
   const scopeName = scope
-    ? task.checkouts.find((c) => c.id === scope)?.project_name ?? "repo"
+    ? (task.checkouts.find((c) => c.id === scope)?.project_name ?? "repo")
     : task.checkouts.length > 1
       ? `all ${task.checkouts.length} repos`
       : "the task folder";
@@ -183,17 +202,25 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
     })),
     ...installed.map((a, i) => ({
       label: a.name,
-      onSelect: () => { chooseAcp(false); setLaunching(a.id); },
+      onSelect: () => {
+        chooseAcp(false);
+        setLaunching(a.id);
+      },
       separated: i === 0 && offerResume.length > 0,
     })),
     // The same agents as a conversation the app draws (§20), as the Chat
     // view offers them. Behind the launch dialog's switch alone, nobody
     // looking at this menu found them.
-    ...installed.filter((a) => a.acp).map((a, i) => ({
-      label: `${a.name} · conversation (ACP)`,
-      onSelect: () => { chooseAcp(true); setLaunching(a.id); },
-      separated: i === 0,
-    })),
+    ...installed
+      .filter((a) => a.acp)
+      .map((a, i) => ({
+        label: `${a.name} · conversation (ACP)`,
+        onSelect: () => {
+          chooseAcp(true);
+          setLaunching(a.id);
+        },
+        separated: i === 0,
+      })),
     {
       label: "Shell",
       onSelect: () => void launchShell(),
@@ -201,41 +228,51 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
     },
   ];
 
-  const launchAgent = (agentId: string) => once(async () => {
-    dialog.clear();
-    try {
-      const acp = asAcp && !!agents.find((a) => a.id === agentId)?.acp;
-      const pane = await api.spawnAgent(task.id, agentId, scope, prompt.trim() || null, false, acp);
-      setLaunching(null);
-      setPrompt("");
-      await refreshPanes();
-      setActive(pane.id);
-    } catch (e) {
-      dialog.fail(e);
-    }
-  });
+  const launchAgent = (agentId: string) =>
+    once(async () => {
+      dialog.clear();
+      try {
+        const acp = asAcp && !!agents.find((a) => a.id === agentId)?.acp;
+        const pane = await api.spawnAgent(
+          task.id,
+          agentId,
+          scope,
+          prompt.trim() || null,
+          false,
+          acp,
+        );
+        setLaunching(null);
+        setPrompt("");
+        await refreshPanes();
+        setActive(pane.id);
+      } catch (e) {
+        dialog.fail(e);
+      }
+    });
 
-  const resume = (agentId: string) => once(async () => {
-    start.clear();
-    try {
-      const pane = await api.spawnAgent(task.id, agentId, scope, null, true);
-      await refreshPanes();
-      setActive(pane.id);
-    } catch (e) {
-      start.fail(e);
-    }
-  });
+  const resume = (agentId: string) =>
+    once(async () => {
+      start.clear();
+      try {
+        const pane = await api.spawnAgent(task.id, agentId, scope, null, true);
+        await refreshPanes();
+        setActive(pane.id);
+      } catch (e) {
+        start.fail(e);
+      }
+    });
 
-  const launchShell = () => once(async () => {
-    start.clear();
-    try {
-      const pane = await api.spawnShell(task.id, scope);
-      await refreshPanes();
-      setActive(pane.id);
-    } catch (e) {
-      start.fail(e);
-    }
-  });
+  const launchShell = () =>
+    once(async () => {
+      start.clear();
+      try {
+        const pane = await api.spawnShell(task.id, scope);
+        await refreshPanes();
+        setActive(pane.id);
+      } catch (e) {
+        start.fail(e);
+      }
+    });
 
   /// Closing signals the agent and gives it five seconds to save, so the tab
   /// stays put for what feels like a hung click. Marking it spends that time
@@ -270,7 +307,9 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             {p.topic ? (
               // Only the name gives way: the scope is what tells two repos' tabs apart.
               <>
-                <span className="name" title={`${p.topic}\n${p.title}`}>{p.topic}</span>
+                <span className="name" title={`${p.topic}\n${p.title}`}>
+                  {p.topic}
+                </span>
                 {paneScope(p) && <span>· {paneScope(p)}</span>}
               </>
             ) : (
@@ -290,19 +329,31 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             {canRestart(p, agents) && !closing.has(p.id) && !restarting.has(p.id) && (
               <RestartButton pane={p} onRestart={restart} />
             )}
-            {p.kind === "agent" && installed.length > 0 && !closing.has(p.id) && !restarting.has(p.id) && (
-              <span
-                className="x"
-                title="Hand off to another agent"
-                onClick={(e) => { e.stopPropagation(); startHandoff(p); }}
-              >
-                <SwapIcon />
-              </span>
-            )}
+            {p.kind === "agent" &&
+              installed.length > 0 &&
+              !closing.has(p.id) &&
+              !restarting.has(p.id) && (
+                <span
+                  className="x"
+                  title="Hand off to another agent"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startHandoff(p);
+                  }}
+                >
+                  <SwapIcon />
+                </span>
+              )}
             {closing.has(p.id) || restarting.has(p.id) ? (
               <Spinner />
             ) : (
-              <span className="x" onClick={(e) => { e.stopPropagation(); void closePane(p); }}>
+              <span
+                className="x"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void closePane(p);
+                }}
+              >
                 <CloseIcon />
               </span>
             )}
@@ -334,7 +385,12 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
         )}
 
         <LoopButton pane={panes.find((x) => x.id === active)} task={task} />
-        <BrowserToggle open={browserOpen} view={browser} whose="this task's" onToggle={() => showBrowser(!browserOpen)} />
+        <BrowserToggle
+          open={browserOpen}
+          view={browser}
+          whose="this task's"
+          onToggle={() => showBrowser(!browserOpen)}
+        />
         <button
           ref={addRef}
           className="ui-button ui-icon-button btn-add"
@@ -367,78 +423,89 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
       <WaitingTaskPanes taskId={task.id} />
 
       <PaneNotice pane={panes.find((x) => x.id === active && x.notice)} onHandoff={startHandoff} />
-      <PaneExited pane={panes.find((x) => x.id === active)} busy={restarting.has(active ?? "")} onResume={restart} />
+      <PaneExited
+        pane={panes.find((x) => x.id === active)}
+        busy={restarting.has(active ?? "")}
+        onResume={restart}
+      />
       <LoopBar pane={panes.find((x) => x.id === active)} />
 
       <div className="term-split">
-      <div className="pane-stack">
-        {panes.map((p) => (
-          // Visible also means this tab is the one on screen. Terminals stay
-          // mounted behind Diff and Pull requests, and a pane fitted while its
-          // container had no height keeps those rows: the process draws into a
-          // short terminal inside a tall one, which is the black band under a
-          // full-screen editor. Toggling this re-fits when the tab comes back.
-          <PaneView
-            key={p.id}
-            pane={p}
-            visible={p.id === active && tab === "terminals"}
-          />
-        ))}
-        {panes.length === 0 && (
-          <div className="empty">
-            <h2>No panes yet</h2>
-            <p>
-              {multi
-                ? `Start an agent in the task folder and it sees all ${task.checkouts.length} repos as sibling folders — the right choice when the change spans them.`
-                : "Start an agent in the task folder, with the repository as a folder inside it, or open a shell to run the dev server and tests."}
-            </p>
-            {offerResume.length > 0 && (
-              <div className="row" style={{ marginBottom: 6 }}>
-                {offerResume.map((r, i) => (
-                  <button
-                    key={r.agent_id}
-                    className={`ui-button${i === 0 ? " ui-button-primary" : ""}`}
-                    onClick={() => void resume(r.agent_id)}
-                  >
-                    ⟲ Resume {r.name}
-                    {r.last_active && (
-                      <span style={{ opacity: 0.75, marginLeft: 6 }}>
-                        · {ago(r.last_active * 1000)}
-                      </span>
-                    )}
+        <div className="pane-stack">
+          {panes.map((p) => (
+            // Visible also means this tab is the one on screen. Terminals stay
+            // mounted behind Diff and Pull requests, and a pane fitted while its
+            // container had no height keeps those rows: the process draws into a
+            // short terminal inside a tall one, which is the black band under a
+            // full-screen editor. Toggling this re-fits when the tab comes back.
+            <PaneView key={p.id} pane={p} visible={p.id === active && tab === "terminals"} />
+          ))}
+          {panes.length === 0 && (
+            <div className="empty">
+              <h2>No panes yet</h2>
+              <p>
+                {multi
+                  ? `Start an agent in the task folder and it sees all ${task.checkouts.length} repos as sibling folders — the right choice when the change spans them.`
+                  : "Start an agent in the task folder, with the repository as a folder inside it, or open a shell to run the dev server and tests."}
+              </p>
+              {offerResume.length > 0 && (
+                <div className="row" style={{ marginBottom: 6 }}>
+                  {offerResume.map((r, i) => (
+                    <button
+                      key={r.agent_id}
+                      className={`ui-button${i === 0 ? " ui-button-primary" : ""}`}
+                      onClick={() => void resume(r.agent_id)}
+                    >
+                      ⟲ Resume {r.name}
+                      {r.last_active && (
+                        <span style={{ opacity: 0.75, marginLeft: 6 }}>
+                          · {ago(r.last_active * 1000)}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="row">
+                {installed.length === 0 && (
+                  <span>
+                    No agent CLIs found on your PATH. Install Claude Code, GitHub Copilot CLI,
+                    OpenCode or Gemini CLI and reopen the app.
+                  </span>
+                )}
+                {installed.map((a) => (
+                  <button key={a.id} className="ui-button" onClick={() => setLaunching(a.id)}>
+                    Start {a.name}
                   </button>
                 ))}
+                <button className="ui-button" onClick={() => void launchShell()}>
+                  Open shell
+                </button>
+                {/* Another app, so a link, as the task header's is (components.md). */}
+                {cursorIde && (
+                  <button
+                    className="ui-link"
+                    title={`Open ${task.root} in Cursor`}
+                    onClick={() => {
+                      start.clear();
+                      void api.openInCursor(task.root).catch(start.fail);
+                    }}
+                  >
+                    Cursor ↗
+                  </button>
+                )}
               </div>
-            )}
-            <div className="row">
-              {installed.length === 0 && (
-                <span>
-                  No agent CLIs found on your PATH. Install Claude Code, GitHub
-                  Copilot CLI, OpenCode or Gemini CLI and reopen the app.
-                </span>
-              )}
-              {installed.map((a) => (
-                <button key={a.id} className="ui-button" onClick={() => setLaunching(a.id)}>
-                  Start {a.name}
-                </button>
-              ))}
-              <button className="ui-button" onClick={() => void launchShell()}>Open shell</button>
-              {/* Another app, so a link, as the task header's is (components.md). */}
-              {cursorIde && (
-                <button
-                  className="ui-link"
-                  title={`Open ${task.root} in Cursor`}
-                  onClick={() => { start.clear(); void api.openInCursor(task.root).catch(start.fail); }}
-                >
-                  Cursor ↗
-                </button>
-              )}
+              <ErrorMessage>{start.error}</ErrorMessage>
             </div>
-            <ErrorMessage>{start.error}</ErrorMessage>
-          </div>
+          )}
+        </div>
+        {browserOpen && (
+          <BrowserSide
+            taskId={task.id}
+            visible={tab === "terminals"}
+            onClose={() => showBrowser(false)}
+          />
         )}
-      </div>
-      {browserOpen && <BrowserSide taskId={task.id} visible={tab === "terminals"} onClose={() => showBrowser(false)} />}
       </div>
 
       {handoffDialog}
@@ -446,13 +513,22 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
       {launching && (
         <Modal
           title={`Start ${agents.find((a) => a.id === launching)?.name ?? launching}`}
-          onClose={() => { if (spawning) return; setLaunching(null); setPrompt(""); fetchedPrompt.current = ""; }}
+          onClose={() => {
+            if (spawning) return;
+            setLaunching(null);
+            setPrompt("");
+            fetchedPrompt.current = "";
+          }}
           footer={
             <>
               <button
                 className="ui-button"
                 disabled={spawning}
-                onClick={() => { setLaunching(null); setPrompt(""); fetchedPrompt.current = ""; }}
+                onClick={() => {
+                  setLaunching(null);
+                  setPrompt("");
+                  fetchedPrompt.current = "";
+                }}
               >
                 Cancel
               </button>
@@ -470,7 +546,8 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             label="Start in"
             hint="The task folder is where repositories appear, including ones added later. Starting inside one pins the agent to it, and anything added afterwards lands outside where it can see."
           >
-            <select className="ui-field"
+            <select
+              className="ui-field"
               value={scope ?? ""}
               onChange={(e) => setScope(e.target.value || null)}
             >
@@ -479,7 +556,9 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 {task.checkouts.length > 1 ? ` — all ${task.checkouts.length} repos` : ""}
               </option>
               {task.checkouts.map((c) => (
-                <option key={c.id} value={c.id}>Only {c.project_name}</option>
+                <option key={c.id} value={c.id}>
+                  Only {c.project_name}
+                </option>
               ))}
             </select>
           </Field>
@@ -491,7 +570,8 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
                 : "Sent to the agent as it starts. Edit it, or clear it to drop in with no instruction."
             }
           >
-            <textarea className="ui-field"
+            <textarea
+              className="ui-field"
               rows={10}
               autoFocus
               value={prompt}
@@ -508,9 +588,8 @@ export const Terminals = memo(function Terminals({ task }: { task: TaskView }) {
             />
           )}
           <div className="muted" style={{ fontSize: "var(--type-ui-small-size)" }}>
-            Starts in <code>{scope
-              ? task.checkouts.find((c) => c.id === scope)?.path
-              : task.root}</code>
+            Starts in{" "}
+            <code>{scope ? task.checkouts.find((c) => c.id === scope)?.path : task.root}</code>
             {` · ${scopeName}`}
           </div>
           <ErrorMessage>{dialog.error}</ErrorMessage>

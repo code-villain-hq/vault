@@ -14,6 +14,7 @@ import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 type Session = { url: string; authorization: string; system: string; allowed: string[] };
 
 const log = process.argv[2];
+if (!log) throw new Error("Usage: bun claude-code.ts <file for the sessions' options>");
 /** The brief a set-up writes around "Zimmerpflanzen, ich schicke Fotos". */
 const BRIEF =
   "Zimmerpflanzen, ich schicke Fotos\nThe houseplants at home: watering, feeding, repotting.";

@@ -251,15 +251,40 @@ async function coalesce(slot: Slot, poll: boolean, work: () => Promise<void>): P
   }
 }
 
-const tasksSlot: Slot = { get: () => tasksInflight, set: (p) => { tasksInflight = p; } };
-const panesSlot: Slot = { get: () => panesInflight, set: (p) => { panesInflight = p; } };
-const reviewsSlot: Slot = { get: () => reviewsInflight, set: (p) => { reviewsInflight = p; } };
+const tasksSlot: Slot = {
+  get: () => tasksInflight,
+  set: (p) => {
+    tasksInflight = p;
+  },
+};
+const panesSlot: Slot = {
+  get: () => panesInflight,
+  set: (p) => {
+    panesInflight = p;
+  },
+};
+const reviewsSlot: Slot = {
+  get: () => reviewsInflight,
+  set: (p) => {
+    reviewsInflight = p;
+  },
+};
 let messagesInflight: Promise<void> | null = null;
-const messagesSlot: Slot = { get: () => messagesInflight, set: (p) => { messagesInflight = p; } };
+const messagesSlot: Slot = {
+  get: () => messagesInflight,
+  set: (p) => {
+    messagesInflight = p;
+  },
+};
 
 function sameMessages(a: Message[], b: Message[]): boolean {
-  return a.length === b.length
-    && a.every((m, i) => m.id === b[i].id && m.at === b[i].at && m.read === b[i].read && m.count === b[i].count);
+  return (
+    a.length === b.length &&
+    a.every(
+      (m, i) =>
+        m.id === b[i].id && m.at === b[i].at && m.read === b[i].read && m.count === b[i].count,
+    )
+  );
 }
 
 /**
@@ -343,292 +368,307 @@ export const useStore = create<State>((set, get) => {
   };
 
   return {
-  projects: [],
-  repoHealth: {},
-  tasks: [],
-  panes: [],
-  waiting: [],
-  prs: {},
-  reviewQueue: null,
-  messages: [],
-  reviewQueueLoading: false,
-  reviewQueueError: null,
-  agents: [],
-  settings: null,
-  issues: [],
-  issueTypes: [],
-  priorities: [],
-  issuesLoading: false,
-  issuesLoaded: false,
-  issuesTruncated: false,
+    projects: [],
+    repoHealth: {},
+    tasks: [],
+    panes: [],
+    waiting: [],
+    prs: {},
+    reviewQueue: null,
+    messages: [],
+    reviewQueueLoading: false,
+    reviewQueueError: null,
+    agents: [],
+    settings: null,
+    issues: [],
+    issueTypes: [],
+    priorities: [],
+    issuesLoading: false,
+    issuesLoaded: false,
+    issuesTruncated: false,
 
-  // Where the app was left. Restored so reopening lands on the work in
-  // progress rather than on an empty shell, alongside the panes themselves.
-  selectedTask: read<string | null>("selectedTask", null),
-  view: readOneOf("view", VIEWS, "work"),
-  tab: readOneOf("tab", TABS, "terminals"),
-  sidebarHidden: read("sidebarHidden", false),
-  settingsOpen: false,
-  settingsSection: null,
-  focusIssueKey: null,
-  focusPane: null,
-  focusReview: null,
-  toasts: [],
-  failure: null,
-  watchFailing: false,
-  cursorIde: false,
-  appActive: true,
-  booted: false,
+    // Where the app was left. Restored so reopening lands on the work in
+    // progress rather than on an empty shell, alongside the panes themselves.
+    selectedTask: read<string | null>("selectedTask", null),
+    view: readOneOf("view", VIEWS, "work"),
+    tab: readOneOf("tab", TABS, "terminals"),
+    sidebarHidden: read("sidebarHidden", false),
+    settingsOpen: false,
+    settingsSection: null,
+    focusIssueKey: null,
+    focusPane: null,
+    focusReview: null,
+    toasts: [],
+    failure: null,
+    watchFailing: false,
+    cursorIde: false,
+    appActive: true,
+    booted: false,
 
-  // Selecting a task is always a request to look at it.
-  select: (id) => set({ selectedTask: id, tab: "terminals", view: "work" }),
-  setView: (view) => set({ view }),
-  setTab: (tab) => set({ tab }),
-  toggleSidebar: () => set((s) => ({ sidebarHidden: !s.sidebarHidden })),
-  toggleSettings: (open, section) =>
-    set((s) => ({ settingsOpen: open ?? !s.settingsOpen, settingsSection: section ?? null })),
-  showIssue: (key) => set({ view: "tickets", focusIssueKey: key }),
-  clearFocusIssue: () => set({ focusIssueKey: null }),
-  showPane: (focusPane) => set({ focusPane }),
-  clearFocusPane: () => set({ focusPane: null }),
-  showReview: (id) => set({ view: "reviews", focusReview: id }),
-  clearFocusReview: () => set({ focusReview: null }),
-  // Terminals watch this themselves: one that is no longer shown detaches,
-  // and the backend stops sending its redraws to a webview nobody is
-  // looking at.
-  setAppActive: (appActive) => {
-    if (get().appActive === appActive) return;
-    set({ appActive });
-  },
+    // Selecting a task is always a request to look at it.
+    select: (id) => set({ selectedTask: id, tab: "terminals", view: "work" }),
+    setView: (view) => set({ view }),
+    setTab: (tab) => set({ tab }),
+    toggleSidebar: () => set((s) => ({ sidebarHidden: !s.sidebarHidden })),
+    toggleSettings: (open, section) =>
+      set((s) => ({ settingsOpen: open ?? !s.settingsOpen, settingsSection: section ?? null })),
+    showIssue: (key) => set({ view: "tickets", focusIssueKey: key }),
+    clearFocusIssue: () => set({ focusIssueKey: null }),
+    showPane: (focusPane) => set({ focusPane }),
+    clearFocusPane: () => set({ focusPane: null }),
+    showReview: (id) => set({ view: "reviews", focusReview: id }),
+    clearFocusReview: () => set({ focusReview: null }),
+    // Terminals watch this themselves: one that is no longer shown detaches,
+    // and the backend stops sending its redraws to a webview nobody is
+    // looking at.
+    setAppActive: (appActive) => {
+      if (get().appActive === appActive) return;
+      set({ appActive });
+    },
 
-  toast: (kind, text, opts) => {
-    const id = ++toastSeq;
-    set((s) => ({ toasts: [...s.toasts, { id, kind, text, target: opts?.target }] }));
-    const keep = opts?.record ?? false;
-    // Swallowed: failing to keep a message must not raise another.
-    if (keep) void api.addMessage(keep, kind, text, opts?.target).catch(() => {});
-    setTimeout(() => get().dismissToast(id), 4000);
-  },
-  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-  fail: (e, opts) => {
-    const id = ++toastSeq;
-    const text = failureText(e);
-    set({ failure: { id, text } });
-    const keep = opts?.record ?? "error";
-    // Swallowed: failing to keep an error must not raise another.
-    if (keep) void api.addMessage(keep, "error", text, opts?.target).catch(() => {});
-    // Only its own: a newer failure keeps its full six seconds.
-    setTimeout(() => {
-      if (get().failure?.id === id) set({ failure: null });
-    }, 6000);
-  },
+    toast: (kind, text, opts) => {
+      const id = ++toastSeq;
+      set((s) => ({ toasts: [...s.toasts, { id, kind, text, target: opts?.target }] }));
+      const keep = opts?.record ?? false;
+      // Swallowed: failing to keep a message must not raise another.
+      if (keep) void api.addMessage(keep, kind, text, opts?.target).catch(() => {});
+      setTimeout(() => get().dismissToast(id), 4000);
+    },
+    dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+    fail: (e, opts) => {
+      const id = ++toastSeq;
+      const text = failureText(e);
+      set({ failure: { id, text } });
+      const keep = opts?.record ?? "error";
+      // Swallowed: failing to keep an error must not raise another.
+      if (keep) void api.addMessage(keep, "error", text, opts?.target).catch(() => {});
+      // Only its own: a newer failure keeps its full six seconds.
+      setTimeout(() => {
+        if (get().failure?.id === id) set({ failure: null });
+      }, 6000);
+    },
 
-  refreshAll: async () => {
-    // Settings (and with them the Jira list) must not wait on a full git-status
-    // of every worktree: that is the slow part of boot, and Tickets used to
-    // sit black until it finished. Kick both off together.
-    const settingsP = get().refreshSettings();
-    const focus = get().selectedTask;
-    const coreP = Promise.all([
-      api.listProjects(),
-      api.listTasks(focus),
-      api.listPanes(),
-      api.listAgents(),
-      api.cursorIdeInstalled().catch(() => false),
-    ]).then(([projects, tasks, panes, agents, cursorIde]) => {
-      // Through `reuse`, as the polls do: it runs after every Sync, Clean up
-      // and Add repos, and a wholesale swap redrew every task row, pane and
-      // agent card even when the operation changed none of them.
-      set((s) => {
-        const kept = reuse(s.tasks, tasks, (t) => t.id);
-        return {
-          projects: reuse(s.projects, projects, (p) => p.id),
-          tasks: kept,
-          panes: reuse(s.panes, panes, (p) => p.id, samePane),
-          agents: reuse(s.agents, agents, (a) => a.id),
-          cursorIde,
-          selectedTask: stillThere(kept, s.selectedTask),
-        };
-      });
-      watchOk();
-    });
-    // The splash waits for both, but no longer than BOOT_WAIT: a slow git
-    // status then fills the lists in an open window rather than holding it.
-    const opened = setTimeout(() => {
-      if (!get().booted) set({ booted: true });
-    }, BOOT_WAIT);
-    try {
-      await Promise.all([settingsP, coreP]);
-    } finally {
-      clearTimeout(opened);
-      // A failed first read still opens the window: the failure is in the
-      // top bar's status, and a splash that never ends would hide it.
-      if (!get().booted) set({ booted: true });
-    }
-  },
-
-  refreshRepos: async () => {
-    const projects = await api.listProjects();
-    set((s) => ({ projects: reuse(s.projects, projects, (p) => p.id) }));
-  },
-
-  refreshRepoHealth: async () => {
-    const rows = await api.repoHealth();
-    set((s) => ({ repoHealth: keep(s.repoHealth, Object.fromEntries(rows.map((h) => [h.project_id, h]))) }));
-  },
-
-  refreshTasks: (opts) =>
-    coalesce(tasksSlot, opts?.poll ?? false, async () => {
-      try {
-        // Focus the selected task so its worktrees stay fresh; everything else
-        // reuses the backend status cache unless it has an agent at work.
-        const fetched = await api.listTasks(get().selectedTask);
-        const live = new Set(fetched.map((t) => t.id));
-        const before = get().tasks;
+    refreshAll: async () => {
+      // Settings (and with them the Jira list) must not wait on a full git-status
+      // of every worktree: that is the slow part of boot, and Tickets used to
+      // sit black until it finished. Kick both off together.
+      const settingsP = get().refreshSettings();
+      const focus = get().selectedTask;
+      const coreP = Promise.all([
+        api.listProjects(),
+        api.listTasks(focus),
+        api.listPanes(),
+        api.listAgents(),
+        api.cursorIdeInstalled().catch(() => false),
+      ]).then(([projects, tasks, panes, agents, cursorIde]) => {
+        // Through `reuse`, as the polls do: it runs after every Sync, Clean up
+        // and Add repos, and a wholesale swap redrew every task row, pane and
+        // agent card even when the operation changed none of them.
         set((s) => {
-          // Whole, not field by field. A hand-picked list missed the base:
-          // changed in the PR panel, Update from base went on saying
-          // "← origin/main" while the backend merged the new one. A few dozen
-          // tasks stringify in well under a millisecond, and nothing in them
-          // changes on its own between polls.
-          const tasks = reuse(s.tasks, fetched, (t) => t.id);
-          if (tasks === s.tasks) return s;
+          const kept = reuse(s.tasks, tasks, (t) => t.id);
           return {
-            tasks,
-            selectedTask: stillThere(tasks, s.selectedTask),
-            // PR rows for a task that has been deleted have nothing to hang off any
-            // more, and the watch would keep comparing against them for good.
-            // Its Diff notes likewise, kept for as long as the app ran.
-            prs: only(s.prs, live),
-            notes: only(s.notes, live),
+            projects: reuse(s.projects, projects, (p) => p.id),
+            tasks: kept,
+            panes: reuse(s.panes, panes, (p) => p.id, samePane),
+            agents: reuse(s.agents, agents, (a) => a.id),
+            cursorIde,
+            selectedTask: stillThere(kept, s.selectedTask),
           };
         });
-        for (const id of prsFetchedAt.keys()) if (!live.has(id)) prsFetchedAt.delete(id);
-        // Its spec, edits and drafts too, which live in their own store.
-        const byTask = useSpecs.getState().byTask;
-        const specs = only(byTask, live);
-        if (specs !== byTask) useSpecs.setState({ byTask: specs });
-        // And the layout remembered for it in localStorage. The chats keep
-        // theirs: they are no task, and never deleted.
-        if (get().tasks !== before) {
-          forgetAllBut(["activePane", "browserOpen"], new Set([...live, CHAT_TASK_ID]));
-        }
         watchOk();
-      } catch (e) {
-        watchFail();
-        throw e;
-      }
-    }),
-  refreshPanes: (opts) =>
-    coalesce(panesSlot, opts?.poll ?? false, async () => {
-      try {
-        const fetched = await api.listPanes();
-        set((s) => {
-          const panes = reuse(s.panes, fetched, (p) => p.id, samePane);
-          return panes === s.panes ? s : { panes };
-        });
-        watchOk();
-      } catch (e) {
-        watchFail();
-        throw e;
-      }
-    }),
-
-  refreshWaiting: async () => {
-    const waiting = await api.waitingPanes();
-    set((s) => (sameJson(s.waiting, waiting) ? s : { waiting }));
-  },
-
-  /**
-   * Ask GitHub what has happened to every task's pull requests.
-   *
-   * Quiet on failure: this runs on a timer whether or not anyone is looking,
-   * and a token that has expired or a network that has gone away should not
-   * put a toast on screen every couple of minutes.
-   */
-  refreshPrs: async () => {
-    if (!get().settings?.github_connected) return;
-    if (sweeping) {
-      sweepAgain = true;
-      return;
-    }
-    sweeping = true;
-    const began = Date.now();
-    try {
-      const all = await api.githubAllPrs();
-      // Merged, not replaced: a task the sweep could not read is left out of
-      // its result, and dropping it here would blank a panel that had just
-      // fetched those rows for itself. Nor over rows fetched after it began.
-      const fresh = all.filter((t) => (prsFetchedAt.get(t.task_id) ?? 0) < began);
-      for (const t of fresh) prsFetchedAt.set(t.task_id, began);
-      set((s) => {
-        const changed = fresh.filter((t) => !sameJson(s.prs[t.task_id], t.rows));
-        if (changed.length === 0) return s;
-        return { prs: { ...s.prs, ...Object.fromEntries(changed.map((t) => [t.task_id, t.rows])) } };
       });
-      const moves = all.map((t) => t.ticket).filter((m): m is TicketMove => m !== null);
-      reportTickets(moves, get().toast, get().fail);
-      if (moves.some((m) => m.moved_to)) void get().refreshIssues({ quiet: true });
-    } catch {
-      // Left as it was: stale rows beat empty ones.
-    } finally {
-      sweeping = false;
-    }
-    if (sweepAgain) {
-      sweepAgain = false;
-      await get().refreshPrs();
-    }
-  },
+      // The splash waits for both, but no longer than BOOT_WAIT: a slow git
+      // status then fills the lists in an open window rather than holding it.
+      const opened = setTimeout(() => {
+        if (!get().booted) set({ booted: true });
+      }, BOOT_WAIT);
+      try {
+        await Promise.all([settingsP, coreP]);
+      } finally {
+        clearTimeout(opened);
+        // A failed first read still opens the window: the failure is in the
+        // top bar's status, and a splash that never ends would hide it.
+        if (!get().booted) set({ booted: true });
+      }
+    },
 
-  notes: {},
-  addNote: (taskId, note) =>
-    set((s) => ({ notes: { ...s.notes, [taskId]: [...(s.notes[taskId] ?? []), { ...note, id: ++noteSeq }] } })),
-  dropNotes: (taskId, ids) =>
-    set((s) => ({ notes: { ...s.notes, [taskId]: (s.notes[taskId] ?? []).filter((n) => !ids.includes(n.id)) } })),
-  editNote: (taskId, id, body) =>
-    set((s) => ({
-      notes: { ...s.notes, [taskId]: (s.notes[taskId] ?? []).map((n) => (n.id === id ? { ...n, body } : n)) },
-    })),
+    refreshRepos: async () => {
+      const projects = await api.listProjects();
+      set((s) => ({ projects: reuse(s.projects, projects, (p) => p.id) }));
+    },
 
-  setTaskPrs: (taskId, rows) => {
-    prsFetchedAt.set(taskId, Date.now());
-    set((s) => (sameJson(s.prs[taskId], rows) ? s : { prs: { ...s.prs, [taskId]: rows } }));
-  },
+    refreshRepoHealth: async () => {
+      const rows = await api.repoHealth();
+      set((s) => ({
+        repoHealth: keep(s.repoHealth, Object.fromEntries(rows.map((h) => [h.project_id, h]))),
+      }));
+    },
 
-  refreshSettings: async () => {
-    const before = get().settings;
-    // Kept when unchanged: this runs after every preference toggle, and a new
-    // object redrew every view that reads the settings, about a dozen.
-    const settings = await api.getSettings();
-    set((s) => ({ settings: keep(s.settings, settings) }));
-    // Only until the first list lands: someone with nothing assigned has an
-    // empty list for good, and every settings change re-fetched 500 issues.
-    if (settings.tracker != null && !get().issuesLoaded && !get().issuesLoading) {
-      void get().refreshIssues();
-    }
-    // Disconnecting has to take the list with it, or the badge keeps counting
-    // tickets from a site the app can no longer reach.
-    if (settings.tracker == null && (get().issues.length > 0 || get().issuesLoaded)) {
-      set({ issues: [], issueTypes: [], priorities: [], issuesTruncated: false, issuesLoaded: false });
-    }
-    // Only when GitHub itself changed. Every slider moved and every update
-    // from base refreshed settings, and each ran a search — which GitHub
-    // allows thirty of a minute.
-    const githubChanged =
-      before?.github_connected !== settings.github_connected ||
-      JSON.stringify(before?.github) !== JSON.stringify(settings.github);
-    if (settings.github_connected) {
-      if (githubChanged || get().reviewQueue === null) void get().refreshReviewQueue({ quiet: true });
-    } else if (get().reviewQueue || get().reviewQueueError) {
-      set({ reviewQueue: null, reviewQueueError: null });
-    }
-  },
+    refreshTasks: (opts) =>
+      coalesce(tasksSlot, opts?.poll ?? false, async () => {
+        try {
+          // Focus the selected task so its worktrees stay fresh; everything else
+          // reuses the backend status cache unless it has an agent at work.
+          const fetched = await api.listTasks(get().selectedTask);
+          const live = new Set(fetched.map((t) => t.id));
+          const before = get().tasks;
+          set((s) => {
+            // Whole, not field by field. A hand-picked list missed the base:
+            // changed in the PR panel, Update from base went on saying
+            // "← origin/main" while the backend merged the new one. A few dozen
+            // tasks stringify in well under a millisecond, and nothing in them
+            // changes on its own between polls.
+            const tasks = reuse(s.tasks, fetched, (t) => t.id);
+            if (tasks === s.tasks) return s;
+            return {
+              tasks,
+              selectedTask: stillThere(tasks, s.selectedTask),
+              // PR rows for a task that has been deleted have nothing to hang off any
+              // more, and the watch would keep comparing against them for good.
+              // Its Diff notes likewise, kept for as long as the app ran.
+              prs: only(s.prs, live),
+              notes: only(s.notes, live),
+            };
+          });
+          for (const id of prsFetchedAt.keys()) if (!live.has(id)) prsFetchedAt.delete(id);
+          // Its spec, edits and drafts too, which live in their own store.
+          const byTask = useSpecs.getState().byTask;
+          const specs = only(byTask, live);
+          if (specs !== byTask) useSpecs.setState({ byTask: specs });
+          // And the layout remembered for it in localStorage. The chats keep
+          // theirs: they are no task, and never deleted.
+          if (get().tasks !== before) {
+            forgetAllBut(["activePane", "browserOpen"], new Set([...live, CHAT_TASK_ID]));
+          }
+          watchOk();
+        } catch (e) {
+          watchFail();
+          throw e;
+        }
+      }),
+    refreshPanes: (opts) =>
+      coalesce(panesSlot, opts?.poll ?? false, async () => {
+        try {
+          const fetched = await api.listPanes();
+          set((s) => {
+            const panes = reuse(s.panes, fetched, (p) => p.id, samePane);
+            return panes === s.panes ? s : { panes };
+          });
+          watchOk();
+        } catch (e) {
+          watchFail();
+          throw e;
+        }
+      }),
 
-  refreshReviewQueue: (opts) =>
-    coalesce(
-      reviewsSlot,
-      opts?.quiet ?? false,
-      async () => {
+    refreshWaiting: async () => {
+      const waiting = await api.waitingPanes();
+      set((s) => (sameJson(s.waiting, waiting) ? s : { waiting }));
+    },
+
+    /**
+     * Ask GitHub what has happened to every task's pull requests.
+     *
+     * Quiet on failure: this runs on a timer whether or not anyone is looking,
+     * and a token that has expired or a network that has gone away should not
+     * put a toast on screen every couple of minutes.
+     */
+    refreshPrs: async () => {
+      if (!get().settings?.github_connected) return;
+      if (sweeping) {
+        sweepAgain = true;
+        return;
+      }
+      sweeping = true;
+      const began = Date.now();
+      try {
+        const all = await api.githubAllPrs();
+        // Merged, not replaced: a task the sweep could not read is left out of
+        // its result, and dropping it here would blank a panel that had just
+        // fetched those rows for itself. Nor over rows fetched after it began.
+        const fresh = all.filter((t) => (prsFetchedAt.get(t.task_id) ?? 0) < began);
+        for (const t of fresh) prsFetchedAt.set(t.task_id, began);
+        set((s) => {
+          const changed = fresh.filter((t) => !sameJson(s.prs[t.task_id], t.rows));
+          if (changed.length === 0) return s;
+          return {
+            prs: { ...s.prs, ...Object.fromEntries(changed.map((t) => [t.task_id, t.rows])) },
+          };
+        });
+        const moves = all.map((t) => t.ticket).filter((m): m is TicketMove => m !== null);
+        reportTickets(moves, get().toast, get().fail);
+        if (moves.some((m) => m.moved_to)) void get().refreshIssues({ quiet: true });
+      } catch {
+        // Left as it was: stale rows beat empty ones.
+      } finally {
+        sweeping = false;
+      }
+      if (sweepAgain) {
+        sweepAgain = false;
+        await get().refreshPrs();
+      }
+    },
+
+    notes: {},
+    addNote: (taskId, note) =>
+      set((s) => ({
+        notes: { ...s.notes, [taskId]: [...(s.notes[taskId] ?? []), { ...note, id: ++noteSeq }] },
+      })),
+    dropNotes: (taskId, ids) =>
+      set((s) => ({
+        notes: { ...s.notes, [taskId]: (s.notes[taskId] ?? []).filter((n) => !ids.includes(n.id)) },
+      })),
+    editNote: (taskId, id, body) =>
+      set((s) => ({
+        notes: {
+          ...s.notes,
+          [taskId]: (s.notes[taskId] ?? []).map((n) => (n.id === id ? { ...n, body } : n)),
+        },
+      })),
+
+    setTaskPrs: (taskId, rows) => {
+      prsFetchedAt.set(taskId, Date.now());
+      set((s) => (sameJson(s.prs[taskId], rows) ? s : { prs: { ...s.prs, [taskId]: rows } }));
+    },
+
+    refreshSettings: async () => {
+      const before = get().settings;
+      // Kept when unchanged: this runs after every preference toggle, and a new
+      // object redrew every view that reads the settings, about a dozen.
+      const settings = await api.getSettings();
+      set((s) => ({ settings: keep(s.settings, settings) }));
+      // Only until the first list lands: someone with nothing assigned has an
+      // empty list for good, and every settings change re-fetched 500 issues.
+      if (settings.tracker != null && !get().issuesLoaded && !get().issuesLoading) {
+        void get().refreshIssues();
+      }
+      // Disconnecting has to take the list with it, or the badge keeps counting
+      // tickets from a site the app can no longer reach.
+      if (settings.tracker == null && (get().issues.length > 0 || get().issuesLoaded)) {
+        set({
+          issues: [],
+          issueTypes: [],
+          priorities: [],
+          issuesTruncated: false,
+          issuesLoaded: false,
+        });
+      }
+      // Only when GitHub itself changed. Every slider moved and every update
+      // from base refreshed settings, and each ran a search — which GitHub
+      // allows thirty of a minute.
+      const githubChanged =
+        before?.github_connected !== settings.github_connected ||
+        JSON.stringify(before?.github) !== JSON.stringify(settings.github);
+      if (settings.github_connected) {
+        if (githubChanged || get().reviewQueue === null)
+          void get().refreshReviewQueue({ quiet: true });
+      } else if (get().reviewQueue || get().reviewQueueError) {
+        set({ reviewQueue: null, reviewQueueError: null });
+      }
+    },
+
+    refreshReviewQueue: (opts) =>
+      coalesce(reviewsSlot, opts?.quiet ?? false, async () => {
         if (!get().settings?.github_connected) return;
         // A timer tick should not flash the spinner over a list already on
         // screen. The first load has nothing to keep, so it still shows one.
@@ -648,45 +688,44 @@ export const useStore = create<State>((set, get) => {
         } finally {
           if (spin) set({ reviewQueueLoading: false });
         }
-      },
-    ),
+      }),
 
-  refreshMessages: () =>
-    coalesce(messagesSlot, false, async () => {
-      const messages = await api.listMessages();
-      if (!sameMessages(get().messages, messages)) set({ messages });
-    }),
+    refreshMessages: () =>
+      coalesce(messagesSlot, false, async () => {
+        const messages = await api.listMessages();
+        if (!sameMessages(get().messages, messages)) set({ messages });
+      }),
 
-  refreshIssues: async (opts) => {
-    if (get().settings?.tracker == null) return;
-    // A timer tick should not flash the spinner over a list already on screen.
-    const spin = !opts?.quiet || !get().issuesLoaded;
-    if (spin) set({ issuesLoading: true });
-    try {
-      const [page, issueTypes, priorities] = await Promise.all([
-        api.ticketsMine(),
-        // Types rarely change and are cached in the backend; a failure here
-        // must not stop the issues themselves from showing.
-        api.ticketTypes().catch(() => get().issueTypes),
-        // Asked once per connection, as rarely changed. Without them a sort
-        // by priority keeps the order it had.
-        get().priorities.length > 0 ? get().priorities : api.ticketPriorities().catch(() => []),
-      ]);
-      // As for reviews: an answer from a site disconnected meanwhile is not kept.
+    refreshIssues: async (opts) => {
       if (get().settings?.tracker == null) return;
-      set((s) => ({
-        issues: reuse(s.issues, page.issues, (i) => i.key),
-        issuesTruncated: page.more,
-        issueTypes: keep(s.issueTypes, issueTypes),
-        priorities: keep(s.priorities, priorities),
-        issuesLoaded: true,
-      }));
-    } catch (e) {
-      if (!opts?.quiet) get().fail(e);
-    } finally {
-      if (spin) set({ issuesLoading: false });
-    }
-  },
+      // A timer tick should not flash the spinner over a list already on screen.
+      const spin = !opts?.quiet || !get().issuesLoaded;
+      if (spin) set({ issuesLoading: true });
+      try {
+        const [page, issueTypes, priorities] = await Promise.all([
+          api.ticketsMine(),
+          // Types rarely change and are cached in the backend; a failure here
+          // must not stop the issues themselves from showing.
+          api.ticketTypes().catch(() => get().issueTypes),
+          // Asked once per connection, as rarely changed. Without them a sort
+          // by priority keeps the order it had.
+          get().priorities.length > 0 ? get().priorities : api.ticketPriorities().catch(() => []),
+        ]);
+        // As for reviews: an answer from a site disconnected meanwhile is not kept.
+        if (get().settings?.tracker == null) return;
+        set((s) => ({
+          issues: reuse(s.issues, page.issues, (i) => i.key),
+          issuesTruncated: page.more,
+          issueTypes: keep(s.issueTypes, issueTypes),
+          priorities: keep(s.priorities, priorities),
+          issuesLoaded: true,
+        }));
+      } catch (e) {
+        if (!opts?.quiet) get().fail(e);
+      } finally {
+        if (spin) set({ issuesLoading: false });
+      }
+    },
   };
 });
 
@@ -713,8 +752,7 @@ export function exitIsNews(paneId: string, pane: PaneInfo | undefined): boolean 
   return !!pane && pane.kind === "agent" && pane.task_id !== CHAT_TASK_ID && !onPurpose;
 }
 
-export const selectedTask = (s: State) =>
-  s.tasks.find((t) => t.id === s.selectedTask) ?? null;
+export const selectedTask = (s: State) => s.tasks.find((t) => t.id === s.selectedTask) ?? null;
 
 /**
  * The time, for labels that change with it: "2m ago".

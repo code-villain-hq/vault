@@ -5,7 +5,11 @@ import type { RepoRow } from "../../lib/usage";
 const worked = (secs: number, said: boolean) => (said ? formatDuration(secs * 1000) : "—");
 
 /** Per repository, and each agent side by side (RUN-8). */
-export const UsageBreakdown = memo(function UsageBreakdown({ repos, agents, agentName }: {
+export const UsageBreakdown = memo(function UsageBreakdown({
+  repos,
+  agents,
+  agentName,
+}: {
   repos: RepoRow[];
   agents: AgentRow[];
   agentName: (id: string) => string;
@@ -20,8 +24,12 @@ export const UsageBreakdown = memo(function UsageBreakdown({ repos, agents, agen
               <th>Repository</th>
               <th>Tasks</th>
               <th>Finished</th>
-              <th title="Agents' working time, where they say. A run at a task's root counts for each of its repositories.">Agents working</th>
-              <th title="A run at a task's root counts for each of its repositories, so these add up to more than the total">Tokens</th>
+              <th title="Agents' working time, where they say. A run at a task's root counts for each of its repositories.">
+                Agents working
+              </th>
+              <th title="A run at a task's root counts for each of its repositories, so these add up to more than the total">
+                Tokens
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -59,7 +67,9 @@ export const UsageBreakdown = memo(function UsageBreakdown({ repos, agents, agen
                 <td>{worked(s.workedSecs, s.withWorked > 0)}</td>
                 <td>{s.tokens ? formatTokens(totalTokens(s.tokens)) : "—"}</td>
                 <td>{s.asks}</td>
-                <td>{s.tools?.calls ? `${Math.round((s.tools.failed / s.tools.calls) * 100)}%` : "—"}</td>
+                <td>
+                  {s.tools?.calls ? `${Math.round((s.tools.failed / s.tools.calls) * 100)}%` : "—"}
+                </td>
                 <td className={s.wrong ? "bad" : ""}>{Math.round(s.wrongRate * 100)}%</td>
               </tr>
             ))}

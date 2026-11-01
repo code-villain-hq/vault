@@ -99,7 +99,6 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted">Name</span>
           <input
-            // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}

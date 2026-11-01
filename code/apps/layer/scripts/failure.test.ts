@@ -23,7 +23,9 @@ describe("the sentence a failure is shown as", () => {
 describe("a failure in the top bar's status", () => {
   test("is kept in the message center, and never as a toast", () => {
     const kept: unknown[][] = [];
-    backend.addMessage = async (...args: unknown[]) => { kept.push(args); };
+    backend.addMessage = async (...args: unknown[]) => {
+      kept.push(args);
+    };
     useStore.getState().fail("couldn't reach Jira");
     expect(useStore.getState().failure?.text).toBe("Couldn't reach Jira.");
     expect(useStore.getState().toasts).toEqual([]);

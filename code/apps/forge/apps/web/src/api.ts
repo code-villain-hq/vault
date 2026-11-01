@@ -2,13 +2,7 @@ import { api, RequestError } from "@code-villain/web";
 import type { ApiError } from "@forge/types";
 import { apiUrl, authHeaders, credentialsFor, placeFor } from "./server";
 
-export {
-  api,
-  messageOf,
-  RequestError,
-  setSessionEndedHandler,
-  useApi,
-} from "@code-villain/web";
+export { api, messageOf, RequestError, setSessionEndedHandler, useApi } from "@code-villain/web";
 
 /** An uploaded file, and the Markdown that shows or links to it. */
 export async function uploadAttachment(

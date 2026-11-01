@@ -59,21 +59,63 @@ const GRAMMARS: Record<string, Grammar> = {
 };
 
 const BY_EXTENSION: Record<string, string> = {
-  ts: "typescript", mts: "typescript", cts: "typescript", tsx: "tsx",
-  js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "jsx",
-  json: "json", jsonc: "jsonc", rs: "rust", py: "python", go: "go",
-  java: "java", kt: "kotlin", kts: "kotlin", swift: "swift",
-  css: "css", scss: "scss", html: "html", htm: "html",
-  md: "markdown", markdown: "markdown", yml: "yaml", yaml: "yaml", toml: "toml",
-  sql: "sql", sh: "shellscript", bash: "shellscript", zsh: "shellscript",
-  rb: "ruby", php: "php", c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp",
-  cs: "csharp", xml: "xml", svg: "xml", plist: "xml", graphql: "graphql", gql: "graphql",
-  vue: "vue", svelte: "svelte", lua: "lua", ini: "ini", cfg: "ini",
+  ts: "typescript",
+  mts: "typescript",
+  cts: "typescript",
+  tsx: "tsx",
+  js: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  jsx: "jsx",
+  json: "json",
+  jsonc: "jsonc",
+  rs: "rust",
+  py: "python",
+  go: "go",
+  java: "java",
+  kt: "kotlin",
+  kts: "kotlin",
+  swift: "swift",
+  css: "css",
+  scss: "scss",
+  html: "html",
+  htm: "html",
+  md: "markdown",
+  markdown: "markdown",
+  yml: "yaml",
+  yaml: "yaml",
+  toml: "toml",
+  sql: "sql",
+  sh: "shellscript",
+  bash: "shellscript",
+  zsh: "shellscript",
+  rb: "ruby",
+  php: "php",
+  c: "c",
+  h: "c",
+  cc: "cpp",
+  cpp: "cpp",
+  hpp: "cpp",
+  cs: "csharp",
+  xml: "xml",
+  svg: "xml",
+  plist: "xml",
+  graphql: "graphql",
+  gql: "graphql",
+  vue: "vue",
+  svelte: "svelte",
+  lua: "lua",
+  ini: "ini",
+  cfg: "ini",
 };
 
 const BY_NAME: Record<string, string> = {
-  Makefile: "make", makefile: "make", GNUmakefile: "make",
-  ".zshrc": "shellscript", ".bashrc": "shellscript", ".zprofile": "shellscript",
+  Makefile: "make",
+  makefile: "make",
+  GNUmakefile: "make",
+  ".zshrc": "shellscript",
+  ".bashrc": "shellscript",
+  ".zprofile": "shellscript",
 };
 
 /** The grammar for a file, by its name; null where Layer bundles none. */
@@ -97,7 +139,10 @@ const THEME = {
     { settings: { foreground: "var(--syntax-text)", background: "transparent" } },
     ...Object.entries(code.scopes as Record<string, string[]>).map(([role, scope]) => ({
       scope,
-      settings: { foreground: `var(--syntax-${role})`, ...(STYLES[role] ? { fontStyle: STYLES[role] } : {}) },
+      settings: {
+        foreground: `var(--syntax-${role})`,
+        ...(STYLES[role] ? { fontStyle: STYLES[role] } : {}),
+      },
     })),
   ],
 };
@@ -124,12 +169,16 @@ const LONGEST_LINE = 1000;
  * Null when the language is not bundled or the patch is too big; a line
  * outside every hunk (the header) is never coloured.
  */
-export async function colourDiff(lines: DiffLine[], path: string): Promise<(Token[] | undefined)[] | null> {
+export async function colourDiff(
+  lines: DiffLine[],
+  path: string,
+): Promise<(Token[] | undefined)[] | null> {
   const lang = languageOf(path);
   if (!lang || lines.length > MOST_LINES) return null;
   const h = await core();
-  if (!h.getLoadedLanguages().includes(lang)) await h.loadLanguage((await GRAMMARS[lang]()).default);
-  const out: (Token[] | undefined)[] = new Array(lines.length);
+  if (!h.getLoadedLanguages().includes(lang))
+    await h.loadLanguage((await GRAMMARS[lang]()).default);
+  const out = Array.from<Token[] | undefined>({ length: lines.length });
   let since = performance.now();
   for (const side of hunkSides(lines).flatMap((s) => [s.old, s.new])) {
     const text = side.map((i) => lines[i].text.slice(1));
@@ -137,7 +186,9 @@ export async function colourDiff(lines: DiffLine[], path: string): Promise<(Toke
     const runs = h.codeToTokensBase(text.join("\n"), { lang, theme: THEME.name });
     // A context line is in both sides and takes the new one's colours, which
     // come second; a removed line only ever has the old side's.
-    side.forEach((i, k) => { out[i] = runs[k]?.map(({ content, color, fontStyle }) => ({ content, color, fontStyle })); });
+    side.forEach((i, k) => {
+      out[i] = runs[k]?.map(({ content, color, fontStyle }) => ({ content, color, fontStyle }));
+    });
     // Let the window breathe between sides on a long patch.
     if (performance.now() - since > 12) {
       await new Promise((resume) => setTimeout(resume, 0));

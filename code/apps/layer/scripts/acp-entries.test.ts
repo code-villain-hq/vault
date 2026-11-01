@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { mergeEntries } from "../src/lib/acpEntries";
 import type { AcpEntry } from "../src/lib/types";
 
-const say = (index: number, text: string, rev = index): AcpEntry => ({ index, rev, kind: "agent", text });
+const say = (index: number, text: string, rev = index): AcpEntry => ({
+  index,
+  rev,
+  kind: "agent",
+  text,
+});
 const view = (entries: AcpEntry[], base = 0, reset = false) => ({ entries, base, reset });
 
 describe("a conversation's entries as they change (ACP-7)", () => {
@@ -27,7 +32,9 @@ describe("a conversation's entries as they change (ACP-7)", () => {
 
   test("entries below the base are dropped, held or new", () => {
     const held = [say(0, "a"), say(1, "b"), say(2, "c")];
-    expect(mergeEntries(held, view([say(1, "B", 9), say(3, "d")], 2)).map((e) => e.index)).toEqual([2, 3]);
+    expect(mergeEntries(held, view([say(1, "B", 9), say(3, "d")], 2)).map((e) => e.index)).toEqual([
+      2, 3,
+    ]);
   });
 
   test("a reset replaces everything held", () => {

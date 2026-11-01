@@ -45,7 +45,7 @@ Run `bun run design:sync` after changing them in the vault.
   in to Raven itself. Needs `bun run dev` running for Acme Inc.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, generated types and design
-  copies up to date, Biome, typecheck, the bun tests (the sync kit's too),
+  copies up to date, Vite+ (Oxfmt, Oxlint, typecheck), the bun tests (the sync kit's too),
   web build. It must pass before you finish. CI runs it on every push that
   touches Raven (`.forgejo/workflows/raven.yml`).
   `RAVEN_CHECK_SKIP_DESKTOP=1` leaves the desktop app out.

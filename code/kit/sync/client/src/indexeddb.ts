@@ -30,6 +30,7 @@ export class IndexedDbStore implements LocalStore {
       // Another tab wants to delete or upgrade the database: let it.
       blocking: () => this.close(),
       upgrade(db) {
+        // oxlint-disable-next-line unicorn/no-useless-spread -- a copy: the list shrinks as stores go
         for (const store of [...db.objectStoreNames]) db.deleteObjectStore(store);
         db.createObjectStore("records", { keyPath: ["model", "id"] });
         db.createObjectStore("meta");

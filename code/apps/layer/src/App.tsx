@@ -1,34 +1,34 @@
-import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { api } from "./lib/api";
-import { selectedTask, useStore, type View } from "./store";
-import { CHAT_TASK_ID, needsYou, repoTrouble, reviewCounts, taskTotals } from "./lib/derive";
-import type { TaskView } from "./lib/types";
-import { Sidebar } from "./components/sidebar/Sidebar";
-import { SidebarGrip } from "./components/sidebar/SidebarGrip";
-import { Terminals } from "./components/Terminals";
-import { DiffView } from "./components/DiffView";
-import { PrPanel } from "./components/PrPanel";
-import { SpecView } from "./components/SpecView";
-import { EpicMain } from "./components/EpicView";
-import { specProgress, useSpecs } from "./lib/specs";
-import { TicketsView } from "./components/tickets/TicketsView";
+import { useEffect, useState } from "react";
 import { AgentsView } from "./components/AgentsView";
 import { ChatView } from "./components/ChatView";
+import { DiffView } from "./components/DiffView";
+import { EpicMain } from "./components/EpicView";
+import { FrameStatus } from "./components/FrameStatus";
+import { CupIcon, GearIcon } from "./components/icons";
+import { MessageCenter } from "./components/MessageCenter";
+import { PhoneBadge } from "./components/PhoneSettings";
+import { PrPanel } from "./components/PrPanel";
 import { ReposView } from "./components/ReposView";
 import { ReviewsView } from "./components/ReviewsView";
-import { UsageView } from "./components/UsageView";
 import { Settings } from "./components/Settings";
-import { UpdateFromBase } from "./components/UpdateFromBase";
-import { CupIcon, GearIcon } from "./components/icons";
-import { PhoneBadge } from "./components/PhoneSettings";
-import { statusClass } from "./components/tickets/status";
-import { SidebarToggle } from "./components/ui";
-import { MessageCenter } from "./components/MessageCenter";
-import { FrameStatus } from "./components/FrameStatus";
-import { Watchers } from "./Watchers";
+import { Sidebar } from "./components/sidebar/Sidebar";
+import { SidebarGrip } from "./components/sidebar/SidebarGrip";
+import { SpecView } from "./components/SpecView";
 import { Splash } from "./components/Splash";
+import { Terminals } from "./components/Terminals";
+import { statusClass } from "./components/tickets/status";
+import { TicketsView } from "./components/tickets/TicketsView";
+import { SidebarToggle } from "./components/ui";
+import { UpdateFromBase } from "./components/UpdateFromBase";
+import { UsageView } from "./components/UsageView";
+import { api } from "./lib/api";
+import { CHAT_TASK_ID, needsYou, repoTrouble, reviewCounts, taskTotals } from "./lib/derive";
 import { goTo } from "./lib/goto";
+import { specProgress, useSpecs } from "./lib/specs";
+import type { TaskView } from "./lib/types";
+import { selectedTask, useStore, type View } from "./store";
+import { Watchers } from "./Watchers";
 
 /**
  * The top bar (Layer's exception to studio/design/layouts/app-window.md): the views
@@ -44,8 +44,8 @@ function TopBar() {
   const toggleSettings = useStore((s) => s.toggleSettings);
   // Counts, not the lists: a number that has not changed is not a redraw.
   // Chats have their own tab, so they must not be counted as work as well.
-  const running = useStore(
-    (s) => s.panes.some((p) => p.kind === "agent" && p.running && p.task_id !== CHAT_TASK_ID),
+  const running = useStore((s) =>
+    s.panes.some((p) => p.kind === "agent" && p.running && p.task_id !== CHAT_TASK_ID),
   );
   const chatting = useStore((s) => s.panes.some((p) => p.task_id === CHAT_TASK_ID && p.running));
   // The dock icon's number, with a place in the window that says what it is.
@@ -82,7 +82,9 @@ function TopBar() {
       // twenty-four PRs of yours read as none. Only the first asks something
       // of you, so only it earns the live dot.
       count: [toReview, yours].some((n) => n && n !== "0")
-        ? (yours === undefined ? toReview : `${toReview ?? "–"} · ${yours}`)
+        ? yours === undefined
+          ? toReview
+          : `${toReview ?? "–"} · ${yours}`
         : undefined,
       title: `${toReview ?? "?"} to review · ${yours ?? "?"} opened by you`,
       news: !!toReview && toReview !== "0",
@@ -113,7 +115,9 @@ function TopBar() {
             aria-current={view === t.id ? "page" : undefined}
             onClick={() => setView(t.id)}
           >
-            <span className="viewtab-label" data-label={t.label}>{t.label}</span>
+            <span className="viewtab-label" data-label={t.label}>
+              {t.label}
+            </span>
             {t.count !== undefined ? (
               <span className="viewtab-count" title={t.title}>
                 {t.news && <span className="ui-live-dot" aria-hidden />}
@@ -130,7 +134,12 @@ function TopBar() {
         <PhoneBadge />
         <KeepAwake />
         <MessageCenter />
-        <button className="ui-button ui-icon-button" title="Settings" aria-label="Settings" onClick={() => toggleSettings(true)}>
+        <button
+          className="ui-button ui-icon-button"
+          title="Settings"
+          aria-label="Settings"
+          onClick={() => toggleSettings(true)}
+        >
           <GearIcon />
         </button>
       </div>
@@ -148,7 +157,9 @@ function KeepAwake() {
   const on = useStore((s) => s.settings?.ui.keep_awake ?? false);
   const phone = useStore((s) => s.settings?.phone_open ?? false);
   const working = useStore(
-    (s) => s.panes.filter((p) => p.kind === "agent" && p.running && (phone || p.activity === "working")).length,
+    (s) =>
+      s.panes.filter((p) => p.kind === "agent" && p.running && (phone || p.activity === "working"))
+        .length,
   );
   const refreshSettings = useStore((s) => s.refreshSettings);
   const fail = useStore((s) => s.fail);
@@ -203,7 +214,9 @@ function TaskMain({ task }: { task: TaskView }) {
   // read with the task.
   const specBadge = useSpecs((s) => specProgress(s.byTask[task.id]?.spec ?? null));
   const loadSpec = useSpecs((s) => s.load);
-  useEffect(() => { void loadSpec(task.id).catch(() => {}); }, [task.id, loadSpec]);
+  useEffect(() => {
+    void loadSpec(task.id).catch(() => {});
+  }, [task.id, loadSpec]);
 
   const totals = taskTotals(task);
   // What the Diff tab lists by default: files with uncommitted changes. The
@@ -235,7 +248,10 @@ function TaskMain({ task }: { task: TaskView }) {
           {totals.unlinked > 0 && (
             <span
               className="ui-status ui-status-danger"
-              title={task.checkouts.filter((c) => c.broken).map((c) => `${c.project_name}: ${c.broken}`).join("\n")}
+              title={task.checkouts
+                .filter((c) => c.broken)
+                .map((c) => `${c.project_name}: ${c.broken}`)
+                .join("\n")}
             >
               {totals.unlinked} worktree{totals.unlinked === 1 ? "" : "s"} unlinked
             </span>
@@ -286,14 +302,21 @@ function TaskMain({ task }: { task: TaskView }) {
               </button>
             )}
             {ticket && (
-              <span className={`ui-status status-pill ${statusClass(ticket.status_category)}`}>{ticket.status}</span>
+              <span className={`ui-status status-pill ${statusClass(ticket.status_category)}`}>
+                {ticket.status}
+              </span>
             )}
           </div>
         )}
       </div>
 
       <div className="ui-tabs task-tabs" role="tablist">
-        <button className="ui-tab" role="tab" aria-selected={tab === "spec"} onClick={() => setTab("spec")}>
+        <button
+          className="ui-tab"
+          role="tab"
+          aria-selected={tab === "spec"}
+          onClick={() => setTab("spec")}
+        >
           Spec{specBadge && <span className="ui-tab-count">{specBadge}</span>}
         </button>
         <button
@@ -304,10 +327,20 @@ function TaskMain({ task }: { task: TaskView }) {
         >
           Agents<span className="ui-tab-count">{paneCount}</span>
         </button>
-        <button className="ui-tab" role="tab" aria-selected={tab === "diff"} onClick={() => setTab("diff")}>
+        <button
+          className="ui-tab"
+          role="tab"
+          aria-selected={tab === "diff"}
+          onClick={() => setTab("diff")}
+        >
           Diff{changed > 0 && <span className="ui-tab-count">{changed}</span>}
         </button>
-        <button className="ui-tab" role="tab" aria-selected={tab === "pr"} onClick={() => setTab("pr")}>
+        <button
+          className="ui-tab"
+          role="tab"
+          aria-selected={tab === "pr"}
+          onClick={() => setTab("pr")}
+        >
           Pull requests
           {task.checkouts.length > 1 && (
             <span className="ui-tab-count">{task.checkouts.length}</span>
@@ -389,7 +422,11 @@ function Shell() {
             <SidebarGrip />
             <div className="main">
               {task ? (
-                task.epic ? <EpicMain key={task.id} epic={task} /> : <TaskMain key={task.id} task={task} />
+                task.epic ? (
+                  <EpicMain key={task.id} epic={task} />
+                ) : (
+                  <TaskMain key={task.id} task={task} />
+                )
               ) : (
                 // With nothing selected, show what every agent is doing rather
                 // than an empty panel — the sidebar covers the task list, this

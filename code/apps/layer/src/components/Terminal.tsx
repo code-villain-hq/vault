@@ -1,15 +1,15 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
-import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { Terminal } from "@xterm/xterm";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { api } from "../lib/api";
-import { onPtyOutput } from "../lib/ptyOutput";
-import { useStore } from "../store";
-import type { PaneInfo } from "../lib/types";
-import { decode, TERMINAL_FONT, terminalTheme } from "../lib/terminal";
 import { whenBehind } from "../lib/catchUp";
-import { currentTheme, type Theme } from "../lib/theme";
 import { afterDrag, isDragging } from "../lib/drag";
+import { onPtyOutput } from "../lib/ptyOutput";
+import { decode, TERMINAL_FONT, terminalTheme } from "../lib/terminal";
+import { currentTheme, type Theme } from "../lib/theme";
+import type { PaneInfo } from "../lib/types";
+import { useStore } from "../store";
 
 /**
  * How many terminals may hold a WebGL context at once.
@@ -128,11 +128,17 @@ class PaneTerminal {
     // input clears the selection: one made with ⌥-drag was gone the moment
     // the mouse moved, before ⌘C. Hovering is held back while there is a
     // selection; a click, a key or a scroll still reaches the agent.
-    this.el.addEventListener("mousemove", (e) => {
-      if (e.buttons === 0 && this.term.hasSelection()) e.stopPropagation();
-    }, true);
+    this.el.addEventListener(
+      "mousemove",
+      (e) => {
+        if (e.buttons === 0 && this.term.hasSelection()) e.stopPropagation();
+      },
+      true,
+    );
     this.subs.push(
-      this.term.onData((d) => { void api.ptyWrite(id, d).catch(() => {}); }),
+      this.term.onData((d) => {
+        void api.ptyWrite(id, d).catch(() => {});
+      }),
       this.term.onResize(({ rows, cols }) => {
         void api.ptyResize(id, rows, cols).catch(() => {});
       }),
@@ -220,7 +226,11 @@ class PaneTerminal {
    */
   private fitAndTell() {
     if (!this.opened) return;
-    try { this.fit.fit(); } catch { return; /* not laid out yet */ }
+    try {
+      this.fit.fit();
+    } catch {
+      return; /* not laid out yet */
+    }
     void api.ptyResize(this.id, this.term.rows, this.term.cols).catch(() => {});
   }
 
@@ -296,7 +306,8 @@ class PaneTerminal {
     const { rows, cols } = this.term;
     void api.ptyResize(this.id, rows, Math.max(1, cols - 1)).catch(() => {});
     setTimeout(() => {
-      if (!this.disposed) void api.ptyResize(this.id, this.term.rows, this.term.cols).catch(() => {});
+      if (!this.disposed)
+        void api.ptyResize(this.id, this.term.rows, this.term.cols).catch(() => {});
     }, REPAINT_GAP_MS);
   }
 

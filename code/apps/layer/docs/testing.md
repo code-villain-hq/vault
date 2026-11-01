@@ -13,16 +13,15 @@ Run before every commit. It stops at the first failure.
 | guard (`scripts/guard.ts`) | the rules in `AGENTS.md` that tools cannot check: command and event sync, nothing blocking the main thread or runtime, no panics, file sizes, docs listing every tool, CLI and event |
 | design copies are current | `src/design/` matches the vault's `studio/design` (`bun scripts/sync-design.ts --check`) |
 | `bun test scripts` | the app's pure logic, in `scripts/*.test.ts`: the Markdown parser, the window's sync client, grouping, sorting, time and the rest. Kept outside `src/` because tsc has no bun types |
-| `tsc` (app) | the app's frontend type-checks, including the mock harness against `types.ts` |
-| `vite build` (app) | the frontend bundles; `tauri::generate_context!` needs `dist/` for the Rust steps |
+| `vp check` | Vite+ over the app, its scripts and the web app (`vite.config.ts`): Oxfmt formats them, Oxlint lints them, and TypeScript type-checks them, the mock harness against `types.ts` and the web app's tests too |
+| `vp check` (sync kit, web kit) | the studio's sync client and web kit, by their own `vite.config.ts` |
+| `vp build` (app) | the frontend bundles; `tauri::generate_context!` needs `dist/` for the Rust steps |
 | `cargo fmt` (server) | `crates/domain`, `crates/sync` and `crates/server` are formatted |
 | `cargo clippy --workspace --all-targets -- -D warnings` | the app and the server, tests included, compile clean. A warning is a failure |
 | `cargo test` (app) | the app's Rust tests (`-p villain-layer --lib`) |
 | `cargo test` (server) | the server's, against Postgres (`bun run db`) |
 | generated types are current | `packages/types` matches `crates/domain` (`bun scripts/gen-types.ts`) |
-| Biome (web, sync kit) | the web app and the studio's sync client are linted and formatted |
-| `tsc` (web) | the web app type-checks, and its tests (`web/tsconfig.test.json`) |
-| `bun test` (web, sync kit) | the web app's tests, and the sync client's |
+| `bun test` (web, sync kit) | the web app's tests, the sync client's and the web kit's |
 | web build | the web app bundles, as the server serves it |
 
 `cargo check` alone does not compile the tests, so it passes while a test

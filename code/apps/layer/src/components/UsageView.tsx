@@ -1,10 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { readOneOf, write } from "../lib/persist";
-import { byAgent, filterRuns, formatDuration, formatSpan, formatTokens, runChoices, runPage, RUN_PAGE } from "../lib/runs";
+import {
+  byAgent,
+  filterRuns,
+  formatDuration,
+  formatSpan,
+  formatTokens,
+  runChoices,
+  runPage,
+  RUN_PAGE,
+} from "../lib/runs";
 import type { RunLog } from "../lib/types-runs";
-import { byRepo, periodStart, PERIODS, taskRows, usageDays, usageStats, type LiveTask, type Period } from "../lib/usage";
+import {
+  byRepo,
+  periodStart,
+  PERIODS,
+  taskRows,
+  usageDays,
+  usageStats,
+  type LiveTask,
+  type Period,
+} from "../lib/usage";
 import { useNow, useStore } from "../store";
 import { RunRow } from "./runs/RunRow";
 import { TaskTable } from "./runs/TaskTable";
@@ -30,7 +48,9 @@ export function UsageView() {
   // The rows keep their own "ago" clocks (`RunRow`).
   const now = useNow(30_000);
   const [log, setLog] = useState<RunLog | null>(null);
-  const [period, setPeriod] = useState<Period>(() => Number(readOneOf("usagePeriod", PERIOD_CHOICES, "30")) as Period);
+  const [period, setPeriod] = useState<Period>(
+    () => Number(readOneOf("usagePeriod", PERIOD_CHOICES, "30")) as Period,
+  );
   const [agent, setAgent] = useState<string | null>(null);
   const [repo, setRepo] = useState<string | null>(null);
   const [listing, setListing] = useState(false);
@@ -45,7 +65,12 @@ export function UsageView() {
     const load = () => {
       // Agents ending together ask together; only the last answer counts.
       const mine = ++asked;
-      api.listRuns().then((l) => { if (current && mine === asked) setLog(l); }).catch(fail);
+      api
+        .listRuns()
+        .then((l) => {
+          if (current && mine === asked) setLog(l);
+        })
+        .catch(fail);
     };
     load();
     const p = listen("runs:changed", load);
@@ -60,13 +85,14 @@ export function UsageView() {
   const runs = useMemo(() => log?.runs ?? [], [log]);
   const done = useMemo(() => log?.tasks ?? [], [log]);
   const live = useMemo<LiveTask[]>(
-    () => tasks.map((t) => ({
-      id: t.id,
-      name: t.name,
-      issue_key: t.issue_key,
-      created_at: t.created_at,
-      repos: t.checkouts.map((c) => ({ id: c.project_id, name: c.project_name })),
-    })),
+    () =>
+      tasks.map((t) => ({
+        id: t.id,
+        name: t.name,
+        issue_key: t.issue_key,
+        created_at: t.created_at,
+        repos: t.checkouts.map((c) => ({ id: c.project_id, name: c.project_name })),
+      })),
     [tasks],
   );
   const choices = useMemo(() => runChoices(runs), [runs]);
@@ -105,7 +131,8 @@ export function UsageView() {
         <div className="spacer" />
         {!empty && (
           <>
-            <select className="ui-field"
+            <select
+              className="ui-field"
               value={period}
               aria-label="Period"
               onChange={(e) => {
@@ -115,17 +142,43 @@ export function UsageView() {
                 setPages(1);
               }}
             >
-              {PERIODS.map((p) => <option key={p} value={p}>Last {p} days</option>)}
+              {PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  Last {p} days
+                </option>
+              ))}
             </select>
-            <select className="ui-field" value={agent ?? ""} onChange={filter(setAgent)} aria-label="Agent">
+            <select
+              className="ui-field"
+              value={agent ?? ""}
+              onChange={filter(setAgent)}
+              aria-label="Agent"
+            >
               <option value="">Every agent</option>
-              {choices.agents.map((a) => <option key={a} value={a}>{agentName(a)}</option>)}
+              {choices.agents.map((a) => (
+                <option key={a} value={a}>
+                  {agentName(a)}
+                </option>
+              ))}
             </select>
-            <select className="ui-field" value={repo ?? ""} onChange={filter(setRepo)} aria-label="Repository">
+            <select
+              className="ui-field"
+              value={repo ?? ""}
+              onChange={filter(setRepo)}
+              aria-label="Repository"
+            >
               <option value="">Every repository</option>
-              {choices.repos.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {choices.repos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             </select>
-            <button type="button" className="ui-button ui-button-danger" onClick={() => setClearing(true)}>
+            <button
+              type="button"
+              className="ui-button ui-button-danger"
+              onClick={() => setClearing(true)}
+            >
               Clear…
             </button>
           </>
@@ -136,8 +189,9 @@ export function UsageView() {
         <div className="empty">
           <h2>Nothing used yet</h2>
           <p>
-            Each agent is recorded here when it ends, and each task when it is finished or deleted: the tokens agents
-            used, how long they worked and waited on you, and how long each task took. Nothing leaves this Mac.
+            Each agent is recorded here when it ends, and each task when it is finished or deleted:
+            the tokens agents used, how long they worked and waited on you, and how long each task
+            took. Nothing leaves this Mac.
           </p>
         </div>
       ) : (
@@ -148,7 +202,9 @@ export function UsageView() {
               value={stats.withTokens ? formatTokens(stats.tokens) : "—"}
               note={
                 stats.withTokens
-                  ? stats.withTokens < stats.runs ? `said by ${stats.withTokens} of ${stats.runs} runs` : `over ${stats.runs} runs`
+                  ? stats.withTokens < stats.runs
+                    ? `said by ${stats.withTokens} of ${stats.runs} runs`
+                    : `over ${stats.runs} runs`
                   : "only Claude Code and agents over ACP say"
               }
             />
@@ -157,7 +213,9 @@ export function UsageView() {
               value={stats.withWorked ? formatDuration(stats.workedSecs * 1000) : "—"}
               note={
                 stats.withWorked
-                  ? stats.withWorked < stats.runs ? `said by ${stats.withWorked} of ${stats.runs} runs` : `over ${stats.runs} runs`
+                  ? stats.withWorked < stats.runs
+                    ? `said by ${stats.withWorked} of ${stats.runs} runs`
+                    : `over ${stats.runs} runs`
                   : "counted for runs that end from 0.9 on"
               }
             />
@@ -186,20 +244,37 @@ export function UsageView() {
           <TaskTable rows={rows} />
           <UsageBreakdown repos={perRepo} agents={perAgent} agentName={agentName} />
 
-          <button type="button" className="run-list-title ui-link" aria-expanded={listing} onClick={() => setListing((l) => !l)}>
+          <button
+            type="button"
+            className="run-list-title ui-link"
+            aria-expanded={listing}
+            onClick={() => setListing((l) => !l)}
+          >
             {listing ? "▾" : "▸"} Every run in these days ({shown.length})
           </button>
           {listing && (
             <>
               <div className="run-list">
                 {page.rows.map((r) => (
-                  <RunRow key={r.id} run={r} agentName={agentName(r.agent)} open={open === r.id} onToggle={toggle} />
+                  <RunRow
+                    key={r.id}
+                    run={r}
+                    agentName={agentName(r.agent)}
+                    open={open === r.id}
+                    onToggle={toggle}
+                  />
                 ))}
               </div>
               {page.left > 0 && (
                 <div className="run-more">
-                  <span>{page.left} older {page.left === 1 ? "run" : "runs"} not shown</span>
-                  <button type="button" className="ui-button" onClick={() => setPages((n) => n + 1)}>
+                  <span>
+                    {page.left} older {page.left === 1 ? "run" : "runs"} not shown
+                  </span>
+                  <button
+                    type="button"
+                    className="ui-button"
+                    onClick={() => setPages((n) => n + 1)}
+                  >
                     Show {Math.min(RUN_PAGE, page.left)} more
                   </button>
                 </div>

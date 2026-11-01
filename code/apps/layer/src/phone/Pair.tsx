@@ -34,8 +34,8 @@ export function Pair() {
     <div className="pair">
       <div className="brand">Layer</div>
       <p>
-        On the Mac, open the app's <b>Settings</b>, then <b>Phone</b>, and choose <b>Pair a phone</b>. Type the code
-        it shows.
+        On the Mac, open the app's <b>Settings</b>, then <b>Phone</b>, and choose{" "}
+        <b>Pair a phone</b>. Type the code it shows.
       </p>
       <form
         onSubmit={(e) => {

@@ -1,0 +1,16 @@
+{
+  "name": "code-villain-site",
+  "private": true,
+  "description": "The site's script and CSS, formatted and linted with Vite+. Python builds the site.",
+  "type": "module",
+  "scripts": {
+    "check": "vp check",
+    "format": "vp check --fix"
+  },
+  "devDependencies": {
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+  }
+}

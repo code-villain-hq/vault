@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { api } from "./api";
-import type { AppliedAnswers, SpecKind, SpecPart, SpecPartView, SpecRepoFailure, TaskSpec } from "./types";
+import type {
+  AppliedAnswers,
+  SpecKind,
+  SpecPart,
+  SpecPartView,
+  SpecRepoFailure,
+  TaskSpec,
+} from "./types";
 
 /**
  * Each task's spec as the Spec tab holds it (§19). Kept here rather than in
@@ -39,7 +46,12 @@ interface Specs {
   /** Merge the specs each repository had of its own into drafts of one (SPEC-25). */
   merge: (taskId: string) => Promise<void>;
   /** Approve files as their editors hold them; the repositories that failed are returned. */
-  approve: (taskId: string, files: SpecFile[], kind?: SpecKind | null, texts?: Record<string, string>) => Promise<SpecRepoFailure[]>;
+  approve: (
+    taskId: string,
+    files: SpecFile[],
+    kind?: SpecKind | null,
+    texts?: Record<string, string>,
+  ) => Promise<SpecRepoFailure[]>;
   putBack: (taskId: string, part: SpecPart, checkoutId: string) => Promise<void>;
   turnDown: (taskId: string, file: SpecFile) => Promise<void>;
   check: (taskId: string, checkoutId: string) => Promise<void>;
@@ -60,17 +72,31 @@ export const slotKey = (part: SpecPart, checkoutId: string | null) =>
   part === "tasks" ? `tasks:${checkoutId ?? ""}` : part;
 
 /** One file's view in a spec. */
-export function partView(spec: TaskSpec | null | undefined, part: SpecPart, checkoutId: string | null): SpecPartView | undefined {
-  return spec?.parts.find((p) => p.part === part && (part !== "tasks" || p.checkout_id === checkoutId));
+export function partView(
+  spec: TaskSpec | null | undefined,
+  part: SpecPart,
+  checkoutId: string | null,
+): SpecPartView | undefined {
+  return spec?.parts.find(
+    (p) => p.part === part && (part !== "tasks" || p.checkout_id === checkoutId),
+  );
 }
 
 /** What is approved of one file, or "". */
-export function approvedText(spec: TaskSpec | null | undefined, part: SpecPart, checkoutId: string | null): string {
+export function approvedText(
+  spec: TaskSpec | null | undefined,
+  part: SpecPart,
+  checkoutId: string | null,
+): string {
   return partView(spec, part, checkoutId)?.approved ?? "";
 }
 
 /** What an editor shows: the edit, else what is approved. */
-export function editorText(state: SpecState | undefined, part: SpecPart, checkoutId: string | null): string {
+export function editorText(
+  state: SpecState | undefined,
+  part: SpecPart,
+  checkoutId: string | null,
+): string {
   return state?.edits[slotKey(part, checkoutId)] ?? approvedText(state?.spec, part, checkoutId);
 }
 
@@ -82,10 +108,20 @@ export function specProgress(spec: TaskSpec | null): string | null {
   return reqs > 0 ? String(reqs) : null;
 }
 
-const EMPTY: SpecState = { loaded: false, spec: null, edits: {}, drafting: null, checking: [], applied: null };
+const EMPTY: SpecState = {
+  loaded: false,
+  spec: null,
+  edits: {},
+  drafting: null,
+  checking: [],
+  applied: null,
+};
 
 /** Drafts are written a moment after typing stops, not at every key. */
-const saving = new Map<string, { timer: ReturnType<typeof setTimeout>; write: () => Promise<void> }>();
+const saving = new Map<
+  string,
+  { timer: ReturnType<typeof setTimeout>; write: () => Promise<void> }
+>();
 
 function keep(taskId: string, file: SpecFile, text: string | null) {
   const key = `${taskId}:${slotKey(file.part, file.checkoutId)}`;
@@ -104,10 +140,12 @@ function keep(taskId: string, file: SpecFile, text: string | null) {
  */
 async function flush(taskId: string) {
   const waiting = [...saving.entries()].filter(([key]) => key.startsWith(`${taskId}:`));
-  await Promise.all(waiting.map(([, w]) => {
-    clearTimeout(w.timer);
-    return w.write();
-  }));
+  await Promise.all(
+    waiting.map(([, w]) => {
+      clearTimeout(w.timer);
+      return w.write();
+    }),
+  );
 }
 
 /** The edits a freshly read spec brings: its drafts. */
@@ -119,11 +157,17 @@ function draftsOf(spec: TaskSpec): Record<string, string> {
 
 export const useSpecs = create<Specs>((set, get) => {
   const put = (taskId: string, part: Partial<SpecState>) =>
-    set((s) => ({ byTask: { ...s.byTask, [taskId]: { ...(s.byTask[taskId] ?? EMPTY), ...part } } }));
+    set((s) => ({
+      byTask: { ...s.byTask, [taskId]: { ...(s.byTask[taskId] ?? EMPTY), ...part } },
+    }));
   const state = (taskId: string) => get().byTask[taskId] ?? EMPTY;
 
   /** A run streamed into the editors; a failed one puts back what they held (SPEC-5). */
-  async function streamed(taskId: string, part: SpecPart | "merge", run: (requestId: string) => Promise<void>) {
+  async function streamed(
+    taskId: string,
+    part: SpecPart | "merge",
+    run: (requestId: string) => Promise<void>,
+  ) {
     await flush(taskId);
     const before = state(taskId).edits;
     const requestId = `spec-${crypto.randomUUID()}`;
@@ -149,26 +193,37 @@ export const useSpecs = create<Specs>((set, get) => {
     edit: (taskId, file, text) => {
       const key = slotKey(file.part, file.checkoutId);
       const edits = { ...state(taskId).edits };
-      const same = text.trim() === approvedText(state(taskId).spec, file.part, file.checkoutId).trim();
+      const same =
+        text.trim() === approvedText(state(taskId).spec, file.part, file.checkoutId).trim();
       if (same) delete edits[key];
       else edits[key] = text;
       // Undo after a change of the user's own would throw that away too.
       put(taskId, file.part === "requirements" ? { edits, applied: null } : { edits });
       keep(taskId, file, same ? null : text);
     },
-    draft: (taskId, part, kind) => streamed(taskId, part, (requestId) => api.draftSpec(taskId, part, kind, requestId)),
+    draft: (taskId, part, kind) =>
+      streamed(taskId, part, (requestId) => api.draftSpec(taskId, part, kind, requestId)),
     merge: (taskId) => streamed(taskId, "merge", (requestId) => api.mergeSpecs(taskId, requestId)),
     approve: async (taskId, files, kind = null, texts) => {
       const s = state(taskId);
       const body = files.map((f) => {
         const key = slotKey(f.part, f.checkoutId);
         clearTimeout(saving.get(`${taskId}:${key}`)?.timer);
-        return { part: f.part, checkout_id: f.checkoutId, text: texts?.[key] ?? editorText(s, f.part, f.checkoutId) };
+        return {
+          part: f.part,
+          checkout_id: f.checkoutId,
+          text: texts?.[key] ?? editorText(s, f.part, f.checkoutId),
+        };
       });
       const { spec, failed } = await api.approveSpec(taskId, body, kind);
       const edits = { ...state(taskId).edits };
       for (const f of files) delete edits[slotKey(f.part, f.checkoutId)];
-      put(taskId, files.some((f) => f.part === "requirements") ? { spec, edits, applied: null } : { spec, edits });
+      put(
+        taskId,
+        files.some((f) => f.part === "requirements")
+          ? { spec, edits, applied: null }
+          : { spec, edits },
+      );
       return failed;
     },
     putBack: async (taskId, part, checkoutId) => {
@@ -200,17 +255,26 @@ export const useSpecs = create<Specs>((set, get) => {
     undoAnswers: (taskId) => {
       const s = state(taskId);
       if (!s.applied) return;
-      get().edit(taskId, { part: "requirements", checkoutId: null }, s.applied.before ?? approvedText(s.spec, "requirements", null));
+      get().edit(
+        taskId,
+        { part: "requirements", checkoutId: null },
+        s.applied.before ?? approvedText(s.spec, "requirements", null),
+      );
       put(taskId, { applied: null });
     },
     chunk: (requestId, part, checkoutId, text) => {
-      const entry = Object.entries(get().byTask).find(([, s]) => s.drafting?.requestId === requestId);
+      const entry = Object.entries(get().byTask).find(
+        ([, s]) => s.drafting?.requestId === requestId,
+      );
       if (!entry) return;
       const [taskId, s] = entry;
       put(taskId, { edits: { ...s.edits, [slotKey(part, checkoutId)]: text } });
     },
     changed: (taskId) => {
-      if (state(taskId).loaded) void get().load(taskId).catch(() => {});
+      if (state(taskId).loaded)
+        void get()
+          .load(taskId)
+          .catch(() => {});
     },
     pending: null,
     setPending: (pending) => set({ pending }),

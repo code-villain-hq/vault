@@ -38,13 +38,18 @@ export function EpicGroup({
   return (
     <div className="epic">
       <div className="epic-head" onClick={onToggle} onContextMenu={onContextMenu}>
-        <span className={`chev${closed ? "" : " open"}`}><ChevronIcon /></span>
+        <span className={`chev${closed ? "" : " open"}`}>
+          <ChevronIcon />
+        </span>
         {epic.key && <IssueTypeIcon types={types} name={typeName} size={18} />}
         {epic.key ? <span className="ui-chip key-chip">{epic.key}</span> : null}
         <span className="title">{epic.summary || (epic.key ? epic.key : "No epic")}</span>
         <span className="count">{epic.issues.length}</span>
         {epic.live > 0 && (
-          <span className="ui-status ui-status-ok" title="Tickets in progress, or with a task open here">
+          <span
+            className="ui-status ui-status-ok"
+            title="Tickets in progress, or with a task open here"
+          >
             {epic.live} in flight
           </span>
         )}

@@ -21,8 +21,10 @@ paintRemembered();
 // the fonts, which xterm measures its cells with.
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(<Splash />);
-void fontsReady().then(() => root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-));
+void fontsReady().then(() =>
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  ),
+);

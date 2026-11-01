@@ -42,7 +42,10 @@ export function MessageCenter() {
           y={at.y}
           ignore={bell}
           onClose={close}
-          onClear={() => { close(); setClearing(true); }}
+          onClear={() => {
+            close();
+            setClearing(true);
+          }}
         />
       )}
       {clearing && (
@@ -59,7 +62,11 @@ export function MessageCenter() {
 }
 
 function MessageList({
-  x, y, ignore, onClose, onClear,
+  x,
+  y,
+  ignore,
+  onClose,
+  onClear,
 }: {
   x: number;
   y: number;
@@ -115,8 +122,7 @@ function MessageList({
       <div className="messages-list">
         {messages.length === 0 && (
           <p className="messages-empty">
-            Nothing yet. Agents that finish or need you, reviews, tickets and
-            errors land here.
+            Nothing yet. Agents that finish or need you, reviews, tickets and errors land here.
           </p>
         )}
         {messages.map((m) => (

@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { syncSummary } from "../src/lib/report";
 import type { Synced } from "../src/lib/types";
 
-const row = (repo: string, ok: boolean): Synced => ({ project_id: `p-${repo}`, repo, ok, detail: ok ? "Fetched." : "git: failed" });
+const row = (repo: string, ok: boolean): Synced => ({
+  project_id: `p-${repo}`,
+  repo,
+  ok,
+  detail: ok ? "Fetched." : "git: failed",
+});
 
 describe("the line a Sync of several repos ends with", () => {
   test("names the repo that failed", () => {

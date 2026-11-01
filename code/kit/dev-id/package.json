@@ -1,0 +1,13 @@
+{
+  "name": "@code-villain/dev-id",
+  "private": true,
+  "description": "The tooling every app's scripts share: Acme's sign-in for `bun run dev`, the checks, and the studio's Vite+ settings.",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+  }
+}

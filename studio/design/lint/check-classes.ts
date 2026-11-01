@@ -15,10 +15,14 @@ const roots: [string, string][] = [
 const skip = [/\/design\//, /\/phone\//, /\.test\.tsx?$/, /\/__mock__\//];
 const palette =
   "white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
-const prefixes = "bg|text|border|ring|fill|stroke|outline|decoration|divide|from|to|via|shadow|caret|accent";
+const prefixes =
+  "bg|text|border|ring|fill|stroke|outline|decoration|divide|from|to|via|shadow|caret|accent";
 const rules: [RegExp, string][] = [
   [new RegExp(`\\b(?:${prefixes})-\\[(?:#|rgb|hsl|oklch)`), "a literal colour"],
-  [new RegExp(`\\b(?:${prefixes})-(?:${palette})(?:-\\d{2,3})?(?:\\/\\d+)?\\b`), "a Tailwind palette colour"],
+  [
+    new RegExp(`\\b(?:${prefixes})-(?:${palette})(?:-\\d{2,3})?(?:\\/\\d+)?\\b`),
+    "a Tailwind palette colour",
+  ],
   [/\btext-\[\d+(?:\.\d+)?(?:px|rem)\]/, "a literal type size"],
   [/\brounded-\[/, "a literal radius"],
   [/style=(?:\{\{|")[^}"]*#[0-9a-fA-F]{3,8}\b/, "a literal colour in a style"],
@@ -34,13 +38,18 @@ for (const [root, glob] of roots) {
       if (line.includes("design-lint-ignore")) return;
       for (const [pattern, what] of rules) {
         const match = line.match(pattern);
-        if (match) found.push(`${path.replace("../../../", "")}:${index + 1}  ${what}: ${match[0]}`);
+        if (match)
+          found.push(`${path.replace("../../../", "")}:${index + 1}  ${what}: ${match[0]}`);
       }
     });
   }
 }
 if (found.length) {
-  console.error(`${found.join("\n")}\n\n${found.length} class(es) bypass the design tokens. Use a token-backed class, or say why with design-lint-ignore.`);
+  console.error(
+    `${found.join("\n")}\n\n${found.length} class(es) bypass the design tokens. Use a token-backed class, or say why with design-lint-ignore.`,
+  );
   process.exit(1);
 }
-console.log("No arbitrary colours, sizes or radii in the web kit's, Forge's, Layer's, Glyph's or Raven's markup.");
+console.log(
+  "No arbitrary colours, sizes or radii in the web kit's, Forge's, Layer's, Glyph's or Raven's markup.",
+);

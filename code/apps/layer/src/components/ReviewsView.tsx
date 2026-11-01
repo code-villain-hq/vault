@@ -1,13 +1,22 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { copyAndSay } from "../lib/clipboard";
 import { authoredGroups, countOf, reviewCounts, taskOfPr } from "../lib/derive";
 import { useEpics } from "../lib/epics";
 import { goTo } from "../lib/goto";
-import { byEpic, groupBy, sortPrs, SORT_LABEL, ticketKeyIn, type EpicOf, type Group, type Sort } from "../lib/grouping";
+import {
+  byEpic,
+  groupBy,
+  sortPrs,
+  SORT_LABEL,
+  ticketKeyIn,
+  type EpicOf,
+  type Group,
+  type Sort,
+} from "../lib/grouping";
 import { readOneOf, write } from "../lib/persist";
-import { useStore } from "../store";
 import type { AuthoredPr, ReviewRequest, TeamReviews } from "../lib/types";
+import { useStore } from "../store";
 import { ChevronIcon } from "./icons";
 import { AuthoredCard, identity, ReviewCard } from "./ReviewCards";
 import { BusyLabel, ContextMenu, type MenuItem } from "./ui";
@@ -35,10 +44,21 @@ type Side = (typeof SIDES)[number];
  * Your own PRs have no size to sort by.
  */
 const GROUPS = {
-  review: [["who", "Who asked"], ["epic", "Epic"], ["repo", "Repository"]],
-  authored: [["move", "Whose move"], ["epic", "Epic"], ["repo", "Repository"]],
+  review: [
+    ["who", "Who asked"],
+    ["epic", "Epic"],
+    ["repo", "Repository"],
+  ],
+  authored: [
+    ["move", "Whose move"],
+    ["epic", "Epic"],
+    ["repo", "Repository"],
+  ],
 } as const;
-const SORTS_OF: Record<Side, readonly Sort[]> = { review: ["newest", "oldest", "smallest"], authored: ["newest", "oldest"] };
+const SORTS_OF: Record<Side, readonly Sort[]> = {
+  review: ["newest", "oldest", "smallest"],
+  authored: ["newest", "oldest"],
+};
 
 /** The ticket a pull request is for: its task's, else a key in its branch or title. */
 function ticketOf(pr: { head: string; title: string }, taskKey?: string | null): string | null {
@@ -46,7 +66,11 @@ function ticketOf(pr: { head: string; title: string }, taskKey?: string | null):
 }
 
 /** Grouped by epic or repository: the grouping that is not about whose move it is. */
-function regroup<T extends { repo: string }>(prs: T[], by: string, epicOf: (pr: T) => EpicOf | null | undefined): Group<T>[] {
+function regroup<T extends { repo: string }>(
+  prs: T[],
+  by: string,
+  epicOf: (pr: T) => EpicOf | null | undefined,
+): Group<T>[] {
   return by === "epic"
     ? byEpic(prs, epicOf)
     : groupBy(prs, (pr) => ({ id: pr.repo, label: pr.repo || "pull request" }), "No repository");
@@ -77,7 +101,9 @@ function ReviewList({
   return (
     <section className="review-list" title={title}>
       <button type="button" className="review-list-head" onClick={onToggle}>
-        <span className={`chev${open ? " open" : ""}`}><ChevronIcon /></span>
+        <span className={`chev${open ? " open" : ""}`}>
+          <ChevronIcon />
+        </span>
         <span className={`title${tone ? ` ${tone}` : ""}`}>{heading}</span>
         {epicKey && <span className="count key">{epicKey}</span>}
         {count !== undefined && <span className="count">{count}</span>}
@@ -85,9 +111,7 @@ function ReviewList({
       {open && (
         <div className="review-list-body">
           {children}
-          {more && (
-            <p className="review-note">Showing the 100 most recently updated.</p>
-          )}
+          {more && <p className="review-note">Showing the 100 most recently updated.</p>}
         </div>
       )}
     </section>
@@ -118,8 +142,16 @@ export function ReviewsView() {
     write("reviewsSide", next);
   };
   const [grouping, setGrouping] = useState<Record<Side, string>>(() => ({
-    review: readOneOf("reviewsGroup.review", GROUPS.review.map((g) => g[0]), "who"),
-    authored: readOneOf("reviewsGroup.authored", GROUPS.authored.map((g) => g[0]), "move"),
+    review: readOneOf(
+      "reviewsGroup.review",
+      GROUPS.review.map((g) => g[0]),
+      "who",
+    ),
+    authored: readOneOf(
+      "reviewsGroup.authored",
+      GROUPS.authored.map((g) => g[0]),
+      "move",
+    ),
   }));
   const [sorting, setSorting] = useState<Record<Side, Sort>>(() => ({
     review: readOneOf("reviewsSort.review", SORTS_OF.review, "newest"),
@@ -177,10 +209,13 @@ export function ReviewsView() {
 
   const requested = [
     ...(queue?.mine ?? []).map((pr) => ({ pr, asked: "you" })),
-    ...(queue?.team && !queue.team.error ? queue.team.prs.map((pr) => ({ pr, asked: teamLabel(queue.team!) })) : []),
+    ...(queue?.team && !queue.team.error
+      ? queue.team.prs.map((pr) => ({ pr, asked: teamLabel(queue.team!) }))
+      : []),
   ];
   const ownPrs = queue?.authored?.prs ?? [];
-  const keyOf = (pr: AuthoredPr) => ticketOf(pr, tasks.find((t) => t.id === taskOfPr(pr, taskPrs, tasks))?.issue_key);
+  const keyOf = (pr: AuthoredPr) =>
+    ticketOf(pr, tasks.find((t) => t.id === taskOfPr(pr, taskPrs, tasks))?.issue_key);
   const epics = useEpics(
     side === "review"
       ? requested.flatMap(({ pr }) => ticketOf(pr) ?? [])
@@ -195,7 +230,13 @@ export function ReviewsView() {
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub to list pull requests waiting on your review.</p>
-        <button type="button" className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect GitHub</button>
+        <button
+          type="button"
+          className="ui-button ui-button-primary"
+          onClick={() => toggleSettings(true)}
+        >
+          Connect GitHub
+        </button>
       </div>
     );
   }
@@ -211,20 +252,22 @@ export function ReviewsView() {
         <h2>Reviews</h2>
         <span className="sub">Group</span>
         <span className="ui-segmented" role="group" aria-label="Group by">
-          {GROUPS[side].filter(([g]) => g !== "epic" || trackerInUse).map(([g, label]) => (
-            <button
-              key={g}
-              type="button"
-              className="ui-segment"
-              aria-pressed={by === g}
-              onClick={() => {
-                setGrouping((c) => ({ ...c, [side]: g }));
-                write(`reviewsGroup.${side}`, g);
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          {GROUPS[side]
+            .filter(([g]) => g !== "epic" || trackerInUse)
+            .map(([g, label]) => (
+              <button
+                key={g}
+                type="button"
+                className="ui-segment"
+                aria-pressed={by === g}
+                onClick={() => {
+                  setGrouping((c) => ({ ...c, [side]: g }));
+                  write(`reviewsGroup.${side}`, g);
+                }}
+              >
+                {label}
+              </button>
+            ))}
         </span>
         <span className="sub">Sort</span>
         <button
@@ -254,10 +297,22 @@ export function ReviewsView() {
       </div>
 
       <div className="ui-tabs sub-tabs" role="tablist">
-        <button type="button" className="ui-tab" role="tab" aria-selected={side === "review"} onClick={() => setSide("review")}>
+        <button
+          type="button"
+          className="ui-tab"
+          role="tab"
+          aria-selected={side === "review"}
+          onClick={() => setSide("review")}
+        >
           To review{toReview !== undefined && <span className="ui-tab-count">{toReview}</span>}
         </button>
-        <button type="button" className="ui-tab" role="tab" aria-selected={side === "authored"} onClick={() => setSide("authored")}>
+        <button
+          type="button"
+          className="ui-tab"
+          role="tab"
+          aria-selected={side === "authored"}
+          onClick={() => setSide("authored")}
+        >
           Opened by you{yours !== undefined && <span className="ui-tab-count">{yours}</span>}
         </button>
       </div>
@@ -286,7 +341,12 @@ export function ReviewsView() {
                 {g.items.map((pr) => {
                   const task = taskOf(pr);
                   return (
-                    <AuthoredCard key={identity(pr)} pr={pr} task={task} onContextMenu={(e) => openMenu(e, pr, task?.id)} />
+                    <AuthoredCard
+                      key={identity(pr)}
+                      pr={pr}
+                      task={task}
+                      onContextMenu={(e) => openMenu(e, pr, task?.id)}
+                    />
                   );
                 })}
               </ReviewList>
@@ -325,11 +385,20 @@ export function ReviewsView() {
       {side === "review" && by !== "who" && (
         <>
           {queue?.team?.error && <p className="review-note warn">{queue.team.error}</p>}
-          {queue && requested.length === 0 && <p className="review-note">Nothing is waiting on you or your team.</p>}
-          {regroup(sortPrs(requested.map((r) => r.pr), sort), by, (pr) => {
-            const key = ticketOf(pr);
-            return key ? epics[key] : null;
-          }).map((g) => (
+          {queue && requested.length === 0 && (
+            <p className="review-note">Nothing is waiting on you or your team.</p>
+          )}
+          {regroup(
+            sortPrs(
+              requested.map((r) => r.pr),
+              sort,
+            ),
+            by,
+            (pr) => {
+              const key = ticketOf(pr);
+              return key ? epics[key] : null;
+            },
+          ).map((g) => (
             <ReviewList
               key={g.id}
               heading={g.label}
@@ -367,14 +436,15 @@ export function ReviewsView() {
             {queue && queue.mine.length === 0 && (
               <p className="review-note">Nothing is waiting on you.</p>
             )}
-            {queue && sortPrs(queue.mine, sort).map((pr) => (
-              <ReviewCard
-                key={`${pr.repo}#${pr.number}`}
-                pr={pr}
-                focused={focusReview === identity(pr)}
-                onContextMenu={(e) => openMenu(e, pr)}
-              />
-            ))}
+            {queue &&
+              sortPrs(queue.mine, sort).map((pr) => (
+                <ReviewCard
+                  key={`${pr.repo}#${pr.number}`}
+                  pr={pr}
+                  focused={focusReview === identity(pr)}
+                  onContextMenu={(e) => openMenu(e, pr)}
+                />
+              ))}
           </ReviewList>
 
           {team ? (
@@ -404,22 +474,19 @@ export function ReviewsView() {
           ) : (
             <ReviewList heading="Team" open={!shut.team} onToggle={() => toggle("team")}>
               <p className="review-note">
-                Set a review team in Settings → Code — for example @fe — to list
-                pull requests requested of that team.
+                Set a review team in Settings → Code — for example @fe — to list pull requests
+                requested of that team.
               </p>
-              <button type="button" className="ui-button" onClick={() => toggleSettings(true)}>Settings</button>
+              <button type="button" className="ui-button" onClick={() => toggleSettings(true)}>
+                Settings
+              </button>
             </ReviewList>
           )}
         </>
       )}
 
       {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={menu.items}
-          onClose={() => setMenu(null)}
-        />
+        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
       )}
     </div>
   );

@@ -963,7 +963,6 @@ function TopicName({ topic }: { topic: Topic }) {
   }
   return (
     <input
-      // biome-ignore lint/a11y/noAutofocus: it opens to type the name
       autoFocus
       aria-label="Name"
       value={draft}
@@ -1106,7 +1105,6 @@ function TopicGroup({ topic }: { topic: Topic }) {
     };
     return (
       <input
-        // biome-ignore lint/a11y/noAutofocus: it opens to type the group
         autoFocus
         aria-label="New group"
         placeholder="New group"
@@ -1201,7 +1199,6 @@ function Brief({ topic }: { topic: Topic }) {
       {draft !== null ? (
         <textarea
           ref={field}
-          // biome-ignore lint/a11y/noAutofocus: it opens to change the brief
           autoFocus
           aria-label="What it sticks to"
           value={draft}
@@ -1224,7 +1221,7 @@ function Brief({ topic }: { topic: Topic }) {
       ) : guest ? (
         <div className={`${look} flex flex-col gap-2`}>
           {lines.map((line, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a brief's lines don't move
+            // oxlint-disable-next-line react/no-array-index-key -- a brief's lines don't move
             <p key={i}>{line}</p>
           ))}
         </div>
@@ -1237,7 +1234,7 @@ function Brief({ topic }: { topic: Topic }) {
         >
           {lines.length ? (
             lines.map((line, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a brief's lines don't move
+              // oxlint-disable-next-line react/no-array-index-key -- a brief's lines don't move
               <span key={i}>{line}</span>
             ))
           ) : (
@@ -1716,7 +1713,6 @@ function RenameBlock({ block, onClose }: { block: Block; onClose: () => void }) 
         </div>
         <div className="px-4 py-3">
           <input
-            // biome-ignore lint/a11y/noAutofocus: the dialog opens to type the title
             autoFocus
             aria-label="Title"
             value={title}

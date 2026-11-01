@@ -2,8 +2,8 @@ import { useRef, useState, type ReactNode } from "react";
 import { dragGrip } from "../../lib/drag";
 import { read, write } from "../../lib/persist";
 import { useSpecs } from "../../lib/specs";
-import { useStore } from "../../store";
 import type { RepoSpec, SpecPart, TaskSpec, TaskView } from "../../lib/types";
+import { useStore } from "../../store";
 import { Spinner } from "../ui";
 
 /** The side's usual width, its narrowest, and what the editor keeps beside it. */
@@ -20,7 +20,13 @@ const VERDICT_MARK: Record<string, string> = { met: "✓", "not met": "✗", unc
  * far each repository's tasks are (SPEC-8): on the tasks, the picked one's
  * steps.
  */
-export function SpecSide({ task, spec, current, repo, children }: {
+export function SpecSide({
+  task,
+  spec,
+  current,
+  repo,
+  children,
+}: {
   task: TaskView;
   spec: TaskSpec;
   current: SpecPart;
@@ -32,7 +38,9 @@ export function SpecSide({ task, spec, current, repo, children }: {
   const fail = useStore((s) => s.fail);
   const [width, setWidth] = useState(() => {
     const kept = read<unknown>("specSideWidth", SIDE_DEFAULT);
-    return typeof kept === "number" && Number.isFinite(kept) ? Math.max(SIDE_MIN, kept) : SIDE_DEFAULT;
+    return typeof kept === "number" && Number.isFinite(kept)
+      ? Math.max(SIDE_MIN, kept)
+      : SIDE_DEFAULT;
   });
   const sideRef = useRef<HTMLElement>(null);
 
@@ -69,10 +77,19 @@ export function SpecSide({ task, spec, current, repo, children }: {
           let next = from;
           // Only the side's style changes while dragging; the width is kept,
           // and remembered, on the drop.
-          dragGrip(e, (m) => {
-            next = Math.round(Math.min(most, Math.max(SIDE_MIN, from + (startX - m.clientX) / scale)));
-            if (sideRef.current) sideRef.current.style.width = `${next}px`;
-          }, () => { setWidth(next); write("specSideWidth", next); });
+          dragGrip(
+            e,
+            (m) => {
+              next = Math.round(
+                Math.min(most, Math.max(SIDE_MIN, from + (startX - m.clientX) / scale)),
+              );
+              if (sideRef.current) sideRef.current.style.width = `${next}px`;
+            },
+            () => {
+              setWidth(next);
+              write("specSideWidth", next);
+            },
+          );
         }}
       />
       <aside className="spec-side" ref={sideRef} style={{ width }}>
@@ -86,19 +103,35 @@ export function SpecSide({ task, spec, current, repo, children }: {
             </p>
           ) : spec.requirements.length === 0 ? (
             <p className="muted">
-              None approved yet. They are what done means: each one a WHEN … THE SYSTEM SHALL … under a
-              Requirements heading{many ? ", naming the repositories that meet it: R-1 [api, web]" : ""}.
+              None approved yet. They are what done means: each one a WHEN … THE SYSTEM SHALL …
+              under a Requirements heading
+              {many ? ", naming the repositories that meet it: R-1 [api, web]" : ""}.
             </p>
           ) : (
             <ol className="spec-reqs">
               {spec.requirements.map((r) => {
                 const vs = verdicts(r.id);
                 return (
-                  <li key={r.id} title={vs.map((v) => `${many ? `${v.folder}: ` : ""}${v.evidence}`).filter(Boolean).join("\n") || undefined}>
+                  <li
+                    key={r.id}
+                    title={
+                      vs
+                        .map((v) => `${many ? `${v.folder}: ` : ""}${v.evidence}`)
+                        .filter(Boolean)
+                        .join("\n") || undefined
+                    }
+                  >
                     <b>{r.id}</b>
-                    {many && <span className="spec-tag">{r.repos.length > 0 ? r.repos.join(", ") : "every repository"}</span>}
+                    {many && (
+                      <span className="spec-tag">
+                        {r.repos.length > 0 ? r.repos.join(", ") : "every repository"}
+                      </span>
+                    )}
                     {vs.map((v) => (
-                      <span key={v.folder} className={`spec-verdict ${v.verdict.replace(" ", "-")}`}>
+                      <span
+                        key={v.folder}
+                        className={`spec-verdict ${v.verdict.replace(" ", "-")}`}
+                      >
                         {VERDICT_MARK[v.verdict]} {many ? v.folder : v.verdict}
                       </span>
                     ))}
@@ -109,30 +142,42 @@ export function SpecSide({ task, spec, current, repo, children }: {
             </ol>
           )}
           {/* An epic's code is its sub-tasks', checked there (EPIC-6). */}
-          {!task.epic && <div className="spec-checks">
-            {spec.repos.map((r) => {
-              const busy = checking?.includes(r.checkout_id) ?? false;
-              const named = spec.requirements.some((q) => q.repos.length === 0 || q.repos.some((f) => f.toLowerCase() === r.folder.toLowerCase()));
-              return (
-                <div key={r.checkout_id} className="row spec-check">
-                  <button
-                    className="ui-button"
-                    disabled={!named || busy}
-                    title={named ? `Read ${r.folder}'s changes on the branch against the requirements that name it` : `No requirement names ${r.folder}`}
-                    onClick={() => void check(task.id, r.checkout_id).catch(fail)}
-                  >
-                    Check {many ? r.folder : "against spec"}
-                  </button>
-                  {busy && <Spinner />}
-                  {r.check && !busy && (
-                    <span className={`muted${r.check.stale ? " spec-stale" : ""}`}>
-                      {r.check.stale ? "Checked before the latest commits" : `Checked at ${r.check.sha.slice(0, 7)}`}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>}
+          {!task.epic && (
+            <div className="spec-checks">
+              {spec.repos.map((r) => {
+                const busy = checking?.includes(r.checkout_id) ?? false;
+                const named = spec.requirements.some(
+                  (q) =>
+                    q.repos.length === 0 ||
+                    q.repos.some((f) => f.toLowerCase() === r.folder.toLowerCase()),
+                );
+                return (
+                  <div key={r.checkout_id} className="row spec-check">
+                    <button
+                      className="ui-button"
+                      disabled={!named || busy}
+                      title={
+                        named
+                          ? `Read ${r.folder}'s changes on the branch against the requirements that name it`
+                          : `No requirement names ${r.folder}`
+                      }
+                      onClick={() => void check(task.id, r.checkout_id).catch(fail)}
+                    >
+                      Check {many ? r.folder : "against spec"}
+                    </button>
+                    {busy && <Spinner />}
+                    {r.check && !busy && (
+                      <span className={`muted${r.check.stale ? " spec-stale" : ""}`}>
+                        {r.check.stale
+                          ? "Checked before the latest commits"
+                          : `Checked at ${r.check.sha.slice(0, 7)}`}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section>
@@ -140,7 +185,12 @@ export function SpecSide({ task, spec, current, repo, children }: {
             <>
               <h3>
                 Tasks{many ? ` of ${repo.folder}` : ""}
-                {repo.steps.length > 0 && <span className="muted"> · {repo.steps.filter((s) => s.done).length} of {repo.steps.length} done</span>}
+                {repo.steps.length > 0 && (
+                  <span className="muted">
+                    {" "}
+                    · {repo.steps.filter((s) => s.done).length} of {repo.steps.length} done
+                  </span>
+                )}
               </h3>
               {repo.steps.length === 0 ? (
                 <p className="muted">None approved yet.</p>
@@ -149,7 +199,9 @@ export function SpecSide({ task, spec, current, repo, children }: {
                   {repo.steps.map((s) => (
                     <li key={s.number} className={s.done ? "done" : ""}>
                       <span className="mark">{s.done ? "✓" : "○"}</span>
-                      <span>{s.number}. {s.text}</span>
+                      <span>
+                        {s.number}. {s.text}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -160,9 +212,19 @@ export function SpecSide({ task, spec, current, repo, children }: {
               <h3>Tasks</h3>
               <ul className="spec-tasks">
                 {spec.repos.map((r) => (
-                  <li key={r.checkout_id} className={r.steps.length > 0 && r.steps.every((s) => s.done) ? "done" : ""}>
-                    <span className="mark">{r.steps.length > 0 && r.steps.every((s) => s.done) ? "✓" : "○"}</span>
-                    <span>{r.folder}: {r.steps.length === 0 ? "none approved yet" : `${r.steps.filter((s) => s.done).length} of ${r.steps.length} done`}</span>
+                  <li
+                    key={r.checkout_id}
+                    className={r.steps.length > 0 && r.steps.every((s) => s.done) ? "done" : ""}
+                  >
+                    <span className="mark">
+                      {r.steps.length > 0 && r.steps.every((s) => s.done) ? "✓" : "○"}
+                    </span>
+                    <span>
+                      {r.folder}:{" "}
+                      {r.steps.length === 0
+                        ? "none approved yet"
+                        : `${r.steps.filter((s) => s.done).length} of ${r.steps.length} done`}
+                    </span>
                   </li>
                 ))}
               </ul>

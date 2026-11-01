@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "types": ["bun"] },
+  "include": ["vite.config.ts", "crates/server/tests/*.ts"]
+}

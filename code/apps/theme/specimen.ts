@@ -1,14 +1,18 @@
 // A specimen of the Code Villain theme on the vault's own code, night and day, for
 // reviewing a palette change. Writes specimen.html (self-contained, so it can
 // be shared as is). Run `bun run build` first: it reads the VS Code themes.
-import { createHighlighter } from "shiki";
+import { createHighlighter, type BundledLanguage } from "shiki";
 
 const vault = new URL("../../../", import.meta.url);
 const here = new URL("./", import.meta.url);
 const text = (path: string) => Bun.file(new URL(path, vault)).text();
 const lines = async (path: string, from: number, to: number) =>
-  (await text(path)).split("\n").slice(from - 1, to).join("\n");
-const theme = async (mode: string) => JSON.parse(await Bun.file(new URL(`vscode/themes/code-villain-${mode}.json`, here)).text());
+  (await text(path))
+    .split("\n")
+    .slice(from - 1, to)
+    .join("\n");
+const theme = async (mode: string) =>
+  JSON.parse(await Bun.file(new URL(`vscode/themes/code-villain-${mode}.json`, here)).text());
 const syntax = JSON.parse(await text("studio/design/tokens/syntax.resolved.json"));
 const color = JSON.parse(await text("studio/design/tokens/color.resolved.json"));
 
@@ -20,12 +24,37 @@ async function slice(path: string, start: string, count: number) {
   return all.slice(at, at + count).join("\n");
 }
 
-const samples = [
-  { title: "TypeScript", file: "code/apps/layer/src/store.ts", lang: "ts", code: await slice("code/apps/layer/src/store.ts", "import { keep, only", 40) },
-  { title: "TypeScript", file: "code/apps/layer/src/lib/diff.ts", lang: "ts", code: await slice("code/apps/layer/src/lib/diff.ts", "/** Parse a unified patch", 33) },
-  { title: "Rust", file: "code/apps/layer/src-tauri/src/git.rs", lang: "rust", code: await slice("code/apps/layer/src-tauri/src/git.rs", "pub fn baseline", 31) },
-  { title: "Python", file: "studio/design/tokens/theme.py", lang: "python", code: await slice("studio/design/tokens/theme.py", "def mix(", 26) },
-  { title: "Markdown", file: "studio/brand/color.md", lang: "markdown", code: await lines("studio/brand/color.md", 1, 24) },
+const samples: { title: string; file: string; lang: BundledLanguage; code: string }[] = [
+  {
+    title: "TypeScript",
+    file: "code/apps/layer/src/store.ts",
+    lang: "ts",
+    code: await slice("code/apps/layer/src/store.ts", "import { keep, only", 40),
+  },
+  {
+    title: "TypeScript",
+    file: "code/apps/layer/src/lib/diff.ts",
+    lang: "ts",
+    code: await slice("code/apps/layer/src/lib/diff.ts", "/** Parse a unified patch", 33),
+  },
+  {
+    title: "Rust",
+    file: "code/apps/layer/src-tauri/src/git.rs",
+    lang: "rust",
+    code: await slice("code/apps/layer/src-tauri/src/git.rs", "pub fn baseline", 31),
+  },
+  {
+    title: "Python",
+    file: "studio/design/tokens/theme.py",
+    lang: "python",
+    code: await slice("studio/design/tokens/theme.py", "def mix(", 26),
+  },
+  {
+    title: "Markdown",
+    file: "studio/brand/color.md",
+    lang: "markdown",
+    code: await lines("studio/brand/color.md", 1, 24),
+  },
 ];
 
 // A diff as Layer shows it: the code coloured, the lines tinted, the changed words marked.
@@ -43,7 +72,12 @@ const span = (code: string, line: number, words: string): [number, number] => {
   const at = code.split("\n")[line].lastIndexOf(words);
   return [at, at + words.length];
 };
-const rows: { kind: "ctx" | "add" | "del"; side: "old" | "new"; line: number; mark?: [number, number] }[] = [
+const rows: {
+  kind: "ctx" | "add" | "del";
+  side: "old" | "new";
+  line: number;
+  mark?: [number, number];
+}[] = [
   { kind: "add", side: "new", line: 0 },
   { kind: "ctx", side: "new", line: 1 },
   { kind: "del", side: "old", line: 1, mark: span(before, 1, "()") },
@@ -66,8 +100,16 @@ const style = (t: { color?: string; fontStyle?: number }) => {
   return css.join(";");
 };
 
-function block(code: string, lang: string, mode: string, extra?: (line: number) => string) {
-  const { tokens } = highlighter.codeToTokens(code, { lang, theme: `Code Villain ${mode === "night" ? "Night" : "Day"}` });
+function block(
+  code: string,
+  lang: BundledLanguage,
+  mode: string,
+  extra?: (line: number) => string,
+) {
+  const { tokens } = highlighter.codeToTokens(code, {
+    lang,
+    theme: `Code Villain ${mode === "night" ? "Night" : "Day"}`,
+  });
   return tokens
     .map((line, i) => {
       const body = line.map((t) => `<span style="${style(t)}">${esc(t.content)}</span>`).join("");
@@ -89,13 +131,16 @@ function diffBlock(mode: string) {
           // Split a token where the changed words begin and end.
           const parts: string[] = [];
           const cuts = [0, t.content.length];
-          if (r.mark) for (const c of r.mark) if (c > at && c < at + t.content.length) cuts.push(c - at);
+          if (r.mark)
+            for (const c of r.mark) if (c > at && c < at + t.content.length) cuts.push(c - at);
           cuts.sort((a, b) => a - b);
           for (let i = 0; i < cuts.length - 1; i++) {
             const piece = t.content.slice(cuts[i], cuts[i + 1]);
             const start = at + cuts[i];
             const marked = r.mark && start >= r.mark[0] && start < r.mark[1];
-            parts.push(`<span class="${marked ? "w" : ""}" style="${style(t)}">${esc(piece)}</span>`);
+            parts.push(
+              `<span class="${marked ? "w" : ""}" style="${style(t)}">${esc(piece)}</span>`,
+            );
           }
           at += t.content.length;
           return parts;
@@ -115,34 +160,75 @@ function editorBlock(mode: string) {
     .replace(/(<span[^>]*>)(ground)(<\/span>)/, `$1<mark class="cur">$2</mark>$3`)
     .replace(/(<span[^>]*>)(ground)(<\/span>)(?![\s\S]*cur)/, "$1$2$3")
     .replace(/>contrast</, '><span class="sel">contrast</span><')
-    .replace(/(\[)(<\/span><span[^>]*>)(ground)/, '<span class="match">$1</span>$2<mark class="hit">$3</mark>');
+    .replace(
+      /(\[)(<\/span><span[^>]*>)(ground)/,
+      '<span class="match">$1</span>$2<mark class="hit">$3</mark>',
+    );
 }
 
 const swatches = (mode: string) => {
   const s = syntax[mode].syntax;
-  const roles = ["text", "keyword", "property", "string", "constant", "function", "special", "bracket", "punctuation"];
+  const roles = [
+    "text",
+    "keyword",
+    "property",
+    "string",
+    "constant",
+    "function",
+    "special",
+    "bracket",
+    "punctuation",
+  ];
   const seen = new Set<string>();
   return roles
     .filter((r) => !seen.has(s[r]) && seen.add(s[r]))
     .map((r) => {
-      const name = { text: "names · types", property: "property · operator · built-in type", special: "this · self · tags", punctuation: "punctuation · comment" }[r] ?? r;
+      const name =
+        {
+          text: "names · types",
+          property: "property · operator · built-in type",
+          special: "this · self · tags",
+          punctuation: "punctuation · comment",
+        }[r] ?? r;
       return `<div class="sw"><i style="background:${s[r]}"></i><b>${name}</b><code>${s[r]}</code></div>`;
     })
     .join("");
 };
 
-const font = Buffer.from(await Bun.file(new URL("code/apps/site/assets/fonts/atkinson-hyperlegible-mono.ttf", vault)).arrayBuffer()).toString("base64");
-const reading = Buffer.from(await Bun.file(new URL("code/apps/site/assets/fonts/atkinson-hyperlegible-next.ttf", vault)).arrayBuffer()).toString("base64");
+const font = Buffer.from(
+  await Bun.file(
+    new URL("code/apps/site/assets/fonts/atkinson-hyperlegible-mono.ttf", vault),
+  ).arrayBuffer(),
+).toString("base64");
+const reading = Buffer.from(
+  await Bun.file(
+    new URL("code/apps/site/assets/fonts/atkinson-hyperlegible-next.ttf", vault),
+  ).arrayBuffer(),
+).toString("base64");
 
 const vars = (mode: string) => {
   const t = color[mode];
   const u = syntax[mode].ui;
   return [
-    `--bg:${t.bg}`, `--panel:${u.background}`, `--fg:${t.fg}`, `--muted:${t.muted}`, `--faint:${t.faint}`,
-    `--n:${u["line-number"]}`, `--cl:${u.cursorline}`, `--sel:${u.selection}`, `--hit:${u.search}`,
-    `--cur:${u["search-current"]}`, `--on-cur:${u["on-search-current"]}`, `--match:${u.match}`, `--cursor:${u.cursor}`,
-    `--add:${u["diff-added"]}`, `--add-w:${u["diff-added-text"]}`, `--del:${u["diff-removed"]}`, `--del-w:${u["diff-removed-text"]}`,
-    `--ok:${u.ok}`, `--danger:${u.danger}`,
+    `--bg:${t.bg}`,
+    `--panel:${u.background}`,
+    `--fg:${t.fg}`,
+    `--muted:${t.muted}`,
+    `--faint:${t.faint}`,
+    `--n:${u["line-number"]}`,
+    `--cl:${u.cursorline}`,
+    `--sel:${u.selection}`,
+    `--hit:${u.search}`,
+    `--cur:${u["search-current"]}`,
+    `--on-cur:${u["on-search-current"]}`,
+    `--match:${u.match}`,
+    `--cursor:${u.cursor}`,
+    `--add:${u["diff-added"]}`,
+    `--add-w:${u["diff-added-text"]}`,
+    `--del:${u["diff-removed"]}`,
+    `--del-w:${u["diff-removed-text"]}`,
+    `--ok:${u.ok}`,
+    `--danger:${u.danger}`,
   ].join(";");
 };
 

@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { trackerOfKey } from "../../lib/tracker";
 import type { Ticket, JiraTransition } from "../../lib/types";
 import { useStore } from "../../store";
-import { trackerOfKey } from "../../lib/tracker";
-import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
+import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { statusClass } from "./status";
 
 export function ReadTicketDialog({
@@ -25,6 +25,7 @@ export function ReadTicketDialog({
 }) {
   // A move or the browser fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
+  const { clear } = failure;
   const [transitions, setTransitions] = useState<JiraTransition[]>([]);
   const [moving, setMoving] = useState(false);
   // Only Jira has moves to offer: a GitHub issue is open or closed (TKT-18).
@@ -35,14 +36,21 @@ export function ReadTicketDialog({
   // ones valid from before, which Jira then refused.
   useEffect(() => {
     let current = true;
-    failure.clear();
+    clear();
     setTransitions([]);
     if (!jira) return;
-    api.jiraTransitions(issue.key)
-      .then((t) => { if (current) setTransitions(t); })
-      .catch(() => { if (current) setTransitions([]); });
-    return () => { current = false; };
-  }, [issue.key, issue.status, failure.clear, jira]);
+    api
+      .jiraTransitions(issue.key)
+      .then((t) => {
+        if (current) setTransitions(t);
+      })
+      .catch(() => {
+        if (current) setTransitions([]);
+      });
+    return () => {
+      current = false;
+    };
+  }, [issue.key, issue.status, clear, jira]);
 
   async function doTransition(t: JiraTransition) {
     setMoving(true);
@@ -64,12 +72,16 @@ export function ReadTicketDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="ui-button" onClick={onClose}>Close</button>
+          <button className="ui-button" onClick={onClose}>
+            Close
+          </button>
           <button
             className="ui-link"
             onClick={() => {
               failure.clear();
-              void openUrl(issue.url).catch(() => failure.fail("Couldn't open the browser. Try again."));
+              void openUrl(issue.url).catch(() =>
+                failure.fail("Couldn't open the browser. Try again."),
+              );
             }}
             title="The same ticket, on the website"
           >
@@ -84,7 +96,14 @@ export function ReadTicketDialog({
         </>
       }
     >
-      <h3 style={{ margin: "0 0 10px", fontSize: "var(--type-ui-size)", fontWeight: 700, lineHeight: 1.4 }}>
+      <h3
+        style={{
+          margin: "0 0 10px",
+          fontSize: "var(--type-ui-size)",
+          fontWeight: 700,
+          lineHeight: 1.4,
+        }}
+      >
         {issue.summary}
       </h3>
 
@@ -103,8 +122,16 @@ export function ReadTicketDialog({
             epic {issue.epic_key}
           </span>
         )}
-        {issue.components.map((c) => <span key={c} className="ui-chip">{c}</span>)}
-        {issue.labels.map((l) => <span key={l} className="ui-chip">{l}</span>)}
+        {issue.components.map((c) => (
+          <span key={c} className="ui-chip">
+            {c}
+          </span>
+        ))}
+        {issue.labels.map((l) => (
+          <span key={l} className="ui-chip">
+            {l}
+          </span>
+        ))}
       </div>
 
       {transitions.length > 0 && (

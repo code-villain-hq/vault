@@ -28,7 +28,7 @@ export function Markdown({ text, empty }: { text: string; empty?: string }) {
     }
   }, [html]);
   if (!text.trim()) return <p className="text-faint">{empty ?? "Nothing here yet."}</p>;
-  // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by DOMPurify above
+  // oxlint-disable-next-line react/no-danger -- sanitised by DOMPurify above
   return <div ref={container} className="markdown" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
@@ -187,7 +187,7 @@ export function MarkdownField({
           className="field-sizing-content min-h-40 resize-none rounded-md ui-field p-3 font-mono text-xs leading-relaxed outline-none"
         />
       ) : (
-        // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: the Edit button above does the same from the keyboard
+        // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the Edit button above does the same from the keyboard
         <div
           className="cursor-text"
           onClick={(event) => {

@@ -41,9 +41,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "forge"
-        ]
+        "schemes": ["forge"]
       }
     }
   }

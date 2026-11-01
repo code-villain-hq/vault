@@ -62,7 +62,8 @@ export async function pick(file: Blob): Promise<Picked> {
 async function base64(blob: Blob): Promise<string> {
   const url = await new Promise<string>((done, fail) => {
     const reader = new FileReader();
-    reader.onload = () => done(String(reader.result));
+    // A data: URL, as readAsDataURL always gives.
+    reader.onload = () => done(reader.result as string);
     reader.onerror = () => fail(reader.error);
     reader.readAsDataURL(blob);
   });

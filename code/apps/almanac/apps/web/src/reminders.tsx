@@ -36,7 +36,6 @@ export function isDue(reminder: Reminder, now = today()): boolean {
 /** Today, which turns over at midnight while the page stays open. */
 export function useToday(): string {
   const [now, setNow] = useState(today);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: set again for the next midnight once the day turns
   useEffect(() => {
     const check = () => setNow(today());
     const midnight = new Date();

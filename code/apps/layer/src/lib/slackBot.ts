@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
+import nightshade from "../design/color.json";
 import { api } from "./api";
 import type { SlackBotView } from "./types";
-import nightshade from "../design/color.json";
 
 /**
  * The Slack bot's connection and threads (§24), kept current by
@@ -13,7 +13,12 @@ export function useSlackBot(): SlackBotView | null {
   useEffect(() => {
     let current = true;
     const read = () => {
-      api.slackBotView().then((v) => { if (current) setView(v); }).catch(() => {});
+      api
+        .slackBotView()
+        .then((v) => {
+          if (current) setView(v);
+        })
+        .catch(() => {});
     };
     read();
     const un = listen("slackbot:changed", read);
@@ -45,7 +50,11 @@ export function botManifest(name: string): object {
       background_color: nightshade.night.bg,
     },
     features: {
-      app_home: { home_tab_enabled: false, messages_tab_enabled: true, messages_tab_read_only_enabled: false },
+      app_home: {
+        home_tab_enabled: false,
+        messages_tab_enabled: true,
+        messages_tab_read_only_enabled: false,
+      },
       bot_user: { display_name: n, always_online: false },
     },
     oauth_config: {
@@ -68,7 +77,13 @@ export function botManifest(name: string): object {
     },
     settings: {
       event_subscriptions: {
-        bot_events: ["app_mention", "message.channels", "message.groups", "message.im", "message.mpim"],
+        bot_events: [
+          "app_mention",
+          "message.channels",
+          "message.groups",
+          "message.im",
+          "message.mpim",
+        ],
       },
       interactivity: { is_enabled: true },
       org_deploy_enabled: false,

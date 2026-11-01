@@ -2,8 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { byEpic, epicsOf, groupBy, sortPrs, ticketKeyIn } from "../src/lib/grouping";
 import type { Ticket } from "../src/lib/types";
 
-const issue = (key: string, epic_key: string | null, epic_summary: string | null, issue_type = "Story") =>
-  ({ key, summary: `${key} title`, epic_key, epic_summary, issue_type }) as Ticket;
+const issue = (
+  key: string,
+  epic_key: string | null,
+  epic_summary: string | null,
+  issue_type = "Story",
+) => ({ key, summary: `${key} title`, epic_key, epic_summary, issue_type }) as Ticket;
 
 describe("finding a pull request's ticket", () => {
   test("reads the key a branch or title starts with, as pr_task.rs does", () => {
@@ -21,20 +25,37 @@ describe("finding a pull request's ticket", () => {
 
 describe("grouping a list", () => {
   test("keeps the order it was sorted in, and puts the ungrouped last", () => {
-    const groups = groupBy(["a1", "x", "b1", "a2"], (s) => (s === "x" ? null : { id: s[0], label: s[0] }), "None");
-    expect(groups.map((g) => [g.id, g.items])).toEqual([["a", ["a1", "a2"]], ["b", ["b1"]], ["", ["x"]]]);
+    const groups = groupBy(
+      ["a1", "x", "b1", "a2"],
+      (s) => (s === "x" ? null : { id: s[0], label: s[0] }),
+      "None",
+    );
+    expect(groups.map((g) => [g.id, g.items])).toEqual([
+      ["a", ["a1", "a2"]],
+      ["b", ["b1"]],
+      ["", ["x"]],
+    ]);
   });
 
   test("labels an epic by its title, and by its key when Jira sent no title", () => {
-    const groups = byEpic(["t1", "t2"], (t) => (t === "t1" ? { key: "E-1", summary: "Search" } : { key: "E-2", summary: "" }));
-    expect(groups.map((g) => [g.label, g.key])).toEqual([["Search", "E-1"], ["E-2", undefined]]);
+    const groups = byEpic(["t1", "t2"], (t) =>
+      t === "t1" ? { key: "E-1", summary: "Search" } : { key: "E-2", summary: "" },
+    );
+    expect(groups.map((g) => [g.label, g.key])).toEqual([
+      ["Search", "E-1"],
+      ["E-2", undefined],
+    ]);
   });
 });
 
 describe("which epic a ticket is in", () => {
   test("an epic is its own, and a ticket with none is known to have none", () => {
     const epics = epicsOf(
-      [issue("A-1", "E-1", "E-1 title"), issue("E-1", null, null, "Epic"), issue("A-2", null, null)],
+      [
+        issue("A-1", "E-1", "E-1 title"),
+        issue("E-1", null, null, "Epic"),
+        issue("A-2", null, null),
+      ],
       (t) => t === "Epic",
     );
     expect(epics["A-1"]).toEqual({ key: "E-1", summary: "E-1 title" });
@@ -43,14 +64,26 @@ describe("which epic a ticket is in", () => {
   });
 
   test("an epic link with no title takes it from the epic when that was sent", () => {
-    const epics = epicsOf([issue("A-1", "E-1", null), issue("E-1", null, null, "Epic")], (t) => t === "Epic");
+    const epics = epicsOf(
+      [issue("A-1", "E-1", null), issue("E-1", null, null, "Epic")],
+      (t) => t === "Epic",
+    );
     expect(epics["A-1"]).toEqual({ key: "E-1", summary: "E-1 title" });
   });
 });
 
 describe("sorting pull requests", () => {
-  const pr = (n: number, updated_at: string, additions = 0) => ({ n, updated_at, additions, deletions: 0 });
-  const prs = [pr(1, "2026-10-01T00:00:00Z", 500), pr(2, "2026-10-03T00:00:00Z", 10), pr(3, "2026-10-02T00:00:00Z", 10)];
+  const pr = (n: number, updated_at: string, additions = 0) => ({
+    n,
+    updated_at,
+    additions,
+    deletions: 0,
+  });
+  const prs = [
+    pr(1, "2026-10-01T00:00:00Z", 500),
+    pr(2, "2026-10-03T00:00:00Z", 10),
+    pr(3, "2026-10-02T00:00:00Z", 10),
+  ];
 
   test("newest, oldest and smallest first", () => {
     expect(sortPrs(prs, "newest").map((p) => p.n)).toEqual([2, 3, 1]);

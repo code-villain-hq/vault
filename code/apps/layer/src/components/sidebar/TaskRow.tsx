@@ -58,7 +58,9 @@ export const TaskRow = memo(function TaskRow({
     <div>
       <div
         className={`ws${selected ? " active" : ""}${vanishing ? " deleting" : ""}`}
-        onClick={() => { if (!vanishing) onSelect(task.id); }}
+        onClick={() => {
+          if (!vanishing) onSelect(task.id);
+        }}
         onContextMenu={(e) => {
           if (vanishing) return;
           e.preventDefault();
@@ -86,12 +88,18 @@ export const TaskRow = memo(function TaskRow({
           {vanishing ? (
             <Spinner />
           ) : (
-          <span
-            className={`dot ${
-              totals.missing || totals.unlinked || stuck ? "gone" : waiting ? "idle" : busy ? "live" : ""
-            }`}
-            title={waiting ? "An agent here needs you: it is asking, or it finished" : undefined}
-          />
+            <span
+              className={`dot ${
+                totals.missing || totals.unlinked || stuck
+                  ? "gone"
+                  : waiting
+                    ? "idle"
+                    : busy
+                      ? "live"
+                      : ""
+              }`}
+              title={waiting ? "An agent here needs you: it is asking, or it finished" : undefined}
+            />
           )}
           <span className="label">
             {task.issue_key ? task.name.replace(`${task.issue_key} `, "") : task.name}
@@ -109,9 +117,7 @@ export const TaskRow = memo(function TaskRow({
           <div className="spacer" />
           {multi && <span>{task.checkouts.length} repos</span>}
           {live > 0 && (
-            <span style={waiting ? { color: "var(--status-warn-ink)" } : undefined}>
-              {live}▶
-            </span>
+            <span style={waiting ? { color: "var(--status-warn-ink)" } : undefined}>{live}▶</span>
           )}
           {totals.dirty > 0 && (
             <span style={{ color: "var(--status-warn-ink)" }}>±{totals.dirty}</span>
@@ -120,37 +126,34 @@ export const TaskRow = memo(function TaskRow({
         </div>
       </div>
 
-      {open && task.checkouts.map((c) => {
-        const d = c.status ? c.status.unstaged + c.status.untracked : 0;
-        const lose = d + (c.status?.staged ?? 0);
-        return (
-          <div key={c.id} className="repo-row">
-            <span
-              className={`dot ${c.exists && !c.broken ? "" : "gone"}`}
-              title={c.broken ?? undefined}
-            />
-            <span className="rname">{c.project_name}</span>
-            {d > 0 && <span style={{ color: "var(--status-warn-ink)" }}>±{d}</span>}
-            <span
-              className="x"
-              title="Remove repo from task"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveRepo(c.id, c.project_name, lose, task.checkouts.length === 1);
-              }}
-            >
-              <CloseIcon />
-            </span>
-          </div>
-        );
-      })}
+      {open &&
+        task.checkouts.map((c) => {
+          const d = c.status ? c.status.unstaged + c.status.untracked : 0;
+          const lose = d + (c.status?.staged ?? 0);
+          return (
+            <div key={c.id} className="repo-row">
+              <span
+                className={`dot ${c.exists && !c.broken ? "" : "gone"}`}
+                title={c.broken ?? undefined}
+              />
+              <span className="rname">{c.project_name}</span>
+              {d > 0 && <span style={{ color: "var(--status-warn-ink)" }}>±{d}</span>}
+              <span
+                className="x"
+                title="Remove repo from task"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveRepo(c.id, c.project_name, lose, task.checkouts.length === 1);
+                }}
+              >
+                <CloseIcon />
+              </span>
+            </div>
+          );
+        })}
 
       {open && canAdd && (
-        <div
-          className="repo-row"
-          style={{ cursor: "pointer" }}
-          onClick={() => onAddRepo(task)}
-        >
+        <div className="repo-row" style={{ cursor: "pointer" }} onClick={() => onAddRepo(task)}>
           <span className="rname">+ add repo</span>
         </div>
       )}

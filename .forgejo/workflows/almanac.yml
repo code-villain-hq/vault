@@ -1,6 +1,6 @@
 # `bun run check` for Almanac on every push that touches it: fmt, clippy and
 # the Rust tests (the desktop shell too), generated types and design copies
-# up to date, Biome, tsc, the bun tests (the sync kit's too) and the web
+# up to date, Vite+ (Oxfmt, Oxlint, tsc), the bun tests (the sync kit's too) and the web
 # build. It runs on the MacBook's runner (label `macos`).
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a

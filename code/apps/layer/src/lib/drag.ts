@@ -31,7 +31,11 @@ export function afterDrag(fn: () => void): void {
  * mouse (`xterm` reports motion to it) is not sent a stroke it never saw
  * start. False when it is not a drag (not the main button).
  */
-export function dragGrip(e: ReactMouseEvent, move: (m: MouseEvent) => void, done: () => void): boolean {
+export function dragGrip(
+  e: ReactMouseEvent,
+  move: (m: MouseEvent) => void,
+  done: () => void,
+): boolean {
   if (e.button !== 0) return false;
   e.preventDefault();
   dragging = true;
@@ -75,7 +79,12 @@ export function sidebarMost(viewport: number, scale: number): number {
 }
 
 /** `width` held to what the sidebar may be; anything not a number is `usual`. */
-export function clampSidebar(width: unknown, viewport: number, scale: number, usual = SIDEBAR_DEFAULT): number {
+export function clampSidebar(
+  width: unknown,
+  viewport: number,
+  scale: number,
+  usual = SIDEBAR_DEFAULT,
+): number {
   const w = typeof width === "number" && Number.isFinite(width) ? width : usual;
   return Math.round(Math.min(sidebarMost(viewport, scale), Math.max(SIDEBAR_MIN, w)));
 }

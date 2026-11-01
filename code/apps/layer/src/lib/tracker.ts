@@ -1,6 +1,6 @@
 import type { TrackerKind } from "@layer/types";
-import type { Settings } from "./types";
 import { useStore } from "../store";
+import type { Settings } from "./types";
 
 /** A tracker by its own name, for "Open in …" and the like (TKT-17). */
 export function trackerName(kind: TrackerKind | null | undefined): string {

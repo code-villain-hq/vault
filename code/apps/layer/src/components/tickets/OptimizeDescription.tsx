@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { ErrorMessage, Spinner, useFailure } from "../ui";
 
@@ -37,7 +37,9 @@ export function OptimizeDescription({
       streamed.current += e.payload.text;
       onChangeRef.current(streamed.current);
     });
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, []);
 
   async function optimize() {

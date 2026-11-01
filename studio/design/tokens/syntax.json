@@ -118,11 +118,7 @@
     },
     "special": {
       "tone": "special",
-      "scopes": [
-        "variable.language",
-        "entity.name.tag",
-        "support.class.component"
-      ]
+      "scopes": ["variable.language", "entity.name.tag", "support.class.component"]
     },
     "bracket": {
       "tone": "structure",
@@ -204,61 +200,39 @@
     "heading": {
       "tone": "fg",
       "style": "bold",
-      "scopes": [
-        "markup.heading",
-        "entity.name.section"
-      ]
+      "scopes": ["markup.heading", "entity.name.section"]
     },
     "link": {
       "tone": "fg",
       "style": "underline",
-      "scopes": [
-        "markup.underline.link",
-        "string.other.link",
-        "markup.link"
-      ]
+      "scopes": ["markup.underline.link", "string.other.link", "markup.link"]
     },
     "emphasis": {
       "tone": "fg",
       "style": "italic",
-      "scopes": [
-        "markup.italic"
-      ]
+      "scopes": ["markup.italic"]
     },
     "strong": {
       "tone": "fg",
       "style": "bold",
-      "scopes": [
-        "markup.bold"
-      ]
+      "scopes": ["markup.bold"]
     },
     "deprecated": {
       "tone": "quiet",
       "style": "strikethrough",
-      "scopes": [
-        "markup.strikethrough"
-      ]
+      "scopes": ["markup.strikethrough"]
     },
     "invalid": {
       "tone": "danger",
-      "scopes": [
-        "invalid",
-        "invalid.illegal"
-      ]
+      "scopes": ["invalid", "invalid.illegal"]
     },
     "inserted": {
       "tone": "ok",
-      "scopes": [
-        "markup.inserted",
-        "punctuation.definition.inserted"
-      ]
+      "scopes": ["markup.inserted", "punctuation.definition.inserted"]
     },
     "deleted": {
       "tone": "danger",
-      "scopes": [
-        "markup.deleted",
-        "punctuation.definition.deleted"
-      ]
+      "scopes": ["markup.deleted", "punctuation.definition.deleted"]
     },
     "changed": {
       "tone": "info",

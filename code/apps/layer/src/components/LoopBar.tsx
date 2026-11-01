@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { paneName } from "../lib/derive";
 import { read, write } from "../lib/persist";
-import { useStore } from "../store";
 import type { AcpSetting, LoopCheckRun, LoopView, PaneInfo, TaskView } from "../lib/types";
+import { useStore } from "../store";
 import { LoopIcon } from "./icons";
 import { ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 
@@ -23,7 +23,12 @@ function useLoop(paneId: string | undefined): LoopView | null {
     if (!paneId) return;
     let current = true;
     const load = () =>
-      api.loopView(paneId).then((v) => { if (current) setView(v); }).catch(() => {});
+      api
+        .loopView(paneId)
+        .then((v) => {
+          if (current) setView(v);
+        })
+        .catch(() => {});
     void load();
     const p = listen<string>("loop:changed", (e) => {
       if (e.payload === paneId) void load();
@@ -61,7 +66,15 @@ export function LoopButton({ pane, task }: { pane: PaneInfo | undefined; task: T
   );
 }
 
-function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; onClose: () => void }) {
+function StartLoop({
+  pane,
+  task,
+  onClose,
+}: {
+  pane: PaneInfo;
+  task: TaskView;
+  onClose: () => void;
+}) {
   const projects = useStore((s) => s.projects);
   const refreshRepos = useStore((s) => s.refreshRepos);
   // Fails in the dialog, above its buttons (NOTE-6).
@@ -84,7 +97,8 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
   useEffect(() => {
     if (!pane.acp) return;
     let current = true;
-    api.acpView(pane.id, null)
+    api
+      .acpView(pane.id, null)
       .then((v) => {
         const m = v.settings.find((s) => s.category === "mode") ?? null;
         if (!current || !m) return;
@@ -92,7 +106,9 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
         setModeValue(m.current);
       })
       .catch(() => {});
-    return () => { current = false; };
+    return () => {
+      current = false;
+    };
   }, [pane.id, pane.acp]);
 
   async function start() {
@@ -104,7 +120,8 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
       // A command typed here is the repository's own from now on (LOOP-1).
       for (const c of repos) {
         const typed = commands[c.project_id]?.trim() ?? "";
-        if (typed !== saved(c.project_id).trim()) await api.setProjectCheck(c.project_id, typed || null);
+        if (typed !== saved(c.project_id).trim())
+          await api.setProjectCheck(c.project_id, typed || null);
       }
       await refreshRepos();
       if (mode && modeValue !== mode.current) await api.acpSet(pane.id, mode.id, modeValue);
@@ -123,11 +140,19 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
   return (
     <Modal
       title={`Put ${paneName(pane)} on a loop`}
-      onClose={() => { if (!busy) onClose(); }}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
       footer={
         <>
-          <button className="ui-button" disabled={busy} onClick={onClose}>Cancel</button>
-          <button className="ui-button ui-button-primary" disabled={busy || !any} onClick={() => void start()}>
+          <button className="ui-button" disabled={busy} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="ui-button ui-button-primary"
+            disabled={busy || !any}
+            onClick={() => void start()}
+          >
             {busy ? "Starting…" : "Start loop"}
           </button>
         </>
@@ -135,12 +160,13 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
     >
       <p className="loop-intro">
         Each time the agent ends a turn, these run in its worktrees. When one fails, the agent is
-        sent what failed and goes on. When they all pass, or the rounds are used, the loop stops
-        and tells you. A turn that changes nothing waits for you.
+        sent what failed and goes on. When they all pass, or the rounds are used, the loop stops and
+        tells you. A turn that changes nothing waits for you.
       </p>
       <p className="loop-intro">
         An agent that stops to ask permission holds the loop until you answer. To leave it alone,
-        give it a mode that does not ask first{mode ? ", below" : pane.acp ? "" : ", in the agent itself"}.
+        give it a mode that does not ask first
+        {mode ? ", below" : pane.acp ? "" : ", in the agent itself"}.
       </p>
       {repos.map((c) => (
         <Field
@@ -160,15 +186,30 @@ function StartLoop({ pane, task, onClose }: { pane: PaneInfo; task: TaskView; on
       {mode && (
         <Field
           label={`The agent's ${mode.name.toLowerCase()}`}
-          hint={mode.options.find((o) => o.value === modeValue)?.description ?? "The agent's own setting, as under its conversation."}
+          hint={
+            mode.options.find((o) => o.value === modeValue)?.description ??
+            "The agent's own setting, as under its conversation."
+          }
         >
-          <select className="ui-field" value={modeValue} onChange={(e) => setModeValue(e.target.value)}>
-            {mode.options.map((o) => <option key={o.value} value={o.value}>{o.name}</option>)}
+          <select
+            className="ui-field"
+            value={modeValue}
+            onChange={(e) => setModeValue(e.target.value)}
+          >
+            {mode.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.name}
+              </option>
+            ))}
           </select>
         </Field>
       )}
-      <Field label="Rounds" hint="The most times failures go back to the agent before the loop gives up (1–20).">
-        <input className="ui-field"
+      <Field
+        label="Rounds"
+        hint="The most times failures go back to the agent before the loop gives up (1–20)."
+      >
+        <input
+          className="ui-field"
           type="number"
           min={1}
           max={20}
@@ -206,14 +247,23 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
   if (!pane || !view || dismissed === view.started_at) return null;
   const ended = ENDED.has(view.phase);
-  const tone = view.phase === "passed" ? "good" : view.phase === "gave_up" ? "bad" : view.phase === "held" ? "held" : "";
+  const tone =
+    view.phase === "passed"
+      ? "good"
+      : view.phase === "gave_up"
+        ? "bad"
+        : view.phase === "held"
+          ? "held"
+          : "";
   return (
     <div className={`loop-bar ${tone}`}>
       <div className="loop-line">
         <LoopIcon />
         <b>Loop</b>
         {view.phase === "checking" && <Spinner />}
-        <span className="loop-what" title={what(view, paneName(pane))}>{what(view, paneName(pane))}</span>
+        <span className="loop-what" title={what(view, paneName(pane))}>
+          {what(view, paneName(pane))}
+        </span>
         <div className="spacer" />
         {view.runs.length > 0 && (
           <button className="ui-button" onClick={() => setOpen((o) => !o)}>
@@ -221,15 +271,33 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
           </button>
         )}
         {!ended && (
-          <button className="ui-button" onClick={() => { failure.clear(); void api.stopLoop(pane.id).catch(failure.fail); }}>Stop</button>
+          <button
+            className="ui-button"
+            onClick={() => {
+              failure.clear();
+              void api.stopLoop(pane.id).catch(failure.fail);
+            }}
+          >
+            Stop
+          </button>
         )}
         {ended && pane.running && (
-          <button className="ui-button" onClick={() => { failure.clear(); void api.startLoop(pane.id, view.rounds).catch(failure.fail); }}>
+          <button
+            className="ui-button"
+            onClick={() => {
+              failure.clear();
+              void api.startLoop(pane.id, view.rounds).catch(failure.fail);
+            }}
+          >
             Start again
           </button>
         )}
         {ended && (
-          <button className="ui-button" title="Put this away" onClick={() => setDismissed(view.started_at)}>
+          <button
+            className="ui-button"
+            title="Put this away"
+            onClick={() => setDismissed(view.started_at)}
+          >
             Done
           </button>
         )}
@@ -237,7 +305,9 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
       <ErrorMessage>{failure.error}</ErrorMessage>
       {open && (
         <div className="loop-runs">
-          {view.runs.map((run, i) => <Run key={run.at} run={run} n={view.runs.length - i} />)}
+          {view.runs.map((run, i) => (
+            <Run key={run.at} run={run} n={view.runs.length - i} />
+          ))}
         </div>
       )}
     </div>
@@ -246,7 +316,11 @@ export function LoopBar({ pane }: { pane: PaneInfo | undefined }) {
 
 function Run({ run, n }: { run: LoopCheckRun; n: number }) {
   const [shown, setShown] = useState<string | null>(null);
-  const at = new Date(run.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const at = new Date(run.at).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
   return (
     <div className="loop-run">
       <div className="loop-run-head">
@@ -262,7 +336,8 @@ function Run({ run, n }: { run: LoopCheckRun; n: number }) {
             <span>{r.repo}/</span>
             <code>{r.command}</code>
             <span className="dim">
-              {r.passed ? "passed" : r.code === null ? "stopped" : `exited ${r.code}`} · {r.secs.toFixed(1)}s
+              {r.passed ? "passed" : r.code === null ? "stopped" : `exited ${r.code}`} ·{" "}
+              {r.secs.toFixed(1)}s
             </span>
           </div>
           {shown === r.repo && <pre className="loop-output">{r.output || "(no output)"}</pre>}

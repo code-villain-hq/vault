@@ -349,7 +349,6 @@ function DraftCollection({
       className="flex flex-col gap-2"
     >
       <input
-        // biome-ignore lint/a11y/noAutofocus: it opens to name the collection
         autoFocus
         aria-label="Title"
         placeholder={`Name this ${kind}`}

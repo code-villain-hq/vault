@@ -130,14 +130,34 @@ export interface RepoFeedback {
 /** A piece of feedback chosen to go to an agent. */
 export type FeedbackItem =
   | {
-      kind: "thread"; checkout_id: string; path: string; line: number | null;
-      start_line: number | null; code: CodeLine[]; outdated: boolean; resolved: boolean; url: string; comments: { author: string; body: string }[];
+      kind: "thread";
+      checkout_id: string;
+      path: string;
+      line: number | null;
+      start_line: number | null;
+      code: CodeLine[];
+      outdated: boolean;
+      resolved: boolean;
+      url: string;
+      comments: { author: string; body: string }[];
     }
-  | { kind: "review"; checkout_id: string; author: string; state: string | null; body: string; url: string }
+  | {
+      kind: "review";
+      checkout_id: string;
+      author: string;
+      state: string | null;
+      body: string;
+      url: string;
+    }
   | { kind: "comment"; checkout_id: string; author: string; body: string; url: string }
   | {
-      kind: "check"; checkout_id: string; name: string; conclusion: string;
-      url: string | null; summary: string; log: string | null;
+      kind: "check";
+      checkout_id: string;
+      name: string;
+      conclusion: string;
+      url: string | null;
+      summary: string;
+      log: string | null;
     };
 
 export interface TaskPrs {

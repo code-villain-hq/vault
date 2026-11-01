@@ -17,7 +17,14 @@
  * The Forgejo token is read from the keychain (service git.codevillain.eu,
  * account release), never from a file or the environment.
  */
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -35,9 +42,17 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-function run(cmd: string[], options: { cwd?: string; env?: Record<string, string | undefined> } = {}) {
+function run(
+  cmd: string[],
+  options: { cwd?: string; env?: Record<string, string | undefined> } = {},
+) {
   console.log(`\n$ ${cmd.join(" ")}`);
-  const done = Bun.spawnSync(cmd, { cwd: options.cwd, env: options.env ?? process.env, stdout: "inherit", stderr: "inherit" });
+  const done = Bun.spawnSync(cmd, {
+    cwd: options.cwd,
+    env: options.env ?? process.env,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   if (done.exitCode !== 0) fail(`${cmd.slice(0, 2).join(" ")} failed.`);
 }
 
@@ -48,14 +63,23 @@ function read(cmd: string[], cwd?: string): string {
 }
 
 const version =
-  readFileSync("src-tauri/Cargo.toml", "utf8").match(/^version = "(.+)"$/m)?.[1] ?? fail("src-tauri/Cargo.toml has no version.");
+  readFileSync("src-tauri/Cargo.toml", "utf8").match(/^version = "(.+)"$/m)?.[1] ??
+  fail("src-tauri/Cargo.toml has no version.");
 const tag = `layer-v${version}`;
 const dmgName = `Layer-${version}-macos-arm64.dmg`;
 
 let cachedToken: string | undefined;
 function token(): string {
   if (cachedToken) return cachedToken;
-  const found = Bun.spawnSync(["security", "find-generic-password", "-s", "git.codevillain.eu", "-a", "release", "-w"]);
+  const found = Bun.spawnSync([
+    "security",
+    "find-generic-password",
+    "-s",
+    "git.codevillain.eu",
+    "-a",
+    "release",
+    "-w",
+  ]);
   if (found.exitCode !== 0) {
     fail(
       "there is no Forgejo token in the keychain. Make one (docs/releasing.md) and store it with\n" +
@@ -66,34 +90,55 @@ function token(): string {
   return cachedToken;
 }
 
-async function api(method: string, path: string, body?: BodyInit, json = true): Promise<any> {
+/** What these scripts read of a Forgejo release. */
+type Release = {
+  id: number;
+  tag_name: string;
+  draft: boolean;
+  prerelease: boolean;
+  assets: { name: string; browser_download_url: string }[];
+};
+
+// The caller says what the answer is; Forgejo's API is not checked here.
+async function api<T = unknown>(
+  method: string,
+  path: string,
+  body?: BodyInit,
+  json = true,
+): Promise<T> {
   const headers: Record<string, string> = { Authorization: `token ${token()}` };
   if (body && json) headers["Content-Type"] = "application/json";
   const res = await fetch(`${FORGEJO}/api/v1/repos/${REPO}${path}`, { method, headers, body });
   if (!res.ok) fail(`Forgejo answered ${method} ${path} with ${res.status}: ${await res.text()}`);
-  return res.status === 204 ? null : res.json();
+  return (res.status === 204 ? null : res.json()) as Promise<T>;
 }
 
 // ---------------------------------------------------------------------------
 // bun run release
 
 async function draft() {
-  if (process.arch !== "arm64") fail("the release is built for Apple silicon; run it on an Apple silicon Mac.");
+  if (process.arch !== "arm64")
+    fail("the release is built for Apple silicon; run it on an Apple silicon Mac.");
   token();
 
   // What is released is what everyone can read on main.
   if (read(["git", "branch", "--show-current"]) !== "main") fail("switch to main first.");
-  if (read(["git", "status", "--porcelain"])) fail("the vault has uncommitted changes. Commit or stash them first.");
+  if (read(["git", "status", "--porcelain"]))
+    fail("the vault has uncommitted changes. Commit or stash them first.");
   run(["git", "fetch", "--quiet", "--tags", "origin", "main"]);
   if (read(["git", "rev-parse", "HEAD"]) !== read(["git", "rev-parse", "origin/main"])) {
-    fail("main and origin/main differ. Push or pull first: a release is cut from a commit that is on Forgejo.");
+    fail(
+      "main and origin/main differ. Push or pull first: a release is cut from a commit that is on Forgejo.",
+    );
   }
   if (read(["git", "ls-remote", "--tags", "origin", `refs/tags/${tag}`])) {
     fail(`${tag} already exists. Bump the version in src-tauri/Cargo.toml first.`);
   }
-  const releases: any[] = await api("GET", "/releases?limit=50");
+  const releases = await api<Release[]>("GET", "/releases?limit=50");
   if (releases.some((r) => r.tag_name === tag)) {
-    fail(`there is already a release for ${tag} on Forgejo. Delete the draft there, or bump the version.`);
+    fail(
+      `there is already a release for ${tag} on Forgejo. Delete the draft there, or bump the version.`,
+    );
   }
 
   const set = SIGNING.filter((name) => process.env[name]);
@@ -109,7 +154,9 @@ async function draft() {
     signing = "ad-hoc";
   } else {
     // Signed but not notarised is stopped by Gatekeeper all the same.
-    fail(`${set.length} of ${SIGNING.join(", ")} are set. Set all of them to sign and notarise, or none to sign ad hoc.`);
+    fail(
+      `${set.length} of ${SIGNING.join(", ")} are set. Set all of them to sign and notarise, or none to sign ad hoc.`,
+    );
   }
 
   run(["bun", "run", "check"]);
@@ -124,14 +171,21 @@ async function draft() {
     run(["spctl", "--assess", "--type", "execute", "--verbose=4", app]);
   }
 
-  const built = readdirSync(`${bundle}/dmg`).filter((f) => f.endsWith(".dmg") && f.includes(version));
-  if (built.length !== 1) fail(`expected one ${version} .dmg in ${bundle}/dmg, found ${built.length}.`);
+  const built = readdirSync(`${bundle}/dmg`).filter(
+    (f) => f.endsWith(".dmg") && f.includes(version),
+  );
+  if (built.length !== 1)
+    fail(`expected one ${version} .dmg in ${bundle}/dmg, found ${built.length}.`);
   const out = mkdtempSync(join(tmpdir(), "layer-release-"));
   copyFileSync(`${bundle}/dmg/${built[0]}`, join(out, dmgName));
   writeFileSync(join(out, "SHA256SUMS.txt"), `${read(["shasum", "-a", "256", dmgName], out)}\n`);
 
-  const previous = read(["git", "tag", "--list", "layer-v*", "--sort=-v:refname"]).split("\n").filter(Boolean)[0];
-  const changes = previous ? read(["git", "log", "--format=- %s", `${previous}..HEAD`, "--", "."]) : "";
+  const previous = read(["git", "tag", "--list", "layer-v*", "--sort=-v:refname"])
+    .split("\n")
+    .filter(Boolean)[0];
+  const changes = previous
+    ? read(["git", "log", "--format=- %s", `${previous}..HEAD`, "--", "."])
+    : "";
   const notes = [
     "For Macs with Apple silicon.",
     "",
@@ -151,7 +205,7 @@ async function draft() {
   // No tag is pushed: Forgejo publishes a release at once when its tag
   // already exists, draft or not (0.9.0 went out that way). A draft names
   // the commit instead, and Forgejo makes the tag when it is published.
-  const release = await api(
+  const release = await api<Release>(
     "POST",
     "/releases",
     JSON.stringify({
@@ -163,11 +217,19 @@ async function draft() {
       prerelease: false,
     }),
   );
-  if (!release.draft) fail(`Forgejo published ${tag} instead of drafting it. Check it on Forgejo before anything else.`);
+  if (!release.draft)
+    fail(
+      `Forgejo published ${tag} instead of drafting it. Check it on Forgejo before anything else.`,
+    );
   for (const name of [dmgName, "SHA256SUMS.txt"]) {
     const form = new FormData();
     form.append("attachment", Bun.file(join(out, name)), name);
-    await api("POST", `/releases/${release.id}/assets?name=${encodeURIComponent(name)}`, form, false);
+    await api(
+      "POST",
+      `/releases/${release.id}/assets?name=${encodeURIComponent(name)}`,
+      form,
+      false,
+    );
     console.log(`Uploaded ${name}.`);
   }
 
@@ -180,8 +242,10 @@ async function draft() {
 
 async function publish() {
   // `?draft=true` filters drafts out rather than in, so read them all.
-  const releases: any[] = await api("GET", "/releases?limit=50");
-  const release = releases.find((r) => r.tag_name === tag) ?? fail(`there is no draft for ${tag}. Run bun run release first.`);
+  const releases = await api<Release[]>("GET", "/releases?limit=50");
+  const release =
+    releases.find((r) => r.tag_name === tag) ??
+    fail(`there is no draft for ${tag}. Run bun run release first.`);
   if (release.draft) {
     await api("PATCH", `/releases/${release.id}`, JSON.stringify({ draft: false }));
     console.log(`Published Layer ${version}: ${FORGEJO}/${REPO}/releases/tag/${tag}`);
@@ -190,9 +254,14 @@ async function publish() {
   // A prerelease would be what everyone gets from `brew upgrade`.
   if (release.prerelease) return console.log("A prerelease is not put in the tap.");
 
-  const sums = release.assets.find((a: any) => a.name === "SHA256SUMS.txt") ?? fail(`${tag} has no SHA256SUMS.txt.`);
+  const sums =
+    release.assets.find((a) => a.name === "SHA256SUMS.txt") ??
+    fail(`${tag} has no SHA256SUMS.txt.`);
   const listed = await (await fetch(sums.browser_download_url)).text();
-  const sha = listed.split("\n").find((line) => line.trim().endsWith(dmgName))?.split(/\s+/)[0];
+  const sha = listed
+    .split("\n")
+    .find((line) => line.trim().endsWith(dmgName))
+    ?.split(/\s+/)[0];
   if (!sha) fail(`${tag}'s SHA256SUMS.txt has no line for ${dmgName}.`);
   mirror(sha);
   const cask = readFileSync("packaging/homebrew/villain-layer.rb", "utf8")
@@ -221,7 +290,10 @@ async function publish() {
     return console.log("The tap already has this cask.");
   }
   // As the vault's author, not whoever the global git config names.
-  const author = ["user.name", "user.email"].flatMap((key) => ["-c", `${key}=${read(["git", "config", key])}`]);
+  const author = ["user.name", "user.email"].flatMap((key) => [
+    "-c",
+    `${key}=${read(["git", "config", key])}`,
+  ]);
   run(["git", ...author, "commit", "--quiet", "-m", `villain-layer ${version}`], { cwd: tap });
   run(["git", "push", "--quiet"], { cwd: tap });
   console.log(`The tap has Layer ${version}.`);
@@ -243,7 +315,10 @@ function mirror(sha: string) {
   }
   const dir = "target/release/bundle/dmg";
   const built = readdirSync(dir).filter((f) => f.endsWith(".dmg") && f.includes(version));
-  if (built.length !== 1) fail(`expected one ${version} .dmg in ${dir}, found ${built.length}. Publish where the release was built.`);
+  if (built.length !== 1)
+    fail(
+      `expected one ${version} .dmg in ${dir}, found ${built.length}. Publish where the release was built.`,
+    );
   if (read(["shasum", "-a", "256", join(dir, built[0])]).split(/\s+/)[0] !== sha) {
     fail(`the .dmg in ${dir} is not the one released. Publish where the release was built.`);
   }
@@ -251,9 +326,19 @@ function mirror(sha: string) {
   copyFileSync(join(dir, built[0]), join(out, dmgName));
   writeFileSync(join(out, "SHA256SUMS.txt"), `${sha}  ${dmgName}\n`);
   run([
-    "gh", "release", "create", tag, "--repo", MIRROR, "--verify-tag", "--title", `Layer ${version}`,
-    "--notes", `The release, with its notes, is on Forgejo: ${FORGEJO}/${REPO}/releases/tag/${tag}. This copy of its .dmg is what Homebrew downloads.`,
-    join(out, dmgName), join(out, "SHA256SUMS.txt"),
+    "gh",
+    "release",
+    "create",
+    tag,
+    "--repo",
+    MIRROR,
+    "--verify-tag",
+    "--title",
+    `Layer ${version}`,
+    "--notes",
+    `The release, with its notes, is on Forgejo: ${FORGEJO}/${REPO}/releases/tag/${tag}. This copy of its .dmg is what Homebrew downloads.`,
+    join(out, dmgName),
+    join(out, "SHA256SUMS.txt"),
   ]);
 }
 

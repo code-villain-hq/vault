@@ -95,7 +95,6 @@ export function createSyncClient(options: {
       protocols: () => socketProtocols(options.place),
     }),
     // What the server would fill in, so new records look complete at once.
-    // biome-ignore-start lint/correctness/noComponentHookFactories: named after models, and they make records, not components
     defaults: {
       Issue: () => ({
         number: 0,
@@ -167,7 +166,6 @@ export function createSyncClient(options: {
       }),
       WorkflowState: () => ({ color: "#b0b0bd", position: 0, ...timestamps() }),
     },
-    // biome-ignore-end lint/correctness/noComponentHookFactories: the defaults end here
     onReject: (_transaction, error) => options.onRefused(error.message),
   });
 }

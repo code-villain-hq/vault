@@ -37,6 +37,9 @@ export function WorkspaceHome() {
   );
 }
 
+// One empty list, so the memos below don't see a new one each render.
+const NO_TYPES: StateType[] = [];
+
 const VIEWS: { id: ViewId; label: string; types: StateType[] }[] = [
   {
     id: "all",
@@ -63,7 +66,7 @@ export function TeamIssuesPage() {
   const [layout, setLayout] = useRemembered("forge:layout", LAYOUTS, "list");
   const [groupBy, setGroupBy] = useRemembered("forge:group-by", GROUPINGS, "status");
   const [filters, setFilters] = useState<Filters>({});
-  const types = VIEWS.find((v) => v.id === view)?.types ?? [];
+  const types = VIEWS.find((v) => v.id === view)?.types ?? NO_TYPES;
   const teamStates = useTeamStates(team?.id);
   const columns = useMemo(
     () => teamStates.filter((s) => types.includes(s.type)),

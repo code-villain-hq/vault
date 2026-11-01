@@ -1,9 +1,9 @@
 import type { MouseEvent } from "react";
+import { useTrackerName } from "../../lib/tracker";
 import type { Ticket, TicketType, TicketPage } from "../../lib/types";
 import type { TypeMap } from "../IssueType";
-import { TypeFilter } from "./TypeFilter";
 import { TicketCard } from "./TicketCard";
-import { useTrackerName } from "../../lib/tracker";
+import { TypeFilter } from "./TypeFilter";
 
 export function BrowsePanel({
   issueTypes,
@@ -53,20 +53,18 @@ export function BrowsePanel({
   const tracker = useTrackerName();
   return (
     <>
-      <TypeFilter
-        issueTypes={issueTypes}
-        types={types}
-        kinds={kinds}
-        onChange={onKinds}
-      />
+      <TypeFilter issueTypes={issueTypes} types={types} kinds={kinds} onChange={onKinds} />
       <div className="card browse-bar">
-        <input className="ui-field"
+        <input
+          className="ui-field"
           type="text"
           autoFocus
           placeholder="Words to look for, or paste a key like ACME-21042…"
           value={browseText}
           onChange={(e) => onBrowseText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSearch();
+          }}
         />
         <select className="ui-field" value={whose} onChange={(e) => onWhose(e.target.value)}>
           <option value="notmine">Not mine</option>
@@ -82,11 +80,7 @@ export function BrowsePanel({
           />
           Include done
         </label>
-        <button
-          className="ui-button ui-button-primary"
-          disabled={searching}
-          onClick={onSearch}
-        >
+        <button className="ui-button ui-button-primary" disabled={searching} onClick={onSearch}>
           {searching ? "Searching…" : "Search"}
         </button>
       </div>
@@ -94,8 +88,8 @@ export function BrowsePanel({
       {found && found.issues.length === 0 && !searching && (
         <div className="card">
           <div className="muted">
-            Nothing matched. "Not mine" covers unassigned work as well as other
-            people's, so widening it rarely helps — try fewer words, or turn on
+            Nothing matched. "Not mine" covers unassigned work as well as other people's, so
+            widening it rarely helps — try fewer words, or turn on
             <b> Include done</b>.
           </div>
         </div>
@@ -124,8 +118,7 @@ export function BrowsePanel({
           </div>
           {found.more && (
             <div className="muted" style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}>
-              {tracker} had more than these. Add a word to the search, or narrow it
-              by type.
+              {tracker} had more than these. Add a word to the search, or narrow it by type.
             </div>
           )}
         </>

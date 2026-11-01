@@ -15,7 +15,8 @@ import {
 import type { Run } from "../src/lib/types-runs";
 
 const now = new Date(2026, 9, 9, 15, 0).getTime();
-const daysAgo = (d: number, minutes = 0) => new Date(now - d * 86_400_000 - minutes * 60_000).toISOString();
+const daysAgo = (d: number, minutes = 0) =>
+  new Date(now - d * 86_400_000 - minutes * 60_000).toISOString();
 
 function run(over: Partial<Run> = {}): Run {
   return {
@@ -43,18 +44,28 @@ function run(over: Partial<Run> = {}): Run {
 
 describe("what a run came to", () => {
   test("a loop's verdict outranks you stopping the agent once it was done", () => {
-    expect(resultOf(run({ end: "stopped", loop: { used: 1, rounds: 5, end: "passed" } }))).toBe("passed");
-    expect(resultOf(run({ end: "stopped", loop: { used: 5, rounds: 5, end: "gave_up" } }))).toBe("gave_up");
-    expect(resultOf(run({ end: "stopped", loop: { used: 2, rounds: 5, end: "stopped" } }))).toBe("stopped");
+    expect(resultOf(run({ end: "stopped", loop: { used: 1, rounds: 5, end: "passed" } }))).toBe(
+      "passed",
+    );
+    expect(resultOf(run({ end: "stopped", loop: { used: 5, rounds: 5, end: "gave_up" } }))).toBe(
+      "gave_up",
+    );
+    expect(resultOf(run({ end: "stopped", loop: { used: 2, rounds: 5, end: "stopped" } }))).toBe(
+      "stopped",
+    );
   });
 
   test("an agent that failed failed, whatever its loop said", () => {
-    expect(resultOf(run({ end: "failed", code: 3, loop: { used: 1, rounds: 5, end: "passed" } }))).toBe("failed");
+    expect(
+      resultOf(run({ end: "failed", code: 3, loop: { used: 1, rounds: 5, end: "passed" } })),
+    ).toBe("failed");
   });
 
   test("only failing and giving up count as going wrong", () => {
     expect(wentWrong(run({ end: "failed" }))).toBe(true);
-    expect(wentWrong(run({ end: "stopped", loop: { used: 5, rounds: 5, end: "gave_up" } }))).toBe(true);
+    expect(wentWrong(run({ end: "stopped", loop: { used: 5, rounds: 5, end: "gave_up" } }))).toBe(
+      true,
+    );
     expect(wentWrong(run({ end: "stopped" }))).toBe(false);
     expect(wentWrong(run({ end: "exited" }))).toBe(false);
   });
@@ -62,7 +73,13 @@ describe("what a run came to", () => {
 
 describe("the filters", () => {
   const runs = [
-    run({ id: "a", repos: [{ id: "api", name: "ACME API" }, { id: "web", name: "ACME Web" }] }),
+    run({
+      id: "a",
+      repos: [
+        { id: "api", name: "ACME API" },
+        { id: "web", name: "ACME Web" },
+      ],
+    }),
     run({ id: "b", agent: "opencode", repos: [{ id: "web", name: "ACME Web" }] }),
   ];
 
@@ -76,7 +93,10 @@ describe("the filters", () => {
     const older = run({ repos: [{ id: "web", name: "web (old name)" }] });
     expect(runChoices([...runs, older])).toEqual({
       agents: ["claude", "opencode"],
-      repos: [{ id: "api", name: "ACME API" }, { id: "web", name: "ACME Web" }],
+      repos: [
+        { id: "api", name: "ACME API" },
+        { id: "web", name: "ACME Web" },
+      ],
     });
   });
 });
@@ -86,15 +106,27 @@ describe("the sums", () => {
     const s = runStats([
       run({ started_at: daysAgo(0, 10), ended_at: daysAgo(0) }),
       run({ end: "failed", code: 1, started_at: daysAgo(0, 30), ended_at: daysAgo(0) }),
-      run({ end: "stopped", loop: { used: 3, rounds: 5, end: "passed" }, started_at: daysAgo(0, 20), ended_at: daysAgo(0) }),
-      run({ end: "stopped", loop: { used: 5, rounds: 5, end: "gave_up" }, started_at: daysAgo(0, 20), ended_at: daysAgo(0) }),
+      run({
+        end: "stopped",
+        loop: { used: 3, rounds: 5, end: "passed" },
+        started_at: daysAgo(0, 20),
+        ended_at: daysAgo(0),
+      }),
+      run({
+        end: "stopped",
+        loop: { used: 5, rounds: 5, end: "gave_up" },
+        started_at: daysAgo(0, 20),
+        ended_at: daysAgo(0),
+      }),
     ]);
     expect([s.runs, s.wrong, s.wrongRate, s.looped, s.rounds]).toEqual([4, 2, 0.5, 2, 8]);
     expect(s.medianMs).toBe(20 * 60_000);
   });
 
   test("give the typical run, which one left open overnight does not drag out", () => {
-    const minutes = [5, 6, 7, 8, 9, 10, 11, 12, 13, 600].map((m) => run({ started_at: daysAgo(0, m), ended_at: daysAgo(0) }));
+    const minutes = [5, 6, 7, 8, 9, 10, 11, 12, 13, 600].map((m) =>
+      run({ started_at: daysAgo(0, m), ended_at: daysAgo(0) }),
+    );
     const s = runStats(minutes);
     expect(s.medianMs).toBe(9 * 60_000);
     expect(s.p90Ms).toBe(13 * 60_000);
@@ -126,22 +158,42 @@ describe("the sums", () => {
   });
 
   test("of nothing are nothing, not NaN", () => {
-    expect(runStats([])).toMatchObject({ runs: 0, wrongRate: 0, medianMs: 0, p90Ms: 0, tokens: null, tools: null });
+    expect(runStats([])).toMatchObject({
+      runs: 0,
+      wrongRate: 0,
+      medianMs: 0,
+      p90Ms: 0,
+      tokens: null,
+      tools: null,
+    });
   });
 });
 
 describe("the breakdowns", () => {
   test("put each agent side by side, the busiest first", () => {
     const rows = byAgent([run({ agent: "gemini" }), run(), run({ end: "failed" })]);
-    expect(rows.map((r) => [r.agent, r.stats.runs, r.stats.wrong])).toEqual([["claude", 2, 1], ["gemini", 1, 0]]);
+    expect(rows.map((r) => [r.agent, r.stats.runs, r.stats.wrong])).toEqual([
+      ["claude", 2, 1],
+      ["gemini", 1, 0],
+    ]);
   });
 });
 
 describe("the numbers", () => {
   test("read short", () => {
-    expect([formatDuration(45_000), formatDuration(192_000), formatDuration(3_900_000)]).toEqual(["45s", "3m 12s", "1h 5m"]);
-    expect([formatTokens(950), formatTokens(12_345), formatTokens(4_500_000)]).toEqual(["950", "12.3k", "4.5M"]);
-    expect([formatSpan(40 * 60_000), formatSpan(320 * 60_000), formatSpan(76 * 3_600_000)]).toEqual(["40m", "5h 20m", "3d 4h"]);
+    expect([formatDuration(45_000), formatDuration(192_000), formatDuration(3_900_000)]).toEqual([
+      "45s",
+      "3m 12s",
+      "1h 5m",
+    ]);
+    expect([formatTokens(950), formatTokens(12_345), formatTokens(4_500_000)]).toEqual([
+      "950",
+      "12.3k",
+      "4.5M",
+    ]);
+    expect([formatSpan(40 * 60_000), formatSpan(320 * 60_000), formatSpan(76 * 3_600_000)]).toEqual(
+      ["40m", "5h 20m", "3d 4h"],
+    );
     expect([formatSpan(2 * 3_600_000), formatSpan(96 * 3_600_000)]).toEqual(["2h", "4d"]);
   });
 });

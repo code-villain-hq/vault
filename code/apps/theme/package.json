@@ -4,10 +4,16 @@
   "type": "module",
   "scripts": {
     "build": "bun build.ts",
-    "check": "bun build.ts --check",
+    "check": "bun build.ts --check && vp check",
+    "format": "vp check --fix",
     "specimen": "bun specimen.ts"
   },
   "devDependencies": {
-    "shiki": "4.5.0"
+    "@types/bun": "1.4.4",
+    "shiki": "4.5.0",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
   }
 }

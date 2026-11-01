@@ -267,13 +267,13 @@ export function TextDiff({
     >
       {diff.map((line, index) =>
         "skipped" in line ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity but their place
+          // oxlint-disable-next-line react/no-array-index-key -- lines have no identity but their place
           <div key={index} className="px-3 text-faint">
             ⋯ {line.skipped} unchanged {line.skipped === 1 ? "line" : "lines"}
           </div>
         ) : (
           <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity but their place
+            // oxlint-disable-next-line react/no-array-index-key -- lines have no identity but their place
             key={index}
             className={`whitespace-pre-wrap px-3 ${
               line.kind === "added"
@@ -293,7 +293,7 @@ export function TextDiff({
               ? // Only the words that changed stand out; the rest reads as before.
                 line.words.map((word, at) => (
                   <span
-                    // biome-ignore lint/suspicious/noArrayIndexKey: words have no identity but their place
+                    // oxlint-disable-next-line react/no-array-index-key -- words have no identity but their place
                     key={at}
                     className={
                       word.kind === "added"

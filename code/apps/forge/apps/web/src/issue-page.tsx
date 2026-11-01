@@ -427,7 +427,7 @@ function DescriptionField({
 
   if (!editing && description.value.trim()) {
     return (
-      // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: the Edit button below does the same from the keyboard
+      // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the Edit button below does the same from the keyboard
       <div
         className="group relative cursor-text"
         onClick={(event) => {

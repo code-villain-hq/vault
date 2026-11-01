@@ -4,7 +4,16 @@
  * reaches the backend.
  */
 import type {
-  AgentStatus, AuthoredPr, CheckoutPr, Ticket, PaneInfo, Project, RepoHealth, ReviewQueue, TaskView, UpdateBy,
+  AgentStatus,
+  AuthoredPr,
+  CheckoutPr,
+  Ticket,
+  PaneInfo,
+  Project,
+  RepoHealth,
+  ReviewQueue,
+  TaskView,
+  UpdateBy,
 } from "./types";
 
 /** Panes started from the Chat view carry this instead of a real task id. */
@@ -32,14 +41,17 @@ export function paneState(pane: PaneInfo): { label: string; dot: string } {
   }
   if (pane.kind === "shell") return { label: "shell", dot: "live" };
   switch (pane.activity) {
-    case "working": return { label: "working", dot: "live" };
-    case "asking": return { label: "needs you — asking permission", dot: "idle" };
+    case "working":
+      return { label: "working", dot: "live" };
+    case "asking":
+      return { label: "needs you — asking permission", dot: "idle" };
     // A chat that has answered is waiting as a chat does, not for you.
     case "done":
       return pane.task_id === CHAT_TASK_ID
         ? { label: "your turn", dot: "" }
         : { label: "finished — your turn", dot: "idle" };
-    default: return { label: "idle", dot: "" };
+    default:
+      return { label: "idle", dot: "" };
   }
 }
 
@@ -145,9 +157,7 @@ export function fleetAgents(panes: readonly PaneInfo[]) {
 export function groupByEpic(issues: Ticket[], started: Set<string> = new Set()) {
   // An epic that heads a group is represented by that header. Listing it again
   // as a card in the orphan bucket would show the same ticket twice.
-  const heads = new Set(
-    issues.map((i) => i.epic_key).filter((k): k is string => !!k),
-  );
+  const heads = new Set(issues.map((i) => i.epic_key).filter((k): k is string => !!k));
 
   const buckets = new Map<
     string,
@@ -177,9 +187,7 @@ export function groupByEpic(issues: Ticket[], started: Set<string> = new Set()) 
   }
 
   const live = (b: { issues: Ticket[] }) =>
-    b.issues.filter(
-      (i) => i.status_category === "indeterminate" || started.has(i.key),
-    ).length;
+    b.issues.filter((i) => i.status_category === "indeterminate" || started.has(i.key)).length;
 
   return [...buckets.values()]
     .filter((b) => b.issues.length > 0)
@@ -217,13 +225,19 @@ export function groupProjects(projects: Project[]) {
  * gone or has become another repository, and task worktrees git cannot
  * read. All of it was found by hand once, before the Repos view said so.
  */
-export function repoTrouble(p: Project, h: RepoHealth | undefined, tasks: TaskView[]): string | null {
+export function repoTrouble(
+  p: Project,
+  h: RepoHealth | undefined,
+  tasks: TaskView[],
+): string | null {
   if (h?.clone === "missing") return `The clone is not at ${p.path} any more.`;
   if (h?.clone === "not_repo") return `${p.path} is not a git repository any more.`;
   if (h?.clone === "other") {
     return `${p.path} is a different repository now, not the one the app's copy fetches from (${h.origin ?? "unknown"}).`;
   }
-  const unlinked = tasks.flatMap((t) => t.checkouts).filter((c) => c.project_id === p.id && c.broken).length;
+  const unlinked = tasks
+    .flatMap((t) => t.checkouts)
+    .filter((c) => c.project_id === p.id && c.broken).length;
   if (unlinked > 0) return `${unlinked} task worktree${unlinked === 1 ? "" : "s"} git cannot read.`;
   return null;
 }
@@ -233,9 +247,14 @@ export function repoTrouble(p: Project, h: RepoHealth | undefined, tasks: TaskVi
  * what it is set to, else what its history suggests, else merge, which
  * rewrites nothing that was pushed.
  */
-export function updateByFor(p: Project | undefined, h: RepoHealth | undefined): { by: UpdateBy; why: string } {
-  if (p?.update_by) return { by: p.update_by, why: "Chosen for this repo, in Repos or at its last update." };
-  if (h?.update_guess) return { by: h.update_guess, why: `Guessed: ${h.update_reason ?? "from its history"}.` };
+export function updateByFor(
+  p: Project | undefined,
+  h: RepoHealth | undefined,
+): { by: UpdateBy; why: string } {
+  if (p?.update_by)
+    return { by: p.update_by, why: "Chosen for this repo, in Repos or at its last update." };
+  if (h?.update_guess)
+    return { by: h.update_guess, why: `Guessed: ${h.update_reason ?? "from its history"}.` };
   return { by: "merge", why: "Nothing to go on yet. A merge rewrites nothing that was pushed." };
 }
 
@@ -252,7 +271,16 @@ export function taskTotals(task: TaskView) {
       unlinked: acc.unlinked + (c.broken ? 1 : 0),
       changed: acc.changed + c.changed,
     }),
-    { dirty: 0, staged: 0, ahead: 0, behind: 0, conflicted: 0, missing: 0, unlinked: 0, changed: 0 },
+    {
+      dirty: 0,
+      staged: 0,
+      ahead: 0,
+      behind: 0,
+      conflicted: 0,
+      missing: 0,
+      unlinked: 0,
+      changed: 0,
+    },
   );
 }
 
@@ -316,8 +344,7 @@ export function githubRejected(prs: Record<string, CheckoutPr[]>): boolean {
 /** How many comments a task's PRs are carrying, conversation and inline both. */
 export function reviewComments(rows: CheckoutPr[]): number {
   return rows.reduce(
-    (n, r) =>
-      n + (r.pr && r.pr.state === "open" ? r.pr.comments + r.pr.review_comments : 0),
+    (n, r) => n + (r.pr && r.pr.state === "open" ? r.pr.comments + r.pr.review_comments : 0),
     0,
   );
 }
@@ -345,9 +372,17 @@ export function suggestBase(current: string, last: string, defaults: readonly st
  * whose move it is. Anything you have to fix outranks anything you are
  * waiting for; a draft is not waiting on anyone.
  */
-export function authoredStanding(pr: AuthoredPr): { label: string; tone: "good" | "bad" | "wait" | "draft" } {
+export function authoredStanding(pr: AuthoredPr): {
+  label: string;
+  tone: "good" | "bad" | "wait" | "draft";
+} {
   if (pr.draft) return { label: "draft", tone: "draft" };
-  if (pr.conflicts || pr.review === "changes_requested" || pr.checks === "failing" || pr.unresolved > 0) {
+  if (
+    pr.conflicts ||
+    pr.review === "changes_requested" ||
+    pr.checks === "failing" ||
+    pr.unresolved > 0
+  ) {
     return { label: "needs you", tone: "bad" };
   }
   if (pr.checks === "pending") return { label: "checks running", tone: "wait" };
@@ -389,7 +424,8 @@ export function taskOfPr(
   tasks: { id: string; branch: string }[],
 ): string | null {
   for (const [taskId, rows] of Object.entries(prs)) {
-    if (rows.some((r) => r.pr?.url === pr.url || r.past.some((p) => p.url === pr.url))) return taskId;
+    if (rows.some((r) => r.pr?.url === pr.url || r.past.some((p) => p.url === pr.url)))
+      return taskId;
   }
   return tasks.find((t) => t.branch === pr.head)?.id ?? null;
 }

@@ -65,10 +65,16 @@ export const phoneApi = {
   overview: () => call<Overview>("/api/overview"),
   /** A line and Enter, into an agent. */
   send: (pane: string, text: string) =>
-    call<void>(`/api/panes/${encodeURIComponent(pane)}/input`, { method: "POST", body: JSON.stringify({ text }) }),
+    call<void>(`/api/panes/${encodeURIComponent(pane)}/input`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
   /** One key of the key bar. */
   key: (pane: string, key: string) =>
-    call<void>(`/api/panes/${encodeURIComponent(pane)}/input`, { method: "POST", body: JSON.stringify({ key }) }),
+    call<void>(`/api/panes/${encodeURIComponent(pane)}/input`, {
+      method: "POST",
+      body: JSON.stringify({ key }),
+    }),
 };
 
 /**

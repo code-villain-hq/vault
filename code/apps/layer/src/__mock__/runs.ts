@@ -45,12 +45,15 @@ function made(): Run[] {
     const acp = agent === "claude" && next() < 0.6;
     const roll = next();
     // Claude Code and Copilot say whether they are working; Gemini's title says nothing to time.
-    const worked_secs = agent === "gemini" ? null : Math.floor((took / 1000) * (0.15 + next() * 0.6));
+    const worked_secs =
+      agent === "gemini" ? null : Math.floor((took / 1000) * (0.15 + next() * 0.6));
     const end: RunEnd = roll < 0.12 ? "failed" : roll < 0.3 ? "exited" : "stopped";
     let loop: RunLoop | null = null;
     if (end === "stopped" && next() < 0.45) {
       const passed = next() < 0.75;
-      loop = passed ? { used: Math.floor(next() * 4), rounds: 5, end: "passed" } : { used: 5, rounds: 5, end: "gave_up" };
+      loop = passed
+        ? { used: Math.floor(next() * 4), rounds: 5, end: "passed" }
+        : { used: 5, rounds: 5, end: "gave_up" };
     }
     runs.push({
       id: `run-${i}`,
@@ -63,9 +66,15 @@ function made(): Run[] {
       code: end === "stopped" ? 1 : end === "exited" ? 0 : 2,
       loop,
       // Claude Code says, over ACP or in its transcript; the others do not.
-      tokens: agent === "claude"
-        ? { input: Math.floor(next() * 4000), output: Math.floor(next() * 60_000), cached_read: Math.floor(next() * 3_000_000), cached_write: Math.floor(next() * 200_000) }
-        : null,
+      tokens:
+        agent === "claude"
+          ? {
+              input: Math.floor(next() * 4000),
+              output: Math.floor(next() * 60_000),
+              cached_read: Math.floor(next() * 3_000_000),
+              cached_write: Math.floor(next() * 200_000),
+            }
+          : null,
       worked_secs,
       turns: 1 + Math.floor(next() * 12),
       ...asked(next()),
@@ -75,7 +84,14 @@ function made(): Run[] {
     });
   }
   // A loop stopped by hand, and a run still on its loop when its agent ended.
-  runs.push({ ...runs[0], id: "run-loop-stopped", end: "stopped", loop: { used: 2, rounds: 5, end: "stopped" }, ended_at: new Date(now - 90_000).toISOString(), started_at: new Date(now - 1_500_000).toISOString() });
+  runs.push({
+    ...runs[0],
+    id: "run-loop-stopped",
+    end: "stopped",
+    loop: { used: 2, rounds: 5, end: "stopped" },
+    ended_at: new Date(now - 90_000).toISOString(),
+    started_at: new Date(now - 1_500_000).toISOString(),
+  });
   return runs.sort((a, b) => Date.parse(b.ended_at) - Date.parse(a.ended_at));
 }
 
@@ -83,10 +99,42 @@ function made(): Run[] {
 function ended(): TaskDone[] {
   const at = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
   return [
-    { id: "t-pages", name: "ACME-101 Paginate the order list", issue_key: "ACME-101", repos: [web], created_at: at(13), ended_at: at(9), finished: true },
-    { id: "t-retry", name: "ACME-108 Retry the webhook with backoff", issue_key: "ACME-108", repos: [api], created_at: at(8), ended_at: at(6.5), finished: true },
-    { id: "t-csv", name: "ACME-112 Export invoices as CSV", issue_key: "ACME-112", repos: [api, web], created_at: at(5), ended_at: at(0.3), finished: true },
-    { id: "t-spike", name: "Try the new date picker", issue_key: null, repos: [web], created_at: at(4), ended_at: at(3.8), finished: false },
+    {
+      id: "t-pages",
+      name: "ACME-101 Paginate the order list",
+      issue_key: "ACME-101",
+      repos: [web],
+      created_at: at(13),
+      ended_at: at(9),
+      finished: true,
+    },
+    {
+      id: "t-retry",
+      name: "ACME-108 Retry the webhook with backoff",
+      issue_key: "ACME-108",
+      repos: [api],
+      created_at: at(8),
+      ended_at: at(6.5),
+      finished: true,
+    },
+    {
+      id: "t-csv",
+      name: "ACME-112 Export invoices as CSV",
+      issue_key: "ACME-112",
+      repos: [api, web],
+      created_at: at(5),
+      ended_at: at(0.3),
+      finished: true,
+    },
+    {
+      id: "t-spike",
+      name: "Try the new date picker",
+      issue_key: null,
+      repos: [web],
+      created_at: at(4),
+      ended_at: at(3.8),
+      finished: false,
+    },
   ];
 }
 

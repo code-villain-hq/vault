@@ -30,7 +30,9 @@ describe("what the Reviews view counts", () => {
   });
 
   test("has no count for your PRs when they could not be read", () => {
-    expect(reviewCounts(queue({ authored: { prs: [], more: false, error: "rate limited" } })).yours).toBeUndefined();
+    expect(
+      reviewCounts(queue({ authored: { prs: [], more: false, error: "rate limited" } })).yours,
+    ).toBeUndefined();
   });
 
   test("has nothing before GitHub answers", () => {

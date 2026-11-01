@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { reportRepoResults } from "../lib/report";
-import { useRunningAgentsOf } from "../lib/panes";
-import { useStore } from "../store";
-import { trackerOfKey } from "../lib/tracker";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
+import { useRunningAgentsOf } from "../lib/panes";
+import { reportRepoResults } from "../lib/report";
+import { trackerOfKey } from "../lib/tracker";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
-import { ChevronIcon, ExternalIcon, PlusIcon } from "./icons";
+import { useStore } from "../store";
 import { CopyButton } from "./CopyButton";
-import { BusyLabel, Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
-import { PrFeedback } from "./PrFeedback";
-import { Outgoing } from "./Outgoing";
-import { PrReadErrors } from "./PrReadErrors";
 import { FinishTask } from "./FinishTask";
+import { ChevronIcon, ExternalIcon, PlusIcon } from "./icons";
+import { Outgoing } from "./Outgoing";
+import { PrFeedback } from "./PrFeedback";
+import { PrReadErrors } from "./PrReadErrors";
+import { BusyLabel, Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
 
 /**
  * The latest review from each reviewer, which is the one GitHub itself shows.
@@ -54,19 +54,30 @@ const REVIEW_WORDS: Record<string, string> = {
 const TASK_REVIEW: Record<TaskReview, { word: string; color: string; hint: string }> = {
   none: { word: "", color: "var(--muted)", hint: "" },
   incomplete: {
-    word: "Partly up for review", color: "var(--status-warn-ink)",
+    word: "Partly up for review",
+    color: "var(--status-warn-ink)",
     hint: "Some repositories with changes have no pull request yet",
   },
-  open: { word: "In review", color: "var(--status-info-ink)", hint: "Waiting on reviewers: nobody has decided yet" },
+  open: {
+    word: "In review",
+    color: "var(--status-info-ink)",
+    hint: "Waiting on reviewers: nobody has decided yet",
+  },
   commented: {
-    word: "In review, with comments", color: "var(--status-info-ink)",
+    word: "In review, with comments",
+    color: "var(--status-info-ink)",
     hint: "Reviewers have commented, but nobody has approved or asked for changes yet",
   },
   changes_requested: {
-    word: "Changes requested", color: "var(--status-danger-ink)",
+    word: "Changes requested",
+    color: "var(--status-danger-ink)",
     hint: "A reviewer asked for changes on at least one pull request",
   },
-  approved: { word: "Approved", color: "var(--status-ok-ink)", hint: "Every pull request is approved" },
+  approved: {
+    word: "Approved",
+    color: "var(--status-ok-ink)",
+    hint: "Every pull request is approved",
+  },
   merged: { word: "Merged", color: "var(--muted)", hint: "Every pull request has merged" },
 };
 
@@ -112,7 +123,8 @@ function checkColor(c: CheckRun) {
 }
 
 export function PrPanel({
-  task, onUpdateFromBase,
+  task,
+  onUpdateFromBase,
 }: {
   task: TaskView;
   onUpdateFromBase: () => void;
@@ -125,6 +137,7 @@ export function PrPanel({
   const panel = useFailure();
   const dialog = useFailure();
   const fail = panel.fail;
+  const clear = panel.clear;
 
   /**
    * The rows, held in the store rather than here.
@@ -175,7 +188,7 @@ export function PrPanel({
   const load = useCallback(async () => {
     if (!settings?.github_connected) return;
     setLoading(true);
-    panel.clear();
+    clear();
     try {
       setTaskPrs(task.id, await api.githubTaskPrs(task.id));
     } catch (e) {
@@ -186,9 +199,11 @@ export function PrPanel({
       setAskedFor(task.id);
       setLoading(false);
     }
-  }, [task.id, settings?.github_connected, fail, panel.clear]);
+  }, [task.id, settings?.github_connected, fail, clear, setTaskPrs]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // What the base field offers. Keyed on the set of repos rather than the rows
   // themselves, so a sweep landing every ninety seconds does not refetch it.
@@ -208,11 +223,18 @@ export function PrPanel({
       if (stop) return;
       setBranches(Object.fromEntries(ids.map((id, i) => [id, lists[i]])));
     })();
-    return () => { stop = true; };
+    return () => {
+      stop = true;
+    };
   }, [checkoutIds, creating]);
 
   // Stop waiting for a draft if the panel goes away.
-  useEffect(() => () => { if (pollRef.current) window.clearInterval(pollRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (pollRef.current) window.clearInterval(pollRef.current);
+    },
+    [],
+  );
 
   // The description arrives a few words at a time. Showing it as it is written
   // is most of what makes this feel quick: the wait is the same, but it starts
@@ -226,7 +248,9 @@ export function PrPanel({
       if (e.payload.task_id !== task.id || !streaming.current) return;
       setBody((current) => current + e.payload.text);
     });
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, [task.id]);
 
   useEffect(() => {
@@ -246,7 +270,13 @@ export function PrPanel({
       // The task list carries the base too, and Update from base reads it
       // from there: left alone it said "← origin/main" while the backend
       // merged the new one.
-      await Promise.all([load(), useStore.getState().refreshTasks().catch(() => {})]);
+      await Promise.all([
+        load(),
+        useStore
+          .getState()
+          .refreshTasks()
+          .catch(() => {}),
+      ]);
     } catch (e) {
       fail(e);
     }
@@ -353,7 +383,9 @@ export function PrPanel({
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub or GitHub Enterprise to open pull requests and read CI from here.</p>
-        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>Connect GitHub</button>
+        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>
+          Connect GitHub
+        </button>
       </div>
     );
   }
@@ -417,7 +449,15 @@ export function PrPanel({
                     : "var(--faint)",
             }}
           />
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--type-ui-small-size)", width: 140 }}>{r.repo}</span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--type-ui-small-size)",
+              width: 140,
+            }}
+          >
+            {r.repo}
+          </span>
           <span>
             {r.pr && r.pr.state === "open"
               ? `PR #${r.pr.number} open`
@@ -465,7 +505,9 @@ export function PrPanel({
           <b>Pull requests</b>
         )}
         <div className="spacer" />
-        <button className="ui-button" onClick={() => void load()}><BusyLabel busy={loading} idle="Refresh" working="Refreshing…" /></button>
+        <button className="ui-button" onClick={() => void load()}>
+          <BusyLabel busy={loading} idle="Refresh" working="Refreshing…" />
+        </button>
         <button className="ui-button" disabled={busy} onClick={() => void push()}>
           Push all
         </button>
@@ -483,7 +525,11 @@ export function PrPanel({
                     pending.length === 1 ? "y" : "ies"
                   }`
             }
-            onClick={() => { setLeftOut([]); dialog.clear(); setCreating(true); }}
+            onClick={() => {
+              setLeftOut([]);
+              dialog.clear();
+              setCreating(true);
+            }}
           >
             <PlusIcon />
           </button>
@@ -519,7 +565,11 @@ export function PrPanel({
           <button
             className={`ui-button${pending.length > 0 ? " ui-button-primary" : ""}`}
             disabled={pending.length === 0}
-            onClick={() => { setLeftOut([]); dialog.clear(); setCreating(true); }}
+            onClick={() => {
+              setLeftOut([]);
+              dialog.clear();
+              setCreating(true);
+            }}
           >
             Open pull request
           </button>
@@ -542,7 +592,11 @@ export function PrPanel({
               style={foldable ? { cursor: "pointer" } : undefined}
               onClick={foldable ? () => setCards((c) => ({ ...c, [key]: !shown })) : undefined}
             >
-              {foldable && <span className={`chev${shown ? " open" : ""}`}><ChevronIcon /></span>}
+              {foldable && (
+                <span className={`chev${shown ? " open" : ""}`}>
+                  <ChevronIcon />
+                </span>
+              )}
               <h3 style={{ margin: 0 }}>
                 <span style={{ color: "var(--muted)" }}>{row.repo}</span> #{pr.number} {pr.title}
               </h3>
@@ -553,12 +607,19 @@ export function PrPanel({
                 <button
                   className={`ui-status ${pr.mergeable_state === "dirty" ? "ui-status-danger" : "ui-status-warn"}`}
                   title={`Bring ${pr.base} into this branch — merge or rebase`}
-                  onClick={(e) => { e.stopPropagation(); onUpdateFromBase(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateFromBase();
+                  }}
                 >
-                  {pr.mergeable_state === "dirty" ? `conflicts with ${pr.base}` : `behind ${pr.base}`}
+                  {pr.mergeable_state === "dirty"
+                    ? `conflicts with ${pr.base}`
+                    : `behind ${pr.base}`}
                 </button>
               )}
-              {row.verdict === "approved" && <span className="ui-status ui-status-ok">approved</span>}
+              {row.verdict === "approved" && (
+                <span className="ui-status ui-status-ok">approved</span>
+              )}
               {row.verdict === "changes_requested" && (
                 <span className="ui-status ui-status-danger">changes requested</span>
               )}
@@ -569,7 +630,10 @@ export function PrPanel({
               <button
                 className="ui-button"
                 title="Pick this PR's review threads, comments and failing checks to hand an agent"
-                onClick={(e) => { e.stopPropagation(); setFeedback(row.checkout_id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFeedback(row.checkout_id);
+                }}
               >
                 Feedback → agent
                 {toAnswer(row) > 0 && <span className="badge">{toAnswer(row)}</span>}
@@ -578,7 +642,10 @@ export function PrPanel({
               <button
                 className="ui-button ui-icon-button"
                 title="Open on GitHub"
-                onClick={(e) => { e.stopPropagation(); openPr(pr.url); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPr(pr.url);
+                }}
               >
                 <ExternalIcon />
               </button>
@@ -629,7 +696,13 @@ export function PrPanel({
                           {REVIEW_WORDS[r.state] ?? r.state.toLowerCase()}
                         </span>
                         {r.url && (
-                          <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(r.url)}><ExternalIcon /></button>
+                          <button
+                            className="ui-button ui-icon-button"
+                            title="Open on GitHub"
+                            onClick={() => openPr(r.url)}
+                          >
+                            <ExternalIcon />
+                          </button>
                         )}
                       </div>
                     ))}
@@ -638,13 +711,19 @@ export function PrPanel({
 
                 {row.checks.length > 0 && (
                   <div style={{ marginTop: 10 }}>
-                    {worstByName(row.checks).map((c, i) => (
-                      <div key={`${c.name}:${i}`} className="check">
+                    {worstByName(row.checks).map((c) => (
+                      <div key={c.name} className="check">
                         <span className="dot" style={{ background: checkColor(c) }} />
                         <span className="name">{c.name}</span>
                         <span className="muted">{c.conclusion ?? c.status}</span>
                         {c.url && (
-                          <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(c.url!)}><ExternalIcon /></button>
+                          <button
+                            className="ui-button ui-icon-button"
+                            title="Open on GitHub"
+                            onClick={() => openPr(c.url!)}
+                          >
+                            <ExternalIcon />
+                          </button>
                         )}
                       </div>
                     ))}
@@ -658,22 +737,17 @@ export function PrPanel({
 
       {earlier.length > 0 && (
         <div className="card">
-          <div
-            className="row"
-            style={{ cursor: "pointer" }}
-            onClick={() => setShowPast((v) => !v)}
-          >
-            <span className={`chev${showPast ? " open" : ""}`}><ChevronIcon /></span>
+          <div className="row" style={{ cursor: "pointer" }} onClick={() => setShowPast((v) => !v)}>
+            <span className={`chev${showPast ? " open" : ""}`}>
+              <ChevronIcon />
+            </span>
             <h3 style={{ margin: 0 }}>Earlier pull requests</h3>
             <span className="muted">{earlier.length}</span>
           </div>
           {showPast &&
             earlier.map(({ row, pr }) => (
               <div key={`${row.checkout_id}:${pr.number}`} className="check">
-                <span
-                  className="dot"
-                  style={{ background: "var(--muted)" }}
-                />
+                <span className="dot" style={{ background: "var(--muted)" }} />
                 <span className="name">
                   {row.repo} #{pr.number}
                 </span>
@@ -684,7 +758,11 @@ export function PrPanel({
                       ? `still open against ${pr.base}`
                       : "closed without merging"}
                 </span>
-                <button className="ui-button ui-icon-button" title="Open on GitHub" onClick={() => openPr(pr.url)}>
+                <button
+                  className="ui-button ui-icon-button"
+                  title="Open on GitHub"
+                  onClick={() => openPr(pr.url)}
+                >
                   <ExternalIcon />
                 </button>
                 <CopyButton text={pr.url} label="Copy link" />
@@ -705,7 +783,9 @@ export function PrPanel({
           onClose={() => setCreating(false)}
           footer={
             <>
-              <button className="ui-button" onClick={() => setCreating(false)}>Cancel</button>
+              <button className="ui-button" onClick={() => setCreating(false)}>
+                Cancel
+              </button>
               <button
                 className="ui-button ui-button-primary"
                 disabled={busy || picked.length === 0 || !title.trim()}
@@ -728,7 +808,11 @@ export function PrPanel({
           ) : (
             <>
               <Field label="Title">
-                <input className="ui-field" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input
+                  className="ui-field"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
               </Field>
               <Field
                 label="Description"
@@ -740,7 +824,12 @@ export function PrPanel({
                     : "Written from the diff by a fast model, as a handoff for whoever reviews this."
                 }
               >
-                <textarea className="ui-field" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
+                <textarea
+                  className="ui-field"
+                  rows={8}
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                />
                 <div className="row" style={{ marginTop: 8 }}>
                   <button
                     className="ui-button"
@@ -768,8 +857,8 @@ export function PrPanel({
           )}
 
           <div className="muted" style={{ lineHeight: 1.55 }}>
-            Opens one PR per ticked repository, all from <code>{task.branch}</code>, with this
-            title and description. When there is more than one, each PR lists the others below it.
+            Opens one PR per ticked repository, all from <code>{task.branch}</code>, with this title
+            and description. When there is more than one, each PR lists the others below it.
             {task.issue_key
               ? ` The links are also posted back to ${task.issue_key} as a single comment.`
               : ""}

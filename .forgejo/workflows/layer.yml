@@ -1,8 +1,9 @@
 # `bun run check` for Layer on every push that touches it: the guard, design
-# copies up to date, the app's tests, tsc and build, rustfmt,
-# clippy, the app's and the server's Rust tests, generated types up to date,
-# and the web app's Biome, tsc, tests and build. It runs on the MacBook's
-# runner (label `macos`), because the app and its PTY tests are macOS-only.
+# copies up to date, the app's tests, Vite+ (Oxfmt, Oxlint, tsc), the app's
+# build, rustfmt, clippy, the app's and the server's Rust tests, generated
+# types up to date, and the web app's tests and build. It runs on the
+# MacBook's runner (label `macos`), because the app and its PTY tests are
+# macOS-only.
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a
 # pull request from someone else's fork would run their code there.

@@ -1,6 +1,6 @@
-import { useStore } from "../store";
 import { TOKEN_REJECTED } from "../lib/derive";
 import type { CheckoutPr } from "../lib/types";
+import { useStore } from "../store";
 
 /**
  * The repos whose pull requests could not be read. A rejected token is said
@@ -19,8 +19,12 @@ export function PrReadErrors({ rows }: { rows: CheckoutPr[] }) {
       {rejected && (
         <div className="card">
           <h3>{TOKEN_REJECTED}</h3>
-          <p className="muted">It may have expired or been revoked. Save a new one to read pull requests again.</p>
-          <button className="ui-button" onClick={() => toggleSettings(true, "github")}>Reconnect GitHub</button>
+          <p className="muted">
+            It may have expired or been revoked. Save a new one to read pull requests again.
+          </p>
+          <button className="ui-button" onClick={() => toggleSettings(true, "github")}>
+            Reconnect GitHub
+          </button>
         </div>
       )}
       {others.length > 0 && (

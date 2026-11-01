@@ -178,7 +178,6 @@ export function FieldsDialog({
             <span />
           </div>
           {fields.map((field, at) => (
-            // biome-ignore lint/a11y/noStaticElementInteractions: a drop target; the grip moves it with keys too.
             <div
               key={field.key}
               onDragOver={(event) => {
@@ -216,7 +215,6 @@ export function FieldsDialog({
                   <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
                 </button>
                 <input
-                  // biome-ignore lint/a11y/noAutofocus: a new field opens to be named
                   autoFocus={field.was === null}
                   aria-label="Field name"
                   placeholder="Field name"

@@ -20,7 +20,8 @@ export function SyncStatus() {
     const waiting = status.pending > 0 ? ` · ${status.pending} waiting` : "";
     return <Pill tone="warn" label={`Offline${waiting}`} />;
   }
-  if (status.connection === "connecting" && !status.ready) return <Pill tone="muted" label="Connecting…" />;
+  if (status.connection === "connecting" && !status.ready)
+    return <Pill tone="muted" label="Connecting…" />;
   if (status.pending > 0 && slow) return <Pill tone="muted" label={`Syncing ${status.pending}`} />;
   return <Pill tone="ok" label="Synced" />;
 }

@@ -8,7 +8,11 @@ const backend = api as unknown as Record<string, (...args: unknown[]) => Promise
 
 describe("a refresh that found nothing new", () => {
   test("keeps the settings object every settings view holds", async () => {
-    const settings = { jira_connected: false, github_connected: false, github: null } as unknown as Settings;
+    const settings = {
+      jira_connected: false,
+      github_connected: false,
+      github: null,
+    } as unknown as Settings;
     backend.getSettings = async () => structuredClone(settings);
     await useStore.getState().refreshSettings();
     const held = useStore.getState().settings;

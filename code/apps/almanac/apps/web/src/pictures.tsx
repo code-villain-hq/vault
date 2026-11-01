@@ -74,7 +74,6 @@ export function DropBox({
     setOver(true);
   };
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: a drop target; the button inside picks a photo too.
     <div
       onDragEnter={enter}
       onDragOver={enter}

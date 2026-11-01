@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { CHAT_TASK_ID } from "../lib/derive";
 import { goTo } from "../lib/goto";
-import { useStore } from "../store";
 import type { WaitingPane } from "../lib/types";
+import { useStore } from "../store";
 import { Confirm, ErrorMessage, useFailure } from "./ui";
 
 const NONE: WaitingPane[] = [];
@@ -27,7 +27,8 @@ function useActions(taskId: string) {
   const failure = useFailure();
   const [busy, setBusy] = useState<string | null>(null);
   const [forgetting, setForgetting] = useState<WaitingPane | null>(null);
-  const refresh = () => Promise.all([useStore.getState().refreshPanes(), useStore.getState().refreshWaiting()]);
+  const refresh = () =>
+    Promise.all([useStore.getState().refreshPanes(), useStore.getState().refreshWaiting()]);
 
   async function reopen(w: WaitingPane) {
     if (busy) return;
@@ -85,25 +86,47 @@ interface WaitingChatsProps {
 }
 
 /** Chats the last launch did not put back, under the open ones in the Chat view. */
-export function WaitingChats({ keep, heading = true, label, sub = "not reopened at launch · click to reopen" }: WaitingChatsProps) {
+export function WaitingChats({
+  keep,
+  heading = true,
+  label,
+  sub = "not reopened at launch · click to reopen",
+}: WaitingChatsProps) {
   const waiting = useWaiting(CHAT_TASK_ID).filter(keep);
   const { busy, reopen, ask, confirm, problem } = useActions(CHAT_TASK_ID);
   if (waiting.length === 0) return null;
   return (
     <>
       {heading && (
-        <div className="chat-list-waiting" title="At most 12 panes come back at launch. These wait for you.">
+        <div
+          className="chat-list-waiting"
+          title="At most 12 panes come back at launch. These wait for you."
+        >
           Not reopened
         </div>
       )}
       {waiting.map((w) => (
-        <div key={w.id} className="chat-item waiting" onClick={() => void reopen(w)} title="Reopen this chat where it left off">
+        <div
+          key={w.id}
+          className="chat-item waiting"
+          onClick={() => void reopen(w)}
+          title="Reopen this chat where it left off"
+        >
           <span className="dot" />
           <span className="chat-item-text">
             <span className="chat-item-title">{w.title ?? label?.(w) ?? "Chat"}</span>
             <span className="chat-item-sub">{busy === w.id ? "Reopening…" : sub}</span>
           </span>
-          <span className="x" title="Forget this chat" onClick={(e) => { e.stopPropagation(); ask(w); }}>✕</span>
+          <span
+            className="x"
+            title="Forget this chat"
+            onClick={(e) => {
+              e.stopPropagation();
+              ask(w);
+            }}
+          >
+            ✕
+          </span>
         </div>
       ))}
       {problem}
@@ -122,16 +145,23 @@ export function WaitingTaskPanes({ taskId }: { taskId: string }) {
     <>
       <div className="limit-banner waiting-banner">
         <span>
-          {waiting.length === 1 ? "A pane was" : `${waiting.length} panes were`} not reopened at launch (12 at most):
+          {waiting.length === 1 ? "A pane was" : `${waiting.length} panes were`} not reopened at
+          launch (12 at most):
         </span>
         {waiting.map((w) => (
           <span key={w.id} className="waiting-pane">
-            <b>{w.kind === "shell" ? "Shell" : agents.find((a) => a.id === w.agent_id)?.name ?? w.agent_id ?? "Agent"}</b>
+            <b>
+              {w.kind === "shell"
+                ? "Shell"
+                : (agents.find((a) => a.id === w.agent_id)?.name ?? w.agent_id ?? "Agent")}
+            </b>
             {w.title && ` · ${w.title}`}
             <button className="ui-button" disabled={busy !== null} onClick={() => void reopen(w)}>
               {busy === w.id ? "Reopening…" : "Reopen"}
             </button>
-            <button className="ui-button" title="Do not list it again" onClick={() => ask(w)}>Forget</button>
+            <button className="ui-button" title="Do not list it again" onClick={() => ask(w)}>
+              Forget
+            </button>
           </span>
         ))}
         {confirm}

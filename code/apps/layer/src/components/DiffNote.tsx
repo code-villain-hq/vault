@@ -17,7 +17,12 @@ function withSuggestion(text: string, code: string): string {
  * should read.
  */
 function NoteText({
-  initial, code, placeholder, saveLabel, onSave, onCancel,
+  initial,
+  code,
+  placeholder,
+  saveLabel,
+  onSave,
+  onCancel,
 }: {
   initial: string;
   code: string;
@@ -30,7 +35,8 @@ function NoteText({
   const box = useRef<HTMLTextAreaElement>(null);
   return (
     <>
-      <textarea className="ui-field"
+      <textarea
+        className="ui-field"
         ref={box}
         rows={Math.min(12, Math.max(3, text.split("\n").length + 1))}
         autoFocus
@@ -43,8 +49,12 @@ function NoteText({
         }}
       />
       <div className="actions">
-        <button className="ui-button ui-button-primary" onClick={() => onSave(text)}>{saveLabel}</button>
-        <button className="ui-button" onClick={onCancel}>Cancel</button>
+        <button className="ui-button ui-button-primary" onClick={() => onSave(text)}>
+          {saveLabel}
+        </button>
+        <button className="ui-button" onClick={onCancel}>
+          Cancel
+        </button>
         {code !== "" && !text.includes("```suggestion") && (
           <button
             className="ui-button"
@@ -64,7 +74,9 @@ function NoteText({
             Suggest a change
           </button>
         )}
-        <span style={{ color: "var(--faint)", fontSize: "var(--type-ui-small-size)" }}>⌘↵ to {saveLabel.toLowerCase()}</span>
+        <span style={{ color: "var(--faint)", fontSize: "var(--type-ui-small-size)" }}>
+          ⌘↵ to {saveLabel.toLowerCase()}
+        </span>
       </div>
     </>
   );
@@ -77,11 +89,26 @@ function NoteText({
  * thousand rows — to change one textarea.
  */
 export function NoteEditor({
-  onAdd, onCancel, placeholder, code,
-}: { onAdd: (text: string) => void; onCancel: () => void; placeholder: string; code: string }) {
+  onAdd,
+  onCancel,
+  placeholder,
+  code,
+}: {
+  onAdd: (text: string) => void;
+  onCancel: () => void;
+  placeholder: string;
+  code: string;
+}) {
   return (
     <div className="inline-comment">
-      <NoteText initial="" code={code} placeholder={placeholder} saveLabel="Add note" onSave={onAdd} onCancel={onCancel} />
+      <NoteText
+        initial=""
+        code={code}
+        placeholder={placeholder}
+        saveLabel="Add note"
+        onSave={onAdd}
+        onCancel={onCancel}
+      />
     </div>
   );
 }
@@ -101,9 +128,14 @@ export function NoteCard({
 }) {
   const [editing, setEditing] = useState(false);
   // Said when it is not plain: a removed line, a range, or away from its line.
-  const span = note.side === "LEFT"
-    ? `removed L${note.line}`
-    : note.startLine ? `L${note.startLine}–${note.line}` : where ? `L${note.line}` : null;
+  const span =
+    note.side === "LEFT"
+      ? `removed L${note.line}`
+      : note.startLine
+        ? `L${note.startLine}–${note.line}`
+        : where
+          ? `L${note.line}`
+          : null;
   if (editing) {
     return (
       <div className="inline-comment">
@@ -112,7 +144,10 @@ export function NoteCard({
           code={note.code}
           placeholder="What should the author know about this line?"
           saveLabel="Save"
-          onSave={(body) => { if (body.trim()) onEdit(body.trim()); setEditing(false); }}
+          onSave={(body) => {
+            if (body.trim()) onEdit(body.trim());
+            setEditing(false);
+          }}
           onCancel={() => setEditing(false)}
         />
       </div>
@@ -125,7 +160,9 @@ export function NoteCard({
           <span className="ui-chip">{span}</span>
         </div>
       )}
-      <div className="body"><Markdown text={note.body} /></div>
+      <div className="body">
+        <Markdown text={note.body} />
+      </div>
       <div className="actions">
         <button className="ui-button" onClick={() => setEditing(true)} title="Reword it">
           Edit

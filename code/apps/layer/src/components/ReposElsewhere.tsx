@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useState } from "react";
 import { api } from "../lib/api";
 import type { Elsewhere } from "../lib/types-profiles";
 import { BusyLabel, ErrorMessage, useFailure } from "./ui";
@@ -12,7 +12,9 @@ export function ReposElsewhere({ repos, onPlaced }: { repos: Elsewhere[]; onPlac
   if (repos.length === 0) return null;
   return (
     <div className="card">
-      {repos.map((r) => <Row key={r.id} repo={r} onPlaced={onPlaced} />)}
+      {repos.map((r) => (
+        <Row key={r.id} repo={r} onPlaced={onPlaced} />
+      ))}
     </div>
   );
 }
@@ -30,7 +32,9 @@ function Row({ repo, onPlaced }: { repo: Elsewhere; onPlaced: () => void }) {
     setBusy(how);
     failure.clear();
     try {
-      await (how === "locate" ? api.locateElsewhere(repo.id, chosen) : api.cloneElsewhere(repo.id, chosen));
+      await (how === "locate"
+        ? api.locateElsewhere(repo.id, chosen)
+        : api.cloneElsewhere(repo.id, chosen));
       onPlaced();
     } catch (e) {
       failure.fail(e);
@@ -43,13 +47,19 @@ function Row({ repo, onPlaced }: { repo: Elsewhere; onPlaced: () => void }) {
     <div className="repo-manage">
       <div className="repo-line">
         <span className="rname">{repo.name}</span>
-        <span className="ui-chip" title="Default branch">{repo.default_branch}</span>
+        <span className="ui-chip" title="Default branch">
+          {repo.default_branch}
+        </span>
         <span className="ui-status">Not on this Mac</span>
         <div className="spacer" />
         <button className="ui-button" disabled={busy !== null} onClick={() => void place("locate")}>
           Locate…
         </button>
-        <button className="ui-button ui-button-primary" disabled={busy !== null} onClick={() => void place("clone")}>
+        <button
+          className="ui-button ui-button-primary"
+          disabled={busy !== null}
+          onClick={() => void place("clone")}
+        >
           <BusyLabel busy={busy === "clone"} idle="Clone" working="Cloning…" />
         </button>
       </div>

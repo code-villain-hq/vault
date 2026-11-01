@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { projectOf } from "../../lib/tracker";
-import { useProjectChoice } from "./ProjectField";
 import { api } from "../../lib/api";
-import { useStore } from "../../store";
+import { projectOf } from "../../lib/tracker";
 import type { Ticket, TicketType } from "../../lib/types";
-import { ErrorMessage, Field, Modal, useFailure } from "../ui";
+import { useStore } from "../../store";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { creatableTypes, preferredCreatable } from "../task-forms/creatable";
+import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { OptimizeDescription } from "./OptimizeDescription";
+import { useProjectChoice } from "./ProjectField";
 import { RequiredFieldPickers, useRequiredFields } from "./RequiredFields";
 
 export function FileIssueDialog({
@@ -49,16 +49,18 @@ export function FileIssueDialog({
   // was named — a ticket filed on its own does not have one, and a project
   // that insists on a parent should say so.
   const rf = useRequiredFields(projectKey, typeId, [
-    "summary", "description", "issuetype", "project", "reporter",
+    "summary",
+    "description",
+    "issuetype",
+    "project",
+    "reporter",
     ...(epic ? ["parent"] : []),
   ]);
   const descriptionRequired = rf.descriptionRequired;
 
   const missing = [
     ...rf.missing,
-    ...(descriptionRequired && !newDesc.trim()
-      ? [{ id: "description", name: "Description" }]
-      : []),
+    ...(descriptionRequired && !newDesc.trim() ? [{ id: "description", name: "Description" }] : []),
   ];
 
   async function fileIssue() {
@@ -94,10 +96,14 @@ export function FileIssueDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="ui-button" onClick={onClose}>Cancel</button>
+          <button className="ui-button" onClick={onClose}>
+            Cancel
+          </button>
           <button
             className="ui-button ui-button-primary"
-            disabled={filingBusy || !newSummary.trim() || !newType || !projectKey || missing.length > 0}
+            disabled={
+              filingBusy || !newSummary.trim() || !newType || !projectKey || missing.length > 0
+            }
             title={
               missing.length > 0
                 ? `${missing.map((f) => f.name).join(", ")} required by this project`
@@ -114,7 +120,8 @@ export function FileIssueDialog({
         {epic ? (
           <>
             Filed under <b>{epic.key}</b>
-            {epic.summary ? ` — ${epic.summary}` : ""}, in that epic's own {place.github ? "repository" : "project"}.
+            {epic.summary ? ` — ${epic.summary}` : ""}, in that epic's own{" "}
+            {place.github ? "repository" : "project"}.
           </>
         ) : (
           <>Filed in the {place.github ? "repository" : "project"} you pick, with no parent epic.</>
@@ -125,12 +132,15 @@ export function FileIssueDialog({
       {!epic && place.field("ticket")}
 
       <Field label="Summary">
-        <input className="ui-field"
+        <input
+          className="ui-field"
           autoFocus
           value={newSummary}
           onChange={(e) => setNewSummary(e.target.value)}
           placeholder="What needs doing"
-          onKeyDown={(e) => { if (e.key === "Enter") void fileIssue(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void fileIssue();
+          }}
         />
       </Field>
 
@@ -159,7 +169,8 @@ export function FileIssueDialog({
             : "Optional. Becomes the ticket body and an agent's briefing."
         }
       >
-        <textarea className="ui-field"
+        <textarea
+          className="ui-field"
           rows={5}
           value={newDesc}
           onChange={(e) => setNewDesc(e.target.value)}

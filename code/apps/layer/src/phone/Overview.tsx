@@ -29,7 +29,11 @@ function useOpen(): [Set<string>, (id: string) => void] {
 /** The dot and the words for a pane's state, as the window's `paneState` has them. */
 export function stateOf(p: PhonePane): { label: string; dot: string } {
   if (!p.running) return { label: "exited", dot: "" };
-  if (p.waiting) return { label: p.waiting.replace(/^is /, ""), dot: p.notice === "usage_limit" ? "gone" : "idle" };
+  if (p.waiting)
+    return {
+      label: p.waiting.replace(/^is /, ""),
+      dot: p.notice === "usage_limit" ? "gone" : "idle",
+    };
   if (p.kind === "shell") return { label: "shell", dot: "live" };
   if (p.activity === "working") return { label: "working", dot: "live" };
   return { label: p.activity === "done" ? "your turn" : "idle", dot: "" };
@@ -37,7 +41,10 @@ export function stateOf(p: PhonePane): { label: string; dot: string } {
 
 /** A task's name without its ticket key, which is shown beside it already. */
 function bare(g: Group): string {
-  const name = g.key && g.name.startsWith(g.key) ? g.name.slice(g.key.length).replace(/^[\s:·-]+/, "") : g.name;
+  const name =
+    g.key && g.name.startsWith(g.key)
+      ? g.name.slice(g.key.length).replace(/^[\s:·-]+/, "")
+      : g.name;
   return name || g.name;
 }
 
@@ -68,7 +75,10 @@ function PaneRow({ pane, onOpen }: { pane: PhonePane; onOpen: (id: string) => vo
  * agents are doing: a dot each, and whether one needs you.
  */
 function GroupCard({
-  group, open, onToggle, onOpen,
+  group,
+  open,
+  onToggle,
+  onOpen,
 }: {
   group: Group;
   open: boolean;
@@ -77,7 +87,11 @@ function GroupCard({
 }) {
   const waiting = group.panes.filter((p) => p.waiting).length;
   const working = group.panes.filter((p) => p.running && p.activity === "working").length;
-  const summary = waiting ? `${waiting} need${waiting === 1 ? "s" : ""} you` : working ? `${working} working` : "";
+  const summary = waiting
+    ? `${waiting} need${waiting === 1 ? "s" : ""} you`
+    : working
+      ? `${working} working`
+      : "";
   return (
     <section className={`group${waiting ? " waiting" : ""}`}>
       <button className="group-head" aria-expanded={open} onClick={onToggle}>
@@ -101,7 +115,10 @@ function GroupCard({
 
 /** Every task and its agents, the ones that need you first (PHONE-5). */
 export function Overview({
-  data, live, error, onOpen,
+  data,
+  live,
+  error,
+  onOpen,
 }: {
   data: Data | null;
   live: boolean;
@@ -117,7 +134,10 @@ export function Overview({
       <header className="bar">
         <div className="brand">Layer</div>
         <div className="spacer" />
-        <span className={`dot ${live ? "live" : "gone"}`} title={live ? "Connected to the Mac" : "Not connected"} />
+        <span
+          className={`dot ${live ? "live" : "gone"}`}
+          title={live ? "Connected to the Mac" : "Not connected"}
+        />
       </header>
       <main className="scroll">
         {error && <div className="error">{error}</div>}
@@ -128,9 +148,17 @@ export function Overview({
           </div>
         )}
         {withPanes.map((g) => (
-          <GroupCard key={g.id} group={g} open={open.has(g.id)} onToggle={() => toggle(g.id)} onOpen={onOpen} />
+          <GroupCard
+            key={g.id}
+            group={g}
+            open={open.has(g.id)}
+            onToggle={() => toggle(g.id)}
+            onOpen={onOpen}
+          />
         ))}
-        {data && withPanes.length === 0 && <div className="muted pad">No agents or terminals are open on the Mac.</div>}
+        {data && withPanes.length === 0 && (
+          <div className="muted pad">No agents or terminals are open on the Mac.</div>
+        )}
         {quiet.length > 0 && (
           <section className="group quiet">
             <h2>No terminals open</h2>

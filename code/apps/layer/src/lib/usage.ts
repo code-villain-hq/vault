@@ -68,7 +68,10 @@ export function taskRows(
   opts: { since: number; now: number; repo: string | null; byRuns: boolean },
 ): TaskRow[] {
   const rows = new Map<string, TaskRow>();
-  const row = (id: string, init: () => Omit<TaskRow, "workedSecs" | "tokens" | "runs" | "asks" | "waitedSecs">) => {
+  const row = (
+    id: string,
+    init: () => Omit<TaskRow, "workedSecs" | "tokens" | "runs" | "asks" | "waitedSecs">,
+  ) => {
     let r = rows.get(id);
     if (!r) {
       r = { ...init(), workedSecs: 0, tokens: 0, runs: 0, asks: 0, waitedSecs: 0 };
@@ -100,7 +103,15 @@ export function taskRows(
     const ended = Date.parse(t.ended_at);
     // One a run in the period was for is named by its record wherever it ended.
     if (!rows.has(t.id) && (opts.byRuns || ended < opts.since || !inRepo(t.repos))) continue;
-    const r = row(t.id, () => ({ id: t.id, name: t.name, key: null, state: "deleted", tookMs: null, at: ended, repos: t.repos }));
+    const r = row(t.id, () => ({
+      id: t.id,
+      name: t.name,
+      key: null,
+      state: "deleted",
+      tookMs: null,
+      at: ended,
+      repos: t.repos,
+    }));
     Object.assign(r, {
       name: t.name,
       key: t.issue_key,
@@ -115,7 +126,15 @@ export function taskRows(
     const created = Date.parse(t.created_at);
     const worked = rows.get(t.id);
     if (!worked && (opts.byRuns || created < opts.since || !inRepo(t.repos))) continue;
-    const r = row(t.id, () => ({ id: t.id, name: t.name, key: null, state: "open", tookMs: null, at: created, repos: t.repos }));
+    const r = row(t.id, () => ({
+      id: t.id,
+      name: t.name,
+      key: null,
+      state: "open",
+      tookMs: null,
+      at: created,
+      repos: t.repos,
+    }));
     Object.assign(r, {
       name: t.name,
       key: t.issue_key,
@@ -133,10 +152,19 @@ export type SortKey = "name" | "took" | "worked" | "tokens" | "asks" | "at";
 /** Biggest first, a name A to Z; what is not known goes last either way. */
 export function sortRows(rows: TaskRow[], by: SortKey): TaskRow[] {
   const value = (r: TaskRow): number | null =>
-    by === "took" ? r.tookMs : by === "worked" ? r.workedSecs : by === "tokens" ? r.tokens : by === "asks" ? r.asks : r.at;
+    by === "took"
+      ? r.tookMs
+      : by === "worked"
+        ? r.workedSecs
+        : by === "tokens"
+          ? r.tokens
+          : by === "asks"
+            ? r.asks
+            : r.at;
   return [...rows].sort((a, b) => {
     if (by === "name") return a.name.localeCompare(b.name);
-    const x = value(a), y = value(b);
+    const x = value(a),
+      y = value(b);
     if (x === null || y === null) return x === null ? (y === null ? 0 : 1) : -1;
     return y - x;
   });
@@ -162,7 +190,12 @@ export interface UsageStats {
 }
 
 export function usageStats(runs: Run[], rows: TaskRow[]): UsageStats {
-  let tokens = 0, withTokens = 0, workedSecs = 0, withWorked = 0, asks = 0, waitedSecs = 0;
+  let tokens = 0,
+    withTokens = 0,
+    workedSecs = 0,
+    withWorked = 0,
+    asks = 0,
+    waitedSecs = 0;
   for (const r of runs) {
     if (r.tokens) {
       withTokens++;

@@ -70,7 +70,12 @@ function blocks(text: string): Block[] {
       const id = item.match(/^\**(Q-\d+)\**\s*[:.\-–—]?\**\s*/i);
       const qid = id ? id[1].toUpperCase() : `Q-${found.length + 1}`;
       const rest = id ? item.slice(id[0].length) : item;
-      found.push({ question: { id: qid, text: rest.trim(), options: [], answer: null }, start: i, end: i + 1, answerLines: [] });
+      found.push({
+        question: { id: qid, text: rest.trim(), options: [], answer: null },
+        start: i,
+        end: i + 1,
+        answerLines: [],
+      });
       return;
     }
     if (!last) return;
@@ -119,12 +124,16 @@ export function approveWarning(qs: Question[]): string | null {
   const answered = qs.length - open;
   const said: string[] = [];
   if (open > 0) {
-    said.push(open === 1
-      ? "1 open question has no answer. An agent working to these requirements will stop to ask it."
-      : `${open} open questions have no answer. An agent working to these requirements will stop to ask them.`);
+    said.push(
+      open === 1
+        ? "1 open question has no answer. An agent working to these requirements will stop to ask it."
+        : `${open} open questions have no answer. An agent working to these requirements will stop to ask them.`,
+    );
   }
   if (answered > 0) {
-    said.push(`${answered === 1 ? "1 answer is" : `${answered} answers are`} not built into the requirements yet, and Check against spec reads only the requirements. Apply answers does that.`);
+    said.push(
+      `${answered === 1 ? "1 answer is" : `${answered} answers are`} not built into the requirements yet, and Check against spec reads only the requirements. Apply answers does that.`,
+    );
   }
   return said.length > 0 ? said.join(" ") : null;
 }

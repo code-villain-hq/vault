@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { IndexedDbStore } from "./indexeddb";
 import type { Transaction } from "./protocol";
 import type { Row } from "./store";
@@ -53,14 +53,13 @@ test("an unavailable database can be opened again without dropping its saved out
   await original.addToOutbox({ id: "offline", operations: [] });
   original.close();
   const store = new IndexedDbStore(name);
-  const open = indexedDB.open;
-  indexedDB.open = () => {
+  const open = spyOn(indexedDB, "open").mockImplementation(() => {
     throw new Error("storage unavailable");
-  };
+  });
   try {
     await expect(store.load()).rejects.toThrow("storage unavailable");
   } finally {
-    indexedDB.open = open;
+    open.mockRestore();
   }
   expect((await store.load()).outbox.map((t) => t.id)).toEqual(["offline"]);
   store.close();

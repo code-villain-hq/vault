@@ -109,8 +109,8 @@ issue is done.
   outside the repository: `FORGE_BACKUP_DIR`, or else `backup/forge` next to
   the vault's checkout (restoring: see the script).
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
-- `bun run check`: fmt, clippy, Rust tests, types up to date, Biome,
-  typecheck, bun tests, web build. It must pass before you finish.
+- `bun run check`: fmt, clippy, Rust tests, types up to date, Vite+
+  (Oxfmt, Oxlint, typecheck), bun tests, web build. It must pass before you finish.
   The vault's CI runs it on every push that touches Forge
   (`.forgejo/workflows/forge.yml`, on the MacBook's runner). It runs on push
   only, not on pull requests, so a pull request shows no result: run the

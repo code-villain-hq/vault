@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { readable, type Row } from "../src/phone/readable";
 
 const rows = (...lines: (string | [string, true])[]): Row[] =>
-  lines.map((l) => (typeof l === "string" ? { text: l, wrapped: false } : { text: l[0], wrapped: true }));
+  lines.map((l) =>
+    typeof l === "string" ? { text: l, wrapped: false } : { text: l[0], wrapped: true },
+  );
 
 describe("a terminal's screen as text a phone can read (PHONE-6)", () => {
   test("puts back together a line the terminal wrapped at its width", () => {
@@ -30,6 +32,8 @@ describe("a terminal's screen as text a phone can read (PHONE-6)", () => {
     expect(readable(rows("auto mode on            (shift+tab to cycle)"))).toEqual([
       "auto mode on  (shift+tab to cycle)",
     ]);
-    expect(readable(rows("    indented code stays indented"))).toEqual(["    indented code stays indented"]);
+    expect(readable(rows("    indented code stays indented"))).toEqual([
+      "    indented code stays indented",
+    ]);
   });
 });

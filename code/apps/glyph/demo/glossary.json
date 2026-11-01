@@ -12,9 +12,7 @@
     "target_lang": "sv",
     "source_term": "lair",
     "target_term": "näste",
-    "target_variants": [
-      "nästet"
-    ],
+    "target_variants": ["nästet"],
     "note": "The villain's base. Not 'håla'."
   },
   {
@@ -22,10 +20,7 @@
     "target_lang": "sv",
     "source_term": "scheme",
     "target_term": "komplott",
-    "target_variants": [
-      "komplotter",
-      "komplotten"
-    ],
+    "target_variants": ["komplotter", "komplotten"],
     "note": ""
   },
   {
@@ -33,9 +28,7 @@
     "target_lang": "sv",
     "source_term": "overlord",
     "target_term": "överherre",
-    "target_variants": [
-      "överherren"
-    ],
+    "target_variants": ["överherren"],
     "note": "Plan name and title."
   },
   {
@@ -43,11 +36,7 @@
     "target_lang": "sv",
     "source_term": "henchman",
     "target_term": "hejduk",
-    "target_variants": [
-      "hejduken",
-      "hejdukar",
-      "hejdukarna"
-    ],
+    "target_variants": ["hejduken", "hejdukar", "hejdukarna"],
     "note": "Senior staff, above a minion. Not 'medhjälpare'."
   },
   {
@@ -55,11 +44,7 @@
     "target_lang": "sv",
     "source_term": "heist",
     "target_term": "kupp",
-    "target_variants": [
-      "kuppen",
-      "kupper",
-      "kupperna"
-    ],
+    "target_variants": ["kuppen", "kupper", "kupperna"],
     "note": ""
   },
   {
@@ -67,11 +52,7 @@
     "target_lang": "sv",
     "source_term": "gadget",
     "target_term": "pryl",
-    "target_variants": [
-      "prylen",
-      "prylar",
-      "prylarna"
-    ],
+    "target_variants": ["prylen", "prylar", "prylarna"],
     "note": "Casual on purpose. Not 'apparat'."
   },
   {
@@ -79,10 +60,7 @@
     "target_lang": "sv",
     "source_term": "doomsday device",
     "target_term": "domedagsmaskin",
-    "target_variants": [
-      "domedagsmaskinen",
-      "domedagsmaskiner"
-    ],
+    "target_variants": ["domedagsmaskinen", "domedagsmaskiner"],
     "note": ""
   },
   {
@@ -90,11 +68,7 @@
     "target_lang": "sv",
     "source_term": "hero",
     "target_term": "hjälte",
-    "target_variants": [
-      "hjälten",
-      "hjältar",
-      "hjältarna"
-    ],
+    "target_variants": ["hjälten", "hjältar", "hjältarna"],
     "note": "Always a little contemptuous in tone."
   },
   {
@@ -102,10 +76,7 @@
     "target_lang": "sv",
     "source_term": "death ray",
     "target_term": "dödsstråle",
-    "target_variants": [
-      "dödsstrålen",
-      "dödsstrålar"
-    ],
+    "target_variants": ["dödsstrålen", "dödsstrålar"],
     "note": ""
   },
   {
@@ -113,9 +84,7 @@
     "target_lang": "fr",
     "source_term": "minion",
     "target_term": "sbire",
-    "target_variants": [
-      "sbires"
-    ],
+    "target_variants": ["sbires"],
     "note": ""
   },
   {
@@ -131,9 +100,7 @@
     "target_lang": "fr",
     "source_term": "scheme",
     "target_term": "complot",
-    "target_variants": [
-      "complots"
-    ],
+    "target_variants": ["complots"],
     "note": "Not 'plan'."
   },
   {
@@ -149,9 +116,7 @@
     "target_lang": "fr",
     "source_term": "henchman",
     "target_term": "homme de main",
-    "target_variants": [
-      "hommes de main"
-    ],
+    "target_variants": ["hommes de main"],
     "note": ""
   },
   {
@@ -159,9 +124,7 @@
     "target_lang": "fr",
     "source_term": "heist",
     "target_term": "casse",
-    "target_variants": [
-      "casses"
-    ],
+    "target_variants": ["casses"],
     "note": "Masculine: le casse. Not 'braquage'."
   },
   {
@@ -169,9 +132,7 @@
     "target_lang": "fr",
     "source_term": "gadget",
     "target_term": "gadget",
-    "target_variants": [
-      "gadgets"
-    ],
+    "target_variants": ["gadgets"],
     "note": ""
   },
   {
@@ -179,9 +140,7 @@
     "target_lang": "fr",
     "source_term": "doomsday device",
     "target_term": "machine de l'apocalypse",
-    "target_variants": [
-      "machines de l'apocalypse"
-    ],
+    "target_variants": ["machines de l'apocalypse"],
     "note": ""
   },
   {
@@ -197,9 +156,7 @@
     "target_lang": "fr",
     "source_term": "death ray",
     "target_term": "rayon de la mort",
-    "target_variants": [
-      "rayons de la mort"
-    ],
+    "target_variants": ["rayons de la mort"],
     "note": ""
   },
   {
@@ -207,12 +164,7 @@
     "target_lang": "fi",
     "source_term": "minion",
     "target_term": "apuri",
-    "target_variants": [
-      "apurit",
-      "apurin",
-      "apureita",
-      "apureiden"
-    ],
+    "target_variants": ["apurit", "apurin", "apureita", "apureiden"],
     "note": "Not 'orja' or 'palvelija'."
   },
   {
@@ -220,11 +172,7 @@
     "target_lang": "fi",
     "source_term": "lair",
     "target_term": "piilopaikka",
-    "target_variants": [
-      "piilopaikan",
-      "piilopaikkaan",
-      "piilopaikassa"
-    ],
+    "target_variants": ["piilopaikan", "piilopaikkaan", "piilopaikassa"],
     "note": ""
   },
   {
@@ -232,12 +180,7 @@
     "target_lang": "fi",
     "source_term": "scheme",
     "target_term": "juoni",
-    "target_variants": [
-      "juonet",
-      "juonen",
-      "juonta",
-      "juonia"
-    ],
+    "target_variants": ["juonet", "juonen", "juonta", "juonia"],
     "note": ""
   },
   {
@@ -245,10 +188,7 @@
     "target_lang": "fi",
     "source_term": "overlord",
     "target_term": "yliherra",
-    "target_variants": [
-      "yliherran",
-      "yliherraa"
-    ],
+    "target_variants": ["yliherran", "yliherraa"],
     "note": "Plan name and title."
   },
   {
@@ -256,11 +196,7 @@
     "target_lang": "fi",
     "source_term": "henchman",
     "target_term": "kätyri",
-    "target_variants": [
-      "kätyrit",
-      "kätyrin",
-      "kätyreitä"
-    ],
+    "target_variants": ["kätyrit", "kätyrin", "kätyreitä"],
     "note": ""
   },
   {
@@ -268,11 +204,7 @@
     "target_lang": "fi",
     "source_term": "heist",
     "target_term": "keikka",
-    "target_variants": [
-      "keikan",
-      "keikat",
-      "keikkaa"
-    ],
+    "target_variants": ["keikan", "keikat", "keikkaa"],
     "note": ""
   }
 ]

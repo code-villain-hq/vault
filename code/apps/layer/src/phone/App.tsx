@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "../lib/theme";
 import { follow, phoneApi, token, Unpaired } from "./client";
 import { Overview } from "./Overview";
-import { PaneView } from "./PaneView";
 import { Pair } from "./Pair";
+import { PaneView } from "./PaneView";
 import type { Overview as Data } from "./types";
-import { useTheme } from "../lib/theme";
 
 /** The pane open, if one is: `#pane=<id>`, so Back on the phone goes back. */
 function paneInHash(): string | null {
@@ -81,9 +81,16 @@ export function App() {
         pane={open ?? null}
         typing={data?.typing ?? false}
         theme={theme}
-        onBack={() => history.length > 1 ? history.back() : (location.hash = "")}
+        onBack={() => (history.length > 1 ? history.back() : (location.hash = ""))}
       />
     );
   }
-  return <Overview data={data} live={live} error={error} onOpen={(id) => (location.hash = `pane=${encodeURIComponent(id)}`)} />;
+  return (
+    <Overview
+      data={data}
+      live={live}
+      error={error}
+      onOpen={(id) => (location.hash = `pane=${encodeURIComponent(id)}`)}
+    />
+  );
 }

@@ -1,8 +1,9 @@
-# The Rust kits' fmt, clippy and tests on every push that touches them
-# (`code/kit/dev-id/check-kits.ts`). Each kit is a package of its own,
-# outside every app's Cargo workspace, so the apps' checks format it but
-# never lint or test it. The kits' TypeScript is checked by every app's
-# `bun run check`. It runs on the MacBook's runner (label `macos`).
+# The Rust kits' fmt, clippy and tests, and the dev-id kit's `vp check`, on
+# every push that touches them (`code/kit/dev-id/check-kits.ts`). Each kit
+# is a package of its own, outside every app's Cargo workspace, so the apps'
+# checks format it but never lint or test it. The web and sync kits'
+# TypeScript is checked by every app's `bun run check`. It runs on the
+# MacBook's runner (label `macos`).
 #
 # On push only, never on pull_request: the runner is the Mac itself, and a
 # pull request from someone else's fork would run their code there.

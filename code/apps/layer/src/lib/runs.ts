@@ -50,7 +50,9 @@ export function runPage(runs: Run[], pages: number): { rows: Run[]; left: number
 
 /** A run counts for a repository it could have changed: its own, or any of its task's. */
 export function filterRuns(runs: Run[], f: RunFilter): Run[] {
-  return runs.filter((r) => (!f.agent || r.agent === f.agent) && (!f.repo || r.repos.some((p) => p.id === f.repo)));
+  return runs.filter(
+    (r) => (!f.agent || r.agent === f.agent) && (!f.repo || r.repos.some((p) => p.id === f.repo)),
+  );
 }
 
 export interface RunStats {
@@ -98,8 +100,16 @@ function addTokens(into: RunTokens, t: RunTokens) {
 }
 
 export function runStats(runs: Run[]): RunStats {
-  let wrong = 0, asks = 0, waitedSecs = 0, workedSecs = 0, withWorked = 0;
-  let limited = 0, looped = 0, rounds = 0, withTokens = 0, withTools = 0;
+  let wrong = 0,
+    asks = 0,
+    waitedSecs = 0,
+    workedSecs = 0,
+    withWorked = 0;
+  let limited = 0,
+    looped = 0,
+    rounds = 0,
+    withTokens = 0,
+    withTools = 0;
   const tokens: RunTokens = { input: 0, output: 0, cached_read: 0, cached_write: 0 };
   const tools = { calls: 0, failed: 0 };
   for (const r of runs) {
@@ -161,11 +171,16 @@ export interface AgentRow {
 export function byAgent(runs: Run[]): AgentRow[] {
   const of = new Map<string, Run[]>();
   for (const r of runs) of.set(r.agent, [...(of.get(r.agent) ?? []), r]);
-  return [...of].map(([agent, rs]) => ({ agent, stats: runStats(rs) })).sort((a, b) => b.stats.runs - a.stats.runs);
+  return [...of]
+    .map(([agent, rs]) => ({ agent, stats: runStats(rs) }))
+    .sort((a, b) => b.stats.runs - a.stats.runs);
 }
 
 /** The filters' choices: every agent and repository the log has seen, the latest name for each. */
-export function runChoices(runs: Run[]): { agents: string[]; repos: { id: string; name: string }[] } {
+export function runChoices(runs: Run[]): {
+  agents: string[];
+  repos: { id: string; name: string }[];
+} {
   const agents = new Set<string>();
   const repos = new Map<string, string>();
   for (const r of runs) {
@@ -175,7 +190,9 @@ export function runChoices(runs: Run[]): { agents: string[]; repos: { id: string
   }
   return {
     agents: [...agents].sort(),
-    repos: [...repos].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+    repos: [...repos]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

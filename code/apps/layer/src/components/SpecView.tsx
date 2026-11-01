@@ -2,20 +2,22 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { approveWarning, questions } from "../lib/questions";
 import { approvedText, editorText, partView, slotKey, useSpecs, type SpecFile } from "../lib/specs";
-import { useStore } from "../store";
 import type { SpecKind, SpecPart, TaskSpec, TaskView } from "../lib/types";
-import { Confirm, ErrorMessage, Spinner, useFailure } from "./ui";
+import { useStore } from "../store";
 import { SpecBanners } from "./spec/SpecBanners";
 import { SpecQuestions } from "./spec/SpecQuestions";
 import { SpecSide } from "./spec/SpecSide";
 import { SpecStartAgent } from "./spec/SpecStartAgent";
+import { Confirm, ErrorMessage, Spinner, useFailure } from "./ui";
 
 const PARTS: SpecPart[] = ["requirements", "design", "tasks"];
 
 /** What "Write them yourself" starts from: the headings a draft has (SPEC-1). */
 const TEMPLATE: Record<SpecKind, string> = {
-  feature: "## Goal\n\n## Requirements\n\n- R-1: WHEN … THE SYSTEM SHALL …\n\n## Out of scope\n\n-\n\n## Open questions\n\nNone.\n",
-  bugfix: "## Current behaviour\n\n## Expected behaviour\n\n- R-1: WHEN … THE SYSTEM SHALL …\n\n## Unchanged behaviour\n\n- R-2: WHEN … THE SYSTEM SHALL CONTINUE TO …\n\n## Open questions\n\nNone.\n",
+  feature:
+    "## Goal\n\n## Requirements\n\n- R-1: WHEN … THE SYSTEM SHALL …\n\n## Out of scope\n\n-\n\n## Open questions\n\nNone.\n",
+  bugfix:
+    "## Current behaviour\n\n## Expected behaviour\n\n- R-1: WHEN … THE SYSTEM SHALL …\n\n## Unchanged behaviour\n\n- R-2: WHEN … THE SYSTEM SHALL CONTINUE TO …\n\n## Open questions\n\nNone.\n",
 };
 
 export function partName(part: SpecPart, kind: SpecKind): string {
@@ -25,7 +27,9 @@ export function partName(part: SpecPart, kind: SpecKind): string {
 
 /** Every file of the spec for one part: the task's one, or every repository's tasks. */
 export function filesOf(spec: TaskSpec, part: SpecPart): SpecFile[] {
-  return part === "tasks" ? spec.repos.map((r) => ({ part, checkoutId: r.checkout_id })) : [{ part, checkoutId: null }];
+  return part === "tasks"
+    ? spec.repos.map((r) => ({ part, checkoutId: r.checkout_id }))
+    : [{ part, checkoutId: null }];
 }
 
 /**
@@ -43,7 +47,9 @@ export function SpecView({ task }: { task: TaskView }) {
   const approve = useSpecs((s) => s.approve);
   const pending = useSpecs((s) => s.pending);
   const setPending = useSpecs((s) => s.setPending);
-  const running = useStore((s) => s.panes.filter((p) => p.task_id === task.id && p.running && p.kind === "agent").length);
+  const running = useStore(
+    (s) => s.panes.filter((p) => p.task_id === task.id && p.running && p.kind === "agent").length,
+  );
   // Loading, the draft Start work asked for, and telling the agents (its
   // banner closes on the click) fail in the top bar. What the user drafts or
   // approves here fails under the row of buttons they used, whichever is
@@ -110,7 +116,10 @@ export function SpecView({ task }: { task: TaskView }) {
         legacy={spec.legacy}
         busy={busy}
         error={actions.error}
-        onDraft={() => { actions.clear(); void draft(task.id, "requirements", kind).catch(actions.fail); }}
+        onDraft={() => {
+          actions.clear();
+          void draft(task.id, "requirements", kind).catch(actions.fail);
+        }}
         onQuick={() => void quick()}
         onWrite={(text) => edit(task.id, { part: "requirements", checkoutId: null }, text)}
       />
@@ -119,7 +128,10 @@ export function SpecView({ task }: { task: TaskView }) {
 
   const current = part ?? firstOpen(spec);
   // The file in the editor: the task's, or the picked repository's tasks.
-  const file: SpecFile = { part: current, checkoutId: current === "tasks" ? repo.checkout_id : null };
+  const file: SpecFile = {
+    part: current,
+    checkoutId: current === "tasks" ? repo.checkout_id : null,
+  };
   const view = partView(spec, file.part, file.checkoutId)!;
   const text = editorText(state, file.part, file.checkoutId);
   const dirty = edits[slotKey(file.part, file.checkoutId)] !== undefined;
@@ -127,13 +139,24 @@ export function SpecView({ task }: { task: TaskView }) {
   const views = all.map((f) => partView(spec, f.part, f.checkoutId)!);
   const stale = views.some((v) => v.stale);
   const before = PARTS[PARTS.indexOf(current) - 1];
-  const ready = !before || filesOf(spec, before).every((f) => !!approvedText(spec, f.part, f.checkoutId) || edits[slotKey(f.part, f.checkoutId)] !== undefined);
+  const ready =
+    !before ||
+    filesOf(spec, before).every(
+      (f) =>
+        !!approvedText(spec, f.part, f.checkoutId) ||
+        edits[slotKey(f.part, f.checkoutId)] !== undefined,
+    );
   const isDrafting = drafting?.part === current || drafting?.part === "merge";
   // Every file with something to approve: an edit, or out of date with text.
   const pendingFiles = spec.parts
     .filter((p) => edits[slotKey(p.part, p.checkout_id)] !== undefined)
     .map((p) => ({ part: p.part, checkoutId: p.checkout_id }));
-  const toApprove = all.filter((f) => edits[slotKey(f.part, f.checkoutId)] !== undefined || (partView(spec, f.part, f.checkoutId)?.stale && editorText(state, f.part, f.checkoutId).trim()));
+  const toApprove = all.filter(
+    (f) =>
+      edits[slotKey(f.part, f.checkoutId)] !== undefined ||
+      (partView(spec, f.part, f.checkoutId)?.stale &&
+        editorText(state, f.part, f.checkoutId).trim()),
+  );
   const canApprove = !drafting && !busy && toApprove.length > 0;
 
   async function quick() {
@@ -159,7 +182,8 @@ export function SpecView({ task }: { task: TaskView }) {
     try {
       const design = partView(spec, "design", null);
       if (design?.stale) await draft(task.id, "design", null);
-      if (design?.stale || spec.parts.some((p) => p.part === "tasks" && p.stale)) await draft(task.id, "tasks", null);
+      if (design?.stale || spec.parts.some((p) => p.part === "tasks" && p.stale))
+        await draft(task.id, "tasks", null);
     } catch (e) {
       actions.fail(e);
     } finally {
@@ -171,14 +195,22 @@ export function SpecView({ task }: { task: TaskView }) {
     setBusy(true);
     actions.clear();
     try {
-      const failed = await approve(task.id, files, files.some((f) => f.part === "requirements") ? kind : null);
+      const failed = await approve(
+        task.id,
+        files,
+        files.some((f) => f.part === "requirements") ? kind : null,
+      );
       // The task's files go into every repository; tasks into their own.
-      const reached = files.some((f) => f.part !== "tasks") ? repos : repos.filter((r) => files.some((f) => f.checkoutId === r.checkout_id));
+      const reached = files.some((f) => f.part !== "tasks")
+        ? repos
+        : repos.filter((r) => files.some((f) => f.checkoutId === r.checkout_id));
       // What was approved shows on its tab and banner (NOTE-7); only a
       // repository that refused it is said.
       if (failed.length > 0) {
         const rest = reached.length > failed.length ? "The others have it." : "Try again.";
-        actions.fail(`Couldn't write it in ${failed.map((f) => `${f.folder} (${f.error})`).join(", ")}. ${rest}`);
+        actions.fail(
+          `Couldn't write it in ${failed.map((f) => `${f.folder} (${f.error})`).join(", ")}. ${rest}`,
+        );
       }
       if (running > 0) setTell([...new Set(files.map((f) => f.part))]);
       const parts = files.map((f) => f.part);
@@ -193,7 +225,9 @@ export function SpecView({ task }: { task: TaskView }) {
 
   /** Approve, after saying what questions left in the requirements put at risk (SPEC-21). */
   function tryApprove(files: SpecFile[]) {
-    const warning = files.some((f) => f.part === "requirements") ? approveWarning(questions(editorText(state, "requirements", null))) : null;
+    const warning = files.some((f) => f.part === "requirements")
+      ? approveWarning(questions(editorText(state, "requirements", null)))
+      : null;
     if (warning) setAsking({ files, warning });
     else void approveFiles(files);
   }
@@ -205,7 +239,11 @@ export function SpecView({ task }: { task: TaskView }) {
 
   const many = repos.length > 1;
   const status = isDrafting
-    ? drafting?.part === "merge" ? "Merging the specs from before…" : current === "tasks" && many ? "Drafting every repository's tasks…" : "Drafting…"
+    ? drafting?.part === "merge"
+      ? "Merging the specs from before…"
+      : current === "tasks" && many
+        ? "Drafting every repository's tasks…"
+        : "Drafting…"
     : drafting
       ? `Drafting the ${drafting.part}…`
       : stale
@@ -213,30 +251,63 @@ export function SpecView({ task }: { task: TaskView }) {
         : view.proposal
           ? `Proposed by ${view.proposal.by}: not approved yet`
           : dirty
-            ? view.approved ? "Changed since approved: agents still work to what was approved" : "Not approved: no agent sees it yet"
+            ? view.approved
+              ? "Changed since approved: agents still work to what was approved"
+              : "Not approved: no agent sees it yet"
             : view.approved
-              ? repos.some((r) => r.in_repo) ? `Approved and committed${many && current !== "tasks" ? " in every repository" : ""}` : "Approved"
+              ? repos.some((r) => r.in_repo)
+                ? `Approved and committed${many && current !== "tasks" ? " in every repository" : ""}`
+                : "Approved"
               : "Not started";
   const draftLabel = stale ? "Sync" : text.trim() ? "Redraft" : "Draft";
-  const draftTitle = current === "requirements"
-    ? `From ${task.issue_key ? "the ticket" : "the task's name"}, for the whole task`
-    : current === "design" ? `From the requirements, reading ${many ? "every repository's" : `${repo.folder}'s`} code` : `From the requirements and the design${many ? ", for every repository at once" : ""}`;
+  const draftTitle =
+    current === "requirements"
+      ? `From ${task.issue_key ? "the ticket" : "the task's name"}, for the whole task`
+      : current === "design"
+        ? `From the requirements, reading ${many ? "every repository's" : `${repo.folder}'s`} code`
+        : `From the requirements and the design${many ? ", for every repository at once" : ""}`;
 
   return (
     <div className="spec">
       {/* One primary on the screen: approving what is waiting comes before
           starting an agent on it. */}
       {/* An epic's agents are its sub-tasks', started from Sub-tasks (EPIC-6). */}
-      {!task.epic && <SpecStartAgent task={task} spec={spec} agentId={agentId} setAgentId={setAgentId} quiet={canApprove} />}
+      {!task.epic && (
+        <SpecStartAgent
+          task={task}
+          spec={spec}
+          agentId={agentId}
+          setAgentId={setAgentId}
+          quiet={canApprove}
+        />
+      )}
       <div className="spec-steps">
         {PARTS.map((p, i) => {
           const vs = filesOf(spec, p).map((f) => partView(spec, f.part, f.checkoutId)!);
           const has = vs.some((v) => edits[slotKey(v.part, v.checkout_id)] !== undefined);
           const approved = vs.every((v) => v.approved);
-          const label = vs.some((v) => v.outside.length > 0) ? "changed outside" : vs.some((v) => v.stale) ? "out of date" : vs.some((v) => v.proposal) ? "proposal" : has ? (approved ? "changed" : "draft") : approved ? "approved" : vs.some((v) => v.approved) ? "partly approved" : "not started";
+          const label = vs.some((v) => v.outside.length > 0)
+            ? "changed outside"
+            : vs.some((v) => v.stale)
+              ? "out of date"
+              : vs.some((v) => v.proposal)
+                ? "proposal"
+                : has
+                  ? approved
+                    ? "changed"
+                    : "draft"
+                  : approved
+                    ? "approved"
+                    : vs.some((v) => v.approved)
+                      ? "partly approved"
+                      : "not started";
           const done = label === "approved";
           return (
-            <button key={p} className={`spec-step${p === current ? " active" : ""}`} onClick={() => setPart(p)}>
+            <button
+              key={p}
+              className={`spec-step${p === current ? " active" : ""}`}
+              onClick={() => setPart(p)}
+            >
               <span className={`spec-num ${done ? "done" : ""}`}>{done ? "✓" : i + 1}</span>
               <span>{partName(p, spec.kind)}</span>
               <span className={`spec-state ${label.replace(/ /g, "-")}`}>{label}</span>
@@ -244,8 +315,21 @@ export function SpecView({ task }: { task: TaskView }) {
           );
         })}
         <span className="spacer" />
-        <span className="muted spec-home" title={many ? "The same requirements and design in each; each repository's own tasks" : repo.in_repo ? "Committed on the task's branch" : "Specs are off for this repository (Repos): kept by the app, not in git"}>
-          {many ? `in ${repos.map((r) => (r.in_repo ? r.home : `${r.folder} (kept by the app)`)).join(", ")}` : repo.in_repo ? repo.home : "kept by the app"}
+        <span
+          className="muted spec-home"
+          title={
+            many
+              ? "The same requirements and design in each; each repository's own tasks"
+              : repo.in_repo
+                ? "Committed on the task's branch"
+                : "Specs are off for this repository (Repos): kept by the app, not in git"
+          }
+        >
+          {many
+            ? `in ${repos.map((r) => (r.in_repo ? r.home : `${r.folder} (kept by the app)`)).join(", ")}`
+            : repo.in_repo
+              ? repo.home
+              : "kept by the app"}
         </span>
       </div>
       {current === "tasks" && many && (
@@ -254,33 +338,68 @@ export function SpecView({ task }: { task: TaskView }) {
             const v = partView(spec, "tasks", r.checkout_id);
             const has = edits[slotKey("tasks", r.checkout_id)] !== undefined;
             return (
-              <button key={r.checkout_id} className={`spec-repo${r.checkout_id === repo.checkout_id ? " active" : ""}`} onClick={() => setCheckoutId(r.checkout_id)}>
+              <button
+                key={r.checkout_id}
+                className={`spec-repo${r.checkout_id === repo.checkout_id ? " active" : ""}`}
+                onClick={() => setCheckoutId(r.checkout_id)}
+              >
                 {r.folder}
                 <span className="muted">
-                  {r.steps.length > 0 ? `${r.steps.filter((s) => s.done).length}/${r.steps.length}` : "—"}
-                  {v?.outside.length ? " · changed outside" : v?.stale ? " · out of date" : has ? " · draft" : ""}
+                  {r.steps.length > 0
+                    ? `${r.steps.filter((s) => s.done).length}/${r.steps.length}`
+                    : "—"}
+                  {v?.outside.length
+                    ? " · changed outside"
+                    : v?.stale
+                      ? " · out of date"
+                      : has
+                        ? " · draft"
+                        : ""}
                 </span>
               </button>
             );
           })}
         </div>
       )}
-      <SpecBanners task={task} spec={spec} file={file} busy={busy || !!drafting} onApprove={tryApprove} onShow={(t, cid) => edit(task.id, { part: file.part, checkoutId: file.part === "tasks" ? cid : null }, t)} />
+      <SpecBanners
+        task={task}
+        spec={spec}
+        file={file}
+        busy={busy || !!drafting}
+        onApprove={tryApprove}
+        onShow={(t, cid) =>
+          edit(task.id, { part: file.part, checkoutId: file.part === "tasks" ? cid : null }, t)
+        }
+      />
       {tell && (
         <div className="spec-tell">
-          {running} agent{running === 1 ? " is" : "s are"} working in this task to the spec as it was.
-          <button className="ui-button" onClick={() => {
-            void api.tellSpecChange(task.id, tell).catch(fail);
-            setTell(null);
-          }}>Tell them</button>
-          <button className="ui-button" onClick={() => setTell(null)}>Not now</button>
+          {running} agent{running === 1 ? " is" : "s are"} working in this task to the spec as it
+          was.
+          <button
+            className="ui-button"
+            onClick={() => {
+              void api.tellSpecChange(task.id, tell).catch(fail);
+              setTell(null);
+            }}
+          >
+            Tell them
+          </button>
+          <button className="ui-button" onClick={() => setTell(null)}>
+            Not now
+          </button>
         </div>
       )}
       <div className="spec-bar">
         <button
           className="ui-button"
           disabled={!!drafting || busy || !ready}
-          title={ready ? (stale ? "Redraft every file that is out of date, in order" : draftTitle) : `Approve the ${before} first`}
+          title={
+            ready
+              ? stale
+                ? "Redraft every file that is out of date, in order"
+                : draftTitle
+              : `Approve the ${before} first`
+          }
           onClick={() => (stale ? void sync() : text.trim() ? setReplacing(true) : redraft())}
         >
           {draftLabel} {current === "requirements" ? "" : current}
@@ -298,17 +417,29 @@ export function SpecView({ task }: { task: TaskView }) {
           </button>
         )}
         {pendingFiles.length > 1 && (
-          <button className="ui-button" disabled={!!drafting || busy} title="Approve every file drafted or changed, together" onClick={() => tryApprove(pendingFiles)}>
+          <button
+            className="ui-button"
+            disabled={!!drafting || busy}
+            title="Approve every file drafted or changed, together"
+            onClick={() => tryApprove(pendingFiles)}
+          >
             Approve all {pendingFiles.length}
           </button>
         )}
         <button
           className={`ui-button${canApprove ? " ui-button-primary" : ""}`}
           disabled={!canApprove}
-          title={repos.some((r) => r.in_repo) ? `Write it ${current === "tasks" || !many ? "to its repository" : "to every repository"} and commit it on the task's branch` : "Keep it as the approved spec"}
+          title={
+            repos.some((r) => r.in_repo)
+              ? `Write it ${current === "tasks" || !many ? "to its repository" : "to every repository"} and commit it on the task's branch`
+              : "Keep it as the approved spec"
+          }
           onClick={() => tryApprove(toApprove)}
         >
-          Approve {partName(current, spec.kind).toLowerCase()}{current === "tasks" && toApprove.length > 1 ? ` of ${toApprove.length} repositories` : ""}
+          Approve {partName(current, spec.kind).toLowerCase()}
+          {current === "tasks" && toApprove.length > 1
+            ? ` of ${toApprove.length} repositories`
+            : ""}
         </button>
       </div>
       <ErrorMessage>{actions.error}</ErrorMessage>
@@ -328,12 +459,17 @@ export function SpecView({ task }: { task: TaskView }) {
       {replacing && (
         <Confirm
           title="Replace what the editor holds?"
-          body={current === "tasks" && many
-            ? "A new draft replaces every repository's tasks in the editor. What is approved stays until you approve again."
-            : "A new draft replaces what is in the editor. What is approved stays until you approve again."}
+          body={
+            current === "tasks" && many
+              ? "A new draft replaces every repository's tasks in the editor. What is approved stays until you approve again."
+              : "A new draft replaces what is in the editor. What is approved stays until you approve again."
+          }
           confirmLabel="Redraft"
           danger={false}
-          onConfirm={() => { setReplacing(false); redraft(); }}
+          onConfirm={() => {
+            setReplacing(false);
+            redraft();
+          }}
           onCancel={() => setReplacing(false)}
         />
       )}
@@ -343,7 +479,11 @@ export function SpecView({ task }: { task: TaskView }) {
           body={asking.warning}
           confirmLabel="Approve anyway"
           danger={false}
-          onConfirm={() => { const { files } = asking; setAsking(null); void approveFiles(files); }}
+          onConfirm={() => {
+            const { files } = asking;
+            setAsking(null);
+            void approveFiles(files);
+          }}
           onCancel={() => setAsking(null)}
         />
       )}
@@ -353,11 +493,25 @@ export function SpecView({ task }: { task: TaskView }) {
 
 /** The first part with a file not yet approved, or out of date, or the tasks. */
 function firstOpen(spec: TaskSpec): SpecPart {
-  return spec.parts.find((p) => !p.approved || p.stale || p.outside.length > 0 || p.proposal)?.part ?? "tasks";
+  return (
+    spec.parts.find((p) => !p.approved || p.stale || p.outside.length > 0 || p.proposal)?.part ??
+    "tasks"
+  );
 }
 
 /** Before any spec: what it is, a bug or a feature, and how to start one. */
-function SpecStart({ kind, setKind, many, from, legacy, busy, error, onDraft, onQuick, onWrite }: {
+function SpecStart({
+  kind,
+  setKind,
+  many,
+  from,
+  legacy,
+  busy,
+  error,
+  onDraft,
+  onQuick,
+  onWrite,
+}: {
   kind: SpecKind;
   setKind: (k: SpecKind) => void;
   many: boolean;
@@ -375,26 +529,46 @@ function SpecStart({ kind, setKind, many, from, legacy, busy, error, onDraft, on
       <h2>No spec yet</h2>
       <p>
         A spec is reviewed in three steps: the requirements (what done means), the design (how), and
-        the tasks an agent works through. {many
+        the tasks an agent works through.{" "}
+        {many
           ? "The requirements and the design are one for the whole task, so the repositories cannot drift apart; each repository gets its own tasks. "
           : ""}
-        Approving one commits it on the task's branch{many ? " in every repository" : ""}, so it goes to
-        review with the code and stays in the repository.
+        Approving one commits it on the task's branch{many ? " in every repository" : ""}, so it
+        goes to review with the code and stays in the repository.
       </p>
       <div className="row spec-kind">
-        <label><input type="radio" checked={kind === "feature"} onChange={() => setKind("feature")} /> A feature</label>
-        <label><input type="radio" checked={kind === "bugfix"} onChange={() => setKind("bugfix")} /> A bug</label>
+        <label>
+          <input type="radio" checked={kind === "feature"} onChange={() => setKind("feature")} /> A
+          feature
+        </label>
+        <label>
+          <input type="radio" checked={kind === "bugfix"} onChange={() => setKind("bugfix")} /> A
+          bug
+        </label>
       </div>
       <div className="row">
-        <button className="ui-button ui-button-primary" disabled={busy} onClick={onDraft}>Draft the {kind === "bugfix" ? "bug analysis" : "requirements"} from {from}</button>
-        <button className="ui-button" disabled={busy} onClick={onQuick} title="Requirements, design and tasks in one go, to approve together">Quick spec</button>
-        <button className="ui-button" disabled={busy} onClick={() => onWrite(TEMPLATE[kind])}>Write it yourself</button>
+        <button className="ui-button ui-button-primary" disabled={busy} onClick={onDraft}>
+          Draft the {kind === "bugfix" ? "bug analysis" : "requirements"} from {from}
+        </button>
+        <button
+          className="ui-button"
+          disabled={busy}
+          onClick={onQuick}
+          title="Requirements, design and tasks in one go, to approve together"
+        >
+          Quick spec
+        </button>
+        <button className="ui-button" disabled={busy} onClick={() => onWrite(TEMPLATE[kind])}>
+          Write it yourself
+        </button>
       </div>
       <ErrorMessage>{error}</ErrorMessage>
       {legacy && (
         <p className="muted">
           This task has a spec from before, kept beside the task.{" "}
-          <button className="ui-button" onClick={() => onWrite(legacy)}>Start from it</button>
+          <button className="ui-button" onClick={() => onWrite(legacy)}>
+            Start from it
+          </button>
         </p>
       )}
     </div>

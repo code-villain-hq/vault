@@ -152,7 +152,6 @@ function NewIssueForm({ defaults, onDone }: { defaults: NewIssueDefaults; onDone
 
       <div className="flex flex-col gap-2 px-4 py-3">
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a title
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}

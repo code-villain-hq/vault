@@ -49,7 +49,7 @@ snapshots by hand. `bun run check` fails when they've drifted.
   through dev-id. Needs `bun run dev` running, for Acme Inc.
 - `bun run gen:types`: regenerate `packages/types` from the Rust models.
 - `bun run check`: fmt, clippy, Rust tests, types and design copies up to
-  date, Biome, typecheck, bun tests, web build. It must pass before you
+  date, Vite+ (Oxfmt, Oxlint, typecheck), bun tests, web build. It must pass before you
   finish. CI runs it on every push that touches Glyph
   (`.forgejo/workflows/glyph.yml`).
   `GLYPH_CHECK_SKIP_DESKTOP=1` leaves the desktop app out.

@@ -11,7 +11,10 @@ import type { AcpEntry, AcpView } from "./types";
  * is put in place by a binary search and the list is otherwise only cut
  * where `base` says.
  */
-export function mergeEntries(prev: readonly AcpEntry[], view: Pick<AcpView, "base" | "reset" | "entries">): AcpEntry[] {
+export function mergeEntries(
+  prev: readonly AcpEntry[],
+  view: Pick<AcpView, "base" | "reset" | "entries">,
+): AcpEntry[] {
   const from = view.reset ? prev.length : firstAt(prev, view.base);
   if (view.entries.length === 0 && from === 0) return prev as AcpEntry[];
   const out = view.reset ? [] : prev.slice(from);

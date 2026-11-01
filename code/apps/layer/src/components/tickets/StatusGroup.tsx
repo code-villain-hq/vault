@@ -21,7 +21,9 @@ export function StatusGroup({
   return (
     <div className="epic">
       <div className="epic-head" onClick={onToggle}>
-        <span className={`chev${closed ? "" : " open"}`}><ChevronIcon /></span>
+        <span className={`chev${closed ? "" : " open"}`}>
+          <ChevronIcon />
+        </span>
         <span className={`ui-status ${statusClass(category)}`}>{name}</span>
         <span className="count">{count}</span>
       </div>

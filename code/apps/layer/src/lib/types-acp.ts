@@ -16,28 +16,29 @@ export interface AcpChoice {
 }
 
 /** One entry of the conversation. `index` stays the same as older ones go. */
-export type AcpEntry = { index: number; rev: number } & (
+export type AcpEntry = { index: number; rev: number } &
   /** `queued` while it waits for the turn before it; `dropped` if Stop ended that turn first. */
-  | { kind: "user"; text: string; queued: boolean; dropped: boolean }
-  | { kind: "agent"; text: string }
-  | { kind: "thought"; text: string }
-  | {
-      kind: "tool";
-      id: string;
-      title: string;
-      /** read, edit, delete, move, search, execute, think, fetch, switch_mode, other. */
-      tool: string;
-      /** pending, in_progress, completed or failed. */
-      status: string;
-      content: AcpToolContent[];
-      locations: string[];
-    }
-  | { kind: "plan"; steps: { content: string; status: string }[] }
-  /** A permission question (ACP-5); `answer` is the option chosen, or "cancelled". */
-  | { kind: "question"; title: string; options: AcpChoice[]; answer: string | null }
-  /** Something the app says: an error, how to sign in. */
-  | { kind: "note"; text: string; error: boolean }
-);
+  (
+    | { kind: "user"; text: string; queued: boolean; dropped: boolean }
+    | { kind: "agent"; text: string }
+    | { kind: "thought"; text: string }
+    | {
+        kind: "tool";
+        id: string;
+        title: string;
+        /** read, edit, delete, move, search, execute, think, fetch, switch_mode, other. */
+        tool: string;
+        /** pending, in_progress, completed or failed. */
+        status: string;
+        content: AcpToolContent[];
+        locations: string[];
+      }
+    | { kind: "plan"; steps: { content: string; status: string }[] }
+    /** A permission question (ACP-5); `answer` is the option chosen, or "cancelled". */
+    | { kind: "question"; title: string; options: AcpChoice[]; answer: string | null }
+    /** Something the app says: an error, how to sign in. */
+    | { kind: "note"; text: string; error: boolean }
+  );
 
 /** A setting the agent offers: its mode, its model (ACP-12). */
 export interface AcpSetting {

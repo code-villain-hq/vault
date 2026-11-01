@@ -1,6 +1,14 @@
 import type { TrackerKind } from "@layer/types";
 import type { SavedSignIn } from "./types-browser";
-import type { GithubConfig, GrafanaConfig, JiraConfig, LogSource, ModelChoice, SlackBotConfig, SlackConfig } from "./types-integrations";
+import type {
+  GithubConfig,
+  GrafanaConfig,
+  JiraConfig,
+  LogSource,
+  ModelChoice,
+  SlackBotConfig,
+  SlackConfig,
+} from "./types-integrations";
 
 export interface Project {
   id: string;
@@ -53,7 +61,14 @@ export interface Synced {
 /** Something Clean up would remove (REPO-8). */
 export interface CleanupItem {
   id: string;
-  kind: "worktree" | "folder" | "clone_branch" | "store_branch" | "origin_branch" | "records" | "store";
+  kind:
+    | "worktree"
+    | "folder"
+    | "clone_branch"
+    | "store_branch"
+    | "origin_branch"
+    | "records"
+    | "store";
   repo: string | null;
   title: string;
   detail: string;
@@ -364,7 +379,10 @@ export interface FlowStatus {
 }
 
 /** Where a ticket goes when work on it starts (TKT-1). */
-export type StartTo = { to: "first_in_progress" } | { to: "leave" } | { to: "status"; id: string; name: string };
+export type StartTo =
+  | { to: "first_in_progress" }
+  | { to: "leave" }
+  | { to: "status"; id: string; name: string };
 
 /** Where a Jira project's tickets go as the work moves (TKT-1, TKT-8). */
 export interface TicketFlow {
@@ -396,7 +414,15 @@ export * from "./types-loop";
 // Where each integration is and how it is set.
 export * from "./types-integrations";
 
-export type ThemeChoice = "night" | "day" | "tokyo-night" | "cursor-dark" | "cursor-light" | "ayu-dark" | "ayu-light" | "system";
+export type ThemeChoice =
+  | "night"
+  | "day"
+  | "tokyo-night"
+  | "cursor-dark"
+  | "cursor-light"
+  | "ayu-dark"
+  | "ayu-light"
+  | "system";
 
 export interface UiPrefs {
   scale: number;
@@ -584,5 +610,3 @@ export interface RepoOutgoing {
   leftovers_more: boolean;
   error: string | null;
 }
-
-

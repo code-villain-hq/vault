@@ -6,7 +6,6 @@
  * every restart gives panes new ids, a task can be deleted — and each gone
  * thing falls back to the nearest place that still exists.
  */
-import type { Target } from "./types";
 
 export type Step =
   | { view: "work"; task: string | null; tab?: "pr"; pane?: string }
@@ -28,14 +27,15 @@ function after(target: string, prefix: string): string | null {
     : null;
 }
 
-export function route(target: Target | string, known: Known): Step | null {
+// `target` is a `Target` (types.ts), or text from a banner that may not be one.
+export function route(target: string, known: Known): Step | null {
   const taskStep = (id: string, extra: { tab?: "pr"; pane?: string } = {}): Step =>
     id === CHAT
       ? { view: "chat", ...(extra.pane ? { pane: extra.pane } : {}) }
       : known.tasks.includes(id)
         ? { view: "work", task: id, ...extra }
-        // Deleted since: the overview, not a blank task.
-        : { view: "work", task: null };
+        : // Deleted since: the overview, not a blank task.
+          { view: "work", task: null };
 
   if (target === "reviews" || target === "tickets") return { view: target };
   if (target === "chat") return { view: "chat" };

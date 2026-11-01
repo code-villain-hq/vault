@@ -124,10 +124,10 @@ export function Shortcuts({
                       <dd className="flex shrink-0 items-center gap-1 text-xs text-faint">
                         {keys.split(/\s+/).map((key, index) =>
                           key === "then" || key === "or" ? (
-                            // biome-ignore lint/suspicious/noArrayIndexKey: the words repeat
+                            // oxlint-disable-next-line react/no-array-index-key -- the words repeat
                             <span key={index}>{key}</span>
                           ) : (
-                            // biome-ignore lint/suspicious/noArrayIndexKey: keys can repeat
+                            // oxlint-disable-next-line react/no-array-index-key -- keys can repeat
                             <kbd key={index} className="ui-kbd">
                               {key}
                             </kbd>

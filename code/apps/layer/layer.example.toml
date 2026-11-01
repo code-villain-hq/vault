@@ -6,11 +6,11 @@
 
 # Required.
 
-company = "Acme Inc"                    # names the workspace and the sign-in button
-public_url = "https://layer.acme.org"   # where people reach Layer
+company = "Acme Inc" # names the workspace and the sign-in button
+public_url = "https://layer.acme.org" # where people reach Layer
 
 [database]
-url = "postgres://layer@localhost/layer"   # or DATABASE_URL
+url = "postgres://layer@localhost/layer" # or DATABASE_URL
 
 # The company's account signs people in (OpenID Connect). Register Layer as a
 # confidential client with the callback <public_url>/api/auth/oidc/callback.

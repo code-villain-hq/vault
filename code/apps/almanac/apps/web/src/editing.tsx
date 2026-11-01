@@ -175,7 +175,6 @@ function Options({
         <button
           key={option}
           type="button"
-          // biome-ignore lint/a11y/noAutofocus: the options open where the value was clicked
           autoFocus={option === value || (i === 0 && !field.options.includes(String(value)))}
           onClick={() => onDone(option)}
           className={`${chip} ${option === value ? "bg-chip font-semibold" : "text-muted"}`}
@@ -217,7 +216,6 @@ function TypeIn({
   };
   return (
     <input
-      // biome-ignore lint/a11y/noAutofocus: the field opens where the value was clicked
       autoFocus
       aria-label={field.name}
       type={date ? "date" : "text"}
@@ -302,7 +300,6 @@ export function NewRow({ block, rows }: { block: Block; rows: Point[] }) {
     >
       <input
         ref={first}
-        // biome-ignore lint/a11y/noAutofocus: New opens to type the row's name
         autoFocus
         aria-label="Name"
         placeholder="Name"

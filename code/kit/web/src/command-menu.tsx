@@ -107,7 +107,6 @@ function Commands({
   return (
     <div>
       <input
-        // biome-ignore lint/a11y/noAutofocus: the menu opens to type into it
         autoFocus
         value={query}
         onChange={(e) => {

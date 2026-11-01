@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { useStore } from "../store";
 import type { PhoneStatus } from "../lib/types";
+import { useStore } from "../store";
 import { PhoneIcon } from "./icons";
 import { ErrorMessage, Field, Switch, useFailure } from "./ui";
 
@@ -13,7 +13,12 @@ function usePhoneStatus(): [PhoneStatus | null, (s: PhoneStatus) => void, () => 
   useEffect(() => {
     let current = true;
     const load = () => {
-      api.phoneStatus().then((s) => { if (current) setStatus(s); }).catch(() => {});
+      api
+        .phoneStatus()
+        .then((s) => {
+          if (current) setStatus(s);
+        })
+        .catch(() => {});
     };
     load();
     const p = listen("phone:changed", load);
@@ -116,7 +121,8 @@ export function PhoneSettings() {
         >
           {status.addresses.length === 0 ? (
             <div className="phone-hint">
-              This Mac has no address on {status.tailscale && !status.home ? "Tailscale" : "these ways"} right now.
+              This Mac has no address on{" "}
+              {status.tailscale && !status.home ? "Tailscale" : "these ways"} right now.
               {status.tailscale && " Is Tailscale running and signed in?"}
             </div>
           ) : (
@@ -124,7 +130,9 @@ export function PhoneSettings() {
               {status.addresses.map((a) => (
                 <div key={a.ip} className="row">
                   <span className="ui-chip">{WAY[a.way]}</span>
-                  <code>http://{a.ip}:{status.port}</code>
+                  <code>
+                    http://{a.ip}:{status.port}
+                  </code>
                   <span className="phone-hint">{a.interface}</span>
                 </div>
               ))}
@@ -151,7 +159,11 @@ export function PhoneSettings() {
         hint="A phone gets in only with a code shown here, and each paired phone has a token of its own. Forget one and it is out at once."
       >
         {status.pairing ? (
-          <Pairing code={status.pairing.code} seconds={status.pairing.seconds_left} onExpired={reload} />
+          <Pairing
+            code={status.pairing.code}
+            seconds={status.pairing.seconds_left}
+            onExpired={reload}
+          />
         ) : (
           <button className="ui-button" disabled={!status.listening} onClick={() => void pair()}>
             Pair a phone
@@ -161,11 +173,18 @@ export function PhoneSettings() {
           <div className="phone-list">
             {status.devices.map((d) => (
               <div key={d.id} className="row">
-                <span className={`dot ${d.connected ? "live" : ""}`} title={d.connected ? "Connected now" : "Not connected"} />
+                <span
+                  className={`dot ${d.connected ? "live" : ""}`}
+                  title={d.connected ? "Connected now" : "Not connected"}
+                />
                 <span>{d.name}</span>
-                <span className="phone-hint">paired {new Date(d.paired_at).toLocaleDateString()}</span>
+                <span className="phone-hint">
+                  paired {new Date(d.paired_at).toLocaleDateString()}
+                </span>
                 <div className="spacer" />
-                <button className="ui-button" onClick={() => void forget(d.id)}>Forget</button>
+                <button className="ui-button" onClick={() => void forget(d.id)}>
+                  Forget
+                </button>
               </div>
             ))}
           </div>
@@ -177,7 +196,15 @@ export function PhoneSettings() {
 }
 
 /** The code to type on the phone, and how long it has left. */
-function Pairing({ code, seconds, onExpired }: { code: string; seconds: number; onExpired: () => void }) {
+function Pairing({
+  code,
+  seconds,
+  onExpired,
+}: {
+  code: string;
+  seconds: number;
+  onExpired: () => void;
+}) {
   const [left, setLeft] = useState(seconds);
   useEffect(() => {
     setLeft(seconds);
@@ -190,10 +217,12 @@ function Pairing({ code, seconds, onExpired }: { code: string; seconds: number; 
   }, [left, onExpired]);
   return (
     <div className="phone-pairing">
-      <div className="phone-code">{code.slice(0, 3)} {code.slice(3)}</div>
+      <div className="phone-code">
+        {code.slice(0, 3)} {code.slice(3)}
+      </div>
       <div className="phone-hint">
-        Open the address above on the phone and type this code. It works once, for {Math.floor(left / 60)}:
-        {String(left % 60).padStart(2, "0")} more.
+        Open the address above on the phone and type this code. It works once, for{" "}
+        {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")} more.
       </div>
     </div>
   );

@@ -37,9 +37,12 @@ export function readable(rows: Row[]): string[] {
       if (out.length && out[out.length - 1] !== "") out.push("");
       continue;
     }
-    const inner = line.trimStart().startsWith("│") || line.trimStart().startsWith("┃") || line.trimStart().startsWith("║")
-      ? line.trim().replace(WALLS, "").trimEnd()
-      : line;
+    const inner =
+      line.trimStart().startsWith("│") ||
+      line.trimStart().startsWith("┃") ||
+      line.trimStart().startsWith("║")
+        ? line.trim().replace(WALLS, "").trimEnd()
+        : line;
     // Runs of padding inside a line were alignment at full width; at a
     // phone's width they only push words onto the next line.
     out.push(inner.replace(/(\S) {3,}/g, "$1  "));

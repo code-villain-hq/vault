@@ -1,13 +1,13 @@
 {
   "name": "almanac",
   "private": true,
-  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*",
     "../../kit/sync/client",
     "../../kit/web"
   ],
+  "type": "module",
   "scripts": {
     "design:sync": "bun scripts/sync-design.ts",
     "db": "docker compose up -d --wait",
@@ -21,15 +21,18 @@
     "release": "bun scripts/release.ts",
     "release:publish": "bun scripts/release.ts publish",
     "gen:types": "bun scripts/gen-types.ts",
-    "typecheck": "tsc -p apps/web && tsc -p apps/web/tsconfig.test.json && tsc -p scripts && tsc -p ../../kit/sync/client && tsc -p ../../kit/web",
-    "lint": "biome check .",
-    "format": "biome check --write .",
+    "typecheck": "vp check --no-fmt --no-lint",
+    "lint": "vp check",
+    "format": "vp check --fix",
     "test": "cargo test --workspace && bun test",
     "check": "bun scripts/check.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
     "@types/bun": "1.4.4",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
   }
 }

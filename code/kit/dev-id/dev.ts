@@ -58,7 +58,7 @@ async function makeDatabase(url: URL, name: string) {
     const [found] = await db`SELECT 1 FROM pg_database WHERE datname = ${name}`;
     if (!found) await db.unsafe(`CREATE DATABASE "${name}"`);
   } catch (e) {
-    throw new Error(`Can't reach Postgres at ${url.host} (bun run db starts it): ${e}`);
+    throw new Error(`Can't reach Postgres at ${url.host} (bun run db starts it): ${String(e)}`);
   } finally {
     await db.close();
   }

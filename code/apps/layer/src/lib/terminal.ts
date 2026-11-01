@@ -1,6 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
-import { isLight, type Theme } from "./theme";
 import code from "../design/syntax.json";
+import { isLight, type Theme } from "./theme";
 
 /**
  * Nightshade's terminal in one mode, from the vault's code palette
@@ -13,16 +13,38 @@ import code from "../design/syntax.json";
  */
 function nightshade(mode: typeof code.night): ITheme {
   const [black, red, green, yellow, blue, magenta, cyan, white] = mode.ansi.normal;
-  const [brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite] =
-    mode.ansi.bright;
+  const [
+    brightBlack,
+    brightRed,
+    brightGreen,
+    brightYellow,
+    brightBlue,
+    brightMagenta,
+    brightCyan,
+    brightWhite,
+  ] = mode.ansi.bright;
   return {
     background: mode.ui.background,
     foreground: mode.syntax.text,
     cursor: mode.ui.cursor,
     cursorAccent: mode.ui.background,
     selectionBackground: mode.ui.selection,
-    black, red, green, yellow, blue, magenta, cyan, white,
-    brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite,
+    black,
+    red,
+    green,
+    yellow,
+    blue,
+    magenta,
+    cyan,
+    white,
+    brightBlack,
+    brightRed,
+    brightGreen,
+    brightYellow,
+    brightBlue,
+    brightMagenta,
+    brightCyan,
+    brightWhite,
   };
 }
 
@@ -36,11 +58,22 @@ const PALETTES: Record<Theme, ITheme> = {
     cursor: "#c0caf5",
     cursorAccent: "#1f2335",
     selectionBackground: "#283457",
-    black: "#15161e", red: "#f7768e", green: "#9ece6a", yellow: "#e0af68",
-    blue: "#7aa2f7", magenta: "#bb9af7", cyan: "#7dcfff", white: "#a9b1d6",
-    brightBlack: "#414868", brightRed: "#f7768e", brightGreen: "#9ece6a",
-    brightYellow: "#e0af68", brightBlue: "#7aa2f7", brightMagenta: "#bb9af7",
-    brightCyan: "#7dcfff", brightWhite: "#c0caf5",
+    black: "#15161e",
+    red: "#f7768e",
+    green: "#9ece6a",
+    yellow: "#e0af68",
+    blue: "#7aa2f7",
+    magenta: "#bb9af7",
+    cyan: "#7dcfff",
+    white: "#a9b1d6",
+    brightBlack: "#414868",
+    brightRed: "#f7768e",
+    brightGreen: "#9ece6a",
+    brightYellow: "#e0af68",
+    brightBlue: "#7aa2f7",
+    brightMagenta: "#bb9af7",
+    brightCyan: "#7dcfff",
+    brightWhite: "#c0caf5",
   },
   // Cursor's own terminal colours (theme-cursor), on the page's --bg rather
   // than its panel's, and opaque where Cursor's are see-through.
@@ -50,11 +83,22 @@ const PALETTES: Record<Theme, ITheme> = {
     cursor: "#f0f0f0",
     cursorAccent: "#181818",
     selectionBackground: "#3b3b3b",
-    black: "#242424", red: "#fc6b83", green: "#3fa266", yellow: "#d2943e",
-    blue: "#81a1c1", magenta: "#b48ead", cyan: "#88c0d0", white: "#f0f0f0",
-    brightBlack: "#9a9a9a", brightRed: "#fc6b83", brightGreen: "#70b489",
-    brightYellow: "#f1b467", brightBlue: "#87a6c4", brightMagenta: "#b48ead",
-    brightCyan: "#88c0d0", brightWhite: "#ffffff",
+    black: "#242424",
+    red: "#fc6b83",
+    green: "#3fa266",
+    yellow: "#d2943e",
+    blue: "#81a1c1",
+    magenta: "#b48ead",
+    cyan: "#88c0d0",
+    white: "#f0f0f0",
+    brightBlack: "#9a9a9a",
+    brightRed: "#fc6b83",
+    brightGreen: "#70b489",
+    brightYellow: "#f1b467",
+    brightBlue: "#87a6c4",
+    brightMagenta: "#b48ead",
+    brightCyan: "#88c0d0",
+    brightWhite: "#ffffff",
   },
   "cursor-light": {
     background: "#fcfcfc",
@@ -62,11 +106,22 @@ const PALETTES: Record<Theme, ITheme> = {
     cursor: "#141414",
     cursorAccent: "#fcfcfc",
     selectionBackground: "#dbdbdb",
-    black: "#141414", red: "#be1744", green: "#007041", yellow: "#8b5700",
-    blue: "#0064b0", magenta: "#92156a", cyan: "#176c74", white: "#6c6c6c",
-    brightBlack: "#505050", brightRed: "#ce405b", brightGreen: "#00854c",
-    brightYellow: "#a46700", brightBlue: "#2778c1", brightMagenta: "#b54e90",
-    brightCyan: "#3b7e84", brightWhite: "#949494",
+    black: "#141414",
+    red: "#be1744",
+    green: "#007041",
+    yellow: "#8b5700",
+    blue: "#0064b0",
+    magenta: "#92156a",
+    cyan: "#176c74",
+    white: "#6c6c6c",
+    brightBlack: "#505050",
+    brightRed: "#ce405b",
+    brightGreen: "#00854c",
+    brightYellow: "#a46700",
+    brightBlue: "#2778c1",
+    brightMagenta: "#b54e90",
+    brightCyan: "#3b7e84",
+    brightWhite: "#949494",
   },
   // Ayu's terminal colours as its extension publishes them, on the page's
   // --bg, with its accent for a cursor as its editor has.
@@ -76,11 +131,22 @@ const PALETTES: Record<Theme, ITheme> = {
     cursor: "#e6b450",
     cursorAccent: "#10141c",
     selectionBackground: "#193155",
-    black: "#1b1f29", red: "#f06b73", green: "#70bf56", yellow: "#fdb04c",
-    blue: "#4fbfff", magenta: "#d0a1ff", cyan: "#93e2c8", white: "#c7c7c7",
-    brightBlack: "#686868", brightRed: "#f07178", brightGreen: "#aad94c",
-    brightYellow: "#ffb454", brightBlue: "#59c2ff", brightMagenta: "#d2a6ff",
-    brightCyan: "#95e6cb", brightWhite: "#ffffff",
+    black: "#1b1f29",
+    red: "#f06b73",
+    green: "#70bf56",
+    yellow: "#fdb04c",
+    blue: "#4fbfff",
+    magenta: "#d0a1ff",
+    cyan: "#93e2c8",
+    white: "#c7c7c7",
+    brightBlack: "#686868",
+    brightRed: "#f07178",
+    brightGreen: "#aad94c",
+    brightYellow: "#ffb454",
+    brightBlue: "#59c2ff",
+    brightMagenta: "#d2a6ff",
+    brightCyan: "#95e6cb",
+    brightWhite: "#ffffff",
   },
   "ayu-light": {
     background: "#fcfcfc",
@@ -88,11 +154,22 @@ const PALETTES: Record<Theme, ITheme> = {
     cursor: "#f29718",
     cursorAccent: "#fcfcfc",
     selectionBackground: "#d7e4f6",
-    black: "#000000", red: "#f06b6c", green: "#6cbf43", yellow: "#e7a100",
-    blue: "#21a1e2", magenta: "#a176cb", cyan: "#4abc96", white: "#c7c7c7",
-    brightBlack: "#686868", brightRed: "#f07171", brightGreen: "#86b300",
-    brightYellow: "#eba400", brightBlue: "#22a4e6", brightMagenta: "#a37acc",
-    brightCyan: "#4cbf99", brightWhite: "#d1d1d1",
+    black: "#000000",
+    red: "#f06b6c",
+    green: "#6cbf43",
+    yellow: "#e7a100",
+    blue: "#21a1e2",
+    magenta: "#a176cb",
+    cyan: "#4abc96",
+    white: "#c7c7c7",
+    brightBlack: "#686868",
+    brightRed: "#f07171",
+    brightGreen: "#86b300",
+    brightYellow: "#eba400",
+    brightBlue: "#22a4e6",
+    brightMagenta: "#a37acc",
+    brightCyan: "#4cbf99",
+    brightWhite: "#d1d1d1",
   },
 };
 
@@ -114,7 +191,11 @@ export const TERMINAL_FONT = '"Atkinson Hyperlegible Mono", ui-monospace, Menlo,
  * waits long: past a second the page draws with what it has.
  */
 export function fontsReady(): Promise<unknown> {
-  const faces = ['13px "Atkinson Hyperlegible Mono"', '14px "Atkinson Hyperlegible Next"', '700 28px "Grenze Gotisch"'];
+  const faces = [
+    '13px "Atkinson Hyperlegible Mono"',
+    '14px "Atkinson Hyperlegible Next"',
+    '700 28px "Grenze Gotisch"',
+  ];
   return Promise.race([
     Promise.all(faces.map((f) => document.fonts.load(f))).catch(() => {}),
     new Promise((done) => setTimeout(done, 1000)),

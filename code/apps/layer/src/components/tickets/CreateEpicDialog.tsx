@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
-import { useStore } from "../../store";
 import type { Ticket, TicketType } from "../../lib/types";
-import { ErrorMessage, Field, Modal, useFailure } from "../ui";
+import { useStore } from "../../store";
 import { IssueTypeIcon, type TypeMap } from "../IssueType";
 import { epicTypes, preferredEpic } from "../task-forms/creatable";
+import { ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { OptimizeDescription } from "./OptimizeDescription";
-import { RequiredFieldPickers, useRequiredFields } from "./RequiredFields";
 import { useProjectChoice } from "./ProjectField";
+import { RequiredFieldPickers, useRequiredFields } from "./RequiredFields";
 
 export function CreateEpicDialog({
   issueTypes,
@@ -41,15 +41,18 @@ export function CreateEpicDialog({
   const typeId = epics.find((t) => t.name === epicType)?.id;
   // Fields the dialog fills itself, whether or not Jira calls them required.
   const rf = useRequiredFields(project.trim(), typeId, [
-    "summary", "description", "issuetype", "project", "parent", "reporter",
+    "summary",
+    "description",
+    "issuetype",
+    "project",
+    "parent",
+    "reporter",
   ]);
   const descriptionRequired = rf.descriptionRequired;
 
   const missing = [
     ...rf.missing,
-    ...(descriptionRequired && !desc.trim()
-      ? [{ id: "description", name: "Description" }]
-      : []),
+    ...(descriptionRequired && !desc.trim() ? [{ id: "description", name: "Description" }] : []),
   ];
 
   async function createEpic() {
@@ -84,16 +87,12 @@ export function CreateEpicDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="ui-button" onClick={onClose}>Cancel</button>
+          <button className="ui-button" onClick={onClose}>
+            Cancel
+          </button>
           <button
             className="ui-button ui-button-primary"
-            disabled={
-              busy ||
-              !summary.trim() ||
-              !epicType ||
-              !project.trim() ||
-              missing.length > 0
-            }
+            disabled={busy || !summary.trim() || !epicType || !project.trim() || missing.length > 0}
             title={
               missing.length > 0
                 ? `${missing.map((f) => f.name).join(", ")} required by this project`
@@ -107,19 +106,22 @@ export function CreateEpicDialog({
       }
     >
       <div className="muted" style={{ marginBottom: 12, lineHeight: 1.6 }}>
-        Creates a top-level epic in the {place.github ? "repository" : "project"} you pick. Then pick its
-        repositories to write its spec: its tasks become its sub-tasks.
+        Creates a top-level epic in the {place.github ? "repository" : "project"} you pick. Then
+        pick its repositories to write its spec: its tasks become its sub-tasks.
       </div>
 
       {place.field("epic")}
 
       <Field label="Summary">
-        <input className="ui-field"
+        <input
+          className="ui-field"
           autoFocus
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           placeholder="What this epic covers"
-          onKeyDown={(e) => { if (e.key === "Enter") void createEpic(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void createEpic();
+          }}
         />
       </Field>
 
@@ -143,12 +145,11 @@ export function CreateEpicDialog({
       <Field
         label="Description"
         hint={
-          descriptionRequired
-            ? "Required by this project."
-            : "Optional. Becomes the epic body."
+          descriptionRequired ? "Required by this project." : "Optional. Becomes the epic body."
         }
       >
-        <textarea className="ui-field"
+        <textarea
+          className="ui-field"
           rows={5}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}

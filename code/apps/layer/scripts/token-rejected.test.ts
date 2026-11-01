@@ -22,7 +22,10 @@ describe("a token GitHub refused (PR-12)", () => {
     backend.githubAllPrs = async () => {
       calls++;
       const now = answer;
-      if (calls === 1) await new Promise<void>((r) => { release = r; });
+      if (calls === 1)
+        await new Promise<void>((r) => {
+          release = r;
+        });
       return structuredClone(now);
     };
     const first = useStore.getState().refreshPrs();

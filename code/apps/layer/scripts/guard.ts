@@ -69,7 +69,12 @@ function allowed(file: string, line: number, rule: string): boolean {
     const m = lines[i]?.match(new RegExp(`guard: allow ${rule}\\b(.*)$`));
     if (!m) continue;
     if (m[1].replace(/[\s—:-]/g, "").length < 4) {
-      report(rule, file, i + 1, `This exception has no reason. Write why: // guard: allow ${rule} — <why>.`);
+      report(
+        rule,
+        file,
+        i + 1,
+        `This exception has no reason. Write why: // guard: allow ${rule} — <why>.`,
+      );
     }
     return true;
   }
@@ -101,9 +106,13 @@ function maskRust(src: string): string {
       let depth = 1;
       let j = i + 2;
       while (j < n && depth > 0) {
-        if (src[j] === "/" && src[j + 1] === "*") { depth++; j += 2; }
-        else if (src[j] === "*" && src[j + 1] === "/") { depth--; j += 2; }
-        else j++;
+        if (src[j] === "/" && src[j + 1] === "*") {
+          depth++;
+          j += 2;
+        } else if (src[j] === "*" && src[j + 1] === "/") {
+          depth--;
+          j += 2;
+        } else j++;
       }
       blank(i, j);
       i = j;
@@ -114,8 +123,14 @@ function maskRust(src: string): string {
     ) {
       let j = i + 1;
       let hashes = 0;
-      while (src[j] === "#") { hashes++; j++; }
-      if (src[j] !== '"') { i++; continue; }
+      while (src[j] === "#") {
+        hashes++;
+        j++;
+      }
+      if (src[j] !== '"') {
+        i++;
+        continue;
+      }
       const close = '"' + "#".repeat(hashes);
       const end = src.indexOf(close, j + 1);
       const stop = end === -1 ? n : end;
@@ -155,7 +170,9 @@ function withoutTests(masked: string): string {
   // source. Emptied, everything after a test-only method mid-file (a
   // `for_tests` constructor) moved, and an event emitted below one was read
   // as whatever text sat that many characters earlier.
-  const drop = (k: number) => { lines[k] = " ".repeat(lines[k].length); };
+  const drop = (k: number) => {
+    lines[k] = " ".repeat(lines[k].length);
+  };
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() !== "#[cfg(test)]") continue;
     const close = lines[i].slice(0, lines[i].indexOf("#")) + "}";
@@ -232,14 +249,21 @@ function splitTopLevel(s: string): string[] {
 
 const commands: Command[] = [];
 for (const [file, { code }] of rust) {
-  const re = /#\[tauri::command[^\]]*\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?(async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(/g;
-  for (let m; (m = re.exec(code)); ) {
+  const re =
+    /#\[tauri::command[^\]]*\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?(async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*\(/g;
+  for (let m; (m = re.exec(code));) {
     const open = m.index + m[0].length - 1;
     const close = closing(code, open);
     const params = splitTopLevel(code.slice(open + 1, close))
       .map((p) => {
         const colon = p.indexOf(":");
-        return { name: p.slice(0, colon).replace(/^mut\s+/, "").trim(), type: p.slice(colon + 1).trim() };
+        return {
+          name: p
+            .slice(0, colon)
+            .replace(/^mut\s+/, "")
+            .trim(),
+          type: p.slice(colon + 1).trim(),
+        };
       })
       .filter((p) => !INJECTED.test(p.type))
       .map((p) => ({ name: p.name, optional: p.type.startsWith("Option<") }));
@@ -261,8 +285,12 @@ const registered = new Set([...(handler?.[1] ?? "").matchAll(/(?:\w+::)*(\w+)/g)
 
 for (const c of commands) {
   if (!registered.has(c.name)) {
-    report("command-registered", c.file, c.line,
-      `\`${c.name}\` is a #[tauri::command] that is not in generate_handler! in ${libRs}, so nothing can call it. Register it, or delete it.`);
+    report(
+      "command-registered",
+      c.file,
+      c.line,
+      `\`${c.name}\` is a #[tauri::command] that is not in generate_handler! in ${libRs}, so nothing can call it. Register it, or delete it.`,
+    );
   }
 }
 
@@ -277,8 +305,12 @@ for (const f of tsFiles) {
   const text = read(f);
   const m = text.match(/import\s*\{[^}]*\binvoke\b[^}]*\}\s*from\s*["']@tauri-apps\/api\/core["']/);
   if (m) {
-    report("api-only", f, lineAt(text, m.index!),
-      `Calls \`invoke\` directly. Every command goes through ${apiTs}, which is the one place the frontend's view of the backend is written down — add a wrapper there and call that.`);
+    report(
+      "api-only",
+      f,
+      lineAt(text, m.index!),
+      `Calls \`invoke\` directly. Every command goes through ${apiTs}, which is the one place the frontend's view of the backend is written down — add a wrapper there and call that.`,
+    );
   }
 }
 
@@ -297,15 +329,31 @@ function objectKeys(s: string, open: number): string[] | null {
   let expectKey = true;
   for (let i = open; i < s.length; i++) {
     const c = s[i];
-    if (c === '"' || c === "'" || c === "`") { i = skipJsString(s, i) - 1; continue; }
-    if ("{([".includes(c)) { depth++; if (depth === 1) expectKey = true; continue; }
-    if ("})]".includes(c)) { if (--depth === 0) return keys; continue; }
+    if (c === '"' || c === "'" || c === "`") {
+      i = skipJsString(s, i) - 1;
+      continue;
+    }
+    if ("{([".includes(c)) {
+      depth++;
+      if (depth === 1) expectKey = true;
+      continue;
+    }
+    if ("})]".includes(c)) {
+      if (--depth === 0) return keys;
+      continue;
+    }
     if (depth !== 1) continue;
-    if (c === ",") { expectKey = true; continue; }
+    if (c === ",") {
+      expectKey = true;
+      continue;
+    }
     if (expectKey && /[A-Za-z_$.]/.test(c)) {
       if (s.startsWith("...", i)) return null;
       const m = s.slice(i).match(/^[A-Za-z_$][\w$]*/);
-      if (m) { keys.push(m[0]); i += m[0].length - 1; }
+      if (m) {
+        keys.push(m[0]);
+        i += m[0].length - 1;
+      }
       expectKey = false;
     }
   }
@@ -320,15 +368,23 @@ for (const m of api.matchAll(/\binvoke\s*(?:<[\s\S]*?>)?\s*\(\s*"(\w+)"\s*(,\s*\
   invoked.set(name, line);
   const cmd = byName.get(name);
   if (!cmd) {
-    report("api-command-exists", apiTs, line,
-      `Invokes \`${name}\`, which is not a #[tauri::command] in src-tauri/src. It fails at runtime with "command not found". Fix the name, or remove the wrapper.`);
+    report(
+      "api-command-exists",
+      apiTs,
+      line,
+      `Invokes \`${name}\`, which is not a #[tauri::command] in src-tauri/src. It fails at runtime with "command not found". Fix the name, or remove the wrapper.`,
+    );
     continue;
   }
   if (!m[2]) {
     const needed = cmd.params.filter((p) => !p.optional);
     if (needed.length) {
-      report("api-args", apiTs, line,
-        `\`${name}\` needs ${needed.map((p) => camel(p.name)).join(", ")} (${cmd.file}:${cmd.line}), and is invoked with no arguments.`);
+      report(
+        "api-args",
+        apiTs,
+        line,
+        `\`${name}\` needs ${needed.map((p) => camel(p.name)).join(", ")} (${cmd.file}:${cmd.line}), and is invoked with no arguments.`,
+      );
     }
     continue;
   }
@@ -337,34 +393,56 @@ for (const m of api.matchAll(/\binvoke\s*(?:<[\s\S]*?>)?\s*\(\s*"(\w+)"\s*(,\s*\
   const expected = new Map(cmd.params.map((p) => [camel(p.name), p]));
   for (const k of keys) {
     if (!expected.has(k)) {
-      const hint = k.includes("_") ? ` Tauri renames Rust's snake_case parameters to camelCase — send \`${camel(k)}\`.` : "";
-      report("api-args", apiTs, line,
-        `\`${name}\` is sent \`${k}\`, which is not one of its parameters (${[...expected.keys()].join(", ") || "none"}; ${cmd.file}:${cmd.line}).${hint}`);
+      const hint = k.includes("_")
+        ? ` Tauri renames Rust's snake_case parameters to camelCase — send \`${camel(k)}\`.`
+        : "";
+      report(
+        "api-args",
+        apiTs,
+        line,
+        `\`${name}\` is sent \`${k}\`, which is not one of its parameters (${[...expected.keys()].join(", ") || "none"}; ${cmd.file}:${cmd.line}).${hint}`,
+      );
     }
   }
   for (const [k, p] of expected) {
     if (!p.optional && !keys.includes(k)) {
-      report("api-args", apiTs, line,
-        `\`${name}\` needs \`${k}\` (${cmd.file}:${cmd.line}); without it the call fails at runtime.`);
+      report(
+        "api-args",
+        apiTs,
+        line,
+        `\`${name}\` needs \`${k}\` (${cmd.file}:${cmd.line}); without it the call fails at runtime.`,
+      );
     }
   }
 }
 
 for (const c of commands) {
   if (registered.has(c.name) && !invoked.has(c.name)) {
-    report("dead-command", c.file, c.line,
-      `\`${c.name}\` is registered but nothing in ${apiTs} invokes it. Dead code goes: remove it from its module, from generate_handler! and from the types on both sides.`);
+    report(
+      "dead-command",
+      c.file,
+      c.line,
+      `\`${c.name}\` is registered but nothing in ${apiTs} invokes it. Dead code goes: remove it from its module, from generate_handler! and from the types on both sides.`,
+    );
   }
 }
 
-// Wrappers nobody calls are dead too.
+// Wrappers nobody calls are dead too. A call may be chained onto `api` on
+// the line before it, as the formatter breaks a long one.
 const apiBody = api.slice(api.indexOf("export const api = {"));
 const wrappers = [...apiBody.matchAll(/^ {2}(\w+):/gm)].map((m) => m[1]);
-const everythingElse = tsFiles.filter((f) => f !== apiTs).map(read).join("\n");
+const everythingElse = tsFiles
+  .filter((f) => f !== apiTs)
+  .map(read)
+  .join("\n");
 for (const w of wrappers) {
-  if (!new RegExp(`\\bapi\\.${w}\\b`).test(everythingElse)) {
-    report("dead-wrapper", apiTs, lineAt(api, api.indexOf(`  ${w}:`)),
-      `\`api.${w}\` is never called. Dead code goes — remove it, and its command if nothing else uses that.`);
+  if (!new RegExp(`\\bapi\\s*\\.${w}\\b`).test(everythingElse)) {
+    report(
+      "dead-wrapper",
+      apiTs,
+      lineAt(api, api.indexOf(`  ${w}:`)),
+      `\`api.${w}\` is never called. Dead code goes — remove it, and its command if nothing else uses that.`,
+    );
   }
 }
 
@@ -388,14 +466,22 @@ for (const f of tsFiles) {
 }
 for (const [name, at] of emitted) {
   if (!listened.has(name)) {
-    report("event-sync", at.file, at.line,
-      `Emits "${name}", which nothing in src/ listens for. Either the listener was removed and this should go too, or the name is wrong.`);
+    report(
+      "event-sync",
+      at.file,
+      at.line,
+      `Emits "${name}", which nothing in src/ listens for. Either the listener was removed and this should go too, or the name is wrong.`,
+    );
   }
 }
 for (const [name, at] of listened) {
   if (!emitted.has(name)) {
-    report("event-sync", at.file, at.line,
-      `Listens for "${name}", which the backend never emits. The UI will wait for it forever.`);
+    report(
+      "event-sync",
+      at.file,
+      at.line,
+      `Listens for "${name}", which the backend never emits. The UI will wait for it forever.`,
+    );
   }
 }
 
@@ -408,9 +494,11 @@ for (const [name, at] of listened) {
  * window; an async one runs on the runtime's workers, which the MCP server
  * and the HTTP clients share.
  */
-const WAITS = /\bgit::\w+|Command::new|thread::sleep|\bblock_on\b|\bread_dir\b|\.wait\(\)|\.wait_with_output\(\)|\bstd::process::/g;
+const WAITS =
+  /\bgit::\w+|Command::new|thread::sleep|\bblock_on\b|\bread_dir\b|\.wait\(\)|\.wait_with_output\(\)|\bstd::process::/g;
 /** Calls that move a closure onto a thread of its own. */
-const OFFLOADS = /\b(blocking|off_runtime|spawn_blocking|thread::spawn|thread::scope|std::thread::Builder)\b/g;
+const OFFLOADS =
+  /\b(blocking|off_runtime|spawn_blocking|thread::spawn|thread::scope|std::thread::Builder)\b/g;
 
 for (const c of commands) {
   const { code } = rust.get(c.file)!;
@@ -426,9 +514,14 @@ for (const c of commands) {
     const line = lineAt(code, from + m.index!);
     const rule = c.async ? "runtime-blocking" : "main-thread";
     if (allowed(c.file, line, rule)) continue;
-    report(rule, c.file, line, c.async
-      ? `\`${m[0]}\` directly in async command \`${c.name}\`. Async commands run on the tokio workers the MCP server and the Jira/GitHub/Slack clients share; waiting on one stalls them. Wrap the work: commands::blocking(app, move |state| …) or commands::off_runtime(move || …).`
-      : `\`${m[0]}\` in \`${c.name}\`, a plain #[tauri::command] fn — those run on the main thread, and while it waits no event reaches the webview: terminals stop printing and the window stops answering. Make the command async and move the work into commands::blocking.`);
+    report(
+      rule,
+      c.file,
+      line,
+      c.async
+        ? `\`${m[0]}\` directly in async command \`${c.name}\`. Async commands run on the tokio workers the MCP server and the Jira/GitHub/Slack clients share; waiting on one stalls them. Wrap the work: commands::blocking(app, move |state| …) or commands::off_runtime(move || …).`
+        : `\`${m[0]}\` in \`${c.name}\`, a plain #[tauri::command] fn — those run on the main thread, and while it waits no event reaches the webview: terminals stop printing and the window stops answering. Make the command async and move the work into commands::blocking.`,
+    );
   }
 }
 
@@ -437,21 +530,30 @@ for (const f of tsFiles) {
   lines.forEach((l, i) => {
     if (!/\bsetInterval\s*\(/.test(l) || /^\s*(\/\/|\*)/.test(l)) return;
     if (allowed(f, i + 1, "poll")) return;
-    report("poll", f, i + 1,
-      `A new setInterval. macOS throttles a hidden webview's timers, and every poll is work repeated whether or not anything changed. Prefer an event from the backend (see docs/architecture.md, "Events"). If polling really is the answer, poll only while \`appActive\`, and say why: // guard: allow poll — <why an event cannot do this>.`);
+    report(
+      "poll",
+      f,
+      i + 1,
+      `A new setInterval. macOS throttles a hidden webview's timers, and every poll is work repeated whether or not anything changed. Prefer an event from the backend (see docs/architecture.md, "Events"). If polling really is the answer, poll only while \`appActive\`, and say why: // guard: allow poll — <why an event cannot do this>.`,
+    );
   });
 }
 
 // ---------------------------------------------------------------------------
 // Robustness and hygiene
 
-const PANICS = /\.unwrap\(\)|\.expect\(|\bpanic!\(|\btodo!\(|\bunimplemented!\(|\bunreachable!\(|\bdbg!\(/g;
+const PANICS =
+  /\.unwrap\(\)|\.expect\(|\bpanic!\(|\btodo!\(|\bunimplemented!\(|\bunreachable!\(|\bdbg!\(/g;
 for (const [file, { code }] of rust) {
   for (const m of code.matchAll(PANICS)) {
     const line = lineAt(code, m.index!);
     if (allowed(file, line, "panic")) continue;
-    report("panic", file, line,
-      `\`${m[0]}\` outside tests. A panic quits the app (the panic hook in lib.rs aborts), and that takes every running agent down with it. Return an error (\`?\`, ok_or, unwrap_or_else) instead.`);
+    report(
+      "panic",
+      file,
+      line,
+      `\`${m[0]}\` outside tests. A panic quits the app (the panic hook in lib.rs aborts), and that takes every running agent down with it. Return an error (\`?\`, ok_or, unwrap_or_else) instead.`,
+    );
   }
 }
 
@@ -464,22 +566,34 @@ for (const [file, { code }] of rust) {
   const toml = read("Cargo.toml");
   const profile = /^\[profile\.release\]\n([^[]*)/m.exec(toml);
   if (!profile || !/^panic\s*=\s*"unwind"\s*$/m.test(profile[1])) {
-    report("unwind", "Cargo.toml", profile ? lineAt(toml, profile.index) : 1,
-      `The release profile must say panic = "unwind". An exception AppKit raises inside an event (macOS 27's text-selection UI does) has to unwind back through tao's Rust frames to NSApplication, which logs it and carries on. Under "abort" no Rust frame can be unwound through, and the app quits with every agent in it. A panic of ours still quits: the panic hooks abort.`);
+    report(
+      "unwind",
+      "Cargo.toml",
+      profile ? lineAt(toml, profile.index) : 1,
+      `The release profile must say panic = "unwind". An exception AppKit raises inside an event (macOS 27's text-selection UI does) has to unwind back through tao's Rust frames to NSApplication, which logs it and carries on. Under "abort" no Rust frame can be unwound through, and the app quits with every agent in it. A panic of ours still quits: the panic hooks abort.`,
+    );
   }
 
   const lock = read("Cargo.lock");
   const tao = /^name = "tao"\nversion = "(\d+)\.(\d+)\.(\d+)"/m.exec(lock);
   const [major, minor, patch] = tao ? tao.slice(1).map(Number) : [];
   if (tao && major === 0 && (minor < 37 || (minor === 37 && patch < 2))) {
-    report("unwind", "Cargo.lock", lineAt(lock, tao.index),
-      `tao ${tao.slice(1).join(".")}'s Objective-C callbacks are extern "C", so an exception AppKit raises inside an event aborts the app in tao's sendEvent: instead of reaching NSApplication. 0.37.2 is the first that lets it through (tauri-apps/tao#1354): cargo update -p tao.`);
+    report(
+      "unwind",
+      "Cargo.lock",
+      lineAt(lock, tao.index),
+      `tao ${tao.slice(1).join(".")}'s Objective-C callbacks are extern "C", so an exception AppKit raises inside an event aborts the app in tao's sendEvent: instead of reaching NSApplication. 0.37.2 is the first that lets it through (tauri-apps/tao#1354): cargo update -p tao.`,
+    );
   }
 
   for (const file of ["src-tauri/src/lib.rs", "crates/server/src/main.rs"]) {
     if (!/set_hook\(Box::new\([\s\S]*?std::process::abort\(\);\s*\}\)\);/.test(read(file))) {
-      report("unwind", file, 1,
-        `The panic hook here must end in std::process::abort(). Release builds unwind (for AppKit's exceptions), so without it a panic ends only the task it happened in, and the app or server runs on with part of it gone and nobody told.`);
+      report(
+        "unwind",
+        file,
+        1,
+        `The panic hook here must end in std::process::abort(). Release builds unwind (for AppKit's exceptions), so without it a panic ends only the task it happened in, and the app or server runs on with part of it gone and nobody told.`,
+      );
     }
   }
 }
@@ -487,8 +601,12 @@ for (const [file, { code }] of rust) {
 for (const [file, { code }] of rust) {
   if (file === "src-tauri/src/git.rs") continue;
   for (const m of code.matchAll(/Command::new\(\s*"git"/g)) {
-    report("git-only-in-git-rs", file, lineAt(code, m.index!),
-      `Runs git outside git.rs. git.rs is the only place that shells out to git, because it is where the flags that defend against the user's own git config live (see docs/architecture.md, "Git"). Add a function there.`);
+    report(
+      "git-only-in-git-rs",
+      file,
+      lineAt(code, m.index!),
+      `Runs git outside git.rs. git.rs is the only place that shells out to git, because it is where the flags that defend against the user's own git config live (see docs/architecture.md, "Git"). Add a function there.`,
+    );
   }
 }
 
@@ -498,8 +616,12 @@ for (const [file, { masked, code }] of rust) {
   const open = masked.indexOf("{", at);
   const rest = masked.slice(closing(masked, open) + 1);
   if (rest.trim()) {
-    report("tests-last", file, lineAt(masked, at),
-      "The test module is not the last thing in the file. Keep it last: the size ceiling and the panic rule count everything above it as shipped code.");
+    report(
+      "tests-last",
+      file,
+      lineAt(masked, at),
+      "The test module is not the last thing in the file. Keep it last: the size ceiling and the panic rule count everything above it as shipped code.",
+    );
   }
   void code;
 }
@@ -510,7 +632,12 @@ for (const f of tsFiles) {
     if (/^\s*(\/\/|\*)/.test(l)) return;
     const m = l.match(/\bconsole\.(log|debug|info)\s*\(|\bdebugger\b/);
     if (m && !allowed(f, i + 1, "console")) {
-      report("console", f, i + 1, `\`${m[0]}\` left in. Remove it; for something the user should see, use the store's \`toast\`.`);
+      report(
+        "console",
+        f,
+        i + 1,
+        `\`${m[0]}\` left in. Remove it; for something the user should see, use the store's \`toast\`.`,
+      );
     }
   });
 }
@@ -524,8 +651,12 @@ for (const f of tsFiles) {
   lines.forEach((l, i) => {
     if (!/\buse\w*Store\(\s*\(\w+\)\s*=>[^;]*\?\?\s*(\[\s*\]|\{\s*\})\s*\)/.test(l)) return;
     if (allowed(f, i + 1, "selector-fallback")) return;
-    report("selector-fallback", f, i + 1,
-      "A store selector that returns a new `[]` or `{}` when the field is missing re-renders forever. Put the fallback outside the selector: `useStore((s) => s.x) ?? []`.");
+    report(
+      "selector-fallback",
+      f,
+      i + 1,
+      "A store selector that returns a new `[]` or `{}` when the field is missing re-renders forever. Put the fallback outside the selector: `useStore((s) => s.x) ?? []`.",
+    );
   });
 }
 
@@ -543,16 +674,19 @@ const DEFAULT_CEILING = 600;
 const CEILINGS: Record<string, number> = {
   // One sheet by design (docs/recipes.md: each area's section, the tokens
   // on :root); reviewing in the app (DIFF-6, REV-9..11, PR-11) added its
-  // sections, and the browser panel (BRW-9) its own.
-  "src/styles.css": 2000,
-  "src/components/DiffView.tsx": 1100,
-  "src/components/PrPanel.tsx": 800,
+  // sections, and the browser panel (BRW-9) its own. Oxfmt, once it
+  // formatted the frontend too, gave each rule a line per declaration: 3292.
+  "src/styles.css": 3400,
+  // Oxfmt's line breaks took DiffView to 1103 and PrPanel to 871.
+  "src/components/DiffView.tsx": 1150,
+  "src/components/PrPanel.tsx": 900,
   "src/store.ts": 800,
   "src/components/Terminals.tsx": 700,
   // The panel and its bar are one view (BRW-9); each control in the bar
   // that does more than a call is its own component (SaveSignIn,
-  // BrowserScreenshot), and placing the screenshot's took it to 601.
-  "src/components/BrowserPanel.tsx": 620,
+  // BrowserScreenshot), and placing the screenshot's took it to 601, and
+  // Oxfmt's line breaks to 683.
+  "src/components/BrowserPanel.tsx": 700,
   "src-tauri/src/commands/jira.rs": 1400,
   "src-tauri/src/pty.rs": 1350,
   "src-tauri/src/commands/github.rs": 1100,
@@ -586,10 +720,16 @@ const CEILINGS: Record<string, number> = {
   // rustfmt, once it checked the app's code too, set the one-line choice of
   // how a conversation opens over seven lines: 601.
   "src-tauri/src/acp/conn.rs": 620,
+  // Oxfmt broke these files' long lines and took them past the default, with
+  // no new code: TicketsView 637, ui 608, types 613.
+  "src/components/tickets/TicketsView.tsx": 660,
+  "src/components/ui.tsx": 640,
+  "src/lib/types.ts": 640,
 };
 
 for (const f of files) {
-  if (!/^(src|src-tauri\/src)\/.*\.(ts|tsx|css|rs)$/.test(f) || f.startsWith("src/__mock__/")) continue;
+  if (!/^(src|src-tauri\/src)\/.*\.(ts|tsx|css|rs)$/.test(f) || f.startsWith("src/__mock__/"))
+    continue;
   let count: number;
   if (f.endsWith(".rs")) {
     const { masked } = rust.get(f)!;
@@ -600,12 +740,22 @@ for (const f of files) {
   }
   const ceiling = CEILINGS[f] ?? DEFAULT_CEILING;
   if (count > ceiling) {
-    report("file-size", f, count,
-      `${count} lines, past its ceiling of ${ceiling}. Split it along a seam instead of growing it (docs/recipes.md, "Splitting a file"). If the growth really belongs here, raise its entry in scripts/guard.ts and say why in the pull request.`);
+    report(
+      "file-size",
+      f,
+      count,
+      `${count} lines, past its ceiling of ${ceiling}. Split it along a seam instead of growing it (docs/recipes.md, "Splitting a file"). If the growth really belongs here, raise its entry in scripts/guard.ts and say why in the pull request.`,
+    );
   }
 }
 for (const f of Object.keys(CEILINGS)) {
-  if (!files.includes(f)) report("file-size", "scripts/guard.ts", 1, `CEILINGS lists ${f}, which no longer exists. Remove the entry.`);
+  if (!files.includes(f))
+    report(
+      "file-size",
+      "scripts/guard.ts",
+      1,
+      `CEILINGS lists ${f}, which no longer exists. Remove the entry.`,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -616,15 +766,27 @@ const architecture = existsSync("docs/architecture.md") ? read("docs/architectur
 
 // Every file that defines MCP tools: the browser's are kept with the browser,
 // Grafana's with the rest of Grafana, S3's with the rest of S3.
-for (const file of ["src-tauri/src/mcp.rs", "src-tauri/src/browser/tools.rs", "src-tauri/src/commands/grafana.rs", "src-tauri/src/commands/s3_logs.rs", "src-tauri/src/commands/finish_tool.rs", "src-tauri/src/commands/epic_tools.rs", "src-tauri/src/commands/tracker_tools.rs"]) {
+for (const file of [
+  "src-tauri/src/mcp.rs",
+  "src-tauri/src/browser/tools.rs",
+  "src-tauri/src/commands/grafana.rs",
+  "src-tauri/src/commands/s3_logs.rs",
+  "src-tauri/src/commands/finish_tool.rs",
+  "src-tauri/src/commands/epic_tools.rs",
+  "src-tauri/src/commands/tracker_tools.rs",
+]) {
   const mcp = rust.get(file);
   if (!mcp) continue;
   for (const m of mcp.code.matchAll(/\btool\(\s*"/g)) {
     const start = m.index! + m[0].length;
     const name = mcp.raw.slice(start, mcp.raw.indexOf('"', start));
     if (!features.includes(`\`${name}\``)) {
-      report("docs-sync", file, lineAt(mcp.raw, m.index!),
-        `MCP tool \`${name}\` is not in the tool table in docs/features.md. Agents' users read that table to know what an agent can do on their behalf.`);
+      report(
+        "docs-sync",
+        file,
+        lineAt(mcp.raw, m.index!),
+        `MCP tool \`${name}\` is not in the tool table in docs/features.md. Agents' users read that table to know what an agent can do on their behalf.`,
+      );
     }
   }
 }
@@ -635,26 +797,39 @@ if (agentsRs) {
     const start = m.index! + m[0].length;
     const id = agentsRs.raw.slice(start, agentsRs.raw.indexOf('"', start));
     if (!features.includes(`\`${id}\``)) {
-      report("docs-sync", "src-tauri/src/agents.rs", lineAt(agentsRs.raw, m.index!),
-        `Agent CLI \`${id}\` is not in the agent table in docs/features.md.`);
+      report(
+        "docs-sync",
+        "src-tauri/src/agents.rs",
+        lineAt(agentsRs.raw, m.index!),
+        `Agent CLI \`${id}\` is not in the agent table in docs/features.md.`,
+      );
     }
   }
 }
 
 for (const [name, at] of emitted) {
   if (!architecture.includes(`\`${name}\``)) {
-    report("docs-sync", at.file, at.line, `Event \`${name}\` is not in the events table in docs/architecture.md.`);
+    report(
+      "docs-sync",
+      at.file,
+      at.line,
+      `Event \`${name}\` is not in the events table in docs/architecture.md.`,
+    );
   }
 }
 
 // ---------------------------------------------------------------------------
 
 if (problems.length === 0) {
-  console.log(`guard: ok — ${commands.length} commands, ${emitted.size} events, ${files.length} files checked`);
+  console.log(
+    `guard: ok — ${commands.length} commands, ${emitted.size} events, ${files.length} files checked`,
+  );
   process.exit(0);
 }
 
 problems.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 for (const p of problems) console.error(`${p.file}:${p.line}  [${p.rule}]\n  ${p.message}\n`);
-console.error(`guard: ${problems.length} problem${problems.length === 1 ? "" : "s"}. Each rule is explained in AGENTS.md, "Guard rules".`);
+console.error(
+  `guard: ${problems.length} problem${problems.length === 1 ? "" : "s"}. Each rule is explained in AGENTS.md, "Guard rules".`,
+);
 process.exit(1);

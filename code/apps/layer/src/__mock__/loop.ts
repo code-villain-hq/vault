@@ -18,8 +18,8 @@ const FAILED = [
   "guard: ok — 128 commands, 16 events, 263 files checked",
   "src/components/Login.test.tsx:",
   "✗ signs in with a saved password [12.40ms]",
-  "  expected: \"Welcome back\"",
-  "  received: \"Sign in\"",
+  '  expected: "Welcome back"',
+  '  received: "Sign in"',
   "",
   " 41 pass",
   " 1 fail",
@@ -30,16 +30,38 @@ function run(round: number, passed: boolean): LoopCheckRun {
     at: new Date().toISOString(),
     round,
     results: [
-      { repo: "web", command: "bun run check", passed, code: passed ? 0 : 1, secs: passed ? 41.2 : 39.8, output: passed ? "41 pass\n0 fail" : FAILED },
-      { repo: "api", command: "cargo test", passed: true, code: 0, secs: 63.1, output: "test result: ok. 212 passed" },
+      {
+        repo: "web",
+        command: "bun run check",
+        passed,
+        code: passed ? 0 : 1,
+        secs: passed ? 41.2 : 39.8,
+        output: passed ? "41 pass\n0 fail" : FAILED,
+      },
+      {
+        repo: "api",
+        command: "cargo test",
+        passed: true,
+        code: 0,
+        secs: 63.1,
+        output: "test result: ok. 212 passed",
+      },
     ],
   };
 }
 
 function view(pane: string, task: string, phase: LoopPhase): LoopView {
   return {
-    pane_id: pane, task_id: task, phase, round: 0, rounds: 5, started_at: new Date().toISOString(),
-    repos: ["web", "api"], checking: null, note: null, runs: [],
+    pane_id: pane,
+    task_id: task,
+    phase,
+    round: 0,
+    rounds: 5,
+    started_at: new Date().toISOString(),
+    repos: ["web", "api"],
+    checking: null,
+    note: null,
+    runs: [],
   };
 }
 
@@ -60,21 +82,37 @@ function step(pane: string, after: number, change: (v: LoopView) => void) {
 /** The states a seeded loop can be shown in. */
 export function seedLoop(pane: string, task: string, phase: string) {
   const v = view(pane, task, "waiting");
-  if (phase === "checking") Object.assign(v, { phase, checking: "web", runs: [run(0, false)], round: 1 });
+  if (phase === "checking")
+    Object.assign(v, { phase, checking: "web", runs: [run(0, false)], round: 1 });
   if (phase === "held") {
     Object.assign(v, {
-      phase, round: 1, runs: [run(0, false)],
+      phase,
+      round: 1,
+      runs: [run(0, false)],
       note: "The agent ended its turn without changing anything: it may be asking you something. The loop goes on after a turn that changes something.",
     });
   }
-  if (phase === "passed") Object.assign(v, { phase, round: 1, runs: [run(1, true), run(0, false)], note: "The checks pass, after 1 round." });
+  if (phase === "passed")
+    Object.assign(v, {
+      phase,
+      round: 1,
+      runs: [run(1, true), run(0, false)],
+      note: "The checks pass, after 1 round.",
+    });
   if (phase === "gave_up") {
-    Object.assign(v, { phase, round: 5, runs: [5, 4, 3, 2, 1, 0].map((r) => run(r, false)), note: "The checks still fail after 5 rounds." });
+    Object.assign(v, {
+      phase,
+      round: 5,
+      runs: [5, 4, 3, 2, 1, 0].map((r) => run(r, false)),
+      note: "The checks still fail after 5 rounds.",
+    });
   }
   loops.set(pane, v);
 }
 
-export function loopAnswers(projects: Project[]): Record<string, (a: Record<string, unknown>) => unknown> {
+export function loopAnswers(
+  projects: Project[],
+): Record<string, (a: Record<string, unknown>) => unknown> {
   return {
     loop_view: (a) => structuredClone(loops.get(a.paneId as string) ?? null),
     set_project_check: (a) => {
@@ -85,16 +123,24 @@ export function loopAnswers(projects: Project[]): Record<string, (a: Record<stri
     start_loop: (a) => {
       const pane = a.paneId as string;
       const old = loops.get(pane);
-      if (old && !["passed", "gave_up", "stopped"].includes(old.phase)) throw "This agent is on a loop already.";
+      if (old && !["passed", "gave_up", "stopped"].includes(old.phase))
+        throw "This agent is on a loop already.";
       const v = { ...view(pane, "t-login", "waiting"), rounds: a.rounds as number };
       loops.set(pane, v);
       step(pane, 1200, (v) => Object.assign(v, { phase: "checking", checking: "web" }));
       step(pane, 2400, (v) => Object.assign(v, { checking: "api" }));
-      step(pane, 3200, (v) => Object.assign(v, { phase: "waiting", checking: null, round: 1, runs: [run(0, false)] }));
+      step(pane, 3200, (v) =>
+        Object.assign(v, { phase: "waiting", checking: null, round: 1, runs: [run(0, false)] }),
+      );
       step(pane, 6000, (v) => Object.assign(v, { phase: "checking", checking: "web" }));
-      step(pane, 7500, (v) => Object.assign(v, {
-        phase: "passed", checking: null, runs: [run(1, true), ...v.runs], note: "The checks pass, after 1 round.",
-      }));
+      step(pane, 7500, (v) =>
+        Object.assign(v, {
+          phase: "passed",
+          checking: null,
+          runs: [run(1, true), ...v.runs],
+          note: "The checks pass, after 1 round.",
+        }),
+      );
       setTimeout(() => tell(pane), 0);
       return structuredClone(v);
     },

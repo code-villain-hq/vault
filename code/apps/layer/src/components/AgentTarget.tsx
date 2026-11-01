@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { paneName } from "../lib/derive";
 import { useRunningAgentsOf } from "../lib/panes";
-import { useStore } from "../store";
 import type { TaskView } from "../lib/types";
+import { useStore } from "../store";
 
 /**
  * Where a prompt about a task should go: an agent already running in it, or
@@ -32,14 +32,24 @@ export function useAgentTarget(task: TaskView) {
   const pane = running.find((p) => p.id === target) ?? null;
 
   return {
-    running, installed, target, setTarget, agentId, setAgentId, scope, setScope, pane,
+    running,
+    installed,
+    target,
+    setTarget,
+    agentId,
+    setAgentId,
+    scope,
+    setScope,
+    pane,
     /** Nothing is running and nothing could be started. */
     stuck: running.length === 0 && !agentId,
     /**
      * Send through `deliver`, which types into the pane when given one and
      * otherwise returns the prompt to start an agent with. Says who got it.
      */
-    async send(deliver: (paneId: string | null, scope: string | null) => Promise<string>): Promise<string> {
+    async send(
+      deliver: (paneId: string | null, scope: string | null) => Promise<string>,
+    ): Promise<string> {
       if (pane) {
         await deliver(pane.id, null);
         return pane.title;
@@ -55,7 +65,9 @@ export function useAgentTarget(task: TaskView) {
 
 /** The selects for `useAgentTarget`, sized for a modal footer. */
 export function AgentTargetFields({
-  task, at, disabled,
+  task,
+  at,
+  disabled,
 }: {
   task: TaskView;
   at: ReturnType<typeof useAgentTarget>;
@@ -66,19 +78,33 @@ export function AgentTargetFields({
       <>
         <label className="review-target">
           <span>Start</span>
-          <select className="ui-field" value={at.agentId} onChange={(e) => at.setAgentId(e.target.value)} disabled={disabled}>
-            {at.installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          <select
+            className="ui-field"
+            value={at.agentId}
+            onChange={(e) => at.setAgentId(e.target.value)}
+            disabled={disabled}
+          >
+            {at.installed.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="review-target">
           <span>in</span>
-          <select className="ui-field"
+          <select
+            className="ui-field"
             value={at.scope ?? ""}
             onChange={(e) => at.setScope(e.target.value || null)}
             disabled={disabled}
           >
             <option value="">the task folder</option>
-            {task.checkouts.map((c) => <option key={c.id} value={c.id}>only {c.project_name}</option>)}
+            {task.checkouts.map((c) => (
+              <option key={c.id} value={c.id}>
+                only {c.project_name}
+              </option>
+            ))}
           </select>
         </label>
       </>
@@ -88,8 +114,17 @@ export function AgentTargetFields({
   return (
     <label className="review-target">
       <span>Send to</span>
-      <select className="ui-field" value={at.target} onChange={(e) => at.setTarget(e.target.value)} disabled={disabled}>
-        {at.running.map((p) => <option key={p.id} value={p.id}>{paneName(p)}</option>)}
+      <select
+        className="ui-field"
+        value={at.target}
+        onChange={(e) => at.setTarget(e.target.value)}
+        disabled={disabled}
+      >
+        {at.running.map((p) => (
+          <option key={p.id} value={p.id}>
+            {paneName(p)}
+          </option>
+        ))}
       </select>
     </label>
   );

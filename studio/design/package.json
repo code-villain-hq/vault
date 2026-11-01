@@ -1,0 +1,20 @@
+{
+  "name": "code-villain-design",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "vp check && bun run check:css && bun run check:classes",
+    "check:css": "cd lint && stylelint --max-warnings 0 \"../components.css\" \"../../../code/apps/site/*.css\" \"../../../code/apps/forge/apps/web/src/**/*.css\" \"../../../code/apps/layer/src/**/*.css\" \"../../../code/apps/layer/web/src/**/*.css\" \"../../../code/apps/glyph/apps/web/src/**/*.css\" \"../../../code/apps/raven/apps/web/src/**/*.css\"",
+    "check:classes": "cd lint && bun check-classes.ts",
+    "format": "vp check --fix"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "stylelint": "16.26.1",
+    "stylelint-declaration-strict-value": "1.12.1",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+  }
+}

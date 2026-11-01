@@ -125,14 +125,12 @@ export function ReviewPage() {
     return [
       ...waiting
         .filter((s) => matches(s.namespace, s.key, [s.value, s.source_text]))
-        .map(
-          (s): Item => ({
-            kind: "suggestion",
-            id: s.id,
-            suggestion: s,
-            entry: catalog.entries.get(entryId(s.namespace, s.key)),
-          }),
-        ),
+        .map((s): Item => ({
+          kind: "suggestion",
+          id: s.id,
+          suggestion: s,
+          entry: catalog.entries.get(entryId(s.namespace, s.key)),
+        })),
       ...entries
         .filter(
           (e) =>
@@ -429,7 +427,7 @@ function ProposalRow({
   const tone =
     suggestion.confidence < 0.5 ? "danger" : suggestion.confidence < threshold ? "warn" : "ok";
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: j and k select rows from the keyboard
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- j and k select rows from the keyboard
     <li data-review-row={index} className={row(selected, skipped)} onClick={onSelect}>
       <div className="mb-1.5 flex items-center gap-2">
         <KeyName namespace={suggestion.namespace} name={suggestion.key} />
@@ -498,7 +496,7 @@ function MissingRow({
 }) {
   const [value, setValue] = useState("");
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: j and k select rows from the keyboard
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- j and k select rows from the keyboard
     <li data-review-row={index} className={row(selected, skipped)} onClick={onSelect}>
       <div className="flex items-center gap-3">
         <span className="w-64 shrink-0 truncate">
@@ -525,7 +523,6 @@ function MissingRow({
           }}
         >
           <textarea
-            // biome-ignore lint/a11y/noAutofocus: w opens it to type
             autoFocus
             aria-label={`Text for ${entry.key}`}
             value={value}

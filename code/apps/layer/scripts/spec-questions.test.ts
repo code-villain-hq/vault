@@ -34,7 +34,11 @@ describe("open questions in the requirements (SPEC-1, SPEC-19)", () => {
 - Which mail provider?
 `;
     const qs = questions(typed);
-    expect(qs.map((q) => [q.id, q.answer])).toEqual([["Q-1", "the minutes left"], ["Q-2", "yes"], ["Q-3", null]]);
+    expect(qs.map((q) => [q.id, q.answer])).toEqual([
+      ["Q-1", "the minutes left"],
+      ["Q-2", "yes"],
+      ["Q-3", null],
+    ]);
   });
 
   test("none, a heading of another name, or a code block hold no questions", () => {
@@ -45,7 +49,9 @@ describe("open questions in the requirements (SPEC-1, SPEC-19)", () => {
   });
 
   test("a question wrapped onto a second line is one question", () => {
-    const qs = questions("## Open questions\n- Q-1: Should staff be able\n  to lift the limit?\n  - Yes\n");
+    const qs = questions(
+      "## Open questions\n- Q-1: Should staff be able\n  to lift the limit?\n  - Yes\n",
+    );
     expect(qs[0].text).toBe("Should staff be able to lift the limit?");
     expect(qs[0].options).toEqual(["Yes"]);
   });
@@ -78,7 +84,9 @@ describe("open questions in the requirements (SPEC-1, SPEC-19)", () => {
 describe("approving with questions still there (SPEC-21)", () => {
   test("says how many have no answer and how many are not built in", () => {
     expect(approveWarning([])).toBeNull();
-    const one = approveWarning(questions(DRAFT.replace("  - No\n- Q-2", "  - No\n  Answer: No\n- Q-2")));
+    const one = approveWarning(
+      questions(DRAFT.replace("  - No\n- Q-2", "  - No\n  Answer: No\n- Q-2")),
+    );
     expect(one).toContain("1 open question has no answer");
     expect(one).toContain("1 answer is not built into the requirements yet");
     const none = approveWarning(questions(DRAFT));

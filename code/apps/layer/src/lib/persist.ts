@@ -39,7 +39,11 @@ type Keys = Pick<Storage, "length" | "key" | "removeItem">;
  * written for each task and never removed with it, so every task ever made
  * stayed in storage for good.
  */
-export function forgetAllBut(names: readonly string[], live: ReadonlySet<string>, store?: Keys): void {
+export function forgetAllBut(
+  names: readonly string[],
+  live: ReadonlySet<string>,
+  store?: Keys,
+): void {
   try {
     const s = store ?? localStorage;
     const gone: string[] = [];

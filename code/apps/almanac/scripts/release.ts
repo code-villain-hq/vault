@@ -99,7 +99,7 @@ function token(): string {
   return cachedToken;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Forgejo's answers, read for a few fields
+// oxlint-disable-next-line typescript/no-explicit-any -- Forgejo's answers, read for a few fields
 async function api(method: string, path: string, body?: BodyInit, json = true): Promise<any> {
   const headers: Record<string, string> = { Authorization: `token ${token()}` };
   if (body && json) headers["Content-Type"] = "application/json";
@@ -139,7 +139,7 @@ async function draft() {
   if (read(["git", "ls-remote", "--tags", "origin", `refs/tags/${tag}`])) {
     fail(`${tag} already exists. Bump the version first.`);
   }
-  // biome-ignore lint/suspicious/noExplicitAny: Forgejo's releases
+  // oxlint-disable-next-line typescript/no-explicit-any -- Forgejo's releases
   const releases: any[] = await api("GET", "/releases?limit=50");
   if (releases.some((r) => r.tag_name === tag)) {
     fail(
@@ -244,7 +244,7 @@ async function draft() {
 
 async function publish() {
   // `?draft=true` filters drafts out rather than in, so read them all.
-  // biome-ignore lint/suspicious/noExplicitAny: Forgejo's releases
+  // oxlint-disable-next-line typescript/no-explicit-any -- Forgejo's releases
   const releases: any[] = await api("GET", "/releases?limit=50");
   const release =
     releases.find((r) => r.tag_name === tag) ??
@@ -258,7 +258,7 @@ async function publish() {
   if (release.prerelease) return console.log("A prerelease is not put in the tap.");
 
   const sums =
-    // biome-ignore lint/suspicious/noExplicitAny: a release's asset
+    // oxlint-disable-next-line typescript/no-explicit-any -- a release's asset
     release.assets.find((a: any) => a.name === "SHA256SUMS.txt") ??
     fail(`${tag} has no SHA256SUMS.txt.`);
   const listed = await (await fetch(sums.browser_download_url)).text();

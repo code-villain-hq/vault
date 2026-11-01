@@ -5,7 +5,15 @@ import type { CheckoutPr, EpicView, SubTaskView } from "./types";
 
 /** Where a sub-task stands, in the order EPIC-10 asks the questions. */
 export type SubTaskState =
-  | "merged" | "changes" | "approved" | "in review" | "asking" | "working" | "waits" | "ready" | "to file";
+  | "merged"
+  | "changes"
+  | "approved"
+  | "in review"
+  | "asking"
+  | "working"
+  | "waits"
+  | "ready"
+  | "to file";
 
 /**
  * The first that holds (EPIC-10): its pull requests, as the task list reads
@@ -40,7 +48,11 @@ export const STATE_COLOR: Partial<Record<SubTaskState, string>> = {
  * The titles `sub` waits for that have not merged. One not filed has not;
  * read from the pull requests the task list already has.
  */
-export function openWaits(sub: SubTaskView, all: SubTaskView[], prs: Record<string, CheckoutPr[]>): string[] {
+export function openWaits(
+  sub: SubTaskView,
+  all: SubTaskView[],
+  prs: Record<string, CheckoutPr[]>,
+): string[] {
   return sub.waits_for.filter((title) => {
     const other = all.find((s) => s.title.toLowerCase() === title.toLowerCase());
     return !other?.task_id || taskReview(prs[other.task_id] ?? []) !== "merged";

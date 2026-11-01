@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useState } from "react";
 import { api } from "../lib/api";
 import { BOT_NAME_MAX, botManifest, newAppUrl, useSlackBot } from "../lib/slackBot";
-import { useStore } from "../store";
 import type { AgentStatus, SlackBotConfig, SlackBotStatus, SlackConfig } from "../lib/types";
-import { BusyLabel, ErrorMessage, Field, Switch, useFailure } from "./ui";
+import { useStore } from "../store";
 import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
+import { BusyLabel, ErrorMessage, Field, Switch, useFailure } from "./ui";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
   connected: ["connected", "ui-status"],
@@ -47,7 +47,12 @@ export function SlackSettings() {
     setBusy(true);
     connecting.clear();
     try {
-      await api.slackBotConnect(botToken.trim(), appToken.trim(), owner.trim(), bot?.agent_id || agentId);
+      await api.slackBotConnect(
+        botToken.trim(),
+        appToken.trim(),
+        owner.trim(),
+        bot?.agent_id || agentId,
+      );
       setBotToken("");
       setAppToken("");
       await refreshSettings();
@@ -109,7 +114,14 @@ export function SlackSettings() {
   }
 
   const link = (href: string, text: string) => (
-    <a className="ui-link" href="#" onClick={(e) => { e.preventDefault(); void openUrl(href); }}>
+    <a
+      className="ui-link"
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        void openUrl(href);
+      }}
+    >
       {text}
     </a>
   );
@@ -120,9 +132,9 @@ export function SlackSettings() {
     <>
       <p className="muted" style={{ marginTop: 0 }}>
         Mention your bot in a Slack thread, or send it a direct message, and a chat opens here with
-        the thread and what you asked. Its replies go back to the thread, and you can answer it there
-        or here. It listens to you alone, and only while this app is open. It also posts the app's
-        notifications to a channel you choose.
+        the thread and what you asked. Its replies go back to the thread, and you can answer it
+        there or here. It listens to you alone, and only while this app is open. It also posts the
+        app's notifications to a channel you choose.
       </p>
 
       {bot && (
@@ -136,7 +148,9 @@ export function SlackSettings() {
             </button>
           </div>
           {status?.error && (
-            <div className="hint" style={{ color: "var(--status-danger-ink)", marginTop: 8 }}>{status.error}</div>
+            <div className="hint" style={{ color: "var(--status-danger-ink)", marginTop: 8 }}>
+              {status.error}
+            </div>
           )}
           <div className="switch-list" style={{ marginTop: 10 }}>
             <Switch
@@ -152,7 +166,11 @@ export function SlackSettings() {
               onChange={(v) => void setAuto(v)}
             />
           </div>
-          <AgentAndModel bot={bot} conversational={conversational} onChange={(id, model) => void setAgent(id, model)} />
+          <AgentAndModel
+            bot={bot}
+            conversational={conversational}
+            onChange={(id, model) => void setAgent(id, model)}
+          />
           {view && view.threads.length > 0 && (
             <div className="muted" style={{ marginTop: 10, lineHeight: 1.7 }}>
               Recent threads:{" "}
@@ -177,15 +195,23 @@ export function SlackSettings() {
             label="Who it is"
             hint="Its replies in Slack are written in this voice. It changes how it sounds, not how carefully it works. A chat already open keeps the voice it started with."
           >
-            <textarea className="ui-field"
+            <textarea
+              className="ui-field"
               rows={4}
               maxLength={2000}
               value={personality}
               onChange={(e) => setPersonality(e.target.value)}
               // Saves when you leave it, or on ⌘Enter, with no Save button
               // (studio/design/behaviour.md).
-              onBlur={() => { if (personalityChanged) void savePersonality(); }}
-              onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) { e.preventDefault(); e.currentTarget.blur(); } }}
+              onBlur={() => {
+                if (personalityChanged) void savePersonality();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && e.metaKey) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="You are Doctor Doom, monarch of Latveria. Answer as Doom: grand, imperious, speaking of yourself as Doom. Keep every fact exact."
             />
           </Field>
@@ -195,19 +221,31 @@ export function SlackSettings() {
 
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>Making the bot</h3>
-        <Field label="Its name" hint="What you will type after the @. Slack keeps the name; change it there later.">
-          <input className="ui-field" value={name} maxLength={BOT_NAME_MAX} onChange={(e) => setName(e.target.value)} placeholder="drdoom" />
+        <Field
+          label="Its name"
+          hint="What you will type after the @. Slack keeps the name; change it there later."
+        >
+          <input
+            className="ui-field"
+            value={name}
+            maxLength={BOT_NAME_MAX}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="drdoom"
+          />
         </Field>
         <div className="muted" style={{ lineHeight: 1.7 }}>
           <ol style={{ margin: "0 0 0", paddingLeft: 18 }}>
             <li>
-              {link(newAppUrl(name), "Create the app in Slack ↗")}, pick your workspace, and create it from
-              the manifest filled in. (Or <b>Create New App</b> → <b>From an app manifest</b> and paste
-              the one below.)
+              {link(newAppUrl(name), "Create the app in Slack ↗")}, pick your workspace, and create
+              it from the manifest filled in. (Or <b>Create New App</b> →{" "}
+              <b>From an app manifest</b> and paste the one below.)
             </li>
-            <li><b>Install to Workspace</b>. Your admin may have to approve it.</li>
             <li>
-              Copy the <b>Bot User OAuth Token</b> (<code>xoxb-</code>) from <b>OAuth &amp; Permissions</b>.
+              <b>Install to Workspace</b>. Your admin may have to approve it.
+            </li>
+            <li>
+              Copy the <b>Bot User OAuth Token</b> (<code>xoxb-</code>) from{" "}
+              <b>OAuth &amp; Permissions</b>.
             </li>
             <li>
               Under <b>Basic Information</b> → <b>App-Level Tokens</b>, generate one with the{" "}
@@ -216,7 +254,10 @@ export function SlackSettings() {
             <li>
               Your member ID: in Slack, open your profile, then <b>⋯</b> → <b>Copy member ID</b>.
             </li>
-            <li>Invite the bot to the channels you want it in: <code>/invite @{name.trim() || "layer"}</code>.</li>
+            <li>
+              Invite the bot to the channels you want it in:{" "}
+              <code>/invite @{name.trim() || "layer"}</code>.
+            </li>
           </ol>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
@@ -225,7 +266,8 @@ export function SlackSettings() {
           </button>
         </div>
         {showManifest && (
-          <textarea className="ui-field"
+          <textarea
+            className="ui-field"
             readOnly
             rows={16}
             value={JSON.stringify(botManifest(name), null, 2)}
@@ -235,16 +277,24 @@ export function SlackSettings() {
         )}
       </div>
 
-      <Field label="Bot token" hint="OAuth & Permissions → Bot User OAuth Token. Stored in your keychain.">
-        <input className="ui-field"
+      <Field
+        label="Bot token"
+        hint="OAuth & Permissions → Bot User OAuth Token. Stored in your keychain."
+      >
+        <input
+          className="ui-field"
           type="password"
           value={botToken}
           onChange={(e) => setBotToken(e.target.value)}
           placeholder={bot ? "•••••••• (leave blank to keep)" : "xoxb-…"}
         />
       </Field>
-      <Field label="App-level token" hint="Basic Information → App-Level Tokens, with connections:write. Stored in your keychain.">
-        <input className="ui-field"
+      <Field
+        label="App-level token"
+        hint="Basic Information → App-Level Tokens, with connections:write. Stored in your keychain."
+      >
+        <input
+          className="ui-field"
           type="password"
           value={appToken}
           onChange={(e) => setAppToken(e.target.value)}
@@ -252,21 +302,38 @@ export function SlackSettings() {
         />
       </Field>
       <Field label="Your member ID" hint="The one person the bot takes requests from.">
-        <input className="ui-field" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="U0123ABCD" />
+        <input
+          className="ui-field"
+          value={owner}
+          onChange={(e) => setOwner(e.target.value)}
+          placeholder="U0123ABCD"
+        />
       </Field>
       {!bot && (
-        <Field label="Agent" hint="Who a thread is handed to: an agent that runs as a conversation (ACP).">
+        <Field
+          label="Agent"
+          hint="Who a thread is handed to: an agent that runs as a conversation (ACP)."
+        >
           <select className="ui-field" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            {conversational.length === 0 && <option value="">No agent on your PATH runs over ACP</option>}
+            {conversational.length === 0 && (
+              <option value="">No agent on your PATH runs over ACP</option>
+            )}
             {conversational.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
             ))}
           </select>
         </Field>
       )}
       <button
         className="ui-button ui-button-primary"
-        disabled={busy || !owner.trim() || !(bot?.agent_id || agentId) || (!bot && (!botToken.trim() || !appToken.trim()))}
+        disabled={
+          busy ||
+          !owner.trim() ||
+          !(bot?.agent_id || agentId) ||
+          (!bot && (!botToken.trim() || !appToken.trim()))
+        }
         onClick={() => void connect()}
       >
         {/* One button, named by what it does (SET-12). */}
@@ -282,7 +349,11 @@ export function SlackSettings() {
  * agent names its models only to a conversation, so the list is what it
  * offered when one last opened.
  */
-function AgentAndModel({ bot, conversational, onChange }: {
+function AgentAndModel({
+  bot,
+  conversational,
+  onChange,
+}: {
   bot: SlackBotConfig;
   conversational: AgentStatus[];
   onChange: (agentId: string, model: string) => void;
@@ -290,29 +361,46 @@ function AgentAndModel({ bot, conversational, onChange }: {
   const offered = useStore((s) => s.settings?.agent_models[bot.agent_id]) ?? [];
   const agentName = conversational.find((a) => a.id === bot.agent_id)?.name ?? bot.agent_id;
   // A model saved that the agent no longer lists still shows as chosen.
-  const models = bot.model && !offered.some((m) => m.value === bot.model)
-    ? [...offered, { value: bot.model, name: bot.model }]
-    : offered;
+  const models =
+    bot.model && !offered.some((m) => m.value === bot.model)
+      ? [...offered, { value: bot.model, name: bot.model }]
+      : offered;
   return (
     <div className="row" style={{ marginTop: 10, gap: 12, alignItems: "flex-start" }}>
       <Field label="Agent" hint="Who a thread is handed to.">
-        <select className="ui-field" value={bot.agent_id} onChange={(e) => onChange(e.target.value, "")}>
-          {!conversational.some((a) => a.id === bot.agent_id) && <option value={bot.agent_id}>{agentName}</option>}
+        <select
+          className="ui-field"
+          value={bot.agent_id}
+          onChange={(e) => onChange(e.target.value, "")}
+        >
+          {!conversational.some((a) => a.id === bot.agent_id) && (
+            <option value={bot.agent_id}>{agentName}</option>
+          )}
           {conversational.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
           ))}
         </select>
       </Field>
       <Field
         label="Model"
-        hint={offered.length === 0
-          ? `Open a chat with ${agentName} once and its models are listed here.`
-          : "For chats opened from now on."}
+        hint={
+          offered.length === 0
+            ? `Open a chat with ${agentName} once and its models are listed here.`
+            : "For chats opened from now on."
+        }
       >
-        <select className="ui-field" value={bot.model} onChange={(e) => onChange(bot.agent_id, e.target.value)}>
+        <select
+          className="ui-field"
+          value={bot.model}
+          onChange={(e) => onChange(bot.agent_id, e.target.value)}
+        >
           <option value="">{agentName} decides</option>
           {models.map((m) => (
-            <option key={m.value} value={m.value}>{m.name}</option>
+            <option key={m.value} value={m.value}>
+              {m.name}
+            </option>
           ))}
         </select>
       </Field>
@@ -335,7 +423,8 @@ function Notifications({ botName }: { botName: string }) {
   const [channel, setChannel] = useState(slack?.channel || heldChannel || "");
   const [busy, setBusy] = useState(false);
   const chosen = slack !== null && slack.channel !== "";
-  const memberToTest = workspace?.admin === false && heldChannel !== null && slack?.channel !== heldChannel;
+  const memberToTest =
+    workspace?.admin === false && heldChannel !== null && slack?.channel !== heldChannel;
 
   async function saveChannel() {
     setBusy(true);
@@ -365,58 +454,76 @@ function Notifications({ botName }: { botName: string }) {
     <div className="card" style={{ marginBottom: 14 }}>
       <h3>Notifications</h3>
       <Theirs kind="slack" what="Slack" rows={[["Channel", channel]]}>
-      <Field
-        label="Channel"
-        hint={<>A channel name or ID. The bot posts only where it is invited: <code>/invite @{botName}</code> there first.</>}
-      >
-        <div className="row">
-          <input className="ui-field" value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="#eng-agents" />
-          <button
-            className="ui-button"
-            disabled={busy || !channel.trim() || channel.trim() === slack?.channel}
-            onClick={() => void saveChannel()}
-          >
-            {busy ? "Posting…" : "Save & test"}
-          </button>
-        </div>
-      </Field>
+        <Field
+          label="Channel"
+          hint={
+            <>
+              A channel name or ID. The bot posts only where it is invited:{" "}
+              <code>/invite @{botName}</code> there first.
+            </>
+          }
+        >
+          <div className="row">
+            <input
+              className="ui-field"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              placeholder="#eng-agents"
+            />
+            <button
+              className="ui-button"
+              disabled={busy || !channel.trim() || channel.trim() === slack?.channel}
+              onClick={() => void saveChannel()}
+            >
+              {busy ? "Posting…" : "Save & test"}
+            </button>
+          </div>
+        </Field>
       </Theirs>
       {memberToTest && (
-        <button className="ui-button" disabled={busy} onClick={() => void saveChannel()} style={{ marginBottom: 14 }}>
+        <button
+          className="ui-button"
+          disabled={busy}
+          onClick={() => void saveChannel()}
+          style={{ marginBottom: 14 }}
+        >
           {busy ? "Posting…" : "Post a test there"}
         </button>
       )}
       {chosen && (
         <Yours>
-        <Field label="What gets posted" hint="Muting is enforced in the backend, so an agent cannot route around it.">
-          <div className="switch-list">
-            <Switch
-              label="Send anything to Slack"
-              detail="Master switch. Off means silence, without disconnecting."
-              checked={slack.enabled}
-              onChange={(v) => void save({ ...slack, enabled: v })}
-            />
-            <Switch
-              label="When an agent finishes"
-              checked={slack.notify_on_done}
-              disabled={!slack.enabled}
-              onChange={(v) => void save({ ...slack, notify_on_done: v })}
-            />
-            <Switch
-              label="When pull requests open"
-              checked={slack.notify_on_prs}
-              disabled={!slack.enabled}
-              onChange={(v) => void save({ ...slack, notify_on_prs: v })}
-            />
-            <Switch
-              label="Messages agents send themselves"
-              detail="The slack_post tool. Agents post unattended, so this is separate."
-              checked={slack.allow_agent_posts}
-              disabled={!slack.enabled}
-              onChange={(v) => void save({ ...slack, allow_agent_posts: v })}
-            />
-          </div>
-        </Field>
+          <Field
+            label="What gets posted"
+            hint="Muting is enforced in the backend, so an agent cannot route around it."
+          >
+            <div className="switch-list">
+              <Switch
+                label="Send anything to Slack"
+                detail="Master switch. Off means silence, without disconnecting."
+                checked={slack.enabled}
+                onChange={(v) => void save({ ...slack, enabled: v })}
+              />
+              <Switch
+                label="When an agent finishes"
+                checked={slack.notify_on_done}
+                disabled={!slack.enabled}
+                onChange={(v) => void save({ ...slack, notify_on_done: v })}
+              />
+              <Switch
+                label="When pull requests open"
+                checked={slack.notify_on_prs}
+                disabled={!slack.enabled}
+                onChange={(v) => void save({ ...slack, notify_on_prs: v })}
+              />
+              <Switch
+                label="Messages agents send themselves"
+                detail="The slack_post tool. Agents post unattended, so this is separate."
+                checked={slack.allow_agent_posts}
+                disabled={!slack.enabled}
+                onChange={(v) => void save({ ...slack, allow_agent_posts: v })}
+              />
+            </div>
+          </Field>
         </Yours>
       )}
       <ErrorMessage>{failure.error}</ErrorMessage>

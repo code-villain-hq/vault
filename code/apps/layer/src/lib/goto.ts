@@ -1,19 +1,18 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 /**
  * Going where a banner, a toast or a message points (NOTE-4): the one place
  * that turns a target into a view, a task, a tab and a selection.
  */
 import { useEffect } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "../store";
 import { api } from "./api";
 import { route } from "./target";
-import type { Target } from "./types";
 
 /**
  * Open what `target` is about. `raise` brings the window forward too, for a
  * banner clicked while the app was behind something else.
  */
-export function goTo(target: Target | string, opts: { raise?: boolean } = {}) {
+export function goTo(target: string, opts: { raise?: boolean } = {}) {
   const s = useStore.getState();
   const step = route(target, { tasks: s.tasks.map((t) => t.id), panes: s.panes });
   if (step) {

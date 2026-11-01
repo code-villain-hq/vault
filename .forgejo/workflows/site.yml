@@ -1,5 +1,6 @@
 # The website's build on every push that could change it: build.py checks
-# every local HTML and CSS dependency and fails on a missing one.
+# every local HTML and CSS dependency and fails on a missing one. Vite+
+# formats and lints its script and CSS (vite.config.ts).
 name: site
 
 on:
@@ -10,6 +11,7 @@ on:
       - "studio/design/tokens/**"
       - "studio/brand/mark/**"
       - "studio/content/blog/**"
+      - "code/kit/dev-id/vite-plus.ts"
       - ".forgejo/workflows/site.yml"
 
 jobs:
@@ -22,3 +24,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 -m unittest
       - run: python3 build.py
+      - run: bun install --frozen-lockfile && bun run check

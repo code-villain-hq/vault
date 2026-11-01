@@ -2,8 +2,8 @@
 # generated outputs in studio/design/tokens against build.py, Forge's, Layer's,
 # Caster's, Glyph's, Raven's and the editor themes' copies against the vault, and the lint
 # guard over the web CSS and the apps' TSX (studio/design/lint; not the site's
-# HTML). Each check
-# writes nothing and fails with the fix.
+# HTML), with Vite+ over studio/design's own code and CSS. Each check writes
+# nothing and fails with the fix.
 name: design
 
 on:
@@ -13,6 +13,11 @@ on:
       - "studio/design/tokens/**"
       - "studio/design/components.css"
       - "studio/design/lint/**"
+      - "studio/design/package.json"
+      - "studio/design/bun.lock"
+      - "studio/design/vite.config.ts"
+      - "studio/design/tsconfig.json"
+      - "code/kit/dev-id/vite-plus.ts"
       - "code/apps/site/**/*.css"
       - "code/kit/web/src/**"
       - "code/apps/forge/apps/web/src/**"
@@ -55,11 +60,11 @@ jobs:
         working-directory: code/apps/layer
       - run: make design-check
         working-directory: code/apps/caster
-      - run: bun build.ts --check
+      - run: bun install --frozen-lockfile && bun run check
         working-directory: code/apps/theme
       - run: bun scripts/sync-design.ts --check
         working-directory: code/apps/glyph
       - run: bun scripts/sync-design.ts --check
         working-directory: code/apps/raven
       - run: bun install --frozen-lockfile && bun run check
-        working-directory: studio/design/lint
+        working-directory: studio/design

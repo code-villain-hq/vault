@@ -77,7 +77,6 @@ function NewTeamForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="flex flex-col gap-2 px-4 py-3">
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
           autoFocus
           value={name}
           onChange={(e) => {
@@ -302,7 +301,6 @@ function NewLabelForm({ onDone }: { onDone: () => void }) {
         <div className="flex items-center gap-3">
           <span className="size-3.5 shrink-0 rounded-full" style={{ background: color }} />
           <input
-            // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a name
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}

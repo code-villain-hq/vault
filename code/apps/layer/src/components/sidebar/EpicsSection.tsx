@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { useEpics } from "../../lib/epics";
 import type { EpicOf } from "../../lib/grouping";
+import { trackerOfKey } from "../../lib/tracker";
 import type { Ticket, TaskView } from "../../lib/types";
 import { useStore } from "../../store";
-import { trackerOfKey } from "../../lib/tracker";
 import { typeMap } from "../IssueType";
 import { StartWorkDialog } from "../tickets/StartWorkDialog";
 import { EpicRow, JiraEpicRow } from "./EpicRow";
@@ -28,12 +28,19 @@ export type EpicSections = {
  * needs it, whatever the list is grouped by (TASK-17).
  */
 export function useEpicSections(everyTask: TaskView[]): EpicSections {
-  const keys = useMemo(() => everyTask.flatMap((t) => (!t.epic && t.issue_key ? [t.issue_key] : [])), [everyTask]);
+  const keys = useMemo(
+    () => everyTask.flatMap((t) => (!t.epic && t.issue_key ? [t.issue_key] : [])),
+    [everyTask],
+  );
   const epics = useEpics(keys, true);
   return useMemo(() => {
     const layerEpics = everyTask.filter((t) => t.epic);
-    const subsOf: Record<string, TaskView[]> = Object.fromEntries(layerEpics.map((e) => [e.id, []]));
-    const byTicket = new Map(layerEpics.flatMap((e) => (e.issue_key ? [[e.issue_key, e.id] as const] : [])));
+    const subsOf: Record<string, TaskView[]> = Object.fromEntries(
+      layerEpics.map((e) => [e.id, []]),
+    );
+    const byTicket = new Map(
+      layerEpics.flatMap((e) => (e.issue_key ? [[e.issue_key, e.id] as const] : [])),
+    );
     const jira = new Map<string, { epic: EpicOf; tasks: TaskView[] }>();
     const tasks: TaskView[] = [];
     for (const t of everyTask) {
@@ -58,7 +65,14 @@ export function useEpicSections(everyTask: TaskView[]): EpicSections {
  * are what it is. A Jira epic that is not one here yet opens Start work on
  * its ticket, with its tasks' repositories picked (EPIC-13).
  */
-export function EpicsSection({ sections, selected, expanded, onSelect, onToggle, onMenu }: {
+export function EpicsSection({
+  sections,
+  selected,
+  expanded,
+  onSelect,
+  onToggle,
+  onMenu,
+}: {
   sections: EpicSections;
   selected: string | null;
   expanded: Record<string, boolean>;
@@ -76,8 +90,9 @@ export function EpicsSection({ sections, selected, expanded, onSelect, onToggle,
 
   async function open(epic: EpicOf, tasks: TaskView[]) {
     try {
-      const issue = useStore.getState().issues.find((i) => i.key === epic.key)
-        ?? (await api.ticketsByKey([epic.key]))[0];
+      const issue =
+        useStore.getState().issues.find((i) => i.key === epic.key) ??
+        (await api.ticketsByKey([epic.key]))[0];
       if (issue) setMaking({ issue, tasks });
       else fail(`${trackerOfKey(epic.key)} did not return ${epic.key}.`);
     } catch (e) {

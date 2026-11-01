@@ -5,5 +5,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["bun"]
   },
-  "include": ["*.ts", "../../../kit/dev-id/*.ts"]
+  "include": ["*.ts"]
 }

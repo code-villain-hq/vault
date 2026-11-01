@@ -9,7 +9,14 @@
  */
 import { emit } from "@tauri-apps/api/event";
 import { questions } from "../lib/questions";
-import type { RepoSpec, SpecKind, SpecPart, SpecProposal, SpecVerdict, TaskSpec } from "../lib/types";
+import type {
+  RepoSpec,
+  SpecKind,
+  SpecPart,
+  SpecProposal,
+  SpecVerdict,
+  TaskSpec,
+} from "../lib/types";
 import type { World } from "./world";
 
 const PARTS: SpecPart[] = ["requirements", "design", "tasks"];
@@ -30,7 +37,8 @@ interface Kept {
   before: Record<string, Record<SpecPart, string>> | null;
 }
 
-const slot = (part: SpecPart, checkout: string | null) => (part === "tasks" ? `tasks:${checkout}` : part);
+const slot = (part: SpecPart, checkout: string | null) =>
+  part === "tasks" ? `tasks:${checkout}` : part;
 
 const API_REQUIREMENTS = `## Goal
 Two logins at once no longer leave one of them signed out.
@@ -86,7 +94,10 @@ const WEB_TASKS = `## Tasks
 `;
 
 /** What an agent proposed for the api's tasks (SPEC-24). */
-const API_TASKS_PROPOSED = API_TASKS.replace("- [ ] 4. Test a forced lost race (R-2)", "- [ ] 4. Test a forced lost race (R-2)\n- [ ] 5. Log each lost race with the account id (R-2)");
+const API_TASKS_PROPOSED = API_TASKS.replace(
+  "- [ ] 4. Test a forced lost race (R-2)",
+  "- [ ] 4. Test a forced lost race (R-2)\n- [ ] 5. Log each lost race with the account id (R-2)",
+);
 
 /** The web's spec from before, when each repository had its own (SPEC-25). */
 const WEB_REQUIREMENTS = `## Goal
@@ -179,10 +190,19 @@ function applied(text: string): string {
   const head = text.split(/^## Open questions/m)[0].trimEnd();
   const ids = requirements(text).map((r) => Number(r.id.slice(2)));
   let next = Math.max(0, ...ids);
-  const added = qs.filter((q) => q.answer).map((q) =>
-    `- R-${++next}: WHEN ${q.text.replace(/\?$/, "").replace(/^\w/, (c) => c.toLowerCase())} THE SYSTEM SHALL do as decided: ${q.answer}.`);
-  const withReqs = head.replace(/(^- R-\d+[^\n]*\n)(?![\s\S]*^- R-\d+)/m, (m) => m + added.map((a) => a + "\n").join(""));
-  const left = qs.filter((q) => !q.answer).map((q) => [`- ${q.id}: ${q.text}`, ...q.options.map((o) => `  - ${o}`)].join("\n"));
+  const added = qs
+    .filter((q) => q.answer)
+    .map(
+      (q) =>
+        `- R-${++next}: WHEN ${q.text.replace(/\?$/, "").replace(/^\w/, (c) => c.toLowerCase())} THE SYSTEM SHALL do as decided: ${q.answer}.`,
+    );
+  const withReqs = head.replace(
+    /(^- R-\d+[^\n]*\n)(?![\s\S]*^- R-\d+)/m,
+    (m) => m + added.map((a) => a + "\n").join(""),
+  );
+  const left = qs
+    .filter((q) => !q.answer)
+    .map((q) => [`- ${q.id}: ${q.text}`, ...q.options.map((o) => `  - ${o}`)].join("\n"));
   return `${withReqs}\n\n## Open questions\n${left.length > 0 ? left.join("\n") : "None."}\n`;
 }
 
@@ -190,11 +210,16 @@ function requirements(text: string) {
   const at = text.search(/^## (Requirements|Expected behaviour)/m);
   if (at < 0) return [];
   const part = text.slice(at).split(/^## (?!Unchanged)/m)[1] ?? "";
-  return [...part.matchAll(/^- (?:\[[ xX]\] )?(R-\d+)(?: \[([^\]]*)\])?[:.]? (.+)$/gm)].map((m) => ({
-    id: m[1],
-    repos: (m[2] ?? "").split(",").map((r) => r.trim()).filter(Boolean),
-    text: m[3].trim(),
-  }));
+  return [...part.matchAll(/^- (?:\[[ xX]\] )?(R-\d+)(?: \[([^\]]*)\])?[:.]? (.+)$/gm)].map(
+    (m) => ({
+      id: m[1],
+      repos: (m[2] ?? "")
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean),
+      text: m[3].trim(),
+    }),
+  );
 }
 
 function steps(text: string) {
@@ -211,7 +236,13 @@ function steps(text: string) {
 }
 
 /** Streams `text` into an editor as `spec:draft`, a line at a time. */
-async function stream(requestId: unknown, part: SpecPart, checkoutId: string | null, text: string, pause = 40) {
+async function stream(
+  requestId: unknown,
+  part: SpecPart,
+  checkoutId: string | null,
+  text: string,
+  pause = 40,
+) {
   let sent = "";
   for (const piece of text.match(/[^\n]*\n?/g) ?? []) {
     await new Promise((r) => setTimeout(r, pause));
@@ -226,14 +257,24 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
   const get = (taskId: string): Kept => {
     let k = kept.get(taskId);
     if (!k) {
-      k = { kind: "feature", approved: {}, drafts: {}, stale: [], outside: {}, proposals: {}, checks: {}, before: null };
+      k = {
+        kind: "feature",
+        approved: {},
+        drafts: {},
+        stale: [],
+        outside: {},
+        proposals: {},
+        checks: {},
+        before: null,
+      };
       kept.set(taskId, k);
     }
     return k;
   };
   const task = (id: string) => world.tasks.find((t) => t.id === id);
   const checkouts = (taskId: string) => task(taskId)?.checkouts ?? [];
-  const folderOf = (taskId: string, checkout: string) => checkouts(taskId).find((c) => c.id === checkout)?.project_name ?? "";
+  const folderOf = (taskId: string, checkout: string) =>
+    checkouts(taskId).find((c) => c.id === checkout)?.project_name ?? "";
 
   // ACME-123, under way: one spec for api and web, api two steps in; the
   // web's copy of the requirements edited by an agent (SPEC-22), and the
@@ -243,25 +284,41 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
     const k = get("t-login");
     if (new URLSearchParams(location.search).get("spec") === "split") {
       k.before = {
-        "c-login-api": { requirements: API_REQUIREMENTS.replace(/ \[[^\]]*\]/g, ""), design: API_DESIGN, tasks: API_TASKS },
+        "c-login-api": {
+          requirements: API_REQUIREMENTS.replace(/ \[[^\]]*\]/g, ""),
+          design: API_DESIGN,
+          tasks: API_TASKS,
+        },
         "c-login-web": { requirements: WEB_REQUIREMENTS, design: "", tasks: "" },
       };
     } else {
       Object.assign(k.approved, {
-        requirements: API_REQUIREMENTS, design: API_DESIGN,
-        [slot("tasks", "c-login-api")]: API_TASKS, [slot("tasks", "c-login-web")]: WEB_TASKS,
+        requirements: API_REQUIREMENTS,
+        design: API_DESIGN,
+        [slot("tasks", "c-login-api")]: API_TASKS,
+        [slot("tasks", "c-login-web")]: WEB_TASKS,
       });
-      k.outside[`requirements@c-login-web`] = API_REQUIREMENTS.replace("disable the submit button", "disable the submit button and show a spinner");
+      k.outside[`requirements@c-login-web`] = API_REQUIREMENTS.replace(
+        "disable the submit button",
+        "disable the submit button and show a spinner",
+      );
       k.drafts[slot("tasks", "c-login-api")] = API_TASKS_PROPOSED;
       k.proposals[slot("tasks", "c-login-api")] = {
         why: "A lost race leaves no trace in the logs, so step 3 cannot be checked in staging.",
-        by: "Claude Code", pane_id: "pane-claude", at: Date.now() - 120_000,
+        by: "Claude Code",
+        pane_id: "pane-claude",
+        at: Date.now() - 120_000,
       };
-      k.checks["c-login-api"] = { sha: "a1b2c3d4", at: Date.now() - 600_000, stale: true, results: [
-        { id: "R-1", verdict: "met", evidence: "src/auth/session.ts:41, session.test.ts" },
-        { id: "R-2", verdict: "not met", evidence: "no retry in login.ts yet" },
-        { id: "R-3", verdict: "unclear", evidence: "the 409 body is not sent yet" },
-      ] };
+      k.checks["c-login-api"] = {
+        sha: "a1b2c3d4",
+        at: Date.now() - 600_000,
+        stale: true,
+        results: [
+          { id: "R-1", verdict: "met", evidence: "src/auth/session.ts:41, session.test.ts" },
+          { id: "R-2", verdict: "not met", evidence: "no retry in login.ts yet" },
+          { id: "R-3", verdict: "unclear", evidence: "the 409 body is not sent yet" },
+        ],
+      };
     }
   }
 
@@ -297,7 +354,11 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
         stale: k.stale.includes(key),
         outside: Object.entries(k.outside)
           .filter(([at]) => at.split("@")[0] === key)
-          .map(([at, text]) => ({ checkout_id: at.split("@")[1], folder: folderOf(taskId, at.split("@")[1]), text })),
+          .map(([at, text]) => ({
+            checkout_id: at.split("@")[1],
+            folder: folderOf(taskId, at.split("@")[1]),
+            text,
+          })),
         proposal: k.proposals[key] ?? null,
       };
     });
@@ -308,7 +369,9 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
         checkout_id: c.id,
         repo: c.project_name,
         folder: c.project_name,
-        home: inRepo ? `${c.project_name}/${project?.spec_folder ?? "specs"}/${t!.branch}` : `~/Library/Application Support/…/specs/${c.project_name}/${t!.branch}`,
+        home: inRepo
+          ? `${c.project_name}/${project?.spec_folder ?? "specs"}/${t!.branch}`
+          : `~/Library/Application Support/…/specs/${c.project_name}/${t!.branch}`,
         in_repo: inRepo,
         steps: steps(approved(taskId, slot("tasks", c.id), c.id) ?? ""),
         check: k.checks[c.id] ?? null,
@@ -316,7 +379,12 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
     });
     const split = !!k.before && !k.approved.requirements;
     return structuredClone({
-      kind: k.kind, parts, requirements: requirements(approved(taskId, "requirements", null) ?? ""), repos, legacy: null, split,
+      kind: k.kind,
+      parts,
+      requirements: requirements(approved(taskId, "requirements", null) ?? ""),
+      repos,
+      legacy: null,
+      split,
     });
   };
 
@@ -345,16 +413,19 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
         for (const at of Object.keys(k.outside)) if (at.split("@")[0] === key) delete k.outside[at];
       }
       k.stale = k.stale.filter((s) => !done.includes(s));
-      const later = [ "design", ...checkouts(taskId).map((c) => slot("tasks", c.id)) ];
+      const later = ["design", ...checkouts(taskId).map((c) => slot("tasks", c.id))];
       for (const key of later) {
         const part = key.startsWith("tasks") ? 2 : 1;
-        if (part > first && k.approved[key] && !done.includes(key) && !k.stale.includes(key)) k.stale.push(key);
+        if (part > first && k.approved[key] && !done.includes(key) && !k.stale.includes(key))
+          k.stale.push(key);
       }
       return { spec: view(taskId), failed: [] };
     },
     put_back_spec: (a) => {
       const k = get(a.taskId as string);
-      delete k.outside[`${slot(a.part as SpecPart, a.checkoutId as string)}@${a.checkoutId}`];
+      delete k.outside[
+        `${slot(a.part as SpecPart, a.checkoutId as string)}@${a.checkoutId as string}`
+      ];
       return view(a.taskId as string);
     },
     turn_down_spec_proposal: (a) => {
@@ -371,44 +442,86 @@ export function specAnswers(world: World): Record<string, (a: Record<string, unk
       if (a.kind) k.kind = a.kind as SpecKind;
       const cs = checkouts(taskId);
       if (part === "tasks") {
-        for (const c of cs) k.drafts[slot("tasks", c.id)] = await stream(a.requestId, part, c.id, DRAFT.tasks(c.project_name));
+        for (const c of cs)
+          k.drafts[slot("tasks", c.id)] = await stream(
+            a.requestId,
+            part,
+            c.id,
+            DRAFT.tasks(c.project_name),
+          );
       } else {
-        k.drafts[part] = await stream(a.requestId, part, null, DRAFT[part](cs.map((c) => c.project_name).join(", ")));
+        k.drafts[part] = await stream(
+          a.requestId,
+          part,
+          null,
+          DRAFT[part](cs.map((c) => c.project_name).join(", ")),
+        );
       }
       return null;
     },
     merge_specs: async (a) => {
       const taskId = a.taskId as string;
       const k = get(taskId);
-      k.drafts.requirements = await stream(a.requestId, "requirements", null, API_REQUIREMENTS.replace("instead of looping.", "instead of looping. (was web R-1)"), 25);
+      k.drafts.requirements = await stream(
+        a.requestId,
+        "requirements",
+        null,
+        API_REQUIREMENTS.replace("instead of looping.", "instead of looping. (was web R-1)"),
+        25,
+      );
       k.drafts.design = await stream(a.requestId, "design", null, API_DESIGN, 25);
-      k.drafts[slot("tasks", "c-login-api")] = await stream(a.requestId, "tasks", "c-login-api", API_TASKS, 25);
-      k.drafts[slot("tasks", "c-login-web")] = await stream(a.requestId, "tasks", "c-login-web", WEB_TASKS, 25);
+      k.drafts[slot("tasks", "c-login-api")] = await stream(
+        a.requestId,
+        "tasks",
+        "c-login-api",
+        API_TASKS,
+        25,
+      );
+      k.drafts[slot("tasks", "c-login-web")] = await stream(
+        a.requestId,
+        "tasks",
+        "c-login-web",
+        WEB_TASKS,
+        25,
+      );
       return null;
     },
     apply_spec_answers: async (a) => {
       const k = get(a.taskId as string);
       const before = k.drafts.requirements ?? k.approved.requirements;
-      if (!before || !questions(before).some((q) => q.answer)) throw "no open question has an answer yet";
+      if (!before || !questions(before).some((q) => q.answer))
+        throw "no open question has an answer yet";
       const after = applied(before);
       k.drafts.requirements = await stream(a.requestId, "requirements", null, after, 30);
       const old = requirements(before).map((r) => r.id);
-      return { changed: [], added: requirements(after).map((r) => r.id).filter((id) => !old.includes(id)), removed: [] };
+      return {
+        changed: [],
+        added: requirements(after)
+          .map((r) => r.id)
+          .filter((id) => !old.includes(id)),
+        removed: [],
+      };
     },
     check_spec: async (a) => {
       await new Promise((r) => setTimeout(r, 900));
       const taskId = a.taskId as string;
       const folder = folderOf(taskId, a.checkoutId as string);
-      const mine = requirements(approved(taskId, "requirements", null) ?? "").filter((r) => r.repos.length === 0 || r.repos.includes(folder));
+      const mine = requirements(approved(taskId, "requirements", null) ?? "").filter(
+        (r) => r.repos.length === 0 || r.repos.includes(folder),
+      );
       const results: SpecVerdict[] = mine.map((r, i) => ({
-        id: r.id, verdict: i === 0 ? "met" : "unclear", evidence: i === 0 ? "src/auth/session.ts:41" : "needs a run to tell",
+        id: r.id,
+        verdict: i === 0 ? "met" : "unclear",
+        evidence: i === 0 ? "src/auth/session.ts:41" : "needs a run to tell",
       }));
       const check = { sha: "e5f6a7b8", at: Date.now(), results, stale: false };
       get(taskId).checks[a.checkoutId as string] = check;
       return check;
     },
-    spec_work_prompt: (a) => `Work through the steps in the approved tasks.md, and call spec_task with task id \`${a.taskId}\` as soon as each is done.`,
-    tell_spec_change: (a) => world.panes.filter((p) => p.task_id === a.taskId && p.running && p.kind === "agent").length,
+    spec_work_prompt: (a) =>
+      `Work through the steps in the approved tasks.md, and call spec_task with task id \`${a.taskId as string}\` as soon as each is done.`,
+    tell_spec_change: (a) =>
+      world.panes.filter((p) => p.task_id === a.taskId && p.running && p.kind === "agent").length,
     set_project_specs: (a) => {
       const p = world.projects.find((x) => x.id === a.projectId);
       if (p) {

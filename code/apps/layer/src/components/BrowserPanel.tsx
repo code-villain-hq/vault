@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useRef, useState } from "react";
 import { api, errMessage } from "../lib/api";
 import { key, mouse, pagePoint, wheel } from "../lib/browserInput";
 import { copyText } from "../lib/clipboard";
@@ -10,8 +10,8 @@ import type { BrowserInput, BrowserView } from "../lib/types";
 import { useStore } from "../store";
 import { BrowserScreenshot } from "./BrowserScreenshot";
 import { BrowserTabs } from "./BrowserTabs";
-import { SaveSignIn } from "./SaveSignIn";
 import { BackIcon, CloseIcon, ExternalIcon, ForwardIcon, ReloadIcon } from "./icons";
+import { SaveSignIn } from "./SaveSignIn";
 import { ErrorMessage, Spinner, useFailure } from "./ui";
 
 /**
@@ -27,8 +27,11 @@ export function useBrowserView(taskId: string): BrowserView | null {
     let asked = 0;
     const load = () => {
       const n = ++asked;
-      api.browserView(taskId)
-        .then((v) => { if (current && n === asked) setView(v); })
+      api
+        .browserView(taskId)
+        .then((v) => {
+          if (current && n === asked) setView(v);
+        })
         .catch(() => {});
     };
     load();
@@ -54,7 +57,15 @@ type Size = { width: number; height: number };
  * and the user's own mouse and keys sent to it, to sign in or to help an
  * agent that is stuck. What an agent last did is shown under it (BRW-10).
  */
-export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; visible: boolean; onClose: () => void }) {
+export function BrowserPanel({
+  taskId,
+  visible,
+  onClose,
+}: {
+  taskId: string;
+  visible: boolean;
+  onClose: () => void;
+}) {
   const view = useBrowserView(taskId);
   // Tabs, keys and the toolbar's icons fail in the top bar; the address,
   // taking over and the answers here fail under the bar (NOTE-6).
@@ -72,7 +83,9 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
   const [marker, setMarker] = useState<{ x: number; y: number; at: number } | null>(null);
   const [promptText, setPromptText] = useState("");
   const dialogShown = view?.dialog ? `${view.dialog.kind}:${view.dialog.message}` : "";
-  useEffect(() => { setPromptText(view?.dialog?.default_prompt ?? ""); }, [dialogShown]); // eslint-disable-line react-hooks/exhaustive-deps -- a new dialog, not every refresh
+  useEffect(() => {
+    setPromptText(view?.dialog?.default_prompt ?? "");
+  }, [dialogShown]); // eslint-disable-line react-hooks/exhaustive-deps -- a new dialog, not every refresh
   const screenRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keysRef = useRef<HTMLTextAreaElement>(null);
@@ -106,7 +119,10 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     measure();
-    return () => { ro.disconnect(); window.clearTimeout(timer); };
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(timer);
+    };
   }, [view?.chrome]);
 
   // Frames only while on screen (BRW-9), and not while the window is away:
@@ -146,8 +162,11 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
       if (!drawing) void draw();
     };
     setError(null);
-    api.browserWatch(taskId, size.width, size.height, window.devicePixelRatio || 1, frames)
-      .catch((e) => { if (current) setError(errMessage(e)); });
+    api
+      .browserWatch(taskId, size.width, size.height, window.devicePixelRatio || 1, frames)
+      .catch((e) => {
+        if (current) setError(errMessage(e));
+      });
     return () => {
       current = false;
       void api.browserUnwatch(taskId).catch(() => {});
@@ -231,7 +250,10 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
   // Moves coalesce to one per frame: a mouse reports far more often than
   // a page needs to hear it.
   const move = useRef<{ e: MouseEvent; frame: number } | null>(null);
-  function onMouse(type: "mousePressed" | "mouseReleased" | "mouseMoved", e: React.MouseEvent<HTMLCanvasElement>) {
+  function onMouse(
+    type: "mousePressed" | "mouseReleased" | "mouseMoved",
+    e: React.MouseEvent<HTMLCanvasElement>,
+  ) {
     if (!size) return;
     const el = e.currentTarget;
     const native = e.nativeEvent;
@@ -256,7 +278,12 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
       }),
     };
   }
-  useEffect(() => () => { if (move.current) cancelAnimationFrame(move.current.frame); }, []);
+  useEffect(
+    () => () => {
+      if (move.current) cancelAnimationFrame(move.current.frame);
+    },
+    [],
+  );
 
   async function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const k = e.nativeEvent;
@@ -304,7 +331,11 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
   async function answerDialog(accept: boolean) {
     panel.clear();
     try {
-      await api.browserDialog(taskId, accept, view?.dialog?.kind === "prompt" ? promptText : undefined);
+      await api.browserDialog(
+        taskId,
+        accept,
+        view?.dialog?.kind === "prompt" ? promptText : undefined,
+      );
       keysRef.current?.focus();
     } catch (e) {
       panel.fail(e);
@@ -378,30 +409,57 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
         onSwitch={(id) => void api.browserSwitchTab(taskId, id).catch(fail)}
         onClose={(id) => void api.browserCloseTab(taskId, id).catch(fail)}
         onNew={() => {
-          void api.browserNewTab(taskId).then(() => addressRef.current?.focus()).catch(fail);
+          void api
+            .browserNewTab(taskId)
+            .then(() => addressRef.current?.focus())
+            .catch(fail);
         }}
       />
       <div className="browser-bar">
-        <button className="ui-button ui-icon-button" title="Back (⌘[)" onClick={() => void go("back")} disabled={!tab || driving}>
+        <button
+          className="ui-button ui-icon-button"
+          title="Back (⌘[)"
+          onClick={() => void go("back")}
+          disabled={!tab || driving}
+        >
           <BackIcon />
         </button>
-        <button className="ui-button ui-icon-button" title="Forward (⌘])" onClick={() => void go("forward")} disabled={!tab || driving}>
+        <button
+          className="ui-button ui-icon-button"
+          title="Forward (⌘])"
+          onClick={() => void go("forward")}
+          disabled={!tab || driving}
+        >
           <ForwardIcon />
         </button>
-        <button className="ui-button ui-icon-button" title="Reload (⌘R)" onClick={() => void go("reload")} disabled={!tab || driving}>
+        <button
+          className="ui-button ui-icon-button"
+          title="Reload (⌘R)"
+          onClick={() => void go("reload")}
+          disabled={!tab || driving}
+        >
           {view?.loading ? <Spinner /> : <ReloadIcon />}
         </button>
         <form className="browser-address" onSubmit={(e) => void open(e)}>
-          <input className="ui-field"
+          <input
+            className="ui-field"
             disabled={driving}
             ref={addressRef}
             value={address}
             placeholder="localhost:3000, an address, or words to search for"
             spellCheck={false}
             onChange={(e) => setAddress(e.target.value)}
-            onFocus={(e) => { setEditing(true); e.target.select(); }}
+            onFocus={(e) => {
+              setEditing(true);
+              e.target.select();
+            }}
             onBlur={() => setEditing(false)}
-            onKeyDown={(e) => { if (e.key === "Escape") { setEditing(false); keysRef.current?.focus(); } }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setEditing(false);
+                keysRef.current?.focus();
+              }
+            }}
           />
         </form>
         {view?.held && (
@@ -436,7 +494,9 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
             {r.reason && <> — {r.reason}</>}
           </span>
           <div className="spacer" />
-          <button className="ui-button" onClick={() => void answer(r.id, false)}>No</button>
+          <button className="ui-button" onClick={() => void answer(r.id, false)}>
+            No
+          </button>
           <button className="ui-button ui-button-primary" onClick={() => void answer(r.id, true)}>
             Allow {r.site}
           </button>
@@ -446,13 +506,21 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
       {view?.dialog && (
         <form
           className="browser-ask browser-dialog"
-          onSubmit={(e) => { e.preventDefault(); void answerDialog(true); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void answerDialog(true);
+          }}
         >
           <span>
             <b>The page {view.dialog.kind === "alert" ? "says" : "asks"}:</b> {view.dialog.message}
           </span>
           {view.dialog.kind === "prompt" && (
-            <input className="ui-field" value={promptText} onChange={(e) => setPromptText(e.target.value)} autoFocus />
+            <input
+              className="ui-field"
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              autoFocus
+            />
           )}
           <div className="spacer" />
           {view.dialog.kind !== "alert" && (
@@ -471,12 +539,15 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
           <div className="empty">
             <h2>No Chrome to run</h2>
             <p>
-              The browser runs on Google Chrome (or Chromium), with a profile of its own:
-              your Chrome's sign-ins and extensions stay out of it. Install Chrome, and it
-              starts the next time it is needed.
+              The browser runs on Google Chrome (or Chromium), with a profile of its own: your
+              Chrome's sign-ins and extensions stay out of it. Install Chrome, and it starts the
+              next time it is needed.
             </p>
             <div className="row">
-              <button className="ui-button ui-button-primary" onClick={() => void openUrl("https://www.google.com/chrome/")}>
+              <button
+                className="ui-button ui-button-primary"
+                onClick={() => void openUrl("https://www.google.com/chrome/")}
+              >
                 Get Chrome ↗
               </button>
             </div>
@@ -486,7 +557,9 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
             <h2>The browser could not start</h2>
             <p>{error}</p>
             <div className="row">
-              <button className="ui-button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+              <button className="ui-button" onClick={() => setAttempt((n) => n + 1)}>
+                Try again
+              </button>
             </div>
           </div>
         ) : (
@@ -502,7 +575,9 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
               onContextMenu={(e) => e.preventDefault()}
             />
             {!tab && (
-              <div className="browser-starting"><Spinner /> Starting the browser…</div>
+              <div className="browser-starting">
+                <Spinner /> Starting the browser…
+              </div>
             )}
             {driving && driver && (
               // Over the page and taking its clicks: the user's input would
@@ -528,7 +603,10 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
               <span
                 key={marker.at}
                 className="browser-marker"
-                style={{ left: `${(marker.x / size.width) * 100}%`, top: `${(marker.y / size.height) * 100}%` }}
+                style={{
+                  left: `${(marker.x / size.width) * 100}%`,
+                  top: `${(marker.y / size.height) * 100}%`,
+                }}
               />
             )}
           </>
@@ -583,7 +661,10 @@ export function BrowserPanel({ taskId, visible, onClose }: { taskId: string; vis
         <div className="spacer" />
         {tab && host && !view?.agents_may && (
           <>
-            <span className="browser-off" title="Agents use only this machine's pages and the sites you allowed (BRW-3)">
+            <span
+              className="browser-off"
+              title="Agents use only this machine's pages and the sites you allowed (BRW-3)"
+            >
               Agents cannot use {host}
             </span>
             <button

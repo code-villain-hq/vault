@@ -541,7 +541,6 @@ function NoteForm({
           <textarea
             id="note-text"
             required
-            // biome-ignore lint/a11y/noAutofocus: the dialog opens to write the note
             autoFocus
             rows={4}
             placeholder="Run the migrations before the tests: they expect the new columns."

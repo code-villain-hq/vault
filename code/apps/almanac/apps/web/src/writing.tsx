@@ -189,7 +189,6 @@ export function WriteText({
     onDone(words, enter);
   };
   // As tall as what's written.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: it grows as the text changes
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -281,7 +280,6 @@ export function Passage({ point, children }: { point: Point; children: ReactNode
     setWriting(true);
   };
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a passage holds links, which a button can't
     <span
       role="button"
       tabIndex={0}

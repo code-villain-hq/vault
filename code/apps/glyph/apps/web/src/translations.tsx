@@ -812,7 +812,6 @@ function NewKeyForm({
           )}
           {ns === NEW && (
             <input
-              // biome-ignore lint/a11y/noAutofocus: the dialog opens to name the namespace
               autoFocus={mode === "namespace"}
               value={newNs}
               onChange={(e) => setNewNs(e.target.value)}
@@ -823,7 +822,6 @@ function NewKeyForm({
           )}
         </div>
         <input
-          // biome-ignore lint/a11y/noAutofocus: the dialog opens to type a key
           autoFocus={mode === "key"}
           value={key}
           onChange={(e) => setKey(e.target.value)}
@@ -913,7 +911,6 @@ function ManageNamespaces({
                   }}
                 >
                   <input
-                    // biome-ignore lint/a11y/noAutofocus: renaming starts by typing
                     autoFocus
                     onFocus={(e) => e.target.select()}
                     value={name}

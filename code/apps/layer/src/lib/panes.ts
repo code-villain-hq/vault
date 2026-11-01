@@ -31,7 +31,9 @@ export function usePanesOf(taskId: string): { panes: PaneInfo[]; ids: string[] }
  */
 export function useRunningAgentsOf(taskId: string): PaneInfo[] {
   return useStore(
-    useShallow((s) => s.panes.filter((p) => p.task_id === taskId && p.kind === "agent" && p.running)),
+    useShallow((s) =>
+      s.panes.filter((p) => p.task_id === taskId && p.kind === "agent" && p.running),
+    ),
   );
 }
 

@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
+import { groupProjects, repoTrouble, updateByFor } from "../lib/derive";
 import { syncSummary } from "../lib/report";
 import { ago } from "../lib/time";
-import { useNow, useStore } from "../store";
-import { groupProjects, repoTrouble, updateByFor } from "../lib/derive";
 import type { Project, RepoHealth, RepoNote, Synced, UpdateBy } from "../lib/types";
 import type { Elsewhere } from "../lib/types-profiles";
+import { useNow, useStore } from "../store";
 import { AddRepos } from "./AddRepos";
 import { CleanUp } from "./CleanUp";
-import { ReposElsewhere } from "./ReposElsewhere";
-import { RepoNotes } from "./RepoNotes";
 import { ChevronIcon } from "./icons";
+import { RepoNotes } from "./RepoNotes";
+import { ReposElsewhere } from "./ReposElsewhere";
 import { BusyLabel, Combo, Confirm, ErrorMessage, useFailure } from "./ui";
 
 export function ReposView() {
@@ -49,22 +49,29 @@ export function ReposView() {
 
   // Read again whenever the view opens: what it says is only as fresh as
   // the last look (REPO-5).
-  useEffect(() => { void refreshRepoHealth().catch(fail); }, [refreshRepoHealth, fail]);
+  useEffect(() => {
+    void refreshRepoHealth().catch(fail);
+  }, [refreshRepoHealth, fail]);
 
   // The workspace's repositories with no clone here (REPO-9): read again
   // whenever the list is, which the workspace's changes also read again.
-  useEffect(() => { void api.listElsewhere().then(setElsewhere).catch(fail); }, [projects, fail]);
+  useEffect(() => {
+    void api.listElsewhere().then(setElsewhere).catch(fail);
+  }, [projects, fail]);
 
   // Read when the view opens and whenever an agent changes one (MEM-6).
   const loadNotes = useCallback(() => {
-    void api.listRepoNotes()
+    void api
+      .listRepoNotes()
       .then((rows) => setNotes(Object.fromEntries(rows.map((r) => [r.project_id, r.notes]))))
       .catch(fail);
   }, [fail]);
   useEffect(() => {
     loadNotes();
     const p = listen("notes:changed", loadNotes);
-    return () => { void p.then((un) => un()); };
+    return () => {
+      void p.then((un) => un());
+    };
   }, [loadNotes]);
 
   const groups = groupProjects(projects);
@@ -74,7 +81,8 @@ export function ReposView() {
   // Collapsed by default: this tab is for finding one repository among
   // many, and a group is a heading long before it is a list. A group with
   // a repo in trouble opens, or the trouble is a count nobody can find.
-  const isClosed = (g: (typeof groups)[number]) => shut[g.group] ?? !g.projects.some((p) => trouble(p));
+  const isClosed = (g: (typeof groups)[number]) =>
+    shut[g.group] ?? !g.projects.some((p) => trouble(p));
   const anyOpen = groups.some((g) => !isClosed(g));
   const lastSync = Math.max(0, ...projects.map((p) => health[p.id]?.synced_at ?? 0));
 
@@ -137,7 +145,8 @@ export function ReposView() {
   async function sync(ids: string[]) {
     setSyncing((s) => new Set([...s, ...ids]));
     const all = ids.length > 1;
-    if (all) head.clear(); else tryAt(ids[0]);
+    if (all) head.clear();
+    else tryAt(ids[0]);
     try {
       const rows = await api.syncRepos(ids);
       setSynced((s) => ({ ...s, ...Object.fromEntries(rows.map((r) => [r.project_id, r])) }));
@@ -153,7 +162,8 @@ export function ReposView() {
   }
 
   async function locate(p: Project, path?: string) {
-    const chosen = path ?? (await openDialog({ directory: true, title: `Where is ${p.name} now?` }));
+    const chosen =
+      path ?? (await openDialog({ directory: true, title: `Where is ${p.name} now?` }));
     if (typeof chosen !== "string") return;
     tryAt(p.id);
     try {
@@ -174,12 +184,12 @@ export function ReposView() {
       label: "Remove",
       body: (
         <>
-          Remove <b>{p.name}</b> from Layer? The clone at <code>{p.path}</code>{" "}
-          and any worktrees stay on disk untouched — only this app forgets about it.
+          Remove <b>{p.name}</b> from Layer? The clone at <code>{p.path}</code> and any worktrees
+          stay on disk untouched — only this app forgets about it.
           {using.length > 0 && (
             <div className="confirm-detail">
-              {using.length} task{using.length === 1 ? "" : "s"} currently use it. They
-              lose that repository, and any task left with none is removed.
+              {using.length} task{using.length === 1 ? "" : "s"} currently use it. They lose that
+              repository, and any task left with none is removed.
               {health[p.id]?.clone !== "ok" && " If it has only moved, Locate it instead."}
             </div>
           )}
@@ -212,10 +222,19 @@ export function ReposView() {
         <h2>Repositories</h2>
         <span className="sub">
           {/* Nothing cloned yet: "0 in 0 groups" says nothing. */}
-          {(projects.length > 0 || elsewhere.length === 0) && <>{projects.length} in {groups.length} group{groups.length === 1 ? "" : "s"}</>}
+          {(projects.length > 0 || elsewhere.length === 0) && (
+            <>
+              {projects.length} in {groups.length} group{groups.length === 1 ? "" : "s"}
+            </>
+          )}
           {projects.length > 0 && elsewhere.length > 0 && " · "}
           {elsewhere.length > 0 && <>{elsewhere.length} not on this Mac</>}
-          {troubled > 0 && <> · <span className="trouble-text">{troubled} to fix</span></>}
+          {troubled > 0 && (
+            <>
+              {" "}
+              · <span className="trouble-text">{troubled} to fix</span>
+            </>
+          )}
           {lastSync > 0 && <> · last synced {ago(lastSync * 1000, now)}</>}
         </span>
         <div className="spacer" />
@@ -249,7 +268,10 @@ export function ReposView() {
         </button>
         {/* The primary while nothing needs fixing or cloning; a repository
             in trouble or not on this Mac has its own next action. */}
-        <button className={`ui-button${troubled > 0 || elsewhere.length > 0 ? "" : " ui-button-primary"}`} onClick={() => setAdding(true)}>
+        <button
+          className={`ui-button${troubled > 0 || elsewhere.length > 0 ? "" : " ui-button-primary"}`}
+          onClick={() => setAdding(true)}
+        >
           Add repositories
         </button>
       </div>
@@ -265,8 +287,8 @@ export function ReposView() {
       {projects.length === 0 && elsewhere.length === 0 && (
         <div className="card">
           <div className="muted" style={{ lineHeight: 1.6 }}>
-            None registered yet. <b>Add repositories</b> can scan a parent folder and
-            pick up a whole stack at once.
+            None registered yet. <b>Add repositories</b> can scan a parent folder and pick up a
+            whole stack at once.
           </div>
         </div>
       )}
@@ -274,116 +296,161 @@ export function ReposView() {
       {groups.map((g) => {
         const closed = isClosed(g);
         return (
-        <div key={g.group || "_"} className="card">
-          <div
-            className="row"
-            style={{ marginBottom: closed ? 0 : 8, cursor: "pointer" }}
-            onClick={() => setShut((c) => ({ ...c, [g.group]: !closed }))}
-          >
-            <span className={`chev${closed ? "" : " open"}`}><ChevronIcon /></span>
-            <h3 style={{ margin: 0 }}>{g.label}</h3>
-            <span className="muted">{g.projects.length}</span>
-            <div className="spacer" />
-            {/* Renaming must not toggle the section underneath it. */}
-            <div onClick={(e) => e.stopPropagation()}>
-              <Combo
-                value={g.group}
-                options={groupNames}
-                placeholder="rename group"
-                width={170}
-                onChange={(v) => { if (v.trim() !== g.group) void regroup(g.group, v); }}
-              />
-            </div>
-          </div>
-          {failedAt === `group:${g.group}` && <ErrorMessage>{row.error}</ErrorMessage>}
-
-          {!closed && g.projects.map((p) => {
-            const h = health[p.id];
-            const problem = trouble(p);
-            const unlinked = problem !== null && h?.clone === "ok";
-            const inUse = tasks.filter((t) =>
-              t.checkouts.some((c) => c.project_id === p.id),
-            ).length;
-            const last = synced[p.id];
-            const busy = syncing.has(p.id);
-            const noted = notes[p.id] ?? [];
-            const stale = noted.filter((n) => n.changed?.length).length;
-            const showNotes = notesOpen.has(p.id);
-            return (
-              <div key={p.id} className={`repo-manage${problem ? " trouble" : ""}`}>
-                <div className="repo-line">
-                  <span className="rname">{p.name}</span>
-                  <span className="ui-chip" title="Default branch">{p.default_branch}</span>
-                  <Standing h={h} branch={p.default_branch} />
-                  {inUse > 0 && <span className="ui-status">{inUse} task{inUse === 1 ? "" : "s"}</span>}
-                  <CopyState h={h} now={now} />
-                  <div className="spacer" />
-                  <UpdateByPicker p={p} h={h} onChange={(by) => void setUpdateBy(p, by)} />
-                  <SpecsPicker p={p} onChange={(inApp, folder) => void setSpecs(p, inApp, folder)} />
-                  <Combo
-                    value={p.group ?? ""}
-                    options={groupNames}
-                    placeholder="ungrouped"
-                    width={150}
-                    onChange={(v) => {
-                      if ((v.trim() || null) !== p.group) void setGroup(p.id, v);
-                    }}
-                  />
-                  <button
-                    className={`ui-button${showNotes ? " active" : ""}${stale ? " notes-stale" : ""}`}
-                    title={stale
-                      ? `${stale} to check: files ${stale === 1 ? "it is" : "they are"} about changed since ${stale === 1 ? "it was" : "they were"} last checked`
-                      : "What agents learned about this repository"}
-                    onClick={() => setNotesOpen((s) => {
-                      const next = new Set(s);
-                      if (!next.delete(p.id)) next.add(p.id);
-                      return next;
-                    })}
-                  >
-                    {noted.length ? `${noted.length} note${noted.length === 1 ? "" : "s"}` : "Notes"}
-                  </button>
-                  <button className="ui-button" disabled={busy} onClick={() => void sync([p.id])}>
-                    <BusyLabel busy={busy} idle="Sync" working="Syncing…" />
-                  </button>
-                  <button className="ui-button ui-button-danger" onClick={() => askRemove(p)}>
-                    Remove
-                  </button>
-                </div>
-                <div className="repo-sub">
-                  {/* Isolated, or the right-to-left run that keeps the end in
-                      view moves the leading slash to the end. */}
-                  <span className="rpath" title={p.path}><bdi>{p.path}</bdi></span>
-                  {h?.origin && <span className="rorigin" title={`Fetches from ${h.origin}`}>{h.origin}</span>}
-                  <div className="spacer" />
-                  <CheckCommand p={p} onSave={(command) => void setCheck(p, command)} />
-                </div>
-                {problem && (
-                  <div className="repo-problem">
-                    <span>
-                      {problem}
-                      {unlinked && " They are linked back when the app next starts, if the app's copy has their last commit."}
-                    </span>
-                    {h?.found && (
-                      <button className="ui-button ui-button-primary" onClick={() => void locate(p, h.found ?? undefined)}>
-                        Use {h.found}
-                      </button>
-                    )}
-                    {!unlinked && (
-                      <button className="ui-button" onClick={() => void locate(p)}>Locate…</button>
-                    )}
-                  </div>
-                )}
-                {last && <div className={`repo-synced${last.ok ? "" : " failed"}`}>{last.detail}</div>}
-                {failedAt === p.id && <ErrorMessage>{row.error}</ErrorMessage>}
-                {showNotes && <RepoNotes project={p} notes={noted} onChanged={loadNotes} />}
+          <div key={g.group || "_"} className="card">
+            <div
+              className="row"
+              style={{ marginBottom: closed ? 0 : 8, cursor: "pointer" }}
+              onClick={() => setShut((c) => ({ ...c, [g.group]: !closed }))}
+            >
+              <span className={`chev${closed ? "" : " open"}`}>
+                <ChevronIcon />
+              </span>
+              <h3 style={{ margin: 0 }}>{g.label}</h3>
+              <span className="muted">{g.projects.length}</span>
+              <div className="spacer" />
+              {/* Renaming must not toggle the section underneath it. */}
+              <div onClick={(e) => e.stopPropagation()}>
+                <Combo
+                  value={g.group}
+                  options={groupNames}
+                  placeholder="rename group"
+                  width={170}
+                  onChange={(v) => {
+                    if (v.trim() !== g.group) void regroup(g.group, v);
+                  }}
+                />
               </div>
-            );
-          })}
-        </div>
+            </div>
+            {failedAt === `group:${g.group}` && <ErrorMessage>{row.error}</ErrorMessage>}
+
+            {!closed &&
+              g.projects.map((p) => {
+                const h = health[p.id];
+                const problem = trouble(p);
+                const unlinked = problem !== null && h?.clone === "ok";
+                const inUse = tasks.filter((t) =>
+                  t.checkouts.some((c) => c.project_id === p.id),
+                ).length;
+                const last = synced[p.id];
+                const busy = syncing.has(p.id);
+                const noted = notes[p.id] ?? [];
+                const stale = noted.filter((n) => n.changed?.length).length;
+                const showNotes = notesOpen.has(p.id);
+                return (
+                  <div key={p.id} className={`repo-manage${problem ? " trouble" : ""}`}>
+                    <div className="repo-line">
+                      <span className="rname">{p.name}</span>
+                      <span className="ui-chip" title="Default branch">
+                        {p.default_branch}
+                      </span>
+                      <Standing h={h} branch={p.default_branch} />
+                      {inUse > 0 && (
+                        <span className="ui-status">
+                          {inUse} task{inUse === 1 ? "" : "s"}
+                        </span>
+                      )}
+                      <CopyState h={h} now={now} />
+                      <div className="spacer" />
+                      <UpdateByPicker p={p} h={h} onChange={(by) => void setUpdateBy(p, by)} />
+                      <SpecsPicker
+                        p={p}
+                        onChange={(inApp, folder) => void setSpecs(p, inApp, folder)}
+                      />
+                      <Combo
+                        value={p.group ?? ""}
+                        options={groupNames}
+                        placeholder="ungrouped"
+                        width={150}
+                        onChange={(v) => {
+                          if ((v.trim() || null) !== p.group) void setGroup(p.id, v);
+                        }}
+                      />
+                      <button
+                        className={`ui-button${showNotes ? " active" : ""}${stale ? " notes-stale" : ""}`}
+                        title={
+                          stale
+                            ? `${stale} to check: files ${stale === 1 ? "it is" : "they are"} about changed since ${stale === 1 ? "it was" : "they were"} last checked`
+                            : "What agents learned about this repository"
+                        }
+                        onClick={() =>
+                          setNotesOpen((s) => {
+                            const next = new Set(s);
+                            if (!next.delete(p.id)) next.add(p.id);
+                            return next;
+                          })
+                        }
+                      >
+                        {noted.length
+                          ? `${noted.length} note${noted.length === 1 ? "" : "s"}`
+                          : "Notes"}
+                      </button>
+                      <button
+                        className="ui-button"
+                        disabled={busy}
+                        onClick={() => void sync([p.id])}
+                      >
+                        <BusyLabel busy={busy} idle="Sync" working="Syncing…" />
+                      </button>
+                      <button className="ui-button ui-button-danger" onClick={() => askRemove(p)}>
+                        Remove
+                      </button>
+                    </div>
+                    <div className="repo-sub">
+                      {/* Isolated, or the right-to-left run that keeps the end in
+                      view moves the leading slash to the end. */}
+                      <span className="rpath" title={p.path}>
+                        <bdi>{p.path}</bdi>
+                      </span>
+                      {h?.origin && (
+                        <span className="rorigin" title={`Fetches from ${h.origin}`}>
+                          {h.origin}
+                        </span>
+                      )}
+                      <div className="spacer" />
+                      <CheckCommand p={p} onSave={(command) => void setCheck(p, command)} />
+                    </div>
+                    {problem && (
+                      <div className="repo-problem">
+                        <span>
+                          {problem}
+                          {unlinked &&
+                            " They are linked back when the app next starts, if the app's copy has their last commit."}
+                        </span>
+                        {h?.found && (
+                          <button
+                            className="ui-button ui-button-primary"
+                            onClick={() => void locate(p, h.found ?? undefined)}
+                          >
+                            Use {h.found}
+                          </button>
+                        )}
+                        {!unlinked && (
+                          <button className="ui-button" onClick={() => void locate(p)}>
+                            Locate…
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {last && (
+                      <div className={`repo-synced${last.ok ? "" : " failed"}`}>{last.detail}</div>
+                    )}
+                    {failedAt === p.id && <ErrorMessage>{row.error}</ErrorMessage>}
+                    {showNotes && <RepoNotes project={p} notes={noted} onChanged={loadNotes} />}
+                  </div>
+                );
+              })}
+          </div>
         );
       })}
 
-      {adding && <AddRepos onClose={() => { setAdding(false); void refreshRepoHealth().catch(fail); }} />}
+      {adding && (
+        <AddRepos
+          onClose={() => {
+            setAdding(false);
+            void refreshRepoHealth().catch(fail);
+          }}
+        />
+      )}
 
       {cleaning && (
         <CleanUp
@@ -415,13 +482,17 @@ function Standing({ h, branch }: { h: RepoHealth | undefined; branch: string }) 
         className="ui-status ui-status-warn"
         title={`Your clone's ${branch} has ${h.ahead} commit${h.ahead === 1 ? "" : "s"} origin does not${h.behind ? `, and is ${h.behind} behind` : ""}. Sync leaves it alone.`}
       >
-        ↑{h.ahead}{h.behind > 0 && ` ↓${h.behind}`}
+        ↑{h.ahead}
+        {h.behind > 0 && ` ↓${h.behind}`}
       </span>
     );
   }
   if (h.behind > 0) {
     return (
-      <span className="ui-chip" title={`Your clone's ${branch} is ${h.behind} commit${h.behind === 1 ? "" : "s"} behind origin. Sync fast-forwards it.`}>
+      <span
+        className="ui-chip"
+        title={`Your clone's ${branch} is ${h.behind} commit${h.behind === 1 ? "" : "s"} behind origin. Sync fast-forwards it.`}
+      >
         ↓{h.behind}
       </span>
     );
@@ -433,7 +504,11 @@ function Standing({ h, branch }: { h: RepoHealth | undefined; branch: string }) 
  * How Update from base updates branches here (UPD-7). Unset, it follows
  * the guess from history, and the first option says what that is.
  */
-function UpdateByPicker({ p, h, onChange }: {
+function UpdateByPicker({
+  p,
+  h,
+  onChange,
+}: {
   p: Project;
   h: RepoHealth | undefined;
   onChange: (by: UpdateBy | null) => void;
@@ -465,7 +540,9 @@ function CheckCommand({ p, onSave }: { p: Project; onSave: (command: string) => 
       title="What says the work here is done (bun run check, cargo test). A loop runs it after each of an agent's turns."
       spellCheck={false}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={() => { if (value.trim() !== (p.check ?? "")) onSave(value.trim()); }}
+      onBlur={() => {
+        if (value.trim() !== (p.check ?? "")) onSave(value.trim());
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
         if (e.key === "Escape") setValue(p.check ?? "");
@@ -478,7 +555,13 @@ function CheckCommand({ p, onSave }: { p: Project; onSave: (command: string) => 
  * Where specs are kept for this repository (SPEC-1, SPEC-3): committed in it,
  * under a folder, or by the app for a repository whose team keeps none.
  */
-function SpecsPicker({ p, onChange }: { p: Project; onChange: (inApp: boolean, folder: string) => void }) {
+function SpecsPicker({
+  p,
+  onChange,
+}: {
+  p: Project;
+  onChange: (inApp: boolean, folder: string) => void;
+}) {
   const folder = p.spec_folder ?? "specs";
   const folders = [...new Set(["specs", "docs/specs", folder])];
   return (
@@ -488,7 +571,11 @@ function SpecsPicker({ p, onChange }: { p: Project; onChange: (inApp: boolean, f
       title="Where a task's spec is kept: committed on its branch in this folder, or by the app, outside git"
       onChange={(e) => onChange(!e.target.value, e.target.value || folder)}
     >
-      {folders.map((f) => <option key={f} value={f}>specs in {f}/</option>)}
+      {folders.map((f) => (
+        <option key={f} value={f}>
+          specs in {f}/
+        </option>
+      ))}
       <option value="">specs kept by the app</option>
     </select>
   );
@@ -498,7 +585,11 @@ function SpecsPicker({ p, onChange }: { p: Project; onChange: (inApp: boolean, f
 function CopyState({ h, now }: { h: RepoHealth | undefined; now: number }) {
   if (!h) return null;
   if (!h.store) {
-    return <span className="rstore warn" title="Sync makes it, if the clone is there">no copy yet</span>;
+    return (
+      <span className="rstore warn" title="Sync makes it, if the clone is there">
+        no copy yet
+      </span>
+    );
   }
   return (
     <span className="rstore" title={`The app's copy: ${h.store}`}>

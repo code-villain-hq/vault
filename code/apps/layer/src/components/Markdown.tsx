@@ -1,6 +1,8 @@
-import { useMemo, type MouseEvent, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useMemo, type MouseEvent, type ReactNode } from "react";
 import { parse, safeHref, type Block, type Inline } from "../lib/markdown";
+
+/* oxlint-disable react/no-array-index-key -- nodes are parsed afresh from the text, with nothing else to tell them apart */
 
 /**
  * Markdown as GitHub shows it, built from React elements only (see
@@ -21,15 +23,27 @@ function open(e: MouseEvent, href: string) {
 function inlines(nodes: Inline[]): ReactNode[] {
   return nodes.map((n, i) => {
     switch (n.t) {
-      case "text": return n.v;
-      case "code": return <code key={i}>{n.v}</code>;
-      case "strong": return <strong key={i}>{inlines(n.c)}</strong>;
-      case "em": return <em key={i}>{inlines(n.c)}</em>;
-      case "del": return <del key={i}>{inlines(n.c)}</del>;
-      case "br": return <br key={i} />;
+      case "text":
+        return n.v;
+      case "code":
+        return <code key={i}>{n.v}</code>;
+      case "strong":
+        return <strong key={i}>{inlines(n.c)}</strong>;
+      case "em":
+        return <em key={i}>{inlines(n.c)}</em>;
+      case "del":
+        return <del key={i}>{inlines(n.c)}</del>;
+      case "br":
+        return <br key={i} />;
       case "link":
         return (
-          <a key={i} className="ui-link" href={n.href} title={n.href} onClick={(e) => open(e, n.href)}>
+          <a
+            key={i}
+            className="ui-link"
+            href={n.href}
+            title={n.href}
+            onClick={(e) => open(e, n.href)}
+          >
             {inlines(n.c)}
           </a>
         );
@@ -43,24 +57,47 @@ function block(b: Block, i: number): ReactNode {
       const H = `h${b.level}` as "h1";
       return <H key={i}>{inlines(b.c)}</H>;
     }
-    case "p": return <p key={i}>{inlines(b.c)}</p>;
+    case "p":
+      return <p key={i}>{inlines(b.c)}</p>;
     // GitHub's suggested change: said as one, since it is applied, not read.
-    case "pre": return b.lang === "suggestion"
-      ? <div key={i} className="suggestion"><span>Suggested change</span><pre><code>{b.v}</code></pre></div>
-      : <pre key={i}><code>{b.v}</code></pre>;
-    case "quote": return <blockquote key={i}>{b.c.map(block)}</blockquote>;
-    case "hr": return <hr key={i} />;
+    case "pre":
+      return b.lang === "suggestion" ? (
+        <div key={i} className="suggestion">
+          <span>Suggested change</span>
+          <pre>
+            <code>{b.v}</code>
+          </pre>
+        </div>
+      ) : (
+        <pre key={i}>
+          <code>{b.v}</code>
+        </pre>
+      );
+    case "quote":
+      return <blockquote key={i}>{b.c.map(block)}</blockquote>;
+    case "hr":
+      return <hr key={i} />;
     case "table":
       return (
         <div key={i} className="md-table">
           <table>
             <thead>
-              <tr>{b.head.map((c, n) => <th key={n} style={{ textAlign: b.align[n] ?? undefined }}>{inlines(c)}</th>)}</tr>
+              <tr>
+                {b.head.map((c, n) => (
+                  <th key={n} style={{ textAlign: b.align[n] ?? undefined }}>
+                    {inlines(c)}
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
               {b.rows.map((row, r) => (
                 <tr key={r}>
-                  {row.map((c, n) => <td key={n} style={{ textAlign: b.align[n] ?? undefined }}>{inlines(c)}</td>)}
+                  {row.map((c, n) => (
+                    <td key={n} style={{ textAlign: b.align[n] ?? undefined }}>
+                      {inlines(c)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -80,9 +117,13 @@ function block(b: Block, i: number): ReactNode {
           </li>
         );
       });
-      return b.ordered
-        ? <ol key={i} start={b.start}>{items}</ol>
-        : <ul key={i}>{items}</ul>;
+      return b.ordered ? (
+        <ol key={i} start={b.start}>
+          {items}
+        </ol>
+      ) : (
+        <ul key={i}>{items}</ul>
+      );
     }
   }
 }

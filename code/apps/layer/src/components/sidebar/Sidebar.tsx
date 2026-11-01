@@ -1,27 +1,40 @@
-import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { api, errMessage, failureText } from "../../lib/api";
 import { copyAndSay } from "../../lib/clipboard";
-import { useStore } from "../../store";
 import { taskReview } from "../../lib/derive";
 import { byEpic, groupBy } from "../../lib/grouping";
-import { readOneOf, write } from "../../lib/persist";
 import { useFleetAgents } from "../../lib/panes";
+import { readOneOf, write } from "../../lib/persist";
 import { trackerOfKey } from "../../lib/tracker";
 import type { JiraTransition, TaskView } from "../../lib/types";
-import { BusyOverlay, Confirm, ContextMenu, ErrorMessage, Field, Modal, useFailure, type MenuItem } from "../ui";
-import { RepoPicker } from "../RepoPicker";
+import { useStore } from "../../store";
 import { FinishTask } from "../FinishTask";
+import { RepoPicker } from "../RepoPicker";
+import {
+  BusyOverlay,
+  Confirm,
+  ContextMenu,
+  ErrorMessage,
+  Field,
+  Modal,
+  useFailure,
+  type MenuItem,
+} from "../ui";
 import { DeleteTask } from "./DeleteTask";
-import { TaskRow } from "./TaskRow";
 import { EpicsSection, useEpicSections } from "./EpicsSection";
 import { ProfileMenu } from "./ProfileMenu";
 import { SyncStatus } from "./SyncStatus";
+import { TaskRow } from "./TaskRow";
 
 /** What the task list is grouped by (TASK-17). Stage is the three lists it always had. */
 const GROUPINGS = ["stage", "epic", "repo"] as const;
 type Grouping = (typeof GROUPINGS)[number];
-const GROUPING_LABEL: Record<Grouping, string> = { stage: "Stage", epic: "Epic", repo: "Repository" };
+const GROUPING_LABEL: Record<Grouping, string> = {
+  stage: "Stage",
+  epic: "Epic",
+  repo: "Repository",
+};
 
 /**
  * The overview is a place, not merely what you see before choosing.
@@ -101,7 +114,9 @@ export function Sidebar() {
   /** The task whose delete dialog is open. */
   const [asking, setAsking] = useState<TaskView | null>(null);
   const [finishing, setFinishing] = useState<TaskView | null>(null);
-  const [grouping, setGroupingState] = useState<Grouping>(() => readOneOf("tasksGroup", GROUPINGS, "stage"));
+  const [grouping, setGroupingState] = useState<Grouping>(() =>
+    readOneOf("tasksGroup", GROUPINGS, "stage"),
+  );
   const [groupMenu, setGroupMenu] = useState<{ x: number; y: number } | null>(null);
   // Without Jira there is no epic to ask for; the choice is kept for when it is back.
   const by: Grouping = grouping === "epic" && !trackerInUse ? "stage" : grouping;
@@ -147,7 +162,10 @@ export function Sidebar() {
     // invisibly.
     const added = adding.length - failed.length;
     if (added > 0 && told > 0) {
-      toast("info", `Told ${told} running agent${told === 1 ? "" : "s"} about the new worktree${added === 1 ? "" : "s"}.`);
+      toast(
+        "info",
+        `Told ${told} running agent${told === 1 ? "" : "s"} about the new worktree${added === 1 ? "" : "s"}.`,
+      );
     }
   }
 
@@ -182,8 +200,8 @@ export function Sidebar() {
         label: "Force delete",
         body: (
           <>
-            git refused to remove {stuck.length} worktree{stuck.length === 1 ? "" : "s"},
-            so the task has been kept rather than leaving them orphaned:
+            git refused to remove {stuck.length} worktree{stuck.length === 1 ? "" : "s"}, so the
+            task has been kept rather than leaving them orphaned:
             <div className="confirm-detail">
               {stuck.map((r) => (
                 <div key={r.checkout_id}>
@@ -212,52 +230,52 @@ export function Sidebar() {
     (id: string) => setExpanded((x) => ({ ...x, [id]: !(x[id] ?? false) })),
     [],
   );
-  const askRemoveRepo = useCallback((checkoutId: string, repoName: string, dirty: number, last: boolean) => {
-    setConfirming({
-      title: "Remove repository from task",
-      label: "Remove",
-      body: (
-        <>
-          Remove <b>{repoName}</b> from this task and delete its worktree?
-          <div className="muted" style={{ marginTop: 8 }}>
-            Any terminal running inside it is stopped. Panes started at the task
-            root, which see every repo, are left alone.
-          </div>
-          {last && (
-            <div className="confirm-detail">
-              This is the only repository in the task. Removing it leaves nothing to
-              work in — add another, or delete the task instead.
+  const askRemoveRepo = useCallback(
+    (checkoutId: string, repoName: string, dirty: number, last: boolean) => {
+      setConfirming({
+        title: "Remove repository from task",
+        label: "Remove",
+        body: (
+          <>
+            Remove <b>{repoName}</b> from this task and delete its worktree?
+            <div className="muted" style={{ marginTop: 8 }}>
+              Any terminal running inside it is stopped. Panes started at the task root, which see
+              every repo, are left alone.
             </div>
-          )}
-          {dirty > 0 && (
-            <div className="confirm-detail">
-              {dirty} uncommitted change{dirty === 1 ? "" : "s"} in that worktree will be
-              lost.
-            </div>
-          )}
-        </>
-      ),
-      // Awaited by the dialog, so the spinner is up for the whole thing —
-      // stopping the panes alone waits two seconds on them, and `git worktree
-      // remove` is as slow here as it is when a whole task goes.
-      busyLabel: "Removing…",
-      run: async () => {
-        try {
-          await api.removeCheckout(checkoutId, dirty > 0);
-          // Panes rooted in that worktree are stopped with it, so refresh both
-          // or the terminals stay on screen until the next poll happens to run.
-          await Promise.all([refreshTasks(), refreshPanes()]);
-        } catch (e) {
-          fail(e);
-        }
-      },
-    });
-  }, [refreshTasks, refreshPanes, fail]);
+            {last && (
+              <div className="confirm-detail">
+                This is the only repository in the task. Removing it leaves nothing to work in — add
+                another, or delete the task instead.
+              </div>
+            )}
+            {dirty > 0 && (
+              <div className="confirm-detail">
+                {dirty} uncommitted change{dirty === 1 ? "" : "s"} in that worktree will be lost.
+              </div>
+            )}
+          </>
+        ),
+        // Awaited by the dialog, so the spinner is up for the whole thing —
+        // stopping the panes alone waits two seconds on them, and `git worktree
+        // remove` is as slow here as it is when a whole task goes.
+        busyLabel: "Removing…",
+        run: async () => {
+          try {
+            await api.removeCheckout(checkoutId, dirty > 0);
+            // Panes rooted in that worktree are stopped with it, so refresh both
+            // or the terminals stay on screen until the next poll happens to run.
+            await Promise.all([refreshTasks(), refreshPanes()]);
+          } catch (e) {
+            fail(e);
+          }
+        },
+      });
+    },
+    [refreshTasks, refreshPanes, fail],
+  );
 
   function taskMenu(task: TaskView): MenuItem[] {
-    const items: MenuItem[] = [
-      { label: "Open", onSelect: () => select(task.id) },
-    ];
+    const items: MenuItem[] = [{ label: "Open", onSelect: () => select(task.id) }];
     if (task.issue_url) {
       items.push({
         label: `Open ${task.issue_key} in ${trackerOfKey(task.issue_key ?? "")}`,
@@ -290,7 +308,10 @@ export function Sidebar() {
       items.push({
         label: "Add a repository…",
         separated: true,
-        onSelect: () => { dialog.clear(); setAddingRepoTo(task); },
+        onSelect: () => {
+          dialog.clear();
+          setAddingRepoTo(task);
+        },
       });
     }
     const landed = taskReview(prs[task.id] ?? []) === "merged";
@@ -320,8 +341,7 @@ export function Sidebar() {
   const done = tasks.filter((t) => review.get(t.id) === "merged");
   const reviewing = tasks.filter(
     (t) =>
-      review.get(t.id) !== "merged" &&
-      (prs[t.id] ?? []).some((r) => r.pr && r.pr.state === "open"),
+      review.get(t.id) !== "merged" && (prs[t.id] ?? []).some((r) => r.pr && r.pr.state === "open"),
   );
   const elsewhere = new Set([...done, ...reviewing].map((t) => t.id));
   const working = tasks.filter((t) => !elsewhere.has(t.id));
@@ -332,12 +352,19 @@ export function Sidebar() {
     by === "epic"
       ? byEpic(ordered, (t) => (t.issue_key ? epics[t.issue_key] : null))
       : by === "repo"
-        ? groupBy(ordered, (t) => {
-            // A task in several repositories is one piece of work: it is listed
-            // once, under all of them, rather than once under each.
-            const names = t.checkouts.map((c) => c.project_name).sort().join(", ");
-            return names ? { id: names, label: names } : null;
-          }, "No repository")
+        ? groupBy(
+            ordered,
+            (t) => {
+              // A task in several repositories is one piece of work: it is listed
+              // once, under all of them, rather than once under each.
+              const names = t.checkouts
+                .map((c) => c.project_name)
+                .sort()
+                .join(", ");
+              return names ? { id: names, label: names } : null;
+            },
+            "No repository",
+          )
         : null;
 
   const row = (task: TaskView) => (
@@ -394,11 +421,14 @@ export function Sidebar() {
             {projects.length === 0 ? (
               <>
                 No repositories yet —{" "}
+                {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- a link in the sentence; a view has no URL */}
                 <a
                   className="ui-link"
                   href="#"
-                 
-                  onClick={(e) => { e.preventDefault(); setView("repos"); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setView("repos");
+                  }}
                 >
                   add some in the Repos tab
                 </a>
@@ -407,11 +437,14 @@ export function Sidebar() {
             ) : (
               <>
                 No tasks yet. A task starts from a ticket —{" "}
+                {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- a link in the sentence; a view has no URL */}
                 <a
                   className="ui-link"
                   href="#"
-                 
-                  onClick={(e) => { e.preventDefault(); setView("tickets"); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setView("tickets");
+                  }}
                 >
                   pick one in Tickets
                 </a>
@@ -431,24 +464,24 @@ export function Sidebar() {
           </Fragment>
         ))}
 
-        {!groups && ordered.map((task, i) => (
-          <Fragment key={task.id}>
-            {i === working.length && reviewing.length > 0 && (
-              <div className="section-head">
-                In review
-                <span className="count">{reviewing.length}</span>
-              </div>
-            )}
-            {i === working.length + reviewing.length && done.length > 0 && (
-              <div className="section-head">
-                Done
-                <span className="count">{done.length}</span>
-              </div>
-            )}
-            {row(task)}
-          </Fragment>
-        ))}
-
+        {!groups &&
+          ordered.map((task, i) => (
+            <Fragment key={task.id}>
+              {i === working.length && reviewing.length > 0 && (
+                <div className="section-head">
+                  In review
+                  <span className="count">{reviewing.length}</span>
+                </div>
+              )}
+              {i === working.length + reviewing.length && done.length > 0 && (
+                <div className="section-head">
+                  Done
+                  <span className="count">{done.length}</span>
+                </div>
+              )}
+              {row(task)}
+            </Fragment>
+          ))}
       </div>
       <ProfileMenu />
       {/* Where every app has it (PROF-19): Forge keeps a help button beside it. */}
@@ -513,12 +546,18 @@ export function Sidebar() {
       {addingRepoTo && (
         <Modal
           title={`Add repositories to ${addingRepoTo.issue_key ?? addingRepoTo.branch}`}
-          onClose={() => { setAddingRepoTo(null); setAdding([]); }}
+          onClose={() => {
+            setAddingRepoTo(null);
+            setAdding([]);
+          }}
           footer={
             <>
               <button
                 className="ui-button"
-                onClick={() => { setAddingRepoTo(null); setAdding([]); }}
+                onClick={() => {
+                  setAddingRepoTo(null);
+                  setAdding([]);
+                }}
               >
                 Cancel
               </button>
@@ -527,9 +566,7 @@ export function Sidebar() {
                 disabled={busy || adding.length === 0}
                 onClick={() => void addRepos(addingRepoTo)}
               >
-                {busy
-                  ? "Creating…"
-                  : `Add ${adding.length} repo${adding.length === 1 ? "" : "s"}`}
+                {busy ? "Creating…" : `Add ${adding.length} repo${adding.length === 1 ? "" : "s"}`}
               </button>
             </>
           }
@@ -538,11 +575,7 @@ export function Sidebar() {
             label="Repositories"
             hint={`A worktree on ${addingRepoTo.branch} is created for each, beside the ones already in this task.`}
           >
-            <RepoPicker
-              projects={available(addingRepoTo)}
-              picked={adding}
-              onChange={setAdding}
-            />
+            <RepoPicker projects={available(addingRepoTo)} picked={adding} onChange={setAdding} />
           </Field>
           <ErrorMessage>{dialog.error}</ErrorMessage>
         </Modal>

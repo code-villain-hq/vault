@@ -10,7 +10,8 @@ const MEASURES: { id: Measure; label: string }[] = [
   { id: "finished", label: "Tasks finished" },
 ];
 
-const value = (m: Measure, d: UsageDay) => (m === "tokens" ? d.tokens : m === "worked" ? d.workedSecs : d.finished);
+const value = (m: Measure, d: UsageDay) =>
+  m === "tokens" ? d.tokens : m === "worked" ? d.workedSecs : d.finished;
 
 function say(m: Measure, n: number): string {
   if (m === "tokens") return `${formatTokens(n)} tokens`;
@@ -21,7 +22,11 @@ function say(m: Measure, n: number): string {
 /** "Thu 8 Oct", from `YYYY-MM-DD`, read as the Mac's own day. */
 function dayName(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
-  return new Date(y, m - 1, d, 12).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  return new Date(y, m - 1, d, 12).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 
 /**
@@ -41,13 +46,22 @@ export const UsageChart = memo(function UsageChart({ days }: { days: UsageDay[] 
       <div className="run-chart-head">
         <div className="ui-tabs sub-tabs" role="tablist">
           {MEASURES.map((m) => (
-            <button key={m.id} type="button" className="ui-tab" role="tab" aria-selected={measure === m.id} onClick={() => setMeasure(m.id)}>
+            <button
+              key={m.id}
+              type="button"
+              className="ui-tab"
+              role="tab"
+              aria-selected={measure === m.id}
+              onClick={() => setMeasure(m.id)}
+            >
               {m.label}
             </button>
           ))}
         </div>
         <span className="run-chart-readout" aria-live="polite">
-          {at ? `${dayName(at.day)}: ${say(measure, value(measure, at))}` : `${say(measure, total)} in ${days.length} days`}
+          {at
+            ? `${dayName(at.day)}: ${say(measure, value(measure, at))}`
+            : `${say(measure, total)} in ${days.length} days`}
         </span>
       </div>
       <div
@@ -57,8 +71,15 @@ export const UsageChart = memo(function UsageChart({ days }: { days: UsageDay[] 
         onMouseLeave={() => setHover(null)}
       >
         {days.map((d, i) => (
-          <div key={d.day} className={`run-day${hover === i ? " hover" : ""}`} onMouseEnter={() => setHover(i)}>
-            <div className="bar" style={{ height: value(measure, d) ? `${(value(measure, d) / peak) * 100}%` : 0 }} />
+          <div
+            key={d.day}
+            className={`run-day${hover === i ? " hover" : ""}`}
+            onMouseEnter={() => setHover(i)}
+          >
+            <div
+              className="bar"
+              style={{ height: value(measure, d) ? `${(value(measure, d) / peak) * 100}%` : 0 }}
+            />
           </div>
         ))}
       </div>

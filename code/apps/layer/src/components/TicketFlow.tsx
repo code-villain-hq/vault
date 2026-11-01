@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { api, errMessage } from "../lib/api";
-import type { FlowStatus, JiraTransition, ProjectStatus, Settings, StartTo, TicketFlow } from "../lib/types";
+import type {
+  FlowStatus,
+  JiraTransition,
+  ProjectStatus,
+  Settings,
+  StartTo,
+  TicketFlow,
+} from "../lib/types";
 import { useStore } from "../store";
 import { ErrorMessage, Field, useFailure } from "./ui";
 
@@ -15,9 +22,15 @@ export function flowOf(settings: Settings | null, key: string | null): TicketFlo
  * when that is a guess: Done and Cancelled are both "done", and the first
  * in the list once closed a merged ticket as Won't Do.
  */
-export function mergedTransition(all: JiraTransition[], flow: TicketFlow | undefined): JiraTransition | undefined {
+export function mergedTransition(
+  all: JiraTransition[],
+  flow: TicketFlow | undefined,
+): JiraTransition | undefined {
   const done = all.filter((t) => t.to_category === "done");
-  return all.find((t) => flow?.merged && t.to_id === flow.merged.id) ?? (done.length === 1 ? done[0] : undefined);
+  return (
+    all.find((t) => flow?.merged && t.to_id === flow.merged.id) ??
+    (done.length === 1 ? done[0] : undefined)
+  );
 }
 
 /**
@@ -34,10 +47,12 @@ export function TicketFlowSettings() {
   const failure = useFailure();
   const [failedIn, setFailedIn] = useState<string | null>(null);
   // The project the ticket list is scoped to, and every one there is work in.
-  const projects = [...new Set([
-    ...(settings?.jira?.project_key ? [settings.jira.project_key] : []),
-    ...tasks.map((t) => t.issue_key?.split("-")[0]).filter((k): k is string => !!k),
-  ])].sort();
+  const projects = [
+    ...new Set([
+      ...(settings?.jira?.project_key ? [settings.jira.project_key] : []),
+      ...tasks.map((t) => t.issue_key?.split("-")[0]).filter((k): k is string => !!k),
+    ]),
+  ].sort();
   const [statuses, setStatuses] = useState<Record<string, ProjectStatus[] | string>>({});
   const wanted = projects.join(",");
 
@@ -55,7 +70,9 @@ export function TicketFlowSettings() {
     const picked = Array.isArray(list) ? list.find((s) => s.id === value) : undefined;
     const to: StartTo = picked
       ? { to: "status", id: picked.id, name: picked.name }
-      : value === "leave" ? { to: "leave" } : { to: "first_in_progress" };
+      : value === "leave"
+        ? { to: "leave" }
+        : { to: "first_in_progress" };
     failure.clear();
     setFailedIn(project);
     try {
@@ -91,29 +108,45 @@ export function TicketFlowSettings() {
           const list = statuses[p];
           const flow = settings?.jira?.flow?.[p];
           const pick = (stage: "review" | "merged", chosen: FlowStatus | null | undefined) => (
-            <select className="ui-field"
+            <select
+              className="ui-field"
               value={chosen?.id ?? ""}
               style={{ width: "100%" }}
               onChange={(e) => void choose(p, stage, e.target.value)}
             >
               <option value="">leave the ticket</option>
-              {Array.isArray(list) && list.filter((s) => s.category !== "new").map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
+              {Array.isArray(list) &&
+                list
+                  .filter((s) => s.category !== "new")
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
             </select>
           );
           // Until chosen here, as the switch that came before said (TKT-1).
-          const started = flow?.started ?? (settings?.ui.sync_jira_status === false ? { to: "leave" } : { to: "first_in_progress" });
+          const started =
+            flow?.started ??
+            (settings?.ui.sync_jira_status === false
+              ? { to: "leave" }
+              : { to: "first_in_progress" });
           const start = (
-            <select className="ui-field"
+            <select
+              className="ui-field"
               value={started.to === "status" ? started.id : started.to === "leave" ? "leave" : ""}
               style={{ width: "100%" }}
               onChange={(e) => void chooseStart(p, e.target.value)}
             >
               <option value="">first in-progress status</option>
-              {Array.isArray(list) && list.filter((s) => s.category === "indeterminate").map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
+              {Array.isArray(list) &&
+                list
+                  .filter((s) => s.category === "indeterminate")
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
               <option value="leave">leave the ticket</option>
             </select>
           );
@@ -123,7 +156,9 @@ export function TicketFlowSettings() {
               {typeof list === "string" ? (
                 <div style={{ color: "var(--status-danger-ink)", marginTop: 6 }}>{list}</div>
               ) : !list ? (
-                <div className="muted" style={{ marginTop: 6 }}>Reading its statuses…</div>
+                <div className="muted" style={{ marginTop: 6 }}>
+                  Reading its statuses…
+                </div>
               ) : (
                 // One under the other, in the order a ticket meets them. In
                 // one row they wrapped wherever the width ran out, and the

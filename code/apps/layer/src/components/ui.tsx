@@ -1,12 +1,17 @@
 import type { ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import { failureText } from "../lib/api";
 import { useStore } from "../store";
 import { CloseIcon, PanelIcon } from "./icons";
 
 export function Modal({
-  title, children, footer, toolbar, onClose, wide, tall,
+  title,
+  children,
+  footer,
+  toolbar,
+  onClose,
+  wide,
+  tall,
 }: {
   title: string;
   children: ReactNode;
@@ -34,7 +39,14 @@ export function Modal({
         <div className="modal-head">
           {title}
           <div className="spacer" />
-          <button className="ui-button ui-icon-button" onClick={onClose} title="Close" aria-label="Close"><CloseIcon /></button>
+          <button
+            className="ui-button ui-icon-button"
+            onClick={onClose}
+            title="Close"
+            aria-label="Close"
+          >
+            <CloseIcon />
+          </button>
         </div>
         {toolbar && <div className="modal-toolbar">{toolbar}</div>}
         <div className="modal-body">{children}</div>
@@ -45,7 +57,9 @@ export function Modal({
 }
 
 export function Field({
-  label, hint, children,
+  label,
+  hint,
+  children,
 }: {
   label: string;
   hint?: ReactNode;
@@ -94,7 +108,15 @@ export function Spinner() {
  * grid cell and the one not showing is only hidden, so the button keeps the
  * width of the longer and does not jump the moment it starts.
  */
-export function BusyLabel({ busy, idle, working }: { busy: boolean; idle: ReactNode; working: ReactNode }) {
+export function BusyLabel({
+  busy,
+  idle,
+  working,
+}: {
+  busy: boolean;
+  idle: ReactNode;
+  working: ReactNode;
+}) {
   return (
     <span className="busy-label">
       <span data-off={busy || undefined}>{idle}</span>
@@ -128,7 +150,11 @@ export function SidebarToggle() {
 
 /** A labelled toggle row, for settings that read better as switches. */
 export function Switch({
-  label, detail, checked, disabled, onChange,
+  label,
+  detail,
+  checked,
+  disabled,
+  onChange,
 }: {
   label: string;
   detail?: string;
@@ -169,7 +195,15 @@ export interface MenuItem {
  * A press outside it or Escape closes it.
  */
 export function Floating({
-  x, y, align = "start", above = false, onClose, ignore, measureKey, className, children,
+  x,
+  y,
+  align = "start",
+  above = false,
+  onClose,
+  ignore,
+  measureKey,
+  className,
+  children,
 }: {
   x: number;
   y: number;
@@ -211,7 +245,10 @@ export function Floating({
 
     const want = align === "end" ? x - origin.width : x;
     const left = Math.max(8, Math.min(want, window.innerWidth - origin.width - 8));
-    const top = Math.max(8, Math.min(above ? y - origin.height : y, window.innerHeight - origin.height - 8));
+    const top = Math.max(
+      8,
+      Math.min(above ? y - origin.height : y, window.innerHeight - origin.height - 8),
+    );
     const placed = { left: (left - origin.left) / sx, top: (top - origin.top) / sy };
     // Onto the element as well as into state: measuring moved it, and when
     // the place comes out the same as last time React sees nothing to change
@@ -245,7 +282,7 @@ export function Floating({
       ref={ref}
       className={className}
       // Hidden until measured, so it never flashes at the unadjusted spot.
-      style={{ ...(pos ?? {}), visibility: pos ? "visible" : "hidden" }}
+      style={{ ...pos, visibility: pos ? "visible" : "hidden" }}
       onMouseDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -256,7 +293,11 @@ export function Floating({
 
 /** A right-click menu anchored at the cursor. */
 export function ContextMenu({
-  x, y, items, onClose, ignore,
+  x,
+  y,
+  items,
+  onClose,
+  ignore,
 }: {
   x: number;
   y: number;
@@ -277,12 +318,16 @@ export function ContextMenu({
     >
       {items.map((item, i) => (
         <button
+          // oxlint-disable-next-line react/no-array-index-key -- a menu's items, in order; a label can repeat
           key={i}
           className={`ctx-item ui-option${item.danger ? " danger" : ""}${
             item.separated ? " separated" : ""
           }`}
           disabled={item.disabled}
-          onClick={() => { onClose(); item.onSelect(); }}
+          onClick={() => {
+            onClose();
+            item.onSelect();
+          }}
         >
           {item.label}
         </button>
@@ -306,7 +351,13 @@ export function ContextMenu({
  * screen or open a second dialog of their own.
  */
 export function Confirm({
-  title, body, confirmLabel, busyLabel, danger = true, onConfirm, onCancel,
+  title,
+  body,
+  confirmLabel,
+  busyLabel,
+  danger = true,
+  onConfirm,
+  onCancel,
 }: {
   title: string;
   body: ReactNode;
@@ -338,7 +389,10 @@ export function Confirm({
       () => onCancel(),
       // A rejection stays in the dialog, above its buttons (NOTE-6). A caller
       // that reports its own failure resolves instead, and the dialog closes.
-      (e: unknown) => { setRunning(false); failure.fail(e); },
+      (e: unknown) => {
+        setRunning(false);
+        failure.fail(e);
+      },
     );
   }
 
@@ -347,11 +401,15 @@ export function Confirm({
       title={title}
       // Not dismissable mid-flight: the work is already away, and closing the
       // dialog would only hide that it is still running.
-      onClose={() => { if (!running) onCancel(); }}
+      onClose={() => {
+        if (!running) onCancel();
+      }}
       footer={
         <>
           {/* Cancel takes the focus, so Enter can't delete by accident (WIN-3). */}
-          <button className="ui-button" autoFocus disabled={running} onClick={onCancel}>Cancel</button>
+          <button className="ui-button" autoFocus disabled={running} onClick={onCancel}>
+            Cancel
+          </button>
           <button
             className={`ui-button ${danger ? "ui-button-danger" : "ui-button-primary"}`}
             disabled={running}
@@ -469,12 +527,22 @@ export function Combo({
 
   return (
     <div className="combo" style={width === undefined ? undefined : { width }}>
-      <input className="ui-field"
+      <input
+        className="ui-field"
         value={text}
         placeholder={placeholder}
         title={title}
-        onChange={(e) => { setText(e.target.value); setTyped(true); setOpen(true); setCursor(-1); }}
-        onFocus={() => { setOpen(true); setTyped(false); setCursor(-1); }}
+        onChange={(e) => {
+          setText(e.target.value);
+          setTyped(true);
+          setOpen(true);
+          setCursor(-1);
+        }}
+        onFocus={() => {
+          setOpen(true);
+          setTyped(false);
+          setCursor(-1);
+        }}
         onBlur={() => {
           setOpen(false);
           setTyped(false);
@@ -516,9 +584,7 @@ export function Combo({
       />
       {open && (
         <div className="ui-menu combo-list">
-          {shown.length === 0 && (
-            <div className="combo-empty">{empty ?? "Nothing matches"}</div>
-          )}
+          {shown.length === 0 && <div className="combo-empty">{empty ?? "Nothing matches"}</div>}
           {shown.map((o, i) => (
             <button
               key={o}
@@ -526,7 +592,10 @@ export function Combo({
               className={`ui-option${i === cursor ? " is-active" : ""}`}
               // Down, not click: a click fires after blur has already closed
               // the list out from under the pointer.
-              onMouseDown={(e) => { e.preventDefault(); commit(o); }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                commit(o);
+              }}
               onMouseEnter={() => setCursor(i)}
             >
               {o}

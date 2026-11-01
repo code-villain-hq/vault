@@ -24,7 +24,12 @@ export function heldText(held: Record<string, unknown> | null, key: string): str
  * no connection of this kind keeps their own on this Mac (SET-10), so they
  * get the fields, and a line saying so.
  */
-export function Theirs({ kind, what, rows, children }: {
+export function Theirs({
+  kind,
+  what,
+  rows,
+  children,
+}: {
   kind: ConnectionKind;
   /** The service, as in "Code Villain has no Jira connection". */
   what: string;
@@ -39,7 +44,8 @@ export function Theirs({ kind, what, rows, children }: {
     return (
       <section className="settings-block">
         <p className="settings-alone">
-          {workspace.name} has no {what} connection, so yours stays on this Mac. An admin connects one for everyone.
+          {workspace.name} has no {what} connection, so yours stays on this Mac. An admin connects
+          one for everyone.
         </p>
         {children}
       </section>
@@ -48,14 +54,24 @@ export function Theirs({ kind, what, rows, children }: {
   return (
     <section className="settings-block">
       <h3 className="settings-block-title">
-        {workspace.name}'s <span className="muted">· {workspace.admin ? "the same for everyone in it" : "admins change these"}</span>
+        {workspace.name}'s{" "}
+        <span className="muted">
+          · {workspace.admin ? "the same for everyone in it" : "admins change these"}
+        </span>
       </h3>
-      {workspace.admin ? children : (
+      {workspace.admin ? (
+        children
+      ) : (
         <dl className="settings-shared">
           {rows.map(([label, value, code]) => (
             <Fragment key={label}>
               <dt>{label}</dt>
-              <dd className={!value ? "muted" : code ? "mono" : undefined} title={value ?? undefined}>{value || "none"}</dd>
+              <dd
+                className={!value ? "muted" : code ? "mono" : undefined}
+                title={value ?? undefined}
+              >
+                {value || "none"}
+              </dd>
             </Fragment>
           ))}
         </dl>

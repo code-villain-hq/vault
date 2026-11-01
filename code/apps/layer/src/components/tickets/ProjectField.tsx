@@ -15,7 +15,10 @@ export function useProjectChoice() {
   const issues = useStore((s) => s.issues);
   const remembered = github ? "githubRepo" : "jiraProject";
   const [project, setProject] = useState(() => read(remembered, ""));
-  const options = useMemo(() => [...new Set(issues.map((i) => projectOf(i.key)).filter(Boolean))], [issues]);
+  const options = useMemo(
+    () => [...new Set(issues.map((i) => projectOf(i.key)).filter(Boolean))],
+    [issues],
+  );
   const fallback = (github ? undefined : jiraDefault) ?? options[0] ?? "";
 
   useEffect(() => {
@@ -29,7 +32,9 @@ export function useProjectChoice() {
     field: (what: string) => (
       <Field
         label={github ? "Repository" : "Project"}
-        hint={github ? `The repository the ${what} is filed in.` : `The key the ${what} is filed under.`}
+        hint={
+          github ? `The repository the ${what} is filed in.` : `The key the ${what} is filed under.`
+        }
       >
         <Combo
           value={project}

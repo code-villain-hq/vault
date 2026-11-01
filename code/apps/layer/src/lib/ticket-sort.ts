@@ -19,9 +19,14 @@ const at = (t: string | null) => (t ? Date.parse(t) || 0 : 0);
  * does not name, goes after every ranked one. Ties go to the most recently
  * updated, and past that the order Jira sent.
  */
-export function sortTickets(issues: Ticket[], sort: TicketSort, priorities: readonly string[]): Ticket[] {
+export function sortTickets(
+  issues: Ticket[],
+  sort: TicketSort,
+  priorities: readonly string[],
+): Ticket[] {
   const rank = new Map(priorities.map((p, i) => [p, i]));
-  const of = (i: Ticket) => (i.priority !== null ? rank.get(i.priority) : undefined) ?? priorities.length;
+  const of = (i: Ticket) =>
+    (i.priority !== null ? rank.get(i.priority) : undefined) ?? priorities.length;
   const updated = (a: Ticket, b: Ticket) => at(b.updated) - at(a.updated);
   const by: Record<TicketSort, (a: Ticket, b: Ticket) => number> = {
     updated,

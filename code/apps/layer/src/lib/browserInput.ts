@@ -5,7 +5,12 @@
 import type { BrowserInput } from "./types";
 
 /** Chrome's modifier bits. */
-export function modifiers(e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): number {
+export function modifiers(e: {
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}): number {
   return (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
 }
 
@@ -33,7 +38,7 @@ export function mouse(
     type,
     x: at.x,
     y: at.y,
-    button: type === "mouseMoved" ? "none" : BUTTONS[e.button] ?? "left",
+    button: type === "mouseMoved" ? "none" : (BUTTONS[e.button] ?? "left"),
     buttons: e.buttons,
     click_count: type === "mouseMoved" ? 0 : Math.max(1, e.detail),
     modifiers: modifiers(e),
@@ -43,7 +48,14 @@ export function mouse(
 /** A wheel's travel in pixels, whatever unit the event counted in. */
 export function wheel(e: WheelEvent, at: { x: number; y: number }): BrowserInput {
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 600 : 1;
-  return { kind: "wheel", x: at.x, y: at.y, dx: e.deltaX * unit, dy: e.deltaY * unit, modifiers: modifiers(e) };
+  return {
+    kind: "wheel",
+    x: at.x,
+    y: at.y,
+    dx: e.deltaX * unit,
+    dy: e.deltaY * unit,
+    modifiers: modifiers(e),
+  };
 }
 
 /** What a key types, if anything: a modified key types nothing. */

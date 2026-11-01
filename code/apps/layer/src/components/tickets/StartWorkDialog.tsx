@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
-import { branchStem } from "../../lib/tracker";
-import { useStore } from "../../store";
-import { useSpecs } from "../../lib/specs";
-import type { AgentStatus, Ticket, Project, TaskView } from "../../lib/types";
-import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
-import { RepoPicker } from "../RepoPicker";
 import { suggestBase } from "../../lib/derive";
 import { read, write } from "../../lib/persist";
+import { useSpecs } from "../../lib/specs";
+import { branchStem } from "../../lib/tracker";
+import type { AgentStatus, Ticket, Project, TaskView } from "../../lib/types";
+import { useStore } from "../../store";
 import { IssueTypeIcon, isEpicType, type TypeMap } from "../IssueType";
+import { RepoPicker } from "../RepoPicker";
+import { Combo, ErrorMessage, Field, Modal, useFailure } from "../ui";
 
 export function StartWorkDialog({
   issue,
@@ -34,6 +34,7 @@ export function StartWorkDialog({
   const setPendingSpec = useSpecs((s) => s.setPending);
   // Starting fails in the dialog, above its buttons (NOTE-6).
   const failure = useFailure();
+  const { clear } = failure;
 
   const [picked, setPicked] = useState<string[]>([]);
   const [reason, setReason] = useState<string | null>(null);
@@ -54,7 +55,9 @@ export function StartWorkDialog({
   const epic = isEpicType(types, issue.issue_type);
   // Its work is already under way: it opens on those tasks, with no spec drafted.
   const adopting = epic && subTasks.length > 0;
-  const theirRepos = [...new Set(subTasks.flatMap((t) => t.checkouts.map((c) => c.project_id)))].join(",");
+  const theirRepos = [
+    ...new Set(subTasks.flatMap((t) => t.checkouts.map((c) => c.project_id))),
+  ].join(",");
   const selected = projects.filter((p) => picked.includes(p.id));
 
   // A default, once. Re-filled whenever the value was empty — and on every
@@ -66,7 +69,7 @@ export function StartWorkDialog({
   }, [firstInstalled, agentId]);
 
   useEffect(() => {
-    failure.clear();
+    clear();
     setReason(null);
     setSuffix("");
     setBase("");
@@ -74,20 +77,27 @@ export function StartWorkDialog({
     setPicked([]);
     if (theirRepos) {
       setPicked(theirRepos.split(","));
-      setReason(`the repositories its ${subTasks.length === 1 ? "task" : "tasks"} here ${subTasks.length === 1 ? "is" : "are"} in`);
+      setReason(
+        `the repositories its ${subTasks.length === 1 ? "task" : "tasks"} here ${subTasks.length === 1 ? "is" : "are"} in`,
+      );
       return;
     }
     let stop = false;
     // A suggestion, so it gives way to what was picked while it was out.
-    api.suggestRepos({ issueKey: issue.key, epicKey: issue.epic_key })
+    api
+      .suggestRepos({ issueKey: issue.key, epicKey: issue.epic_key })
       .then((s) => {
         if (stop) return;
         setPicked((p) => (p.length > 0 ? p : s.project_ids));
         setReason(s.reason);
       })
-      .catch(() => { if (!stop) setReason(null); });
-    return () => { stop = true; };
-  }, [issue, theirRepos, failure.clear]);
+      .catch(() => {
+        if (!stop) setReason(null);
+      });
+    return () => {
+      stop = true;
+    };
+  }, [issue, theirRepos, clear, subTasks.length]);
 
   // Prefill from the repos' defaults when they agree; load the union of their
   // remote-tracking branches for the picker. Typing still works — a branch
@@ -105,26 +115,30 @@ export function StartWorkDialog({
     setBase((cur) => suggestBase(cur, last, defaults));
     autoBase.current = suggestBase("", "", defaults);
     let cancelled = false;
-    Promise.all(selected.map((p) => api.projectBranches(p.id).catch(() => [] as string[])))
-      .then((lists) => {
-        if (cancelled) return;
-        const seen = new Set<string>();
-        const merged: string[] = [];
-        for (const list of lists) {
-          for (const b of list) {
-            if (!seen.has(b)) {
-              seen.add(b);
-              merged.push(b);
-            }
+    void Promise.all(
+      selected.map((p) => api.projectBranches(p.id).catch(() => [] as string[])),
+    ).then((lists) => {
+      if (cancelled) return;
+      const seen = new Set<string>();
+      const merged: string[] = [];
+      for (const list of lists) {
+        for (const b of list) {
+          if (!seen.has(b)) {
+            seen.add(b);
+            merged.push(b);
           }
         }
-        // Keep each repo's default near the top even when it is not the newest.
-        for (const d of defaults) {
-          if (!seen.has(d)) merged.unshift(d);
-        }
-        setBaseOptions(merged);
-      });
-    return () => { cancelled = true; };
+      }
+      // Keep each repo's default near the top even when it is not the newest.
+      for (const d of defaults) {
+        if (!seen.has(d)) merged.unshift(d);
+      }
+      setBaseOptions(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // oxlint-disable-next-line react/exhaustive-deps -- `selected` is a new list each render; the ids say when it changed
   }, [picked.join(","), projects]);
 
   async function startWork() {
@@ -158,11 +172,12 @@ export function StartWorkDialog({
     }
   }
 
-  const baseHint = selected.length === 0
-    ? "Pick repositories first."
-    : selected.length === 1
-      ? `New branch starts at this tip in ${selected[0].name}.`
-      : "Created from this tip in every repo you picked. Blank uses each repo's own default.";
+  const baseHint =
+    selected.length === 0
+      ? "Pick repositories first."
+      : selected.length === 1
+        ? `New branch starts at this tip in ${selected[0].name}.`
+        : "Created from this tip in every repo you picked. Blank uses each repo's own default.";
 
   return (
     <Modal
@@ -171,7 +186,9 @@ export function StartWorkDialog({
       onClose={onClose}
       footer={
         <>
-          <button className="ui-button" onClick={onClose}>Close</button>
+          <button className="ui-button" onClick={onClose}>
+            Close
+          </button>
           <button
             className="ui-button ui-button-primary"
             disabled={picked.length === 0 || starting}
@@ -182,13 +199,22 @@ export function StartWorkDialog({
               : adopting
                 ? `Make it an epic in ${picked.length} repo${picked.length === 1 ? "" : "s"}`
                 : epic
-                ? `Write the epic's spec in ${picked.length} repo${picked.length === 1 ? "" : "s"}`
-                : `Start work in ${picked.length} repo${picked.length === 1 ? "" : "s"}`}
+                  ? `Write the epic's spec in ${picked.length} repo${picked.length === 1 ? "" : "s"}`
+                  : `Start work in ${picked.length} repo${picked.length === 1 ? "" : "s"}`}
           </button>
         </>
       }
     >
-      <h3 style={{ margin: "0 0 10px", fontSize: "var(--type-ui-size)", fontWeight: 700, lineHeight: 1.4 }}>{issue.summary}</h3>
+      <h3
+        style={{
+          margin: "0 0 10px",
+          fontSize: "var(--type-ui-size)",
+          fontWeight: 700,
+          lineHeight: 1.4,
+        }}
+      >
+        {issue.summary}
+      </h3>
 
       <div className="row" style={{ marginBottom: 14, flexWrap: "wrap" }}>
         <span className="ui-chip chip-type">
@@ -202,20 +228,23 @@ export function StartWorkDialog({
             epic {issue.epic_key}
           </span>
         )}
-        {issue.components.map((c) => <span key={c} className="ui-chip">{c}</span>)}
-        {issue.labels.map((l) => <span key={l} className="ui-chip">{l}</span>)}
+        {issue.components.map((c) => (
+          <span key={c} className="ui-chip">
+            {c}
+          </span>
+        ))}
+        {issue.labels.map((l) => (
+          <span key={l} className="ui-chip">
+            {l}
+          </span>
+        ))}
       </div>
 
       <Field
         label="Repositories"
         hint="One worktree per repo, on the same branch, side by side in one task folder. You can add more later."
       >
-        <RepoPicker
-          projects={projects}
-          picked={picked}
-          onChange={setPicked}
-          reason={reason}
-        />
+        <RepoPicker projects={projects} picked={picked} onChange={setPicked} reason={reason} />
       </Field>
 
       <Field
@@ -225,7 +254,8 @@ export function StartWorkDialog({
         <div className="ui-field branch-compose">
           <span className="branch-key">{branchStem(issue.key, issue.summary)}</span>
           <span className="branch-dash">-</span>
-          <input className="ui-field"
+          <input
+            className="ui-field"
             value={suffix}
             onChange={(e) => setSuffix(e.target.value)}
             placeholder="optional suffix"
@@ -240,7 +270,7 @@ export function StartWorkDialog({
           placeholder={
             selected.length > 1 && !base
               ? "(each repo's default)"
-              : selected[0]?.default_branch ?? "main"
+              : (selected[0]?.default_branch ?? "main")
           }
           empty="No branch matches"
           onChange={setBase}
@@ -249,41 +279,57 @@ export function StartWorkDialog({
 
       {adopting ? (
         <div className="muted" style={{ marginBottom: 14, lineHeight: 1.6 }}>
-          An epic: {subTasks.length === 1 ? "its task here becomes its sub-task" : `its ${subTasks.length} tasks here become its sub-tasks`},
-          and its chat runs them. The work is under way, so no spec is drafted; one can still be
+          An epic:{" "}
+          {subTasks.length === 1
+            ? "its task here becomes its sub-task"
+            : `its ${subTasks.length} tasks here become its sub-tasks`}
+          , and its chat runs them. The work is under way, so no spec is drafted; one can still be
           written on its Spec tab.
         </div>
       ) : epic ? (
         <div className="muted" style={{ marginBottom: 14, lineHeight: 1.6 }}>
-          An epic: its spec is written here, and its tasks become sub-tasks, each
-          filed under {issue.key} and worked in a task of its own.
+          An epic: its spec is written here, and its tasks become sub-tasks, each filed under{" "}
+          {issue.key} and worked in a task of its own.
         </div>
-      ) : <>
-      <Field
-        label="Agent"
-        hint={
-          picked.length > 1
-            ? "Starts at the task root, where all the repos are visible as sibling folders, primed with the ticket and the layout."
-            : "Starts in the new worktree with the ticket as its opening prompt."
-        }
-      >
-        <select className="ui-field" value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value)}>
-          <option value="">No agent — just the worktrees</option>
-          {installed.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-      </Field>
-      {agentId && (
-        <label className="row" style={{ gap: 7, margin: "-6px 0 14px", cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            style={{ width: "auto" }}
-            checked={specFirst}
-            onChange={(e) => { setSpecFirst(e.target.checked); write("specFirst", e.target.checked); }}
-          />
-          Write a spec first: the agent starts from the Spec tab once you have agreed it
-        </label>
+      ) : (
+        <>
+          <Field
+            label="Agent"
+            hint={
+              picked.length > 1
+                ? "Starts at the task root, where all the repos are visible as sibling folders, primed with the ticket and the layout."
+                : "Starts in the new worktree with the ticket as its opening prompt."
+            }
+          >
+            <select
+              className="ui-field"
+              value={agentId ?? ""}
+              onChange={(e) => setAgentId(e.target.value)}
+            >
+              <option value="">No agent — just the worktrees</option>
+              {installed.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {agentId && (
+            <label className="row" style={{ gap: 7, margin: "-6px 0 14px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                style={{ width: "auto" }}
+                checked={specFirst}
+                onChange={(e) => {
+                  setSpecFirst(e.target.checked);
+                  write("specFirst", e.target.checked);
+                }}
+              />
+              Write a spec first: the agent starts from the Spec tab once you have agreed it
+            </label>
+          )}
+        </>
       )}
-      </>}
 
       {issue.description.trim() && (
         <Field label="Description">
