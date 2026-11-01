@@ -35,6 +35,7 @@ import {
   Server,
   SquarePen,
   Tag,
+  Terminal,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -485,6 +486,12 @@ function SettingsNav() {
           <NavIcon icon={UserRound} />
           Account
         </Link>
+        {isDesktop && (
+          <Link to="/$workspace/settings/claude" params={params} className={navLink}>
+            <NavIcon icon={Terminal} />
+            Claude
+          </Link>
+        )}
       </nav>
       <AppVersion name="Forge" />
     </>

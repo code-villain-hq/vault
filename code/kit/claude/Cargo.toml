@@ -1,0 +1,24 @@
+[package]
+name = "code-villain-claude"
+description = "Claude Code on the asker's Mac for a studio app: the ACP adapter, questions handed to the Mac, and the app's tools over MCP"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+getrandom = "0.4"
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1.53", features = ["io-util", "macros", "process", "rt", "sync", "time"] }
+tracing = "0.1"
+uuid = { version = "1.28", features = ["v7"] }
+
+[dev-dependencies]
+tokio = { version = "1.53", features = ["full"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

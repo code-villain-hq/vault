@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::run::RunTools;
 use super::{object, write};
 use crate::mcp::snapshot::Snapshot;
 use crate::mcp::tools::{self as mcp, DecisionRef, SpecRef};
@@ -255,6 +256,16 @@ struct Finish {
 
 fn parse<T: serde::de::DeserializeOwned>(input: &Value) -> Result<T, String> {
     serde_json::from_value(input.clone()).map_err(|e| format!("invalid input: {e}"))
+}
+
+impl RunTools for DriftTools {
+    fn summary(&self) -> Option<String> {
+        self.summary.clone()
+    }
+
+    fn suggestions(&self) -> i32 {
+        self.suggestions
+    }
 }
 
 impl ToolHandler for DriftTools {

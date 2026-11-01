@@ -1,7 +1,7 @@
 {
   "name": "@code-villain/web",
   "private": true,
-  "description": "The parts every studio web app shares: boot, places, the API and the session; sign-in and desktop deep links; the command menu, the shortcuts list, confirming, the account pages, the sync indicator, time in words.",
+  "description": "The parts every studio web app shares: boot, places, the API and the session; sign-in and desktop deep links; Claude Code on this Mac for a server's workspace; the command menu, the shortcuts list, confirming, the account pages, the sync indicator, time in words.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

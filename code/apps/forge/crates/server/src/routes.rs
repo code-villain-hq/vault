@@ -108,6 +108,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/github/setup", get(github::setup))
         .route("/api/auth/github/callback", get(github::oauth::callback))
         .route("/api/github/webhook", post(github::webhook::receive))
+        .route(drift::here::MCP_PATH, post(drift::here::mcp_endpoint))
+        .route("/api/answered", post(drift::here::answered))
         .nest("/api/w/{workspace_id}", workspace)
         .merge(mcp::router(state.clone()))
         .layer(desktop_cors(&state.extra_origins))

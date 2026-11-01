@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use code_villain_claude::{Adapter, Kind};
 use code_villain_desktop::{LocalPostgres, LocalServer};
+use forge_server::drift::here::{FORGE, MCP_PATH};
 use forge_server::{AppState, local};
 use serde::Serialize;
 use sqlx::PgPool;
@@ -165,11 +167,21 @@ async fn start_server(
     let mut state = AppState::new(pool.clone(), false)
         .on_this_mac()
         .with_data_dir(dir.join("files"));
+    // Services on this Mac are checked in repositories in your home folder.
+    state.drift.repos_root =
+        std::env::var_os("HOME").and_then(|home| std::fs::canonicalize(home).ok());
     if cfg!(debug_assertions) {
         // `bun run dev:desktop` shows the web app from Vite.
         state = state.allowing_origin("http://localhost:5173");
     }
-    let server = LocalServer::spawn(SERVER_PORT, |listener, shutdown| {
+    let folder = dir.join("claude");
+    let server = LocalServer::spawn(SERVER_PORT, move |listener, shutdown| {
+        // Claude Code runs what people ask Forge AI, as they're signed in to
+        // it, in an empty folder of its own, with the run's tools on this
+        // server, at the port it got. No key.
+        let port = listener.local_addr().map_or(SERVER_PORT, |a| a.port());
+        let mcp = format!("http://127.0.0.1:{port}{MCP_PATH}");
+        let state = state.with_claude_code(Adapter::new(FORGE, Kind::ClaudeCode, folder, mcp));
         forge_server::serve(state, None, listener, shutdown)
     })
     .await

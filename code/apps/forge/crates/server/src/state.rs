@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
+use code_villain_claude::{Adapter, Questions};
 use forge_ai::ModelProvider;
 use sqlx::PgPool;
 use tokio::sync::{Notify, broadcast};
 use uuid::Uuid;
 
 use crate::drift::DriftSettings;
+use crate::drift::here::MacRun;
 use crate::github::GitHubApp;
 use crate::github::oauth::GitHubOAuth;
 use crate::oidc::OidcLogin;
@@ -20,8 +22,15 @@ pub struct AppState {
     /// The model drift checks use; `None` turns them off.
     pub ai: Option<Arc<dyn ModelProvider>>,
     pub drift: DriftSettings,
-    /// Wakes the drift worker when a check is requested.
+    /// Wakes the night's lane: a push, or a check it should queue.
     pub drift_wake: Arc<Notify>,
+    /// Wakes the lane for what people ask, when the key runs it.
+    pub asked_wake: Arc<Notify>,
+    /// Claude Code on this Mac, for the desktop app's own server: it runs
+    /// what people ask Forge AI, as they're signed in to it.
+    pub claude_code: Option<Adapter>,
+    /// The runs Claude Code has now, here or on the asker's Mac, by token.
+    pub runs: Questions<MacRun>,
     /// Wakes the Forgejo worker when Forgejo is connected.
     pub forgejo_wake: Arc<Notify>,
     /// The GitHub App; `None` turns the GitHub connection off.
@@ -59,6 +68,9 @@ impl AppState {
             ai: None,
             drift: DriftSettings::default(),
             drift_wake: Arc::new(Notify::new()),
+            asked_wake: Arc::new(Notify::new()),
+            claude_code: None,
+            runs: Questions::default(),
             forgejo_wake: Arc::new(Notify::new()),
             github: None,
             github_oauth: None,
@@ -76,6 +88,12 @@ impl AppState {
     /// The desktop app's own server: no sign-ins.
     pub fn on_this_mac(mut self) -> Self {
         self.on_this_mac = true;
+        self
+    }
+
+    /// Runs what people ask Forge AI with Claude Code on this Mac.
+    pub fn with_claude_code(mut self, adapter: Adapter) -> Self {
+        self.claude_code = Some(adapter);
         self
     }
 

@@ -33,6 +33,16 @@ export {
 } from "./controls";
 export { isDesktop, onAppLink, openExternalLinksInBrowser, openInBrowser } from "./desktop";
 export { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
+export {
+  type Answered,
+  answerHere,
+  answersHere,
+  asksHere,
+  type ClaudeCodeInfo,
+  claudeHere,
+  type HandedQuestion,
+  setAnswersHere,
+} from "./here";
 export { ago, lasted } from "./format";
 export { GroupSelect, useGroups } from "./groups";
 export { isTyping, overlayOpen, shortcutFree } from "./keys";

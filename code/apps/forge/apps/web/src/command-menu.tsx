@@ -15,6 +15,7 @@ import {
   Server,
   SquarePen,
   Tag,
+  Terminal,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
 } from "./data";
 import { NavIcon, PriorityIcon, ProjectIcon, StateIcon } from "./icons";
 import { useNewIssue } from "./new-issue";
+import { isDesktop } from "./platform";
 import { placeName } from "./server";
 import { signOut, useSession, workspaceEntries } from "./session";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
@@ -169,6 +171,9 @@ function useForgeCommands(q: string): Command[] {
                 ["forgejo", "Forgejo", GitMerge, "/$workspace/settings/forgejo"],
               ] as const)),
           ["account", "Account", UserRound, "/$workspace/settings/account"],
+          ...(isDesktop
+            ? ([["claude", "Claude", Terminal, "/$workspace/settings/claude"]] as const)
+            : []),
         ] as const
       ).map(([id, label, icon, to]) => ({
         id,

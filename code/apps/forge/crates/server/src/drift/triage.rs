@@ -7,10 +7,11 @@
 //! the same checks ([`changes`], [`save`]), so triage works without a key.
 
 use std::fmt::Write as _;
+use std::time::Duration;
 
 use axum::Json;
 use axum::extract::{Path as UrlPath, State};
-use forge_ai::{Agent, ModelProvider, Stop, ToolHandler, ToolOutput};
+use forge_ai::{ToolHandler, ToolOutput};
 use forge_domain::{Actor, Issue, ModelKind, Operation};
 use futures::future::BoxFuture;
 use serde::Deserialize;
@@ -18,8 +19,8 @@ use serde_json::{Value, json};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use super::check::{CheckResult, last_text};
-use super::{DriftSettings, QueuedRun, ai_agent, object, write};
+use super::run::{Prepared, RunTools};
+use super::{DriftSettings, QueuedRun, Target, ai_agent, here, object, write};
 use crate::agents::takes_work;
 use crate::auth::Member;
 use crate::error::AppError;
@@ -33,6 +34,9 @@ pub const ADD_LABELS: &str = "add_label_ids";
 
 /// Triage runs are short: a few searches, then one suggestion.
 const MAX_TURNS: usize = 15;
+
+/// How long Claude Code on a Mac may take over it.
+const CLAUDE_CODE_FOR: Duration = Duration::from_secs(10 * 60);
 
 /// Issues that arrived in triage within this long get triaged on their own.
 const NEW_FOR: &str = "1 day";
@@ -55,13 +59,16 @@ without a workaround; medium for most bugs and wanted features; low for polish.
 issues recently, or an agent when the issue is a change to the code that an agent can build.
 - If nothing is worth suggesting, call finish instead and say why in a sentence.";
 
-/// `POST /api/w/{workspace}/issues/{issue}/triage`: asks Forge's AI to triage an issue.
+/// `POST /api/w/{workspace}/issues/{issue}/triage`: asks Forge's AI to
+/// triage an issue, or hands it to Claude Code on the asker's Mac (`here`).
 pub async fn request(
     State(state): State<AppState>,
     member: Member,
     UrlPath((_, issue_id)): UrlPath<(Uuid, Uuid)>,
+    ask: Option<Json<here::Ask>>,
 ) -> Result<Json<QueuedRun>, AppError> {
-    let provider = state.ai.as_ref().ok_or_else(|| {
+    let ask = ask.map(|Json(ask)| ask).unwrap_or_default();
+    let who = here::Who::of(&state, &ask).ok_or_else(|| {
         AppError::invalid("triage by Forge AI needs a model: set ANTHROPIC_API_KEY on the server")
     })?;
     let exists: bool = sqlx::query_scalar(
@@ -76,11 +83,13 @@ pub async fn request(
     }
     member.require_not_guest()?;
     member.require_sees_issue(&state.pool, issue_id).await?;
+    let workspace_id = member.actor.workspace_id;
     let mut db = state.pool.begin().await?;
-    let id = queue(&mut db, member.actor, issue_id, "manual", provider.model()).await?;
+    let id = queue(&mut db, member.actor, issue_id, "manual", who.model()).await?;
+    here::claim(&mut db, &who, workspace_id, id).await?;
     db.commit().await?;
-    state.drift_wake.notify_one();
-    Ok(Json(QueuedRun { id }))
+    let question = here::start(&state, who, workspace_id, id, Target::Triage(issue_id)).await?;
+    Ok(Json(QueuedRun { id, question }))
 }
 
 /// Queues a triage run unless the issue already has one waiting or running.
@@ -151,14 +160,13 @@ pub async fn queue_new_issues(pool: &PgPool, model: &str) -> Result<usize, AppEr
     Ok(queued)
 }
 
-pub async fn run(
+pub async fn prepare(
     pool: &PgPool,
-    provider: &dyn ModelProvider,
     settings: &DriftSettings,
     agent: Actor,
     run_id: Uuid,
     issue_id: Uuid,
-) -> Result<CheckResult, String> {
+) -> Result<Prepared, String> {
     let snapshot = Snapshot::load(pool, agent).await?;
     let issue = snapshot
         .issues
@@ -176,7 +184,7 @@ pub async fn run(
     .await?;
     let context = context(&snapshot, &issue, &details);
 
-    let mut tools = TriageTools {
+    let tools = TriageTools {
         pool: pool.clone(),
         agent,
         snapshot,
@@ -186,41 +194,14 @@ pub async fn run(
         summary: None,
         finished: false,
     };
-    let max_turns = settings.max_turns.min(MAX_TURNS);
-    let agent_loop = Agent {
-        system: SYSTEM.into(),
-        tools: definitions(),
-        max_turns,
+    Ok(Prepared {
+        system: SYSTEM,
+        context,
+        definitions: definitions(),
+        max_turns: settings.max_turns.min(MAX_TURNS),
         max_tokens: 8_000,
-    };
-    let outcome = agent_loop
-        .run(provider, context, &mut tools)
-        .await
-        .map_err(|e| e.to_string())?;
-    let error = match &outcome.stop {
-        Stop::Done => None,
-        Stop::Refused(why) => Some(format!(
-            "The model declined to continue{}",
-            why.as_deref().map(|w| format!(": {w}")).unwrap_or_default()
-        )),
-        Stop::TurnLimit => Some(format!(
-            "Stopped after {max_turns} turns without finishing."
-        )),
-        Stop::MaxTokens => Some("A response hit the output limit.".into()),
-    };
-    Ok(CheckResult {
-        summary: tools
-            .summary
-            .clone()
-            .unwrap_or_else(|| last_text(&outcome.messages)),
-        error,
-        input_tokens: outcome.usage.input_tokens
-            + outcome.usage.cache_creation_input_tokens
-            + outcome.usage.cache_read_input_tokens,
-        output_tokens: outcome.usage.output_tokens,
-        cost_usd: outcome.usage.cost_usd(provider.model()),
-        suggestions: tools.suggestions,
-        messages: outcome.messages,
+        timeout: CLAUDE_CODE_FOR,
+        tools: Box::new(tools),
     })
 }
 
@@ -371,6 +352,16 @@ struct TriageTools {
     suggestions: i32,
     summary: Option<String>,
     finished: bool,
+}
+
+impl RunTools for TriageTools {
+    fn summary(&self) -> Option<String> {
+        self.summary.clone()
+    }
+
+    fn suggestions(&self) -> i32 {
+        self.suggestions
+    }
 }
 
 impl ToolHandler for TriageTools {

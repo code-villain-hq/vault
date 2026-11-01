@@ -3,10 +3,15 @@
 //! state, and suggests fixes for people to accept or dismiss.
 //!
 //! Checks run as `ai_runs`, queued by people (manual) or on a schedule, and
-//! executed one at a time by a background worker, which also triages new
-//! issues (see `triage.rs`).
+//! executed by background workers, one run at a time in each of two lanes
+//! ([`Lane`]): what people ask, and the night's runs (schedule, pushes,
+//! triage of new issues, see `triage.rs`), so a person never waits behind
+//! the night. What people ask goes to Claude Code on their Mac first
+//! (`here.rs`); the key runs the rest (`run.rs`).
 
 mod check;
+pub mod here;
+mod run;
 pub mod suggestions;
 mod tools;
 pub mod triage;
@@ -18,6 +23,7 @@ use std::time::Duration;
 use axum::Json;
 use axum::extract::{Path as UrlPath, State};
 use chrono::{DateTime, Utc};
+use code_villain_claude::HandedQuestion;
 use forge_ai::ModelProvider;
 use forge_domain::{
     Actor, AiRunStatus, CheckResult, DriftCheckDetails, ModelKind, Operation, Transaction,
@@ -136,30 +142,38 @@ pub async fn ai_agent(db: &mut PgConnection, workspace_id: Uuid) -> Result<Actor
 #[derive(Serialize)]
 pub struct QueuedRun {
     pub id: Uuid,
+    /// The run, for Claude Code on the asker's Mac, when they asked `here`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub question: Option<HandedQuestion>,
 }
 
 #[derive(Serialize)]
 pub struct AiStatus {
-    /// Whether the server has a model, so Forge AI can check and triage.
+    /// Whether Forge AI can check and triage without the desktop app: the
+    /// server has a model, or it's this Mac's Forge, with Claude Code.
     pub configured: bool,
 }
 
 /// `GET /api/w/{workspace}/ai`: whether Forge AI can run here. Without it,
-/// the app doesn't offer to ask it; agents can still suggest triage.
+/// the app offers to ask it only from the desktop app, whose Claude Code
+/// runs it; agents can still suggest triage.
 pub async fn status(State(state): State<AppState>, _member: Member) -> Json<AiStatus> {
     Json(AiStatus {
-        configured: state.ai.is_some(),
+        configured: state.ai.is_some() || state.claude_code.is_some(),
     })
 }
 
-/// `POST /api/w/{workspace}/services/{service}/check`: queues a drift check.
+/// `POST /api/w/{workspace}/services/{service}/check`: queues a drift check,
+/// or hands it to Claude Code on the asker's Mac (`here`).
 pub async fn request_check(
     State(state): State<AppState>,
     member: Member,
     UrlPath((_, service_id)): UrlPath<(Uuid, Uuid)>,
+    ask: Option<Json<here::Ask>>,
 ) -> Result<Json<QueuedRun>, AppError> {
     member.require_not_guest()?;
-    let provider = state.ai.as_ref().ok_or_else(|| {
+    let ask = ask.map(|Json(ask)| ask).unwrap_or_default();
+    let who = here::Who::of(&state, &ask).ok_or_else(|| {
         AppError::invalid("drift checks need a model: set ANTHROPIC_API_KEY on the server")
     })?;
     let repository: Option<Option<String>> =
@@ -176,18 +190,13 @@ pub async fn request_check(
         .resolve_repository(&repository)
         .map_err(AppError::invalid)?;
 
+    let workspace_id = member.actor.workspace_id;
     let mut db = state.pool.begin().await?;
-    let id = queue(
-        &mut db,
-        member.actor,
-        service_id,
-        "manual",
-        provider.model(),
-    )
-    .await?;
+    let id = queue(&mut db, member.actor, service_id, "manual", who.model()).await?;
+    here::claim(&mut db, &who, workspace_id, id).await?;
     db.commit().await?;
-    state.drift_wake.notify_one();
-    Ok(Json(QueuedRun { id }))
+    let question = here::start(&state, who, workspace_id, id, Target::Check(service_id)).await?;
+    Ok(Json(QueuedRun { id, question }))
 }
 
 /// `GET /api/w/{workspace}/drift-checks/{run}`: what a drift check found,
@@ -311,9 +320,42 @@ fn object(value: Value) -> Map<String, Value> {
     }
 }
 
-/// Runs queued checks one at a time, and queues scheduled ones, for the
-/// life of the server. Without a model it only clears up runs that can't go
-/// on, so nothing waits for them forever.
+/// The two lanes runs wait in, each run one at a time: what people ask
+/// (`manual`), and the night's runs (scheduled, after a push, new issues),
+/// so neither waits for the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lane {
+    Asked,
+    Night,
+}
+
+/// What a run looks at.
+#[derive(Debug, Clone, Copy)]
+pub enum Target {
+    Check(Uuid),
+    Triage(Uuid),
+}
+
+/// The run's prompt, first message and tools, for whoever runs it.
+async fn prepare(
+    pool: &PgPool,
+    settings: &DriftSettings,
+    agent: Actor,
+    run_id: Uuid,
+    target: Target,
+) -> Result<run::Prepared, String> {
+    match target {
+        Target::Check(service_id) => {
+            check::prepare(pool, settings, agent, run_id, service_id).await
+        }
+        Target::Triage(issue_id) => triage::prepare(pool, settings, agent, run_id, issue_id).await,
+    }
+}
+
+/// Runs what people ask and the night's runs, each lane on its own, and
+/// queues scheduled checks and triage of new issues, for the life of the
+/// server. Without a model it only clears up runs that can't go on, so
+/// nothing waits for them forever; Claude Code runs what people ask then.
 pub async fn worker(state: AppState) {
     if let Err(e) = recover_interrupted(&state.pool, state.ai.is_some()).await {
         tracing::error!(error = ?e, "couldn't mark interrupted runs failed");
@@ -321,6 +363,34 @@ pub async fn worker(state: AppState) {
     let Some(provider) = state.ai.clone() else {
         return;
     };
+    tokio::join!(
+        asked(state.clone(), provider.clone()),
+        night(state, provider)
+    );
+}
+
+/// The lane for what people ask, when the key runs it.
+async fn asked(state: AppState, provider: Arc<dyn ModelProvider>) {
+    loop {
+        match run_next_in(
+            &state.pool,
+            provider.as_ref(),
+            &state.drift,
+            Some(Lane::Asked),
+        )
+        .await
+        {
+            Ok(true) => continue,
+            Ok(false) => {}
+            Err(e) => tracing::error!(error = ?e, "AI worker failed on what people ask"),
+        }
+        let _ = tokio::time::timeout(Duration::from_secs(30), state.asked_wake.notified()).await;
+    }
+}
+
+/// The night's lane: it queues the scheduled checks and the triage of new
+/// issues, and runs them and the checks after pushes.
+async fn night(state: AppState, provider: Arc<dyn ModelProvider>) {
     let mut last_schedule = std::time::Instant::now() - Duration::from_secs(3600);
     loop {
         if let Some(every) = state.drift.check_every
@@ -338,7 +408,14 @@ pub async fn worker(state: AppState) {
         {
             tracing::error!(error = ?e, "couldn't queue triage of new issues");
         }
-        match run_next(&state.pool, provider.as_ref(), &state.drift).await {
+        match run_next_in(
+            &state.pool,
+            provider.as_ref(),
+            &state.drift,
+            Some(Lane::Night),
+        )
+        .await
+        {
             Ok(true) => continue,
             Ok(false) => {}
             Err(e) => tracing::error!(error = ?e, "drift worker failed"),
@@ -347,18 +424,34 @@ pub async fn worker(state: AppState) {
     }
 }
 
-/// Runs the oldest queued check, if any. Returns whether one ran.
+/// Runs the oldest queued run of either lane, if any. Returns whether one ran.
 pub async fn run_next(
     pool: &PgPool,
     provider: &dyn ModelProvider,
     settings: &DriftSettings,
 ) -> Result<bool, AppError> {
+    run_next_in(pool, provider, settings, None).await
+}
+
+/// Runs the oldest queued run in `lane` (any lane: `None`) with the key, if
+/// any. Returns whether one ran.
+pub async fn run_next_in(
+    pool: &PgPool,
+    provider: &dyn ModelProvider,
+    settings: &DriftSettings,
+    lane: Option<Lane>,
+) -> Result<bool, AppError> {
     let mut db = pool.begin().await?;
     type Claimed = (Uuid, Uuid, String, Option<Uuid>, Option<Uuid>);
     let claimed: Option<Claimed> = sqlx::query_as(
         "SELECT id, workspace_id, kind, service_id, issue_id FROM ai_runs WHERE status = 'queued' \
+         AND ($1::text IS NULL OR (trigger = 'manual') = ($1 = 'asked')) \
          ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED",
     )
+    .bind(lane.map(|lane| match lane {
+        Lane::Asked => "asked",
+        Lane::Night => "night",
+    }))
     .fetch_optional(&mut *db)
     .await?;
     let Some((run_id, workspace_id, kind, service_id, issue_id)) = claimed else {
@@ -381,17 +474,30 @@ pub async fn run_next(
     db.commit().await?;
 
     tracing::info!(%run_id, %kind, "AI run started");
-    let outcome = match (kind.as_str(), service_id, issue_id) {
-        ("triage", _, Some(issue_id)) => {
-            triage::run(pool, provider, settings, agent, run_id, issue_id).await
-        }
+    let target = match (kind.as_str(), service_id, issue_id) {
+        ("triage", _, Some(issue_id)) => Ok(Target::Triage(issue_id)),
         ("triage", _, None) => Err("the issue was deleted".to_string()),
-        (_, Some(service_id), _) => {
-            check::run(pool, provider, settings, agent, run_id, service_id).await
-        }
+        (_, Some(service_id), _) => Ok(Target::Check(service_id)),
         (_, None, _) => Err("the service was deleted".to_string()),
     };
+    let outcome = match target {
+        Ok(target) => match prepare(pool, settings, agent, run_id, target).await {
+            Ok(prepared) => run::by_key(provider, prepared).await,
+            Err(error) => Err(error),
+        },
+        Err(error) => Err(error),
+    };
+    finish(pool, agent, run_id, outcome).await?;
+    Ok(true)
+}
 
+/// Writes how a run ended, and its conversation.
+async fn finish(
+    pool: &PgPool,
+    agent: Actor,
+    run_id: Uuid,
+    outcome: Result<run::RunResult, String>,
+) -> Result<(), AppError> {
     let mut finish = object(json!({ "finished_at": Utc::now() }));
     let mut db = pool.begin().await?;
     match outcome {
@@ -434,7 +540,7 @@ pub async fn run_next(
     .await?;
     db.commit().await?;
     tracing::info!(%run_id, "AI run finished");
-    Ok(true)
+    Ok(())
 }
 
 /// A server that stopped mid-run leaves it "running" forever; fail those.

@@ -192,6 +192,27 @@ linked to a group (`Team.group_name`, say `design`) has the people of
 leaves it by hand: `forge_sync::follow_groups` keeps it so. Tests:
 `crates/server/tests/scim.rs`.
 
+## Forge AI
+
+What a person asks Forge AI, a check or a triage, is answered first by
+Claude Code on their Mac, wherever the workspace is
+(`studio/design/behaviour.md`, "Claude"; `code/kit/claude`). The desktop
+app's own Forge asks Claude Code itself (`with_claude_code` in
+`this_mac.rs`). On a server's workspace the desktop app asks with
+`{"here": true}`, the server replies with the run's question, Claude Code
+on the asker's Mac calls the run's tools at `/api/ai/mcp` with its token,
+and the app says what came of it at `/api/answered` (`drift/here.rs`).
+The server's key (`ANTHROPIC_API_KEY`) runs it only when Claude Code isn't
+installed or signed in, and in the browser. Claude Code's runs are still
+Forge AI's, with the model `claude-code` and no cost.
+
+Runs wait in two lanes, each one at a time (`Lane` in `drift/mod.rs`):
+what people ask (`manual`), and the night's (scheduled checks, checks after
+a push, triage of new issues), which stay on the key. Settings → Claude,
+in the desktop app, turns Claude Code off for a server's workspaces, per
+Mac. Tests: `crates/server/tests/claude_code.rs`, with a stand-in for
+Claude Code (`claude-code.ts`, run by bun).
+
 ## Adding a synced model
 
 1. A migration for its table, with `id`, `workspace_id`, `created_at` and

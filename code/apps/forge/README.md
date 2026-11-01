@@ -22,10 +22,13 @@ is and why" and "Architecture overview".
 - **Knowledge.** Services (parts of the code), domains (areas of the
   product) with their specs, and decisions, linked to issues. Specs follow
   OpenSpec's convention and change when the issue that changes them is done.
-- **Forge AI** (needs `ANTHROPIC_API_KEY`). Drift checks read a service's
-  code and history and suggest fixes where the tracker no longer matches it;
-  new issues in triage get suggested properties and duplicates. People
-  accept or dismiss every suggestion.
+- **Forge AI.** Drift checks read a service's code and history and suggest
+  fixes where the tracker no longer matches it; new issues in triage get
+  suggested properties and duplicates. People accept or dismiss every
+  suggestion. In the desktop app, Claude Code on your Mac runs what you ask,
+  as you're signed in to it, on any workspace. The server's key
+  (`ANTHROPIC_API_KEY`) runs it in the browser, when Claude Code can't, and
+  for the scheduled checks and triage.
 - **Coding agents.** An MCP server with full read and write access, acting
   as an agent member (Settings → Agents shows the `claude mcp add` command).
 - **GitHub** (needs a GitHub App, see Settings → GitHub). Pull requests and
@@ -68,7 +71,8 @@ clients notice and download a new copy.
 own Postgres (7386) and server (7385) for the workspaces on this Mac, or
 signing in to a server, by default the Docker setup below.
 
-To try drift checks, start the server with `ANTHROPIC_API_KEY` set, give a
+To try drift checks, ask from the desktop app with Claude Code signed in
+on your Mac, or start the server with `ANTHROPIC_API_KEY` set. Give a
 service a repository in the folder containing the vault (for example
 `villain-vault`) and some path globs from its root (like
 `code/apps/forge/crates/**`), and press "Check for drift".

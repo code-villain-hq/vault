@@ -15,6 +15,7 @@ import { api, messageOf } from "./api";
 import { byId, identifier, timeAgo, useNow, useTeams } from "./data";
 import { PageHeader } from "./layout";
 import { Markdown } from "./markdown";
+import { askForgeAi } from "./suggestions";
 import { Button, Disclosure, ErrorMessage } from "./ui";
 import { useRecords, useSyncStatus, useWorkspace } from "./workspace";
 
@@ -235,7 +236,7 @@ export function ServiceDriftChecks({
   ai: boolean;
   checks: AiRun[];
 }) {
-  const { workspace } = useWorkspace();
+  const { place, workspace } = useWorkspace();
   const [error, setError] = useState<string | null>(null);
   const busy = checks.some(
     (r) => r.trigger !== "agent" && (r.status === "queued" || r.status === "running"),
@@ -244,7 +245,7 @@ export function ServiceDriftChecks({
   const start = async () => {
     setError(null);
     try {
-      await api("POST", `/api/w/${workspace.id}/services/${serviceId}/check`);
+      await askForgeAi(place, `/api/w/${workspace.id}/services/${serviceId}/check`);
     } catch (e) {
       setError(messageOf(e));
     }

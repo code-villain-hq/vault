@@ -18,6 +18,7 @@ import { Home, NotFound, WorkspaceLayout } from "./layout";
 import { InitiativePage, InitiativesPage, ProjectPage, ProjectsPage } from "./planning";
 import { AccountPage, MembersPage } from "./settings";
 import { AgentsSettingsPage } from "./settings-agents";
+import { ClaudeSettingsPage } from "./settings-claude";
 import { ForgejoSettingsPage } from "./settings-forgejo";
 import { GitHubSettingsPage } from "./settings-github";
 import { LabelsSettingsPage, TeamsSettingsPage } from "./settings-tracker";
@@ -193,6 +194,11 @@ const account = createRoute({
   path: "/settings/account",
   component: AccountPage,
 });
+const claude = createRoute({
+  getParentRoute: () => workspace,
+  path: "/settings/claude",
+  component: ClaudeSettingsPage,
+});
 
 const routeTree = root.addChildren([
   index,
@@ -227,6 +233,7 @@ const routeTree = root.addChildren([
     teamsSettings,
     labels,
     account,
+    claude,
   ]),
 ]);
 

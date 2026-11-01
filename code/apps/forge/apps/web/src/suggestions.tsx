@@ -1,3 +1,4 @@
+import { answerHere, asksHere, type HandedQuestion } from "@code-villain/web";
 import type { Issue, Suggestion } from "@forge/types";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -5,6 +6,7 @@ import { api, messageOf } from "./api";
 import { byId, decisionProposal, identifier, timeAgo, useStates } from "./data";
 import { foldDiff, lineDiff, wordPairs } from "./diff";
 import { Markdown } from "./markdown";
+import type { Place } from "./server";
 import { Button, Disclosure, ErrorMessage } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
@@ -44,12 +46,20 @@ function useResolve(suggestion: Suggestion) {
 /** Whether the server has a model for Forge AI, asked once per workspace. */
 const aiStatus = new Map<string, Promise<boolean>>();
 
-/** Whether Forge AI can run here; `undefined` until the server says. */
-/** Whether the server has a model for Forge AI; undefined until it has said. */
+/**
+ * Whether Forge AI can run for you here: Claude Code on this Mac runs it
+ * from the desktop app, or the server has a model. `undefined` until the
+ * server says.
+ */
 export function useAiConfigured(): boolean | undefined {
-  const { workspace } = useWorkspace();
+  const { place, workspace } = useWorkspace();
   const [configured, setConfigured] = useState<boolean>();
+  const here = asksHere(place);
   useEffect(() => {
+    if (here) {
+      setConfigured(true);
+      return;
+    }
     let status = aiStatus.get(workspace.id);
     if (!status) {
       status = api<{ configured: boolean }>("GET", `/api/w/${workspace.id}/ai`).then(
@@ -66,8 +76,23 @@ export function useAiConfigured(): boolean | undefined {
     return () => {
       current = false;
     };
-  }, [workspace.id]);
+  }, [here, workspace.id]);
   return configured;
+}
+
+/**
+ * Asks Forge AI for a run (`path`: a check or a triage). From the desktop
+ * app, on a server's workspace, the server hands it to Claude Code on this
+ * Mac, which runs it while the run shows as running.
+ */
+export async function askForgeAi(place: Place, path: string): Promise<void> {
+  const here = asksHere(place);
+  const queued = await api<{ id: string; question?: HandedQuestion }>(
+    "POST",
+    path,
+    here ? { here: true } : undefined,
+  );
+  if (queued.question) void answerHere(place, queued.question);
 }
 
 /**
@@ -76,7 +101,7 @@ export function useAiConfigured(): boolean | undefined {
  * model there's no button: an agent's suggestion arrives by itself.
  */
 export function TriageSuggestion({ issueId }: { issueId: string }) {
-  const { workspace } = useWorkspace();
+  const { place, workspace } = useWorkspace();
   const aiConfigured = useAiConfigured();
   const suggestions = useRecords("Suggestion");
   const runs = useRecords("AiRun");
@@ -102,7 +127,7 @@ export function TriageSuggestion({ issueId }: { issueId: string }) {
         onClick={() => {
           setError(null);
           setAsking(true);
-          api("POST", `/api/w/${workspace.id}/issues/${issueId}/triage`)
+          askForgeAi(place, `/api/w/${workspace.id}/issues/${issueId}/triage`)
             .catch((e) => setError(messageOf(e)))
             .finally(() => setAsking(false));
         }}

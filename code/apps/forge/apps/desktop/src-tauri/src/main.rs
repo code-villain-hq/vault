@@ -3,13 +3,16 @@
 //! token kept in the system keychain, and `forge://` links, which bring a
 //! sign-in in the browser back to the app; the web app calls them when it
 //! runs here. It also runs Forge itself for the workspaces on this Mac
-//! (`this_mac`).
+//! (`this_mac`), and Claude Code here for what you ask Forge AI on a
+//! server's workspace (`claude_here`, `answer_here`).
 
 // Don't open a console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod this_mac;
 
+use code_villain_claude::{Answered, ClaudeCodeInfo, HandedQuestion, Here};
+use forge_server::drift::here::{FORGE, MCP_PATH};
 use tauri::{Manager, RunEvent, State};
 use this_mac::{Place, ThisMac};
 
@@ -68,6 +71,24 @@ fn mac_user_name() -> String {
     this_mac::account_name()
 }
 
+/// Whether Claude Code on this Mac can run Forge AI for the server at
+/// `origin`, as Settings → Claude shows it.
+#[tauri::command]
+async fn claude_here(here: State<'_, Here>, origin: String) -> Result<ClaudeCodeInfo, String> {
+    here.check(&origin).await
+}
+
+/// Runs what the server at `origin` handed over with Claude Code on this
+/// Mac. A run's result shows once it's done, so nothing streams.
+#[tauri::command]
+async fn answer_here(
+    here: State<'_, Here>,
+    origin: String,
+    question: HandedQuestion,
+) -> Result<Answered, String> {
+    here.answer(&origin, question, |_| {}).await
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -80,7 +101,9 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            app.manage(ThisMac::new(app.path().app_data_dir()?));
+            let data = app.path().app_data_dir()?;
+            app.manage(Here::new(FORGE, data.join("claude"), MCP_PATH));
+            app.manage(ThisMac::new(data));
             app.state::<ThisMac>().resume();
             Ok(())
         })
@@ -90,7 +113,9 @@ fn main() {
             forget_session_token,
             this_mac,
             start_on_this_mac,
-            mac_user_name
+            mac_user_name,
+            claude_here,
+            answer_here
         ])
         .build(tauri::generate_context!())
         .expect("Forge failed to start");

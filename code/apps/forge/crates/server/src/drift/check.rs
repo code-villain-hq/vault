@@ -1,28 +1,23 @@
-//! One drift check: build the context, run Claude with the code tools, and
-//! report what happened.
+//! One drift check: build the context and the code tools for whoever runs
+//! it (`run.rs`).
 
 use std::fmt::Write as _;
+use std::time::Duration;
 
-use forge_ai::{Agent, ModelProvider, Repo, Stop};
+use forge_ai::Repo;
 use forge_domain::{Actor, DecisionStatus, Issue, Service, StateType};
-use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::DriftSettings;
+use super::run::Prepared;
 use super::tools::{DriftTools, definitions};
 use crate::mcp::snapshot::Snapshot;
 use crate::mcp::tools::knowledge;
 
-pub struct CheckResult {
-    pub summary: String,
-    pub error: Option<String>,
-    pub input_tokens: i64,
-    pub output_tokens: i64,
-    pub cost_usd: f64,
-    pub suggestions: i32,
-    pub messages: Vec<Value>,
-}
+/// How long Claude Code on a Mac may take over a check: reading code takes
+/// longer than answering.
+const CLAUDE_CODE_FOR: Duration = Duration::from_secs(20 * 60);
 
 const SYSTEM: &str = "\
 You check one software service for drift: places where what the team's tracker says about it (its \
@@ -54,14 +49,13 @@ behaviours, interfaces and notable limits, at most about 400 words. That field i
 accurate; write it even when nothing drifted.
 - Finish with finish, summarising in a few sentences what you checked and what you found.";
 
-pub async fn run(
+pub async fn prepare(
     pool: &PgPool,
-    provider: &dyn ModelProvider,
     settings: &DriftSettings,
     agent: Actor,
     run_id: Uuid,
     service_id: Uuid,
-) -> Result<CheckResult, String> {
+) -> Result<Prepared, String> {
     let snapshot = Snapshot::load(pool, agent).await?;
     let service = snapshot
         .services
@@ -84,58 +78,16 @@ pub async fn run(
     let commit = repo.head().await.unwrap_or_default();
     let context = context(&snapshot, &service, repo.file_count(), &history);
 
-    let mut tools = DriftTools::new(pool.clone(), agent, snapshot, service, repo, run_id, commit);
-    let agent_loop = Agent {
-        system: SYSTEM.into(),
-        tools: definitions(),
+    let tools = DriftTools::new(pool.clone(), agent, snapshot, service, repo, run_id, commit);
+    Ok(Prepared {
+        system: SYSTEM,
+        context,
+        definitions: definitions(),
         max_turns: settings.max_turns,
         max_tokens: 16_000,
-    };
-    let outcome = agent_loop
-        .run(provider, context, &mut tools)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let error = match &outcome.stop {
-        Stop::Done => None,
-        Stop::Refused(why) => Some(format!(
-            "The model declined to continue{}",
-            why.as_deref().map(|w| format!(": {w}")).unwrap_or_default()
-        )),
-        Stop::TurnLimit => Some(format!(
-            "Stopped after {} turns without finishing.",
-            settings.max_turns
-        )),
-        Stop::MaxTokens => Some("A response hit the output limit.".into()),
-    };
-    let summary = tools
-        .summary
-        .clone()
-        .unwrap_or_else(|| last_text(&outcome.messages));
-    Ok(CheckResult {
-        summary,
-        error,
-        input_tokens: outcome.usage.input_tokens
-            + outcome.usage.cache_creation_input_tokens
-            + outcome.usage.cache_read_input_tokens,
-        output_tokens: outcome.usage.output_tokens,
-        cost_usd: outcome.usage.cost_usd(provider.model()),
-        suggestions: tools.suggestions,
-        messages: outcome.messages,
+        timeout: CLAUDE_CODE_FOR,
+        tools: Box::new(tools),
     })
-}
-
-/// The last thing the model said, for runs that ended without `finish`.
-pub(super) fn last_text(messages: &[Value]) -> String {
-    messages
-        .iter()
-        .rev()
-        .filter(|m| m["role"] == "assistant")
-        .flat_map(|m| m["content"].as_array().cloned().unwrap_or_default())
-        .find_map(|block| {
-            (block["type"] == "text").then(|| block["text"].as_str().unwrap_or("").to_string())
-        })
-        .unwrap_or_default()
 }
 
 fn cut(text: &str, max: usize) -> String {
