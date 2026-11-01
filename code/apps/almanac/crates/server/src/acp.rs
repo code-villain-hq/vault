@@ -716,10 +716,11 @@ fn permission_is_for_almanac(params: &Value) -> bool {
         tool["rawInput"]["toolName"].as_str(),
     ];
     let mcp = format!("mcp__{MCP_NAME}__");
-    if names.into_iter().flatten().any(|name| {
-        WEB_TOOLS.iter().any(|w| name == *w || name.contains(w))
-            || name.contains(&mcp)
-    }) {
+    if names
+        .into_iter()
+        .flatten()
+        .any(|name| WEB_TOOLS.iter().any(|w| name == *w || name.contains(w)) || name.contains(&mcp))
+    {
         return true;
     }
     kind == "fetch"

@@ -97,6 +97,7 @@ async fn setup(pool: PgPool) -> Setup {
         "almanac".into(),
         "secret".into(),
         "http://almanac.test",
+        "almanac",
     )
     .unwrap();
     let state = common::state(pool.clone())

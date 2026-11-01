@@ -4,11 +4,11 @@
 
 use std::collections::HashMap;
 
+use almanac_domain::{Actor, Role};
 use axum::extract::{FromRequestParts, Path};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, HeaderValue};
 use code_villain_auth::SessionNames;
-use almanac_domain::{Actor, Role};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 

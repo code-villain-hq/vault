@@ -252,7 +252,10 @@ mod tests {
     #[test]
     fn a_relative_binary_path_is_not_run_as_is() {
         let looked_up = find_program("../evil/llama-server");
-        assert_eq!(looked_up.file_name().and_then(|n| n.to_str()), Some("llama-server"));
+        assert_eq!(
+            looked_up.file_name().and_then(|n| n.to_str()),
+            Some("llama-server")
+        );
         assert!(!looked_up.to_string_lossy().contains(".."));
     }
 }

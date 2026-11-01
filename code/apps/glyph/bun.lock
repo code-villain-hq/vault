@@ -23,15 +23,25 @@
     "../../kit/web": {
       "name": "@code-villain/web",
       "devDependencies": {
+        "@tauri-apps/plugin-deep-link": "2.6.2",
+        "@tauri-apps/plugin-opener": "2.7.2",
         "@types/bun": "1.4.4",
         "@types/react": "19.3.0",
+        "@types/react-dom": "19.3.0",
       },
       "peerDependencies": {
         "@base-ui/react": "1.9.0",
         "@tanstack/react-router": "1.170.46",
+        "@tauri-apps/plugin-deep-link": "2.6.2",
+        "@tauri-apps/plugin-opener": "2.7.2",
         "lucide-react": "1.62.0",
         "react": "19.3.1",
+        "react-dom": "19.3.1",
       },
+      "optionalPeers": [
+        "@tauri-apps/plugin-deep-link",
+        "@tauri-apps/plugin-opener",
+      ],
     },
     "apps/desktop": {
       "name": "@glyph/desktop",

@@ -401,10 +401,7 @@ fn clean_url(url: &str) -> Result<String, AppError> {
             "the runner URL must start with http:// or https://",
         ));
     }
-    if parsed
-        .host_str()
-        .is_some_and(|host| !runner_host_ok(host))
-    {
+    if parsed.host_str().is_some_and(|host| !runner_host_ok(host)) {
         return Err(AppError::invalid(
             "the runner URL can't point at a link-local or metadata address",
         ));
@@ -420,8 +417,9 @@ fn runner_host_ok(host: &str) -> bool {
         .to_ascii_lowercase();
     match host.parse::<std::net::IpAddr>() {
         Ok(ip) => !link_local_or_metadata(ip),
-        Err(_) => host != "metadata.google.internal"
-            && !host.ends_with(".metadata.google.internal"),
+        Err(_) => {
+            host != "metadata.google.internal" && !host.ends_with(".metadata.google.internal")
+        }
     }
 }
 

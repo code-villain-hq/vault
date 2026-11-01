@@ -93,8 +93,14 @@ struct Setup {
 
 async fn setup(pool: PgPool) -> Setup {
     let issuer = fake_provider().await;
-    let login =
-        OidcLogin::new(issuer, "forge".into(), "secret".into(), "http://forge.test").unwrap();
+    let login = OidcLogin::new(
+        issuer,
+        "forge".into(),
+        "secret".into(),
+        "http://forge.test",
+        "forge",
+    )
+    .unwrap();
     let state = AppState::new(pool.clone(), false)
         .for_company("Acme Inc")
         .with_oidc_login(login);

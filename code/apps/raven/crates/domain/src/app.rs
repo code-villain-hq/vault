@@ -110,18 +110,25 @@ fn health_url(value: &str) -> Result<(), ValidationError> {
     let rest = value
         .strip_prefix("https://")
         .or_else(|| value.strip_prefix("http://"));
-    let Some(rest) = rest.filter(|rest| !rest.is_empty() && !rest.starts_with('/')) else {
+    // Not `http:///x`, which the URL parser would read as `http://x/`.
+    if !rest.is_some_and(|rest| !rest.is_empty() && !rest.starts_with('/')) {
         return invalid("A health address starts with http:// or https://.");
-    };
+    }
     if value.len() > 500 || value.contains(char::is_whitespace) {
         return invalid("A health address starts with http:// or https://.");
     }
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-    let host = match authority.split_once(']') {
-        Some((v6, _)) => v6.strip_prefix('[').unwrap_or(v6),
-        None => authority.split(':').next().unwrap_or_default(),
+    // The host as the server's HTTP client reads it: `x@169.254.169.254`,
+    // `2852039166` and `0xa9.0xfe.0xa9.0xfe` all name the metadata address.
+    let Ok(url) = url::Url::parse(value) else {
+        return invalid("A health address starts with http:// or https://.");
     };
-    if host.is_empty() || !health_host_ok(host) {
+    let ok = match url.host() {
+        Some(url::Host::Ipv4(ip)) => !link_local_or_metadata(ip.into()),
+        Some(url::Host::Ipv6(ip)) => !link_local_or_metadata(ip.into()),
+        Some(url::Host::Domain(host)) => health_host_ok(host),
+        None => false,
+    };
+    if !ok {
         return invalid("A health address can't be a link-local or metadata address.");
     }
     Ok(())
@@ -132,8 +139,7 @@ fn health_host_ok(host: &str) -> bool {
     match host.parse::<std::net::IpAddr>() {
         Ok(ip) => !link_local_or_metadata(ip),
         Err(_) => {
-            host != "metadata.google.internal"
-                && !host.ends_with(".metadata.google.internal")
+            host != "metadata.google.internal" && !host.ends_with(".metadata.google.internal")
         }
     }
 }
@@ -187,6 +193,14 @@ mod tests {
             "http://a b",
             "http://169.254.169.254/latest/meta-data",
             "http://metadata.google.internal/",
+            "http://x@169.254.169.254/",
+            "http://2852039166/",
+            "http://0xa9.0xfe.0xa9.0xfe/",
+            "http://169.254.169.254./",
+            "http://\\169.254.169.254/",
+            "http://[::ffff:169.254.169.254]/",
+            "http://[fe80::1]/",
+            "http://METADATA.google.internal./",
         ] {
             assert!(health_url(bad).is_err(), "{bad}");
         }

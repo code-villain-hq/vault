@@ -1,7 +1,7 @@
 // Boots every studio web app the same way: Nightshade from the system
 // preference, the session, external links on desktop, then the router.
 
-import { RouterProvider, type AnyRouter } from "@tanstack/react-router";
+import { type AnyRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { openExternalLinksInBrowser } from "./desktop";

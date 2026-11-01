@@ -9,6 +9,13 @@
 //! account is linked to (`users.oidc_sub`), else the one with the provider's
 //! verified email, and lets them in only when they're in the workspace.
 //!
+//! The round trip carries a signed `state` and a cookie with the nonce and
+//! the PKCE verifier. The server trades the code for tokens itself, with its
+//! client secret over TLS, so it checks the ID token's issuer, audience,
+//! expiry and nonce but not its signature (OpenID Connect Core 1.0,
+//! 3.1.3.7, step 6). The provider must therefore be https, except on this
+//! machine.
+//!
 //! The desktop app can't see the browser's cookies. It opens the system
 //! browser at `/api/auth/oidc?desktop=<challenge>`, the hex SHA-256 of a
 //! secret it keeps. Once signed in, the browser lands on the web app's
@@ -91,6 +98,8 @@ pub trait OidcHost: Clone + Send + Sync + 'static {
 pub struct OidcLogin {
     /// Without a trailing slash.
     issuer: String,
+    /// The issuer's setting by name, for the log: `oidc.issuer (FORGE_OIDC_ISSUER)`.
+    issuer_setting: String,
     client_id: String,
     client_secret: String,
     redirect_uri: String,
@@ -192,29 +201,30 @@ fn trusted_url(url: &str) -> bool {
 
 impl OidcLogin {
     /// `public_url` is the app's own address, as people's browsers reach it.
-    /// `user_agent` is the app's key (`forge`, `glyph`, …).
+    /// `app` is the app's key (`forge`, `glyph`, …): the HTTP client's user
+    /// agent, and the start of the issuer's environment variable.
     pub fn new(
         issuer: String,
         client_id: String,
         client_secret: String,
         public_url: &str,
-        user_agent: &str,
+        app: &str,
     ) -> anyhow::Result<Self> {
         let issuer = issuer.trim_end_matches('/').to_string();
+        let issuer_setting = format!("oidc.issuer ({}_OIDC_ISSUER)", app.to_ascii_uppercase());
         if !trusted_url(&issuer) {
-            bail!(
-                "the setting oidc.issuer is an https address (or http on this machine)"
-            );
+            bail!("the setting {issuer_setting} is an https address (or http on this machine)");
         }
         let mut key = [0u8; 32];
         getrandom::fill(&mut key).expect("the OS random number generator works");
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(20))
-            .user_agent(user_agent)
+            .user_agent(app)
             .build()
             .expect("an HTTP client with default settings builds");
         Ok(OidcLogin {
             issuer,
+            issuer_setting,
             client_id,
             client_secret,
             redirect_uri: format!(
@@ -293,7 +303,10 @@ impl OidcLogin {
                         })
                     }
                     _ => {
-                        tracing::warn!("the sign-in provider's discovery document doesn't fit oidc.issuer");
+                        tracing::warn!(
+                            "the sign-in provider's discovery document doesn't fit {}",
+                            self.issuer_setting
+                        );
                         Err(Problem::Provider)
                     }
                 }
@@ -413,7 +426,10 @@ pub struct StartParams {
 }
 
 /// `GET /api/auth/oidc`: off to the provider to sign in.
-pub async fn start<H: OidcHost>(State(state): State<H>, Query(params): Query<StartParams>) -> Response {
+pub async fn start<H: OidcHost>(
+    State(state): State<H>,
+    Query(params): Query<StartParams>,
+) -> Response {
     let secure = state.cookie_secure();
     let cookie = H::oidc_cookie();
     let desktop = params.desktop.is_some();
@@ -449,7 +465,10 @@ pub async fn start<H: OidcHost>(State(state): State<H>, Query(params): Query<Sta
         urlencode(&login.redirect_uri),
         urlencode(&state_param),
     );
-    redirect(&to, &[nonce_cookie(cookie, &cookie_value, VALID_FOR, secure)])
+    redirect(
+        &to,
+        &[nonce_cookie(cookie, &cookie_value, VALID_FOR, secure)],
+    )
 }
 
 #[derive(Deserialize)]
@@ -527,7 +546,9 @@ async fn finish<H: OidcHost>(
             Ok(Done::Desktop { code, to })
         }
         None => {
-            let session = start_session(&mut *db, user).await.map_err(|_| Problem::Failed)?;
+            let session = start_session(&mut *db, user)
+                .await
+                .map_err(|_| Problem::Failed)?;
             db.commit().await?;
             Ok(Done::Browser { session, to })
         }
@@ -567,14 +588,12 @@ async fn account(
                 .filter(|e| policy != LinkPolicy::PeopleOnly || !is_agent_email(e))
                 .ok_or(Problem::NoEmail)?;
             let existing: Option<(Uuid, bool)> = match policy {
-                LinkPolicy::PeopleOnly => {
-                    sqlx::query_as(
-                        "SELECT id, kind = 'person' AND oidc_sub IS NULL FROM users WHERE email = $1",
-                    )
-                    .bind(&email)
-                    .fetch_optional(&mut *db)
-                    .await?
-                }
+                LinkPolicy::PeopleOnly => sqlx::query_as(
+                    "SELECT id, kind = 'person' AND oidc_sub IS NULL FROM users WHERE email = $1",
+                )
+                .bind(&email)
+                .fetch_optional(&mut *db)
+                .await?,
                 LinkPolicy::AnyUser => {
                     sqlx::query_as("SELECT id, oidc_sub IS NULL FROM users WHERE email = $1")
                         .bind(&email)

@@ -44,7 +44,11 @@ pub async fn handler(
         move || {
             let pool = pool.clone();
             let token_hash = token_hash.clone();
-            async move { still_member(&pool, &token_hash, actor).await.unwrap_or(false) }
+            async move {
+                still_member(&pool, &token_hash, actor)
+                    .await
+                    .unwrap_or(false)
+            }
         },
     )
 }

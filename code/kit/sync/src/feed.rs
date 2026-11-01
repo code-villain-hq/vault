@@ -52,8 +52,7 @@ where
     ws.protocols([protocol])
         .on_upgrade(move |socket| async move {
             let wake = wake.subscribe();
-            if let Err(e) =
-                follow::<R, _, _>(socket, &pool, wake, actor, from, still_allowed).await
+            if let Err(e) = follow::<R, _, _>(socket, &pool, wake, actor, from, still_allowed).await
             {
                 tracing::debug!(error = %e, "sync socket closed");
             }

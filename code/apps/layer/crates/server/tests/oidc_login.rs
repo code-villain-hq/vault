@@ -92,8 +92,14 @@ struct Setup {
 
 async fn setup(pool: PgPool) -> Setup {
     let issuer = fake_provider().await;
-    let login =
-        OidcLogin::new(issuer, "layer".into(), "secret".into(), "http://layer.test").unwrap();
+    let login = OidcLogin::new(
+        issuer,
+        "layer".into(),
+        "secret".into(),
+        "http://layer.test",
+        "layer",
+    )
+    .unwrap();
     let state = common::state(pool.clone())
         .for_company("Acme Inc")
         .with_oidc_login(login);

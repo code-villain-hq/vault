@@ -78,12 +78,10 @@ pub async fn user_for_session(
     db: impl PgExecutor<'_>,
     token_hash: &[u8],
 ) -> Result<Option<Uuid>, sqlx::Error> {
-    sqlx::query_scalar(
-        "SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > now()",
-    )
-    .bind(token_hash)
-    .fetch_optional(db)
-    .await
+    sqlx::query_scalar("SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > now()")
+        .bind(token_hash)
+        .fetch_optional(db)
+        .await
 }
 
 /// Whether a session is still valid and its user still in the workspace.
