@@ -8,7 +8,7 @@ use std::time::Duration;
 use code_villain_scim::Groups;
 use glyph_llm::Models;
 use glyph_server::config::{Config, KNOWN, Settings};
-use glyph_server::oidc::OidcLogin;
+use glyph_server::oidc;
 use glyph_server::{AppState, company, translate};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let settings = Settings::load("glyph", KNOWN, file.as_deref())?;
     let config = Config::from_settings(&settings)?;
-    let login = OidcLogin::from_settings(&settings)?;
+    let login = oidc::from_settings(&settings)?;
     let scim_token = settings.get("scim.token").unwrap_or_default();
     let groups = Groups::new(
         "glyph",

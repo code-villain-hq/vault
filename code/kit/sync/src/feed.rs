@@ -7,7 +7,8 @@
 use std::future::Future;
 use std::time::Duration;
 
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::Response;
 use futures::stream::SplitSink;
 use futures::{SinkExt, StreamExt};
 use sqlx::PgPool;
@@ -28,6 +29,35 @@ const HEARTBEAT: Duration = Duration::from_secs(25);
 pub struct Position {
     pub after: i64,
     pub epoch: Option<Uuid>,
+}
+
+/// Upgrades `ws` to `protocol` and runs [`follow`] on it. Subscribes to `wake`
+/// before the catch-up so no change slips between the two.
+pub fn follow_upgrade<R, F, Fut>(
+    ws: WebSocketUpgrade,
+    protocol: &'static str,
+    pool: PgPool,
+    wake: broadcast::Sender<Uuid>,
+    actor: Actor,
+    from: Position,
+    still_allowed: F,
+) -> Response
+where
+    R: Rules + 'static,
+    F: FnMut() -> Fut + Send + 'static,
+    Fut: Future<Output = bool> + Send,
+{
+    // Selecting the protocol the desktop app offers next to its token, as
+    // browsers require; the browser app offers none.
+    ws.protocols([protocol])
+        .on_upgrade(move |socket| async move {
+            let wake = wake.subscribe();
+            if let Err(e) =
+                follow::<R, _, _>(socket, &pool, wake, actor, from, still_allowed).await
+            {
+                tracing::debug!(error = %e, "sync socket closed");
+            }
+        })
 }
 
 /// Sends `actor` the workspace's changes after `from` on `socket` until the

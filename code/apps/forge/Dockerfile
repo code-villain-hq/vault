@@ -27,6 +27,7 @@ COPY apps/forge/crates crates
 COPY apps/forge/migrations migrations
 COPY kit/sync /code/kit/sync
 COPY kit/desktop /code/kit/desktop
+COPY kit/auth /code/kit/auth
 COPY kit/scim /code/kit/scim
 COPY kit/settings /code/kit/settings
 # Cargo needs every workspace member's manifest, even when not building it.

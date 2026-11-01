@@ -1,100 +1,52 @@
-//! Who is making a request: sessions, and the extractors handlers use to
-//! require a signed-in user or a workspace member.
+//! Who is making a request: sessions and the extractors handlers use to
+//! require a signed-in user or a workspace member. Token helpers live in
+//! `code-villain-auth`.
 
 use std::collections::HashMap;
 
 use axum::extract::{FromRequestParts, Path};
-use axum::http::header::{AUTHORIZATION, COOKIE, SEC_WEBSOCKET_PROTOCOL};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, HeaderValue};
-use chrono::{Duration, Utc};
+use code_villain_auth::SessionNames;
 use layer_domain::{Actor, Role};
-use sha2::{Digest, Sha256};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::state::AppState;
 
-pub const SESSION_COOKIE: &str = "layer_session";
-/// Sent by the packaged desktop app, which keeps its session token itself
-/// (in the system keychain) instead of in a cookie.
-pub const CLIENT_HEADER: &str = "x-layer-client";
-/// Where the desktop app gets its session token when it signs in.
-pub const SESSION_HEADER: &str = "x-layer-session";
-/// Browsers can't set headers on a WebSocket, so the desktop app offers its
-/// token as a subprotocol, `bearer.<token>`, next to [`SYNC_PROTOCOL`].
-pub const BEARER_PROTOCOL_PREFIX: &str = "bearer.";
-pub const SYNC_PROTOCOL: &str = "layer";
-const SESSION_DAYS: i64 = 60;
+pub const NAMES: SessionNames = SessionNames {
+    cookie: "layer_session",
+    client_header: "x-layer-client",
+    session_header: "x-layer-session",
+    bearer_protocol_prefix: "bearer.",
+    sync_protocol: "layer",
+};
 
-/// A random 256-bit token, hex-encoded, for sessions.
-pub fn new_token() -> String {
-    let mut bytes = [0u8; 32];
-    getrandom::fill(&mut bytes).expect("the OS random number generator works");
-    hex::encode(bytes)
-}
+pub const SESSION_COOKIE: &str = NAMES.cookie;
+pub const CLIENT_HEADER: &str = NAMES.client_header;
+pub const SESSION_HEADER: &str = NAMES.session_header;
+pub const BEARER_PROTOCOL_PREFIX: &str = NAMES.bearer_protocol_prefix;
+pub const SYNC_PROTOCOL: &str = NAMES.sync_protocol;
 
-/// Tokens are stored only as hashes, so a leaked database can't be used to sign in.
-pub fn hash_token(token: &str) -> Vec<u8> {
-    Sha256::digest(token.as_bytes()).to_vec()
-}
+pub use code_villain_auth::{hash_token, new_token};
 
 /// Starts a session and returns its token, for the cookie.
 pub async fn start_session(db: impl PgExecutor<'_>, user_id: Uuid) -> Result<String, AppError> {
-    let token = new_token();
-    sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)")
-        .bind(hash_token(&token))
-        .bind(user_id)
-        .bind(Utc::now() + Duration::days(SESSION_DAYS))
-        .execute(db)
-        .await?;
-    Ok(token)
+    Ok(code_villain_auth::start_session(db, user_id).await?)
 }
 
 pub fn session_cookie(token: &str, secure: bool) -> HeaderValue {
-    cookie(token, SESSION_DAYS * 24 * 60 * 60, secure)
+    code_villain_auth::session_cookie(NAMES, token, secure)
 }
 
 pub fn clear_session_cookie(secure: bool) -> HeaderValue {
-    cookie("", 0, secure)
-}
-
-fn cookie(value: &str, max_age: i64, secure: bool) -> HeaderValue {
-    let secure = if secure { "; Secure" } else { "" };
-    HeaderValue::from_str(&format!(
-        "{SESSION_COOKIE}={value}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}{secure}"
-    ))
-    .expect("a cookie made of hex and ASCII is a valid header")
+    code_villain_auth::clear_session_cookie(NAMES, secure)
 }
 
 /// The session token from an `Authorization: Bearer` header or the session cookie.
 pub fn session_token(headers: &HeaderMap) -> Option<String> {
-    let bearer = headers
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
-    if let Some(token) = bearer {
-        return Some(token.trim().to_string());
-    }
-    let protocol = headers
-        .get_all(SEC_WEBSOCKET_PROTOCOL)
-        .iter()
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(|v| v.split(','))
-        .find_map(|p| p.trim().strip_prefix(BEARER_PROTOCOL_PREFIX));
-    if let Some(token) = protocol {
-        return Some(token.to_string());
-    }
-    headers
-        .get_all(COOKIE)
-        .iter()
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(|v| v.split(';'))
-        .find_map(|pair| {
-            let (name, value) = pair.trim().split_once('=')?;
-            (name == SESSION_COOKIE && !value.is_empty()).then(|| value.to_string())
-        })
+    code_villain_auth::session_token(NAMES, headers)
 }
 
 /// The signed-in user. Rejects the request with 401 otherwise.
@@ -113,13 +65,8 @@ impl FromRequestParts<AppState> for CurrentUser {
         let token =
             session_token(&parts.headers).ok_or_else(|| AppError::unauthorized("not signed in"))?;
         let token_hash = hash_token(&token);
-        let user_id: Option<Uuid> = sqlx::query_scalar(
-            "SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > now()",
-        )
-        .bind(&token_hash)
-        .fetch_optional(&state.pool)
-        .await?;
-        let id = user_id
+        let id = code_villain_auth::user_for_session(&state.pool, &token_hash)
+            .await?
             .ok_or_else(|| AppError::unauthorized("your session has ended; sign in again"))?;
         Ok(CurrentUser { id, token_hash })
     }
@@ -169,14 +116,8 @@ impl FromRequestParts<AppState> for Member {
             .get("workspace_id")
             .and_then(|id| id.parse().ok())
             .ok_or_else(not_found)?;
-        let role: Option<String> = sqlx::query_scalar(
-            "SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2",
-        )
-        .bind(workspace_id)
-        .bind(user.id)
-        .fetch_optional(&state.pool)
-        .await?;
-        let role = role
+        let role = code_villain_auth::member_role(&state.pool, workspace_id, user.id)
+            .await?
             .as_deref()
             .and_then(Role::parse)
             .ok_or_else(not_found)?;
@@ -198,14 +139,5 @@ pub async fn still_member(
     token_hash: &[u8],
     actor: Actor,
 ) -> Result<bool, AppError> {
-    let found: Option<i32> = sqlx::query_scalar(
-        "SELECT 1 FROM sessions s JOIN workspace_members m ON m.user_id = s.user_id \
-         WHERE s.token_hash = $1 AND s.expires_at > now() AND m.workspace_id = $2 AND m.user_id = $3",
-    )
-    .bind(token_hash)
-    .bind(actor.workspace_id)
-    .bind(actor.user_id)
-    .fetch_optional(db)
-    .await?;
-    Ok(found.is_some())
+    Ok(code_villain_auth::still_member(db, token_hash, actor.workspace_id, actor.user_id).await?)
 }

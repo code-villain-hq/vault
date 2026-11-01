@@ -3,7 +3,7 @@
 Every app's desktop build runs on its own, with no server elsewhere: it
 starts its own Postgres and its own server for the workspaces on that Mac.
 This crate does the starting and stopping; each app brings its server.
-Forge, Glyph, Raven and Layer use it.
+Forge, Glyph, Raven, Almanac and Layer use it.
 
 ## Layout
 
@@ -32,5 +32,5 @@ Forge, Glyph, Raven and Layer use it.
 
 `cargo test` here starts a real Postgres in a temporary folder, restarts it
 and kills it. No CI runs it, so run it yourself. CI runs `bun run check` in
-Forge, Glyph, Raven and Layer when `code/kit` changes, which builds each
+Forge, Glyph, Raven, Almanac and Layer when `code/kit` changes, which builds each
 app's desktop shell on this crate.

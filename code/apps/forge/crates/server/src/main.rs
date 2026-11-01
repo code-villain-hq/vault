@@ -11,7 +11,7 @@ use forge_server::config::{Config, KNOWN, Settings};
 use forge_server::drift::{self, DriftSettings};
 use forge_server::github::GitHubApp;
 use forge_server::github::oauth::GitHubOAuth;
-use forge_server::oidc::OidcLogin;
+use forge_server::oidc;
 use forge_server::{AppState, company};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let settings = Settings::load("forge", KNOWN, file.as_deref())?;
     let config = Config::from_settings(&settings)?;
-    let login = OidcLogin::from_settings(&settings)?;
+    let login = oidc::from_settings(&settings)?;
     let scim_token = settings.get("scim.token").unwrap_or_default();
     let groups = Groups::new(
         "forge",

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use code_villain_scim::Groups;
 use layer_server::config::{Config, KNOWN, Settings};
-use layer_server::oidc::OidcLogin;
+use layer_server::oidc;
 use layer_server::{AppState, company};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let settings = Settings::load("layer", KNOWN, file.as_deref())?;
     let config = Config::from_settings(&settings)?;
-    let login = OidcLogin::from_settings(&settings)?;
+    let login = oidc::from_settings(&settings)?;
     let scim_token = settings.get("scim.token").unwrap_or_default();
     let groups = Groups::new(
         "layer",

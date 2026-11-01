@@ -1,7 +1,7 @@
 # Settings: notes for coding agents
 
 `code-villain-settings` reads an app server's settings: one TOML file, with
-the environment over it. Forge, Glyph, Raven and Layer use it. A company
+the environment over it. Forge, Glyph, Raven, Almanac and Layer use it. A company
 runs an app with a file like `<app>.example.toml` in the app's folder.
 
 - The file is `--config <file>`, else the one `<APP>_CONFIG` names, else

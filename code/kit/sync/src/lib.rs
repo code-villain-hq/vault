@@ -23,7 +23,7 @@ pub use apply::{
     log, notify, record_change,
 };
 pub use error::SyncError;
-pub use feed::{Position, follow};
+pub use feed::{Position, follow, follow_upgrade};
 pub use listen::listen;
 pub use model::{Actor, GuestView, Model, ValidationError, Write};
 pub use protocol::{

@@ -662,6 +662,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
+name = "code-villain-auth"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64 0.23.1",
+ "chrono",
+ "getrandom 0.4.3",
+ "hex",
+ "hmac",
+ "jsonwebtoken",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "code-villain-desktop"
 version = "0.1.0"
 dependencies = [
@@ -1871,6 +1893,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "chrono",
+ "code-villain-auth",
  "code-villain-scim",
  "code-villain-settings",
  "code-villain-sync",

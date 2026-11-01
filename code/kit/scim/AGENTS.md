@@ -4,7 +4,7 @@ A server runs for one company, whose account (Pocket ID, or another OpenID
 Connect provider with SCIM) signs people in. With SCIM it also sends the
 server the people and groups its sign-in client allows. This crate,
 `code-villain-scim`, takes them at `/api/scim/v2` and turns them into roles
-in the company's workspace. Forge, Glyph, Raven and Layer use it.
+in the company's workspace. Forge, Glyph, Raven, Almanac and Layer use it.
 
 ## What it does
 

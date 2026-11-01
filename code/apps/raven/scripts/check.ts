@@ -1,32 +1,28 @@
 // The verification gate: everything here must pass before a change is done.
-import { readdir } from "node:fs/promises";
 import { $ } from "bun";
+import { assertTypesCurrent, runChecks } from "../../../kit/dev-id/check";
 
 const root = new URL("..", import.meta.url).pathname;
 // The studio's sync client, which Raven builds on (`code/kit/sync`).
 const kitClient = `${root}../../kit/sync/client`;
 // The parts every studio web app shares (`code/kit/web`).
 const kitWeb = `${root}../../kit/web`;
-// Leaves the desktop shell out, for a quick check of the server and web app.
+// RAVEN_CHECK_SKIP_DESKTOP leaves the desktop app out, for a quicker check
+// that doesn't wait for Tauri to build.
 const crates = process.env.RAVEN_CHECK_SKIP_DESKTOP
   ? ["--workspace", "--exclude", "raven-desktop"]
   : ["--workspace"];
 
-const steps: [string, () => Promise<unknown>][] = [
+await runChecks([
   ["cargo fmt", () => $`cargo fmt --all --check`.cwd(root)],
   ["cargo clippy", () => $`cargo clippy ${crates} --all-targets -- -D warnings`.cwd(root)],
   ["cargo test", () => $`cargo test ${crates} --quiet`.cwd(root)],
   [
     "generated types are current",
-    async () => {
-      const before = await snapshot(`${root}packages/types/src`);
-      await $`bun scripts/gen-types.ts`.cwd(root).quiet();
-      if (before !== (await snapshot(`${root}packages/types/src`))) {
-        throw new Error(
-          "packages/types was out of date; it has been regenerated, review and commit it",
-        );
-      }
-    },
+    () =>
+      assertTypesCurrent(`${root}packages/types/src`, () =>
+        $`bun scripts/gen-types.ts`.cwd(root).quiet(),
+      ),
   ],
   // Shared tokens are generated, and Raven bundles a copy: neither may drift.
   [
@@ -50,22 +46,4 @@ const steps: [string, () => Promise<unknown>][] = [
     },
   ],
   ["web build", () => $`bun run --cwd apps/web build`.cwd(root).quiet()],
-];
-
-for (const [name, run] of steps) {
-  process.stdout.write(`• ${name}\n`);
-  try {
-    await run();
-  } catch (error) {
-    if (error instanceof Error && !("exitCode" in error)) console.error(error.message);
-    console.error(`\n✗ ${name} failed`);
-    process.exit(1);
-  }
-}
-console.log("\n✓ all checks passed");
-
-async function snapshot(dir: string): Promise<string> {
-  const files = (await readdir(dir, { recursive: true })).filter((f) => f.endsWith(".ts")).sort();
-  const contents = await Promise.all(files.map((f) => Bun.file(`${dir}/${f}`).text()));
-  return JSON.stringify(files.map((f, i) => [f, contents[i]]));
-}
+]);

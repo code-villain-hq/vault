@@ -12,16 +12,11 @@ use crate::accounts::create_workspace;
 use crate::auth::start_session;
 use crate::error::AppError;
 
-/// The local person's address: never a real one (`.invalid` can't be
-/// registered), so it can't be taken for anyone's.
-pub const EMAIL: &str = "me@this-mac.invalid";
+pub use code_villain_auth::THIS_MAC_EMAIL as EMAIL;
 
 /// The person on this Mac, once they've started here.
 pub async fn person(pool: &PgPool) -> Result<Option<Uuid>, AppError> {
-    Ok(sqlx::query_scalar("SELECT id FROM users WHERE email = $1")
-        .bind(EMAIL)
-        .fetch_optional(pool)
-        .await?)
+    Ok(code_villain_auth::this_mac_person(pool).await?)
 }
 
 /// The apps on this Mac Raven watches from the start: Forge's and Glyph's
@@ -41,15 +36,7 @@ pub async fn start(pool: &PgPool, name: &str, workspace: &str) -> Result<Uuid, A
     let name = clean_name(name, "name")?;
     let workspace = clean_name(workspace, "workspace name")?;
     let mut db = pool.begin().await?;
-    let user_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO users (id, email, name) VALUES ($1, $2, $3)
-         ON CONFLICT (email) DO UPDATE SET name = users.name RETURNING id",
-    )
-    .bind(Uuid::now_v7())
-    .bind(EMAIL)
-    .bind(&name)
-    .fetch_one(&mut *db)
-    .await?;
+    let user_id = code_villain_auth::ensure_this_mac_person(&mut db, &name).await?;
     let workspace_id = create_workspace(&mut db, &workspace, user_id).await?;
     watch_this_mac(
         &mut db,

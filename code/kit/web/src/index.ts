@@ -10,9 +10,16 @@ export {
   type Role,
 } from "./account";
 export { api, RequestError, setSessionEndedHandler, useApi } from "./api";
+export { bootApp, followSystemTheme } from "./boot";
 export { Button, type ButtonVariant, buttonClass } from "./button";
 export { type Command, CommandMenu, matching, openCommandMenu } from "./command-menu";
 export { type Confirmation, ConfirmDialog } from "./confirm";
+export {
+  type AuthPagesOptions,
+  type AuthSession,
+  type AuthStartCopy,
+  createAuthPages,
+} from "./auth";
 export {
   AuthScreen,
   Empty,
@@ -24,6 +31,12 @@ export {
   Splash,
   TextField,
 } from "./controls";
+export {
+  isDesktop,
+  onAppLink,
+  openExternalLinksInBrowser,
+  openInBrowser,
+} from "./desktop";
 export { focusBackAfterKeys, useDialogFocus } from "./dialog-focus";
 export { ago, lasted } from "./format";
 export { GroupSelect, useGroups } from "./groups";
@@ -49,7 +62,6 @@ export {
   databaseName,
   forgetPlace,
   getPlaces,
-  isDesktop,
   loadPlaces,
   macUserName,
   normalizeServer,

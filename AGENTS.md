@@ -24,18 +24,20 @@ Every app except Caster, the theme and the site is built the same way:
 
 The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge, Glyph, Raven and Almanac use it. Layer uses it for the setup a team shares: its desktop app keeps that in a workspace, and the rest of its state in local files.
 
+Company sign-in lives in `code/kit/auth` (OIDC, sessions, desktop handoff). Shared web chrome and sign-in screens live in `code/kit/web`. Settings parsing is `code/kit/settings`; SCIM is `code/kit/scim`; local Postgres for desktop apps is `code/kit/desktop`; Acme stand-in for `bun run dev` is `code/kit/dev-id`.
+
 The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge, Glyph, Raven and Almanac have it (`apps/desktop/src-tauri/src/this_mac.rs`), and Layer, one per profile (`src-tauri/src/workspace.rs`).
 
 ## Running an app for a company
 
 A server runs for one company, from one settings file: `<app>.toml` (`<app>.example.toml` shows it), or `--config <file>`, with the environment over it (`[oidc] issuer` is `<APP>_OIDC_ISSUER`). `code/kit/settings` reads it; a missing or unknown setting stops the server, naming it. Required: `company`, `public_url`, the database, the company's account (`[oidc] issuer`, `client_id`, `client_secret`) and a SCIM token (`[scim] token`). Optional: `[groups] users`, `admins` and `guests`, by default `<app>-users`, `-admins` and `-guests`. `studio/design/behaviour.md` ("Who gets in") says what people see. Every app installs the same way: the settings file, a container image (`Dockerfile`, built from `code/`), and its README's "Running it for a company".
 
-- The account signs people in over OpenID Connect (`crates/server/src/oidc.rs`) and is the only way in: no passwords, sign-up or invites. The studio's own is Pocket ID at id.codevillain.eu; a company brings its own.
+- The account signs people in over OpenID Connect (`code/kit/auth`, wired in each app's `oidc.rs`) and is the only way in: no passwords, sign-up or invites. The studio's own is Pocket ID at id.codevillain.eu; a company brings its own.
 - It also sends its people and groups over SCIM 2.0 to `/api/scim/v2`, with `code/kit/scim` (its `AGENTS.md` says how). On its first start the server makes the company's workspace, and the groups its settings name say who's in it and as what (`crates/server/src/company.rs`, `groups.rs`).
 - In the account: register the app as a confidential client with the callback `<public url>/api/auth/oidc/callback`, allow only the app's groups on it, and turn on SCIM with the endpoint `<public url>/api/scim/v2` and the settings' token.
 - The desktop app's own server, for the workspaces on this Mac, signs in to nothing and reads no settings file.
 - Local development runs every app for a made-up company, Acme Inc, with `code/kit/dev-id` standing in for its account (sign-in at 127.0.0.1:7280, people in `people.toml`). Each app's `bun run dev` starts it, on a database of the app's own (`<app>_acme`); with your own `<app>.toml` or `<APP>_OIDC_ISSUER` in `.env`, it uses those instead.
-- For the next app, copy Forge's: `config.rs`, `company.rs`, `groups.rs`, `oidc.rs` and their tests, the migrations for `users.oidc_sub` and one company, `/api/auth/providers`; on the web side `useProviders`, the sign-in button, `DesktopSignIn` and the sign-in problems in `auth.tsx`; for the desktop app the `<app>://` deep link (tauri-plugin-deep-link 2.6.1) and `openInBrowser`/`onAppLink` in `platform.ts`; and `scripts/dev.ts`, `forge.example.toml` and the `Dockerfile`.
+- For the next app, depend on `code-villain-auth` and `code/kit/web`, then copy Forge's thin wiring: `OidcHost` in `oidc.rs`, `SessionNames` in `auth.rs`, `follow_upgrade` in `ws.rs`, this-Mac helpers in `local.rs`, `company.rs`/`groups.rs`, the migrations for `users.oidc_sub` and one company, `/api/auth/providers`; on the web side `bootApp`, `createAuthPages` and a one-line `platform.ts` re-export; for the desktop app the `<app>://` deep link (tauri-plugin-deep-link 2.6.1); and `scripts/dev.ts` via `runPrefixed`, `scripts/check.ts` / `gen-types.ts` via kit/dev-id helpers, `<app>.example.toml` and the `Dockerfile` (include `kit/auth`).
 
 ## Specs are checked against the code
 

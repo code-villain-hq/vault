@@ -1,7 +1,7 @@
 # The studio's sync engine: notes for coding agents
 
 Every app with a server keeps its workspaces in sync with this engine.
-Forge, Glyph, Raven and Layer use it; the next app does too. The engine knows the protocol, the
+Forge, Glyph, Raven, Almanac and Layer use it; the next app does too. The engine knows the protocol, the
 tables and the feed; each app brings its models and its rules.
 
 ## Layout
@@ -57,5 +57,5 @@ whole workspace and pay nothing for it.
 
 A change here changes every app. Keep the protocol as it is unless every app
 moves with it, and keep app rules out: they go behind `Rules`. Check with
-`bun run check` in Forge, Glyph, Raven and Layer; each runs the client's
+`bun run check` in Forge, Glyph, Raven, Almanac and Layer; each runs the client's
 tests and builds the crate (CI runs all four when `code/kit` changes).

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use code_villain_scim::Groups;
 use raven_server::config::{Config, KNOWN, Settings};
-use raven_server::oidc::OidcLogin;
+use raven_server::oidc;
 use raven_server::telemetry::{Capture, Recorder};
 use raven_server::{AppState, company};
 use sqlx::postgres::PgPoolOptions;
@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::from_settings(&settings)?;
-    let login = OidcLogin::from_settings(&settings)?;
+    let login = oidc::from_settings(&settings)?;
     let scim_token = settings.get("scim.token").unwrap_or_default();
     let groups = Groups::new(
         "raven",

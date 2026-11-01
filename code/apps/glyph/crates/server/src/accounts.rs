@@ -27,10 +27,7 @@ pub async fn logout(
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
     if let Some(token) = session_token(&headers) {
-        sqlx::query("DELETE FROM sessions WHERE token_hash = $1")
-            .bind(hash_token(&token))
-            .execute(&state.pool)
-            .await?;
+        code_villain_auth::end_session(&state.pool, &hash_token(&token)).await?;
     }
     Ok((
         StatusCode::NO_CONTENT,

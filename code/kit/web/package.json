@@ -2,7 +2,7 @@
   "name": "@code-villain/web",
   "private": true,
   "type": "module",
-  "description": "The parts every studio web app shares: places, the API and the session; the command menu, the shortcuts list, confirming, the account pages, the sync indicator, time in words.",
+  "description": "The parts every studio web app shares: boot, places, the API and the session; sign-in and desktop deep links; the command menu, the shortcuts list, confirming, the account pages, the sync indicator, time in words.",
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./src/vite.ts"
@@ -10,10 +10,19 @@
   "peerDependencies": {
     "@base-ui/react": "1.9.0",
     "@tanstack/react-router": "1.170.46",
+    "@tauri-apps/plugin-deep-link": "2.6.2",
+    "@tauri-apps/plugin-opener": "2.7.2",
     "lucide-react": "1.62.0",
-    "react": "19.3.1"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "peerDependenciesMeta": {
+    "@tauri-apps/plugin-deep-link": { "optional": true },
+    "@tauri-apps/plugin-opener": { "optional": true }
   },
   "devDependencies": {
+    "@tauri-apps/plugin-deep-link": "2.6.2",
+    "@tauri-apps/plugin-opener": "2.7.2",
     "@types/bun": "1.4.4",
     "@types/react": "19.3.0"
   }

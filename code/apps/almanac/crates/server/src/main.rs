@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use almanac_server::claude::Claude;
 use almanac_server::config::{Config, KNOWN, Settings};
-use almanac_server::oidc::OidcLogin;
+use almanac_server::oidc;
 use almanac_server::{AppState, company};
 use code_villain_scim::Groups;
 use sqlx::postgres::PgPoolOptions;
@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::from_settings(&settings)?;
-    let login = OidcLogin::from_settings(&settings)?;
+    let login = oidc::from_settings(&settings)?;
     let scim_token = settings.get("scim.token").unwrap_or_default();
     let groups = Groups::new(
         "almanac",
