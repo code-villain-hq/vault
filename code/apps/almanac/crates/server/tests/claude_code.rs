@@ -434,12 +434,13 @@ async fn a_topic_sits_under_another_one_level_deep(pool: PgPool) {
     let shoes = shoes.body["id"].clone();
 
     // Not two levels deep, and not under Almanac's own.
-    for parent in [shoes.clone(), own] {
+    for parent in [shoes.clone(), own.clone()] {
         let refused = start("Preppy", parent.clone()).await;
         assert!(!refused.status.is_success(), "{parent}: {}", refused.body);
     }
-    // Not under itself, and a topic with sub-topics goes under none.
-    for (id, parent) in [(&shoes, &shoes), (&prices, &shoes)] {
+    // Not under itself, and a topic with sub-topics or Almanac's own goes
+    // under none.
+    for (id, parent) in [(&shoes, &shoes), (&prices, &shoes), (&own, &prices)] {
         let refused = app
             .sync(
                 &ada,
@@ -1001,12 +1002,17 @@ async fn chatgpt_answers_once_it_is_chosen(pool: PgPool) {
     .await;
     assert_eq!(answer["changes"][0]["said"], "Kept a point under Care.");
 
+    // The answer's session: the topic sets itself up in the background, so
+    // its session may start after the question's.
     let asked = sessions(&log);
-    let last = asked.last().unwrap();
-    assert!(
-        last["system"].as_str().unwrap().contains("You are Almanac"),
-        "Almanac's prompt in place of Codex's: {last}"
-    );
+    let last = asked
+        .iter()
+        .rfind(|s| {
+            s["system"]
+                .as_str()
+                .is_some_and(|s| s.contains("You are Almanac"))
+        })
+        .expect("Almanac's prompt in place of Codex's");
     assert_eq!(last["config"]["features"]["shell_tool"], false, "{last}");
     assert_eq!(last["config"]["sandbox_mode"], "read-only");
     assert_eq!(last["config"]["web_search"], "live");
