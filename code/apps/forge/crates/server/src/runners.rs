@@ -218,7 +218,11 @@ pub async fn of_workspace(
 /// Delivers wake-ups for the life of the server: whenever a workspace
 /// changes (that's when they're queued), and every few seconds for retries.
 pub async fn worker(state: AppState) {
-    let client = match reqwest::Client::builder().timeout(TIMEOUT).build() {
+    let client = match reqwest::Client::builder()
+        .timeout(TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+    {
         Ok(client) => client,
         Err(e) => {
             tracing::error!(error = %e, "couldn't start delivering wake-ups to agent runners");
@@ -385,7 +389,9 @@ fn new_secret() -> String {
     format!("{SECRET_PREFIX}{}", new_token())
 }
 
-/// An http(s) URL, as given (trimmed).
+/// An http(s) URL, as given (trimmed). Loopback and ordinary hosts are fine;
+/// link-local and cloud-metadata addresses are not — Forge would otherwise
+/// POST wake-ups into the server's own cloud or LAN link.
 fn clean_url(url: &str) -> Result<String, AppError> {
     let url = url.trim();
     let parsed = reqwest::Url::parse(url)
@@ -395,10 +401,58 @@ fn clean_url(url: &str) -> Result<String, AppError> {
             "the runner URL must start with http:// or https://",
         ));
     }
+    if parsed
+        .host_str()
+        .is_some_and(|host| !runner_host_ok(host))
+    {
+        return Err(AppError::invalid(
+            "the runner URL can't point at a link-local or metadata address",
+        ));
+    }
     Ok(url.to_string())
+}
+
+fn runner_host_ok(host: &str) -> bool {
+    let host = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    match host.parse::<std::net::IpAddr>() {
+        Ok(ip) => !link_local_or_metadata(ip),
+        Err(_) => host != "metadata.google.internal"
+            && !host.ends_with(".metadata.google.internal"),
+    }
+}
+
+fn link_local_or_metadata(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => {
+            let [a, b, ..] = ip.octets();
+            // 169.254.0.0/16 is link-local; cloud metadata sits in it too.
+            ip.is_link_local() || (a == 169 && b == 254)
+        }
+        std::net::IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
+            Some(v4) => link_local_or_metadata(std::net::IpAddr::V4(v4)),
+            None => ip.is_unicast_link_local(),
+        },
+    }
 }
 
 /// A value stored as its snake_case name, such as an event or status.
 fn from_text<T: serde::de::DeserializeOwned>(text: &str) -> Option<T> {
     serde_json::from_value(json!(text)).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runner_urls_reject_metadata() {
+        assert!(clean_url("http://127.0.0.1:9876/wake").is_ok());
+        assert!(clean_url("https://runner.example/wake").is_ok());
+        assert!(clean_url("http://169.254.169.254/latest").is_err());
+        assert!(clean_url("http://metadata.google.internal/").is_err());
+    }
 }

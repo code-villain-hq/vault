@@ -18,10 +18,19 @@ const LINES: usize = 200;
 /// `PATH` without them, so they're looked in too.
 const MORE_PLACES: [&str; 2] = ["/opt/homebrew/bin", "/usr/local/bin"];
 
-/// The program to run for `binary`: a path as it is, else the first match on
-/// `PATH` or in Homebrew's folders, else the name, for the error to show.
+/// The program to run for `binary`: an absolute path as it is (relative
+/// paths with a separator aren't run as-is — a models.toml can't point at
+/// `../evil`), else the first match on `PATH` or in Homebrew's folders,
+/// else the name, for the error to show.
 pub fn find_program(binary: &str) -> PathBuf {
-    if binary.contains(std::path::MAIN_SEPARATOR) {
+    if binary.contains(std::path::MAIN_SEPARATOR) || binary.contains('/') {
+        let path = PathBuf::from(binary);
+        if path.is_absolute() && !binary.split(['/', '\\']).any(|p| p == "..") {
+            return path;
+        }
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            return find_program(name);
+        }
         return binary.into();
     }
     let path = std::env::var_os("PATH").unwrap_or_default();
@@ -238,5 +247,12 @@ mod tests {
         let processes = Processes::new();
         let missing = processes.start("m", "/nonexistent/llama-server", &[]);
         assert!(matches!(missing, Err(ProcessError::Spawn { .. })));
+    }
+
+    #[test]
+    fn a_relative_binary_path_is_not_run_as_is() {
+        let looked_up = find_program("../evil/llama-server");
+        assert_eq!(looked_up.file_name().and_then(|n| n.to_str()), Some("llama-server"));
+        assert!(!looked_up.to_string_lossy().contains(".."));
     }
 }

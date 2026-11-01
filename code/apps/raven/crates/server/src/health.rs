@@ -24,6 +24,7 @@ const KEEP_DAYS: i32 = 30;
 pub async fn watch(pool: PgPool, self_url: String) {
     let client = reqwest::Client::builder()
         .timeout(TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
         .user_agent("raven")
         .build()
         .expect("an HTTP client with default settings builds");

@@ -671,12 +671,14 @@ impl Agent {
     }
 }
 
-/// Almanac's answer to something the adapter asks. Its tools are only
-/// Almanac's and the web's, so a permission it asks for is one of those;
-/// the files and the terminal it has no business with.
+/// Almanac's answer to something the adapter asks. Only Almanac's MCP tools
+/// and the web's may run; anything else (shell, files, …) is cancelled.
 fn reply_to(method: &str, params: &Value) -> Value {
     match method {
         "session/request_permission" => {
+            if !permission_is_for_almanac(params) {
+                return json!({ "result": { "outcome": { "outcome": "cancelled" } } });
+            }
             let allow = params["options"].as_array().and_then(|options| {
                 options
                     .iter()
@@ -696,6 +698,31 @@ fn reply_to(method: &str, params: &Value) -> Value {
         }
         _ => json!({ "error": { "code": -32601, "message": "Almanac doesn't offer that." } }),
     }
+}
+
+/// Whether the permission is for a tool Almanac means to allow: one of its
+/// MCP tools (`mcp__almanac__…`) or a web tool when those are on. Shell,
+/// files and anything unnamed are refused.
+fn permission_is_for_almanac(params: &Value) -> bool {
+    let tool = &params["toolCall"];
+    let kind = tool["kind"].as_str().unwrap_or("");
+    if matches!(kind, "execute" | "edit" | "delete" | "move") {
+        return false;
+    }
+    let names = [
+        tool["title"].as_str(),
+        tool["name"].as_str(),
+        tool["rawInput"]["name"].as_str(),
+        tool["rawInput"]["toolName"].as_str(),
+    ];
+    let mcp = format!("mcp__{MCP_NAME}__");
+    if names.into_iter().flatten().any(|name| {
+        WEB_TOOLS.iter().any(|w| name == *w || name.contains(w))
+            || name.contains(&mcp)
+    }) {
+        return true;
+    }
+    kind == "fetch"
 }
 
 /// What a JSON-RPC error from the adapter means for the talk.
@@ -720,16 +747,34 @@ mod tests {
 
     #[test]
     fn a_permission_is_given_once() {
-        let params = json!({ "options": [
-            { "optionId": "always", "kind": "allow_always" },
-            { "optionId": "once", "kind": "allow_once" },
-            { "optionId": "no", "kind": "reject_once" },
-        ]});
+        let params = json!({
+            "toolCall": { "title": "mcp__almanac__add_items" },
+            "options": [
+                { "optionId": "always", "kind": "allow_always" },
+                { "optionId": "once", "kind": "allow_once" },
+                { "optionId": "no", "kind": "reject_once" },
+            ]
+        });
         assert_eq!(
             reply_to("session/request_permission", &params)["result"]["outcome"]["optionId"],
             "once"
         );
         assert!(!reply_to("fs/read_text_file", &json!({}))["error"].is_null());
+    }
+
+    #[test]
+    fn a_shell_permission_is_refused() {
+        let params = json!({
+            "toolCall": { "title": "Bash", "kind": "execute" },
+            "options": [
+                { "optionId": "once", "kind": "allow_once" },
+                { "optionId": "no", "kind": "reject_once" },
+            ]
+        });
+        assert_eq!(
+            reply_to("session/request_permission", &params)["result"]["outcome"]["outcome"],
+            "cancelled"
+        );
     }
 
     #[test]

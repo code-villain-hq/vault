@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::routing::{any, get, patch, post, put};
 use axum::{Json, Router, middleware};
 use raven_domain::{Bootstrap, Transaction, TransactionResult};
@@ -66,8 +66,14 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/oidc/desktop", post(oidc::desktop))
         .route("/api/me", get(accounts::me).put(accounts::update_profile))
         .nest("/api/w/{workspace_id}", workspace)
-        .route("/v1/traces", post(otlp::traces))
-        .route("/v1/logs", post(otlp::logs))
+        .route(
+            "/v1/traces",
+            post(otlp::traces).layer(DefaultBodyLimit::max(2 * 1024 * 1024)),
+        )
+        .route(
+            "/v1/logs",
+            post(otlp::logs).layer(DefaultBodyLimit::max(2 * 1024 * 1024)),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             telemetry::record_calls,

@@ -137,6 +137,25 @@ async fn start(dir: &Path, app: &AppHandle) -> Result<Running, String> {
     let postgres = LocalPostgres::start(&dir.join("postgres"), POSTGRES_PORT)
         .await
         .map_err(|e| e.to_string())?;
+    match start_server(dir, app, &postgres).await {
+        Ok((server, pool, session)) => Ok(Running {
+            postgres,
+            server,
+            pool,
+            session,
+        }),
+        Err(e) => {
+            let _ = postgres.stop().await;
+            Err(e)
+        }
+    }
+}
+
+async fn start_server(
+    dir: &Path,
+    app: &AppHandle,
+    postgres: &LocalPostgres,
+) -> Result<(LocalServer, PgPool, Option<(Uuid, String)>), String> {
     let url = postgres
         .database("almanac")
         .await
@@ -175,16 +194,23 @@ async fn start(dir: &Path, app: &AppHandle) -> Result<Running, String> {
     .map_err(|e| e.to_string())?;
     tracing::info!("Almanac on this Mac at {}", server.origin());
 
-    let session = match local::person(&pool).await.map_err(|e| e.to_string())? {
-        Some(person) => Some((person, new_session(&pool, person).await?)),
-        None => None,
+    let session = match local::person(&pool).await.map_err(|e| e.to_string()) {
+        Ok(Some(person)) => match new_session(&pool, person).await {
+            Ok(token) => Some((person, token)),
+            Err(e) => {
+                server.stop().await;
+                pool.close().await;
+                return Err(e);
+            }
+        },
+        Ok(None) => None,
+        Err(e) => {
+            server.stop().await;
+            pool.close().await;
+            return Err(e);
+        }
     };
-    Ok(Running {
-        postgres,
-        server,
-        pool,
-        session,
-    })
+    Ok((server, pool, session))
 }
 
 /// Reminders as they come due, as notifications: the topic's name over

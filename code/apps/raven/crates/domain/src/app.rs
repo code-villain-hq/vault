@@ -104,18 +104,51 @@ fn service_name(value: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-/// An http or https address Raven can call.
+/// An http or https address Raven can call. Loopback and private hosts are
+/// fine (This Mac watches local apps); link-local and cloud-metadata are not.
 fn health_url(value: &str) -> Result<(), ValidationError> {
-    let valid = value.len() <= 500
-        && !value.contains(char::is_whitespace)
-        && value
-            .strip_prefix("https://")
-            .or_else(|| value.strip_prefix("http://"))
-            .is_some_and(|rest| !rest.is_empty() && !rest.starts_with('/'));
-    if valid {
-        Ok(())
-    } else {
-        invalid("A health address starts with http:// or https://.")
+    let rest = value
+        .strip_prefix("https://")
+        .or_else(|| value.strip_prefix("http://"));
+    let Some(rest) = rest.filter(|rest| !rest.is_empty() && !rest.starts_with('/')) else {
+        return invalid("A health address starts with http:// or https://.");
+    };
+    if value.len() > 500 || value.contains(char::is_whitespace) {
+        return invalid("A health address starts with http:// or https://.");
+    }
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = match authority.split_once(']') {
+        Some((v6, _)) => v6.strip_prefix('[').unwrap_or(v6),
+        None => authority.split(':').next().unwrap_or_default(),
+    };
+    if host.is_empty() || !health_host_ok(host) {
+        return invalid("A health address can't be a link-local or metadata address.");
+    }
+    Ok(())
+}
+
+fn health_host_ok(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    match host.parse::<std::net::IpAddr>() {
+        Ok(ip) => !link_local_or_metadata(ip),
+        Err(_) => {
+            host != "metadata.google.internal"
+                && !host.ends_with(".metadata.google.internal")
+        }
+    }
+}
+
+fn link_local_or_metadata(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => {
+            let [a, b, ..] = ip.octets();
+            // 169.254.0.0/16 is link-local; cloud metadata sits in it too.
+            ip.is_link_local() || (a == 169 && b == 254)
+        }
+        std::net::IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
+            Some(v4) => link_local_or_metadata(std::net::IpAddr::V4(v4)),
+            None => ip.is_unicast_link_local(),
+        },
     }
 }
 
@@ -152,6 +185,8 @@ mod tests {
             "http://",
             "http:///x",
             "http://a b",
+            "http://169.254.169.254/latest/meta-data",
+            "http://metadata.google.internal/",
         ] {
             assert!(health_url(bad).is_err(), "{bad}");
         }

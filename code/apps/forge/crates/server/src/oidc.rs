@@ -269,7 +269,9 @@ impl OidcLogin {
                 }
                 let doc: Value = response.json().await.map_err(|_| Problem::Provider)?;
                 let issuer = doc["issuer"].as_str().map(|i| i.trim_end_matches('/'));
-                let authorization = doc["authorization_endpoint"].as_str();
+                let authorization = doc["authorization_endpoint"]
+                    .as_str()
+                    .filter(|a| trusted_url(a));
                 let token = doc["token_endpoint"].as_str().filter(|t| trusted_url(t));
                 match (issuer, authorization, token) {
                     (Some(issuer), Some(authorization), Some(token)) if issuer == self.issuer => {
@@ -612,11 +614,15 @@ pub async fn desktop(
 }
 
 /// A path on this site, nothing that a browser could read as another one:
-/// no control characters, spaces or backslashes, and not `//`.
+/// no control characters, spaces or backslashes, not `//`, and no encoded
+/// `/` or `\` that would become those after a decode.
 fn safe_redirect(path: Option<&str>) -> String {
     path.filter(|p| {
+        let lower = p.to_ascii_lowercase();
         p.starts_with('/')
             && !p.starts_with("//")
+            && !lower.contains("%2f")
+            && !lower.contains("%5c")
             && p.chars().all(|c| c.is_ascii_graphic() && c != '\\')
     })
     .unwrap_or("/")
@@ -731,6 +737,9 @@ mod tests {
         for bad in [
             "//evil.example",
             "/\\evil.example",
+            "/%2f%2fevil.example",
+            "/%2Fevil.example",
+            "/%5cevil.example",
             "/\t/evil.example",
             "/\n/evil.example",
             "/ /evil.example",
