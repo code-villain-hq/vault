@@ -1606,7 +1606,7 @@ impl Kept {
 }
 
 /// A text's bold lead and what follows it: "**Zwei Sichten**: Für …".
-pub fn led(text: &str) -> Option<(&str, &str)> {
+fn led(text: &str) -> Option<(&str, &str)> {
     let rest = text.trim().strip_prefix("**")?;
     let (lead, after) = rest.split_once("**")?;
     let after = after.strip_prefix([':', '.', ',']).unwrap_or(after);

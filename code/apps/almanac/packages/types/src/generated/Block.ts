@@ -14,8 +14,8 @@ export type Block = { id: string, workspace_id: string, topic_id: string, kind: 
  */
 title: string, 
 /**
- * For cards from before the set, which the server reads once to move
- * them into a collection's fields.
+ * What cards from before the set named on their face. Nothing reads it
+ * now that they're collections.
  */
 facets: Array<Facet>, 
 /**

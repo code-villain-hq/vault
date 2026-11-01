@@ -156,11 +156,6 @@ topics.
   on its page, in blocks of its own. Removing the row takes its page. A button above its title
   goes back to the topic, as do the breadcrumb and Esc, to where you
   were on the page.
-- **Pages from before the set** move into it once, when the server
-  starts: cards with facts, tables, timelines, bars and trends become
-  collections; steps a checklist; sections, questions and the rest
-  lists, and the parts of a section rows with their sentences on their
-  pages. The week goes; Calendar has it.
 - **A talk changes the page when you ask**: "tidy this up", "put the
   shopping list first", "show my plants as a table". It rewords, moves and
   removes points and blocks, changes a collection's fields, or picks

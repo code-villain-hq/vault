@@ -157,13 +157,8 @@ pub const SET_KINDS: &[&str] = &["heading", "paragraph", "callout", "collection"
 /// The cell a picture's point keeps its photo in.
 pub const PICTURE_CELL: &str = "photo";
 
-/// The kinds the set had before lists, checklists and toggles became
-/// collections (`proposals/facts-as-data.md`, C).
-pub const LIST_KINDS: &[&str] = &["bullets", "checklist", "toggle"];
-
-/// How wide a block is, of the page's twelve columns: a quarter, a third,
-/// a half, two thirds, three quarters or the whole. Empty is its kind's own.
-pub const BLOCK_WIDTHS: &[&str] = &["", "1/4", "1/3", "1/2", "2/3", "3/4", "whole"];
+/// How wide a block is: half the page or the whole. Empty is its kind's own.
+pub const BLOCK_WIDTHS: &[&str] = &["", "1/2", "whole"];
 
 /// How a person asked a collection to be drawn, with View as: a table,
 /// cards, a list, a checklist, a timeline, a line, a board, a week, bars,
@@ -336,8 +331,8 @@ pub struct Block {
     pub kind: String,
     /// Empty for none.
     pub title: String,
-    /// For cards from before the set, which the server reads once to move
-    /// them into a collection's fields.
+    /// What cards from before the set named on their face. Nothing reads it
+    /// now that they're collections.
     pub facets: Vec<Facet>,
     /// For a collection: the fields every row has, besides its name.
     pub fields: Vec<Field>,

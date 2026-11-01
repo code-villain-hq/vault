@@ -224,10 +224,8 @@ What they do:
     and the rest a text field, which a list shows under the name and
     cards without its field's name (`BESIDE_MOST`). add_items and
     change_points refuse a paragraph that opens with a term in bold
-    (`as_prose` in `kept.rs`), and a third pass on start (`terms` in
-    `convert.rs`) made such paragraphs collections; a fourth
-    (`named_terms`) names the rows that pass left whole, a term too long for
-    a cell then. A text cell holds 2000 characters, as a point does. Cards and a board
+    (`as_prose` in `kept.rs`). A text cell holds 2000 characters, as a
+    point does. Cards and a board
     card with nothing else to say show what a row's page keeps as chips
     (its collections' row names). A timeline's axis has a lane per choice; a
     click on one picks its rows for the list under it, and past ten rows
@@ -288,15 +286,7 @@ What they do:
     no row stays in, and a choice's lanes no row stays in; in words, only
     those are removed, not what moved.
 
-  Pages from before the set move into it once, on the server's start
-  (`convert.rs`, a rule per old kind, the same for every topic): text,
-  questions, shelves and cards become toggles; cards and tables with
-  facets, timelines, bars and trends become collections; the rest
-  bullets or a checklist. A second pass (`lists`) makes those
-  collections: bullets rows with only a name, a checklist rows with a
-  Done check (from `done`), a toggle a row per theme with its sentences
-  in a paragraph on the row's page. It reads the blocks' old `facets`, which stay
-  in the database for it. The app draws a block as its kind
+  The app draws a block as its kind
   (`views.ts`: `viewOf` and `widthOf`), on a grid of twelve columns, at
   the width a person picked with the block's ⋯ (`width`, half or the
   whole), or else its own; a
