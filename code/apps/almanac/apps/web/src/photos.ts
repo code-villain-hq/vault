@@ -1,9 +1,11 @@
 // Photos a question comes with. A photo is made smaller on the way in, to
 // the size Claude reads best, so it's quick to send; a sent one is fetched
-// once and kept for as long as the app runs.
+// once and kept for as long as the app runs. One added here shows from
+// this device until it's sent (`sending.ts`).
 
 import type { PhotoUpload } from "@almanac/types";
 import { useEffect, useState } from "react";
+import { addedHere } from "./sending";
 import { apiUrl, authHeaders, credentialsFor, type Place } from "./server";
 
 /** A photo picked for a question: what goes out, and how it looks here. */
@@ -73,34 +75,51 @@ async function base64(blob: Blob): Promise<string> {
 /** Sent photos by id, fetched once. */
 const fetched = new Map<string, Promise<string>>();
 
-/** An object URL for a sent photo, once it's here. */
+/**
+ * How long to wait before asking again for a photo that didn't come: the
+ * device that added it may not have sent it yet, or the server isn't there.
+ */
+const AGAIN = [2_000, 5_000, 15_000, 30_000, 60_000, 120_000];
+
+/** An object URL for a photo, once it's here. */
 export function usePhoto(place: Place, workspaceId: string, id: string): string | null {
   // The photo fetched last, by id, so another id never shows the one before.
   const [got, setGot] = useState<{ id: string; url: string } | null>(null);
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     // A sample's photo is the app's own file, at its address already.
     if (ownFile(id)) return;
     let current = true;
+    let later: ReturnType<typeof setTimeout> | undefined;
     let photo = fetched.get(id);
     if (!photo) {
-      photo = fetch(apiUrl(`/api/w/${workspaceId}/photos/${id}`, place), {
-        credentials: credentialsFor(place),
-        headers: authHeaders(place),
-      }).then(async (response) => {
-        if (!response.ok) throw new Error(`photo ${response.status}`);
-        return URL.createObjectURL(await response.blob());
-      });
+      photo = addedHere(id).then((url) => url ?? fromServer(place, workspaceId, id));
       // A photo that didn't come is asked for again next time.
       photo.catch(() => fetched.delete(id));
       fetched.set(id, photo);
     }
-    photo.then((url) => current && setGot({ id, url })).catch(() => {});
+    photo
+      .then((url) => current && setGot({ id, url }))
+      .catch(() => {
+        const wait = AGAIN[tries];
+        if (current && wait) later = setTimeout(() => setTries(tries + 1), wait);
+      });
     return () => {
       current = false;
+      clearTimeout(later);
     };
-  }, [place, workspaceId, id]);
+  }, [place, workspaceId, id, tries]);
   if (ownFile(id)) return id;
   return got?.id === id ? got.url : null;
+}
+
+async function fromServer(place: Place, workspaceId: string, id: string): Promise<string> {
+  const response = await fetch(apiUrl(`/api/w/${workspaceId}/photos/${id}`, place), {
+    credentials: credentialsFor(place),
+    headers: authHeaders(place),
+  });
+  if (!response.ok) throw new Error(`photo ${response.status}`);
+  return URL.createObjectURL(await response.blob());
 }
 
 /** Whether a photo's id is the address of one of the app's own files. */

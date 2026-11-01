@@ -1,36 +1,25 @@
 // Pictures on a page beyond a question's photos: a topic's cover, a row's
 // photo and a picture block's photos, dropped on, or picked with a button. A photo is made smaller
-// on the way in, as a question's is, kept on the server
-// (`POST /api/w/{id}/photos`), and its id set on the topic or in the row's
-// photo cell, or a picture's point, which the sync engine carries to every
-// client.
+// on the way in, as a question's is, kept on this device until the server
+// has it (`sending.ts`), offline too, and its id set on the topic or in the
+// row's photo cell, or a picture's point, which the sync engine carries to
+// every client.
 
-import type { Block, Field, Photo as Kept, Point, Topic } from "@almanac/types";
+import type { Block, Field, Point, Topic } from "@almanac/types";
 import { ImagePlus, X } from "lucide-react";
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import { holdsPhoto, MOST_PHOTOS, photosIn, pick } from "./photos";
-import { apiUrl, authHeaders, credentialsFor } from "./server";
+import { keepHere } from "./sending";
 import { Photo } from "./set";
 import { useIsGuest, useWorkspace } from "./workspace";
 
 /** The field a row's photo goes in when its collection has none yet. */
 const PHOTO_FIELD: Field = { name: "Foto", kind: "photo", unit: "", goal: null, options: [] };
 
-/** Keeps a photo on the server and gives its id. */
+/** Keeps a photo to send and gives its id. */
 function useKeep(): (file: File) => Promise<string> {
-  const { place, workspace } = useWorkspace();
-  return async (file) => {
-    const { url, ...upload } = await pick(file);
-    URL.revokeObjectURL(url);
-    const response = await fetch(apiUrl(`/api/w/${workspace.id}/photos`, place), {
-      method: "POST",
-      credentials: credentialsFor(place),
-      headers: { ...authHeaders(place), "Content-Type": "application/json" },
-      body: JSON.stringify(upload),
-    });
-    if (!response.ok) throw new Error("Almanac couldn't keep that photo. Try another.");
-    return ((await response.json()) as Kept).id;
-  };
+  const { workspace } = useWorkspace();
+  return async (file) => keepHere(workspace.id, await pick(file));
 }
 
 /**

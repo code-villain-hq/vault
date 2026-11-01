@@ -6,7 +6,7 @@
 
 import type { Field, SetUpTopicRequest, StartedTopic } from "@almanac/types";
 import { type SyncClient, uuidv7 } from "@code-villain/sync-client";
-import { api, RequestError } from "./api";
+import { api, triedLater } from "./api";
 import { answerHere, asksHere } from "./here";
 import type { Place } from "./server";
 import type { Schema } from "./sync";
@@ -174,7 +174,7 @@ export function followSetUps(sync: Sync, place: Place, workspaceId: string): () 
           // Claude Code on this Mac sets it up.
           if (set_up) void answerHere(place, set_up);
         } catch (error) {
-          if (error instanceof RequestError && !error.offline && error.status < 500) {
+          if (!triedLater(error)) {
             done(workspaceId, topic.id);
             continue;
           }

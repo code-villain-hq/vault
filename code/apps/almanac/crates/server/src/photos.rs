@@ -7,8 +7,9 @@
 //! question can ask about an earlier photo.
 //!
 //! A photo may also belong to no message: one dropped on a topic's cover or
-//! a row (`POST /api/w/{id}/photos`), or one a talk fetched from the web
-//! for a row or the cover ([`from_web`]).
+//! a row, or one a talk fetched from the web for a row or the cover
+//! ([`from_web`]). The app names one dropped itself and sends it when it
+//! can (`PUT /api/w/{id}/photos/{photo}`), so it's added offline too.
 
 use std::collections::HashMap;
 
@@ -36,6 +37,9 @@ const SAVE: &str = "INSERT INTO photos (id, workspace_id, message_id, position, 
      VALUES ($1, $2, $3, $4, $5, $6)";
 const SAVE_ALONE: &str = "INSERT INTO photos (id, workspace_id, position, media_type, data) \
      VALUES ($1, $2, 0, $3, $4)";
+const SAVE_NAMED: &str = "INSERT INTO photos (id, workspace_id, position, media_type, data) \
+     VALUES ($1, $2, 0, $3, $4) ON CONFLICT (id) DO NOTHING";
+const OURS: &str = "SELECT EXISTS (SELECT 1 FROM photos WHERE id = $1 AND workspace_id = $2)";
 const ONE: &str = "SELECT media_type, data FROM photos WHERE id = $1 AND workspace_id = $2";
 const OF_TALK: &str = "SELECT p.id, p.message_id, p.media_type, p.data FROM photos p \
      JOIN messages m ON m.id = p.message_id \
@@ -165,6 +169,43 @@ pub async fn upload(
         .execute(&state.pool)
         .await?;
     Ok(Json(checked.photo))
+}
+
+/// `PUT /api/w/{id}/photos/{photo_id}`: keeps a photo the app named
+/// itself, for a cover or a row it set already, offline too. Sent again,
+/// it's kept once; an id another workspace's photo has is refused.
+pub async fn keep(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, photo_id)): Path<(Uuid, Uuid)>,
+    Json(upload): Json<PhotoUpload>,
+) -> Result<Json<Photo>, AppError> {
+    member.require_not_guest()?;
+    let workspace_id = member.actor.workspace_id;
+    let [checked] = <[Upload; 1]>::try_from(check(std::slice::from_ref(&upload))?)
+        .map_err(|_| AppError::invalid("Add one photo."))?;
+    let kept = sqlx::query(SAVE_NAMED)
+        .bind(photo_id)
+        .bind(workspace_id)
+        .bind(&checked.media_type)
+        .bind(&checked.bytes)
+        .execute(&state.pool)
+        .await?
+        .rows_affected();
+    if kept == 0 {
+        let ours: bool = sqlx::query_scalar(OURS)
+            .bind(photo_id)
+            .bind(workspace_id)
+            .fetch_one(&state.pool)
+            .await?;
+        if !ours {
+            return Err(AppError::conflict("That photo's id is taken."));
+        }
+    }
+    Ok(Json(Photo {
+        id: photo_id,
+        ..checked.photo
+    }))
 }
 
 /// How long fetching a picture from the web may take.

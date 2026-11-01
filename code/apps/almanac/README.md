@@ -191,7 +191,9 @@ topics.
   Add below in a block's ⋯, or ⌘K adds a heading, a paragraph, a
   callout, a list, a checklist, a table or a picture, written where it
   will read. A click on a passage or a heading writes in it, and
-  "Fields…" in a collection's ⋯ names its fields and their kinds.
+  "Fields…" in a collection's ⋯ names its fields and their kinds. All
+  of it works offline, photos too: a cover, a row's photo or a
+  picture's shows at once and goes to the server when it's there.
 - **A talk changes the page when you ask**: "tidy this up", "put the
   shopping list first", "show my plants as a table". It rewords, moves and
   removes points and blocks, changes a collection's fields, or picks

@@ -89,9 +89,12 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   5 MB) and stay in `photos`, which doesn't sync: the message names them
   (id and size) and the app fetches each one (`GET
   /api/w/{id}/photos/{photo}`, `photos.rs`). They go with their message.
-- A page's other pictures are photos with no message (`POST
-  /api/w/{id}/photos`): a topic's `cover`, and a row's photo cell, dropped
-  on or picked in `pictures.tsx`. A talk keeps one from the web with
+- A page's other pictures are photos with no message: a topic's `cover`,
+  and a row's photo cell, dropped on or picked in `pictures.tsx`. The app
+  names each one, sets it at once and keeps it in IndexedDB until `PUT
+  /api/w/{id}/photos/{photo}` has it (`sending.ts`), offline too; sent
+  again, it's kept once. Another device asks a while for one not sent
+  yet (`usePhoto`). `POST /api/w/{id}/photos` stays for older apps. A talk keeps one from the web with
   `fetch_picture` (public https only, the page's og:image, 5 MB at most)
   and sets the cover with `set_cover`. Rows with a photo show it small on
   their line in every view.

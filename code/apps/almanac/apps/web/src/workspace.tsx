@@ -11,6 +11,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { followPhotos } from "./sending";
 import type { Place } from "./server";
 import { loadSession } from "./session";
 import { followSetUps } from "./starting";
@@ -71,11 +72,13 @@ export function WorkspaceProvider({
     setConnection({ sync, refusals, opened: `${place.id} ${userId} ${workspaceId}` });
     void sync.start();
     const stopSetUps = followSetUps(sync, place, workspaceId);
+    const stopPhotos = followPhotos(sync, place, workspaceId);
     const online = () => sync.retryNow();
     window.addEventListener("online", online);
     return () => {
       window.removeEventListener("online", online);
       stopSetUps();
+      stopPhotos();
       sync.stop();
     };
   }, [place, userId, workspaceId]);

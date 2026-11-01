@@ -52,7 +52,12 @@ pub fn router(state: AppState) -> Router {
             "/photos",
             post(photos::upload).layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
         )
-        .route("/photos/{photo_id}", get(photos::show))
+        .route(
+            "/photos/{photo_id}",
+            get(photos::show)
+                .put(photos::keep)
+                .layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
+        )
         .route("/messages/{message_id}/undo", post(topics::undo))
         .route(
             "/claude",
