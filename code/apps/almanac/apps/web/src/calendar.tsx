@@ -1,11 +1,12 @@
 // Calendar: what's due in the workspace this week, from every topic, and
 // what's still to do from before it. What's done stays on its day, ticked.
-// A day under the other, at the reading measure on any screen, a card a
-// reminder, and a bar of how much of it is done. A bell marks the
-// reminders that notify the Mac.
+// A day under the other at the reading measure, or a column a day, as the
+// switch at the top picks; this browser keeps the pick. A card a reminder,
+// and a bar of how much of a day is done. A bell marks the reminders that
+// notify the Mac.
 import type { Reminder, Topic } from "@almanac/types";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Columns3, type LucideIcon, Rows3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   addDays,
@@ -34,12 +35,44 @@ import {
 import { Empty, Section } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
+/** How the week is laid out: a day under the other, or a column a day. */
+type Layout = "list" | "week";
+
+const LAYOUTS: { id: Layout; name: string; icon: LucideIcon }[] = [
+  { id: "list", name: "List", icon: Rows3 },
+  { id: "week", name: "Week", icon: Columns3 },
+];
+
+/** Where this browser keeps the layout picked last. */
+const LAYOUT_KEY = "almanac.calendar";
+
+/** The layout picked last in this browser; a list until one is. */
+function useLayout(): [Layout, (layout: Layout) => void] {
+  const [layout, setLayout] = useState<Layout>(() => {
+    try {
+      return localStorage.getItem(LAYOUT_KEY) === "week" ? "week" : "list";
+    } catch {
+      return "list";
+    }
+  });
+  const pick = (next: Layout) => {
+    setLayout(next);
+    try {
+      localStorage.setItem(LAYOUT_KEY, next);
+    } catch {
+      // The pick still holds until the page reloads.
+    }
+  };
+  return [layout, pick];
+}
+
 export function CalendarPage() {
   const { workspace } = useWorkspace();
   const all = useRecords("Reminder");
   const topics = useTopics();
   const now = useToday();
   const [week, setWeek] = useState(() => weekOf(now));
+  const [layout, setLayout] = useLayout();
   const reminders = useMemo(
     () =>
       all
@@ -58,6 +91,23 @@ export function CalendarPage() {
   return (
     <>
       <PageHeader title="Calendar">
+        {/* On a phone a column a day can't fit, so there's only the list. */}
+        <fieldset aria-label="Show the week as" className="ui-segmented view-as mr-2 max-sm:hidden">
+          {LAYOUTS.map(({ id, name, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className="ui-segment"
+              aria-pressed={layout === id}
+              aria-label={name}
+              title={layout === id ? undefined : name}
+              onClick={() => setLayout(id)}
+            >
+              <Icon aria-hidden="true" className="size-3.5" />
+              {layout === id && name}
+            </button>
+          ))}
+        </fieldset>
         <button
           type="button"
           onClick={() => setWeek(weekOf(addDays(first, -7)))}
@@ -86,7 +136,7 @@ export function CalendarPage() {
         </button>
       </PageHeader>
       <PageBody>
-        <div className="flex max-w-measure flex-col gap-8">
+        <div className={`flex flex-col gap-8 ${layout === "list" ? "max-w-measure" : ""}`}>
           <div className="flex flex-col gap-1">
             <p className="text-title font-semibold">{weekWords(week)}</p>
             <p className="text-muted">What's due in {workspace.name}, from every topic.</p>
@@ -100,7 +150,13 @@ export function CalendarPage() {
             <>
               {overdue.length > 0 && (
                 <Section title="Still to do">
-                  <ul className="flex flex-col gap-1.5">
+                  <ul
+                    className={
+                      layout === "list"
+                        ? "flex flex-col gap-1.5"
+                        : "grid grid-cols-[repeat(auto-fill,minmax(min(14rem,100%),1fr))] gap-2"
+                    }
+                  >
                     {overdue.map((r) => (
                       <Row
                         key={r.id}
@@ -113,61 +169,70 @@ export function CalendarPage() {
                   </ul>
                 </Section>
               )}
-              <div className="flex flex-col gap-6">
-                {week.map((day) => {
-                  const due = reminders.filter((r) => occurrences(r, day, day).length > 0);
-                  const ticked = done.filter((r) => doneFor(r) === day);
-                  const all = due.length + ticked.length;
-                  return (
-                    <section
-                      key={day}
-                      aria-label={weekdayWords(day)}
-                      aria-current={day === now ? "date" : undefined}
-                      className="flex min-w-0 flex-col gap-2"
-                    >
-                      <h2 className="flex items-end gap-2 border-line border-b pb-2">
-                        <span
-                          className={`font-semibold text-2xl tabular-nums leading-none ${day === now ? "text-accent" : all ? "" : "text-faint"}`}
-                        >
-                          {dayOfMonth(day)}
-                        </span>
-                        <span
-                          className={`text-xs ${day === now ? "font-semibold text-fg" : "text-muted"}`}
-                        >
-                          {day === now ? "Today" : weekdayShort(day)}
-                        </span>
-                        {all > 0 && (
+              {/* A column a day, side by side when they fit; else one under the other. */}
+              <div className="@container">
+                <div
+                  className={
+                    layout === "list"
+                      ? "flex flex-col gap-6"
+                      : "grid gap-x-2.5 gap-y-6 @4xl:grid-cols-7"
+                  }
+                >
+                  {week.map((day) => {
+                    const due = reminders.filter((r) => occurrences(r, day, day).length > 0);
+                    const ticked = done.filter((r) => doneFor(r) === day);
+                    const all = due.length + ticked.length;
+                    return (
+                      <section
+                        key={day}
+                        aria-label={weekdayWords(day)}
+                        aria-current={day === now ? "date" : undefined}
+                        className="flex min-w-0 flex-col gap-2"
+                      >
+                        <h2 className="flex items-end gap-2 border-line border-b pb-2">
                           <span
-                            role="img"
-                            aria-label={`${ticked.length} of ${all} done`}
-                            className="mb-1 ml-auto h-1.5 w-10 overflow-hidden rounded-full bg-chip"
+                            className={`font-semibold text-2xl tabular-nums leading-none ${day === now ? "text-accent" : all ? "" : "text-faint"}`}
                           >
-                            <span
-                              className={`block h-full rounded-full ${ticked.length === all ? "bg-ok" : "bg-info"}`}
-                              style={{ width: `${(ticked.length / all) * 100}%` }}
-                            />
+                            {dayOfMonth(day)}
                           </span>
+                          <span
+                            className={`text-xs ${day === now ? "font-semibold text-fg" : "text-muted"}`}
+                          >
+                            {day === now ? "Today" : weekdayShort(day)}
+                          </span>
+                          {all > 0 && (
+                            <span
+                              role="img"
+                              aria-label={`${ticked.length} of ${all} done`}
+                              className="mb-1 ml-auto h-1.5 w-10 overflow-hidden rounded-full bg-chip"
+                            >
+                              <span
+                                className={`block h-full rounded-full ${ticked.length === all ? "bg-ok" : "bg-info"}`}
+                                style={{ width: `${(ticked.length / all) * 100}%` }}
+                              />
+                            </span>
+                          )}
+                        </h2>
+                        {all > 0 && (
+                          <ul className="flex flex-col gap-1.5">
+                            {ticked.map((r) => (
+                              <Row
+                                key={`${r.id}-done`}
+                                reminder={r}
+                                topic={byId.get(r.topic_id)}
+                                day={day}
+                                done
+                              />
+                            ))}
+                            {due.map((r) => (
+                              <Row key={r.id} reminder={r} topic={byId.get(r.topic_id)} day={day} />
+                            ))}
+                          </ul>
                         )}
-                      </h2>
-                      {all > 0 && (
-                        <ul className="flex flex-col gap-1.5">
-                          {ticked.map((r) => (
-                            <Row
-                              key={`${r.id}-done`}
-                              reminder={r}
-                              topic={byId.get(r.topic_id)}
-                              day={day}
-                              done
-                            />
-                          ))}
-                          {due.map((r) => (
-                            <Row key={r.id} reminder={r} topic={byId.get(r.topic_id)} day={day} />
-                          ))}
-                        </ul>
-                      )}
-                    </section>
-                  );
-                })}
+                      </section>
+                    );
+                  })}
+                </div>
               </div>
             </>
           )}
@@ -235,7 +300,7 @@ function Row({
           <NotifyBell reminder={reminder} />
         </span>
       </span>
-      {/* Over the card's corner on hover, so the card keeps its words. */}
+      {/* Over the card's corner on hover, so a narrow day keeps its words. */}
       <span className="absolute top-1 right-1 rounded-md bg-surface opacity-0 focus-within:opacity-100 group-hover/card:opacity-100 has-[[aria-expanded=true]]:opacity-100">
         <ReminderMenu sync={sync} reminder={reminder} day={day} />
       </span>
