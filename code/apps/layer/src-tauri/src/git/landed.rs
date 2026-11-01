@@ -32,11 +32,7 @@ pub fn have_commit(dir: &Path, sha: &str) -> bool {
 /// `landed` has every one, as it is or as the same change. None when it
 /// lacks the first, or there is none.
 pub fn landed_through(dir: &Path, from: &str, landed: &str) -> Option<String> {
-    marked(dir, from, "HEAD", landed)?
-        .into_iter()
-        .take_while(|(_, has)| *has)
-        .last()
-        .map(|(commit, _)| commit)
+    marked(dir, from, "HEAD", landed)?.into_iter().take_while(|(_, has)| *has).last().map(|(commit, _)| commit)
 }
 
 /// Whether `landed` has every commit on `tip`'s first-parent line after

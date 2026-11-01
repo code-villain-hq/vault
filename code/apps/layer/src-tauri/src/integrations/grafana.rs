@@ -3,7 +3,7 @@
 
 use chrono::{DateTime, Duration, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::http_client;
 use crate::error::{Error, Result};
@@ -284,9 +284,10 @@ pub fn parse_time(raw: &str, now: DateTime<Utc>) -> Result<i64> {
 /// datasource uid in a link to another Grafana would mean nothing here, or
 /// another datasource that happens to share it.
 pub fn parse_explore(link: &str, site: &str) -> Result<ExploreLink> {
-    let url = reqwest::Url::parse(link.trim())
-        .map_err(|_| Error::Other("the Explore link is not a web address".into()))?;
-    let origin = |u: &reqwest::Url| (u.scheme().to_string(), u.host_str().map(str::to_lowercase), u.port_or_known_default());
+    let url =
+        reqwest::Url::parse(link.trim()).map_err(|_| Error::Other("the Explore link is not a web address".into()))?;
+    let origin =
+        |u: &reqwest::Url| (u.scheme().to_string(), u.host_str().map(str::to_lowercase), u.port_or_known_default());
     let site_url = reqwest::Url::parse(site).map_err(|_| Error::Other(format!("{site} is not a web address")))?;
     if origin(&url) != origin(&site_url) {
         return Err(Error::Other(format!(
@@ -300,8 +301,8 @@ pub fn parse_explore(link: &str, site: &str) -> Result<ExploreLink> {
         .find(|(k, _)| k == "panes")
         .map(|(_, v)| v.into_owned())
         .ok_or_else(|| Error::Other("the link has no Explore query (no panes= in it)".into()))?;
-    let panes: Value = serde_json::from_str(&panes)
-        .map_err(|_| Error::Other("the link's Explore query is not readable".into()))?;
+    let panes: Value =
+        serde_json::from_str(&panes).map_err(|_| Error::Other("the link's Explore query is not readable".into()))?;
     // Split view has two panes; the first is the one the link was made from.
     let pane = panes
         .as_object()
@@ -398,7 +399,8 @@ mod tests {
             }
         });
         let page = lines(&body, 3);
-        let got: Vec<&str> = page["lines"].as_array().into_iter().flatten().filter_map(|l| l["line"].as_str()).collect();
+        let got: Vec<&str> =
+            page["lines"].as_array().into_iter().flatten().filter_map(|l| l["line"].as_str()).collect();
         assert_eq!(got, ["newest", "middle", "oldest"], "newest first, across streams");
         assert_eq!(page["lines"][1]["stream"], 1);
         assert_eq!(page["streams"][1]["level"], "info");

@@ -99,10 +99,8 @@ impl Registry {
         if name.chars().any(char::is_control) {
             return Err(Error::Other("A workspace's name is one line of text.".into()));
         }
-        let taken = self
-            .profiles
-            .iter()
-            .any(|p| Some(p.id.as_str()) != except && p.name.to_lowercase() == name.to_lowercase());
+        let taken =
+            self.profiles.iter().any(|p| Some(p.id.as_str()) != except && p.name.to_lowercase() == name.to_lowercase());
         if taken {
             return Err(Error::Other(format!("There is a workspace called {name} already.")));
         }
@@ -224,7 +222,8 @@ fn lock_path(folder: &Path) -> PathBuf {
 /// taken. `None` when another copy holds it.
 pub fn hold(folder: &Path) -> Result<Option<File>> {
     std::fs::create_dir_all(folder)?;
-    let mut file = std::fs::OpenOptions::new().create(true).truncate(false).read(true).write(true).open(lock_path(folder))?;
+    let mut file =
+        std::fs::OpenOptions::new().create(true).truncate(false).read(true).write(true).open(lock_path(folder))?;
     // Another copy looking to see whether this one is open holds it for a
     // moment too. A few tries, so that is not mistaken for a copy.
     for _ in 0..5 {
@@ -350,7 +349,8 @@ pub fn start(identifier: &str, args: &[String]) -> Option<Vec<String>> {
                     }
                     Ok(())
                 });
-                let profile = Profile { id: id.clone(), base, folder, identifier: identifier.into(), _lock: Some(lock) };
+                let profile =
+                    Profile { id: id.clone(), base, folder, identifier: identifier.into(), _lock: Some(lock) };
                 let _ = CURRENT.set(profile);
                 return Some(wanted.iter().skip(i + 1).cloned().collect());
             }
@@ -360,7 +360,8 @@ pub fn start(identifier: &str, args: &[String]) -> Option<Vec<String>> {
     }
     // Everything wanted is open already: bring the first of it forward, or,
     // when nothing was wanted, the first profile open.
-    let open = wanted.first().cloned().or_else(|| registry.profiles.iter().map(|p| p.id.clone()).find(|id| is_open(id)));
+    let open =
+        wanted.first().cloned().or_else(|| registry.profiles.iter().map(|p| p.id.clone()).find(|id| is_open(id)));
     if let Some(pid) = open.and_then(|id| holder(&folder_of(&base, &id))) {
         bring_forward(pid);
     }
@@ -452,7 +453,8 @@ pub fn show_identity(app: &tauri::AppHandle) {
     std::thread::spawn(move || {
         let profile = current();
         let registry = read(&profile.base);
-        let entry = registry.get(&profile.id).cloned().unwrap_or_else(|| Entry::new(profile.id.clone(), profile.id.clone()));
+        let entry =
+            registry.get(&profile.id).cloned().unwrap_or_else(|| Entry::new(profile.id.clone(), profile.id.clone()));
         let identity = Identity { name: entry.name.clone(), many: registry.profiles.len() > 1, colour: entry.colour() };
         if IDENTITY.lock().replace(identity.clone()).as_ref() == Some(&identity) {
             return;
@@ -497,10 +499,7 @@ mod tests {
 
         assert_eq!(folder_of(&base, "personal"), base.join("profiles/personal"));
         assert_eq!(service_of("app.test", "dev"), "app.test.profile.dev", "never the dev build's item");
-        assert_eq!(
-            root_of("personal").file_name().unwrap().to_string_lossy(),
-            ".villain-worktrees-personal"
-        );
+        assert_eq!(root_of("personal").file_name().unwrap().to_string_lossy(), ".villain-worktrees-personal");
     }
 
     #[test]

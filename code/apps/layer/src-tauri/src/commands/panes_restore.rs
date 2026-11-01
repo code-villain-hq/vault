@@ -12,7 +12,9 @@ use crate::config::SavedPane;
 use crate::error::{Error, Result};
 use crate::pty::{PaneInfo, PaneKind};
 
-use super::panes::{open_chat, open_shell, resolve_scope, resumable_for, resume_dir, start_agent, Resume, CHAT_TASK_ID};
+use super::panes::{
+    open_chat, open_shell, resolve_scope, resumable_for, resume_dir, start_agent, Resume, CHAT_TASK_ID,
+};
 use super::AppState;
 
 /// Remember a pane so it can be put back next launch.
@@ -88,7 +90,9 @@ fn open_agents(state: &AppState) -> HashSet<(String, String)> {
 /// transcript, named the conversation already open below it.
 fn continued_by_an_open_agent(p: &SavedPane, open: &HashSet<(String, String)>) -> bool {
     match (&p.agent_id, &p.cwd) {
-        (Some(agent), Some(cwd)) if p.waiting && !p.acp && p.kind != "shell" => open.contains(&(agent.clone(), cwd.clone())),
+        (Some(agent), Some(cwd)) if p.waiting && !p.acp && p.kind != "shell" => {
+            open.contains(&(agent.clone(), cwd.clone()))
+        }
         _ => false,
     }
 }
@@ -152,10 +156,8 @@ const _: () = assert!(RESTORE_LIMIT <= SAVED_PANE_LIMIT);
 /// newest, one of them a chat with a day's work in it.
 pub(crate) fn panes_to_restore(saved: Vec<SavedPane>, limit: usize) -> Vec<SavedPane> {
     let mut seen = HashSet::new();
-    let (agents, shells): (Vec<SavedPane>, Vec<SavedPane>) = saved
-        .into_iter()
-        .filter(|p| !p.waiting && seen.insert(p.id.clone()))
-        .partition(|p| p.kind != "shell");
+    let (agents, shells): (Vec<SavedPane>, Vec<SavedPane>) =
+        saved.into_iter().filter(|p| !p.waiting && seen.insert(p.id.clone())).partition(|p| p.kind != "shell");
     agents.into_iter().chain(shells).take(limit).collect()
 }
 
@@ -304,7 +306,18 @@ fn put_back(app: &AppHandle, state: &AppState, pane: &SavedPane, resumed: &mut H
                 },
             };
             let resume = Resume::Restart { cwd, session: pane.session.clone() };
-            start_agent(app, state, pane.task_id.clone(), agent_id, pane.checkout_id.clone(), None, resume, None, None, true)
+            start_agent(
+                app,
+                state,
+                pane.task_id.clone(),
+                agent_id,
+                pane.checkout_id.clone(),
+                None,
+                resume,
+                None,
+                None,
+                true,
+            )
         }
         "agent" => {
             let Some(agent_id) = pane.agent_id.clone() else {
@@ -329,7 +342,18 @@ fn put_back(app: &AppHandle, state: &AppState, pane: &SavedPane, resumed: &mut H
                 None => false,
             };
 
-            start_agent(app, state, pane.task_id.clone(), agent_id, pane.checkout_id.clone(), None, Resume::newest_if(resume), None, None, false)
+            start_agent(
+                app,
+                state,
+                pane.task_id.clone(),
+                agent_id,
+                pane.checkout_id.clone(),
+                None,
+                Resume::newest_if(resume),
+                None,
+                None,
+                false,
+            )
         }
         _ => open_shell(app, state, pane.task_id.clone(), pane.checkout_id.clone(), None, None),
     };
@@ -537,7 +561,8 @@ mod tests {
     #[test]
     fn a_waiting_agent_goes_once_an_open_agent_continues_its_folder() {
         let open: HashSet<(String, String)> = [("claude".to_string(), "/w/a".to_string())].into();
-        let waiting = |id: &str, cwd: &str| SavedPane { waiting: true, cwd: Some(cwd.into()), ..pane(id, "t", "agent") };
+        let waiting =
+            |id: &str, cwd: &str| SavedPane { waiting: true, cwd: Some(cwd.into()), ..pane(id, "t", "agent") };
 
         assert!(continued_by_an_open_agent(&waiting("w", "/w/a"), &open));
         assert!(!continued_by_an_open_agent(&waiting("elsewhere", "/w/b"), &open), "another folder still waits");
@@ -552,10 +577,14 @@ mod tests {
     #[test]
     fn a_waiting_chat_is_named_by_its_last_title() {
         let transcript = concat!(
-            r#"{"type":"user","message":{"content":"look at the repos"}}"#, "\n",
-            r#"{"type":"ai-title","aiTitle":"Repo overview"}"#, "\n",
-            r#"{"type":"assistant","message":{"content":"…"}}"#, "\n",
-            r#"{"type":"ai-title","aiTitle":"Backend architecture and domain structure review"}"#, "\n",
+            r#"{"type":"user","message":{"content":"look at the repos"}}"#,
+            "\n",
+            r#"{"type":"ai-title","aiTitle":"Repo overview"}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":"…"}}"#,
+            "\n",
+            r#"{"type":"ai-title","aiTitle":"Backend architecture and domain structure review"}"#,
+            "\n",
         );
         assert_eq!(title_in(transcript).as_deref(), Some("Backend architecture and domain structure review"));
         assert_eq!(title_in(r#"{"type":"user"}"#), None);

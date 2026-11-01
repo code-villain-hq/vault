@@ -45,8 +45,7 @@ impl GitHub {
         let body = v.get("body").and_then(Value::as_str).unwrap_or_default();
         let next = with_siblings(body, others, ticket);
         if next != body {
-            self.json(self.req(reqwest::Method::PATCH, &path).json(&json!({ "body": next })))
-                .await?;
+            self.json(self.req(reqwest::Method::PATCH, &path).json(&json!({ "body": next }))).await?;
         }
         Ok(())
     }

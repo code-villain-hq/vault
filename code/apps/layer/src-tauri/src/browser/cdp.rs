@@ -53,62 +53,58 @@ impl Cdp {
         let pending: Pending = Arc::default();
         let closed = Arc::new(AtomicBool::new(false));
 
-        std::thread::Builder::new()
-            .name("browser-write".into())
-            .spawn(move || {
-                for message in queue {
-                    if writer.write_all(&message).and_then(|_| writer.flush()).is_err() {
-                        break;
-                    }
+        std::thread::Builder::new().name("browser-write".into()).spawn(move || {
+            for message in queue {
+                if writer.write_all(&message).and_then(|_| writer.flush()).is_err() {
+                    break;
                 }
-            })?;
+            }
+        })?;
 
         let (waiting, gone) = (pending.clone(), closed.clone());
-        std::thread::Builder::new()
-            .name("browser-read".into())
-            .spawn(move || {
-                let mut reader = BufReader::with_capacity(256 * 1024, reader);
-                let mut buf = Vec::new();
-                loop {
-                    buf.clear();
-                    match reader.read_until(0, &mut buf) {
-                        Ok(0) | Err(_) => break,
-                        Ok(_) => {}
-                    }
-                    if buf.last() == Some(&0) {
-                        buf.pop();
-                    }
-                    let Ok(mut message) = serde_json::from_slice::<Value>(&buf) else {
-                        continue;
-                    };
-                    match message.get("id").and_then(Value::as_u64) {
-                        Some(id) => {
-                            if let Some(tx) = waiting.lock().remove(&id) {
-                                let _ = tx.send(answer(message));
-                            }
-                        }
-                        None => {
-                            let Some(method) = message.get("method").and_then(Value::as_str).map(str::to_string) else {
-                                continue;
-                            };
-                            // Taken, not cloned: a screencast frame's params are
-                            // its whole base64 JPEG, up to 30 times a second.
-                            let params = message.as_object_mut().and_then(|o| o.remove("params"));
-                            on_event(Event {
-                                method,
-                                params: params.unwrap_or(Value::Null),
-                                session: message.get("sessionId").and_then(Value::as_str).map(str::to_string),
-                            });
+        std::thread::Builder::new().name("browser-read".into()).spawn(move || {
+            let mut reader = BufReader::with_capacity(256 * 1024, reader);
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                match reader.read_until(0, &mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {}
+                }
+                if buf.last() == Some(&0) {
+                    buf.pop();
+                }
+                let Ok(mut message) = serde_json::from_slice::<Value>(&buf) else {
+                    continue;
+                };
+                match message.get("id").and_then(Value::as_u64) {
+                    Some(id) => {
+                        if let Some(tx) = waiting.lock().remove(&id) {
+                            let _ = tx.send(answer(message));
                         }
                     }
+                    None => {
+                        let Some(method) = message.get("method").and_then(Value::as_str).map(str::to_string) else {
+                            continue;
+                        };
+                        // Taken, not cloned: a screencast frame's params are
+                        // its whole base64 JPEG, up to 30 times a second.
+                        let params = message.as_object_mut().and_then(|o| o.remove("params"));
+                        on_event(Event {
+                            method,
+                            params: params.unwrap_or(Value::Null),
+                            session: message.get("sessionId").and_then(Value::as_str).map(str::to_string),
+                        });
+                    }
                 }
-                gone.store(true, Ordering::Release);
-                // Whoever is still waiting hears now, not after the timeout.
-                for (_, tx) in waiting.lock().drain() {
-                    let _ = tx.send(Err(Error::Other("the browser closed".into())));
-                }
-                on_close();
-            })?;
+            }
+            gone.store(true, Ordering::Release);
+            // Whoever is still waiting hears now, not after the timeout.
+            for (_, tx) in waiting.lock().drain() {
+                let _ = tx.send(Err(Error::Other("the browser closed".into())));
+            }
+            on_close();
+        })?;
 
         Ok(Arc::new(Self { out, pending, next: AtomicU64::new(1), closed }))
     }
@@ -178,7 +174,9 @@ mod tests {
         let (to_chrome_r, to_chrome_w) = std::io::pipe().unwrap();
         let (from_chrome_r, mut from_chrome_w) = std::io::pipe().unwrap();
         std::thread::spawn(move || {
-            from_chrome_w.write_all(b"{\"method\":\"Page.loadEventFired\",\"params\":{},\"sessionId\":\"S\"}\0").unwrap();
+            from_chrome_w
+                .write_all(b"{\"method\":\"Page.loadEventFired\",\"params\":{},\"sessionId\":\"S\"}\0")
+                .unwrap();
             let mut r = BufReader::new(to_chrome_r);
             let mut buf = Vec::new();
             while r.read_until(0, &mut buf).unwrap_or(0) > 0 {
@@ -203,8 +201,12 @@ mod tests {
         let cdp = Cdp::start(
             from_chrome_r,
             to_chrome_w,
-            move |e| { let _ = events_tx.send(e); },
-            move || { let _ = closed_tx.send(()); },
+            move |e| {
+                let _ = events_tx.send(e);
+            },
+            move || {
+                let _ = closed_tx.send(());
+            },
         )
         .unwrap();
         (cdp, events, closed)
@@ -213,10 +215,8 @@ mod tests {
     #[tokio::test]
     async fn each_answer_reaches_the_call_that_asked_and_events_go_to_the_handler() {
         let (cdp, events, _) = echo();
-        let (a, b) = tokio::join!(
-            cdp.call("Page.enable", json!({}), Some("S")),
-            cdp.call("Runtime.enable", json!({}), None),
-        );
+        let (a, b) =
+            tokio::join!(cdp.call("Page.enable", json!({}), Some("S")), cdp.call("Runtime.enable", json!({}), None),);
         assert_eq!(a.unwrap()["method"], "Page.enable");
         assert_eq!(b.unwrap()["method"], "Runtime.enable");
         let e = events.recv_timeout(Duration::from_secs(5)).unwrap();

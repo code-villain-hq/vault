@@ -84,9 +84,7 @@ where
 
 /// `blocking` for work that needs no `AppState`: the same pool, for the same
 /// reason.
-pub(crate) async fn off_runtime<T: Send + 'static>(
-    f: impl FnOnce() -> T + Send + 'static,
-) -> crate::error::Result<T> {
+pub(crate) async fn off_runtime<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> crate::error::Result<T> {
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| crate::error::Error::Other(format!("background work failed: {e}")))
@@ -118,91 +116,91 @@ pub fn notify(app: &tauri::AppHandle, kind: &str, text: impl Into<String>) {
     crate::messages::changed(app);
 }
 
-mod projects;
-mod repos;
-mod elsewhere;
+mod acp_panes;
+mod browser;
 mod cleanup;
 mod cleanup_folders;
 mod cleanup_remote;
-mod tasks;
-mod worktree_status;
+mod diff;
+mod elsewhere;
+mod epic_tools;
+mod epics;
+mod finish_tool;
+mod github;
+mod grafana;
+mod jira;
+mod landed;
+mod loops;
+mod messages;
+mod notes;
+mod open_prs;
+mod outgoing;
 mod panes;
 mod panes_restore;
-mod acp_panes;
-mod diff;
-mod jira;
-mod github;
-mod slack;
-mod slack_bot;
-mod grafana;
+mod phone;
+mod pr_images;
+mod pr_task;
+mod profiles;
+mod projects;
+mod repos;
+mod runs;
 mod s3_logs;
 mod settings;
-mod ticket_flow;
-mod messages;
-mod pr_task;
-mod open_prs;
-mod pr_images;
-mod finish_tool;
-mod outgoing;
-mod landed;
-mod task_context;
-mod tickets;
+mod slack;
+mod slack_bot;
 mod spec;
 mod spec_draft;
 mod spec_outside;
 mod spec_prompts;
 mod spec_view;
 mod spec_work;
-mod epics;
-mod epic_tools;
+mod task_context;
+mod tasks;
+mod ticket_flow;
+mod tickets;
 mod tracker_tools;
-mod notes;
-mod phone;
-mod browser;
-mod loops;
-mod runs;
-mod profiles;
 mod workspace;
+mod worktree_status;
 
-pub use projects::*;
-pub use repos::*;
-pub use elsewhere::*;
+pub use acp_panes::*;
+pub use browser::*;
 pub use cleanup::*;
-pub use tasks::*;
+pub use diff::*;
+pub use elsewhere::*;
+pub use epic_tools::*;
+pub use epics::*;
+pub use finish_tool::*;
+pub use github::*;
+pub use grafana::*;
+pub use jira::*;
+pub(crate) use landed::{advance, branch_landed, landed};
+pub use loops::*;
+pub use messages::*;
+pub use notes::*;
+pub use open_prs::*;
+pub use outgoing::*;
 pub use panes::*;
 pub use panes_restore::*;
-pub use acp_panes::*;
-pub use diff::*;
-pub use jira::*;
-pub use github::*;
-pub use slack::*;
-pub use slack_bot::*;
-pub use grafana::*;
+pub use phone::*;
+pub use pr_images::*;
+pub use pr_task::*;
+pub use profiles::*;
+pub use projects::*;
+pub use repos::*;
+pub use runs::*;
 pub use s3_logs::*;
 pub use settings::*;
-pub use ticket_flow::*;
-pub use tickets::*;
-pub use messages::*;
-pub use pr_task::*;
-pub use open_prs::*;
-pub use pr_images::*;
-pub use finish_tool::*;
-pub use outgoing::*;
-pub(crate) use landed::{advance, branch_landed, landed};
-pub use notes::*;
+pub use slack::*;
+pub use slack_bot::*;
 pub use spec::*;
 pub use spec_draft::*;
 pub use spec_outside::*;
 pub use spec_view::*;
 pub use spec_work::*;
-pub use epics::*;
-pub use epic_tools::*;
+pub use tasks::*;
+pub use ticket_flow::*;
+pub use tickets::*;
 pub use tracker_tools::*;
-pub use phone::*;
-pub use browser::*;
-pub use loops::*;
-pub use runs::*;
-pub use profiles::*;
 pub use workspace::*;
 
 #[cfg(test)]
@@ -289,15 +287,9 @@ mod tests {
         let name = "ACME-1234 Fix the thing";
 
         assert_eq!(derive_branch(None, Some("ACME-1234"), None, name), "ACME-1234");
-        assert_eq!(
-            derive_branch(None, Some("ACME-1234"), Some("some feature"), name),
-            "ACME-1234-some-feature",
-        );
+        assert_eq!(derive_branch(None, Some("ACME-1234"), Some("some feature"), name), "ACME-1234-some-feature",);
         // The UI sends the suffix exactly as typed; slugifying happens here.
-        assert_eq!(
-            derive_branch(None, Some("ACME-21215"), Some("Locale Switch!!"), name),
-            "ACME-21215-locale-switch",
-        );
+        assert_eq!(derive_branch(None, Some("ACME-21215"), Some("Locale Switch!!"), name), "ACME-21215-locale-switch",);
         // A blank or punctuation-only suffix is the same as none.
         assert_eq!(derive_branch(None, Some("ACME-1234"), Some("   "), name), "ACME-1234");
         assert_eq!(derive_branch(None, Some("ACME-1234"), Some("--"), name), "ACME-1234");
@@ -305,15 +297,9 @@ mod tests {
 
     #[test]
     fn explicit_branch_wins_and_ticketless_tasks_use_the_name() {
-        assert_eq!(
-            derive_branch(Some("hotfix/prod"), Some("ACME-1"), Some("ignored"), "whatever"),
-            "hotfix/prod",
-        );
+        assert_eq!(derive_branch(Some("hotfix/prod"), Some("ACME-1"), Some("ignored"), "whatever"), "hotfix/prod",);
         assert_eq!(derive_branch(Some("  "), Some("ACME-1"), None, "n"), "ACME-1");
-        assert_eq!(
-            derive_branch(None, None, None, "fix checkout rounding"),
-            "villain/fix-checkout-rounding",
-        );
+        assert_eq!(derive_branch(None, None, None, "fix checkout rounding"), "villain/fix-checkout-rounding",);
         // Nothing to slug still gives a branch git will make.
         let b = derive_branch(None, None, None, "Корзина");
         assert!(b.starts_with("villain/task-") && b.len() > "villain/task-".len(), "{b}");
@@ -421,11 +407,8 @@ mod tests {
         // Three shells in the same worktree are three shells someone opened on
         // purpose. Treating them as duplicates of each other silently threw two
         // of them away at every launch.
-        let shells = vec![
-            saved("1", "t", "shell", "/w"),
-            saved("2", "t", "shell", "/w"),
-            saved("3", "t", "shell", "/w"),
-        ];
+        let shells =
+            vec![saved("1", "t", "shell", "/w"), saved("2", "t", "shell", "/w"), saved("3", "t", "shell", "/w")];
         assert_eq!(panes_to_restore(shells, RESTORE_LIMIT).len(), 3);
     }
 
@@ -433,19 +416,15 @@ mod tests {
     fn restoring_is_capped_however_the_config_got_that_way() {
         // The ceiling is the thing that keeps a bad config from being able to
         // take the machine down, so it holds even when every entry is distinct.
-        let many: Vec<SavedPane> = (0..500)
-            .map(|i| saved(&i.to_string(), &format!("task{i}"), "shell", &format!("/w{i}")))
-            .collect();
+        let many: Vec<SavedPane> =
+            (0..500).map(|i| saved(&i.to_string(), &format!("task{i}"), "shell", &format!("/w{i}"))).collect();
         assert_eq!(panes_to_restore(many, RESTORE_LIMIT).len(), RESTORE_LIMIT);
     }
 
     #[test]
     fn panes_in_different_places_are_all_kept() {
-        let distinct = vec![
-            saved("1", "t", "agent", "/a"),
-            saved("2", "t", "agent", "/b"),
-            saved("3", "chat", "agent", "/c"),
-        ];
+        let distinct =
+            vec![saved("1", "t", "agent", "/a"), saved("2", "t", "agent", "/b"), saved("3", "chat", "agent", "/c")];
         assert_eq!(panes_to_restore(distinct, RESTORE_LIMIT).len(), 3);
     }
 
@@ -520,9 +499,7 @@ mod tests {
     fn a_dropped_pane_is_only_ever_a_repeat_or_over_the_cap() {
         // Nothing else may be dropped: the message the user sees says
         // "duplicates dropped", and it has to be true.
-        let many: Vec<SavedPane> = (0..RESTORE_LIMIT)
-            .map(|i| saved(&i.to_string(), "t", "shell", "/same"))
-            .collect();
+        let many: Vec<SavedPane> = (0..RESTORE_LIMIT).map(|i| saved(&i.to_string(), "t", "shell", "/same")).collect();
         assert_eq!(panes_to_restore(many, RESTORE_LIMIT).len(), RESTORE_LIMIT);
     }
 
@@ -555,10 +532,7 @@ mod tests {
         let unpushed = git(&wt, &["rev-parse", "HEAD"]).trim().to_string();
         std::fs::write(wt.join("a.txt"), "more work\n").unwrap();
 
-        let mut cfg = AppConfig {
-            worktree_root: Some(tasks_root.to_string_lossy().to_string()),
-            ..Default::default()
-        };
+        let mut cfg = AppConfig { worktree_root: Some(tasks_root.to_string_lossy().to_string()), ..Default::default() };
         let mut p = project("api", None);
         p.path = clone.to_string_lossy().to_string();
         cfg.projects.push(p);

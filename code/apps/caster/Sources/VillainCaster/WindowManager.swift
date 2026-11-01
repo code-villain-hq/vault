@@ -49,7 +49,8 @@ enum WindowManager {
         guard ensureAccessibility() else { return false }
         guard let window = focusedWindow(), let axFrame = frame(of: window) else { return false }
         guard let currentScreen = screenContaining(axFrame: axFrame),
-              let currentIndex = screens.firstIndex(of: currentScreen) else { return false }
+            let currentIndex = screens.firstIndex(of: currentScreen)
+        else { return false }
 
         // Usable area below the menu bar, so a maximized window stays fully
         // on-screen when the target display is shorter.
@@ -60,9 +61,11 @@ enum WindowManager {
             width: min(axFrame.width, targetAX.width),
             height: min(axFrame.height, targetAX.height)
         )
-        let relX = sourceAX.width > axFrame.width
+        let relX =
+            sourceAX.width > axFrame.width
             ? (axFrame.minX - sourceAX.minX) / (sourceAX.width - axFrame.width) : 0
-        let relY = sourceAX.height > axFrame.height
+        let relY =
+            sourceAX.height > axFrame.height
             ? (axFrame.minY - sourceAX.minY) / (sourceAX.height - axFrame.height) : 0
         let origin = CGPoint(
             x: targetAX.minX + relX.clamped01 * (targetAX.width - size.width),
@@ -124,14 +127,15 @@ enum WindowManager {
         let axApp = AXUIElementCreateApplication(pid)
         var window: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &window) == .success,
-           window != nil {
+            window != nil
+        {
             return (window as! AXUIElement)
         }
         // Some apps (terminals) report no focused window — use the front window.
         var windows: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windows) == .success,
-              let list = windows as? [AXUIElement],
-              let first = list.first
+            let list = windows as? [AXUIElement],
+            let first = list.first
         else { return nil }
         return first
     }
@@ -140,7 +144,7 @@ enum WindowManager {
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionRef) == .success,
-              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success
+            AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success
         else { return nil }
         var position = CGPoint.zero
         var size = CGSize.zero
@@ -175,15 +179,16 @@ enum WindowManager {
     }
 
     private static func cocoaToAX(_ rect: CGRect) -> CGRect {
-        CGRect(x: rect.minX, y: primaryHeight - rect.minY - rect.height,
-               width: rect.width, height: rect.height)
+        CGRect(
+            x: rect.minX, y: primaryHeight - rect.minY - rect.height,
+            width: rect.width, height: rect.height)
     }
 }
 
-private extension CGRect {
-    var area: CGFloat { isNull ? 0 : width * height }
+extension CGRect {
+    fileprivate var area: CGFloat { isNull ? 0 : width * height }
 }
 
-private extension CGFloat {
-    var clamped01: CGFloat { Swift.min(Swift.max(self, 0), 1) }
+extension CGFloat {
+    fileprivate var clamped01: CGFloat { Swift.min(Swift.max(self, 0), 1) }
 }

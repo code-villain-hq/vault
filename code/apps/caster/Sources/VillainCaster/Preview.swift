@@ -49,7 +49,8 @@ enum Preview {
 
     /// The icon at 8x on a dark bar, then a light one.
     private static func menuBar(to url: URL) throws {
-        let scale: CGFloat = 8, side: CGFloat = 22 * scale
+        let scale: CGFloat = 8
+        let side: CGFloat = 22 * scale
         let bars: [(NSAppearance.Name, String)] = [(.darkAqua, "#1E1E1E"), (.aqua, "#ECECEC")]
         let image = NSImage(size: NSSize(width: side * 2, height: side), flipped: false) { _ in
             for (index, bar) in bars.enumerated() {
@@ -62,7 +63,7 @@ enum Preview {
             return true
         }
         guard let tiff = image.tiffRepresentation,
-              let data = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+            let data = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
         else { throw CocoaError(.fileWriteUnknown) }
         try data.write(to: url)
     }

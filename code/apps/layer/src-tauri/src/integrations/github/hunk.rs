@@ -69,9 +69,7 @@ pub fn excerpt(hunk: &str, start: Option<u64>, end: u64, left: bool) -> Vec<Code
 /// Where `@@ -12,7 +12,9 @@` starts on each side.
 fn header(line: &str) -> Option<(u64, u64)> {
     let mut parts = line.strip_prefix("@@ ")?.split(' ');
-    let side = |p: Option<&str>, sign: char| -> Option<u64> {
-        p?.strip_prefix(sign)?.split(',').next()?.parse().ok()
-    };
+    let side = |p: Option<&str>, sign: char| -> Option<u64> { p?.strip_prefix(sign)?.split(',').next()?.parse().ok() };
     Some((side(parts.next(), '-')?, side(parts.next(), '+')?))
 }
 

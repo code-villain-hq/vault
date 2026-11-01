@@ -311,7 +311,12 @@ pub async fn set_browser_sites(app: AppHandle, sites: Vec<String>) -> Result<Vec
 /// Save a sign-in from Settings → Browser (BRW-18). Off the command thread:
 /// the keychain can stop and ask.
 #[tauri::command]
-pub async fn add_browser_sign_in(app: AppHandle, site: String, username: String, password: String) -> Result<SavedSignIn> {
+pub async fn add_browser_sign_in(
+    app: AppHandle,
+    site: String,
+    username: String,
+    password: String,
+) -> Result<SavedSignIn> {
     super::blocking(app, move |state| sign_in::save(state, &site, &username, &password)).await
 }
 
@@ -343,7 +348,12 @@ pub async fn browser_sign_in_form(app: AppHandle, task_id: String) -> Result<Sig
 /// Save the sign-in typed into the page (BRW-20): the password read from the
 /// page's password field, straight to the keychain.
 #[tauri::command]
-pub async fn browser_save_sign_in(app: AppHandle, task_id: String, site: String, username: String) -> Result<SavedSignIn> {
+pub async fn browser_save_sign_in(
+    app: AppHandle,
+    task_id: String,
+    site: String,
+    username: String,
+) -> Result<SavedSignIn> {
     let state = app.state::<AppState>();
     let page = state.browser.page(&app, &task_id).await?;
     let (_, password) = sign_in::read_form(&page).await?;

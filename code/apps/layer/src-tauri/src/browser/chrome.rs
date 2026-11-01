@@ -27,9 +27,8 @@ const APPS: &[(&str, &str)] = &[
 pub fn find() -> Option<PathBuf> {
     #[allow(deprecated)]
     let home = std::env::home_dir();
-    let roots: Vec<PathBuf> = std::iter::once(PathBuf::from("/Applications"))
-        .chain(home.map(|h| h.join("Applications")))
-        .collect();
+    let roots: Vec<PathBuf> =
+        std::iter::once(PathBuf::from("/Applications")).chain(home.map(|h| h.join("Applications"))).collect();
     APPS.iter()
         .flat_map(|(app, exe)| roots.iter().map(move |r| r.join(app).join("Contents/MacOS").join(exe)))
         .find(|p| p.is_file())
@@ -104,9 +103,7 @@ pub fn launch(binary: &Path, profile: &Path) -> Result<(Process, PipeWriter, Pip
         }
     }
 
-    let child = cmd
-        .spawn()
-        .map_err(|e| Error::Other(format!("could not start {}: {e}", binary.display())))?;
+    let child = cmd.spawn().map_err(|e| Error::Other(format!("could not start {}: {e}", binary.display())))?;
     // The child's ends, closed here: while the app held a copy of Chrome's
     // writing end, a Chrome that died never read as gone.
     drop(commands_in);

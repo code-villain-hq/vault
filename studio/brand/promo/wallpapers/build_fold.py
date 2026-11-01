@@ -3,6 +3,7 @@
 Run from this folder: python3 build_fold.py
 The poison-only wallpaper is the source; its original pixels are preserved.
 """
+
 import base64
 import pathlib
 import re
@@ -39,10 +40,19 @@ source.write_text(f'''<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" he
 <use href="#letters" transform="{place}" fill="#EBEBEB"/>
 </svg>''')
 with tempfile.TemporaryDirectory() as profile:
-    subprocess.run([
-        CHROME, "--headless=new", f"--user-data-dir={profile}",
-        "--hide-scrollbars", "--force-device-scale-factor=1",
-        f"--window-size={WIDTH},{HEIGHT}", "--virtual-time-budget=10000",
-        f"--screenshot={output}", source.as_uri(),
-    ], check=True, capture_output=True)
+    subprocess.run(
+        [
+            CHROME,
+            "--headless=new",
+            f"--user-data-dir={profile}",
+            "--hide-scrollbars",
+            "--force-device-scale-factor=1",
+            f"--window-size={WIDTH},{HEIGHT}",
+            "--virtual-time-budget=10000",
+            f"--screenshot={output}",
+            source.as_uri(),
+        ],
+        check=True,
+        capture_output=True,
+    )
 print(f"{stem}: {WIDTH}×{HEIGHT}")

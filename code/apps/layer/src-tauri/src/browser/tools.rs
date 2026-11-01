@@ -238,7 +238,9 @@ pub(super) fn text(t: impl Into<String>) -> Vec<Value> {
 /// `CHAT_TASK_ID`.
 fn task_of(state: &AppState, caller: Option<&str>) -> Result<(String, String, String)> {
     let pane = caller.ok_or_else(|| {
-        Error::Other("only an agent the app started has a browser tab: it is found by the pane the agent runs in".into())
+        Error::Other(
+            "only an agent the app started has a browser tab: it is found by the pane the agent runs in".into(),
+        )
     })?;
     let info = state
         .ptys
@@ -386,8 +388,13 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
     // switched to while this one waits.
     if !matches!(
         name,
-        "browser_dialog" | "browser_snapshot" | "browser_console" | "browser_tabs" | "browser_new_tab"
-            | "browser_switch_tab" | "browser_close_tab"
+        "browser_dialog"
+            | "browser_snapshot"
+            | "browser_console"
+            | "browser_tabs"
+            | "browser_new_tab"
+            | "browser_switch_tab"
+            | "browser_close_tab"
     ) {
         if let Some(d) = browser.dialog(&task) {
             return Err(Error::Other(format!("Nothing was done. {}", d.describe())));
@@ -419,11 +426,11 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
         "browser_snapshot" => {
             browser.record(app, &task, "Read the page", None);
             report(app, &state, &task, "").await.map(|mut c| {
-            if let Some(t) = c[0].get("text").and_then(Value::as_str) {
-                c[0]["text"] = json!(t.trim_start());
-            }
-            c
-        })
+                if let Some(t) = c[0].get("text").and_then(Value::as_str) {
+                    c[0]["text"] = json!(t.trim_start());
+                }
+                c
+            })
         }
 
         "browser_click" => {
@@ -432,9 +439,17 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
             let at = page.center(n).await?;
             let right = args.get("right").and_then(Value::as_bool).unwrap_or(false);
             let double = args.get("double").and_then(Value::as_bool).unwrap_or(false);
-            let what = if double { "Double-clicked" } else if right { "Right-clicked" } else { "Clicked" };
+            let what = if double {
+                "Double-clicked"
+            } else if right {
+                "Right-clicked"
+            } else {
+                "Clicked"
+            };
             browser.record(app, &task, &format!("{what} {}", label(&page, n).await), Some(at));
-            browser.until_dialog(page.click(at, if right { "right" } else { "left" }, if double { 2 } else { 1 })).await?;
+            browser
+                .until_dialog(page.click(at, if right { "right" } else { "left" }, if double { 2 } else { 1 }))
+                .await?;
             page.settle(browser).await;
             report(app, &state, &task, &format!("Clicked e{n}.")).await
         }
@@ -490,8 +505,14 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
             allowed_page(&page, &state).await?;
             let n = node(&args)?;
             let values: Vec<Value> = args.get("values").and_then(Value::as_array).cloned().unwrap_or_default();
-            browser.record(app, &task, &format!("Chose an option in {}", label(&page, n).await), page.center(n).await.ok());
-            match browser.until_dialog(page.call_on(n, super::page::SELECT_OPTIONS, vec![Value::Array(values)])).await? {
+            browser.record(
+                app,
+                &task,
+                &format!("Chose an option in {}", label(&page, n).await),
+                page.center(n).await.ok(),
+            );
+            match browser.until_dialog(page.call_on(n, super::page::SELECT_OPTIONS, vec![Value::Array(values)])).await?
+            {
                 Some(chosen) => Ok(text(format!("Chosen in e{n}: {chosen}"))),
                 None => report(app, &state, &task, &format!("Chose in e{n}.")).await,
             }
@@ -507,7 +528,12 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
                     (v.width as f64 / 2.0, v.height as f64 / 2.0)
                 }
             };
-            browser.record(app, &task, &format!("Scrolled {} {} pixels", if dy < 0.0 { "up" } else { "down" }, dy.abs()), Some(at));
+            browser.record(
+                app,
+                &task,
+                &format!("Scrolled {} {} pixels", if dy < 0.0 { "up" } else { "down" }, dy.abs()),
+                Some(at),
+            );
             browser.until_dialog(page.wheel(at, dy)).await?;
             tokio::time::sleep(Duration::from_millis(400)).await;
             report(app, &state, &task, &format!("Scrolled {dy} pixels.")).await
@@ -607,7 +633,8 @@ pub async fn call<R: Runtime>(app: &AppHandle<R>, name: &str, args: Value, calle
         "browser_switch_tab" => {
             let tab = super::tabs::tab_numbered(&browser.tabs(&task), &args)?;
             let name = browser.switch_tab(app, &task, &tab.id)?;
-            let shown = if sites::allowed(&tab.url, &state.config.read().browser.sites) { name } else { "a tab".into() };
+            let shown =
+                if sites::allowed(&tab.url, &state.config.read().browser.sites) { name } else { "a tab".into() };
             browser.record(app, &task, &format!("Switched to “{shown}”"), None);
             report(app, &state, &task, &format!("Switched to “{shown}”.")).await
         }
@@ -648,23 +675,26 @@ mod tests {
         let state = app.state::<AppState>();
         let chat = state
             .ptys
-            .spawn(app.handle(), SpawnOptions {
-                task_id: CHAT_TASK_ID.into(),
-                checkout_id: None,
-                cwd: root.to_string_lossy().to_string(),
-                kind: PaneKind::Agent,
-                title: "Chat".into(),
-                program: "/bin/sleep".into(),
-                args: vec!["60".into()],
-                agent_id: Some("claude".into()),
-                rows: None,
-                cols: None,
-                initial_input: None,
-                prompted: false,
-                env: Vec::new(),
-                title_activity: None,
-                title_topic: None,
-            })
+            .spawn(
+                app.handle(),
+                SpawnOptions {
+                    task_id: CHAT_TASK_ID.into(),
+                    checkout_id: None,
+                    cwd: root.to_string_lossy().to_string(),
+                    kind: PaneKind::Agent,
+                    title: "Chat".into(),
+                    program: "/bin/sleep".into(),
+                    args: vec!["60".into()],
+                    agent_id: Some("claude".into()),
+                    rows: None,
+                    cols: None,
+                    initial_input: None,
+                    prompted: false,
+                    env: Vec::new(),
+                    title_activity: None,
+                    title_topic: None,
+                },
+            )
             .unwrap()
             .id;
         let (task, pane, _) = task_of(&state, Some(&chat)).unwrap();
@@ -716,7 +746,11 @@ mod tests {
         let asked_now = state.browser.requests("t1");
         assert_eq!(asked_now.len(), 1, "one question, however often it is asked");
         assert_eq!((asked[0].site.as_str(), asked[0].reason.as_str()), ("docs.example.com", "Read the API guide"));
-        assert!(state.messages.list().iter().any(|m| m.title == "An agent asks to use docs.example.com in its browser"));
+        assert!(state
+            .messages
+            .list()
+            .iter()
+            .any(|m| m.title == "An agent asks to use docs.example.com in its browser"));
 
         state.config.update(|c| c.browser.sites.push("docs.example.com".into())).unwrap();
         state.browser.answer(app.handle(), asked[0].id, true);
@@ -725,7 +759,16 @@ mod tests {
         }
         assert!(state.browser.requests("t1").is_empty());
 
-        let again = texts(&call(app.handle(), "browser_request_site", json!({ "site": "docs.example.com", "reason": "again" }), Some(&pane)).await.unwrap());
+        let again = texts(
+            &call(
+                app.handle(),
+                "browser_request_site",
+                json!({ "site": "docs.example.com", "reason": "again" }),
+                Some(&pane),
+            )
+            .await
+            .unwrap(),
+        );
         assert_eq!(again, "Agents may already use docs.example.com.");
 
         state.ptys.shutdown(Duration::from_secs(1));
@@ -750,7 +793,10 @@ mod tests {
 
         let field = ref_of(&opened, "textbox \"User name\"");
         let typed = texts(&tool("browser_type", json!({ "ref": field, "text": "ada" })).await.unwrap());
-        assert!(typed.contains(&format!("textbox \"User name\" [ref={field}] [focused]: \"ada\"\n- combobox")), "{typed}");
+        assert!(
+            typed.contains(&format!("textbox \"User name\" [ref={field}] [focused]: \"ada\"\n- combobox")),
+            "{typed}"
+        );
 
         let size = ref_of(&opened, "combobox \"Size\"");
         let chosen = texts(&tool("browser_select", json!({ "ref": size, "values": ["Large"] })).await.unwrap());

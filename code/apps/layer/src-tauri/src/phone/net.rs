@@ -102,9 +102,7 @@ pub fn addresses() -> Vec<Address> {
         let ip = Ipv4Addr::from(u32::from_be(sin.sin_addr.s_addr));
         let Some(way) = way_of(IpAddr::V4(ip)) else { continue };
         // SAFETY: ifa_name is a NUL-terminated string owned by the list.
-        let interface = unsafe { std::ffi::CStr::from_ptr(ifa.ifa_name) }
-            .to_string_lossy()
-            .to_string();
+        let interface = unsafe { std::ffi::CStr::from_ptr(ifa.ifa_name) }.to_string_lossy().to_string();
         found.push(Address { way, ip: ip.to_string(), interface });
     }
     // SAFETY: the list came from getifaddrs and is freed once.

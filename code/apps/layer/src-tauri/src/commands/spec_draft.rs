@@ -23,7 +23,9 @@ use crate::spec::{self, Kind, Part};
 use super::jira::{review_context, reviewed_repos, task_repos};
 use super::panes::agent_file_dir;
 use super::spec::{spec_of, Check, Slot, Spec, Verdict};
-use super::spec_prompts::{answers_prompt, check_prompt, design_prompt, merge_prompt, requirements_prompt, tasks_prompt};
+use super::spec_prompts::{
+    answers_prompt, check_prompt, design_prompt, merge_prompt, requirements_prompt, tasks_prompt,
+};
 use super::spec_view::CheckView;
 use super::task_context::TICKET_FILE;
 
@@ -59,7 +61,13 @@ fn reading_dir(state: &super::AppState, task: &Task, spec: &Spec) -> PathBuf {
 /// editor and kept as its draft once done: the requirements or the design
 /// of the task, or every repository's tasks. Nothing is approved.
 #[tauri::command]
-pub async fn draft_spec(app: AppHandle, task_id: String, part: Part, kind: Option<Kind>, request_id: String) -> Result<()> {
+pub async fn draft_spec(
+    app: AppHandle,
+    task_id: String,
+    part: Part,
+    kind: Option<Kind>,
+    request_id: String,
+) -> Result<()> {
     let program = claude()?;
     let emitter = app.clone();
     super::blocking(app, move |state| {
@@ -69,7 +77,8 @@ pub async fn draft_spec(app: AppHandle, task_id: String, part: Part, kind: Optio
             return Err(Error::Other("this task has no repositories to write a spec for".into()));
         }
         let say = |part: Part, checkout: Option<&str>, text: &str| {
-            let _ = emitter.emit("spec:draft", SpecDraftChunk { request_id: &request_id, part, checkout_id: checkout, text });
+            let _ = emitter
+                .emit("spec:draft", SpecDraftChunk { request_id: &request_id, part, checkout_id: checkout, text });
         };
         let folders: Vec<String> = spec.homes.iter().map(|h| h.folder.clone()).collect();
         let reqs_slot = Slot::shared(Part::Requirements);
@@ -77,12 +86,14 @@ pub async fn draft_spec(app: AppHandle, task_id: String, part: Part, kind: Optio
             Part::Requirements => {
                 let kind = kind.unwrap_or_else(|| spec.kind());
                 spec.set_kind(kind)?;
-                let ticket = agent_file_dir(state, &task).and_then(|d| std::fs::read_to_string(d.join(TICKET_FILE)).ok());
+                let ticket =
+                    agent_file_dir(state, &task).and_then(|d| std::fs::read_to_string(d.join(TICKET_FILE)).ok());
                 // What the user answered on the draft before is decided:
                 // a redraft from the ticket alone asked it all again and
                 // threw the answers away (SPEC-5).
                 let decided = spec.latest(&reqs_slot).map(|t| spec::answered(&t)).unwrap_or_default();
-                let prompt = requirements_prompt(&task, kind, &folders, &task_repos(state, &task), ticket.as_deref(), &decided);
+                let prompt =
+                    requirements_prompt(&task, kind, &folders, &task_repos(state, &task), ticket.as_deref(), &decided);
                 let mut so_far = String::new();
                 let out = oneshot(&program, home_dir(), how(false), &prompt, |delta| {
                     so_far.push_str(delta);
@@ -94,7 +105,8 @@ pub async fn draft_spec(app: AppHandle, task_id: String, part: Part, kind: Optio
                 spec.save_draft(&reqs_slot, Some(&out))?;
             }
             Part::Design => {
-                let reqs = spec.latest(&reqs_slot).ok_or_else(|| Error::Other("approve the requirements first".into()))?;
+                let reqs =
+                    spec.latest(&reqs_slot).ok_or_else(|| Error::Other("approve the requirements first".into()))?;
                 let old = spec.approved(&Slot::shared(Part::Design));
                 let prompt = design_prompt(spec.kind(), &folders, &reqs, old.as_deref());
                 let mut so_far = String::new();
@@ -108,7 +120,8 @@ pub async fn draft_spec(app: AppHandle, task_id: String, part: Part, kind: Optio
                 spec.save_draft(&Slot::shared(Part::Design), Some(&out))?;
             }
             Part::Tasks => {
-                let reqs = spec.latest(&reqs_slot).ok_or_else(|| Error::Other("approve the requirements first".into()))?;
+                let reqs =
+                    spec.latest(&reqs_slot).ok_or_else(|| Error::Other("approve the requirements first".into()))?;
                 let design = spec.latest(&Slot::shared(Part::Design)).unwrap_or_else(|| "None.".into());
                 let old: Vec<(String, String)> = spec
                     .homes
@@ -178,7 +191,10 @@ pub async fn apply_spec_answers(app: AppHandle, task_id: String, request_id: Str
             return Err(Error::Other("no open question has an answer yet".into()));
         }
         let say = |text: &str| {
-            let _ = emitter.emit("spec:draft", SpecDraftChunk { request_id: &request_id, part: Part::Requirements, checkout_id: None, text });
+            let _ = emitter.emit(
+                "spec:draft",
+                SpecDraftChunk { request_id: &request_id, part: Part::Requirements, checkout_id: None, text },
+            );
         };
         let folders: Vec<String> = spec.homes.iter().map(|h| h.folder.clone()).collect();
         let mut so_far = String::new();
@@ -216,7 +232,8 @@ pub async fn check_spec(app: AppHandle, task_id: String, checkout_id: String) ->
         let requirements = spec
             .approved(&Slot::shared(Part::Requirements))
             .ok_or_else(|| Error::Other("there are no approved requirements to check against".into()))?;
-        let ids: Vec<String> = spec::requirements(&requirements).into_iter().filter(|r| r.names(&home.folder)).map(|r| r.id).collect();
+        let ids: Vec<String> =
+            spec::requirements(&requirements).into_iter().filter(|r| r.names(&home.folder)).map(|r| r.id).collect();
         if ids.is_empty() {
             return Err(Error::Other(format!("no requirement names {}", home.folder)));
         }
@@ -265,7 +282,10 @@ pub async fn merge_specs(app: AppHandle, task_id: String, request_id: String) ->
         };
         let say = |name: &str, text: &str| {
             let checkout = id_of(name);
-            let _ = emitter.emit("spec:draft", SpecDraftChunk { request_id: &request_id, part: part_of(name), checkout_id: checkout.as_deref(), text });
+            let _ = emitter.emit(
+                "spec:draft",
+                SpecDraftChunk { request_id: &request_id, part: part_of(name), checkout_id: checkout.as_deref(), text },
+            );
         };
         let mut so_far = String::new();
         let out = oneshot(&program, home_dir(), how(false), &prompt, |delta| {
@@ -381,7 +401,13 @@ mod tests {
     fn a_run_for_two_repositories_is_split_at_their_headings() {
         let text = "# api\n## Tasks\n- [ ] 1. Add it\n\n# `web`\n## Tasks\n- [ ] 1. Show it\n";
         let parts = by_repo(text, &two());
-        assert_eq!(parts, vec![("api".into(), "## Tasks\n- [ ] 1. Add it\n\n".into()), ("web".into(), "## Tasks\n- [ ] 1. Show it\n".into())]);
+        assert_eq!(
+            parts,
+            vec![
+                ("api".into(), "## Tasks\n- [ ] 1. Add it\n\n".into()),
+                ("web".into(), "## Tasks\n- [ ] 1. Show it\n".into())
+            ]
+        );
         // One repository needs no heading, and is not cut without one.
         assert_eq!(by_repo("## Tasks\nx\n", &two()[..1]), vec![("api".into(), "## Tasks\nx\n".into())]);
         // Half way through, what has come so far.
@@ -434,10 +460,17 @@ mod tests {
                       - Q-1: Should the refusal say when to try again?\n  - Yes, the minutes left\n  - No\n  Answer: Yes, the minutes left\n\
                       - Q-2: Should support staff be able to lift the limit?\n  - Yes\n  - No\n-- no, not in this work\n\
                       - Q-3: Is the hour a sliding window or a clock hour?\n  - Sliding\n  - Clock hour\n";
-        let out = oneshot(&program, std::env::temp_dir(), how(false), &answers_prompt(&two()[..1], before), |_| {}).unwrap();
+        let out =
+            oneshot(&program, std::env::temp_dir(), how(false), &answers_prompt(&two()[..1], before), |_| {}).unwrap();
         let (changed, added, removed) = compare(before, &out);
-        assert!(changed.contains(&"R-1".to_string()) || !added.is_empty(), "the refusal's wording is in no requirement:\n{out}");
-        assert!(!changed.contains(&"R-2".to_string()) && removed.is_empty(), "an untouched requirement changed:\n{out}");
+        assert!(
+            changed.contains(&"R-1".to_string()) || !added.is_empty(),
+            "the refusal's wording is in no requirement:\n{out}"
+        );
+        assert!(
+            !changed.contains(&"R-2".to_string()) && removed.is_empty(),
+            "an untouched requirement changed:\n{out}"
+        );
         assert!(spec::answered(&out).is_empty(), "an answered question is still there:\n{out}");
         assert!(out.contains("sliding window or a clock hour"), "the unanswered question went:\n{out}");
         assert!(!out.contains("Should support staff"), "{out}");
@@ -449,7 +482,10 @@ mod tests {
         let out = "Here you go:\nR-1 | met | api/src/limit.ts:12\n| R-2 | **Not met** | no 429 |\nR-9 | met | ?\nR-3 | maybe | can't tell\n";
         let v = verdicts(out, &["R-1".into(), "R-2".into(), "R-3".into()]);
         assert_eq!(v.len(), 3);
-        assert_eq!((v[0].id.as_str(), v[0].verdict.as_str(), v[0].evidence.as_str()), ("R-1", "met", "api/src/limit.ts:12"));
+        assert_eq!(
+            (v[0].id.as_str(), v[0].verdict.as_str(), v[0].evidence.as_str()),
+            ("R-1", "met", "api/src/limit.ts:12")
+        );
         assert_eq!(v[1].verdict, "not met");
         assert_eq!(v[2].verdict, "unclear");
     }

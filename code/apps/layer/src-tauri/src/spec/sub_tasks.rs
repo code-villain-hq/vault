@@ -74,15 +74,13 @@ fn groups(tasks: &str) -> Vec<Group<'_>> {
 /// `ACME-104 Session refresh` as (Some("ACME-104"), "Session refresh").
 fn key_of(heading: &str) -> (Option<String>, String) {
     let (first, rest) = heading.split_once(' ').unwrap_or((heading, ""));
-    let looks_like_key = first
-        .split_once('-')
-        .is_some_and(|(p, n)| {
-            p.len() >= 2
-                && p.starts_with(|c: char| c.is_ascii_uppercase())
-                && p.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
-                && !n.is_empty()
-                && n.chars().all(|c| c.is_ascii_digit())
-        });
+    let looks_like_key = first.split_once('-').is_some_and(|(p, n)| {
+        p.len() >= 2
+            && p.starts_with(|c: char| c.is_ascii_uppercase())
+            && p.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+            && !n.is_empty()
+            && n.chars().all(|c| c.is_ascii_digit())
+    });
     if looks_like_key && !rest.trim().is_empty() {
         (Some(first.to_string()), rest.trim().trim_start_matches([':', '-', '—', '–']).trim().to_string())
     } else {
@@ -116,7 +114,9 @@ pub fn sub_tasks(epic: &str, files: &[(String, String)]) -> Vec<SubTask> {
                 Some(h) => key_of(h),
                 None => (None, format!("{epic} in {folder}")),
             };
-            let at = found.iter().position(|f| f.title.eq_ignore_ascii_case(&title) && (f.key.is_none() || key.is_none() || f.key == key));
+            let at = found.iter().position(|f| {
+                f.title.eq_ignore_ascii_case(&title) && (f.key.is_none() || key.is_none() || f.key == key)
+            });
             let at = match at {
                 Some(i) => i,
                 None => {
@@ -137,7 +137,9 @@ pub fn sub_tasks(epic: &str, files: &[(String, String)]) -> Vec<SubTask> {
     // that waits for another.
     let owner = |repo: &str, number: u32| -> Option<usize> {
         found.iter().position(|f| {
-            f.repos.iter().any(|(r, lines)| r.eq_ignore_ascii_case(repo) && steps(&lines.join("\n")).iter().any(|s| s.number == number))
+            f.repos.iter().any(|(r, lines)| {
+                r.eq_ignore_ascii_case(repo) && steps(&lines.join("\n")).iter().any(|s| s.number == number)
+            })
         })
     };
     let mut out: Vec<(SubTask, Vec<usize>)> = Vec::new();
@@ -147,12 +149,14 @@ pub fn sub_tasks(epic: &str, files: &[(String, String)]) -> Vec<SubTask> {
         for (folder, lines) in &f.repos {
             let mut kept: Vec<String> = Vec::new();
             for line in lines {
-                let step = list_item(line.trim_start()).and_then(checkbox).is_some() && line.len() - line.trim_start().len() < 2;
+                let step = list_item(line.trim_start()).and_then(checkbox).is_some()
+                    && line.len() - line.trim_start().len() < 2;
                 if !step {
                     kept.push(line.to_string());
                     continue;
                 }
-                let (line, others) = keep_own_afters(line, i, |after| step_ref(after, folder).and_then(|(r, n)| owner(&r, n)));
+                let (line, others) =
+                    keep_own_afters(line, i, |after| step_ref(after, folder).and_then(|(r, n)| owner(&r, n)));
                 for o in others {
                     if !waits.contains(&o) {
                         waits.push(o);
@@ -202,7 +206,8 @@ fn keep_own_afters(line: &str, own: usize, whose: impl Fn(&str) -> Option<usize>
         return (line.to_string(), Vec::new());
     }
     let inner = &line[open + 1..close];
-    let after_of = |e: &str| e.strip_prefix("after ").or_else(|| e.strip_prefix("After ")).map(str::trim).map(str::to_string);
+    let after_of =
+        |e: &str| e.strip_prefix("after ").or_else(|| e.strip_prefix("After ")).map(str::trim).map(str::to_string);
     let entries: Vec<&str> = inner.split([',', ';']).map(str::trim).filter(|e| !e.is_empty()).collect();
     if !entries.iter().any(|e| after_of(e).is_some_and(|a| !keep(&a))) {
         return (line.to_string(), Vec::new());

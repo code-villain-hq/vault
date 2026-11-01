@@ -3,19 +3,28 @@
 OKLab conversion follows CSS Color 4's reference conversion matrices.
 https://www.w3.org/TR/css-color-4/#color-conversion-code
 """
+
 import math
 import re
 
 HOSTS = (
-    "bg", "panel", "surface", "hover", "selected", "dialog", "field",
-    "field-hover", "dialog-field", "dialog-field-hover",
+    "bg",
+    "panel",
+    "surface",
+    "hover",
+    "selected",
+    "dialog",
+    "field",
+    "field-hover",
+    "dialog-field",
+    "dialog-field-hover",
 )
 
 
 def channels(hex):
     if not isinstance(hex, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", hex):
         raise ValueError(f"Expected a six-digit sRGB colour, got {hex!r}")
-    return [int(hex[i:i + 2], 16) for i in (1, 3, 5)]
+    return [int(hex[i : i + 2], 16) for i in (1, 3, 5)]
 
 
 def linear(value):
@@ -46,11 +55,14 @@ def rgb(lightness, chroma, hue):
     l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
     m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
     s = (lightness - 0.0894841775 * a - 1.2914855480 * b) ** 3
-    return [encoded(c) for c in (
-        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-    )]
+    return [
+        encoded(c)
+        for c in (
+            4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+            -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+            -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+        )
+    ]
 
 
 def tone(lightness, chroma, hue):
@@ -70,13 +82,18 @@ def tone(lightness, chroma, hue):
 
 
 def mix(ground, source, opacity):
-    return hex_color([(a * (1 - opacity) + b * opacity) / 255
-                      for a, b in zip(channels(ground), channels(source))])
+    return hex_color(
+        [
+            (a * (1 - opacity) + b * opacity) / 255
+            for a, b in zip(channels(ground), channels(source))
+        ]
+    )
 
 
 def luminance(hex):
-    return sum(linear(c / 255) * weight
-               for c, weight in zip(channels(hex), (0.2126, 0.7152, 0.0722)))
+    return sum(
+        linear(c / 255) * weight for c, weight in zip(channels(hex), (0.2126, 0.7152, 0.0722))
+    )
 
 
 def contrast(a, b):
@@ -99,14 +116,21 @@ def generate(source):
     """Resolve palette + base/accent/contrast into stable night/day role names."""
     settings = source["theme"]
     strength = settings["contrast"]
-    if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not math.isfinite(strength) or not 0 <= strength <= 100:
+    if (
+        isinstance(strength, bool)
+        or not isinstance(strength, (int, float))
+        or not math.isfinite(strength)
+        or not 0 <= strength <= 100
+    ):
         raise ValueError("Theme contrast must be a number from 0 to 100")
+
     def seed(name):
         value = settings[name]
         if value.startswith("{") and value.endswith("}"):
             value = source["palette"][value[1:-1]]
         channels(value)
         return value
+
     base, accent = seed("base"), seed("accent")
     base_lightness, base_chroma, base_hue = oklch(base)
     # Above this lightness a base can't be mixed into dark surfaces as a fill;
@@ -119,38 +143,57 @@ def generate(source):
     for mode in ("night", "day"):
         night = mode == "night"
         # Authored hierarchy, shared by every theme. Contrast widens the steps.
-        levels = ({"bg": .15, "panel": .19, "surface": .22, "hover": .23, "line": .29}
-                  if night else {"bg": .97, "panel": 1, "surface": .955, "hover": .94, "line": .91})
+        levels = (
+            {"bg": 0.15, "panel": 0.19, "surface": 0.22, "hover": 0.23, "line": 0.29}
+            if night
+            else {"bg": 0.97, "panel": 1, "surface": 0.955, "hover": 0.94, "line": 0.91}
+        )
         theme = {}
         for role, level in levels.items():
             # Keep the frame anchored, and the day content white.
-            shift = 0 if role in ("bg", "panel") else amount * (.012 if night else -.012)
+            shift = 0 if role in ("bg", "panel") else amount * (0.012 if night else -0.012)
             theme[role] = tone(level + shift, 0, 0)
         if vivid:
             # A light base is a fill in its own right: the action wears it as
             # is, with dark ink, and selection takes a faint tint of it.
             theme["primary"] = base
-            theme["primary-hover"] = tone(base_lightness - .06, base_chroma, base_hue)
-            theme["selected"] = mix(theme["bg"] if night else theme["panel"], base, .09 if night else .16)
+            theme["primary-hover"] = tone(base_lightness - 0.06, base_chroma, base_hue)
+            theme["selected"] = mix(
+                theme["bg"] if night else theme["panel"], base, 0.09 if night else 0.16
+            )
         else:
-            theme["primary"] = mix(theme["surface"] if night else theme["panel"], base, .40 if night else .14)
-            theme["primary-hover"] = mix(theme["surface"] if night else theme["panel"], base, .50 if night else .22)
-            theme["selected"] = mix(theme["bg"] if night else theme["panel"], base, .20 if night else .07)
-        theme.update({
-            "dialog": theme["hover"] if night else theme["panel"],
-            "field": theme["surface"], "field-hover": theme["hover"],
-            "dialog-field": theme["panel"] if night else theme["surface"],
-            "dialog-field-hover": theme["surface"] if night else theme["hover"],
-        })
+            theme["primary"] = mix(
+                theme["surface"] if night else theme["panel"], base, 0.40 if night else 0.14
+            )
+            theme["primary-hover"] = mix(
+                theme["surface"] if night else theme["panel"], base, 0.50 if night else 0.22
+            )
+            theme["selected"] = mix(
+                theme["bg"] if night else theme["panel"], base, 0.20 if night else 0.07
+            )
+        theme.update(
+            {
+                "dialog": theme["hover"] if night else theme["panel"],
+                "field": theme["surface"],
+                "field-hover": theme["hover"],
+                "dialog-field": theme["panel"] if night else theme["surface"],
+                "dialog-field-hover": theme["surface"] if night else theme["hover"],
+            }
+        )
         hosts = [theme[key] for key in HOSTS]
-        for role, level, change in (("fg", .94 if night else .21, .045),
-                                    ("muted", .69 if night else .45, .10),
-                                    ("faint", .63 if night else .52, .12)):
+        for role, level, change in (
+            ("fg", 0.94 if night else 0.21, 0.045),
+            ("muted", 0.69 if night else 0.45, 0.10),
+            ("faint", 0.63 if night else 0.52, 0.12),
+        ):
             ink = tone(level + amount * change * (1 if night else -1), 0, 0)
             text_hosts = hosts
             if role in ("muted", "faint"):
-                text_hosts = hosts + [mix(host, theme["fg"], source["opacity"][tint])
-                                      for tint in ("chip-tint", "highlight-tint") for host in hosts]
+                text_hosts = hosts + [
+                    mix(host, theme["fg"], source["opacity"][tint])
+                    for tint in ("chip-tint", "highlight-tint")
+                    for host in hosts
+                ]
             theme[role] = readable(ink, text_hosts, mode, minimum)
         # At the contrast extremes the floor can push muted and faint to one
         # tone. Faint keeps the floor; muted steps further from the hosts until
@@ -158,20 +201,26 @@ def generate(source):
         direction = 1 if night else -1
         faint_lightness = oklch(theme["faint"])[0]
         step = 0
-        while (oklch(theme["muted"])[0] - faint_lightness) * direction < .015:
+        while (oklch(theme["muted"])[0] - faint_lightness) * direction < 0.015:
             step += 1
-            theme["muted"] = readable(tone(faint_lightness + direction * step / 1000, 0, 0),
-                                      text_hosts, mode, minimum)
+            theme["muted"] = readable(
+                tone(faint_lightness + direction * step / 1000, 0, 0), text_hosts, mode, minimum
+            )
         if vivid:
             # Dark ink on the light fill, in both modes. A fill too dark for
             # black ink at this contrast rises in lightness until it carries it.
-            for role, start in (("primary", base_lightness), ("primary-hover", base_lightness - .06)):
+            for role, start in (
+                ("primary", base_lightness),
+                ("primary-hover", base_lightness - 0.06),
+            ):
                 level = start
                 while contrast("#000000", theme[role]) < minimum and level < 1:
-                    level += .005
+                    level += 0.005
                     theme[role] = tone(level, base_chroma, base_hue)
             dark = theme["bg"] if night else theme["fg"]
-            theme["on-primary"] = readable(dark, [theme["primary"], theme["primary-hover"]], "day", minimum)
+            theme["on-primary"] = readable(
+                dark, [theme["primary"], theme["primary-hover"]], "day", minimum
+            )
         else:
             # Extreme seed colours must not make the primary action unreadable.
             ground = theme["surface"] if night else theme["panel"]
@@ -181,7 +230,9 @@ def generate(source):
                     theme[role] = mix(original, ground, step / 100)
                     if contrast(theme["fg"], theme[role]) >= minimum:
                         break
-            theme["on-primary"] = readable(theme["fg"], [theme["primary"], theme["primary-hover"]], mode, minimum)
+            theme["on-primary"] = readable(
+                theme["fg"], [theme["primary"], theme["primary-hover"]], mode, minimum
+            )
         # The accent marks focus, never a large fill. Both modes derive from one hue.
         theme["accent"] = readable(accent, hosts, mode, minimum)
         # Live dots wear the brand colour. They carry no text, so WCAG's 3:1
@@ -194,8 +245,11 @@ def generate(source):
             composites = [mix(host, color, source["opacity"]["status-tint"]) for host in hosts]
             if status == "danger":
                 # A destructive button writes its label in danger ink on the button fill.
-                composites += [mix(host, theme["fg"], source["opacity"][tint])
-                               for tint in ("button-tint", "button-hover-tint") for host in hosts]
+                composites += [
+                    mix(host, theme["fg"], source["opacity"][tint])
+                    for tint in ("button-tint", "button-hover-tint")
+                    for host in hosts
+                ]
             theme[f"status-{status}-ink"] = readable(color, composites, mode, minimum)
         result[mode] = theme
     return result

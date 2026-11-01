@@ -9,11 +9,8 @@ pub(super) const NOTICE_TAIL: usize = 4096;
 /// Every task is a brand-new directory, so the trust question is not a rare
 /// edge case — it is the first thing an agent asks on every new task, and an
 /// unanswered one looks exactly like an agent that has silently done nothing.
-const TRUST_MARKERS: &[&str] = &[
-    "do you trust the files in this folder",
-    "trust the files in this directory",
-    "do you trust this folder",
-];
+const TRUST_MARKERS: &[&str] =
+    &["do you trust the files in this folder", "trust the files in this directory", "do you trust this folder"];
 
 /// Phrases the agent CLIs print when they will not do any more work.
 ///
@@ -94,10 +91,7 @@ mod tests {
         let t = |b: &[u8]| last_title(b);
         assert_eq!(t(b"\x1b]0;\xe2\x97\x87  Ready (api)\x07drawn"), Some("◇  Ready (api)".into()));
         // Two in one read: the later wins. ST ends one as well as BEL does.
-        assert_eq!(
-            t(b"\x1b]2;one\x07text\x1b]0;two\x1b\\more"),
-            Some("two".into())
-        );
+        assert_eq!(t(b"\x1b]2;one\x07text\x1b]0;two\x1b\\more"), Some("two".into()));
         // Still arriving: the whole one before it stands.
         assert_eq!(t(b"\x1b]0;done\x07\x1b]0;half"), Some("done".into()));
         // Other OSC sequences are not titles.

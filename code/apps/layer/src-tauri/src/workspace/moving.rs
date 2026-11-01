@@ -99,7 +99,8 @@ pub(super) fn move_in(state: &AppState, workspace: Uuid) -> crate::error::Result
                 p.remote = Some(remote);
             }
         }
-        c.shared.workspace = Some(WorkspaceAt { place: THIS_MAC.into(), id: workspace.to_string(), user_id: None, admin: false });
+        c.shared.workspace =
+            Some(WorkspaceAt { place: THIS_MAC.into(), id: workspace.to_string(), user_id: None, admin: false });
     })?;
     state.notes.share()
 }
@@ -237,7 +238,13 @@ pub(super) mod tests {
         let state = v2_profile(&root);
         move_in(&state, Uuid::now_v7()).unwrap();
         let first = ops(&state).len();
-        state.config.mirror(|c| { c.shared.outbox.clear(); true }).unwrap();
+        state
+            .config
+            .mirror(|c| {
+                c.shared.outbox.clear();
+                true
+            })
+            .unwrap();
 
         forget(&state).unwrap();
         move_in(&state, Uuid::now_v7()).unwrap();

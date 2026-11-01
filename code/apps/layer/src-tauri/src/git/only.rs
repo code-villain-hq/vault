@@ -61,10 +61,21 @@ fn in_house_style(dir: &Path, sentence: &str) -> String {
 /// squash merges keep titles like "Acme 1479 tests".
 fn writes_conventional_commits(dir: &Path) -> bool {
     const CONFIGS: [&str; 15] = [
-        "commitlint.config.js", "commitlint.config.cjs", "commitlint.config.mjs",
-        "commitlint.config.ts", "commitlint.config.cts", "commitlint.config.mts",
-        ".commitlintrc", ".commitlintrc.json", ".commitlintrc.yaml", ".commitlintrc.yml",
-        ".commitlintrc.js", ".commitlintrc.cjs", ".commitlintrc.mjs", ".commitlintrc.ts", ".commitlintrc.cts",
+        "commitlint.config.js",
+        "commitlint.config.cjs",
+        "commitlint.config.mjs",
+        "commitlint.config.ts",
+        "commitlint.config.cts",
+        "commitlint.config.mts",
+        ".commitlintrc",
+        ".commitlintrc.json",
+        ".commitlintrc.yaml",
+        ".commitlintrc.yml",
+        ".commitlintrc.js",
+        ".commitlintrc.cjs",
+        ".commitlintrc.mjs",
+        ".commitlintrc.ts",
+        ".commitlintrc.cts",
     ];
     if CONFIGS.iter().any(|f| dir.join(f).is_file())
         || std::fs::read_to_string(dir.join("package.json")).is_ok_and(|p| p.contains("\"commitlint\""))
@@ -144,7 +155,9 @@ mod tests {
     #[test]
     fn a_repository_that_writes_conventional_commits_gets_one() {
         let dir = repo();
-        for subject in ["feat(ACME-1): favourite stations", "chore(deps)!: bump vitest", "fix: the date", "Acme 1479 tests"] {
+        for subject in
+            ["feat(ACME-1): favourite stations", "chore(deps)!: bump vitest", "fix: the date", "Acme 1479 tests"]
+        {
             std::fs::write(dir.join("a.txt"), subject).unwrap();
             run(&dir, &["commit", "-qam", subject]).unwrap();
         }

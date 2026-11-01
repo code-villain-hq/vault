@@ -169,7 +169,8 @@ impl Reader {
         let mut card_changed = false;
         for e in view.changes.entries.into_iter().filter(|e| e.index >= start) {
             if let Body::Question { title, options, answer } = &e.body {
-                let asked = Asked { entry: e.index, title: title.clone(), options: options.clone(), answer: answer.clone() };
+                let asked =
+                    Asked { entry: e.index, title: title.clone(), options: options.clone(), answer: answer.clone() };
                 if self.asked.get(&e.index) != Some(&asked) {
                     self.asked.insert(e.index, asked);
                     card_changed = true;
@@ -177,7 +178,8 @@ impl Reader {
             }
             self.kept.insert(e.index, e.body);
         }
-        let mut out = Out { card: card_changed.then(|| self.asked.values().cloned().collect()), not_auto, ..Out::default() };
+        let mut out =
+            Out { card: card_changed.then(|| self.asked.values().cloned().collect()), not_auto, ..Out::default() };
         let notes = notes(self.kept.values());
         if ended {
             out.posts = posts(&turn(self.kept.values()));
@@ -208,7 +210,8 @@ pub async fn follow(app: AppHandle, pane: String, thread: SlackThread) {
     let state = app.state::<AppState>();
     if let (Ok(mut turns), Ok(mut feed)) = (state.ptys.turns(&pane), state.ptys.feed(&pane)) {
         let mut seen = *turns.borrow_and_update();
-        let wants_auto = super::presets_for(&state.config.read(), &thread.room).iter().any(|(c, v)| c == "mode" && v == super::AUTO);
+        let wants_auto =
+            super::presets_for(&state.config.read(), &thread.room).iter().any(|(c, v)| c == "mode" && v == super::AUTO);
         let mut reader = Reader::new(wants_auto);
         // The turn's card and progress message, once posted.
         let mut card: Option<String> = None;
@@ -291,10 +294,13 @@ mod tests {
         assert_eq!(t.typed, vec!["also check staging".to_string()]);
         assert_eq!(t.reply.as_deref(), Some("Staging is fine; prod has 500s since 9:02."));
         let p = posts(&t);
-        assert_eq!(p, vec![
-            "_Typed in Layer:_\n> also check staging".to_string(),
-            "Staging is fine; prod has 500s since 9:02.".to_string(),
-        ]);
+        assert_eq!(
+            p,
+            vec![
+                "_Typed in Layer:_\n> also check staging".to_string(),
+                "Staging is fine; prod has 500s since 9:02.".to_string(),
+            ]
+        );
     }
 
     #[test]
@@ -302,7 +308,8 @@ mod tests {
         assert!(posts(&turn(&[user("[Slack] go"), Body::Plan { steps: vec![] }])).is_empty());
         let dropped = Body::User { text: "never sent".into(), queued: false, dropped: true };
         assert!(turn(&[dropped]).typed.is_empty());
-        let failed = turn(&[Body::Note { text: "Stopped: the reply reached the model's length limit.".into(), error: true }]);
+        let failed =
+            turn(&[Body::Note { text: "Stopped: the reply reached the model's length limit.".into(), error: true }]);
         assert_eq!(posts(&failed), vec![":warning: Stopped: the reply reached the model's length limit.".to_string()]);
     }
 
@@ -365,23 +372,42 @@ mod tests {
         r.read(view(1, 0, true, vec![]), false);
         r.read(view(2, 1, true, vec![(0, question(None))]), false);
         let end = r.read(view(3, 2, true, vec![(0, question(Some("cancelled")))]), true);
-        assert_eq!(end.card.unwrap()[0].answer.as_deref(), Some("cancelled"), "a turn with no reply keeps its card, showing how it ended");
+        assert_eq!(
+            end.card.unwrap()[0].answer.as_deref(),
+            Some("cancelled"),
+            "a turn with no reply keeps its card, showing how it ended"
+        );
         assert!(end.turn_over && !end.tidy);
         let next = r.read(view(4, 3, true, vec![(2, question(None))]), false).card.unwrap();
         assert_eq!(next.len(), 1, "only the new turn's question");
     }
 
     fn tool(id: &str) -> Body {
-        Body::Tool { id: id.into(), title: id.into(), tool: "fetch".into(), status: "completed".into(), content: vec![], locations: vec![] }
+        Body::Tool {
+            id: id.into(),
+            title: id.into(),
+            tool: "fetch".into(),
+            status: "completed".into(),
+            content: vec![],
+            locations: vec![],
+        }
     }
 
     #[test]
     fn what_the_agent_says_between_its_tools_reaches_the_thread_while_it_works() {
         let mut r = Reader::default();
         r.read(view(1, 0, true, vec![]), false);
-        let first = vec![(0, user("[Slack] are you there?")), (1, tool("read_thread")), (2, agent("Still here, pulling the logs.")), (3, tool("grafana_logs"))];
+        let first = vec![
+            (0, user("[Slack] are you there?")),
+            (1, tool("read_thread")),
+            (2, agent("Still here, pulling the logs.")),
+            (3, tool("grafana_logs")),
+        ];
         let out = r.read(view(2, 4, true, first), false);
-        assert_eq!(out.progress.as_deref(), Some(":hourglass_flowing_sand: _Working on it…_\n\n> Still here, pulling the logs."));
+        assert_eq!(
+            out.progress.as_deref(),
+            Some(":hourglass_flowing_sand: _Working on it…_\n\n> Still here, pulling the logs.")
+        );
         assert!(out.posts.is_empty(), "the reply waits for the turn's end");
         // Still streaming: nothing came after it yet.
         assert_eq!(r.read(view(3, 5, true, vec![(4, agent("Found 4 fail"))]), false).progress, None);
@@ -397,14 +423,21 @@ mod tests {
     fn a_turns_answer_replaces_its_card_and_progress_message() {
         let mut r = Reader::default();
         r.read(view(1, 0, true, vec![]), false);
-        let asked = vec![(0, user("[Slack] why 7,994?")), (1, question(None)), (2, agent("Found it: format-kpi.ts.")), (3, tool("grep"))];
+        let asked = vec![
+            (0, user("[Slack] why 7,994?")),
+            (1, question(None)),
+            (2, agent("Found it: format-kpi.ts.")),
+            (3, tool("grep")),
+        ];
         let out = r.read(view(2, 4, true, asked), false);
         assert!(out.card.is_some() && out.progress.is_some());
-        let end = r.read(view(3, 5, true, vec![(1, question(Some("allow_always"))), (4, agent("The fix is one word."))]), true);
+        let end = r.read(
+            view(3, 5, true, vec![(1, question(Some("allow_always"))), (4, agent("The fix is one word."))]),
+            true,
+        );
         assert_eq!(end.posts, vec!["The fix is one word.".to_string()]);
         assert_eq!((end.card, end.progress, end.tidy), (None, None, true), "nothing changed only to be deleted");
     }
-
 
     #[test]
     fn a_turn_that_only_answers_gets_no_progress_message() {
@@ -417,7 +450,13 @@ mod tests {
 
     fn modes(current: &str) -> Vec<acp::Setting> {
         let option = |v: &str| acp::SettingOption { value: v.into(), name: v.into(), description: None };
-        vec![acp::Setting { id: "mode".into(), name: "Mode".into(), category: Some("mode".into()), current: current.into(), options: vec![option("default"), option("auto")] }]
+        vec![acp::Setting {
+            id: "mode".into(),
+            name: "Mode".into(),
+            category: Some("mode".into()),
+            current: current.into(),
+            options: vec![option("default"), option("auto")],
+        }]
     }
 
     #[test]

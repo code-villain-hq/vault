@@ -529,7 +529,9 @@ mod tests {
         assert!(md.contains("the spec wins"));
         assert!(md.contains("This task's id is `t1`"), "{md}");
         assert!(md.contains("- `api/`: its copy is in `/work/acme-12/api/specs/ACME-12`\n- `web/`"));
-        assert!(md.contains("\n#### Requirements\n- R-1 [api, web]: WHEN two cards paid THE SYSTEM SHALL refund both.\n"));
+        assert!(
+            md.contains("\n#### Requirements\n- R-1 [api, web]: WHEN two cards paid THE SYSTEM SHALL refund both.\n")
+        );
         assert_eq!(md.matches("R-1 [api, web]").count(), 1, "the requirements once, not once per repository");
         assert!(md.contains("Never edit the spec's files") && md.contains("`spec_propose`"));
         assert!(!md.contains("> - R-1"));
@@ -584,7 +586,12 @@ mod tests {
             folder: "api".into(),
             notes: vec![
                 note("a1", "Tests need `make db` first.", 0, Some(vec![])),
-                note("b2", "Migrations run from\n## db/", 0, Some(vec!["db/1.sql", "db/2.sql", "db/3.sql", "db/4.sql"])),
+                note(
+                    "b2",
+                    "Migrations run from\n## db/",
+                    0,
+                    Some(vec!["db/1.sql", "db/2.sql", "db/3.sql", "db/4.sql"]),
+                ),
             ],
         }];
         let md = notes_section(&repos, 3 * DAY);

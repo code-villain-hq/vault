@@ -25,13 +25,22 @@ use super::AppState;
 /// (SPEC-22), in one repository, keeping the steps it has ticked, and
 /// commit it there.
 #[tauri::command]
-pub async fn put_back_spec(app: tauri::AppHandle, task_id: String, part: Part, checkout_id: String) -> Result<TaskSpec> {
+pub async fn put_back_spec(
+    app: tauri::AppHandle,
+    task_id: String,
+    part: Part,
+    checkout_id: String,
+) -> Result<TaskSpec> {
     super::blocking(app, move |state| {
         let task = state.config.task(&task_id)?;
         let spec = spec_of(state, &task);
         let kind = spec.kind();
         let slot = slot_of(&spec, part, Some(&checkout_id))?;
-        let home = spec.homes.iter().find(|h| h.checkout.id == checkout_id).ok_or_else(|| Error::NotFound(format!("checkout {checkout_id}")))?;
+        let home = spec
+            .homes
+            .iter()
+            .find(|h| h.checkout.id == checkout_id)
+            .ok_or_else(|| Error::NotFound(format!("checkout {checkout_id}")))?;
         let record = spec.record(&slot, kind).ok_or_else(|| Error::Other("nothing was approved to put back".into()))?;
         let text = match (part, home.copy(part, kind)) {
             (Part::Tasks, Some(copy)) => spec::keep_ticks(&record, &copy),
@@ -40,8 +49,16 @@ pub async fn put_back_spec(app: tauri::AppHandle, task_id: String, part: Part, c
         let path = home.dir.join(part.file(kind));
         write(&path, &format!("{}\n", text.trim()))?;
         if let Some(rel) = &home.rel {
-            let message = format!("Put back the approved {} for {}.", part.word(kind), task.issue_key.as_deref().unwrap_or(&task.branch));
-            git::commit_only(Path::new(&home.checkout.path), &[format!("{rel}/{}", part.file(kind)).as_str()], &message)?;
+            let message = format!(
+                "Put back the approved {} for {}.",
+                part.word(kind),
+                task.issue_key.as_deref().unwrap_or(&task.branch)
+            );
+            git::commit_only(
+                Path::new(&home.checkout.path),
+                &[format!("{rel}/{}", part.file(kind)).as_str()],
+                &message,
+            )?;
         }
         write_task_context(state, &task)?;
         Ok(view(state, &task))
@@ -52,7 +69,12 @@ pub async fn put_back_spec(app: tauri::AppHandle, task_id: String, part: Part, c
 /// Turn down a change an agent proposed (SPEC-24): its draft goes, and the
 /// agent is told.
 #[tauri::command]
-pub async fn turn_down_spec_proposal(app: tauri::AppHandle, task_id: String, part: Part, checkout_id: Option<String>) -> Result<TaskSpec> {
+pub async fn turn_down_spec_proposal(
+    app: tauri::AppHandle,
+    task_id: String,
+    part: Part,
+    checkout_id: Option<String>,
+) -> Result<TaskSpec> {
     super::blocking(app, move |state| {
         let task = state.config.task(&task_id)?;
         let spec = spec_of(state, &task);
@@ -69,7 +91,15 @@ pub async fn turn_down_spec_proposal(app: tauri::AppHandle, task_id: String, par
 /// An agent's `spec_propose` (SPEC-24): the whole new text of one file, kept
 /// as its draft for the user to approve or turn down. Refused while the
 /// user has a draft of that file of their own.
-pub(crate) fn propose(state: &AppState, task_id: &str, pane_id: Option<&str>, part: Part, repo: Option<&str>, text: &str, why: &str) -> Result<String> {
+pub(crate) fn propose(
+    state: &AppState,
+    task_id: &str,
+    pane_id: Option<&str>,
+    part: Part,
+    repo: Option<&str>,
+    text: &str,
+    why: &str,
+) -> Result<String> {
     let task = state.config.task(task_id)?;
     let spec = spec_of(state, &task);
     let slot = match part {
@@ -99,7 +129,13 @@ pub(crate) fn propose(state: &AppState, task_id: &str, pane_id: Option<&str>, pa
         .map(|a| a.name.to_string())
         .unwrap_or_else(|| "An agent".into());
     spec.save_draft(&slot, Some(text))?;
-    spec.wait_on(Proposal { slot, why: why.trim().to_string(), by, pane_id: pane_id.map(str::to_string), at: chrono::Utc::now().timestamp_millis() })?;
+    spec.wait_on(Proposal {
+        slot,
+        why: why.trim().to_string(),
+        by,
+        pane_id: pane_id.map(str::to_string),
+        at: chrono::Utc::now().timestamp_millis(),
+    })?;
     Ok(format!(
         "Proposed. The user sees it on the Spec tab and approves it or turns it down; you will be told which. \
          Until then work to the {} as it was approved, or wait.",
@@ -158,14 +194,19 @@ pub async fn spec_call(app: &AppHandle, args: Value, caller: Option<&str>) -> Re
         "requirements" | "bugfix" => Part::Requirements,
         "design" => Part::Design,
         "tasks" => Part::Tasks,
-        other => return Err(Error::Other(format!("`{other}` is not a file of the spec: requirements, design or tasks"))),
+        other => {
+            return Err(Error::Other(format!("`{other}` is not a file of the spec: requirements, design or tasks")))
+        }
     };
     let repo = arg(&args, "repo").map(str::to_string);
     let text = required(&args, "text")?.to_string();
     let why = required(&args, "why")?.to_string();
     let pane = caller.map(str::to_string);
     let id = task_id.clone();
-    let said = super::blocking(app.clone(), move |state| propose(state, &id, pane.as_deref(), part, repo.as_deref(), &text, &why)).await?;
+    let said = super::blocking(app.clone(), move |state| {
+        propose(state, &id, pane.as_deref(), part, repo.as_deref(), &text, &why)
+    })
+    .await?;
     {
         use tauri::Emitter;
         let _ = app.emit("spec:changed", &task_id);

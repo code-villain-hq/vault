@@ -72,17 +72,9 @@ pub(super) fn fresh_statuses(dirs: &[PathBuf]) -> Vec<Fresh> {
     std::thread::scope(|scope| {
         let handles: Vec<_> = dirs
             .chunks(per)
-            .map(|chunk| {
-                (
-                    chunk.len(),
-                    scope.spawn(move || chunk.iter().map(|d| fresh_status(d)).collect::<Vec<_>>()),
-                )
-            })
+            .map(|chunk| (chunk.len(), scope.spawn(move || chunk.iter().map(|d| fresh_status(d)).collect::<Vec<_>>())))
             .collect();
-        handles
-            .into_iter()
-            .flat_map(|(len, h)| h.join().unwrap_or_else(|_| vec![Fresh::default(); len]))
-            .collect()
+        handles.into_iter().flat_map(|(len, h)| h.join().unwrap_or_else(|_| vec![Fresh::default(); len])).collect()
     })
 }
 

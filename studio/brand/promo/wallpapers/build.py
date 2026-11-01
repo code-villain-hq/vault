@@ -5,6 +5,7 @@ Writes one SVG per design and format, and renders a PNG of each with
 headless Chrome. The letters and strikes come from studio/brand/mark; nothing is
 redrawn.
 """
+
 import math
 import pathlib
 import re
@@ -44,7 +45,9 @@ def outline_box(d):
 DESIGNS = {
     "mark": dict(d=path("mark.svg", "cv"), strike=(108, 15), cut=14, by="height"),
     "wordmark": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7, by="width"),
-    "rows": dict(d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7, by="width", rows=True),
+    "rows": dict(
+        d=path("logo-night.svg", "lettering"), strike=(35.48, 8), cut=7, by="width", rows=True
+    ),
 }
 
 # Per design and format: (width, height, centre x, strike centre y, size).
@@ -82,8 +85,10 @@ def rows(design, width, height):
         offset = (word + gap) / 2 if row % 2 else 0
         for column in range(-1, int(width / (word + gap)) + 2):
             x = column * (word + gap) + offset
-            uses.append(f'<use href="#letters" transform="translate({x - left * scale:.1f} {y - top * scale:.1f}) '
-                        f'scale({scale:.4f})" fill="{TEXTURE}"/>')
+            uses.append(
+                f'<use href="#letters" transform="translate({x - left * scale:.1f} {y - top * scale:.1f}) '
+                f'scale({scale:.4f})" fill="{TEXTURE}"/>'
+            )
     return "".join(uses)
 
 
@@ -97,8 +102,11 @@ def cubes(width, height, c):
         d = "M" + "L".join(f"{x:.1f} {y:.1f}" for x, y in points)
         return f'<path d="{d}Z" fill="{fill}" stroke="{fill}" stroke-width="1"/>'
 
-    lerp = lambda p, q, t: (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
-    shape = lambda fill, pts: f'<path d="M{"L".join(f"{x:.1f} {y:.1f}" for x, y in pts)}Z" fill="{fill}"/>'
+    def lerp(p, q, t):
+        return (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+
+    def shape(fill, pts):
+        return f'<path d="M{"L".join(f"{x:.1f} {y:.1f}" for x, y in pts)}Z" fill="{fill}"/>'
 
     def engraved(ground, line, near_a, near_b, far_b, far_a, stripes=14):
         # A parallelogram engraved with stripes parallel to its near edge.
@@ -108,8 +116,17 @@ def cubes(width, height, c):
         for i in range(stripes):
             start = i / stripes
             end = start + (0.85 - 0.8 * i / (stripes - 1)) / stripes
-            out.append(shape(line, (lerp(near_a, far_a, start), lerp(near_b, far_b, start),
-                                    lerp(near_b, far_b, end), lerp(near_a, far_a, end))))
+            out.append(
+                shape(
+                    line,
+                    (
+                        lerp(near_a, far_a, start),
+                        lerp(near_b, far_b, start),
+                        lerp(near_b, far_b, end),
+                        lerp(near_a, far_a, end),
+                    ),
+                )
+            )
         return "".join(out)
 
     def fan(ground, line, apex, lit_side, dark_side, rays=16):
@@ -119,28 +136,39 @@ def cubes(width, height, c):
         for i in range(rays):
             start = i / rays
             end = start + (0.85 - 0.8 * i / (rays - 1)) / rays
-            out.append(shape(line, (apex, lerp(lit_side, dark_side, start), lerp(lit_side, dark_side, end))))
+            out.append(
+                shape(
+                    line, (apex, lerp(lit_side, dark_side, start), lerp(lit_side, dark_side, end))
+                )
+            )
         return "".join(out)
 
     def cube(cx, cy):
-        p = {k: (cx + edge * math.cos(math.radians(a)), cy + edge * math.sin(math.radians(a)))
-             for k, a in (("T", -90), ("UR", -30), ("LR", 30), ("B", 90), ("LL", 150), ("UL", 210))}
+        p = {
+            k: (cx + edge * math.cos(math.radians(a)), cy + edge * math.sin(math.radians(a)))
+            for k, a in (("T", -90), ("UR", -30), ("LR", 30), ("B", 90), ("LL", 150), ("UL", 210))
+        }
         p["C"] = (cx, cy)
         # The top is one engraved face, its stripes parallel to the back-right
         # edge. The left face is lit, then fans into shade; the right stays dark.
-        return (engraved(c["dark"], c["top_line"], p["T"], p["UR"], p["C"], p["UL"])
-                + solid(c["lit"], (p["UL"], p["LL"], p["B"]))
-                + fan(c["shade"], c["lit"], p["B"], p["UL"], p["C"])
-                + solid(c["shade"], (p["UR"], p["C"], p["B"]))
-                + solid(c["dark"], (p["UR"], p["LR"], p["B"])))
+        return (
+            engraved(c["dark"], c["top_line"], p["T"], p["UR"], p["C"], p["UL"])
+            + solid(c["lit"], (p["UL"], p["LL"], p["B"]))
+            + fan(c["shade"], c["lit"], p["B"], p["UL"], p["C"])
+            + solid(c["shade"], (p["UR"], p["C"], p["B"]))
+            + solid(c["dark"], (p["UR"], p["LR"], p["B"]))
+        )
 
     across, down = edge * math.sqrt(3), edge * 1.5
     # Centre the grid so the blocks sit evenly on every screen.
     columns, rows = int(width / across) + 3, int(height / down) + 3
     x0 = (width - (columns - 1) * across) / 2
     y0 = (height - (rows - 1) * down) / 2
-    tiles = "".join(cube(x0 + column * across + (across / 2 if row % 2 else 0), y0 + row * down)
-                    for row in range(rows) for column in range(-1, columns))
+    tiles = "".join(
+        cube(x0 + column * across + (across / 2 if row % 2 else 0), y0 + row * down)
+        for row in range(rows)
+        for column in range(-1, columns)
+    )
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>Code Villain</title>
   <rect width="{width}" height="{height}" fill="{GROUND}"/>{tiles}
@@ -160,10 +188,12 @@ def svg(design, width, height, cx, cy, size):
         # The rows run up to the lit wordmark and its strike: the brand's cut,
         # drawn in the ground colour, clears a thin gap around both.
         half_cut = design["cut"] / 2 * scale
-        texture += (f'<rect y="{y + strike_top * scale - half_cut:.2f}" width="{width}" '
-                    f'height="{strike_height * scale + 2 * half_cut:.2f}" fill="{GROUND}"/>'
-                    f'<use href="#letters" transform="{place}" fill="{GROUND}" stroke="{GROUND}" '
-                    f'stroke-width="{design["cut"]}" stroke-linejoin="round"/>')
+        texture += (
+            f'<rect y="{y + strike_top * scale - half_cut:.2f}" width="{width}" '
+            f'height="{strike_height * scale + 2 * half_cut:.2f}" fill="{GROUND}"/>'
+            f'<use href="#letters" transform="{place}" fill="{GROUND}" stroke="{GROUND}" '
+            f'stroke-width="{design["cut"]}" stroke-linejoin="round"/>'
+        )
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <title>Code Villain</title>
   <defs>
@@ -181,10 +211,15 @@ def svg(design, width, height, cx, cy, size):
 
 
 # The cube pattern has no letters, so it needs no placement.
-JOBS = [(name, size_name, svg(DESIGNS[name], *FORMATS[size_name], cx, cy, size))
-        for (name, size_name), (cx, cy, size) in PLACEMENT.items()]
-JOBS += [(name, size_name, cubes(*FORMATS[size_name], palette))
-         for name, palette in CUBES.items() for size_name in FORMATS]
+JOBS = [
+    (name, size_name, svg(DESIGNS[name], *FORMATS[size_name], cx, cy, size))
+    for (name, size_name), (cx, cy, size) in PLACEMENT.items()
+]
+JOBS += [
+    (name, size_name, cubes(*FORMATS[size_name], palette))
+    for name, palette in CUBES.items()
+    for size_name in FORMATS
+]
 
 for name, size_name, drawing in JOBS:
     width, height = FORMATS[size_name]
@@ -193,10 +228,18 @@ for name, size_name, drawing in JOBS:
     source.write_text(drawing)
     with tempfile.TemporaryDirectory() as profile:
         subprocess.run(
-            [CHROME, "--headless=new", f"--user-data-dir={profile}", "--hide-scrollbars",
-             "--force-device-scale-factor=1", f"--window-size={width},{height}",
-             "--virtual-time-budget=10000",
-             f"--screenshot={HERE / f'{stem}.png'}", source.as_uri()],
-            check=True, capture_output=True,
+            [
+                CHROME,
+                "--headless=new",
+                f"--user-data-dir={profile}",
+                "--hide-scrollbars",
+                "--force-device-scale-factor=1",
+                f"--window-size={width},{height}",
+                "--virtual-time-budget=10000",
+                f"--screenshot={HERE / f'{stem}.png'}",
+                source.as_uri(),
+            ],
+            check=True,
+            capture_output=True,
         )
     print(f"{stem}: {width}×{height}")

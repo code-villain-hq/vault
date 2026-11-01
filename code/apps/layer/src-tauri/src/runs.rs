@@ -402,10 +402,7 @@ impl Log {
     fn parse(raw: &str) -> Option<Self> {
         let value: serde_json::Value = serde_json::from_str(raw).ok()?;
         let entries = value.get("runs")?.as_array()?;
-        let mut items: VecDeque<Run> = entries
-            .iter()
-            .filter_map(|e| serde_json::from_value(e.clone()).ok())
-            .collect();
+        let mut items: VecDeque<Run> = entries.iter().filter_map(|e| serde_json::from_value(e.clone()).ok()).collect();
         items.truncate(CAP);
         // Written before tasks were kept: none.
         let mut tasks: VecDeque<TaskDone> = value
@@ -633,7 +630,9 @@ mod tests {
         let app = tauri::test::mock_app();
         app.manage(state(&root));
         let st = app.state::<AppState>();
-        let start = |checkout: Option<&str>, script: &str| st.ptys.spawn(app.handle(), agent(&root, checkout, script)).unwrap().id;
+        let start = |checkout: Option<&str>, script: &str| {
+            st.ptys.spawn(app.handle(), agent(&root, checkout, script)).unwrap().id
+        };
         let stopped = start(None, "sleep 30");
         let failed = start(Some("t1-web"), "exit 3");
         let exited = start(None, "exit 0");
@@ -724,17 +723,13 @@ mod tests {
         tally.settle(true, true, None, at(100));
         tally.tool(false);
         tally.tool(true);
-        let ended = Ended {
-            info: info(),
-            born: at(0),
-            stopping: true,
-            code: Some(1),
-            tokens: None,
-            turns: 3,
-            tally,
-        };
+        let ended = Ended { info: info(), born: at(0), stopping: true, code: Some(1), tokens: None, turns: 3, tally };
         let run = describe(&AppConfig::default(), ended, None, at(160));
-        assert_eq!((run.asks, run.waited_secs, run.limited, run.turns), (2, 90, true, 3), "30s answered, 60s open at the end");
+        assert_eq!(
+            (run.asks, run.waited_secs, run.limited, run.turns),
+            (2, 90, true, 3),
+            "30s answered, 60s open at the end"
+        );
         assert_eq!(run.tools, Some(ToolCalls { calls: 2, failed: 1 }));
         assert_eq!(run.worked_secs, None, "it never said whether it was working");
     }

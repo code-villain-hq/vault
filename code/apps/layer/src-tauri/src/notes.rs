@@ -138,10 +138,7 @@ impl Book {
     }
 
     fn find(&mut self, id: &str) -> Result<&mut Note> {
-        self.notes
-            .iter_mut()
-            .find(|n| n.id == id)
-            .ok_or_else(|| Error::NotFound(format!("note {id}")))
+        self.notes.iter_mut().find(|n| n.id == id).ok_or_else(|| Error::NotFound(format!("note {id}")))
     }
 
     fn check(&mut self, id: &str, commit: Option<String>, now: i64) -> Result<Note> {
@@ -163,11 +160,7 @@ impl Book {
     }
 
     fn forget(&mut self, id: &str) -> Result<Note> {
-        let at = self
-            .notes
-            .iter()
-            .position(|n| n.id == id)
-            .ok_or_else(|| Error::NotFound(format!("note {id}")))?;
+        let at = self.notes.iter().position(|n| n.id == id).ok_or_else(|| Error::NotFound(format!("note {id}")))?;
         Ok(self.notes.remove(at))
     }
 
@@ -216,12 +209,8 @@ impl Book {
     /// build cannot read is dropped on its own.
     fn parse(raw: &str) -> Option<Self> {
         let value: serde_json::Value = serde_json::from_str(raw).ok()?;
-        let notes = value
-            .get("notes")?
-            .as_array()?
-            .iter()
-            .filter_map(|n| serde_json::from_value(n.clone()).ok())
-            .collect();
+        let notes =
+            value.get("notes")?.as_array()?.iter().filter_map(|n| serde_json::from_value(n.clone()).ok()).collect();
         let shared = value.get("shared").and_then(serde_json::Value::as_bool).unwrap_or(false);
         let outbox = value.get("outbox").and_then(serde_json::Value::as_array).cloned().unwrap_or_default();
         Some(Self { notes, shared, outbox })

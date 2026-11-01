@@ -14,9 +14,9 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::commands::AppState;
 use crate::config::shared::{take_held, take_record, Elsewhere, Held};
 use crate::config::{AppConfig, AthenaTable, LogSource, ModelChoice};
-use crate::commands::AppState;
 use crate::error::Result;
 use crate::git::UpdateBy;
 use crate::notes::Note;
@@ -171,10 +171,8 @@ fn merge(
 
     // A connection needs this Mac's half (a token, the Jira email) before it
     // is one, so only those set up here take the workspace's settings.
-    c.shared.held = connections
-        .iter()
-        .map(|r| (r.kind.clone(), Held { id: r.id.clone(), settings: r.settings.clone() }))
-        .collect();
+    c.shared.held =
+        connections.iter().map(|r| (r.kind.clone(), Held { id: r.id.clone(), settings: r.settings.clone() })).collect();
     // A tracker the workspace no longer has is gone here too.
     c.tracker = None;
     c.shared.connections.remove("tracker");
@@ -249,11 +247,13 @@ mod tests {
         let state = v2_profile(&root);
         super::super::moving::move_in(&state, uuid::Uuid::now_v7()).unwrap();
         let sent = ops(&state);
-        state.config.mirror(|c| {
-            c.shared.outbox.clear();
-            true
-        })
-        .unwrap();
+        state
+            .config
+            .mirror(|c| {
+                c.shared.outbox.clear();
+                true
+            })
+            .unwrap();
         let mut held = json!({ "repositories": [], "connections": [], "log_sources": [], "agent_models": [], "notes": [], "users": [] });
         for op in sent {
             let mut record = op["data"].clone();
@@ -301,7 +301,10 @@ mod tests {
         assert!(cfg.projects[0].path.ends_with("/api"), "the clone stays where it is");
         let jira = cfg.jira.as_ref().unwrap();
         assert_eq!((jira.project_key.as_deref(), jira.email.as_str()), (Some("PAY"), "me@acme.example"));
-        assert_eq!((cfg.log_sources[0].name.as_str(), cfg.log_sources[0].profile.as_str()), ("Payments logs", "acme-prod"));
+        assert_eq!(
+            (cfg.log_sources[0].name.as_str(), cfg.log_sources[0].profile.as_str()),
+            ("Payments logs", "acme-prod")
+        );
         assert!(cfg.shared.outbox.is_empty(), "what came from the workspace is not sent back");
 
         let notes = state.notes.of("github.com/acme/api");

@@ -62,19 +62,12 @@ pub struct Skipped {
 /// folder of twenty should not hold the dialog open for it. A task started
 /// before its copy is made makes it then.
 #[tauri::command]
-pub async fn add_projects(
-    app: AppHandle,
-    paths: Vec<String>,
-    group: Option<String>,
-) -> Result<Added> {
+pub async fn add_projects(app: AppHandle, paths: Vec<String>, group: Option<String>) -> Result<Added> {
     let (added, skipped) = super::blocking(app.clone(), move |state| {
         let (described, skipped) = describe_all(&paths, group.as_deref());
-        let added = state.config.update(|c| {
-            described
-                .into_iter()
-                .map(|project| merge_project(c, project))
-                .collect::<Vec<_>>()
-        })?;
+        let added = state
+            .config
+            .update(|c| described.into_iter().map(|project| merge_project(c, project)).collect::<Vec<_>>())?;
         Ok((added, skipped))
     })
     .await?;
@@ -114,11 +107,7 @@ fn describe_all(paths: &[String], group: Option<&str>) -> (Vec<Project>, Vec<Ski
 }
 
 #[tauri::command]
-pub fn set_project_group(
-    state: State<AppState>,
-    project_ids: Vec<String>,
-    group: Option<String>,
-) -> Result<()> {
+pub fn set_project_group(state: State<AppState>, project_ids: Vec<String>, group: Option<String>) -> Result<()> {
     let group = group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty());
     state.config.update(|c| {
         for p in c.projects.iter_mut().filter(|p| project_ids.contains(&p.id)) {
@@ -138,8 +127,16 @@ pub struct FoundRepo {
 
 /// Directories that are never worth descending into when hunting for repos.
 pub(crate) const SKIP: &[&str] = &[
-    "node_modules", "target", "dist", "build", "vendor", "Pods",
-    "DerivedData", "__pycache__", "Library", "Applications",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    "vendor",
+    "Pods",
+    "DerivedData",
+    "__pycache__",
+    "Library",
+    "Applications",
 ];
 
 pub(crate) fn walk_for_repos(dir: &Path, depth: usize, max_depth: usize, out: &mut Vec<PathBuf>) {
@@ -184,19 +181,11 @@ pub(crate) fn walk_for_repos(dir: &Path, depth: usize, max_depth: usize, out: &m
 /// Off the command thread: this walks the disk three levels deep and then runs
 /// `git rev-parse` in every repository it found.
 #[tauri::command]
-pub async fn scan_repos(
-    app: AppHandle,
-    root: String,
-    max_depth: Option<usize>,
-) -> Result<Vec<FoundRepo>> {
+pub async fn scan_repos(app: AppHandle, root: String, max_depth: Option<usize>) -> Result<Vec<FoundRepo>> {
     super::blocking(app, move |state| scan_repos_inner(state, root, max_depth)).await
 }
 
-fn scan_repos_inner(
-    state: &AppState,
-    root: String,
-    max_depth: Option<usize>,
-) -> Result<Vec<FoundRepo>> {
+fn scan_repos_inner(state: &AppState, root: String, max_depth: Option<usize>) -> Result<Vec<FoundRepo>> {
     let dir = PathBuf::from(&root);
     if !dir.is_dir() {
         return Err(Error::NotFound(format!("{root} is not a directory")));
@@ -212,10 +201,7 @@ fn scan_repos_inner(
         .map(|p| {
             let path = p.to_string_lossy().to_string();
             FoundRepo {
-                name: p
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| path.clone()),
+                name: p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.clone()),
                 branch: git::current_branch(&p).unwrap_or_default(),
                 registered: known.contains(&path),
                 path,
@@ -237,10 +223,7 @@ pub(super) fn describe_project(path: &str, group: Option<&str>) -> Result<Projec
     let root = git::repo_root(&dir)?;
     let root_path = PathBuf::from(&root);
 
-    let name = root_path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| root.clone());
+    let name = root_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| root.clone());
 
     Ok(Project {
         id: uuid::Uuid::new_v4().to_string(),
@@ -281,25 +264,15 @@ pub async fn remove_project(app: tauri::AppHandle, id: String) -> Result<()> {
 pub(crate) fn remove_project_inner(state: &AppState, id: &str) -> Result<()> {
     let (gone, dropped): (Vec<String>, Vec<String>) = state.config.update(|c| {
         c.projects.retain(|p| p.id != id);
-        let gone: Vec<String> = c
-            .checkouts
-            .iter()
-            .filter(|ch| ch.project_id == id)
-            .map(|ch| ch.id.clone())
-            .collect();
+        let gone: Vec<String> = c.checkouts.iter().filter(|ch| ch.project_id == id).map(|ch| ch.id.clone()).collect();
         // The tasks this removal leaves with nothing, and only those. Taking
         // every task with no repositories also took ones that were already
         // empty — a task whose last repo was removed to be replaced — which
         // vanished when some unrelated repository was forgotten.
-        let touched: std::collections::HashSet<String> = c
-            .checkouts
-            .iter()
-            .filter(|ch| ch.project_id == id)
-            .map(|ch| ch.task_id.clone())
-            .collect();
+        let touched: std::collections::HashSet<String> =
+            c.checkouts.iter().filter(|ch| ch.project_id == id).map(|ch| ch.task_id.clone()).collect();
         c.checkouts.retain(|ch| ch.project_id != id);
-        let live: std::collections::HashSet<&str> =
-            c.checkouts.iter().map(|ch| ch.task_id.as_str()).collect();
+        let live: std::collections::HashSet<&str> = c.checkouts.iter().map(|ch| ch.task_id.as_str()).collect();
         let dropped: Vec<String> = c
             .tasks
             .iter()
@@ -319,7 +292,6 @@ pub(crate) fn remove_project_inner(state: &AppState, id: &str) -> Result<()> {
     }
     Ok(())
 }
-
 
 // ------------------------------------------------------ the app's own copies
 
@@ -345,10 +317,7 @@ pub(crate) fn ensure_store(state: &AppState, project_id: &str) -> Result<PathBuf
         return Ok(store);
     }
     if !source.is_dir() {
-        return Err(Error::NotFound(format!(
-            "{} is gone, and the app has no copy of it to work from",
-            project.path
-        )));
+        return Err(Error::NotFound(format!("{} is gone, and the app has no copy of it to work from", project.path)));
     }
     let root = state.config.worktree_root().join(".repos");
     let mut store = root.join(format!("{}.git", project.name));

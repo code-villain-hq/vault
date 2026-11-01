@@ -135,8 +135,13 @@ mod tests {
             title_activity: None,
             title_topic: None,
         };
-        let launch =
-            crate::acp::Launch { mcp: None, pick: crate::acp::Pick::New, prompt: Some("ping".into()), presets: Vec::new(), on_session: None };
+        let launch = crate::acp::Launch {
+            mcp: None,
+            pick: crate::acp::Pick::New,
+            prompt: Some("ping".into()),
+            presets: Vec::new(),
+            on_session: None,
+        };
         let pane = ptys.spawn_acp(app.handle(), opts, launch).unwrap();
         let saved = SavedPane {
             id: pane.id.clone(),
@@ -151,7 +156,10 @@ mod tests {
             session: None,
             on_loop: None,
         };
-        let config = ConfigStore::for_tests(dir.join("config.json"), AppConfig { saved_panes: vec![saved], ..Default::default() });
+        let config = ConfigStore::for_tests(
+            dir.join("config.json"),
+            AppConfig { saved_panes: vec![saved], ..Default::default() },
+        );
         let deadline = Instant::now() + Duration::from_secs(10);
         while ptys.info(&pane.id).unwrap().activity != Activity::Done && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));

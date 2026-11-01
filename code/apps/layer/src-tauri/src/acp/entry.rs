@@ -8,9 +8,17 @@ use serde::Serialize;
 pub enum Body {
     /// What the user sent. `queued` while it waits for the turn before it to
     /// end (ACP-4); `dropped` when Stop ended that turn and it was never sent.
-    User { text: String, queued: bool, dropped: bool },
-    Agent { text: String },
-    Thought { text: String },
+    User {
+        text: String,
+        queued: bool,
+        dropped: bool,
+    },
+    Agent {
+        text: String,
+    },
+    Thought {
+        text: String,
+    },
     Tool {
         id: String,
         title: String,
@@ -22,13 +30,22 @@ pub enum Body {
         /// `path` or `path:line`, absolute.
         locations: Vec<String>,
     },
-    Plan { steps: Vec<Step> },
+    Plan {
+        steps: Vec<Step>,
+    },
     /// A permission question (ACP-5). `answer` is the option chosen, or
     /// "cancelled"; None while it is open.
-    Question { title: String, options: Vec<Choice>, answer: Option<String> },
+    Question {
+        title: String,
+        options: Vec<Choice>,
+        answer: Option<String>,
+    },
     /// Something the app says about the conversation: an error, why it could
     /// not be picked up, how to sign in.
-    Note { text: String, error: bool },
+    Note {
+        text: String,
+        error: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

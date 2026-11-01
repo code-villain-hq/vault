@@ -264,7 +264,6 @@ impl Browser {
         }
         changed(app, task);
     }
-
 }
 
 /// When Chrome drew a frame, in seconds, or now if it does not say.
@@ -471,9 +470,8 @@ impl Browser {
     /// start the page moving again.
     async fn make_sure_sharp(&self, cdp: &Cdp, session: &str) {
         tokio::time::sleep(SHARP_WAIT).await;
-        let missing = |inner: &super::Inner| {
-            inner.watch.as_ref().is_some_and(|w| w.session == session && w.sharp && w.switching)
-        };
+        let missing =
+            |inner: &super::Inner| inner.watch.as_ref().is_some_and(|w| w.session == session && w.sharp && w.switching);
         if !missing(&self.inner.lock()) {
             return;
         }
@@ -555,14 +553,10 @@ impl super::Inner {
     /// One more screencast started on the watched tab; its number.
     fn count_screencast(&mut self) -> i64 {
         let Some(session) = self.watch.as_ref().map(|w| w.session.clone()) else { return 0 };
-        self.tabs
-            .values_mut()
-            .flat_map(|t| t.list.iter_mut())
-            .find(|t| t.session == session)
-            .map_or(0, |t| {
-                t.screencasts += 1;
-                t.screencasts
-            })
+        self.tabs.values_mut().flat_map(|t| t.list.iter_mut()).find(|t| t.session == session).map_or(0, |t| {
+            t.screencasts += 1;
+            t.screencasts
+        })
     }
 }
 
@@ -653,12 +647,16 @@ mod tests {
         // A continuous scroll, as a trackpad: a wheel every 16ms for 2s.
         while frames.try_recv().is_ok() {}
         let t0 = Instant::now();
-        let mut n = 0; let mut bytes = 0;
+        let mut n = 0;
+        let mut bytes = 0;
         while t0.elapsed() < Duration::from_secs(2) {
             let wheel = input::BrowserInput::Wheel { x: 400.0, y: 400.0, dx: 0.0, dy: 30.0, modifiers: 0 };
             state.browser.input("t1", &wheel).unwrap();
             tokio::time::sleep(Duration::from_millis(16)).await;
-            while let Ok((_, b)) = frames.try_recv() { n += 1; bytes += b; }
+            while let Ok((_, b)) = frames.try_recv() {
+                n += 1;
+                bytes += b;
+            }
         }
         let stop = Instant::now();
         let mut idle = Vec::new();
@@ -667,8 +665,14 @@ mod tests {
                 idle.push((at.duration_since(stop).as_millis(), b / 1024));
             }
         }
-        eprintln!("scroll latency ms median {} p90 {} | scroll fps {} avg {} KB | after stopping (ms, KB): {:?}",
-            lat.get(lat.len() / 2).copied().unwrap_or(0), lat.get(lat.len() * 9 / 10).copied().unwrap_or(0), n / 2, bytes / n.max(1) / 1024, idle);
+        eprintln!(
+            "scroll latency ms median {} p90 {} | scroll fps {} avg {} KB | after stopping (ms, KB): {:?}",
+            lat.get(lat.len() / 2).copied().unwrap_or(0),
+            lat.get(lat.len() * 9 / 10).copied().unwrap_or(0),
+            n / 2,
+            bytes / n.max(1) / 1024,
+            idle
+        );
         state.browser.shutdown(Duration::from_secs(3));
         state.ptys.shutdown(Duration::from_secs(1));
         let _ = std::fs::remove_dir_all(&root);
@@ -728,14 +732,25 @@ mod tests {
         let (x, y) = (field[0].as_f64().unwrap(), field[1].as_f64().unwrap());
         for kind in ["mousePressed", "mouseReleased"] {
             let click = input::BrowserInput::Mouse {
-                r#type: kind.into(), x, y, button: "left".into(), buttons: 1, click_count: 1, modifiers: 0,
+                r#type: kind.into(),
+                x,
+                y,
+                button: "left".into(),
+                buttons: 1,
+                click_count: 1,
+                modifiers: 0,
             };
             state.browser.input("t1", &click).unwrap();
         }
         for (kind, text) in [("keyDown", Some("q")), ("keyUp", None)] {
             let k = input::BrowserInput::Key {
-                r#type: kind.into(), key: "q".into(), code: "KeyQ".into(), key_code: 81,
-                text: text.map(str::to_string), modifiers: 0, location: 0,
+                r#type: kind.into(),
+                key: "q".into(),
+                code: "KeyQ".into(),
+                key_code: 81,
+                text: text.map(str::to_string),
+                modifiers: 0,
+                location: 0,
             };
             state.browser.input("t1", &k).unwrap();
         }
@@ -765,10 +780,10 @@ mod tests {
         let state = app.state::<AppState>();
         let viewport = Viewport { width: 640, height: 480, scale: 1.0 };
 
-        let (watched, ()) = tokio::join!(
-            state.browser.watch(app.handle(), "t1", viewport, Channel::new(|_| Ok(()))),
-            async { state.browser.unwatch("t1") },
-        );
+        let (watched, ()) =
+            tokio::join!(state.browser.watch(app.handle(), "t1", viewport, Channel::new(|_| Ok(()))), async {
+                state.browser.unwatch("t1")
+            },);
 
         watched.unwrap();
         assert!(state.browser.inner.lock().watch.is_none());

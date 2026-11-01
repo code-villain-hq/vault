@@ -1,0 +1,4 @@
+# The app's Rust was written wide and dense; these keep it that way. The
+# crates beside it use rustfmt's defaults.
+max_width = 120
+use_small_heuristics = "Max"

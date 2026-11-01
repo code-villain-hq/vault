@@ -16,15 +16,47 @@ const MAX_CHARS: usize = 40_000;
 
 /// Roles an agent acts on, which get a ref whether or not they are focusable.
 const ACTIONABLE: &[&str] = &[
-    "button", "link", "textbox", "searchbox", "checkbox", "radio", "combobox", "listbox", "option",
-    "menuitem", "menuitemcheckbox", "menuitemradio", "tab", "switch", "slider", "spinbutton",
-    "treeitem", "textField", "TextField", "ComboBoxGrouping", "ComboBoxMenuButton", "PopUpButton",
+    "button",
+    "link",
+    "textbox",
+    "searchbox",
+    "checkbox",
+    "radio",
+    "combobox",
+    "listbox",
+    "option",
+    "menuitem",
+    "menuitemcheckbox",
+    "menuitemradio",
+    "tab",
+    "switch",
+    "slider",
+    "spinbutton",
+    "treeitem",
+    "textField",
+    "TextField",
+    "ComboBoxGrouping",
+    "ComboBoxMenuButton",
+    "PopUpButton",
 ];
 
 /// Roles that only wrap others: their children are printed in their place.
 const WRAPPERS: &[&str] = &[
-    "none", "generic", "GenericContainer", "Section", "presentation", "LineBreak", "InlineTextBox",
-    "LayoutTable", "LayoutTableRow", "LayoutTableCell", "Div", "Span", "paragraph", "group", "Pre",
+    "none",
+    "generic",
+    "GenericContainer",
+    "Section",
+    "presentation",
+    "LineBreak",
+    "InlineTextBox",
+    "LayoutTable",
+    "LayoutTableRow",
+    "LayoutTableCell",
+    "Div",
+    "Span",
+    "paragraph",
+    "group",
+    "Pre",
 ];
 
 struct Node<'a> {
@@ -59,24 +91,25 @@ fn parse(nodes: &[Value]) -> (Option<&str>, HashMap<&str, Node<'_>>) {
             .get("properties")
             .and_then(Value::as_array)
             .map(|ps| {
-                ps.iter()
-                    .filter_map(|p| Some((p.get("name")?.as_str()?, p.get("value")?.get("value")?)))
-                    .collect()
+                ps.iter().filter_map(|p| Some((p.get("name")?.as_str()?, p.get("value")?.get("value")?))).collect()
             })
             .unwrap_or_default();
-        map.insert(id, Node {
-            role: text(n, "role"),
-            name: text(n, "name"),
-            value,
-            ignored: n.get("ignored").and_then(Value::as_bool).unwrap_or(false),
-            backend: n.get("backendDOMNodeId").and_then(Value::as_i64),
-            children: n
-                .get("childIds")
-                .and_then(Value::as_array)
-                .map(|c| c.iter().filter_map(Value::as_str).collect())
-                .unwrap_or_default(),
-            props,
-        });
+        map.insert(
+            id,
+            Node {
+                role: text(n, "role"),
+                name: text(n, "name"),
+                value,
+                ignored: n.get("ignored").and_then(Value::as_bool).unwrap_or(false),
+                backend: n.get("backendDOMNodeId").and_then(Value::as_i64),
+                children: n
+                    .get("childIds")
+                    .and_then(Value::as_array)
+                    .map(|c| c.iter().filter_map(Value::as_str).collect())
+                    .unwrap_or_default(),
+                props,
+            },
+        );
     }
     (root, map)
 }
@@ -139,7 +172,9 @@ fn walk(map: &HashMap<&str, Node>, id: &str, depth: usize, out: &mut Vec<String>
     if let Some(b) = n.backend.filter(|_| focusable || ACTIONABLE.contains(&n.role)) {
         line.push_str(&format!(" [ref=e{b}]"));
     }
-    for (key, shown) in [("checked", "checked"), ("selected", "selected"), ("expanded", "expanded"), ("pressed", "pressed")] {
+    for (key, shown) in
+        [("checked", "checked"), ("selected", "selected"), ("expanded", "expanded"), ("pressed", "pressed")]
+    {
         match prop(n, key) {
             Some(Value::Bool(true)) => line.push_str(&format!(" [{shown}]")),
             Some(Value::String(s)) if s == "true" || s == "mixed" => line.push_str(&format!(" [{shown}={s}]")),

@@ -294,11 +294,9 @@ impl Conn {
     fn set_preset(&self, st: &mut State, fx: &mut Effects) -> bool {
         let Some(session) = st.session.clone() else { return false };
         while let Some((category, value)) = st.presets.pop_front() {
-            let offered = st
-                .convo
-                .settings
-                .iter()
-                .find(|s| s.category.as_deref() == Some(category.as_str()) && s.options.iter().any(|o| o.value == value));
+            let offered = st.convo.settings.iter().find(|s| {
+                s.category.as_deref() == Some(category.as_str()) && s.options.iter().any(|o| o.value == value)
+            });
             let Some(setting) = offered.filter(|s| s.current != value) else { continue };
             let params = json!({ "sessionId": session, "configId": setting.id, "value": value });
             self.request(st, fx, "session/set_config_option", params, Waiting::Preset(category));
@@ -309,11 +307,8 @@ impl Conn {
 
     pub(super) fn send_prompt(&self, st: &mut State, fx: &mut Effects, q: &Queued) {
         let Some(session) = st.session.clone() else { return };
-        let mut blocks: Vec<Value> = q
-            .images
-            .iter()
-            .map(|i| json!({ "type": "image", "mimeType": i.mime_type, "data": i.data }))
-            .collect();
+        let mut blocks: Vec<Value> =
+            q.images.iter().map(|i| json!({ "type": "image", "mimeType": i.mime_type, "data": i.data })).collect();
         if !q.text.trim().is_empty() {
             blocks.push(json!({ "type": "text", "text": q.text }));
         }
@@ -396,9 +391,8 @@ impl Conn {
     fn on_response(&self, id: u64, result: Option<&Value>, error: Option<&Value>) {
         self.with(|st, fx| {
             let Some(waiting) = st.waiting.remove(&id) else { return };
-            let failed = error.map(|e| {
-                e.get("message").and_then(Value::as_str).unwrap_or("the agent gave an error").to_string()
-            });
+            let failed = error
+                .map(|e| e.get("message").and_then(Value::as_str).unwrap_or("the agent gave an error").to_string());
             let empty = Value::Null;
             let result = result.unwrap_or(&empty);
             match (waiting, failed) {
@@ -431,7 +425,13 @@ impl Conn {
                     let newest = failed.is_none().then(|| newest_in(result, &cwd)).flatten();
                     match newest {
                         Some(id) => {
-                            let opening = if st.caps.load { Opening::Load(id) } else if st.caps.resume { Opening::Resume(id) } else { Opening::New };
+                            let opening = if st.caps.load {
+                                Opening::Load(id)
+                            } else if st.caps.resume {
+                                Opening::Resume(id)
+                            } else {
+                                Opening::New
+                            };
                             self.open_as(st, fx, opening);
                         }
                         None => self.open_as(st, fx, Opening::New),
@@ -460,7 +460,8 @@ impl Conn {
                     }
                 }
                 (Waiting::Open(Opening::Load(_) | Opening::Resume(_)), Some(e)) => {
-                    st.convo.note(&format!("Could not pick the conversation back up ({e}), so this is a new one."), false);
+                    st.convo
+                        .note(&format!("Could not pick the conversation back up ({e}), so this is a new one."), false);
                     self.open_as(st, fx, Opening::New);
                 }
                 (Waiting::Open(Opening::New), Some(e)) => {
@@ -618,12 +619,22 @@ mod tests {
     struct FakePane(Arc<Mutex<Seen>>);
 
     impl Pane for FakePane {
-        fn report(&self, a: Activity) { self.0.lock().reports.push(a); }
-        fn print(&self, t: &str) { self.0.lock().text.push_str(t); }
+        fn report(&self, a: Activity) {
+            self.0.lock().reports.push(a);
+        }
+        fn print(&self, t: &str) {
+            self.0.lock().text.push_str(t);
+        }
         fn changed(&self) {}
-        fn topic(&self, t: String) { self.0.lock().topic = Some(t); }
-        fn session(&self, id: &str) { self.0.lock().session = Some(id.into()); }
-        fn failed(&self, m: &str) { self.0.lock().failed = Some(m.into()); }
+        fn topic(&self, t: String) {
+            self.0.lock().topic = Some(t);
+        }
+        fn session(&self, id: &str) {
+            self.0.lock().session = Some(id.into());
+        }
+        fn failed(&self, m: &str) {
+            self.0.lock().failed = Some(m.into());
+        }
         fn exited(&self, _: Option<i32>) {}
     }
 
@@ -799,10 +810,7 @@ mod tests {
         reply(&c, &sent(&rx)[0]["id"], json!({ "stopReason": "end_turn", "usage": usage(5) }));
         c.prompt("three").unwrap();
         reply(&c, &sent(&rx)[0]["id"], json!({ "stopReason": "cancelled" }));
-        assert_eq!(
-            c.tokens(),
-            Some(crate::runs::Tokens { input: 15, output: 40, cached_read: 600, cached_write: 8 })
-        );
+        assert_eq!(c.tokens(), Some(crate::runs::Tokens { input: 15, output: 40, cached_read: 600, cached_write: 8 }));
     }
 
     #[test]
@@ -816,7 +824,10 @@ mod tests {
         // A phone's "2" picks the second option.
         assert!(c.key("2"));
         let answer = sent(&rx).remove(0);
-        assert_eq!(answer, json!({ "jsonrpc": "2.0", "id": "q7", "result": { "outcome": { "outcome": "selected", "optionId": "reject" } } }));
+        assert_eq!(
+            answer,
+            json!({ "jsonrpc": "2.0", "id": "q7", "result": { "outcome": { "outcome": "selected", "optionId": "reject" } } })
+        );
         assert_eq!(seen.lock().reports.last(), Some(&Activity::Working));
         assert!(!c.key("1"), "nothing is open any more");
     }
@@ -825,8 +836,10 @@ mod tests {
     fn stopping_cancels_the_turn_and_answers_open_questions_cancelled() {
         let (c, rx, seen) = opened(Some("go"));
         let prompt = sent(&rx).remove(0);
-        c.handle_line(r#"{"jsonrpc":"2.0","id":3,"method":"session/request_permission","params":{"sessionId":"s-1",
-            "toolCall":{"toolCallId":"t1"},"options":[{"optionId":"a","name":"Allow","kind":"allow_once"}]}}"#);
+        c.handle_line(
+            r#"{"jsonrpc":"2.0","id":3,"method":"session/request_permission","params":{"sessionId":"s-1",
+            "toolCall":{"toolCallId":"t1"},"options":[{"optionId":"a","name":"Allow","kind":"allow_once"}]}}"#,
+        );
         c.prompt("then this").unwrap();
         assert!(c.key("\u{1b}"));
         let out = sent(&rx);
@@ -864,8 +877,11 @@ mod tests {
         reply(&c, &init["id"], serde_json::from_str(CAPS).unwrap());
         let load = sent(&rx).remove(0);
         let update = |kind: &str, text: &str| {
-            c.handle_line(&json!({ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s-9",
-                "update": { "sessionUpdate": kind, "content": { "type": "text", "text": text } } } }).to_string());
+            c.handle_line(
+                &json!({ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s-9",
+                "update": { "sessionUpdate": kind, "content": { "type": "text", "text": text } } } })
+                .to_string(),
+            );
         };
         update("user_message_chunk", "say pong");
         update("agent_message_chunk", "pong");
@@ -875,7 +891,10 @@ mod tests {
         update("agent_message_chunk", "pong again");
         let texts: Vec<String> = c.view(None).changes.entries.iter().map(|e| format!("{:?}", e.body)).collect();
         assert_eq!(texts.len(), 4, "{texts:?}");
-        assert!(texts[0].contains("say pong") && texts[2].contains("and now?") && texts[3].contains("pong again"), "{texts:?}");
+        assert!(
+            texts[0].contains("say pong") && texts[2].contains("and now?") && texts[3].contains("pong again"),
+            "{texts:?}"
+        );
     }
 
     #[test]
@@ -885,11 +904,15 @@ mod tests {
         reply(&c, &init["id"], serde_json::from_str(CAPS).unwrap());
         let list = sent(&rx).remove(0);
         assert_eq!(list["method"], "session/list");
-        reply(&c, &list["id"], json!({ "sessions": [
+        reply(
+            &c,
+            &list["id"],
+            json!({ "sessions": [
             { "sessionId": "old", "cwd": "/work", "updatedAt": "2026-10-01T10:00:00Z" },
             { "sessionId": "elsewhere", "cwd": "/other", "updatedAt": "2026-10-08T10:00:00Z" },
             { "sessionId": "new", "cwd": "/work", "updatedAt": "2026-10-07T10:00:00Z" }
-        ] }));
+        ] }),
+        );
         let load = sent(&rx).remove(0);
         assert_eq!(load["params"]["sessionId"], "new");
     }
@@ -900,7 +923,10 @@ mod tests {
         let init = sent(&rx).remove(0);
         reply(&c, &init["id"], serde_json::from_str(CAPS).unwrap());
         let load = sent(&rx).remove(0);
-        c.handle_line(&json!({ "jsonrpc": "2.0", "id": load["id"], "error": { "code": -32002, "message": "Session not found" } }).to_string());
+        c.handle_line(
+            &json!({ "jsonrpc": "2.0", "id": load["id"], "error": { "code": -32002, "message": "Session not found" } })
+                .to_string(),
+        );
         assert_eq!(sent(&rx).remove(0)["method"], "session/new");
         assert!(seen.lock().text.contains("Session not found"));
     }
@@ -909,8 +935,12 @@ mod tests {
     fn an_agent_that_will_not_open_says_how_it_wants_signing_in() {
         let (c, rx, seen) = conn(Pick::New, Some("go"));
         let init = sent(&rx).remove(0);
-        reply(&c, &init["id"], json!({ "agentCapabilities": {}, "authMethods": [{ "id": "copilot-login", "name": "Log in with Copilot CLI",
-            "_meta": { "terminal-auth": { "command": "copilot", "args": ["login"] } } }] }));
+        reply(
+            &c,
+            &init["id"],
+            json!({ "agentCapabilities": {}, "authMethods": [{ "id": "copilot-login", "name": "Log in with Copilot CLI",
+            "_meta": { "terminal-auth": { "command": "copilot", "args": ["login"] } } }] }),
+        );
         let new = sent(&rx).remove(0);
         c.handle_line(&json!({ "jsonrpc": "2.0", "id": new["id"], "error": { "code": -32000, "message": "Authentication required" } }).to_string());
         let text = seen.lock().text.clone();
@@ -995,8 +1025,14 @@ mod tests {
         after.as_array_mut().unwrap().push(model);
         reply(&c, &set[0]["id"], json!({ "configOptions": after }));
         let set = sent(&rx);
-        assert_eq!((set[0]["params"]["configId"].as_str(), set[0]["params"]["value"].as_str()), (Some("model"), Some("opus")));
-        c.handle_line(&json!({ "jsonrpc": "2.0", "id": set[0]["id"], "error": { "code": -32603, "message": "no such model" } }).to_string());
+        assert_eq!(
+            (set[0]["params"]["configId"].as_str(), set[0]["params"]["value"].as_str()),
+            (Some("model"), Some("opus"))
+        );
+        c.handle_line(
+            &json!({ "jsonrpc": "2.0", "id": set[0]["id"], "error": { "code": -32603, "message": "no such model" } })
+                .to_string(),
+        );
         assert_eq!(sent(&rx).remove(0)["method"], "session/prompt", "a model refused still lets the prompt go");
         assert!(c.view(None).changes.entries.iter().any(|e| format!("{e:?}").contains("would not change its model")));
     }
@@ -1013,7 +1049,9 @@ mod tests {
     fn a_mode_refused_is_said_and_the_prompt_still_goes() {
         let (c, rx) = with_mode("auto", modes("default"));
         let set = sent(&rx).remove(0);
-        c.handle_line(&json!({ "jsonrpc": "2.0", "id": set["id"], "error": { "code": -32603, "message": "no" } }).to_string());
+        c.handle_line(
+            &json!({ "jsonrpc": "2.0", "id": set["id"], "error": { "code": -32603, "message": "no" } }).to_string(),
+        );
         assert_eq!(sent(&rx).remove(0)["method"], "session/prompt");
     }
 }

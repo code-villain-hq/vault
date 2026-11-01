@@ -1,0 +1,8 @@
+# Python across the vault (the site, the design tokens, the brand's
+# generators): `uvx ruff format` and `uvx ruff check`. CI runs both
+# (`.forgejo/workflows/python.yml`).
+line-length = 100
+
+[lint.per-file-ignores]
+# l, m and s are the cone responses, as OKLab's own formulas name them.
+"studio/design/tokens/theme.py" = ["E741"]

@@ -67,11 +67,8 @@ impl GitHub {
         pr_url: &str,
         images: &[Image],
     ) -> Result<Vec<Shown>> {
-        let files: Vec<String> = images
-            .iter()
-            .enumerate()
-            .map(|(i, img)| format!("{}-{}.{}", i + 1, slug(&img.caption), img.ext))
-            .collect();
+        let files: Vec<String> =
+            images.iter().enumerate().map(|(i, img)| format!("{}-{}.{}", i + 1, slug(&img.caption), img.ext)).collect();
 
         let mut tree = Vec::new();
         for (img, path) in images.iter().zip(&files) {
@@ -84,7 +81,10 @@ impl GitHub {
             tree.push(json!({ "path": path, "mode": "100644", "type": "blob", "sha": sha_of(&blob)? }));
         }
         let tree = self
-            .json(self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/git/trees")).json(&json!({ "tree": tree })))
+            .json(
+                self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/git/trees"))
+                    .json(&json!({ "tree": tree })),
+            )
             .await?;
         let commit = self.commit_for(owner, repo, number, sha_of(&tree)?).await?;
 
@@ -120,7 +120,12 @@ impl GitHub {
         // Through the API, never `git push`, and never a branch.
         let name = format!("pr-images/{number}");
         let refs = format!("/repos/{owner}/{repo}/git/refs");
-        let point = || self.json(self.req(reqwest::Method::PATCH, &format!("{refs}/{name}")).json(&json!({ "sha": commit, "force": true })));
+        let point = || {
+            self.json(
+                self.req(reqwest::Method::PATCH, &format!("{refs}/{name}"))
+                    .json(&json!({ "sha": commit, "force": true })),
+            )
+        };
         if self.has_ref(owner, repo, &name).await? {
             point().await?;
             return Ok(commit);
@@ -148,25 +153,18 @@ impl GitHub {
             .json(self.req(reqwest::Method::GET, &format!("/repos/{owner}/{repo}/git/matching-refs/{name}")))
             .await?;
         let want = format!("refs/{name}");
-        Ok(v.as_array()
-            .into_iter()
-            .flatten()
-            .any(|r| r.get("ref").and_then(Value::as_str) == Some(&want)))
+        Ok(v.as_array().into_iter().flatten().any(|r| r.get("ref").and_then(Value::as_str) == Some(&want)))
     }
 }
 
 fn sha_of(v: &Value) -> Result<&str> {
-    v.get("sha")
-        .and_then(Value::as_str)
-        .ok_or_else(|| Error::Other("GitHub answered without a sha".into()))
+    v.get("sha").and_then(Value::as_str).ok_or_else(|| Error::Other("GitHub answered without a sha".into()))
 }
 
 /// A caption as a file name: lowercase letters, digits and dashes.
 fn slug(caption: &str) -> String {
-    let s: String = caption
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
-        .collect();
+    let s: String =
+        caption.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
     let s = s.split('-').filter(|p| !p.is_empty()).take(6).collect::<Vec<_>>().join("-");
     if s.is_empty() {
         "image".into()
@@ -281,7 +279,10 @@ mod tests {
     #[test]
     fn a_caption_cannot_close_the_section_or_break_the_markdown() {
         let caption = "Night <!-- /pr-images --> **bold** [x]\nnext";
-        let body = with_images("", &[Shown { caption: caption.into(), url: "https://github.com/acme/web/raw/abc/1.png".into() }]);
+        let body = with_images(
+            "",
+            &[Shown { caption: caption.into(), url: "https://github.com/acme/web/raw/abc/1.png".into() }],
+        );
         assert_eq!(body.matches("pr-images -->").count(), 2);
         assert!(body.contains("**Night /pr-images bold [x] next**"), "{body}");
         assert!(body.contains("![Night /pr-images bold x next]("), "{body}");
@@ -334,7 +335,11 @@ mod tests {
                     if let Some(head_end) = text.find("\r\n\r\n") {
                         let len = text[..head_end]
                             .lines()
-                            .find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap()))
+                            .find_map(|l| {
+                                l.to_ascii_lowercase()
+                                    .strip_prefix("content-length:")
+                                    .map(|v| v.trim().parse::<usize>().unwrap())
+                            })
                             .unwrap_or(0);
                         if raw.len() >= head_end + 4 + len {
                             break;
@@ -346,7 +351,8 @@ mod tests {
                 let body = text.split_once("\r\n\r\n").map(|(_, b)| b.to_string()).unwrap_or_default();
                 log.lock().push(format!("{line} {body}"));
                 let (status, reply) = if line.starts_with("GET /repos/acme/web/git/matching-refs/") {
-                    let listed: Vec<Value> = refs.iter().map(|r| json!({ "ref": r, "object": { "sha": "older" } })).collect();
+                    let listed: Vec<Value> =
+                        refs.iter().map(|r| json!({ "ref": r, "object": { "sha": "older" } })).collect();
                     ("200 OK", json!(listed))
                 } else if line.starts_with("POST /repos/acme/web/git/blobs") {
                     ("201 Created", json!({ "sha": "blob1" }))
@@ -356,7 +362,9 @@ mod tests {
                     ("201 Created", json!({ "sha": "commit1" }))
                 } else if line.starts_with("POST /repos/acme/web/git/refs") && taken {
                     ("422 Unprocessable Entity", json!({ "message": "Reference already exists" }))
-                } else if line.starts_with("PATCH /repos/acme/web/git/refs/") || line.starts_with("POST /repos/acme/web/git/refs") {
+                } else if line.starts_with("PATCH /repos/acme/web/git/refs/")
+                    || line.starts_with("POST /repos/acme/web/git/refs")
+                {
                     ("200 OK", json!({ "ref": "refs/pr-images/12" }))
                 } else if line.starts_with("GET /repos/acme/web/pulls/12") {
                     ("200 OK", json!({ "number": 12, "body": "Darker sidebar." }))

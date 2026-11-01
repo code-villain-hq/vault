@@ -20,8 +20,8 @@ pub use branches::{BranchPr, PrState, MY_PULLS_LIMIT};
 pub use hunk::CodeLine;
 pub use images::{kind_of, Image, MAX_BYTES, MAX_IMAGES};
 pub use issues::IssueRef;
-pub(crate) use requested::{drop_already_listed, mine_review_query, team_review_query};
 pub use requested::ReviewRequest;
+pub(crate) use requested::{drop_already_listed, mine_review_query, team_review_query};
 pub use siblings::Sibling;
 
 pub struct GitHub {
@@ -117,24 +117,12 @@ impl GitHub {
 
     pub async fn login(&self) -> Result<String> {
         let v = self.json(self.req(reqwest::Method::GET, "/user")).await?;
-        Ok(v.get("login")
-            .and_then(|l| l.as_str())
-            .unwrap_or_default()
-            .to_string())
+        Ok(v.get("login").and_then(|l| l.as_str()).unwrap_or_default().to_string())
     }
 
     /// The open PR for a branch, if there is one.
-    pub async fn pull_for_branch(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<Option<PullRequest>> {
-        Ok(self
-            .list_pulls(owner, repo, branch, "open", 1)
-            .await?
-            .into_iter()
-            .next())
+    pub async fn pull_for_branch(&self, owner: &str, repo: &str, branch: &str) -> Result<Option<PullRequest>> {
+        Ok(self.list_pulls(owner, repo, branch, "open", 1).await?.into_iter().next())
     }
 
     /// Pull requests whose head is this branch, newest first.
@@ -152,14 +140,13 @@ impl GitHub {
         let head = format!("{owner}:{branch}");
         let per_page = per_page.to_string();
         let v = self
-            .json(
-                self.req(reqwest::Method::GET, &format!("/repos/{owner}/{repo}/pulls"))
-                    .query(&[("state", state), ("head", head.as_str()), ("per_page", per_page.as_str())]),
-            )
+            .json(self.req(reqwest::Method::GET, &format!("/repos/{owner}/{repo}/pulls")).query(&[
+                ("state", state),
+                ("head", head.as_str()),
+                ("per_page", per_page.as_str()),
+            ]))
             .await?;
-        Ok(v.as_array()
-            .map(|a| a.iter().map(to_pr).collect())
-            .unwrap_or_default())
+        Ok(v.as_array().map(|a| a.iter().map(to_pr).collect()).unwrap_or_default())
     }
 
     /// Every pull request a branch has had, newest first.
@@ -169,12 +156,7 @@ impl GitHub {
     /// looking back: GitHub drops a PR from that listing the moment it closes,
     /// so a panel built on it watches history disappear. A branch abandoned
     /// once and retried has two, and both are worth keeping on screen.
-    pub async fn pulls_for_branch(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<Vec<PullRequest>> {
+    pub async fn pulls_for_branch(&self, owner: &str, repo: &str, branch: &str) -> Result<Vec<PullRequest>> {
         self.list_pulls(owner, repo, branch, "all", 20).await
     }
 
@@ -190,19 +172,13 @@ impl GitHub {
         draft: bool,
     ) -> Result<PullRequest> {
         let v = self
-            .json(
-                self.req(
-                    reqwest::Method::POST,
-                    &format!("/repos/{owner}/{repo}/pulls"),
-                )
-                .json(&json!({
-                    "title": title,
-                    "body": body,
-                    "head": head,
-                    "base": base,
-                    "draft": draft,
-                })),
-            )
+            .json(self.req(reqwest::Method::POST, &format!("/repos/{owner}/{repo}/pulls")).json(&json!({
+                "title": title,
+                "body": body,
+                "head": head,
+                "base": base,
+                "draft": draft,
+            })))
             .await?;
         Ok(to_pr(&v))
     }
@@ -213,12 +189,7 @@ impl GitHub {
     /// omits `merged`, the comment counts and `mergeable_state`, so anything
     /// that reads those has to come back here for them.
     pub async fn pull(&self, owner: &str, repo: &str, number: u64) -> Result<PullRequest> {
-        let v = self
-            .json(self.req(
-                reqwest::Method::GET,
-                &format!("/repos/{owner}/{repo}/pulls/{number}"),
-            ))
-            .await?;
+        let v = self.json(self.req(reqwest::Method::GET, &format!("/repos/{owner}/{repo}/pulls/{number}"))).await?;
         Ok(to_pr(&v))
     }
 
@@ -227,20 +198,11 @@ impl GitHub {
     /// GitHub allows this on an open PR and recomputes the diff itself, which
     /// is the whole reason it is worth offering: the alternative is closing
     /// the PR and opening another, losing its review history with it.
-    pub async fn set_pull_base(
-        &self,
-        owner: &str,
-        repo: &str,
-        number: u64,
-        base: &str,
-    ) -> Result<PullRequest> {
+    pub async fn set_pull_base(&self, owner: &str, repo: &str, number: u64, base: &str) -> Result<PullRequest> {
         let v = self
             .json(
-                self.req(
-                    reqwest::Method::PATCH,
-                    &format!("/repos/{owner}/{repo}/pulls/{number}"),
-                )
-                .json(&json!({ "base": base })),
+                self.req(reqwest::Method::PATCH, &format!("/repos/{owner}/{repo}/pulls/{number}"))
+                    .json(&json!({ "base": base })),
             )
             .await?;
         Ok(to_pr(&v))
@@ -272,16 +234,9 @@ impl GitHub {
         Ok(all
             .iter()
             .map(|r| Review {
-                author: r
-                    .pointer("/user/login")
-                    .and_then(|l| l.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
+                author: r.pointer("/user/login").and_then(|l| l.as_str()).unwrap_or_default().to_string(),
                 state: str_at(r, "state"),
-                submitted_at: r
-                    .get("submitted_at")
-                    .and_then(|x| x.as_str())
-                    .map(str::to_string),
+                submitted_at: r.get("submitted_at").and_then(|x| x.as_str()).map(str::to_string),
                 url: str_at(r, "html_url"),
             })
             .collect())
@@ -304,14 +259,8 @@ impl GitHub {
                     .map(|c| CheckRun {
                         name: str_at(c, "name"),
                         status: str_at(c, "status"),
-                        conclusion: c
-                            .get("conclusion")
-                            .and_then(|x| x.as_str())
-                            .map(str::to_string),
-                        url: c
-                            .get("html_url")
-                            .and_then(|x| x.as_str())
-                            .map(str::to_string),
+                        conclusion: c.get("conclusion").and_then(|x| x.as_str()).map(str::to_string),
+                        url: c.get("html_url").and_then(|x| x.as_str()).map(str::to_string),
                     })
                     .collect()
             })
@@ -365,21 +314,14 @@ impl GitHub {
                 Err(_) => break,
             };
             let threads = "/data/repository/pullRequest/reviewThreads";
-            let more = v
-                .pointer(&format!("{threads}/pageInfo/hasNextPage"))
-                .and_then(|x| x.as_bool())
-                .unwrap_or(false);
-            after = v
-                .pointer(&format!("{threads}/pageInfo/endCursor"))
-                .and_then(|x| x.as_str())
-                .map(str::to_string);
+            let more = v.pointer(&format!("{threads}/pageInfo/hasNextPage")).and_then(|x| x.as_bool()).unwrap_or(false);
+            after = v.pointer(&format!("{threads}/pageInfo/endCursor")).and_then(|x| x.as_str()).map(str::to_string);
             match first.as_mut() {
                 None => first = Some(v),
                 Some(all) => {
-                    let (Some(Value::Array(into)), Some(Value::Array(nodes))) = (
-                        all.pointer_mut(&format!("{threads}/nodes")),
-                        v.pointer(&format!("{threads}/nodes")),
-                    ) else {
+                    let (Some(Value::Array(into)), Some(Value::Array(nodes))) =
+                        (all.pointer_mut(&format!("{threads}/nodes")), v.pointer(&format!("{threads}/nodes")))
+                    else {
                         break;
                     };
                     into.extend(nodes.iter().cloned());
@@ -415,7 +357,8 @@ impl GitHub {
             if out.iter().any(|f| f.name == name) {
                 continue;
             }
-            let output = |k: &str| c.pointer(&format!("/output/{k}")).and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
+            let output =
+                |k: &str| c.pointer(&format!("/output/{k}")).and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
             let summary = [output("title"), output("summary"), output("text")]
                 .into_iter()
                 .filter(|t| !t.is_empty())
@@ -479,9 +422,7 @@ impl GitHub {
                 )
                 .await?;
             let Some(arr) = v.as_array() else {
-                return Err(Error::Other(
-                    "GitHub /user/teams did not return a list".into(),
-                ));
+                return Err(Error::Other("GitHub /user/teams did not return a list".into()));
             };
             if arr.is_empty() {
                 break;
@@ -552,51 +493,29 @@ pub(crate) fn pick_team(raw: &str, teams: &[GhTeam]) -> std::result::Result<GhTe
             .find(|t| t.org.eq_ignore_ascii_case(org) && t.slug.eq_ignore_ascii_case(slug))
             .map(|t| t.name.clone())
             .unwrap_or_else(|| slug.to_string());
-        return Ok(GhTeam {
-            org: org.to_string(),
-            slug: slug.to_string(),
-            name,
-        });
+        return Ok(GhTeam { org: org.to_string(), slug: slug.to_string(), name });
     }
     if raw.contains(char::is_whitespace) {
         return Err("a review team looks like @fe or org/fe".into());
     }
-    let hits: Vec<&GhTeam> = teams
-        .iter()
-        .filter(|t| t.slug.eq_ignore_ascii_case(raw))
-        .collect();
+    let hits: Vec<&GhTeam> = teams.iter().filter(|t| t.slug.eq_ignore_ascii_case(raw)).collect();
     match hits.as_slice() {
         [] => Err(format!("no team @{raw} on this account")),
         [one] => Ok((*one).clone()),
         many => Err(format!(
             "@{raw} is in more than one org ({}); set it as org/{raw}",
-            many.iter()
-                .map(|t| t.org.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
+            many.iter().map(|t| t.org.as_str()).collect::<Vec<_>>().join(", ")
         )),
     }
 }
 
 fn parse_team(v: &Value) -> Option<GhTeam> {
-    let slug = v
-        .get("slug")
-        .and_then(|s| s.as_str())
-        .unwrap_or("")
-        .to_string();
-    let org = v
-        .pointer("/organization/login")
-        .and_then(|s| s.as_str())
-        .unwrap_or("")
-        .to_string();
+    let slug = v.get("slug").and_then(|s| s.as_str()).unwrap_or("").to_string();
+    let org = v.pointer("/organization/login").and_then(|s| s.as_str()).unwrap_or("").to_string();
     if slug.is_empty() || org.is_empty() {
         return None;
     }
-    let name = v
-        .get("name")
-        .and_then(|s| s.as_str())
-        .unwrap_or(&slug)
-        .to_string();
+    let name = v.get("name").and_then(|s| s.as_str()).unwrap_or(&slug).to_string();
     Some(GhTeam { org, slug, name })
 }
 
@@ -606,31 +525,12 @@ fn to_pr(v: &Value) -> PullRequest {
         title: str_at(v, "title"),
         state: str_at(v, "state"),
         draft: v.get("draft").and_then(|d| d.as_bool()).unwrap_or(false),
-        author: v
-            .pointer("/user/login")
-            .and_then(|l| l.as_str())
-            .unwrap_or_default()
-            .to_string(),
-        head: v
-            .pointer("/head/ref")
-            .and_then(|r| r.as_str())
-            .unwrap_or_default()
-            .to_string(),
-        head_sha: v
-            .pointer("/head/sha")
-            .and_then(|r| r.as_str())
-            .unwrap_or_default()
-            .to_string(),
-        base: v
-            .pointer("/base/ref")
-            .and_then(|r| r.as_str())
-            .unwrap_or_default()
-            .to_string(),
+        author: v.pointer("/user/login").and_then(|l| l.as_str()).unwrap_or_default().to_string(),
+        head: v.pointer("/head/ref").and_then(|r| r.as_str()).unwrap_or_default().to_string(),
+        head_sha: v.pointer("/head/sha").and_then(|r| r.as_str()).unwrap_or_default().to_string(),
+        base: v.pointer("/base/ref").and_then(|r| r.as_str()).unwrap_or_default().to_string(),
         url: str_at(v, "html_url"),
-        mergeable_state: v
-            .get("mergeable_state")
-            .and_then(|m| m.as_str())
-            .map(str::to_string),
+        mergeable_state: v.get("mergeable_state").and_then(|m| m.as_str()).map(str::to_string),
         // The list endpoint has no `merged`, only `merged_at`; the detail
         // endpoint has both. Reading either means a listing is enough to say
         // what became of a closed PR, without a second call per repository.
@@ -814,11 +714,7 @@ fn parse_note(v: &Value) -> Note {
         state: v.get("state").and_then(|x| x.as_str()).map(str::to_string),
         body: str_at(v, "body").trim().to_string(),
         url: str_at(v, "url"),
-        at: v
-            .get("createdAt")
-            .or_else(|| v.get("submittedAt"))
-            .and_then(|x| x.as_str())
-            .map(str::to_string),
+        at: v.get("createdAt").or_else(|| v.get("submittedAt")).and_then(|x| x.as_str()).map(str::to_string),
     }
 }
 
@@ -846,12 +742,7 @@ pub(crate) fn parse_feedback(v: &Value) -> Result<PrFeedback> {
         .pointer("/data/repository/pullRequest")
         .filter(|p| !p.is_null())
         .ok_or_else(|| Error::Other("GitHub did not return that pull request".into()))?;
-    let nodes = |path: &str| {
-        pr.pointer(path)
-            .and_then(|n| n.as_array())
-            .cloned()
-            .unwrap_or_default()
-    };
+    let nodes = |path: &str| pr.pointer(path).and_then(|n| n.as_array()).cloned().unwrap_or_default();
 
     let threads = nodes("/reviewThreads/nodes")
         .iter()
@@ -867,7 +758,9 @@ pub(crate) fn parse_feedback(v: &Value) -> Result<PrFeedback> {
                 None => (num("originalLine"), num("originalStartLine")),
             };
             let code = match (t.pointer("/hunk/nodes/0/diffHunk").and_then(|h| h.as_str()), num("originalLine")) {
-                (Some(h), Some(end)) => hunk::excerpt(h, num("originalStartLine"), end, str_at(t, "diffSide") == "LEFT"),
+                (Some(h), Some(end)) => {
+                    hunk::excerpt(h, num("originalStartLine"), end, str_at(t, "diffSide") == "LEFT")
+                }
                 _ => Vec::new(),
             };
             ReviewThread {
@@ -887,16 +780,8 @@ pub(crate) fn parse_feedback(v: &Value) -> Result<PrFeedback> {
     Ok(PrFeedback {
         author: pr.pointer("/author/login").and_then(|x| x.as_str()).unwrap_or("").to_string(),
         threads,
-        reviews: nodes("/reviews/nodes")
-            .iter()
-            .map(parse_note)
-            .filter(|r| !r.body.is_empty())
-            .collect(),
-        comments: nodes("/comments/nodes")
-            .iter()
-            .map(parse_note)
-            .filter(|c| !c.body.is_empty())
-            .collect(),
+        reviews: nodes("/reviews/nodes").iter().map(parse_note).filter(|r| !r.body.is_empty()).collect(),
+        comments: nodes("/comments/nodes").iter().map(parse_note).filter(|c| !c.body.is_empty()).collect(),
     })
 }
 
@@ -922,12 +807,7 @@ mod tests {
     }
 
     fn review(author: &str, state: &str) -> Review {
-        Review {
-            author: author.into(),
-            state: state.into(),
-            submitted_at: None,
-            url: String::new(),
-        }
+        Review { author: author.into(), state: state.into(), submitted_at: None, url: String::new() }
     }
 
     #[test]
@@ -941,56 +821,29 @@ mod tests {
         // Only the latest decisive review from each person counts, in either
         // direction: coming back to approve clears the block, and coming back
         // to block clears the approval.
-        assert_eq!(
-            verdict(&[
-                review("ana", "CHANGES_REQUESTED"),
-                review("ana", "APPROVED")
-            ]),
-            "approved"
-        );
-        assert_eq!(
-            verdict(&[
-                review("ana", "APPROVED"),
-                review("ana", "CHANGES_REQUESTED")
-            ]),
-            "changes_requested"
-        );
+        assert_eq!(verdict(&[review("ana", "CHANGES_REQUESTED"), review("ana", "APPROVED")]), "approved");
+        assert_eq!(verdict(&[review("ana", "APPROVED"), review("ana", "CHANGES_REQUESTED")]), "changes_requested");
     }
 
     #[test]
     fn one_block_outranks_any_number_of_approvals() {
         assert_eq!(
-            verdict(&[
-                review("ana", "APPROVED"),
-                review("bo", "APPROVED"),
-                review("cy", "CHANGES_REQUESTED"),
-            ]),
+            verdict(&[review("ana", "APPROVED"), review("bo", "APPROVED"), review("cy", "CHANGES_REQUESTED"),]),
             "changes_requested"
         );
     }
 
     #[test]
     fn commenting_leaves_an_earlier_verdict_standing() {
-        assert_eq!(
-            verdict(&[review("ana", "APPROVED"), review("ana", "COMMENTED")]),
-            "approved"
-        );
+        assert_eq!(verdict(&[review("ana", "APPROVED"), review("ana", "COMMENTED")]), "approved");
         assert_eq!(verdict(&[review("ana", "COMMENTED")]), "commented");
     }
 
     #[test]
     fn a_bare_slug_matches_the_one_team_you_are_on() {
         let teams = vec![
-            GhTeam {
-                org: "acme".into(),
-                slug: "fe".into(),
-                name: "Frontend".into(),
-            },
-            GhTeam {
-                org: "acme".into(),
-                slug: "be".into(),
-                name: "Backend".into(),
-            },
+            GhTeam { org: "acme".into(), slug: "fe".into(), name: "Frontend".into() },
+            GhTeam { org: "acme".into(), slug: "be".into(), name: "Backend".into() },
         ];
         let hit = pick_team("@fe", &teams).unwrap();
         assert_eq!(hit.org, "acme");
@@ -1004,25 +857,14 @@ mod tests {
         let hit = pick_team("acme/fe", &[]).unwrap();
         assert_eq!(hit.org, "acme");
         assert_eq!(hit.slug, "fe");
-        assert_eq!(
-            team_review_query(&hit.org, &hit.slug),
-            "is:pr is:open team-review-requested:acme/fe -author:@me"
-        );
+        assert_eq!(team_review_query(&hit.org, &hit.slug), "is:pr is:open team-review-requested:acme/fe -author:@me");
     }
 
     #[test]
     fn the_same_slug_in_two_orgs_asks_which() {
         let teams = vec![
-            GhTeam {
-                org: "acme".into(),
-                slug: "fe".into(),
-                name: "Frontend".into(),
-            },
-            GhTeam {
-                org: "other".into(),
-                slug: "fe".into(),
-                name: "FE".into(),
-            },
+            GhTeam { org: "acme".into(), slug: "fe".into(), name: "Frontend".into() },
+            GhTeam { org: "other".into(), slug: "fe".into(), name: "FE".into() },
         ];
         let err = pick_team("fe", &teams).unwrap_err();
         assert!(err.contains("acme"));
@@ -1037,16 +879,9 @@ mod tests {
 
     #[test]
     fn dismissing_clears_the_verdict_it_dismissed() {
+        assert_eq!(verdict(&[review("ana", "APPROVED"), review("ana", "DISMISSED")]), "none");
         assert_eq!(
-            verdict(&[review("ana", "APPROVED"), review("ana", "DISMISSED")]),
-            "none"
-        );
-        assert_eq!(
-            verdict(&[
-                review("ana", "CHANGES_REQUESTED"),
-                review("ana", "DISMISSED"),
-                review("bo", "APPROVED"),
-            ]),
+            verdict(&[review("ana", "CHANGES_REQUESTED"), review("ana", "DISMISSED"), review("bo", "APPROVED"),]),
             "approved"
         );
     }
@@ -1127,7 +962,8 @@ mod tests {
 
     #[test]
     fn a_graphql_error_is_an_error() {
-        let v = json!({ "data": { "repository": null }, "errors": [{ "message": "Could not resolve to a Repository" }] });
+        let v =
+            json!({ "data": { "repository": null }, "errors": [{ "message": "Could not resolve to a Repository" }] });
         assert!(parse_feedback(&v).unwrap_err().to_string().contains("Could not resolve"));
     }
 }

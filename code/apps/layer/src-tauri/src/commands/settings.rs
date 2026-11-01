@@ -149,11 +149,7 @@ pub(crate) fn banner<R: Runtime>(app: &AppHandle<R>, title: String, body: String
     #[cfg(target_os = "macos")]
     {
         let identifier = app.config().identifier.clone();
-        let bundle = if tauri::is_dev() {
-            "com.apple.Terminal"
-        } else {
-            identifier.as_str()
-        };
+        let bundle = if tauri::is_dev() { "com.apple.Terminal" } else { identifier.as_str() };
         let _ = notify_rust::set_application(bundle);
     }
 
@@ -180,9 +176,7 @@ pub(crate) fn banner<R: Runtime>(app: &AppHandle<R>, title: String, body: String
 
 #[tauri::command]
 pub fn set_worktree_root(state: State<AppState>, path: Option<String>) -> Result<()> {
-    state
-        .config
-        .update(|c| c.worktree_root = path.filter(|p| !p.trim().is_empty()))
+    state.config.update(|c| c.worktree_root = path.filter(|p| !p.trim().is_empty()))
 }
 
 /// Off the command thread: deleting the token goes through the keychain,
@@ -242,10 +236,7 @@ fn cursor_app() -> Option<PathBuf> {
 /// "Install 'cursor' command" links `/usr/local/bin/cursor` into its bundle.
 fn app_bundle_of(bin: &Path) -> Option<PathBuf> {
     let real = std::fs::canonicalize(bin).ok()?;
-    real.ancestors()
-        .skip(1)
-        .find(|p| p.extension().is_some_and(|e| e == "app") && p.is_dir())
-        .map(Path::to_path_buf)
+    real.ancestors().skip(1).find(|p| p.extension().is_some_and(|e| e == "app") && p.is_dir()).map(Path::to_path_buf)
 }
 
 /// True when the Cursor IDE is on this machine.
@@ -284,10 +275,7 @@ fn open_in_cursor_inner(path: String) -> Result<()> {
     if out.status.success() {
         return Ok(());
     }
-    Err(Error::Other(format!(
-        "could not open Cursor: {}",
-        String::from_utf8_lossy(&out.stderr).trim()
-    )))
+    Err(Error::Other(format!("could not open Cursor: {}", String::from_utf8_lossy(&out.stderr).trim())))
 }
 
 #[cfg(test)]
@@ -316,10 +304,7 @@ mod cursor_tests {
         std::os::unix::fs::symlink(inner.join("code"), &linked).unwrap();
 
         assert_eq!(app_bundle_of(&shim), None);
-        assert_eq!(
-            app_bundle_of(&linked),
-            Some(std::fs::canonicalize(root.join("Cursor.app")).unwrap())
-        );
+        assert_eq!(app_bundle_of(&linked), Some(std::fs::canonicalize(root.join("Cursor.app")).unwrap()));
         let _ = std::fs::remove_dir_all(&root);
     }
 }

@@ -167,10 +167,7 @@ fn to_authored(v: &Value) -> Option<AuthoredPr> {
         changes_by,
         waiting_on,
         unresolved,
-        unresolved_more: v
-            .pointer("/reviewThreads/pageInfo/hasNextPage")
-            .and_then(|m| m.as_bool())
-            .unwrap_or(false),
+        unresolved_more: v.pointer("/reviewThreads/pageInfo/hasNextPage").and_then(|m| m.as_bool()).unwrap_or(false),
         conflicts: v.get("mergeable").and_then(|m| m.as_str()) == Some("CONFLICTING"),
     })
 }
@@ -227,9 +224,7 @@ mod tests {
 
     #[test]
     fn with_no_review_required_the_reviews_given_decide_and_changes_outrank_approvals() {
-        let reviews = |states: &[(&str, &str)]| {
-            json!({ "latestOpinionatedReviews": { "nodes": states.iter().map(|(who, state)| json!({ "state": state, "author": { "login": who } })).collect::<Vec<_>>() } })
-        };
+        let reviews = |states: &[(&str, &str)]| json!({ "latestOpinionatedReviews": { "nodes": states.iter().map(|(who, state)| json!({ "state": state, "author": { "login": who } })).collect::<Vec<_>>() } });
         let pr = one(reviews(&[("ana", "APPROVED"), ("bo", "CHANGES_REQUESTED")]));
         assert_eq!(pr.review, "changes_requested");
         assert_eq!(pr.approved_by, vec!["ana"]);
@@ -244,7 +239,8 @@ mod tests {
 
     #[test]
     fn checks_read_as_github_rolls_them_up_and_unknown_mergeability_is_no_conflict() {
-        let rollup = |s: &str| json!({ "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": s } } }] } });
+        let rollup =
+            |s: &str| json!({ "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": s } } }] } });
         assert_eq!(one(rollup("SUCCESS")).checks, "passing");
         assert_eq!(one(rollup("ERROR")).checks, "failing");
         assert_eq!(one(rollup("EXPECTED")).checks, "pending");
@@ -260,7 +256,9 @@ mod tests {
         let (prs, more) = parse_authored(&v).unwrap();
         assert_eq!(prs.len(), 1, "a node that is not a pull request is skipped");
         assert!(!more, "and is not a further page");
-        let threads = one(json!({ "reviewThreads": { "pageInfo": { "hasNextPage": true }, "nodes": [{ "isResolved": false }] } }));
+        let threads = one(
+            json!({ "reviewThreads": { "pageInfo": { "hasNextPage": true }, "nodes": [{ "isResolved": false }] } }),
+        );
         assert!(threads.unresolved_more);
     }
 

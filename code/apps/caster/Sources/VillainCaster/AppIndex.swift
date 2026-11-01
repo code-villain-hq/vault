@@ -48,7 +48,7 @@ final class AppIndex {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let roots = [
             "/Applications",
-            "/System/Applications", // includes Utilities via recursion
+            "/System/Applications",  // includes Utilities via recursion
             "\(home)/Applications",
         ]
         var found: [String: AppEntry] = [:]

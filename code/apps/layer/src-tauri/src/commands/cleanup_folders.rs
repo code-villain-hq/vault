@@ -66,7 +66,8 @@ pub(super) fn leftover_folders(root: &Path, used: &InUse, out: &mut Vec<Planned>
         }
         problems.extend(other.problem());
         let (verdict, detail) = if problems.is_empty() && other.files > 0 {
-            let worktrees = if worktrees.is_empty() { "" } else { " Its worktrees have no changes, and their branches stay." };
+            let worktrees =
+                if worktrees.is_empty() { "" } else { " Its worktrees have no changes, and their branches stay." };
             (
                 Verdict::Risky,
                 format!(
@@ -178,7 +179,8 @@ impl Other {
         if let Some(rel) = &self.unreadable {
             return Some(format!("{rel} could not be read"));
         }
-        (self.seen > LOOK_AT_MOST).then(|| format!("it holds more than {LOOK_AT_MOST} things the app did not make. Look at it by hand"))
+        (self.seen > LOOK_AT_MOST)
+            .then(|| format!("it holds more than {LOOK_AT_MOST} things the app did not make. Look at it by hand"))
     }
 
     fn count(&self) -> String {
@@ -188,7 +190,11 @@ impl Other {
     fn listed(&self) -> String {
         let more = self.files - self.first.len();
         let first = self.first.join(", ");
-        if more == 0 { first } else { format!("{first} and {more} more") }
+        if more == 0 {
+            first
+        } else {
+            format!("{first} and {more} more")
+        }
     }
 }
 
@@ -239,10 +245,15 @@ pub(super) fn stray_worktrees(cfg: &AppConfig, used: &InUse, out: &mut Vec<Plann
             let (verdict, detail, owner) = match removable_worktree(&wt) {
                 Ok(owner) => (
                     Verdict::Safe,
-                    "In this task's folder, but not one of its repos. No changes; its branch stays in the repository.".to_string(),
+                    "In this task's folder, but not one of its repos. No changes; its branch stays in the repository."
+                        .to_string(),
                     owner,
                 ),
-                Err(why) => (Verdict::Blocked, format!("In this task's folder, but not one of its repos: {why}."), PathBuf::new()),
+                Err(why) => (
+                    Verdict::Blocked,
+                    format!("In this task's folder, but not one of its repos: {why}."),
+                    PathBuf::new(),
+                ),
             };
             out.push(Planned {
                 item: CleanupItem {

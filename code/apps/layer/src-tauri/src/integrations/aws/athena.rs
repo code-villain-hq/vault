@@ -38,16 +38,22 @@ impl Aws {
             .to_string();
         let deadline = Instant::now() + QUERY_TIMEOUT;
         let execution = loop {
-            let e = self.json(&["athena".into(), "get-query-execution".into(), format!("--query-execution-id={id}")])?;
+            let e =
+                self.json(&["athena".into(), "get-query-execution".into(), format!("--query-execution-id={id}")])?;
             let state = e.pointer("/QueryExecution/Status/State").and_then(Value::as_str).unwrap_or_default();
             match state {
                 "SUCCEEDED" => break e,
                 "FAILED" | "CANCELLED" => {
-                    let why = e.pointer("/QueryExecution/Status/StateChangeReason").and_then(Value::as_str).unwrap_or(state);
+                    let why =
+                        e.pointer("/QueryExecution/Status/StateChangeReason").and_then(Value::as_str).unwrap_or(state);
                     return Err(Error::Other(format!("the query failed: {why}")));
                 }
                 _ if Instant::now() >= deadline => {
-                    let _ = self.json(&["athena".into(), "stop-query-execution".into(), format!("--query-execution-id={id}")]);
+                    let _ = self.json(&[
+                        "athena".into(),
+                        "stop-query-execution".into(),
+                        format!("--query-execution-id={id}"),
+                    ]);
                     return Err(Error::Other(format!(
                         "the query was stopped after {} seconds: filter on the table's partition columns so it reads less",
                         QUERY_TIMEOUT.as_secs()
@@ -64,7 +70,8 @@ impl Aws {
             format!("--query-execution-id={id}"),
             format!("--max-items={}", limit + 1),
         ])?;
-        let scanned = execution.pointer("/QueryExecution/Statistics/DataScannedInBytes").and_then(Value::as_u64).unwrap_or(0);
+        let scanned =
+            execution.pointer("/QueryExecution/Statistics/DataScannedInBytes").and_then(Value::as_u64).unwrap_or(0);
         Ok(rows(&page, limit, scanned, id))
     }
 
@@ -76,7 +83,9 @@ impl Aws {
         let mut found = Vec::new();
         for db in dbs.get("DatabaseList").and_then(Value::as_array).into_iter().flatten() {
             let Some(name) = db.get("Name").and_then(Value::as_str) else { continue };
-            let Ok(tables) = self.json(&["glue".into(), "get-tables".into(), format!("--database-name={name}")]) else { continue };
+            let Ok(tables) = self.json(&["glue".into(), "get-tables".into(), format!("--database-name={name}")]) else {
+                continue;
+            };
             found.extend(tables_in(&tables, name, bucket));
         }
         Ok(found)
@@ -86,8 +95,14 @@ impl Aws {
     pub fn table(&self, database: &str, table: &str) -> Result<Table> {
         check_name(database, "database")?;
         check_name(table, "table")?;
-        let t = self.json(&["glue".into(), "get-table".into(), format!("--database-name={database}"), format!("--name={table}")])?;
-        table_of(t.get("Table").unwrap_or(&Value::Null), database).ok_or_else(|| Error::NotFound(format!("table {database}.{table}")))
+        let t = self.json(&[
+            "glue".into(),
+            "get-table".into(),
+            format!("--database-name={database}"),
+            format!("--name={table}"),
+        ])?;
+        table_of(t.get("Table").unwrap_or(&Value::Null), database)
+            .ok_or_else(|| Error::NotFound(format!("table {database}.{table}")))
     }
 
     /// Whether the profile can see a workgroup by this name. A profile that
@@ -141,7 +156,9 @@ pub fn read_only(sql: &str) -> Result<String> {
         return Err(Error::Other("one statement at a time: remove the ;".into()));
     }
     if first != "SELECT" && first != "WITH" {
-        return Err(Error::Other("only a SELECT (or WITH … SELECT) is run: the app reads logs, it never changes them".into()));
+        return Err(Error::Other(
+            "only a SELECT (or WITH … SELECT) is run: the app reads logs, it never changes them".into(),
+        ));
     }
     Ok(body.to_string())
 }
@@ -155,7 +172,8 @@ pub fn narrowed(sql: &str, keys: &[Column]) -> Result<()> {
         return Ok(());
     }
     let lower = sql.to_lowercase();
-    let words: Vec<&str> = lower.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).filter(|w| !w.is_empty()).collect();
+    let words: Vec<&str> =
+        lower.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).filter(|w| !w.is_empty()).collect();
     let after_where: &[&str] = words.iter().position(|w| *w == "where").map_or(&[], |at| &words[at + 1..]);
     let named = |k: &Column| after_where.contains(&k.name.to_lowercase().as_str());
     let time: Vec<&Column> = keys.iter().filter(|k| is_time_key(&k.name)).collect();
@@ -226,12 +244,23 @@ fn rows(page: &Value, limit: u32, scanned: u64, query_id: String) -> Rows {
                 .collect()
         })
         .collect();
-    if all.first().is_some_and(|r| r.iter().map(|c| c.as_deref().unwrap_or_default()).eq(columns.iter().map(String::as_str))) {
+    if all
+        .first()
+        .is_some_and(|r| r.iter().map(|c| c.as_deref().unwrap_or_default()).eq(columns.iter().map(String::as_str)))
+    {
         all.remove(0);
     }
     let more = all.len() > limit as usize || page.get("NextToken").is_some();
     all.truncate(limit as usize);
-    Rows { columns, rows: all, more, data_scanned: bytes(scanned), scanned_bytes: scanned, cost: cost(scanned), query_id }
+    Rows {
+        columns,
+        rows: all,
+        more,
+        data_scanned: bytes(scanned),
+        scanned_bytes: scanned,
+        cost: cost(scanned),
+        query_id,
+    }
 }
 
 /// An Athena table: where its data is, and what it is made of.

@@ -1,4 +1,5 @@
 """Stress-test the system's relationships, including themes unlike Nightshade."""
+
 import copy
 import json
 from pathlib import Path
@@ -15,33 +16,53 @@ class ThemeTests(unittest.TestCase):
         for mode in ("night", "day"):
             theme = result[mode]
             hosts = [theme[role] for role in HOSTS]
-            for role in ("bg", "panel", "surface", "hover", "line", "fg", "muted", "faint", "dialog"):
+            for role in (
+                "bg",
+                "panel",
+                "surface",
+                "hover",
+                "line",
+                "fg",
+                "muted",
+                "faint",
+                "dialog",
+            ):
                 color = theme[role]
                 self.assertEqual(color[1:3], color[3:5], (mode, role))
                 self.assertEqual(color[3:5], color[5:7], (mode, role))
             for role in ("fg", "muted", "faint", "accent", *SOURCE["semantics"]):
                 for host in hosts:
-                    self.assertGreaterEqual(contrast(theme[role], host), minimum, (mode, role, host))
+                    self.assertGreaterEqual(
+                        contrast(theme[role], host), minimum, (mode, role, host)
+                    )
             for role in ("primary", "primary-hover"):
                 self.assertGreaterEqual(contrast(theme["on-primary"], theme[role]), minimum)
             for host in hosts:
-                self.assertGreaterEqual(contrast(theme["signal"], host), result["contrast"]["signal"], (mode, host))
+                self.assertGreaterEqual(
+                    contrast(theme["signal"], host), result["contrast"]["signal"], (mode, host)
+                )
             for host in hosts:
                 chip = mix(host, theme["fg"], result["opacity"]["chip-tint"])
                 for role in ("muted", "faint"):
-                    self.assertGreaterEqual(contrast(theme[role], chip), minimum, (mode, role, chip))
+                    self.assertGreaterEqual(
+                        contrast(theme[role], chip), minimum, (mode, role, chip)
+                    )
                 # The active option must stand apart from its host and keep every text tone readable.
                 highlight = mix(host, theme["fg"], result["opacity"]["highlight-tint"])
                 self.assertGreaterEqual(contrast(highlight, host), 1.1, (mode, host))
                 for role in ("fg", "muted", "faint"):
-                    self.assertGreaterEqual(contrast(theme[role], highlight), minimum, (mode, role, highlight))
+                    self.assertGreaterEqual(
+                        contrast(theme[role], highlight), minimum, (mode, role, highlight)
+                    )
             # A secondary button reads as a block at rest and on hover, and its text holds the floor.
             for host in hosts:
                 for tint in ("button-tint", "button-hover-tint"):
                     fill = mix(host, theme["fg"], result["opacity"][tint])
                     self.assertGreaterEqual(contrast(fill, host), 1.15, (mode, tint, host))
                     for role in ("fg", "status-danger-ink"):
-                        self.assertGreaterEqual(contrast(theme[role], fill), minimum, (mode, role, fill))
+                        self.assertGreaterEqual(
+                            contrast(theme[role], fill), minimum, (mode, role, fill)
+                        )
             for status in (*SOURCE["semantics"], "neutral"):
                 hue = theme["muted" if status == "neutral" else status]
                 for host in hosts:
@@ -50,7 +71,7 @@ class ThemeTests(unittest.TestCase):
             # Secondary and tertiary text keep distinct tones at every contrast.
             self.assertNotEqual(theme["muted"], theme["faint"], mode)
             gap = oklch(theme["muted"])[0] - oklch(theme["faint"])[0]
-            self.assertGreaterEqual(gap if mode == "night" else -gap, .015, mode)
+            self.assertGreaterEqual(gap if mode == "night" else -gap, 0.015, mode)
             self.assertNotEqual(theme["dialog-field"], theme["dialog"])
             self.assertNotEqual(theme["dialog-field-hover"], theme["dialog"])
             self.assertEqual(set(theme), set(result["night"]))
@@ -62,9 +83,14 @@ class ThemeTests(unittest.TestCase):
                 self.assertGreater(luminance(theme["panel"]), luminance(theme["field"]))
 
     def test_nightshade_and_extreme_seeds_at_all_contrast_levels(self):
-        for base, accent in (("{cloak}", "{poison}"), ("#0066ff", "#ff5500"),
-                             ("#ffffff", "#000000"), ("#000000", "#ffffff"),
-                             ("#ff00ff", "#00ff00"), ("#ffff00", "#0000ff")):
+        for base, accent in (
+            ("{cloak}", "{poison}"),
+            ("#0066ff", "#ff5500"),
+            ("#ffffff", "#000000"),
+            ("#000000", "#ffffff"),
+            ("#ff00ff", "#00ff00"),
+            ("#ffff00", "#0000ff"),
+        ):
             for strength in (0, 50, 100):
                 with self.subTest(base=base, accent=accent, contrast=strength):
                     source = copy.deepcopy(SOURCE)
@@ -96,14 +122,16 @@ class ThemeTests(unittest.TestCase):
         high = generate(source)
         for mode in ("night", "day"):
             for role in ("fg", "muted", "faint"):
-                self.assertGreater(contrast(high[mode][role], high[mode]["panel"]),
-                                   contrast(low[mode][role], low[mode]["panel"]))
+                self.assertGreater(
+                    contrast(high[mode][role], high[mode]["panel"]),
+                    contrast(low[mode][role], low[mode]["panel"]),
+                )
 
     def test_oklch_round_trip_and_srgb_gamut(self):
         for hex in ("#000000", "#ffffff", "#ff0000", "#00ff00", "#0000ff", "#5a1470", "#c9e265"):
             self.assertEqual(tone(*oklch(hex)), hex.upper())
         # Gamut mapping preserves lightness rather than clipping RGB channels.
-        self.assertAlmostEqual(oklch(tone(.6, .4, 1.5))[0], .6, places=2)
+        self.assertAlmostEqual(oklch(tone(0.6, 0.4, 1.5))[0], 0.6, places=2)
 
     def test_rejects_invalid_inputs(self):
         for strength in (-1, 101, True, "50", float("nan")):

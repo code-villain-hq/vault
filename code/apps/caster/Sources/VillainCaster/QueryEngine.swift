@@ -60,8 +60,10 @@ private struct Command {
     let isAvailable: () -> Bool
     let run: () throws -> Void
 
-    init(id: String? = nil, title: String, subtitle: String, symbol: String, isDestructive: Bool = false,
-         isAvailable: @escaping () -> Bool, run: @escaping () throws -> Void) {
+    init(
+        id: String? = nil, title: String, subtitle: String, symbol: String, isDestructive: Bool = false,
+        isAvailable: @escaping () -> Bool, run: @escaping () throws -> Void
+    ) {
         self.id = id ?? title
         self.title = title
         self.subtitle = subtitle
@@ -91,57 +93,67 @@ final class QueryEngine {
     private static let snippetIcon = symbolIcon("doc.on.clipboard", "Snippet")
 
     private let commands: [Command] = [
-        Command(id: "Maximize Window", title: "Maximize window",
-                subtitle: "Monitor size minus the menu bar",
-                symbol: "macwindow",
-                isAvailable: { true },
-                run: { WindowManager.maximizeFocusedWindow() }),
-        Command(id: "Left Half", title: "Left half",
-                subtitle: "Fill the left half of the screen",
-                symbol: "rectangle.lefthalf.inset.filled",
-                isAvailable: { true },
-                run: { WindowManager.snapFocusedWindow(to: .left) }),
-        Command(id: "Right Half", title: "Right half",
-                subtitle: "Fill the right half of the screen",
-                symbol: "rectangle.righthalf.inset.filled",
-                isAvailable: { true },
-                run: { WindowManager.snapFocusedWindow(to: .right) }),
-        Command(id: "Move Window to Next Display", title: "Move window to next display",
-                subtitle: "Send the focused window to the other monitor",
-                symbol: "rectangle.on.rectangle",
-                isAvailable: { WindowManager.hasSecondDisplay },
-                run: { WindowManager.moveFocusedWindowToNextDisplay() }),
-        Command(title: "Sleep",
-                subtitle: "Put the Mac to sleep",
-                symbol: "moon.zzz",
-                isAvailable: { true },
-                run: { SystemActions.sleep() }),
-        Command(id: "Lock Screen", title: "Lock screen",
-                subtitle: "Lock the session immediately",
-                symbol: "lock",
-                isAvailable: { true },
-                run: { try SystemActions.lockScreen() }),
-        Command(id: "Empty Trash", title: "Empty trash",
-                subtitle: "Ask Finder to empty the trash",
-                symbol: "trash",
-                isDestructive: true,
-                isAvailable: { true },
-                run: { SystemActions.emptyTrash() }),
-        Command(id: "Toggle Dark Mode", title: "Toggle dark mode",
-                subtitle: "Switch between light and dark appearance",
-                symbol: "circle.lefthalf.filled",
-                isAvailable: { true },
-                run: { SystemActions.toggleDarkMode() }),
-        Command(title: "Settings",
-                subtitle: "Edit your snippets",
-                symbol: "gearshape",
-                isAvailable: { true },
-                run: { SettingsWindowController.shared.show() }),
-        Command(title: "Quit Caster",
-                subtitle: "Close this launcher",
-                symbol: "power",
-                isAvailable: { true },
-                run: { NSApp.terminate(nil) }),
+        Command(
+            id: "Maximize Window", title: "Maximize window",
+            subtitle: "Monitor size minus the menu bar",
+            symbol: "macwindow",
+            isAvailable: { true },
+            run: { WindowManager.maximizeFocusedWindow() }),
+        Command(
+            id: "Left Half", title: "Left half",
+            subtitle: "Fill the left half of the screen",
+            symbol: "rectangle.lefthalf.inset.filled",
+            isAvailable: { true },
+            run: { WindowManager.snapFocusedWindow(to: .left) }),
+        Command(
+            id: "Right Half", title: "Right half",
+            subtitle: "Fill the right half of the screen",
+            symbol: "rectangle.righthalf.inset.filled",
+            isAvailable: { true },
+            run: { WindowManager.snapFocusedWindow(to: .right) }),
+        Command(
+            id: "Move Window to Next Display", title: "Move window to next display",
+            subtitle: "Send the focused window to the other monitor",
+            symbol: "rectangle.on.rectangle",
+            isAvailable: { WindowManager.hasSecondDisplay },
+            run: { WindowManager.moveFocusedWindowToNextDisplay() }),
+        Command(
+            title: "Sleep",
+            subtitle: "Put the Mac to sleep",
+            symbol: "moon.zzz",
+            isAvailable: { true },
+            run: { SystemActions.sleep() }),
+        Command(
+            id: "Lock Screen", title: "Lock screen",
+            subtitle: "Lock the session immediately",
+            symbol: "lock",
+            isAvailable: { true },
+            run: { try SystemActions.lockScreen() }),
+        Command(
+            id: "Empty Trash", title: "Empty trash",
+            subtitle: "Ask Finder to empty the trash",
+            symbol: "trash",
+            isDestructive: true,
+            isAvailable: { true },
+            run: { SystemActions.emptyTrash() }),
+        Command(
+            id: "Toggle Dark Mode", title: "Toggle dark mode",
+            subtitle: "Switch between light and dark appearance",
+            symbol: "circle.lefthalf.filled",
+            isAvailable: { true },
+            run: { SystemActions.toggleDarkMode() }),
+        Command(
+            title: "Settings",
+            subtitle: "Edit your snippets",
+            symbol: "gearshape",
+            isAvailable: { true },
+            run: { SettingsWindowController.shared.show() }),
+        Command(
+            title: "Quit Caster",
+            subtitle: "Close this launcher",
+            symbol: "power",
+            isAvailable: { true },
+            run: { NSApp.terminate(nil) }),
     ]
 
     func refreshApps() {
@@ -173,18 +185,27 @@ final class QueryEngine {
             deliver(.answer(Answer(.currency, value: "…", copyValue: nil)))
             debounced(gen) { finish in
                 Currency.convert(currencyQuery) { display, copyValue in
-                    finish(.answer(Answer(.currency, value: copyValue == nil ? "Couldn't get a rate. Check your connection." : display,
-                                          copyValue: copyValue)))
+                    finish(
+                        .answer(
+                            Answer(
+                                .currency,
+                                value: copyValue == nil ? "Couldn't get a rate. Check your connection." : display,
+                                copyValue: copyValue)))
                 }
-            } deliver: { deliver($0) }
+            } deliver: {
+                deliver($0)
+            }
             return
         }
 
         if let time = TimeLookup.lookup(text) {
             // "= 05:28 Sun · Tokyo +7 h": the time large, the rest beneath it.
             let rest = time.display.dropFirst("= \(time.copyValue) ".count)
-            deliver(.answer(Answer(.time, value: time.copyValue, detail: String(rest),
-                                   copyValue: time.copyValue)))
+            deliver(
+                .answer(
+                    Answer(
+                        .time, value: time.copyValue, detail: String(rest),
+                        copyValue: time.copyValue)))
             return
         }
 
@@ -199,7 +220,9 @@ final class QueryEngine {
             deliver(.empty)
             debounced(gen) { finish in
                 Weather.fetch { finish(.list($0)) }
-            } deliver: { deliver($0) }
+            } deliver: {
+                deliver($0)
+            }
             return
         }
 
@@ -233,7 +256,7 @@ final class QueryEngine {
         }
         for field in Snippets.fields {
             guard Snippets.value(for: field.defaultsKey) != nil,
-                  let score = Fuzzy.score(query: text, target: field.title + " " + field.keywords)
+                let score = Fuzzy.score(query: text, target: field.title + " " + field.keywords)
             else { continue }
             scored.append((score + boost("snippet:\(field.defaultsKey)"), field.title, { self.snippetItem(field) }))
         }
@@ -272,7 +295,8 @@ final class QueryEngine {
             return
         }
         if let running = NSWorkspace.shared.runningApplications
-            .first(where: { $0.bundleURL?.standardizedFileURL.path == url.standardizedFileURL.path }) {
+            .first(where: { $0.bundleURL?.standardizedFileURL.path == url.standardizedFileURL.path })
+        {
             running.activate()
             return
         }
@@ -318,12 +342,14 @@ final class QueryEngine {
             } else if key.hasPrefix("command:") {
                 let id = String(key.dropFirst(8))
                 guard let command = commands.first(where: { $0.id == id }),
-                      !command.isDestructive, command.isAvailable() else { continue }
+                    !command.isDestructive, command.isAvailable()
+                else { continue }
                 items.append(commandItem(command))
             } else if key.hasPrefix("snippet:") {
                 let defaultsKey = String(key.dropFirst(8))
                 guard let field = Snippets.fields.first(where: { $0.defaultsKey == defaultsKey }),
-                      Snippets.value(for: defaultsKey) != nil else { continue }
+                    Snippets.value(for: defaultsKey) != nil
+                else { continue }
                 items.append(snippetItem(field))
             }
             if items.count == 5 { break }
@@ -333,9 +359,11 @@ final class QueryEngine {
 
     /// Runs a network fetch after a short debounce so keystrokes don't spam
     /// the APIs. Results are only delivered if the query hasn't changed.
-    private func debounced(_ gen: Int,
-                           _ fetch: @escaping (@escaping (QueryOutput) -> Void) -> Void,
-                           deliver: @escaping (QueryOutput) -> Void) {
+    private func debounced(
+        _ gen: Int,
+        _ fetch: @escaping (@escaping (QueryOutput) -> Void) -> Void,
+        deliver: @escaping (QueryOutput) -> Void
+    ) {
         let work = DispatchWorkItem { [weak self] in
             fetch { output in
                 DispatchQueue.main.async {

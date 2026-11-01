@@ -165,10 +165,8 @@ impl Log {
     fn parse(raw: &str) -> Option<Self> {
         let value: serde_json::Value = serde_json::from_str(raw).ok()?;
         let entries = value.get("messages")?.as_array()?;
-        let mut items: VecDeque<Message> = entries
-            .iter()
-            .filter_map(|e| serde_json::from_value(e.clone()).ok())
-            .collect();
+        let mut items: VecDeque<Message> =
+            entries.iter().filter_map(|e| serde_json::from_value(e.clone()).ok()).collect();
         items.truncate(CAP);
         let next_id = items.iter().map(|m| m.id).max().unwrap_or(0);
         Some(Self { items, next_id })
@@ -200,12 +198,7 @@ impl Messages {
             Err(_) => Log::default(),
         };
         let (dirty, rx) = mpsc::channel();
-        let store = Self {
-            path,
-            log: parking_lot::Mutex::new(log),
-            dirty,
-            disk: parking_lot::Mutex::new(()),
-        };
+        let store = Self { path, log: parking_lot::Mutex::new(log), dirty, disk: parking_lot::Mutex::new(()) };
         (store, rx)
     }
 
@@ -294,13 +287,7 @@ mod tests {
     use super::*;
 
     fn new(title: &str) -> New {
-        New {
-            kind: Kind::Error,
-            level: Level::Error,
-            title: title.into(),
-            body: String::new(),
-            target: None,
-        }
+        New { kind: Kind::Error, level: Level::Error, title: title.into(), body: String::new(), target: None }
     }
 
     fn temp_dir() -> PathBuf {

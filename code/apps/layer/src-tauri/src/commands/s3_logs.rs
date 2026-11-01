@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use parking_lot::Mutex;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tauri::{AppHandle, State};
 
 use crate::config::{AthenaTable, LogSource};
@@ -47,7 +47,12 @@ pub struct Found {
 
 /// What is under a bucket's prefix, and the Athena tables over the bucket.
 #[tauri::command]
-pub async fn s3_log_source_find(profile: String, region: Option<String>, bucket: String, prefix: String) -> Result<Found> {
+pub async fn s3_log_source_find(
+    profile: String,
+    region: Option<String>,
+    bucket: String,
+    prefix: String,
+) -> Result<Found> {
     super::off_runtime(move || find(&profile, region.as_deref(), &bucket, &prefix)).await?
 }
 
@@ -141,7 +146,11 @@ pub fn s3_log_source_remove(state: State<AppState>, id: String) -> Result<()> {
 /// also take in `logs-old/` (OBS-10).
 fn folder(prefix: &str) -> String {
     let p = prefix.trim().trim_start_matches('/');
-    if p.is_empty() || p.ends_with('/') { p.to_string() } else { format!("{p}/") }
+    if p.is_empty() || p.ends_with('/') {
+        p.to_string()
+    } else {
+        format!("{p}/")
+    }
 }
 
 // ------------------------------------------------------- what queries cost
@@ -261,7 +270,9 @@ pub fn s3_logs_tools() -> Vec<Value> {
 fn source_named(sources: &[LogSource], named: Option<&str>) -> Result<LogSource> {
     let names = || sources.iter().map(|s| s.name.as_str()).collect::<Vec<_>>().join(", ");
     match (named, sources) {
-        (_, []) => Err(Error::Other("no S3 log source is set up: the user adds one in Settings → Observability".into())),
+        (_, []) => {
+            Err(Error::Other("no S3 log source is set up: the user adds one in Settings → Observability".into()))
+        }
         (None, [one]) => Ok(one.clone()),
         (None, _) => Err(Error::Other(format!("name a source: {}", names()))),
         (Some(n), _) => sources
@@ -290,7 +301,10 @@ fn inside(source: &LogSource, path: &str) -> Result<String> {
     if key.starts_with(&source.prefix) {
         Ok(key)
     } else if path.starts_with("s3://") {
-        Err(Error::Other(format!("{path} is outside this source: it reads only s3://{}/{}", source.bucket, source.prefix)))
+        Err(Error::Other(format!(
+            "{path} is outside this source: it reads only s3://{}/{}",
+            source.bucket, source.prefix
+        )))
     } else {
         Ok(format!("{}{key}", source.prefix))
     }
@@ -325,13 +339,20 @@ fn call(sources: &[LogSource], name: &str, args: &Value) -> Result<Value> {
         }
         "s3_logs_query" => {
             let a = source.athena.as_ref().ok_or_else(|| {
-                Error::Other(format!("{} has no Athena table to query: browse it with s3_logs_list and s3_logs_read", source.name))
+                Error::Other(format!(
+                    "{} has no Athena table to query: browse it with s3_logs_list and s3_logs_read",
+                    source.name
+                ))
             })?;
             let sql = aws::read_only(arg(args, "sql").unwrap_or_default())?;
             let (done, daily) = within_limit(&source, a)?;
             let aws = aws()?;
             aws::narrowed(&sql, &aws.table(&a.database, &a.table)?.partition_keys)?;
-            let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(aws::DEFAULT_ROWS as u64).clamp(1, aws::MAX_ROWS as u64) as u32;
+            let limit = args
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(aws::DEFAULT_ROWS as u64)
+                .clamp(1, aws::MAX_ROWS as u64) as u32;
             let rows = aws.query(&a.workgroup, &a.database, &sql, limit)?;
             add_scanned(&source.id, rows.scanned_bytes);
             let mut out = json!(rows);
@@ -350,7 +371,9 @@ fn describe(s: &LogSource) -> Value {
         match found {
             Ok(t) => json!({ "database": a.database, "table": a.table, "workgroup": a.workgroup,
                              "location": t.location, "partition_keys": t.partition_keys, "columns": t.columns }),
-            Err(e) => json!({ "database": a.database, "table": a.table, "workgroup": a.workgroup, "error": e.to_string() }),
+            Err(e) => {
+                json!({ "database": a.database, "table": a.table, "workgroup": a.workgroup, "error": e.to_string() })
+            }
         }
     };
     json!({
@@ -389,8 +412,17 @@ mod tests {
 
     #[test]
     fn workgroups_are_looked_for_by_the_names_of_the_tables_databases() {
-        let t = |db: &str| Table { database: db.into(), table: "t".into(), location: String::new(), columns: vec![], partition_keys: vec![] };
-        assert_eq!(named_like(&[t("ci_request_logs"), t("ci_request_logs"), t("plain")]), ["ci-request-logs", "ci_request_logs", "plain"]);
+        let t = |db: &str| Table {
+            database: db.into(),
+            table: "t".into(),
+            location: String::new(),
+            columns: vec![],
+            partition_keys: vec![],
+        };
+        assert_eq!(
+            named_like(&[t("ci_request_logs"), t("ci_request_logs"), t("plain")]),
+            ["ci-request-logs", "ci_request_logs", "plain"]
+        );
         assert!(named_like(&[]).is_empty());
     }
 
@@ -425,8 +457,15 @@ mod tests {
         let taken = vec![LogSource { id: "other".into(), ..source("") }];
         assert!(checked_source(&mut source(""), &taken, &profiles).is_err(), "two sources by one name");
         assert!(checked_source(&mut LogSource { profile: "nope".into(), ..source("") }, &[], &profiles).is_err());
-        assert!(checked_source(&mut LogSource { bucket: "--endpoint-url=x".into(), ..source("") }, &[], &profiles).is_err());
-        let half = AthenaTable { workgroup: String::new(), database: "logs".into(), table: "all".into(), daily_limit_gb: None };
+        assert!(
+            checked_source(&mut LogSource { bucket: "--endpoint-url=x".into(), ..source("") }, &[], &profiles).is_err()
+        );
+        let half = AthenaTable {
+            workgroup: String::new(),
+            database: "logs".into(),
+            table: "all".into(),
+            daily_limit_gb: None,
+        };
         assert!(checked_source(&mut LogSource { athena: Some(half), ..source("") }, &[], &profiles).is_err());
         let blank = AthenaTable::default();
         let mut s = LogSource { athena: Some(blank), ..source("") };
@@ -436,7 +475,8 @@ mod tests {
     #[test]
     fn a_source_past_its_daily_limit_is_refused_until_the_next_day() {
         let s = LogSource { id: format!("limit-{}", uuid::Uuid::new_v4()), ..source("") };
-        let one_gb = AthenaTable { workgroup: "w".into(), database: "d".into(), table: "t".into(), daily_limit_gb: Some(1) };
+        let one_gb =
+            AthenaTable { workgroup: "w".into(), database: "d".into(), table: "t".into(), daily_limit_gb: Some(1) };
         assert_eq!(within_limit(&s, &one_gb).unwrap(), (0, 1 << 30));
         add_scanned(&s.id, 600 << 20);
         add_scanned(&s.id, 600 << 20);
@@ -466,7 +506,12 @@ mod tests {
             name: "Real".into(),
             profile: p[0].into(),
             bucket: p[1].into(),
-            athena: Some(AthenaTable { database: p[2].into(), workgroup: p[3].into(), table: p[4].into(), daily_limit_gb: Some(1) }),
+            athena: Some(AthenaTable {
+                database: p[2].into(),
+                workgroup: p[3].into(),
+                table: p[4].into(),
+                daily_limit_gb: Some(1),
+            }),
             ..Default::default()
         };
         let all = [s];
@@ -478,10 +523,25 @@ mod tests {
         let refused = call(&all, "s3_logs_query", &json!({ "sql": wide })).unwrap_err().to_string();
         eprintln!("refused: {refused}");
         assert!(refused.contains("narrow"), "{refused}");
-        let narrow = format!("SELECT count(*) AS n FROM {} WHERE year = '2026' AND month = '10' AND day = '12' AND hour = '09'", p[4]);
+        let narrow = format!(
+            "SELECT count(*) AS n FROM {} WHERE year = '2026' AND month = '10' AND day = '12' AND hour = '09'",
+            p[4]
+        );
         let found = find(p[0], None, p[1], "").unwrap();
-        eprintln!("find: {} folders, tables {:?}, workgroups {:?}", found.folders.len(), found.tables.iter().map(|t| &t.table).collect::<Vec<_>>(), found.workgroups);
+        eprintln!(
+            "find: {} folders, tables {:?}, workgroups {:?}",
+            found.folders.len(),
+            found.tables.iter().map(|t| &t.table).collect::<Vec<_>>(),
+            found.workgroups
+        );
         let answered = call(&all, "s3_logs_query", &json!({ "sql": narrow })).unwrap();
-        eprintln!("answered: rows {} scanned {} cost {} today {} of {}", answered["rows"], answered["data_scanned"], answered["cost"], answered["scanned_today"], answered["daily_limit"]);
+        eprintln!(
+            "answered: rows {} scanned {} cost {} today {} of {}",
+            answered["rows"],
+            answered["data_scanned"],
+            answered["cost"],
+            answered["scanned_today"],
+            answered["daily_limit"]
+        );
     }
 }

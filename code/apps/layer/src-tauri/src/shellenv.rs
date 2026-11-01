@@ -107,9 +107,7 @@ fn parse_env(out: &[u8]) -> Vec<(String, String)> {
 /// The environment of an interactive login shell, falling back to our own.
 pub fn user_env() -> &'static HashMap<String, String> {
     ENV.get_or_init(|| {
-        let mut env: HashMap<String, String> = std::env::vars()
-            .filter(|(k, _)| !from_a_claude_session(k))
-            .collect();
+        let mut env: HashMap<String, String> = std::env::vars().filter(|(k, _)| !from_a_claude_session(k)).collect();
         if let Some(out) = ask_login_shell(&env) {
             env.extend(parse_env(&out));
         }
@@ -141,10 +139,7 @@ pub fn path_if_ready() -> Option<&'static str> {
 }
 
 pub fn path() -> String {
-    user_env()
-        .get("PATH")
-        .cloned()
-        .unwrap_or_else(|| "/usr/bin:/bin".into())
+    user_env().get("PATH").cloned().unwrap_or_else(|| "/usr/bin:/bin".into())
 }
 
 /// Is `program` runnable with the user's real PATH?

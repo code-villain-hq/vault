@@ -21,13 +21,13 @@ pub use outgoing::{outgoing_commits, outgoing_from, outgoing_patch};
 pub use remote::{clone_by_key, forget_origins, origin_slug, origin_slug_cached};
 pub use snapshot::fingerprint;
 pub use store::{
-    adopt_worktree, belongs_to, changed_between, copy_local_config, create_store, default_tip,
-    follow_clone_origin, is_own_clone, is_store_of, owner, reclaim_clone, relink_worktree, take_branch_from_clone, take_branch_from_origin,
+    adopt_worktree, belongs_to, changed_between, copy_local_config, create_store, default_tip, follow_clone_origin,
+    is_own_clone, is_store_of, owner, reclaim_clone, relink_worktree, take_branch_from_clone, take_branch_from_origin,
 };
 pub use upkeep::{
-    branch_tips, delete_branch_at, delete_origin_branch, fast_forward, fetch_store, holds, is_bare,
-    list_worktrees, only_here, origin_branches, origin_url, remote_key, same_remote, standing, synced_at,
-    update_style, user_email, Forwarded, OriginBranch,
+    branch_tips, delete_branch_at, delete_origin_branch, fast_forward, fetch_store, holds, is_bare, list_worktrees,
+    only_here, origin_branches, origin_url, remote_key, same_remote, standing, synced_at, update_style, user_email,
+    Forwarded, OriginBranch,
 };
 
 fn command(dir: &Path, args: &[&str]) -> Command {
@@ -59,18 +59,16 @@ fn command(dir: &Path, args: &[&str]) -> Command {
 /// Private on purpose: a hand-written argument list elsewhere skips the flags
 /// this file adds against the user's own git config. Add a named function.
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
-    let out = command(dir, args)
-        .output()
-        .map_err(|e| {
-            // The common cause is a missing working directory, not a missing
-            // git. Saying "failed to run git: No such file or directory" sends
-            // people looking for the wrong problem.
-            if !dir.is_dir() {
-                Error::Git(format!("{} no longer exists", dir.display()))
-            } else {
-                Error::Git(format!("failed to run git in {}: {e}", dir.display()))
-            }
-        })?;
+    let out = command(dir, args).output().map_err(|e| {
+        // The common cause is a missing working directory, not a missing
+        // git. Saying "failed to run git: No such file or directory" sends
+        // people looking for the wrong problem.
+        if !dir.is_dir() {
+            Error::Git(format!("{} no longer exists", dir.display()))
+        } else {
+            Error::Git(format!("failed to run git in {}: {e}", dir.display()))
+        }
+    })?;
 
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
@@ -133,9 +131,7 @@ pub fn repo_root(dir: &Path) -> Result<String> {
 }
 
 pub fn current_branch(dir: &Path) -> Result<String> {
-    Ok(run(dir, &["rev-parse", "--abbrev-ref", "HEAD"])?
-        .trim()
-        .to_string())
+    Ok(run(dir, &["rev-parse", "--abbrev-ref", "HEAD"])?.trim().to_string())
 }
 
 /// The repo's default branch, best-effort: origin/HEAD, then main, then master.
@@ -161,15 +157,7 @@ pub fn default_branch(dir: &Path) -> String {
 /// be in here, which is why the field that uses this still takes anything
 /// typed into it.
 pub fn remote_branches(dir: &Path) -> Result<Vec<String>> {
-    let out = run(
-        dir,
-        &[
-            "for-each-ref",
-            "--format=%(refname:short)",
-            "--sort=-committerdate",
-            "refs/remotes/origin",
-        ],
-    )?;
+    let out = run(dir, &["for-each-ref", "--format=%(refname:short)", "--sort=-committerdate", "refs/remotes/origin"])?;
     Ok(out
         .lines()
         .filter_map(|l| l.trim().strip_prefix("origin/"))
@@ -179,11 +167,7 @@ pub fn remote_branches(dir: &Path) -> Result<Vec<String>> {
 }
 
 pub fn branch_exists(dir: &Path, branch: &str) -> bool {
-    run(
-        dir,
-        &["rev-parse", "--verify", "--quiet", &format!("refs/heads/{branch}")],
-    )
-    .is_ok()
+    run(dir, &["rev-parse", "--verify", "--quiet", &format!("refs/heads/{branch}")]).is_ok()
 }
 
 /// A start-point that `git worktree add -b` can resolve.
@@ -221,10 +205,7 @@ fn fetch_base(repo: &Path, base: &str) {
 /// date" against a stale base, and a task branch never got the tracking ref a
 /// push lease is read from.
 fn fetch_tracking(repo: &Path, name: &str) -> Result<String> {
-    run(
-        repo,
-        &["fetch", "--quiet", "origin", &format!("+refs/heads/{name}:refs/remotes/origin/{name}")],
-    )
+    run(repo, &["fetch", "--quiet", "origin", &format!("+refs/heads/{name}:refs/remotes/origin/{name}")])
 }
 
 /// Fetch the task branch before rewriting it, and forget it when the remote
@@ -304,24 +285,14 @@ fn each_repo(targets: &[(std::path::PathBuf, String)], work: impl Fn(&Path, &str
 /// Create a worktree at `path`. Creates `branch` from `base` when it does not
 /// already exist, otherwise checks the existing branch out.
 /// Returns the commit the worktree starts at, so the diff has a fixed point.
-pub fn add_worktree(
-    repo: &Path,
-    path: &Path,
-    branch: &str,
-    base: &str,
-) -> Result<String> {
+pub fn add_worktree(repo: &Path, path: &Path, branch: &str, base: &str) -> Result<String> {
     check_names(branch, base)?;
     fetch_base(repo, base);
     add_worktree_fetched(repo, path, branch, base)
 }
 
 /// `add_worktree` for a base already brought up to date by `fetch_bases`.
-pub fn add_worktree_fetched(
-    repo: &Path,
-    path: &Path,
-    branch: &str,
-    base: &str,
-) -> Result<String> {
+pub fn add_worktree_fetched(repo: &Path, path: &Path, branch: &str, base: &str) -> Result<String> {
     check_names(branch, base)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -352,9 +323,7 @@ pub fn add_worktree_fetched(
             .unwrap_or_default())
     } else {
         add(&["worktree", "add", "-b", branch, &path_s, &start])?;
-        Ok(run(path, &["rev-parse", "HEAD"])
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default())
+        Ok(run(path, &["rev-parse", "HEAD"]).map(|s| s.trim().to_string()).unwrap_or_default())
     }
 }
 
@@ -419,10 +388,8 @@ pub fn status(dir: &Path) -> Result<WorktreeStatus> {
     // Spelled out, since the user's config applies: with
     // `status.showUntrackedFiles=no` a worktree holding only new files read
     // as clean, and was removed with them.
-    let out = run(
-        dir,
-        &["status", "--porcelain=v2", "--branch", "--untracked-files=normal", "--ignore-submodules=none"],
-    )?;
+    let out =
+        run(dir, &["status", "--porcelain=v2", "--branch", "--untracked-files=normal", "--ignore-submodules=none"])?;
     let mut s = WorktreeStatus {
         branch: String::new(),
         head: String::new(),
@@ -489,12 +456,7 @@ pub struct ChangedFile {
 const UNTRACKED_COUNT_LIMIT: u64 = 4 * 1024 * 1024;
 
 /// Every file that differs from `base`, including uncommitted and untracked work.
-pub fn changed_files(
-    dir: &Path,
-    base: &str,
-    base_commit: Option<&str>,
-    scope: Scope,
-) -> Result<Vec<ChangedFile>> {
+pub fn changed_files(dir: &Path, base: &str, base_commit: Option<&str>, scope: Scope) -> Result<Vec<ChangedFile>> {
     let mut files: Vec<ChangedFile> = Vec::new();
 
     let merge_base = compare_against(dir, base, base_commit, scope);
@@ -532,9 +494,7 @@ pub fn changed_files(
 /// PNG used to be read as a string, fail, and leave the previous file's patch
 /// on screen beside an error.
 fn untracked_text(path: &Path) -> Option<String> {
-    let small = std::fs::metadata(path)
-        .map(|m| m.is_file() && m.len() <= UNTRACKED_COUNT_LIMIT)
-        .unwrap_or(false);
+    let small = std::fs::metadata(path).map(|m| m.is_file() && m.len() <= UNTRACKED_COUNT_LIMIT).unwrap_or(false);
     if !small {
         return None;
     }
@@ -550,12 +510,7 @@ fn untracked_text(path: &Path) -> Option<String> {
 /// The same set `changed_files` lists, counted without building it: no file
 /// is opened, which is what makes this safe to call for every repository of
 /// every task on the pull-request watch's timer.
-pub fn changed_count(
-    dir: &Path,
-    base: &str,
-    base_commit: Option<&str>,
-    scope: Scope,
-) -> usize {
+pub fn changed_count(dir: &Path, base: &str, base_commit: Option<&str>, scope: Scope) -> usize {
     let merge_base = compare_against(dir, base, base_commit, scope);
     changed_count_from(dir, &merge_base)
 }
@@ -591,12 +546,7 @@ pub enum Scope {
 
 /// The revision a scope compares against: HEAD for uncommitted work, the
 /// branch point for the branch as a whole.
-pub fn compare_against(
-    dir: &Path,
-    base: &str,
-    base_commit: Option<&str>,
-    scope: Scope,
-) -> String {
+pub fn compare_against(dir: &Path, base: &str, base_commit: Option<&str>, scope: Scope) -> String {
     match scope {
         Scope::Uncommitted => "HEAD".to_string(),
         Scope::Branch => baseline(dir, base, base_commit),
@@ -651,25 +601,14 @@ pub struct BranchFacts {
 ///
 /// Every number here is one `git` can answer directly; none of it is inferred
 /// from the file list, which is what makes it safe to print beside one.
-pub fn branch_facts(
-    dir: &Path,
-    branch: &str,
-    base: &str,
-    base_commit: Option<&str>,
-) -> BranchFacts {
+pub fn branch_facts(dir: &Path, branch: &str, base: &str, base_commit: Option<&str>) -> BranchFacts {
     let point = baseline(dir, base, base_commit);
     // `baseline` falls back when the recorded commit is not in this worktree,
     // so believing `base_commit` alone would overstate what is known.
-    let recorded = base_commit
-        .map(str::trim)
-        .filter(|c| !c.is_empty())
-        .is_some_and(|c| c == point);
+    let recorded = base_commit.map(str::trim).filter(|c| !c.is_empty()).is_some_and(|c| c == point);
 
     let count = |range: &str| {
-        run(dir, &["rev-list", "--count", range])
-            .ok()
-            .and_then(|s| s.trim().parse::<u32>().ok())
-            .unwrap_or(0)
+        run(dir, &["rev-list", "--count", range]).ok().and_then(|s| s.trim().parse::<u32>().ok()).unwrap_or(0)
     };
 
     let remote = format!("origin/{branch}");
@@ -688,13 +627,7 @@ pub fn branch_facts(
 
 /// Unified patch for one file, against the baseline. Untracked files are
 /// rendered as an all-additions patch so the review UI has one code path.
-pub fn file_diff(
-    dir: &Path,
-    base: &str,
-    base_commit: Option<&str>,
-    scope: Scope,
-    path: &str,
-) -> Result<String> {
+pub fn file_diff(dir: &Path, base: &str, base_commit: Option<&str>, scope: Scope, path: &str) -> Result<String> {
     let merge_base = compare_against(dir, base, base_commit, scope);
 
     // One call covers modified, staged, renamed and deleted files. Branching on
@@ -718,9 +651,8 @@ pub fn file_diff(
     if !full.exists() {
         return Err(Error::Git(format!("{path} is no longer in the worktree")));
     }
-    let content = untracked_text(&full).ok_or_else(|| {
-        Error::Git(format!("{path} is binary or too large to show as a diff"))
-    })?;
+    let content =
+        untracked_text(&full).ok_or_else(|| Error::Git(format!("{path} is binary or too large to show as a diff")))?;
     let lines = content.lines().count();
     let mut out = format!("--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{lines} @@\n");
     for line in content.lines() {
@@ -745,23 +677,11 @@ pub struct CommitInfo {
 /// into this one dumps that branch's history into the picker, which is how a
 /// two-commit task ends up listing a hundred commits from elsewhere. Cap keeps
 /// a runaway still from drowning the menu.
-pub fn commits_since(
-    dir: &Path,
-    base: &str,
-    base_commit: Option<&str>,
-) -> Result<Vec<CommitInfo>> {
+pub fn commits_since(dir: &Path, base: &str, base_commit: Option<&str>) -> Result<Vec<CommitInfo>> {
     let point = baseline(dir, base, base_commit);
     let out = run(
         dir,
-        &[
-            "log",
-            "--first-parent",
-            "--format=%H\t%h\t%s",
-            "--no-decorate",
-            "-n",
-            "100",
-            &format!("{point}..HEAD"),
-        ],
+        &["log", "--first-parent", "--format=%H\t%h\t%s", "--no-decorate", "-n", "100", &format!("{point}..HEAD")],
     )?;
     Ok(out
         .lines()
@@ -814,10 +734,7 @@ fn commit_id(sha: &str) -> Result<&str> {
 pub fn commit_files(dir: &Path, sha: &str) -> Result<Vec<ChangedFile>> {
     let sha = commit_id(sha)?;
     // Empty format: we only want the numstat body, not the commit header.
-    let numstat = run(
-        dir,
-        &["show", "--numstat", "-z", "--format=", "--diff-filter=AMDR", sha],
-    )?;
+    let numstat = run(dir, &["show", "--numstat", "-z", "--format=", "--diff-filter=AMDR", sha])?;
     let mut files = parse_numstat(&numstat);
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)
@@ -868,10 +785,8 @@ pub fn commit_file_diff(dir: &Path, sha: &str, path: &str) -> Result<String> {
     let sha = commit_id(sha)?;
     // `--pretty=format:` drops the commit header so the UI gets a bare patch,
     // the same shape `file_diff` returns for working-tree changes.
-    let patch = run(
-        dir,
-        &["show", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", "--pretty=format:", sha, "--", path],
-    )?;
+    let patch =
+        run(dir, &["show", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", "--pretty=format:", sha, "--", path])?;
     Ok(patch)
 }
 
@@ -901,10 +816,7 @@ pub fn push(dir: &Path, branch: &str, lease: Option<&str>) -> Result<bool> {
     // Mid-rebase the branch still points at its old tip, so the push went
     // through as a no-op and spent the lease the finished rebase needed.
     if let Some(busy) = in_progress(dir) {
-        return Err(Error::Git(format!(
-            "a {} is in progress here — finish or abandon it before pushing",
-            busy.word()
-        )));
+        return Err(Error::Git(format!("a {} is in progress here — finish or abandon it before pushing", busy.word())));
     }
     // A lease the branch still contains protects nothing: the rebase it came
     // from was abandoned, or its result was merged over since. Sent anyway it
@@ -914,17 +826,14 @@ pub fn push(dir: &Path, branch: &str, lease: Option<&str>) -> Result<bool> {
     let lease = lease.filter(|sha| !is_ancestor(dir, sha, &format!("refs/heads/{branch}")));
     let replaced = lease.is_some();
     match lease {
-        Some(sha) => run(
-            dir,
-            &["push", &format!("--force-with-lease={branch}:{sha}"), "-u", "origin", branch],
-        )
-        .map_err(|e| match e {
-            Error::Git(msg) if msg.contains("stale info") => Error::Git(format!(
-                "{msg}\nThe remote branch has moved since it was rebased here — someone else \
+        Some(sha) => run(dir, &["push", &format!("--force-with-lease={branch}:{sha}"), "-u", "origin", branch])
+            .map_err(|e| match e {
+                Error::Git(msg) if msg.contains("stale info") => Error::Git(format!(
+                    "{msg}\nThe remote branch has moved since it was rebased here — someone else \
                  pushed to it. Fetch and look at what they pushed before replacing it."
-            )),
-            other => other,
-        }),
+                )),
+                other => other,
+            }),
         None => run(dir, &["push", "-u", "origin", branch]),
     }
     .map(|_| replaced)
@@ -987,7 +896,11 @@ pub fn in_progress(dir: &Path) -> Option<UpdateBy> {
         .lines()
         .map(|p| {
             let p = PathBuf::from(p.trim());
-            if p.is_absolute() { p } else { dir.join(p) }
+            if p.is_absolute() {
+                p
+            } else {
+                dir.join(p)
+            }
         })
         .collect();
     match paths.as_slice() {
@@ -1025,10 +938,7 @@ pub fn update_from_base(
     lease: Option<&str>,
 ) -> Result<(Updated, String)> {
     if let Some(busy) = in_progress(dir) {
-        return Err(Error::Git(format!(
-            "a {} is already in progress here — finish or abandon it first",
-            busy.word()
-        )));
+        return Err(Error::Git(format!("a {} is already in progress here — finish or abandon it first", busy.word())));
     }
     let branch = current_branch(dir)?;
     // Something switched the worktree — an agent, a detached checkout. The
@@ -1053,14 +963,9 @@ pub fn update_from_base(
     }
 
     let from = resolve_base(dir, base);
-    let target = run(dir, &["rev-parse", "--verify", &format!("{from}^{{commit}}")])?
-        .trim()
-        .to_string();
+    let target = run(dir, &["rev-parse", "--verify", &format!("{from}^{{commit}}")])?.trim().to_string();
     let count = |range: String| {
-        run(dir, &["rev-list", "--count", &range])
-            .ok()
-            .and_then(|s| s.trim().parse::<u32>().ok())
-            .unwrap_or(0)
+        run(dir, &["rev-list", "--count", &range]).ok().and_then(|s| s.trim().parse::<u32>().ok()).unwrap_or(0)
     };
     let commits = count(format!("HEAD..{target}"));
     if commits == 0 {
@@ -1106,10 +1011,14 @@ pub fn update_from_base(
             run(
                 dir,
                 &[
-                    "-c", "rebase.autoSquash=false",
-                    "-c", "rebase.autoStash=false",
-                    "-c", "rebase.updateRefs=false",
-                    "rebase", &target,
+                    "-c",
+                    "rebase.autoSquash=false",
+                    "-c",
+                    "rebase.autoStash=false",
+                    "-c",
+                    "rebase.updateRefs=false",
+                    "rebase",
+                    &target,
                 ],
             )
         }
@@ -1175,10 +1084,7 @@ mod tests {
     fn detects_default_branch_and_root() {
         let repo = fixture();
         assert_eq!(default_branch(&repo), "main");
-        assert_eq!(
-            std::fs::canonicalize(repo_root(&repo).unwrap()).unwrap(),
-            std::fs::canonicalize(&repo).unwrap()
-        );
+        assert_eq!(std::fs::canonicalize(repo_root(&repo).unwrap()).unwrap(), std::fs::canonicalize(&repo).unwrap());
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -1251,10 +1157,7 @@ mod tests {
         let wt = root.join("wt");
         let point = add_worktree(&local, &wt, "feature/fresh", "main").unwrap();
         assert_eq!(point, newest);
-        assert_eq!(
-            run(&wt, &["rev-parse", "HEAD"]).unwrap().trim(),
-            newest.as_str()
-        );
+        assert_eq!(run(&wt, &["rev-parse", "HEAD"]).unwrap().trim(), newest.as_str());
         assert_eq!(std::fs::read_to_string(wt.join("a.txt")).unwrap(), "new\n");
 
         // The same through the parallel fetch a multi-repo task uses.
@@ -1391,10 +1294,7 @@ mod tests {
         let subjects: Vec<&str> = log.iter().map(|c| c.subject.as_str()).collect();
         assert!(subjects.contains(&"feature work"));
         assert!(subjects.contains(&"merge main"));
-        assert!(
-            !subjects.iter().any(|s| s.starts_with("main-")),
-            "picker listed main's history: {subjects:?}"
-        );
+        assert!(!subjects.iter().any(|s| s.starts_with("main-")), "picker listed main's history: {subjects:?}");
 
         remove_worktree(&repo, &wt.to_string_lossy(), true).ok();
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
@@ -1497,17 +1397,13 @@ mod tests {
     fn a_deleted_worktree_says_so() {
         let gone = std::env::temp_dir().join(format!("vl-gone-{}", uuid::Uuid::new_v4()));
         let err = status(&gone).unwrap_err().to_string();
-        assert!(
-            err.contains("no longer exists"),
-            "expected a message about the missing directory, got: {err}"
-        );
+        assert!(err.contains("no longer exists"), "expected a message about the missing directory, got: {err}");
     }
 
     #[test]
     fn parses_origin_slug_from_ssh_url_with_a_port() {
         let repo = fixture();
-        run(&repo, &["remote", "add", "origin", "ssh://git@ghe.example.com:2222/acme/web.git"])
-            .unwrap();
+        run(&repo, &["remote", "add", "origin", "ssh://git@ghe.example.com:2222/acme/web.git"]).unwrap();
         assert_eq!(origin_slug(&repo).unwrap(), ("acme".into(), "web".into()));
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
@@ -1631,7 +1527,10 @@ mod tests {
 
         run(&wt, &["checkout", "--", "a.txt"]).unwrap();
         std::fs::write(wt.join("notes.txt"), "scratch\n").unwrap();
-        assert_eq!(update_from_base(&wt, "feature", "main", UpdateBy::Merge, None).unwrap().0, Updated::Applied { commits: 1 });
+        assert_eq!(
+            update_from_base(&wt, "feature", "main", UpdateBy::Merge, None).unwrap().0,
+            Updated::Applied { commits: 1 }
+        );
         std::fs::remove_dir_all(root).ok();
     }
     /// Finishing a task: the worktree goes first, because git will not delete
@@ -1857,7 +1756,8 @@ mod tests {
         let bare = root.join("remote.git");
         run(&seed, &["push", "-q", "origin", "main:develop"]).unwrap();
         let narrow = root.join("narrow");
-        run(&root, &["clone", "-q", "--single-branch", "-b", "main", bare.to_str().unwrap(), narrow.to_str().unwrap()]).unwrap();
+        run(&root, &["clone", "-q", "--single-branch", "-b", "main", bare.to_str().unwrap(), narrow.to_str().unwrap()])
+            .unwrap();
         fetch_bases(&[(narrow.clone(), "develop".into())]);
         assert!(remote_tip(&narrow, "develop").is_some());
         std::fs::remove_dir_all(root).ok();

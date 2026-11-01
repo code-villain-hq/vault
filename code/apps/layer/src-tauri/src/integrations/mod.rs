@@ -34,10 +34,7 @@ pub fn http_client() -> reqwest::Client {
 
 /// A string field of a JSON object, or "" when it is missing or not a string.
 pub(crate) fn str_at(v: &serde_json::Value, key: &str) -> String {
-    v.get(key)
-        .and_then(|s| s.as_str())
-        .unwrap_or_default()
-        .to_string()
+    v.get(key).and_then(|s| s.as_str()).unwrap_or_default().to_string()
 }
 
 /// Refuse a site whose address would carry a token unencrypted (SET-3).
@@ -47,11 +44,10 @@ pub(crate) fn str_at(v: &serde_json::Value, key: &str) -> String {
 /// `http://` GitHub Enterprise its bearer token. Plain http is allowed only
 /// to this machine, where nothing leaves it: a local proxy or test server.
 pub fn require_https(url: &str, what: &str) -> Result<()> {
-    let parsed = reqwest::Url::parse(url)
-        .map_err(|_| Error::Other(format!("{what} is not a web address: {url}")))?;
+    let parsed = reqwest::Url::parse(url).map_err(|_| Error::Other(format!("{what} is not a web address: {url}")))?;
     let host = parsed.host_str().unwrap_or("").trim_start_matches('[').trim_end_matches(']');
-    let loopback = host.eq_ignore_ascii_case("localhost")
-        || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback());
+    let loopback =
+        host.eq_ignore_ascii_case("localhost") || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback());
     match parsed.scheme() {
         "https" => Ok(()),
         "http" if loopback => Ok(()),
@@ -81,7 +77,8 @@ pub(crate) fn hide_home(text: &str) -> String {
             .find(|c: char| !(c.is_alphanumeric() || matches!(c, '.' | '_' | '-')))
             .unwrap_or(text.len() - name_at);
         let name = &text[name_at..name_at + name_len];
-        let starts_path = text[..at].chars().next_back().is_none_or(|c| !(c.is_alphanumeric() || matches!(c, '.' | '_' | '-' | '~')));
+        let starts_path =
+            text[..at].chars().next_back().is_none_or(|c| !(c.is_alphanumeric() || matches!(c, '.' | '_' | '-' | '~')));
         if starts_path && !name.is_empty() && !name.eq_ignore_ascii_case("shared") {
             out.push_str(&text[from..at]);
             out.push('~');

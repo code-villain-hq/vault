@@ -20,7 +20,11 @@ use super::projects::{ensure_store, walk_for_repos};
 use super::AppState;
 
 pub(super) fn plural(n: usize) -> &'static str {
-    if n == 1 { "" } else { "s" }
+    if n == 1 {
+        ""
+    } else {
+        "s"
+    }
 }
 
 /// For comparing paths: the temp and home folders both have spellings that
@@ -110,9 +114,7 @@ fn health(project: &Project, registered: &HashSet<PathBuf>, home: Option<&Path>)
     RepoHealth {
         project_id: project.id.clone(),
         clone: state,
-        origin: store
-            .and_then(git::origin_url)
-            .or_else(|| if state == "ok" { git::origin_url(clone) } else { None }),
+        origin: store.and_then(git::origin_url).or_else(|| if state == "ok" { git::origin_url(clone) } else { None }),
         store: store.map(|s| s.to_string_lossy().to_string()),
         synced_at: store.and_then(git::synced_at),
         behind: standing.map(|s| s.behind),
@@ -129,11 +131,7 @@ fn health(project: &Project, registered: &HashSet<PathBuf>, home: Option<&Path>)
 /// Set how Update from base updates branches in a repository (UPD-7), or
 /// with None, go back to guessing from its history.
 #[tauri::command]
-pub fn set_project_update_by(
-    state: State<AppState>,
-    project_id: String,
-    by: Option<git::UpdateBy>,
-) -> Result<()> {
+pub fn set_project_update_by(state: State<AppState>, project_id: String, by: Option<git::UpdateBy>) -> Result<()> {
     state.config.update(|c| {
         if let Some(p) = c.projects.iter_mut().find(|p| p.id == project_id) {
             p.update_by = by;
@@ -163,7 +161,8 @@ fn follow_group(projects: &[Project], rows: &mut [RepoHealth]) {
         if rebase == merge {
             continue;
         }
-        let (by, word) = if rebase > merge { (git::UpdateBy::Rebase, "rebase") } else { (git::UpdateBy::Merge, "merge") };
+        let (by, word) =
+            if rebase > merge { (git::UpdateBy::Rebase, "rebase") } else { (git::UpdateBy::Merge, "merge") };
         let names: Vec<&str> = peers.iter().filter(|(_, b, _)| *b == by).map(|(_, _, n)| *n).take(3).collect();
         row.update_guess = Some(by);
         row.update_reason = Some(format!("the other repos in {group} {word} ({})", names.join(", ")));
@@ -173,12 +172,7 @@ fn follow_group(projects: &[Project], rows: &mut [RepoHealth]) {
 /// A folder that is probably `project`'s clone, moved: the same folder
 /// name, under the nearest folder still there above where it was, and the
 /// same repository as the app's copy when there is one.
-fn find_moved(
-    project: &Project,
-    store: Option<&Path>,
-    registered: &HashSet<PathBuf>,
-    home: &Path,
-) -> Option<String> {
+fn find_moved(project: &Project, store: Option<&Path>, registered: &HashSet<PathBuf>, home: &Path) -> Option<String> {
     let was = Path::new(&project.path);
     let name = was.file_name()?;
     let near = was.ancestors().skip(1).find(|d| d.is_dir())?;
@@ -235,11 +229,7 @@ fn locate(state: &AppState, id: &str, path: &str) -> Result<Project> {
         if let Some(other) = c.projects.iter().find(|p| p.path == root && p.id != id) {
             return Err(Error::Other(format!("{root} is already registered, as {}", other.name)));
         }
-        let p = c
-            .projects
-            .iter_mut()
-            .find(|p| p.id == id)
-            .ok_or_else(|| Error::NotFound(format!("project {id}")))?;
+        let p = c.projects.iter_mut().find(|p| p.id == id).ok_or_else(|| Error::NotFound(format!("project {id}")))?;
         p.path = root.clone();
         p.default_branch = default_branch.clone();
         Ok(p.clone())

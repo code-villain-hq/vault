@@ -10,15 +10,15 @@ struct CurrencyQuery {
     static func parse(_ text: String) -> CurrencyQuery? {
         let pattern = #"^([0-9]+(?:[.,][0-9]+)?)\s*(.+?)\s+(?:to|in)\s+(.+?)$"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))
+            let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))
         else { return nil }
 
         func group(_ i: Int) -> String {
             String(text[Range(match.range(at: i), in: text)!])
         }
         guard let amount = Double(Calculator.normalizeDecimals(group(1))),
-              let from = Currency.normalize(group(2)),
-              let to = Currency.normalize(group(3))
+            let from = Currency.normalize(group(2)),
+            let to = Currency.normalize(group(3))
         else { return nil }
         return CurrencyQuery(amount: amount, from: from, to: to)
     }
@@ -77,18 +77,23 @@ enum Currency {
     /// The ECB only covers ~30 currencies (and dropped e.g. RUB in 2022),
     /// so on a miss it falls back to open.er-api.com (160+ currencies).
     /// Calls back with an inline display string and the value ⏎ should copy.
-    static func convert(_ query: CurrencyQuery,
-                        completion: @escaping (_ display: String, _ copyValue: String?) -> Void) {
+    static func convert(
+        _ query: CurrencyQuery,
+        completion: @escaping (_ display: String, _ copyValue: String?) -> Void
+    ) {
         guard query.from != query.to else {
             deliver(query.amount, query, completion)
             return
         }
-        let url = URL(string: "https://api.frankfurter.dev/v1/latest?amount=\(query.amount)&base=\(query.from)&symbols=\(query.to)")!
+        let url = URL(
+            string:
+                "https://api.frankfurter.dev/v1/latest?amount=\(query.amount)&base=\(query.from)&symbols=\(query.to)")!
         URLSession.shared.dataTask(with: url) { data, _, _ in
             if let data,
-               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let rates = object["rates"] as? [String: Double],
-               let value = rates[query.to] {
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let rates = object["rates"] as? [String: Double],
+                let value = rates[query.to]
+            {
                 deliver(value, query, completion)
             } else {
                 convertViaFallback(query, completion: completion)
@@ -96,14 +101,16 @@ enum Currency {
         }.resume()
     }
 
-    private static func convertViaFallback(_ query: CurrencyQuery,
-                                           completion: @escaping (String, String?) -> Void) {
+    private static func convertViaFallback(
+        _ query: CurrencyQuery,
+        completion: @escaping (String, String?) -> Void
+    ) {
         let url = URL(string: "https://open.er-api.com/v6/latest/\(query.from)")!
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data,
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rates = object["rates"] as? [String: Double],
-                  let rate = rates[query.to]
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let rates = object["rates"] as? [String: Double],
+                let rate = rates[query.to]
             else {
                 completion("no rate", nil)
                 return
@@ -112,8 +119,10 @@ enum Currency {
         }.resume()
     }
 
-    private static func deliver(_ value: Double, _ query: CurrencyQuery,
-                                _ completion: (String, String?) -> Void) {
+    private static func deliver(
+        _ value: Double, _ query: CurrencyQuery,
+        _ completion: (String, String?) -> Void
+    ) {
         let formatted = formatAmount(value)
         completion("= \(formatted) \(query.to)", formatted)
     }

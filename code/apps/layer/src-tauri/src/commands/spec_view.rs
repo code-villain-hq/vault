@@ -107,7 +107,9 @@ pub(super) fn view(state: &AppState, task: &Task) -> TaskSpec {
                 home: h.rel.clone().map(|r| format!("{}/{r}", h.folder)).unwrap_or_else(|| h.shown()),
                 in_repo: h.rel.is_some(),
                 steps: spec.steps(h),
-                check: spec.check(h).map(|check| CheckView { stale: head.as_deref() != Some(check.sha.as_str()), check }),
+                check: spec
+                    .check(h)
+                    .map(|check| CheckView { stale: head.as_deref() != Some(check.sha.as_str()), check }),
             }
         })
         .collect();
@@ -147,4 +149,3 @@ pub async fn save_spec_draft(
     })
     .await
 }
-

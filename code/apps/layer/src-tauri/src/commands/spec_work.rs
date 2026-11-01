@@ -36,8 +36,8 @@ pub(crate) fn tick_step(state: &AppState, task_id: &str, repo: &str, number: u32
 fn tick_file(path: &Path, repo: &str, number: u32, done: bool) -> Result<Step> {
     static TICKING: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
     let _one = TICKING.lock();
-    let text = std::fs::read_to_string(path)
-        .map_err(|_| Error::NotFound(format!("an approved tasks.md for `{repo}`")))?;
+    let text =
+        std::fs::read_to_string(path).map_err(|_| Error::NotFound(format!("an approved tasks.md for `{repo}`")))?;
     let ticked = spec::tick(&text, number, done).ok_or_else(|| Error::NotFound(format!("step {number}")))?;
     crate::agents::replace_file(path, ticked.as_bytes(), None)?;
     spec::steps(&ticked)
@@ -111,7 +111,13 @@ pub(crate) fn pr_section(state: &AppState, task: &Task) -> String {
             let answer = check
                 .as_ref()
                 .and_then(|c| c.results.iter().find(|v| v.id == r.id))
-                .map(|v| format!("{}{}", v.verdict, if v.evidence.is_empty() { String::new() } else { format!(" ({})", v.evidence) }))
+                .map(|v| {
+                    format!(
+                        "{}{}",
+                        v.verdict,
+                        if v.evidence.is_empty() { String::new() } else { format!(" ({})", v.evidence) }
+                    )
+                })
                 .unwrap_or_else(|| "not checked".into());
             md.push_str(&format!("- {}: {} — {answer}\n", r.id, r.text));
         }

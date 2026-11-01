@@ -44,7 +44,9 @@ pub enum BrowserInput {
         location: u32,
     },
     /// Text pasted, or typed by an input method.
-    Text { text: String },
+    Text {
+        text: String,
+    },
 }
 
 const MOUSE: &[&str] = &["mousePressed", "mouseReleased", "mouseMoved"];
@@ -132,7 +134,13 @@ mod tests {
     fn an_event_the_panel_never_sends_is_dropped() {
         assert!(to_cdp(&key("char", "a", None, 0)).is_none());
         let m = BrowserInput::Mouse {
-            r#type: "mouseWheel".into(), x: 0.0, y: 0.0, button: "left".into(), buttons: 0, click_count: 1, modifiers: 0,
+            r#type: "mouseWheel".into(),
+            x: 0.0,
+            y: 0.0,
+            button: "left".into(),
+            buttons: 0,
+            click_count: 1,
+            modifiers: 0,
         };
         assert!(to_cdp(&m).is_none());
     }

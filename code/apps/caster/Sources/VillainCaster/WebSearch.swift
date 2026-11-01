@@ -14,14 +14,16 @@ enum WebSearch {
     static func match(_ text: String) -> ResultItem? {
         let parts = text.split(separator: " ", maxSplits: 1)
         guard parts.count == 2,
-              let engine = engines[parts[0].lowercased()] else { return nil }
+            let engine = engines[parts[0].lowercased()]
+        else { return nil }
         let query = String(parts[1]).trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return nil }
 
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?")
         guard let encoded = query.addingPercentEncoding(withAllowedCharacters: allowed),
-              let url = URL(string: engine.searchURL + encoded) else { return nil }
+            let url = URL(string: engine.searchURL + encoded)
+        else { return nil }
 
         return ResultItem(
             icon: icon,

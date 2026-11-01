@@ -33,10 +33,7 @@ pub async fn diff_files(
     commit: Option<String>,
     checkout_id: Option<String>,
 ) -> Result<Vec<ChangedFileView>> {
-    super::blocking(app, move |state| {
-        diff_files_inner(state, task_id, scope, commit, checkout_id)
-    })
-    .await
+    super::blocking(app, move |state| diff_files_inner(state, task_id, scope, commit, checkout_id)).await
 }
 
 pub(crate) fn diff_files_inner(
@@ -57,45 +54,24 @@ pub(crate) fn diff_files_inner(
         if !dir.is_dir() {
             continue;
         }
-        let repo = state
-            .config
-            .project(&checkout.project_id)
-            .map(|p| p.name)
-            .unwrap_or_else(|_| "(unknown)".into());
+        let repo = state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
 
         // One broken repo should not hide the others' changes.
-        for file in git::changed_files(&dir, &checkout.base, checkout.base_commit.as_deref(), scope)
-            .unwrap_or_default()
+        for file in git::changed_files(&dir, &checkout.base, checkout.base_commit.as_deref(), scope).unwrap_or_default()
         {
-            out.push(ChangedFileView {
-                file,
-                checkout_id: checkout.id.clone(),
-                repo: repo.clone(),
-            });
+            out.push(ChangedFileView { file, checkout_id: checkout.id.clone(), repo: repo.clone() });
         }
     }
     Ok(out)
 }
 
-fn commit_files_view(
-    state: &AppState,
-    checkout_id: &str,
-    sha: &str,
-) -> Result<Vec<ChangedFileView>> {
+fn commit_files_view(state: &AppState, checkout_id: &str, sha: &str) -> Result<Vec<ChangedFileView>> {
     let checkout = state.config.checkout(checkout_id)?;
     let dir = PathBuf::from(&checkout.path);
-    let repo = state
-        .config
-        .project(&checkout.project_id)
-        .map(|p| p.name)
-        .unwrap_or_else(|_| "(unknown)".into());
+    let repo = state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
     Ok(git::commit_files(&dir, sha)?
         .into_iter()
-        .map(|file| ChangedFileView {
-            file,
-            checkout_id: checkout.id.clone(),
-            repo: repo.clone(),
-        })
+        .map(|file| ChangedFileView { file, checkout_id: checkout.id.clone(), repo: repo.clone() })
         .collect())
 }
 
@@ -122,13 +98,7 @@ fn diff_file_inner(
     if let Some(sha) = commit.as_deref().filter(|s| !s.is_empty()) {
         return git::commit_file_diff(&dir, sha, &path);
     }
-    git::file_diff(
-        &dir,
-        &checkout.base,
-        checkout.base_commit.as_deref(),
-        scope.unwrap_or_default(),
-        &path,
-    )
+    git::file_diff(&dir, &checkout.base, checkout.base_commit.as_deref(), scope.unwrap_or_default(), &path)
 }
 
 #[derive(Debug, Serialize)]
@@ -154,19 +124,9 @@ fn task_commits_inner(state: &AppState, task_id: String) -> Result<Vec<RepoCommi
         if !dir.is_dir() {
             continue;
         }
-        let repo = state
-            .config
-            .project(&checkout.project_id)
-            .map(|p| p.name)
-            .unwrap_or_else(|_| "(unknown)".into());
-        let commits =
-            git::commits_since(&dir, &checkout.base, checkout.base_commit.as_deref())
-                .unwrap_or_default();
-        out.push(RepoCommits {
-            checkout_id: checkout.id,
-            repo,
-            commits,
-        });
+        let repo = state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
+        let commits = git::commits_since(&dir, &checkout.base, checkout.base_commit.as_deref()).unwrap_or_default();
+        out.push(RepoCommits { checkout_id: checkout.id, repo, commits });
     }
     Ok(out)
 }
@@ -209,11 +169,7 @@ impl ReviewComment {
 
 /// Batch review notes into one prompt and type it straight into the agent pane.
 #[tauri::command]
-pub fn send_review(
-    state: State<AppState>,
-    pane_id: String,
-    comments: Vec<ReviewComment>,
-) -> Result<String> {
+pub fn send_review(state: State<AppState>, pane_id: String, comments: Vec<ReviewComment>) -> Result<String> {
     if comments.is_empty() {
         return Err(Error::Other("no comments to send".into()));
     }
@@ -257,27 +213,15 @@ pub struct RepoResult {
 /// hooks, which can be a full lint-and-test pass and are under nobody's
 /// control here.
 #[tauri::command]
-pub async fn commit_task(
-    app: AppHandle,
-    task_id: String,
-    message: String,
-) -> Result<Vec<RepoResult>> {
+pub async fn commit_task(app: AppHandle, task_id: String, message: String) -> Result<Vec<RepoResult>> {
     super::blocking(app, move |state| commit_task_inner(state, task_id, message)).await
 }
 
-fn commit_task_inner(
-    state: &AppState,
-    task_id: String,
-    message: String,
-) -> Result<Vec<RepoResult>> {
+fn commit_task_inner(state: &AppState, task_id: String, message: String) -> Result<Vec<RepoResult>> {
     let mut results = Vec::new();
     for checkout in state.config.checkouts_of(&task_id) {
         let dir = PathBuf::from(&checkout.path);
-        let repo = state
-            .config
-            .project(&checkout.project_id)
-            .map(|p| p.name)
-            .unwrap_or_else(|_| "(unknown)".into());
+        let repo = state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
 
         if !dir.is_dir() {
             continue;
@@ -297,12 +241,7 @@ fn commit_task_inner(
         // Failed too: a pre-commit hook may have changed files first. The
         // sidebar's counts would otherwise wait out the cache (TASK-10).
         state.status_cache.lock().remove(&checkout.id);
-        results.push(RepoResult {
-            checkout_id: checkout.id,
-            repo,
-            ok,
-            detail,
-        });
+        results.push(RepoResult { checkout_id: checkout.id, repo, ok, detail });
     }
     Ok(results)
 }
@@ -353,7 +292,6 @@ fn push_task_inner(state: &AppState, task_id: String) -> Result<Vec<RepoResult>>
     });
     Ok(results)
 }
-
 
 /// What bringing one repository up to date with its base came to.
 #[derive(Debug, Serialize)]
@@ -431,11 +369,7 @@ fn update_from_base_inner(state: &AppState, task_id: String, picks: Vec<UpdatePi
 
     let mut out = Vec::new();
     for (checkout, by) in checkouts {
-        let repo = state
-            .config
-            .project(&checkout.project_id)
-            .map(|p| p.name)
-            .unwrap_or_else(|_| "(unknown)".into());
+        let repo = state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
         let mut row = RepoUpdate {
             checkout_id: checkout.id.clone(),
             repo,
@@ -467,11 +401,8 @@ fn update_from_base_inner(state: &AppState, task_id: String, picks: Vec<UpdatePi
                     }
                     git::Updated::Conflicts(files) => {
                         row.outcome = "conflicts";
-                        row.detail = format!(
-                            "{} conflicted file{}",
-                            files.len(),
-                            if files.len() == 1 { "" } else { "s" }
-                        );
+                        row.detail =
+                            format!("{} conflicted file{}", files.len(), if files.len() == 1 { "" } else { "s" });
                         row.conflicts = files;
                     }
                 }
@@ -484,8 +415,7 @@ fn update_from_base_inner(state: &AppState, task_id: String, picks: Vec<UpdatePi
                     let stopped = row.outcome == "conflicts";
                     state.config.update(|c| {
                         if let Some(found) = c.checkouts.iter_mut().find(|c| c.id == id) {
-                            found.point_before_update =
-                                if stopped { found.base_commit.clone() } else { None };
+                            found.point_before_update = if stopped { found.base_commit.clone() } else { None };
                             found.base_commit = Some(target.clone());
                             // What the remote held when this rebase began —
                             // the rebase went ahead only if the branch had all
@@ -589,9 +519,7 @@ pub(crate) fn conflict_prompt(branch: &str, repos: &[Conflicted]) -> String {
              only over the commit it was rebased from. ",
         );
     }
-    out.push_str(
-        "If two changes cannot both be kept, stop and tell me which, and why, before choosing.",
-    );
+    out.push_str("If two changes cannot both be kept, stop and tell me which, and why, before choosing.");
     out
 }
 
@@ -620,11 +548,7 @@ pub async fn send_merge_conflicts(
                 let dir = PathBuf::from(&c.path);
                 let by = git::in_progress(&dir)?;
                 Some(Conflicted {
-                    repo: state
-                        .config
-                        .project(&c.project_id)
-                        .map(|p| p.name)
-                        .unwrap_or_else(|_| "(unknown)".into()),
+                    repo: state.config.project(&c.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into()),
                     here: scope.as_deref() == Some(c.id.as_str()),
                     base: c.base,
                     by,
@@ -652,8 +576,13 @@ mod tests {
     #[test]
     fn a_note_on_a_range_or_a_removed_line_says_so_to_the_agent() {
         let c = |line, side: Option<&str>, start_line| ReviewComment {
-            path: "a.ts".into(), line, body: String::new(), code: None, repo: None,
-            side: side.map(str::to_string), start_line,
+            path: "a.ts".into(),
+            line,
+            body: String::new(),
+            code: None,
+            repo: None,
+            side: side.map(str::to_string),
+            start_line,
         };
         assert_eq!(c(4, None, None).place("api/a.ts"), "api/a.ts:4");
         assert_eq!(c(6, Some("RIGHT"), Some(2)).place("a.ts"), "a.ts:2-6");
@@ -666,8 +595,20 @@ mod tests {
         let prompt = conflict_prompt(
             "ACME-1",
             &[
-                Conflicted { repo: "api".into(), here: true, base: "main".into(), by: git::UpdateBy::Merge, files: vec!["src/a.ts".into()] },
-                Conflicted { repo: "web".into(), here: false, base: "develop".into(), by: git::UpdateBy::Merge, files: vec!["b.ts".into()] },
+                Conflicted {
+                    repo: "api".into(),
+                    here: true,
+                    base: "main".into(),
+                    by: git::UpdateBy::Merge,
+                    files: vec!["src/a.ts".into()],
+                },
+                Conflicted {
+                    repo: "web".into(),
+                    here: false,
+                    base: "develop".into(),
+                    by: git::UpdateBy::Merge,
+                    files: vec!["b.ts".into()],
+                },
             ],
         );
         assert!(prompt.contains("api (merging origin/main):\n- src/a.ts\n"));
@@ -681,7 +622,13 @@ mod tests {
     fn a_rebase_prompt_says_how_to_continue_and_not_to_push() {
         let prompt = conflict_prompt(
             "ACME-1",
-            &[Conflicted { repo: "api".into(), here: false, base: "main".into(), by: git::UpdateBy::Rebase, files: vec!["a.ts".into()] }],
+            &[Conflicted {
+                repo: "api".into(),
+                here: false,
+                base: "main".into(),
+                by: git::UpdateBy::Rebase,
+                files: vec!["a.ts".into()],
+            }],
         );
         assert!(prompt.contains("api (rebasing onto origin/main):\n- api/a.ts\n"));
         assert!(prompt.contains("The rebase is still in progress"));

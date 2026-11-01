@@ -75,9 +75,7 @@ impl Page {
     async fn history(&self, by: i64) -> Result<bool> {
         let h = self.call("Page.getNavigationHistory", json!({})).await?;
         let at = h.get("currentIndex").and_then(Value::as_i64).unwrap_or(0) + by;
-        let entry = usize::try_from(at)
-            .ok()
-            .and_then(|i| h.get("entries")?.as_array()?.get(i)?.get("id")?.as_i64());
+        let entry = usize::try_from(at).ok().and_then(|i| h.get("entries")?.as_array()?.get(i)?.get("id")?.as_i64());
         let Some(id) = entry else { return Ok(false) };
         self.call("Page.navigateToHistoryEntry", json!({ "entryId": id })).await?;
         Ok(true)
@@ -242,7 +240,8 @@ impl Page {
         // without the scroll, a scrolled page came back as its top.
         let m = self.call("Page.getLayoutMetrics", json!({})).await?;
         let at = |k: &str| m.pointer(&format!("/cssVisualViewport/{k}")).and_then(Value::as_f64).unwrap_or(0.0);
-        params["clip"] = json!({ "x": at("pageX"), "y": at("pageY"), "width": v.width, "height": v.height, "scale": scale });
+        params["clip"] =
+            json!({ "x": at("pageX"), "y": at("pageY"), "width": v.width, "height": v.height, "scale": scale });
         let r = self.call("Page.captureScreenshot", params).await?;
         r.get("data")
             .and_then(Value::as_str)
@@ -254,7 +253,8 @@ impl Page {
 /// Chrome's word for an element that went away, in the agent's terms.
 fn stale(e: Error) -> Error {
     let text = e.to_string();
-    if text.contains("No node with given id") || text.contains("Could not find node") || text.contains("No node found") {
+    if text.contains("No node with given id") || text.contains("Could not find node") || text.contains("No node found")
+    {
         return Error::Other("that element is not on the page any more: take a new browser_snapshot".into());
     }
     e

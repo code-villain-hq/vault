@@ -172,7 +172,6 @@ impl Aws {
         let (raw, unpacked) = if bytes.starts_with(&[0x1f, 0x8b]) { (gunzip(&bytes)?, true) } else { (bytes, false) };
         Ok(file_text(&String::from_utf8_lossy(&raw), size, unpacked, contains))
     }
-
 }
 
 /// The `aws` CLI, if the user's PATH has one.
@@ -187,7 +186,8 @@ pub fn profiles() -> Vec<Profile> {
     let env = crate::shellenv::user_env();
     let home = env.get("HOME").cloned().unwrap_or_default();
     let config = env.get("AWS_CONFIG_FILE").cloned().unwrap_or_else(|| format!("{home}/.aws/config"));
-    let credentials = env.get("AWS_SHARED_CREDENTIALS_FILE").cloned().unwrap_or_else(|| format!("{home}/.aws/credentials"));
+    let credentials =
+        env.get("AWS_SHARED_CREDENTIALS_FILE").cloned().unwrap_or_else(|| format!("{home}/.aws/credentials"));
     let mut all = parse_profiles(&std::fs::read_to_string(config).unwrap_or_default(), true);
     for p in parse_profiles(&std::fs::read_to_string(credentials).unwrap_or_default(), false) {
         if !all.iter().any(|a| a.name == p.name) {
@@ -257,9 +257,12 @@ fn explain(stderr: &str, profile: &str) -> String {
         return format!("there is no AWS profile {profile} in ~/.aws/config");
     }
     if lower.contains("unable to locate credentials") {
-        return format!("profile {profile} has no credentials: sign in with `aws sso login --profile {profile}`, or configure it");
+        return format!(
+            "profile {profile} has no credentials: sign in with `aws sso login --profile {profile}`, or configure it"
+        );
     }
-    let first: String = s.lines().find(|l| !l.trim().is_empty()).unwrap_or("the aws CLI failed").chars().take(500).collect();
+    let first: String =
+        s.lines().find(|l| !l.trim().is_empty()).unwrap_or("the aws CLI failed").chars().take(500).collect();
     if lower.contains("accessdenied") || lower.contains("not authorized") {
         return format!("profile {profile} is not allowed to do that: {first}");
     }
@@ -273,7 +276,11 @@ pub fn check_bucket(bucket: &str) -> Result<()> {
         && bucket.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '-')
         && bucket.starts_with(|c: char| c.is_ascii_alphanumeric())
         && bucket.ends_with(|c: char| c.is_ascii_alphanumeric());
-    if ok { Ok(()) } else { Err(Error::Other(format!("{bucket:?} is not an S3 bucket name"))) }
+    if ok {
+        Ok(())
+    } else {
+        Err(Error::Other(format!("{bucket:?} is not an S3 bucket name")))
+    }
 }
 
 /// A key or prefix: no leading slash, no control characters, as S3 keys go.
@@ -302,13 +309,23 @@ pub struct S3File {
 
 fn listing(v: &Value) -> Listing {
     Listing {
-        folders: v.get("CommonPrefixes").and_then(Value::as_array).into_iter().flatten().map(|p| str_at(p, "Prefix")).collect(),
+        folders: v
+            .get("CommonPrefixes")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|p| str_at(p, "Prefix"))
+            .collect(),
         files: v
             .get("Contents")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .map(|f| S3File { key: str_at(f, "Key"), size: f.get("Size").and_then(Value::as_u64).unwrap_or(0), modified: str_at(f, "LastModified") })
+            .map(|f| S3File {
+                key: str_at(f, "Key"),
+                size: f.get("Size").and_then(Value::as_u64).unwrap_or(0),
+                modified: str_at(f, "LastModified"),
+            })
             .collect(),
         next: v.get("NextToken").and_then(Value::as_str).map(str::to_string),
     }
@@ -355,7 +372,13 @@ fn file_text(text: &str, size: u64, unpacked: bool, contains: Option<&str>) -> F
     if let Some(needle) = contains.filter(|c| !c.is_empty()) {
         let hits: Vec<&str> = text.lines().filter(|l| l.contains(needle)).collect();
         let kept: Vec<&str> = hits.iter().take(MAX_LINES).copied().collect();
-        return FileText { text: kept.join("\n"), size, unpacked, cut: !downloaded_all || hits.len() > MAX_LINES, matched: Some(hits.len()) };
+        return FileText {
+            text: kept.join("\n"),
+            size,
+            unpacked,
+            cut: !downloaded_all || hits.len() > MAX_LINES,
+            matched: Some(hits.len()),
+        };
     }
     let mut end = text.len().min(MAX_TEXT);
     while !text.is_char_boundary(end) {
@@ -407,8 +430,14 @@ mod tests {
     fn an_expired_sign_in_says_how_to_renew_it() {
         let said = explain("Error when retrieving token from sso: Token has expired and refresh failed", "acme-prod");
         assert!(said.contains("aws sso login --profile acme-prod"), "{said}");
-        let denied = explain("\nAn error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied\n", "acme-ci");
-        assert!(denied.starts_with("profile acme-ci is not allowed to do that: An error occurred (AccessDenied)"), "{denied}");
+        let denied = explain(
+            "\nAn error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied\n",
+            "acme-ci",
+        );
+        assert!(
+            denied.starts_with("profile acme-ci is not allowed to do that: An error occurred (AccessDenied)"),
+            "{denied}"
+        );
         assert!(explain("The config profile (nope) could not be found", "nope").contains("no AWS profile nope"));
     }
 
@@ -444,8 +473,11 @@ mod tests {
     fn a_gzip_file_is_unpacked_even_when_cut_short() {
         // Varied, as a log is: repeated text packs into one block, and half a
         // block unpacks to nothing.
-        let line: String = (0..20_000u64).map(|i| format!("{{\"n\":{i},\"id\":\"{:x}\"}}\n", i.wrapping_mul(0x9E37_79B9_7F4A_7C15))).collect();
-        let mut child = Command::new("/usr/bin/gzip").arg("-c").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
+        let line: String = (0..20_000u64)
+            .map(|i| format!("{{\"n\":{i},\"id\":\"{:x}\"}}\n", i.wrapping_mul(0x9E37_79B9_7F4A_7C15)))
+            .collect();
+        let mut child =
+            Command::new("/usr/bin/gzip").arg("-c").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
         // From a thread: gzip's output fills its pipe while its input is written.
         let mut stdin = child.stdin.take().unwrap();
         let input = line.clone();
@@ -474,17 +506,27 @@ mod tests {
     #[test]
     fn what_comes_from_outside_reaches_the_cli_as_its_own_option_and_no_shell_reads_it() {
         let (dir, aws) = fake_cli(r#"printf '%s\n' "$@""#);
-        let out = String::from_utf8(aws.run(&["--prefix=flight service/$(touch pwned)/".into()], CALL_TIMEOUT).unwrap()).unwrap();
-        assert_eq!(out.lines().collect::<Vec<_>>(), [
-            "--profile=acme-ci", "--output=json", "--no-cli-pager", "--region=eu-central-1", "--prefix=flight service/$(touch pwned)/",
-        ]);
+        let out =
+            String::from_utf8(aws.run(&["--prefix=flight service/$(touch pwned)/".into()], CALL_TIMEOUT).unwrap())
+                .unwrap();
+        assert_eq!(
+            out.lines().collect::<Vec<_>>(),
+            [
+                "--profile=acme-ci",
+                "--output=json",
+                "--no-cli-pager",
+                "--region=eu-central-1",
+                "--prefix=flight service/$(touch pwned)/",
+            ]
+        );
         assert!(!std::path::Path::new("pwned").exists() && !dir.join("pwned").exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_cli_that_fails_says_why_and_one_that_does_not_answer_is_stopped() {
-        let (dir, aws) = fake_cli("echo 'An error occurred (NoSuchBucket) when calling the ListObjectsV2 operation' >&2; exit 254");
+        let (dir, aws) =
+            fake_cli("echo 'An error occurred (NoSuchBucket) when calling the ListObjectsV2 operation' >&2; exit 254");
         let said = aws.list("prod-logs", "", None).unwrap_err().to_string();
         assert!(said.contains("NoSuchBucket"), "{said}");
         let _ = std::fs::remove_dir_all(&dir);
@@ -524,12 +566,22 @@ mod tests {
         }
         if let Some(key) = file {
             let read = aws.read(parts[1], &key, None).unwrap();
-            eprintln!("{key}: {} bytes stored, unpacked {}, cut {}, first line {:?}", read.size, read.unpacked, read.cut,
-                read.text.lines().next().map(|l| l.chars().take(160).collect::<String>()));
+            eprintln!(
+                "{key}: {} bytes stored, unpacked {}, cut {}, first line {:?}",
+                read.size,
+                read.unpacked,
+                read.cut,
+                read.text.lines().next().map(|l| l.chars().take(160).collect::<String>())
+            );
         }
         if let [_, _, database, workgroup, table] = parts.as_slice() {
-            eprintln!("tables over it: {:?}", aws.tables_over(parts[1]).unwrap().iter().map(|t| &t.table).collect::<Vec<_>>());
-            let sql = format!("SELECT count(*) AS n FROM {table} WHERE year = '2026' AND month = '10' AND day = '12' AND hour = '09'");
+            eprintln!(
+                "tables over it: {:?}",
+                aws.tables_over(parts[1]).unwrap().iter().map(|t| &t.table).collect::<Vec<_>>()
+            );
+            let sql = format!(
+                "SELECT count(*) AS n FROM {table} WHERE year = '2026' AND month = '10' AND day = '12' AND hour = '09'"
+            );
             let rows = aws.query(workgroup, database, &sql, 10).unwrap();
             eprintln!("query: {:?} {:?}, scanned {}", rows.columns, rows.rows, rows.data_scanned);
         }

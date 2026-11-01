@@ -63,7 +63,11 @@ impl Tabs {
 
     fn saved(&self) -> SavedTabs {
         SavedTabs {
-            urls: self.list.iter().map(|t| if t.url.is_empty() { "about:blank".into() } else { t.url.clone() }).collect(),
+            urls: self
+                .list
+                .iter()
+                .map(|t| if t.url.is_empty() { "about:blank".into() } else { t.url.clone() })
+                .collect(),
             active: self.active,
         }
     }
@@ -146,7 +150,8 @@ impl Browser {
     pub fn switch_tab<R: Runtime>(&self, app: &AppHandle<R>, task: &str, id: &str) -> Result<String> {
         let name = {
             let mut inner = self.inner.lock();
-            let tabs = inner.tabs.get_mut(task).ok_or_else(|| Error::Other("this task's browser is not open".into()))?;
+            let tabs =
+                inner.tabs.get_mut(task).ok_or_else(|| Error::Other("this task's browser is not open".into()))?;
             let at = tabs.position(id).ok_or_else(|| Error::Other("that tab is closed".into()))?;
             tabs.active = at;
             name(&tabs.list[at].title, &tabs.list[at].url)
@@ -161,8 +166,13 @@ impl Browser {
     pub async fn close_tab<R: Runtime>(&self, app: &AppHandle<R>, task: &str, id: &str) -> Result<()> {
         let (cdp, closed, last) = {
             let mut inner = self.inner.lock();
-            let cdp = inner.running.as_ref().map(|r| r.cdp.clone()).ok_or_else(|| Error::Other("the browser closed".into()))?;
-            let tabs = inner.tabs.get_mut(task).ok_or_else(|| Error::Other("this task's browser is not open".into()))?;
+            let cdp = inner
+                .running
+                .as_ref()
+                .map(|r| r.cdp.clone())
+                .ok_or_else(|| Error::Other("the browser closed".into()))?;
+            let tabs =
+                inner.tabs.get_mut(task).ok_or_else(|| Error::Other("this task's browser is not open".into()))?;
             let at = tabs.position(id).ok_or_else(|| Error::Other("that tab is closed".into()))?;
             if tabs.list.len() == 1 {
                 (cdp, None, Some(tabs.list[at].session.clone()))

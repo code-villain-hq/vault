@@ -131,7 +131,14 @@ fn leftover(added: &str) -> Option<&'static str> {
         return (t.contains("TODO") || t.contains("FIXME")).then_some("todo");
     }
     const DEBUG: &[&str] = &[
-        "console.log(", "console.debug(", "dbg!(", "binding.pry", "byebug", "pdb.set_trace(", "breakpoint()", "var_dump(",
+        "console.log(",
+        "console.debug(",
+        "dbg!(",
+        "binding.pry",
+        "byebug",
+        "pdb.set_trace(",
+        "breakpoint()",
+        "var_dump(",
     ];
     if DEBUG.iter().any(|d| t.contains(d)) || t == "debugger" || t == "debugger;" {
         return Some("debug");
@@ -195,7 +202,12 @@ diff --git a/src/merge.rs b/src/merge.rs
 
     #[test]
     fn ordinary_code_is_not_a_leftover() {
-        for line in ["const fit = (a) => a;", "logger.info(\"started\")", "describe(\"login\", () => {", "// it.only( is banned here"] {
+        for line in [
+            "const fit = (a) => a;",
+            "logger.info(\"started\")",
+            "describe(\"login\", () => {",
+            "// it.only( is banned here",
+        ] {
             assert_eq!(leftover(line), None, "{line}");
         }
     }

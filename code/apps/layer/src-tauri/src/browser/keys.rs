@@ -119,7 +119,8 @@ pub fn press(spec: &str) -> Result<[Value; 2]> {
     if !commands.is_empty() {
         down["commands"] = json!(commands);
     }
-    let up = json!({ "type": "keyUp", "key": key, "code": code, "windowsVirtualKeyCode": key_code, "modifiers": modifiers });
+    let up =
+        json!({ "type": "keyUp", "key": key, "code": code, "windowsVirtualKeyCode": key_code, "modifiers": modifiers });
     Ok([down, up])
 }
 
@@ -145,7 +146,10 @@ mod tests {
     #[test]
     fn one_character_is_a_key_and_shift_makes_it_upper_case() {
         let [down, _] = press("Shift+b").unwrap();
-        assert_eq!((down["key"].as_str(), down["code"].as_str(), down["text"].as_str()), (Some("B"), Some("KeyB"), Some("B")));
+        assert_eq!(
+            (down["key"].as_str(), down["code"].as_str(), down["text"].as_str()),
+            (Some("B"), Some("KeyB"), Some("B"))
+        );
         assert!(press("Hyper+x").is_err());
         assert!(press("NotAKey").is_err());
     }

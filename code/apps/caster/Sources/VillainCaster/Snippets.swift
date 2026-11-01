@@ -18,9 +18,11 @@ enum Snippets {
     ]
 
     static func value(for key: String) -> String? {
-        guard let value = UserDefaults.standard.string(forKey: key)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-            !value.isEmpty else { return nil }
+        guard
+            let value = UserDefaults.standard.string(forKey: key)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            !value.isEmpty
+        else { return nil }
         return value
     }
 
@@ -129,7 +131,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, N
     // Leaving a field (Tab, a click elsewhere) and Enter both end editing.
     func controlTextDidEndEditing(_ obj: Notification) {
         guard let input = obj.object as? NSTextField,
-              let key = inputs.first(where: { $0.value === input })?.key
+            let key = inputs.first(where: { $0.value === input })?.key
         else { return }
         Snippets.set(input.stringValue, for: key)
     }
@@ -169,8 +171,10 @@ final class FieldBox: NSView {
             input.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.glow - 8),
             input.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                                       owner: self, userInfo: nil))
+        addTrackingArea(
+            NSTrackingArea(
+                rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                owner: self, userInfo: nil))
     }
 
     required init?(coder: NSCoder) {
@@ -197,7 +201,8 @@ final class FieldBox: NSView {
         shape.fill()
         if isEditing {
             Nightshade.accent.setStroke()
-            let edge = NSBezierPath(roundedRect: field.insetBy(dx: 0.5, dy: 0.5), xRadius: radius - 0.5, yRadius: radius - 0.5)
+            let edge = NSBezierPath(
+                roundedRect: field.insetBy(dx: 0.5, dy: 0.5), xRadius: radius - 0.5, yRadius: radius - 0.5)
             edge.lineWidth = 1
             edge.stroke()
         }
@@ -248,7 +253,9 @@ final class PrimaryButton: NSButton {
         if ring.superlayer == nil { layer?.addSublayer(ring) }
         // The stroke's centre sits 3pt out: a 2pt gap, then the 2pt ring.
         let rect = bounds.insetBy(dx: -3, dy: -3)
-        ring.path = CGPath(roundedRect: rect, cornerWidth: Nightshade.radiusMd + 3, cornerHeight: Nightshade.radiusMd + 3, transform: nil)
+        ring.path = CGPath(
+            roundedRect: rect, cornerWidth: Nightshade.radiusMd + 3, cornerHeight: Nightshade.radiusMd + 3,
+            transform: nil)
         ring.fillColor = nil
         ring.lineWidth = 2
         effectiveAppearance.performAsCurrentDrawingAppearance {
@@ -266,15 +273,19 @@ final class PrimaryButton: NSButton {
         focusRingType = .none
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: 28).isActive = true
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                                       owner: self, userInfo: nil))
+        addTrackingArea(
+            NSTrackingArea(
+                rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                owner: self, userInfo: nil))
     }
 
     private var label: NSAttributedString {
-        NSAttributedString(string: title, attributes: [
-            .font: Nightshade.font(TypeTokens.control),
-            .foregroundColor: Nightshade.onPrimary,
-        ])
+        NSAttributedString(
+            string: title,
+            attributes: [
+                .font: Nightshade.font(TypeTokens.control),
+                .foregroundColor: Nightshade.onPrimary,
+            ])
     }
 
     override var intrinsicContentSize: NSSize {

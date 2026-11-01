@@ -19,13 +19,7 @@ use super::AppState;
 /// a new one on it. `repo` is `owner/name`; `head` and `base` are the pull
 /// request's branches, as GitHub named them.
 #[tauri::command]
-pub async fn task_for_pr(
-    app: AppHandle,
-    repo: String,
-    head: String,
-    base: String,
-    title: String,
-) -> Result<Task> {
+pub async fn task_for_pr(app: AppHandle, repo: String, head: String, base: String, title: String) -> Result<Task> {
     super::blocking(app, move |state| task_for_pr_inner(state, &repo, &head, &base, &title)).await
 }
 
@@ -72,10 +66,9 @@ pub(crate) fn task_for_pr_inner(state: &AppState, repo: &str, head: &str, base: 
 /// asked for.
 pub(crate) fn not_a_review(task: &Task, what: &str) -> Result<()> {
     match &task.review {
-        Some(r) => Err(Error::Other(format!(
-            "{} is a review of {}#{}; it is never {what}",
-            task.name, r.repo, r.number
-        ))),
+        Some(r) => {
+            Err(Error::Other(format!("{} is a review of {}#{}; it is never {what}", task.name, r.repo, r.number)))
+        }
         None => Ok(()),
     }
 }
@@ -96,13 +89,10 @@ fn project_for(state: &AppState, repo: &str) -> Result<Project> {
         // Read from the copy where there is one: no clone is made, or fetched,
         // just to be asked where it came from.
         .find(|p| {
-            git::origin_slug(&p.repo())
-                .is_ok_and(|(owner, name)| format!("{owner}/{name}").eq_ignore_ascii_case(repo))
+            git::origin_slug(&p.repo()).is_ok_and(|(owner, name)| format!("{owner}/{name}").eq_ignore_ascii_case(repo))
         })
         .ok_or_else(|| {
-            Error::NotFound(format!(
-                "{repo} is not one of your repositories. Add it under Repos to work on it here."
-            ))
+            Error::NotFound(format!("{repo} is not one of your repositories. Add it under Repos to work on it here."))
         })
 }
 

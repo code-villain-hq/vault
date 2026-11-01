@@ -91,7 +91,11 @@ pub fn folder_name(branch: &str) -> String {
         .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '-' })
         .collect();
     let name = name.trim_matches(|c| c == '.' || c == '-').to_string();
-    if name.is_empty() { "spec".into() } else { name }
+    if name.is_empty() {
+        "spec".into()
+    } else {
+        name
+    }
 }
 
 /// A repository's spec folder as the user set it: relative, inside the
@@ -198,7 +202,8 @@ pub fn answered(spec: &str) -> Vec<(String, String)> {
 /// `Answer: yes` (bullet and bold allowed) or `-- yes` as "yes".
 fn answer_line(trimmed: &str) -> Option<String> {
     let dashed = trimmed.starts_with("--");
-    let rest = if dashed { trimmed.trim_start_matches('-').trim_start() } else { list_item(trimmed).unwrap_or(trimmed) };
+    let rest =
+        if dashed { trimmed.trim_start_matches('-').trim_start() } else { list_item(trimmed).unwrap_or(trimmed) };
     let bare = rest.trim_start_matches('*');
     if bare.get(..6).is_some_and(|w| w.eq_ignore_ascii_case("answer")) {
         if let Some(answer) = bare[6..].trim_start_matches('*').trim_start().strip_prefix(':') {
@@ -252,9 +257,7 @@ pub fn tick(tasks: &str, number: u32, done: bool) -> Option<String> {
         if trimmed.starts_with("```") {
             fence = !fence;
         }
-        let step = (!fence && line.len() - trimmed.len() < 2)
-            .then(|| list_item(trimmed).and_then(checkbox))
-            .flatten();
+        let step = (!fence && line.len() - trimmed.len() < 2).then(|| list_item(trimmed).and_then(checkbox)).flatten();
         if let Some((_, rest)) = step {
             place += 1;
             let n = step_number(rest).map(|(n, _)| n).unwrap_or(place);
@@ -479,7 +482,10 @@ mod tests {
     fn requirements_are_read_with_their_own_ids() {
         let ids: Vec<(String, String)> = requirements(REQUIREMENTS).into_iter().map(|r| (r.id, r.text)).collect();
         assert_eq!(ids[0].0, "R-1");
-        assert_eq!(ids[1], ("R-2".into(), "WHEN a refund is made THE SYSTEM SHALL never return more than was paid.".into()));
+        assert_eq!(
+            ids[1],
+            ("R-2".into(), "WHEN a refund is made THE SYSTEM SHALL never return more than was paid.".into())
+        );
         assert_eq!(ids[2], ("R-3".into(), "WHEN one card paid THE SYSTEM SHALL refund as before.".into()));
         assert_eq!(ids.len(), 3);
     }
@@ -505,7 +511,10 @@ mod tests {
     fn steps_are_read_with_their_numbers_ticks_and_own_requirements() {
         let s = steps(TASKS);
         assert_eq!(s.len(), 3);
-        assert_eq!((s[0].number, s[0].done, s[0].serves.clone()), (1, false, vec!["R-1".to_string(), "R-2".to_string()]));
+        assert_eq!(
+            (s[0].number, s[0].done, s[0].serves.clone()),
+            (1, false, vec!["R-1".to_string(), "R-2".to_string()])
+        );
         assert_eq!((s[1].number, s[1].done, s[1].serves.clone()), (2, true, vec!["R-1".to_string()]));
         assert_eq!((s[2].number, s[2].text.as_str()), (3, "Write the tests"));
     }
@@ -534,7 +543,10 @@ mod tests {
         assert!(s[0].done, "a step done before is still done");
         assert!(!s[1].done);
         assert!(s[2].text.contains(ORPHANED), "{synced}");
-        assert!(s.iter().any(|x| x.done && x.text.starts_with("Wire up metrics")), "dropped work is put back: {synced}");
+        assert!(
+            s.iter().any(|x| x.done && x.text.starts_with("Wire up metrics")),
+            "dropped work is put back: {synced}"
+        );
         // Synced again, nothing is marked twice.
         assert_eq!(sync_steps(old, &synced, &reqs).matches(ORPHANED).count(), 1);
     }
@@ -582,15 +594,22 @@ mod tests {
         let text = "## Requirements\n- R-1 [api, `web`]: WHEN a refund is made THE SYSTEM SHALL say so.\n\
                     - **R-2** [api] — WHEN two cards paid THE SYSTEM SHALL refund both.\n- R-3: WHEN anything THE SYSTEM SHALL log it.\n";
         let r = requirements(text);
-        assert_eq!((r[0].repos.clone(), r[0].text.as_str()), (vec!["api".to_string(), "web".to_string()], "WHEN a refund is made THE SYSTEM SHALL say so."));
-        assert_eq!((r[1].repos.clone(), r[1].text.as_str()), (vec!["api".to_string()], "WHEN two cards paid THE SYSTEM SHALL refund both."));
+        assert_eq!(
+            (r[0].repos.clone(), r[0].text.as_str()),
+            (vec!["api".to_string(), "web".to_string()], "WHEN a refund is made THE SYSTEM SHALL say so.")
+        );
+        assert_eq!(
+            (r[1].repos.clone(), r[1].text.as_str()),
+            (vec!["api".to_string()], "WHEN two cards paid THE SYSTEM SHALL refund both.")
+        );
         assert!(r[1].names("api") && !r[1].names("web"));
         assert!(r[2].repos.is_empty() && r[2].names("web"), "naming none, it is every repository's");
     }
 
     #[test]
     fn a_step_says_which_other_repositories_steps_it_waits_for() {
-        let s = steps("- [ ] 3. Call the refund endpoint (R-3, C-1; after api 2, after api 4)\n- [ ] 4. Show it (R-4)\n");
+        let s =
+            steps("- [ ] 3. Call the refund endpoint (R-3, C-1; after api 2, after api 4)\n- [ ] 4. Show it (R-4)\n");
         assert_eq!(s[0].serves, vec!["R-3"]);
         assert_eq!(s[0].after, vec!["api 2", "api 4"]);
         assert!(s[1].after.is_empty());
@@ -609,4 +628,3 @@ mod tests {
         assert_eq!(put_back, ticked, "the step done stays done; the step added goes");
     }
 }
-

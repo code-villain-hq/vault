@@ -25,21 +25,13 @@ fn clip(text: &str, max: usize) -> String {
 
 impl Slack {
     pub fn new(token: &str) -> Self {
-        Self {
-            token: token.trim().to_string(),
-            client: http_client(),
-        }
+        Self { token: token.trim().to_string(), client: http_client() }
     }
 
     /// Where a posted message landed, so the app can retract it later. Only a
     /// bot can delete a bot's messages, so without this the app leaves litter
     /// nobody else is able to clear up.
-    pub async fn post(
-        &self,
-        channel: &str,
-        text: &str,
-        context: Option<&str>,
-    ) -> Result<Option<Posted>> {
+    pub async fn post(&self, channel: &str, text: &str, context: Option<&str>) -> Result<Option<Posted>> {
         // Slack refuses a section over 3000 characters with `invalid_blocks`,
         // which an agent's longer `slack_post` ran into. The block is cut;
         // `text`, which has no such limit, keeps all of it for notifications.
@@ -75,16 +67,8 @@ impl Slack {
         // postMessage resolves a channel name to its id, which is what
         // chat.delete needs later.
         Ok(Some(Posted {
-            channel: body
-                .get("channel")
-                .and_then(|c| c.as_str())
-                .unwrap_or(channel)
-                .to_string(),
-            ts: body
-                .get("ts")
-                .and_then(|t| t.as_str())
-                .unwrap_or_default()
-                .to_string(),
+            channel: body.get("channel").and_then(|c| c.as_str()).unwrap_or(channel).to_string(),
+            ts: body.get("ts").and_then(|t| t.as_str()).unwrap_or_default().to_string(),
         }))
     }
 
@@ -103,11 +87,9 @@ impl Slack {
             let code = body.get("error").and_then(|e| e.as_str()).unwrap_or("unknown");
             return Err(Error::Other(match code {
                 "message_not_found" => "already gone".to_string(),
-                "cant_delete_message" => {
-                    "Slack will not let this token delete that message; it can only \
+                "cant_delete_message" => "Slack will not let this token delete that message; it can only \
                      delete messages the same bot posted."
-                        .to_string()
-                }
+                    .to_string(),
                 other => format!("Slack rejected the delete: {other}"),
             }));
         }
@@ -125,12 +107,7 @@ impl Slack {
             .header("Authorization", format!("Bearer {}", self.token))
             .send()
             .await?;
-        let scopes = res
-            .headers()
-            .get("x-oauth-scopes")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_string();
+        let scopes = res.headers().get("x-oauth-scopes").and_then(|v| v.to_str().ok()).unwrap_or_default().to_string();
         let body: serde_json::Value = res.json().await?;
         // A revoked or mistyped token has no bot id either, and was reported
         // as "not a bot token", which sends people looking for the wrong fix.
@@ -140,11 +117,7 @@ impl Slack {
                 "the channel",
             )));
         }
-        let bot = body
-            .get("bot_id")
-            .and_then(|b| b.as_str())
-            .unwrap_or_default()
-            .to_string();
+        let bot = body.get("bot_id").and_then(|b| b.as_str()).unwrap_or_default().to_string();
         Ok((bot, scopes))
     }
 
@@ -182,30 +155,22 @@ impl Slack {
                     body.get("error").and_then(|e| e.as_str()).unwrap_or("unknown")
                 )));
             }
-            let found = body
-                .get("channels")
-                .and_then(|c| c.as_array())
-                .and_then(|a| {
-                    a.iter()
-                        .find(|c| c.get("name").and_then(|n| n.as_str()) == Some(wanted))
-                        .and_then(|c| c.get("id").and_then(|i| i.as_str()))
-                        .map(str::to_string)
-                });
+            let found = body.get("channels").and_then(|c| c.as_array()).and_then(|a| {
+                a.iter()
+                    .find(|c| c.get("name").and_then(|n| n.as_str()) == Some(wanted))
+                    .and_then(|c| c.get("id").and_then(|i| i.as_str()))
+                    .map(str::to_string)
+            });
             if let Some(id) = found {
                 return Ok(id);
             }
-            cursor = body
-                .pointer("/response_metadata/next_cursor")
-                .and_then(|c| c.as_str())
-                .unwrap_or_default()
-                .to_string();
+            cursor =
+                body.pointer("/response_metadata/next_cursor").and_then(|c| c.as_str()).unwrap_or_default().to_string();
             if cursor.is_empty() {
                 break;
             }
         }
-        Err(Error::Other(format!(
-            "no public channel named {name}; for a private one, set the channel to its id (C…)"
-        )))
+        Err(Error::Other(format!("no public channel named {name}; for a private one, set the channel to its id (C…)")))
     }
 
     /// The app's own recent messages in a channel. Needs channels:history.
@@ -231,10 +196,7 @@ impl Slack {
                 a.iter()
                     .filter(|m| m.get("bot_id").and_then(|b| b.as_str()) == Some(bot_id))
                     .filter_map(|m| {
-                        Some(Posted {
-                            channel: channel.to_string(),
-                            ts: m.get("ts")?.as_str()?.to_string(),
-                        })
+                        Some(Posted { channel: channel.to_string(), ts: m.get("ts")?.as_str()?.to_string() })
                     })
                     .collect()
             })
@@ -262,10 +224,7 @@ pub fn parse_permalink(link: &str) -> Option<Posted> {
     }
     // p1758271234567890 -> 1758271234.567890
     let (secs, micros) = digits.split_at(digits.len() - 6);
-    Some(Posted {
-        channel,
-        ts: format!("{secs}.{micros}"),
-    })
+    Some(Posted { channel, ts: format!("{secs}.{micros}") })
 }
 
 /// Slack's error codes are terse and the fix is rarely obvious from them.

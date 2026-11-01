@@ -13,14 +13,17 @@ enum Weather {
     static func fetch(completion: @escaping ([ResultItem]) -> Void) {
         URLSession.shared.dataTask(with: URL(string: "https://ipapi.co/json/")!) { data, _, error in
             guard let data,
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let lat = object["latitude"] as? Double,
-                  let lon = object["longitude"] as? Double
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let lat = object["latitude"] as? Double,
+                let lon = object["longitude"] as? Double
             else {
                 // Unreachable or rate-limited; the detail is for the log.
                 NSLog("Caster location lookup failed: \(error.map { "\($0)" } ?? "no coordinates from ipapi.co")")
-                completion([ResultItem(icon: nil, title: "Couldn't find your location. Try again.",
-                                       subtitle: nil, action: nil)])
+                completion([
+                    ResultItem(
+                        icon: nil, title: "Couldn't find your location. Try again.",
+                        subtitle: nil, action: nil)
+                ])
                 return
             }
             let city = object["city"] as? String ?? "Current location"
@@ -28,34 +31,42 @@ enum Weather {
         }.resume()
     }
 
-    private static func fetchConditions(lat: Double, lon: Double, city: String,
-                                        completion: @escaping ([ResultItem]) -> Void) {
-        let url = URL(string: "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)"
-            + "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"
-            + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
-            + "&timezone=auto&forecast_days=4")!
+    private static func fetchConditions(
+        lat: Double, lon: Double, city: String,
+        completion: @escaping ([ResultItem]) -> Void
+    ) {
+        let url = URL(
+            string: "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)"
+                + "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"
+                + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+                + "&timezone=auto&forecast_days=4")!
         URLSession.shared.dataTask(with: url) { data, _, error in
             guard let data,
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let current = object["current"] as? [String: Any],
-                  let temp = current["temperature_2m"] as? Double,
-                  let code = (current["weather_code"] as? NSNumber)?.intValue
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let current = object["current"] as? [String: Any],
+                let temp = current["temperature_2m"] as? Double,
+                let code = (current["weather_code"] as? NSNumber)?.intValue
             else {
                 NSLog("Caster weather fetch failed: \(error.map { "\($0)" } ?? "no conditions from open-meteo.com")")
-                completion([ResultItem(icon: nil, title: "Couldn't reach the weather service. Check your connection.",
-                                       subtitle: nil, action: nil)])
+                completion([
+                    ResultItem(
+                        icon: nil, title: "Couldn't reach the weather service. Check your connection.",
+                        subtitle: nil, action: nil)
+                ])
                 return
             }
             let feels = current["apparent_temperature"] as? Double ?? temp
             let wind = current["wind_speed_10m"] as? Double ?? 0
             let (symbol, description) = describe(code)
 
-            var items = [ResultItem(
-                icon: symbolIcon(symbol, description),
-                title: "\(Int(temp.rounded()))° \(description) — \(city)",
-                subtitle: "Feels like \(Int(feels.rounded()))° · wind \(Int(wind.rounded())) km/h",
-                action: nil
-            )]
+            var items = [
+                ResultItem(
+                    icon: symbolIcon(symbol, description),
+                    title: "\(Int(temp.rounded()))° \(description) — \(city)",
+                    subtitle: "Feels like \(Int(feels.rounded()))° · wind \(Int(wind.rounded())) km/h",
+                    action: nil
+                )
+            ]
             items.append(contentsOf: forecastRows(from: object["daily"] as? [String: Any]))
             completion(items)
         }.resume()
@@ -64,10 +75,10 @@ enum Weather {
     /// One row per day for the next three days (skipping today).
     private static func forecastRows(from daily: [String: Any]?) -> [ResultItem] {
         guard let daily,
-              let dates = daily["time"] as? [String],
-              let codeNumbers = daily["weather_code"] as? [NSNumber],
-              let highs = daily["temperature_2m_max"] as? [Double],
-              let lows = daily["temperature_2m_min"] as? [Double]
+            let dates = daily["time"] as? [String],
+            let codeNumbers = daily["weather_code"] as? [NSNumber],
+            let highs = daily["temperature_2m_max"] as? [Double],
+            let lows = daily["temperature_2m_min"] as? [Double]
         else { return [] }
 
         let dateParser = DateFormatter()
@@ -77,15 +88,16 @@ enum Weather {
 
         var rows: [ResultItem] = []
         let days = min(4, dates.count, codeNumbers.count, highs.count, lows.count)
-        for i in stride(from: 1, to: days, by: 1) { // tolerates short/empty arrays
+        for i in stride(from: 1, to: days, by: 1) {  // tolerates short/empty arrays
             let (symbol, description) = describe(codeNumbers[i].intValue)
             let weekday = dateParser.date(from: dates[i]).map(weekdayFormatter.string(from:)) ?? dates[i]
-            rows.append(ResultItem(
-                icon: symbolIcon(symbol, description),
-                title: "\(weekday) — \(description)",
-                subtitle: "\(Int(lows[i].rounded()))° to \(Int(highs[i].rounded()))°",
-                action: nil
-            ))
+            rows.append(
+                ResultItem(
+                    icon: symbolIcon(symbol, description),
+                    title: "\(weekday) — \(description)",
+                    subtitle: "\(Int(lows[i].rounded()))° to \(Int(highs[i].rounded()))°",
+                    action: nil
+                ))
         }
         return rows
     }

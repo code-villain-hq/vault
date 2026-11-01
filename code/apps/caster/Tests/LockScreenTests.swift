@@ -1,5 +1,6 @@
-import XCTest
 import CoreGraphics
+import XCTest
+
 @testable import VillainCaster
 
 final class LockScreenTests: XCTestCase {

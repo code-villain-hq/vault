@@ -416,7 +416,9 @@ fn describe(model: &str) -> &'static str {
 /// What an update may change: the rest is fixed when a record is made.
 fn patch_keys(model: &str) -> &'static [&'static str] {
     match model {
-        REPOSITORY => &["name", "default_branch", "group_name", "update_by", "check_command", "spec_folder", "specs_in_app"],
+        REPOSITORY => {
+            &["name", "default_branch", "group_name", "update_by", "check_command", "spec_folder", "specs_in_app"]
+        }
         CONNECTION => &["settings"],
         LOG_SOURCE => &["name", "region", "bucket", "prefix", "athena"],
         AGENT_MODEL => &["models"],

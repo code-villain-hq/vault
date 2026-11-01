@@ -152,7 +152,8 @@ mod tests {
     #[test]
     fn a_command_that_exits_0_passes_with_what_it_printed_on_both_streams_in_order() {
         let stop = AtomicBool::new(false);
-        let out = run(&dir(), "echo one; echo two >&2; echo three", Duration::from_secs(10), &stop, &AtomicI32::new(0)).unwrap();
+        let out = run(&dir(), "echo one; echo two >&2; echo three", Duration::from_secs(10), &stop, &AtomicI32::new(0))
+            .unwrap();
         assert_eq!(out.ended, Ended::Exited);
         assert_eq!(out.code, Some(0));
         assert_eq!(out.output, "one\ntwo\nthree\n");
@@ -167,7 +168,8 @@ mod tests {
         let out = run(&here, "ls; exit 3", Duration::from_secs(10), &stop, &AtomicI32::new(0)).unwrap();
         assert_eq!(out.code, Some(3));
         assert!(out.output.contains("marker"), "{}", out.output);
-        let missing = run(&here, "no-such-command-anywhere", Duration::from_secs(10), &stop, &AtomicI32::new(0)).unwrap();
+        let missing =
+            run(&here, "no-such-command-anywhere", Duration::from_secs(10), &stop, &AtomicI32::new(0)).unwrap();
         assert_eq!(missing.code, Some(127), "the shell's own code for a command it cannot find");
         let _ = std::fs::remove_dir_all(&here);
     }
@@ -177,7 +179,14 @@ mod tests {
         let stop = AtomicBool::new(false);
         let begun = Instant::now();
         // A child of its own that would print later, had it lived.
-        let out = run(&dir(), "(sleep 30; echo late) & echo early; sleep 30", Duration::from_millis(1500), &stop, &AtomicI32::new(0)).unwrap();
+        let out = run(
+            &dir(),
+            "(sleep 30; echo late) & echo early; sleep 30",
+            Duration::from_millis(1500),
+            &stop,
+            &AtomicI32::new(0),
+        )
+        .unwrap();
         assert_eq!(out.ended, Ended::TimedOut);
         assert_eq!(out.code, None);
         assert!(begun.elapsed() < Duration::from_secs(10), "took {:?}", begun.elapsed());
@@ -199,7 +208,14 @@ mod tests {
     #[test]
     fn a_long_log_keeps_its_end() {
         let stop = AtomicBool::new(false);
-        let out = run(&dir(), "i=0; while [ $i -lt 40000 ]; do echo line-$i-padding-padding; i=$((i+1)); done", Duration::from_secs(60), &stop, &AtomicI32::new(0)).unwrap();
+        let out = run(
+            &dir(),
+            "i=0; while [ $i -lt 40000 ]; do echo line-$i-padding-padding; i=$((i+1)); done",
+            Duration::from_secs(60),
+            &stop,
+            &AtomicI32::new(0),
+        )
+        .unwrap();
         assert!(out.output.len() <= KEEP);
         assert!(out.output.ends_with("line-39999-padding-padding\n"));
     }

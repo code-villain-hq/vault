@@ -231,7 +231,10 @@ mod tests {
             .filter(|f| f.path().extension().is_some_and(|e| e == "jsonl"))
             .max_by_key(|f| f.metadata().and_then(|m| m.modified()).ok())
             .expect("a transcript");
-        let (dir, id) = (newest.path().parent().unwrap().to_path_buf(), newest.path().file_stem().unwrap().to_string_lossy().to_string());
+        let (dir, id) = (
+            newest.path().parent().unwrap().to_path_buf(),
+            newest.path().file_stem().unwrap().to_string_lossy().to_string(),
+        );
         let used = tokens_in(&dir, &[id], DateTime::<Utc>::MIN_UTC, Utc::now()).expect("replies with usage");
         eprintln!("{}: {used:?}", newest.path().display());
         assert!(used.output > 0 && used.input + used.cached_read + used.cached_write > 0);

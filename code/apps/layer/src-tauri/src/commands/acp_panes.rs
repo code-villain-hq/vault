@@ -29,8 +29,8 @@ pub(crate) struct Start {
 /// protocol (ACP-2).
 pub(crate) fn start(app: &AppHandle, state: &AppState, def: &agents::AgentDef, s: Start) -> Result<PaneInfo> {
     let cmd = def.acp.ok_or_else(|| Error::Other(format!("{} cannot run as a conversation (ACP)", def.name)))?;
-    let program = shellenv::which(cmd.program)
-        .ok_or_else(|| Error::NotFound(format!("{} is not on your PATH", cmd.program)))?;
+    let program =
+        shellenv::which(cmd.program).ok_or_else(|| Error::NotFound(format!("{} is not on your PATH", cmd.program)))?;
     let pick = match &s.resume {
         Resume::No => acp::Pick::New,
         Resume::Newest => acp::Pick::Newest,
@@ -91,7 +91,10 @@ fn models_offered(offered: &[acp::Setting]) -> Vec<ModelChoice> {
         .iter()
         .filter(|s| s.category.as_deref() == Some("model"))
         .flat_map(|s| &s.options)
-        .map(|o| ModelChoice { value: o.value.clone(), name: if o.name.is_empty() { o.value.clone() } else { o.name.clone() } })
+        .map(|o| ModelChoice {
+            value: o.value.clone(),
+            name: if o.name.is_empty() { o.value.clone() } else { o.name.clone() },
+        })
         .collect()
 }
 

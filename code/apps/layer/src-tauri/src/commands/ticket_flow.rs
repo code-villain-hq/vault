@@ -47,11 +47,7 @@ impl Stage {
 /// merged, with nothing left over: work committed since, or in a repo that
 /// never had one, is not done.
 pub fn stage(rows: &[CheckoutPr]) -> Option<Stage> {
-    let live: Vec<_> = rows
-        .iter()
-        .filter_map(|r| r.pr.as_ref())
-        .filter(|p| p.state == "open" || p.merged)
-        .collect();
+    let live: Vec<_> = rows.iter().filter_map(|r| r.pr.as_ref()).filter(|p| p.state == "open" || p.merged).collect();
     if live.is_empty() {
         return None;
     }
@@ -87,12 +83,13 @@ pub(crate) async fn follow(state: &AppState, client: &Jira, task: &Task, rows: &
     let key = task.issue_key.clone()?;
     let stage = due(task, stage(rows))?;
     let project = key.split('-').next()?.to_string();
-    let target = state
-        .config
-        .read()
-        .jira
-        .and_then(|j| j.flow.get(&project).cloned())
-        .and_then(|f| if stage == Stage::Review { f.review } else { f.merged });
+    let target = state.config.read().jira.and_then(|j| j.flow.get(&project).cloned()).and_then(|f| {
+        if stage == Stage::Review {
+            f.review
+        } else {
+            f.merged
+        }
+    });
     let mut out = TicketMove { key: key.clone(), stage: stage.key(), moved_to: None, unchosen: false, error: None };
     let Some(target) = target else {
         out.unchosen = true;
@@ -300,8 +297,16 @@ mod tests {
         assert_eq!(stage(&[row("open", false, false, 3)]), Some(Stage::Review));
         assert_eq!(stage(&[row("open", true, false, 1), row("open", false, false, 2)]), Some(Stage::Review));
         assert_eq!(stage(&[row("closed", false, true, 0), row("closed", false, true, 0)]), Some(Stage::Merged));
-        assert_eq!(stage(&[row("closed", false, true, 0), row("open", false, false, 2)]), Some(Stage::Review), "one still open");
-        assert_eq!(stage(&[row("closed", false, true, 0), row("", false, false, 4)]), None, "a repo with work and no PR");
+        assert_eq!(
+            stage(&[row("closed", false, true, 0), row("open", false, false, 2)]),
+            Some(Stage::Review),
+            "one still open"
+        );
+        assert_eq!(
+            stage(&[row("closed", false, true, 0), row("", false, false, 4)]),
+            None,
+            "a repo with work and no PR"
+        );
         assert_eq!(stage(&[row("closed", false, false, 2)]), None, "closed without merging is given up on");
     }
 

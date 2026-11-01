@@ -35,9 +35,7 @@ pub async fn github_connect(
     let cfg = GithubConfig {
         api_url: api_url.trim_end_matches('/').to_string(),
         web_url: web_url.trim_end_matches('/').to_string(),
-        review_team: review_team
-            .as_deref()
-            .and_then(github::normalize_review_team),
+        review_team: review_team.as_deref().and_then(github::normalize_review_team),
     };
     let was = state.config.read().github.as_ref().map(|g| g.api_url.clone());
     let typed = !token.trim().is_empty();
@@ -85,11 +83,7 @@ pub struct CheckoutPr {
 /// time. This decides where the *next* PR is opened; one already open keeps
 /// its base until `github_retarget_pr` moves it.
 #[tauri::command]
-pub async fn set_checkout_base(
-    state: State<'_, AppState>,
-    checkout_id: String,
-    base: String,
-) -> Result<()> {
+pub async fn set_checkout_base(state: State<'_, AppState>, checkout_id: String, base: String) -> Result<()> {
     let base = base.trim().to_string();
     if base.is_empty() {
         return Err(Error::Other("a pull request needs a base branch".into()));
@@ -138,17 +132,8 @@ fn task_branch_facts_inner(state: &AppState, task_id: String) -> Result<Vec<Repo
         .checkouts_of(&task_id)
         .into_iter()
         .map(|c| RepoBranchFacts {
-            repo: state
-                .config
-                .project(&c.project_id)
-                .map(|p| p.name)
-                .unwrap_or_else(|_| "(unknown)".into()),
-            facts: git::branch_facts(
-                &PathBuf::from(&c.path),
-                &task.branch,
-                &c.base,
-                c.base_commit.as_deref(),
-            ),
+            repo: state.config.project(&c.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into()),
+            facts: git::branch_facts(&PathBuf::from(&c.path), &task.branch, &c.base, c.base_commit.as_deref()),
             base: c.base,
             checkout_id: c.id,
         })
@@ -179,9 +164,7 @@ pub async fn github_retarget_pr(state: State<'_, AppState>, checkout_id: String)
         .await?
         .ok_or_else(|| Error::NotFound(format!("an open PR for {}", task.branch)))?;
 
-    client
-        .set_pull_base(&owner, &name, pr.number, &checkout.base)
-        .await?;
+    client.set_pull_base(&owner, &name, pr.number, &checkout.base).await?;
     Ok(format!("#{} now targets {}", pr.number, checkout.base))
 }
 
@@ -196,10 +179,7 @@ pub struct TaskPrs {
 
 /// PR state for every repository in the task, one row each.
 #[tauri::command]
-pub async fn github_task_prs(
-    state: State<'_, AppState>,
-    task_id: String,
-) -> Result<Vec<CheckoutPr>> {
+pub async fn github_task_prs(state: State<'_, AppState>, task_id: String) -> Result<Vec<CheckoutPr>> {
     let (client, _) = github_client(&state)?;
     task_prs(&state, &client, &task_id).await
 }
@@ -268,9 +248,7 @@ const SETTLED_SWEEP: std::time::Duration = std::time::Duration::from_secs(15 * 6
 /// The tasks a sweep asks about: every one, but a settled one only once
 /// `SETTLED_SWEEP` has passed since it was last read.
 fn due(ids: Vec<String>, settled: &HashMap<String, std::time::Instant>, now: std::time::Instant) -> Vec<String> {
-    ids.into_iter()
-        .filter(|id| settled.get(id).is_none_or(|at| now.duration_since(*at) >= SETTLED_SWEEP))
-        .collect()
+    ids.into_iter().filter(|id| settled.get(id).is_none_or(|at| now.duration_since(*at) >= SETTLED_SWEEP)).collect()
 }
 
 /// Whether a task's rows are settled: some pull request, and every repo's
@@ -358,12 +336,7 @@ pub(crate) async fn review_queue(state: &AppState) -> Result<ReviewQueue> {
         github::drop_already_listed(&mut t.prs, &mine);
         t
     });
-    Ok(ReviewQueue {
-        mine,
-        mine_more,
-        team,
-        authored: None,
-    })
+    Ok(ReviewQueue { mine, mine_more, team, authored: None })
 }
 
 /// The last review team resolved, keyed by the API and the setting it came
@@ -372,8 +345,7 @@ pub(crate) async fn review_queue(state: &AppState) -> Result<ReviewQueue> {
 /// A team given without its org is found by walking `/user/teams`, up to ten
 /// pages, and that walk was repeated on every poll of the review queue for an
 /// answer that changes when the setting does.
-static RESOLVED_TEAM: parking_lot::Mutex<Option<(String, String, github::GhTeam)>> =
-    parking_lot::Mutex::new(None);
+static RESOLVED_TEAM: parking_lot::Mutex<Option<(String, String, github::GhTeam)>> = parking_lot::Mutex::new(None);
 
 /// The team column must not take the personal one down with it: a missing
 /// `read:org` scope, or a slug that matches nothing, is a problem with that
@@ -404,32 +376,13 @@ async fn load_team_reviews(client: &GitHub, api_url: &str, raw: &str) -> TeamRev
         },
     };
     let slug = format!("{}/{}", team.org, team.slug);
-    match client
-        .requested_prs(&github::team_review_query(&team.org, &team.slug))
-        .await
-    {
-        Ok((prs, more)) => TeamReviews {
-            slug,
-            name: team.name,
-            prs,
-            more,
-            error: None,
-        },
-        Err(e) => TeamReviews {
-            slug,
-            name: team.name,
-            prs: Vec::new(),
-            more: false,
-            error: Some(e.to_string()),
-        },
+    match client.requested_prs(&github::team_review_query(&team.org, &team.slug)).await {
+        Ok((prs, more)) => TeamReviews { slug, name: team.name, prs, more, error: None },
+        Err(e) => TeamReviews { slug, name: team.name, prs: Vec::new(), more: false, error: Some(e.to_string()) },
     }
 }
 
-pub(crate) async fn task_prs(
-    state: &AppState,
-    client: &GitHub,
-    task_id: &str,
-) -> Result<Vec<CheckoutPr>> {
+pub(crate) async fn task_prs(state: &AppState, client: &GitHub, task_id: &str) -> Result<Vec<CheckoutPr>> {
     let task = state.config.task(task_id)?;
     let checkouts = state.config.checkouts_of(task_id);
 
@@ -446,12 +399,7 @@ pub(crate) async fn task_prs(
                     // A count, not the list: this runs for every repository of
                     // every task on a timer, and building the list reads each
                     // untracked file.
-                    let changed = git::changed_count(
-                        &dir,
-                        &c.base,
-                        c.base_commit.as_deref(),
-                        git::Scope::Branch,
-                    );
+                    let changed = git::changed_count(&dir, &c.base, c.base_commit.as_deref(), git::Scope::Branch);
                     (changed, git::origin_slug_cached(&dir))
                 })
                 .collect::<Vec<_>>()
@@ -463,11 +411,8 @@ pub(crate) async fn task_prs(
     let rows = checkouts.into_iter().zip(local).map(|(checkout, (changed, slug))| {
         let task = &task;
         async move {
-            let repo = state
-                .config
-                .project(&checkout.project_id)
-                .map(|p| p.name)
-                .unwrap_or_else(|_| "(unknown)".into());
+            let repo =
+                state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
 
             let mut row = CheckoutPr {
                 checkout_id: checkout.id.clone(),
@@ -586,10 +531,7 @@ const LOGS_PER_REPO: usize = 6;
 /// Everything said on the task's open pull requests, for picking what to
 /// hand the agent.
 #[tauri::command]
-pub async fn github_pr_feedback(
-    state: State<'_, AppState>,
-    task_id: String,
-) -> Result<Vec<RepoFeedback>> {
+pub async fn github_pr_feedback(state: State<'_, AppState>, task_id: String) -> Result<Vec<RepoFeedback>> {
     let task = state.config.task(&task_id)?;
     let (client, _) = github_client(&state)?;
     let checkouts = state.config.checkouts_of(&task_id);
@@ -602,11 +544,8 @@ pub async fn github_pr_feedback(
     let rows = checkouts.into_iter().zip(slugs).map(|(checkout, slug)| {
         let (client, task, state) = (&client, &task, &*state);
         async move {
-            let repo = state
-                .config
-                .project(&checkout.project_id)
-                .map(|p| p.name)
-                .unwrap_or_else(|_| "(unknown)".into());
+            let repo =
+                state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
             let found: Result<Option<RepoFeedback>> = async {
                 let (owner, name) = slug?;
                 let Some(pr) = client.pull_for_branch(&owner, &name, &task.branch).await? else {
@@ -788,7 +727,9 @@ pub(crate) fn feedback_markdown(
                     md.push_str("\nResolved on GitHub: the reviewer accepted it as it stands. It was sent on purpose, so read it, but do not undo what was settled.\n");
                 }
                 if *outdated {
-                    md.push_str("\nThe code here has changed since this was written — check whether it still applies.\n");
+                    md.push_str(
+                        "\nThe code here has changed since this was written — check whether it still applies.\n",
+                    );
                 }
                 if !code.is_empty() {
                     let diff: Vec<String> = code.iter().map(|c| format!("{}{}", c.op, c.text)).collect();
@@ -803,10 +744,8 @@ pub(crate) fn feedback_markdown(
             }
         }
 
-        let said: Vec<_> = mine
-            .iter()
-            .filter(|i| matches!(i, FeedbackItem::Review { .. } | FeedbackItem::Comment { .. }))
-            .collect();
+        let said: Vec<_> =
+            mine.iter().filter(|i| matches!(i, FeedbackItem::Review { .. } | FeedbackItem::Comment { .. })).collect();
         if !said.is_empty() {
             md.push_str("\n### On the pull request as a whole\n");
             for item in said {
@@ -1021,7 +960,11 @@ mod tests {
     }
 
     fn name(id: &str) -> String {
-        if id == "c1" { "api".into() } else { "web".into() }
+        if id == "c1" {
+            "api".into()
+        } else {
+            "web".into()
+        }
     }
 
     #[test]

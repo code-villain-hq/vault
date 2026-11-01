@@ -26,9 +26,7 @@ pub struct RepoNote {
 /// What a repository's notes are kept by: where it fetches from, spelled
 /// one way (MEM-7), or its clone's path when it fetches from nowhere.
 pub(crate) fn repo_key(project: &Project) -> String {
-    git::origin_url(&project.repo())
-        .map(|url| git::remote_key(&url))
-        .unwrap_or_else(|| project.path.clone())
+    git::origin_url(&project.repo()).map(|url| git::remote_key(&url)).unwrap_or_else(|| project.path.clone())
 }
 
 /// The registered repository whose notes these are, if it still is one.
@@ -42,8 +40,9 @@ fn tip(project: &Project) -> Option<String> {
 
 fn measured(project: Option<&Project>, note: Note) -> RepoNote {
     let changed = match (project, &note.checked_commit) {
-        (Some(p), Some(since)) if !note.paths.is_empty() => tip(p)
-            .and_then(|now| git::changed_between(&p.repo(), since, &now, &note.paths).ok()),
+        (Some(p), Some(since)) if !note.paths.is_empty() => {
+            tip(p).and_then(|now| git::changed_between(&p.repo(), since, &now, &note.paths).ok())
+        }
         _ => None,
     };
     RepoNote { note, changed }
@@ -52,26 +51,17 @@ fn measured(project: Option<&Project>, note: Note) -> RepoNote {
 /// A registered repository by its name, the way agents name them.
 pub(crate) fn project_named(state: &AppState, name: &str) -> Result<Project> {
     let projects = state.config.read().projects;
-    projects
-        .iter()
-        .find(|p| p.name.eq_ignore_ascii_case(name.trim()))
-        .cloned()
-        .ok_or_else(|| {
-            Error::NotFound(format!(
-                "no repository named {name}; known: {}",
-                projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
-            ))
-        })
+    projects.iter().find(|p| p.name.eq_ignore_ascii_case(name.trim())).cloned().ok_or_else(|| {
+        Error::NotFound(format!(
+            "no repository named {name}; known: {}",
+            projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+        ))
+    })
 }
 
 /// A repository's notes, the most recently checked first, each measured.
 pub(crate) fn notes_of(state: &AppState, project: &Project) -> Vec<RepoNote> {
-    state
-        .notes
-        .of(&repo_key(project))
-        .into_iter()
-        .map(|n| measured(Some(project), n))
-        .collect()
+    state.notes.of(&repo_key(project)).into_iter().map(|n| measured(Some(project), n)).collect()
 }
 
 /// Remember something about `project`, from `source`.
@@ -82,13 +72,7 @@ pub(crate) fn remember_inner(
     paths: Vec<String>,
     source: String,
 ) -> Result<Note> {
-    state.notes.add(New {
-        repo: repo_key(project),
-        text: text.to_string(),
-        paths,
-        source,
-        commit: tip(project),
-    })
+    state.notes.add(New { repo: repo_key(project), text: text.to_string(), paths, source, commit: tip(project) })
 }
 
 /// Say a note still holds, as of its repository's default branch now.

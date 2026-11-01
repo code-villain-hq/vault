@@ -58,7 +58,9 @@ fn host_of(url: &str) -> String {
 pub fn parse_key(key: &str) -> Option<IssueRef> {
     let (repo, number) = key.trim().split_once('#')?;
     let (owner, name) = repo.split_once('/')?;
-    let fine = |s: &str| !s.is_empty() && !s.starts_with(['-', '.']) && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c));
+    let fine = |s: &str| {
+        !s.is_empty() && !s.starts_with(['-', '.']) && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+    };
     let number: u64 = number.parse().ok().filter(|n| *n > 0)?;
     (fine(owner) && fine(name)).then(|| (owner.to_string(), name.to_string(), number))
 }
@@ -71,7 +73,13 @@ pub fn url_of(web_url: &str, key: &str) -> Option<String> {
 /// What an issue is, by TKT-17: without the organisation's issue types, an
 /// issue with sub-issues is an epic, and any other is just an issue.
 pub(super) fn types() -> Vec<TicketType> {
-    let t = |id: &str, level| TicketType { id: id.into(), name: id.into(), subtask: false, hierarchy_level: level, icon: None };
+    let t = |id: &str, level| TicketType {
+        id: id.into(),
+        name: id.into(),
+        subtask: false,
+        hierarchy_level: level,
+        icon: None,
+    };
     vec![t("Issue", 0), t("Epic", 1)]
 }
 
@@ -222,7 +230,8 @@ pub(super) async fn file(client: &GitHub, issues: &Issues, new: &NewTicket) -> R
         (None, None, [only]) => only.clone(),
         _ => return Err(Error::Other("choose the repository to file the issue in".into())),
     };
-    let (owner, name, _) = parse_key(&format!("{repo}#1")).ok_or_else(|| Error::Other(format!("{repo} is not a GitHub repository (owner/name)")))?;
+    let (owner, name, _) = parse_key(&format!("{repo}#1"))
+        .ok_or_else(|| Error::Other(format!("{repo} is not a GitHub repository (owner/name)")))?;
     let number = client.create_issue(&owner, &name, new.summary.trim(), &new.description).await?;
     let child = (owner.clone(), name.clone(), number);
     if let Some(parent) = parent {
@@ -260,14 +269,21 @@ mod tests {
 
     #[test]
     fn an_issue_is_seen_on_the_github_it_lives_on() {
-        assert_eq!(url_of("https://github.com/", "acme/web#12").as_deref(), Some("https://github.com/acme/web/issues/12"));
+        assert_eq!(
+            url_of("https://github.com/", "acme/web#12").as_deref(),
+            Some("https://github.com/acme/web/issues/12")
+        );
         assert_eq!(url_of("https://github.com", "ACME-12"), None);
     }
 
     #[test]
     fn only_the_workspace_repositories_on_this_github_are_searched() {
         let mut cfg = AppConfig::default();
-        for (i, remote) in ["github.com/acme/web", "github.com/acme/api", "ghe.example.com/acme/tools", "github.com/acme/Web"].iter().enumerate() {
+        for (i, remote) in
+            ["github.com/acme/web", "github.com/acme/api", "ghe.example.com/acme/tools", "github.com/acme/Web"]
+                .iter()
+                .enumerate()
+        {
             cfg.projects.push(crate::config::Project {
                 id: i.to_string(),
                 name: remote.to_string(),

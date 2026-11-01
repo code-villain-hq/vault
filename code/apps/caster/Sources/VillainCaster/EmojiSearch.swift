@@ -14,8 +14,11 @@ enum EmojiSearch {
         guard lower == "emoji" || lower.hasPrefix("emoji ") else { return nil }
         let query = String(lower.dropFirst(5)).trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else {
-            return [ResultItem(icon: nil, title: "😀 Type to search emoji",
-                               subtitle: "e.g. \"emoji shrug\"", action: nil)]
+            return [
+                ResultItem(
+                    icon: nil, title: "😀 Type to search emoji",
+                    subtitle: "e.g. \"emoji shrug\"", action: nil)
+            ]
         }
 
         let queryChars = Array(query)
@@ -24,14 +27,17 @@ enum EmojiSearch {
             else { return nil }
             return (score, entry)
         }
-        return scored
+        return
+            scored
             .sorted { $0.score > $1.score }
             .prefix(8)
             .map { _, entry in
-                ResultItem(icon: nil,
-                           title: "\(entry.emoji)  \(entry.name.prefix(1).uppercased() + entry.name.dropFirst())", // sentence case
-                           subtitle: "⏎ copies",
-                           action: { Clipboard.copy(entry.emoji) })
+                ResultItem(
+                    icon: nil,
+                    // Sentence case.
+                    title: "\(entry.emoji)  \(entry.name.prefix(1).uppercased() + entry.name.dropFirst())",
+                    subtitle: "⏎ copies",
+                    action: { Clipboard.copy(entry.emoji) })
             }
     }
 

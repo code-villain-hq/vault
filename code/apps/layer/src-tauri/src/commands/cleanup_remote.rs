@@ -91,7 +91,8 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
             if git::origin_url(store).is_none_or(|u| host(&u) != ours) {
                 continue;
             }
-            let found = git::origin_slug(store).and_then(|slug| Ok((slug, git::origin_branches(store, &project.default_branch)?)));
+            let found = git::origin_slug(store)
+                .and_then(|slug| Ok((slug, git::origin_branches(store, &project.default_branch)?)));
             match found {
                 Ok((slug, branches)) => repos.push(Repo {
                     name: project.name.clone(),
@@ -150,7 +151,9 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
                     });
                 }
             }
-            Err(e) => out.push(problem(&repo.name, repo.store.clone(), format!("Could not ask GitHub about them: {e}"))),
+            Err(e) => {
+                out.push(problem(&repo.name, repo.store.clone(), format!("Could not ask GitHub about them: {e}")))
+            }
         }
     }
 
@@ -160,13 +163,14 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
     for r in &repos {
         reviews.extend(r.reviewed.iter().map(|n| (r.store.clone(), r.slug.clone(), *n)));
     }
-    let looked_up: Vec<_> = futures_util::stream::iter(reviews.into_iter().map(|(store, (owner, name), n)| async move {
-        let found = client.pull(&owner, &name, n).await;
-        (store, n, found)
-    }))
-    .buffered(AT_ONCE)
-    .collect()
-    .await;
+    let looked_up: Vec<_> =
+        futures_util::stream::iter(reviews.into_iter().map(|(store, (owner, name), n)| async move {
+            let found = client.pull(&owner, &name, n).await;
+            (store, n, found)
+        }))
+        .buffered(AT_ONCE)
+        .collect()
+        .await;
     for (store, n, found) in looked_up {
         let became = found.map(|p| (pr_state(&p), p.head_sha)).map_err(|e| e.to_string());
         pulls.entry(store).or_default().reviewed.insert(n, became);
@@ -231,7 +235,11 @@ pub(super) fn judge_local(
     base: &str,
     holds: impl Fn(&str) -> bool,
 ) -> Option<(Verdict, String)> {
-    let not_on_origin = if n == 1 { "1 commit on it is on no origin branch".to_string() } else { format!("{n} commits on it are on no origin branch") };
+    let not_on_origin = if n == 1 {
+        "1 commit on it is on no origin branch".to_string()
+    } else {
+        format!("{n} commits on it are on no origin branch")
+    };
     if let Some(number) = review_number(branch) {
         return Some(match pulls.reviewed.get(&number)? {
             Ok((_, head)) if holds(head) => (
@@ -359,7 +367,10 @@ mod tests {
     fn a_branch_whose_pull_request_merged_untouched_goes_and_one_pushed_to_since_is_asked_about() {
         let branches = [branch("ACME-1", "aaa", "me@acme.test", false), branch("ACME-2", "bbb", "me@acme.test", false)];
         let prs = [pr(1, "ACME-1", "aaa", PrState::Merged), pr(2, "ACME-2", "b0b", PrState::Merged)];
-        assert_eq!(verdicts(&branches, &prs), vec![("ACME-1".into(), Verdict::Safe), ("ACME-2".into(), Verdict::Risky)]);
+        assert_eq!(
+            verdicts(&branches, &prs),
+            vec![("ACME-1".into(), Verdict::Safe), ("ACME-2".into(), Verdict::Risky)]
+        );
     }
 
     #[test]
@@ -408,7 +419,10 @@ mod tests {
     #[test]
     fn a_review_branch_goes_when_its_pull_request_holds_every_commit_on_it() {
         let pulls = Pulls {
-            reviewed: HashMap::from([(392, Ok((PrState::Merged, "aaa".to_string()))), (441, Err("Not Found".to_string()))]),
+            reviewed: HashMap::from([
+                (392, Ok((PrState::Merged, "aaa".to_string()))),
+                (441, Err("Not Found".to_string())),
+            ]),
             ..Default::default()
         };
         assert_eq!(local("review/customer-portal-392", &pulls, true), Some(Verdict::Safe));

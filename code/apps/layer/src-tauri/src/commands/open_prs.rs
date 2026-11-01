@@ -12,8 +12,8 @@ use crate::integrations::github;
 
 use super::diff::RepoResult;
 use super::github::github_client;
-use super::tickets::tracker;
 use super::slack::{record_post, slack_for};
+use super::tickets::tracker;
 use super::{off_runtime, AppState};
 
 /// Push and open a PR in every repository that has changes, then post the whole
@@ -54,7 +54,12 @@ pub async fn github_open_prs(
             let (task, id) = (task.clone(), checkout.id.clone());
             super::blocking(app.clone(), move |state| super::spec_work::commit_ticks(state, &task, &id)).await
         } {
-            results.push(RepoResult { checkout_id: checkout.id, repo, ok: false, detail: format!("the spec's ticked steps could not be committed: {e}") });
+            results.push(RepoResult {
+                checkout_id: checkout.id,
+                repo,
+                ok: false,
+                detail: format!("the spec's ticked steps could not be committed: {e}"),
+            });
             continue;
         }
 
@@ -140,31 +145,11 @@ pub async fn github_open_prs(
 
             let (pr, new) = match open {
                 Some(existing) => (existing, false),
-                None => (
-                    client
-                        .create_pull(
-                            &owner,
-                            &name,
-                            &title,
-                            &body,
-                            &task.branch,
-                            &checkout.base,
-                            draft,
-                        )
-                        .await?,
-                    true,
-                ),
+                None => {
+                    (client.create_pull(&owner, &name, &title, &body, &task.branch, &checkout.base, draft).await?, true)
+                }
             };
-            Ok((
-                github::Sibling {
-                    repo: repo.clone(),
-                    owner,
-                    name,
-                    url: pr.url,
-                    number: pr.number,
-                },
-                new,
-            ))
+            Ok((github::Sibling { repo: repo.clone(), owner, name, url: pr.url, number: pr.number }, new))
         }
         .await;
 
@@ -185,12 +170,7 @@ pub async fn github_open_prs(
                     opened.push(pr);
                 }
             }
-            Err(e) => results.push(RepoResult {
-                checkout_id: checkout.id,
-                repo,
-                ok: false,
-                detail: e.to_string(),
-            }),
+            Err(e) => results.push(RepoResult { checkout_id: checkout.id, repo, ok: false, detail: e.to_string() }),
         }
     }
 
@@ -206,10 +186,7 @@ pub async fn github_open_prs(
     }
 
     if !opened.is_empty() {
-        let lines: Vec<String> = opened
-            .iter()
-            .map(|p| format!("{}: {}", p.repo, p.url))
-            .collect();
+        let lines: Vec<String> = opened.iter().map(|p| format!("{}: {}", p.repo, p.url)).collect();
 
         // A GitHub issue lists the pull requests that fix it by itself.
         if let Some(key) = task.issue_key.as_ref() {
@@ -236,11 +213,7 @@ pub async fn github_open_prs(
         }
 
         if let Ok(Some((client, cfg))) = slack_for(&state, "prs") {
-            let text = format!(
-                "*{title}* — {} PR{} opened",
-                opened.len(),
-                if opened.len() == 1 { "" } else { "s" },
-            );
+            let text = format!("*{title}* — {} PR{} opened", opened.len(), if opened.len() == 1 { "" } else { "s" },);
             let context = opened
                 .iter()
                 .map(|p| format!("<{}|{} #{}>", p.url, p.repo, p.number))

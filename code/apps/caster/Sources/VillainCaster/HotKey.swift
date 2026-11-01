@@ -12,14 +12,16 @@ final class HotKeyManager {
             eventKind: UInt32(kEventHotKeyPressed)
         )
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, userData in
-            guard let userData else { return noErr }
-            let manager = Unmanaged<HotKeyManager>.fromOpaque(userData).takeUnretainedValue()
-            DispatchQueue.main.async { manager.onPress?() }
-            return noErr
-        }, 1, &eventType, selfPtr, &eventHandler)
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, _, userData in
+                guard let userData else { return noErr }
+                let manager = Unmanaged<HotKeyManager>.fromOpaque(userData).takeUnretainedValue()
+                DispatchQueue.main.async { manager.onPress?() }
+                return noErr
+            }, 1, &eventType, selfPtr, &eventHandler)
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x56435354), id: 1) // "VCST"
+        let hotKeyID = EventHotKeyID(signature: OSType(0x5643_5354), id: 1)  // "VCST"
         let status = RegisterEventHotKey(
             keyCode, modifiers, hotKeyID,
             GetApplicationEventTarget(), 0, &hotKeyRef

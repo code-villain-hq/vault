@@ -16,11 +16,11 @@ use crate::pty::PaneInfo;
 use crate::spec::{self, Part, SubTask};
 use crate::tickets::{NewTicket, Ticket, Tracker};
 
-use super::tickets::{default_ticket_type, tracker};
 use super::panes::{agent_file_dir, start_agent, Resume};
 use super::spec::{and_list, approve, spec_of, Slot, DRAFTS};
 use super::task_context::{keep_ticket, write_task_context};
 use super::tasks::{new_task, NewTask};
+use super::tickets::{default_ticket_type, tracker};
 use super::AppState;
 
 /// Under the epic's `DRAFTS`: tickets filed for sub-tasks, by title, so a
@@ -75,19 +75,16 @@ fn an_epic(state: &AppState, epic_id: &str) -> Result<Task> {
 /// approved tasks to make them from.
 pub(crate) fn plan(state: &AppState, epic: &Task) -> (bool, Vec<SubTask>) {
     let spec = spec_of(state, epic);
-    let files: Vec<(String, String)> = spec
-        .homes
-        .iter()
-        .filter_map(|h| Some((h.folder.clone(), spec.approved(&Slot::tasks(&h.folder))?)))
-        .collect();
+    let files: Vec<(String, String)> =
+        spec.homes.iter().filter_map(|h| Some((h.folder.clone(), spec.approved(&Slot::tasks(&h.folder))?))).collect();
     (!files.is_empty(), spec::sub_tasks(&title_of(epic), &files))
 }
 
 /// The epic's sub-tasks filed so far.
 pub(crate) fn filed_of(state: &AppState, epic_id: &str) -> Vec<Task> {
-    state.config.with(|c| {
-        c.tasks.iter().filter(|t| t.sub_task.as_ref().is_some_and(|s| s.epic == epic_id)).cloned().collect()
-    })
+    state
+        .config
+        .with(|c| c.tasks.iter().filter(|t| t.sub_task.as_ref().is_some_and(|s| s.epic == epic_id)).cloned().collect())
 }
 
 fn is(task: &Task, title: &str) -> bool {
@@ -100,7 +97,10 @@ pub(crate) fn view(state: &AppState, epic: &Task) -> EpicView {
     let remembered = remembered(state, epic);
     let counts = |task: &Task| {
         let spec = spec_of(state, task);
-        spec.homes.iter().map(|h| spec.steps(h)).fold((0, 0), |(n, d), s| (n + s.len(), d + s.iter().filter(|s| s.done).count()))
+        spec.homes
+            .iter()
+            .map(|h| spec.steps(h))
+            .fold((0, 0), |(n, d), s| (n + s.len(), d + s.iter().filter(|s| s.done).count()))
     };
     let mut out: Vec<SubTaskView> = subs
         .iter()
@@ -108,7 +108,10 @@ pub(crate) fn view(state: &AppState, epic: &Task) -> EpicView {
             let task = filed.iter().find(|t| is(t, &sub.title));
             let (steps, done) = match task {
                 Some(t) => counts(t),
-                None => sub.repos.iter().fold((0, 0), |(n, d), r| (n + r.steps.len(), d + r.steps.iter().filter(|s| s.done).count())),
+                None => sub
+                    .repos
+                    .iter()
+                    .fold((0, 0), |(n, d), r| (n + r.steps.len(), d + r.steps.iter().filter(|s| s.done).count())),
             };
             SubTaskView {
                 title: sub.title.clone(),
@@ -172,7 +175,11 @@ pub async fn adopt_sub_tasks(app: AppHandle, epic_id: String, task_ids: Vec<Stri
 /// epic's own ticket: one made before epics, which stays an ordinary task.
 fn adopt(tasks: &mut [Task], epic: &Task, ids: &[String]) {
     for t in tasks.iter_mut().filter(|t| ids.contains(&t.id)) {
-        if t.epic || t.id == epic.id || t.sub_task.is_some() || (epic.issue_key.is_some() && t.issue_key == epic.issue_key) {
+        if t.epic
+            || t.id == epic.id
+            || t.sub_task.is_some()
+            || (epic.issue_key.is_some() && t.issue_key == epic.issue_key)
+        {
             continue;
         }
         t.sub_task = Some(SubTaskOf { epic: epic.id.clone(), title: title_of(t) });
@@ -228,7 +235,12 @@ struct ToFile {
 /// task, and its share of the spec, approved. No agent starts and no ticket
 /// moves.
 #[tauri::command]
-pub async fn file_sub_tasks(app: AppHandle, epic_id: String, issue_type: Option<String>, fields: Option<Value>) -> Result<Filed> {
+pub async fn file_sub_tasks(
+    app: AppHandle,
+    epic_id: String,
+    issue_type: Option<String>,
+    fields: Option<Value>,
+) -> Result<Filed> {
     let state = app.state::<AppState>();
     let epic = an_epic(&state, &epic_id)?;
     let e = epic.clone();
@@ -282,11 +294,8 @@ fn to_file(state: &AppState, epic: &Task) -> (bool, Vec<ToFile>) {
                     d.push_str(&format!("- {}. {}\n", s.number, s.text));
                 }
             }
-            let project_ids = sub
-                .repos
-                .iter()
-                .filter_map(|r| spec.home(&r.folder).map(|h| h.checkout.project_id.clone()))
-                .collect();
+            let project_ids =
+                sub.repos.iter().filter_map(|r| spec.home(&r.folder).map(|h| h.checkout.project_id.clone())).collect();
             let remembered = remembered.get(&sub.title.to_lowercase()).cloned();
             ToFile { sub, description: d, project_ids, remembered }
         })
@@ -294,7 +303,14 @@ fn to_file(state: &AppState, epic: &Task) -> (bool, Vec<ToFile>) {
     (planned, todo)
 }
 
-async fn file_one(app: &AppHandle, epic: &Task, one: ToFile, tracker: Option<&Tracker>, issue_type: &str, fields: &Value) -> Result<()> {
+async fn file_one(
+    app: &AppHandle,
+    epic: &Task,
+    one: ToFile,
+    tracker: Option<&Tracker>,
+    issue_type: &str,
+    fields: &Value,
+) -> Result<()> {
     let state = app.state::<AppState>();
     let ToFile { sub, description, project_ids, remembered } = one;
     if project_ids.is_empty() {
@@ -303,7 +319,10 @@ async fn file_one(app: &AppHandle, epic: &Task, one: ToFile, tracker: Option<&Tr
     let issue: Option<Ticket> = match (tracker, sub.key.clone().or(remembered), epic.issue_key.as_deref()) {
         (Some(client), Some(key), parent) => {
             if let (Some(parent), Some(_)) = (parent, &sub.key) {
-                client.put_under(&key, parent).await.map_err(|e| Error::Other(format!("{key} could not be moved under the epic: {e}")))?;
+                client
+                    .put_under(&key, parent)
+                    .await
+                    .map_err(|e| Error::Other(format!("{key} could not be moved under the epic: {e}")))?;
             }
             Some(client.ticket(&key).await?)
         }
@@ -327,7 +346,9 @@ async fn file_one(app: &AppHandle, epic: &Task, one: ToFile, tracker: Option<&Tr
     let (key, url) = (issue.as_ref().map(|i| i.key.clone()), issue.as_ref().map(|i| i.url.clone()));
     // A ticket that already has a task is that task: a second would check
     // the same branch out twice.
-    let had = key.as_deref().and_then(|k| state.config.with(|c| c.tasks.iter().find(|t| t.issue_key.as_deref() == Some(k)).cloned()));
+    let had = key
+        .as_deref()
+        .and_then(|k| state.config.with(|c| c.tasks.iter().find(|t| t.issue_key.as_deref() == Some(k)).cloned()));
     let of = SubTaskOf { epic: epic.id.clone(), title: sub.title.clone() };
     if let Some(task) = had {
         let id = task.id.clone();
@@ -389,7 +410,8 @@ pub(crate) async fn waiting_for(app: &AppHandle, task: &Task) -> Result<Vec<Stri
     let epic = state.config.task(&of.epic)?;
     let (waits, filed) = super::blocking(app.clone(), move |state| {
         let (_, subs) = plan(state, &epic);
-        let waits = subs.into_iter().find(|s| s.title.eq_ignore_ascii_case(&of.title)).map(|s| s.waits_for).unwrap_or_default();
+        let waits =
+            subs.into_iter().find(|s| s.title.eq_ignore_ascii_case(&of.title)).map(|s| s.waits_for).unwrap_or_default();
         Ok((waits, filed_of(state, &of.epic)))
     })
     .await?;
@@ -400,7 +422,8 @@ pub(crate) async fn waiting_for(app: &AppHandle, task: &Task) -> Result<Vec<Stri
             (Some(t), Some((client, _))) => super::github::task_prs(&state, client, &t.id)
                 .await
                 .map(|rows| {
-                    let live: Vec<_> = rows.iter().filter_map(|r| r.pr.as_ref()).filter(|p| p.merged || p.state == "open").collect();
+                    let live: Vec<_> =
+                        rows.iter().filter_map(|r| r.pr.as_ref()).filter(|p| p.merged || p.state == "open").collect();
                     !live.is_empty() && live.iter().all(|p| p.merged)
                 })
                 .unwrap_or(false),
@@ -423,10 +446,16 @@ pub struct StartedSubTask {
 /// Start `agent_id` on a sub-task's spec, as Start agent does (SPEC-12),
 /// and move its ticket, and the epic's while that is still to do, as Start
 /// work does (EPIC-8). One that waits is refused unless `anyway`.
-pub(crate) async fn start_sub_task_inner(app: &AppHandle, task_id: String, agent_id: String, anyway: bool) -> Result<StartedSubTask> {
+pub(crate) async fn start_sub_task_inner(
+    app: &AppHandle,
+    task_id: String,
+    agent_id: String,
+    anyway: bool,
+) -> Result<StartedSubTask> {
     let state = app.state::<AppState>();
     let task = state.config.task(&task_id)?;
-    let of = task.sub_task.clone().ok_or_else(|| Error::Other(format!("{} is not a sub-task of an epic", task.name)))?;
+    let of =
+        task.sub_task.clone().ok_or_else(|| Error::Other(format!("{} is not a sub-task of an epic", task.name)))?;
     if !anyway {
         let open = waiting_for(app, &task).await?;
         if !open.is_empty() {
@@ -456,7 +485,12 @@ pub(crate) async fn start_sub_task_inner(app: &AppHandle, task_id: String, agent
 }
 
 #[tauri::command]
-pub async fn start_sub_task(app: AppHandle, task_id: String, agent_id: String, anyway: Option<bool>) -> Result<StartedSubTask> {
+pub async fn start_sub_task(
+    app: AppHandle,
+    task_id: String,
+    agent_id: String,
+    anyway: Option<bool>,
+) -> Result<StartedSubTask> {
     start_sub_task_inner(&app, task_id, agent_id, anyway.unwrap_or(false)).await
 }
 

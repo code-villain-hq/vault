@@ -12,7 +12,8 @@ use crate::commands::AppState;
 
 /// The themes `UiPrefs::theme` may name, as `src/theme.css` (and the vault's
 /// generated colours it imports, for night and day) names them.
-pub const THEMES: &[&str] = &["night", "day", "tokyo-night", "cursor-dark", "cursor-light", "ayu-dark", "ayu-light", "system"];
+pub const THEMES: &[&str] =
+    &["night", "day", "tokyo-night", "cursor-dark", "cursor-light", "ayu-dark", "ayu-light", "system"];
 
 /// The default: Nightshade's night, the studio's theme.
 pub fn night() -> String {
@@ -59,10 +60,7 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, choice: &str) {
 /// The window's background, in whichever appearance it has now: also when
 /// macOS switches between light and dark under "system".
 pub fn repaint<R: Runtime>(window: &Window<R>) {
-    let choice = window
-        .try_state::<AppState>()
-        .map(|state| state.config.read().ui.theme)
-        .unwrap_or_default();
+    let choice = window.try_state::<AppState>().map(|state| state.config.read().ui.theme).unwrap_or_default();
     paint(window, &choice);
 }
 
@@ -99,7 +97,11 @@ mod tests {
             let at = css.find(&format!("[data-theme=\"{name}\"]")).unwrap_or_else(|| panic!("{name} not in theme.css"));
             let bg = css[at..].split("--bg:").nth(1).and_then(|b| b.split(';').next()).unwrap().trim();
             let Color(r, g, b, _) = background(name, *name == "day");
-            assert_eq!(bg.to_lowercase(), format!("#{r:02x}{g:02x}{b:02x}"), "{name}'s window and page backgrounds differ");
+            assert_eq!(
+                bg.to_lowercase(),
+                format!("#{r:02x}{g:02x}{b:02x}"),
+                "{name}'s window and page backgrounds differ"
+            );
             assert!(listed.contains(&format!("id: \"{name}\"")), "{name} not offered in lib/theme.ts");
             // A light page in a window macOS draws dark has dark scrollbars
             // and dialogs, and xterm leaves faint colours faint on it.

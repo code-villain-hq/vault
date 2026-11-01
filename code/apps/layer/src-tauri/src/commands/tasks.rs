@@ -11,11 +11,11 @@ use crate::error::{Error, Result};
 use crate::git;
 use crate::pty::PaneKind;
 
-use super::AppState;
 use super::diff::RepoResult;
 use super::panes::{agent_file_dir, remove_generated};
 use super::task_context::write_task_context;
 use super::worktree_status::{busy_tasks, fresh_statuses, status_ttl};
+use super::AppState;
 
 // ------------------------------------------------------------------- tasks
 
@@ -95,11 +95,8 @@ pub(crate) fn list_tasks_inner(state: &AppState, focus: Option<String>) -> Vec<T
     let (tasks, rows): (Vec<Task>, Vec<Vec<(String, Checkout)>>) = state.config.with(|cfg| {
         // One pass over the projects rather than a lookup per checkout, which
         // took the config lock and cloned the whole project each time.
-        let names: std::collections::HashMap<&str, &str> = cfg
-            .projects
-            .iter()
-            .map(|p| (p.id.as_str(), p.name.as_str()))
-            .collect();
+        let names: std::collections::HashMap<&str, &str> =
+            cfg.projects.iter().map(|p| (p.id.as_str(), p.name.as_str())).collect();
         cfg.tasks
             .iter()
             .map(|task| {
@@ -222,11 +219,7 @@ pub struct RepoSuggestion {
 /// what the last ticket in the same epic used, then the same Jira project,
 /// then whatever was used last.
 #[tauri::command]
-pub fn suggest_repos(
-    state: State<AppState>,
-    issue_key: Option<String>,
-    epic_key: Option<String>,
-) -> RepoSuggestion {
+pub fn suggest_repos(state: State<AppState>, issue_key: Option<String>, epic_key: Option<String>) -> RepoSuggestion {
     suggest_from(&state.config.read(), issue_key.as_deref(), epic_key.as_deref())
 }
 
@@ -236,19 +229,14 @@ pub(crate) fn suggest_from(
     epic_key: Option<&str>,
 ) -> RepoSuggestion {
     let known = |ids: Vec<String>| -> Vec<String> {
-        ids.into_iter()
-            .filter(|id| cfg.projects.iter().any(|p| &p.id == id))
-            .collect()
+        ids.into_iter().filter(|id| cfg.projects.iter().any(|p| &p.id == id)).collect()
     };
 
     // 1. The same epic is a tighter signal than the same project.
     if let Some(epic) = epic_key.filter(|e| !e.is_empty()) {
         let ids = known(cfg.last_repos.get(&format!("epic:{epic}")).cloned().unwrap_or_default());
         if !ids.is_empty() {
-            return RepoSuggestion {
-                project_ids: ids,
-                reason: Some(format!("last task under {epic}")),
-            };
+            return RepoSuggestion { project_ids: ids, reason: Some(format!("last task under {epic}")) };
         }
     }
 
@@ -258,18 +246,12 @@ pub(crate) fn suggest_from(
         for key in [format!("project:{project}"), project.clone()] {
             let ids = known(cfg.last_repos.get(&key).cloned().unwrap_or_default());
             if !ids.is_empty() {
-                return RepoSuggestion {
-                    project_ids: ids,
-                    reason: Some(format!("last {project} ticket")),
-                };
+                return RepoSuggestion { project_ids: ids, reason: Some(format!("last {project} ticket")) };
             }
         }
     }
 
-    RepoSuggestion {
-        project_ids: known(cfg.last_repos.get("").cloned().unwrap_or_default()),
-        reason: None,
-    }
+    RepoSuggestion { project_ids: known(cfg.last_repos.get("").cloned().unwrap_or_default()), reason: None }
 }
 
 /// The branch for a task.
@@ -292,7 +274,8 @@ pub(crate) fn derive_branch(
         // slug are, as GitHub's own "Create a branch" makes them (TKT-21).
         Some(key) if crate::tickets::github::parse_key(key).is_some() => {
             let number = key.rsplit('#').next().unwrap_or_default();
-            let parts = [Some(number.to_string()), Some(slugify(name.strip_prefix(key).unwrap_or(name))), suffix.map(slugify)];
+            let parts =
+                [Some(number.to_string()), Some(slugify(name.strip_prefix(key).unwrap_or(name))), suffix.map(slugify)];
             parts.into_iter().flatten().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("-")
         }
         Some(key) => match suffix.map(slugify).filter(|s| !s.is_empty()) {
@@ -338,10 +321,7 @@ pub(crate) fn checkout_path(root: &Path, project: &Project, taken: &[String]) ->
 
 /// The branch a repo's worktree is cut from: the task's, or the repo's own.
 fn base_for(project: &Project, base: Option<&str>) -> String {
-    base.map(str::trim)
-        .filter(|s| !s.is_empty())
-        .unwrap_or(project.default_branch.as_str())
-        .to_string()
+    base.map(str::trim).filter(|s| !s.is_empty()).unwrap_or(project.default_branch.as_str()).to_string()
 }
 
 pub(crate) fn create_checkout(
@@ -357,11 +337,7 @@ pub(crate) fn create_checkout(
 ) -> Result<Checkout> {
     let root = PathBuf::from(&task.root);
     let path = checkout_path(&root, project, taken);
-    taken.push(
-        path.file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default(),
-    );
+    taken.push(path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
 
     let base = base_for(project, base);
     let repo = super::repo_for_branch(state, project, &task.branch);
@@ -382,9 +358,7 @@ pub(crate) fn create_checkout(
         point_before_update: None,
         last_head: None,
     };
-    state
-        .config
-        .update(|c| c.checkouts.push(checkout.clone()))?;
+    state.config.update(|c| c.checkouts.push(checkout.clone()))?;
     Ok(checkout)
 }
 
@@ -436,18 +410,10 @@ pub(crate) fn new_task(state: &AppState, req: NewTask) -> Result<Task> {
     if req.project_ids.is_empty() {
         return Err(Error::Other("pick at least one repository".into()));
     }
-    let projects: Vec<Project> = req
-        .project_ids
-        .iter()
-        .map(|id| state.config.project(id))
-        .collect::<Result<_>>()?;
+    let projects: Vec<Project> = req.project_ids.iter().map(|id| state.config.project(id)).collect::<Result<_>>()?;
 
-    let branch = derive_branch(
-        req.branch.as_deref(),
-        req.issue_key.as_deref(),
-        req.branch_suffix.as_deref(),
-        &req.name,
-    );
+    let branch =
+        derive_branch(req.branch.as_deref(), req.issue_key.as_deref(), req.branch_suffix.as_deref(), &req.name);
 
     // The folder is named after the branch, so the two are always findable
     // from each other. Slashes would nest it, so they become dashes.
@@ -472,18 +438,12 @@ pub(crate) fn new_task(state: &AppState, req: NewTask) -> Result<Task> {
     };
     state.config.update(|c| c.tasks.push(task.clone()))?;
 
-    let base = req
-        .base
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
+    let base = req.base.as_deref().map(str::trim).filter(|s| !s.is_empty());
 
     // The copy's branch, else the clone's (`repo_for_branch`), else GitHub's
     // (`fetch_for_task`), as TASK-3 orders them.
-    let targets: Vec<(PathBuf, String)> = projects
-        .iter()
-        .map(|p| (super::repo_for_branch(state, p, &task.branch), base_for(p, base)))
-        .collect();
+    let targets: Vec<(PathBuf, String)> =
+        projects.iter().map(|p| (super::repo_for_branch(state, p, &task.branch), base_for(p, base))).collect();
     // Asked before GitHub's is taken, so that unwinding knows which branches
     // are ours to take back — one GitHub still has is. Left behind, a retry
     // with a different base found the branch already there, checked it out
@@ -533,11 +493,7 @@ pub(crate) fn new_task(state: &AppState, req: NewTask) -> Result<Task> {
         if let Some(epic) = epic.filter(|e| !e.is_empty()) {
             c.last_repos.insert(format!("epic:{epic}"), ids.clone());
         }
-        let key = if project.is_empty() {
-            String::new()
-        } else {
-            format!("project:{project}")
-        };
+        let key = if project.is_empty() { String::new() } else { format!("project:{project}") };
         c.last_repos.insert(key, ids);
     })?;
 
@@ -599,11 +555,7 @@ pub struct AddedRepo {
 /// Add a repository to a task that is already in flight.
 pub(crate) fn add_repo(state: &AppState, task_id: &str, project_id: &str) -> Result<AddedRepo> {
     let checkout = add_checkout_inner(state, task_id, project_id)?;
-    let name = state
-        .config
-        .project(project_id)
-        .map(|p| p.name)
-        .unwrap_or_else(|_| "a repository".into());
+    let name = state.config.project(project_id).map(|p| p.name).unwrap_or_else(|_| "a repository".into());
 
     // The folder gained a sibling, so the description of it is now wrong.
     if let Ok(task) = state.config.task(task_id) {
@@ -624,19 +576,11 @@ pub(crate) fn add_repo(state: &AppState, task_id: &str, project_id: &str) -> Res
 }
 
 #[tauri::command]
-pub async fn add_checkout(
-    app: AppHandle,
-    task_id: String,
-    project_id: String,
-) -> Result<AddedRepo> {
+pub async fn add_checkout(app: AppHandle, task_id: String, project_id: String) -> Result<AddedRepo> {
     super::blocking(app, move |state| add_repo(state, &task_id, &project_id)).await
 }
 
-pub(crate) fn add_checkout_inner(
-    state: &AppState,
-    task_id: &str,
-    project_id: &str,
-) -> Result<Checkout> {
+pub(crate) fn add_checkout_inner(state: &AppState, task_id: &str, project_id: &str) -> Result<Checkout> {
     let task_id = task_id.to_string();
     let project_id = project_id.to_string();
     let task = state.config.task(&task_id)?;
@@ -644,10 +588,7 @@ pub(crate) fn add_checkout_inner(
 
     let existing = state.config.checkouts_of(&task_id);
     if existing.iter().any(|c| c.project_id == project_id) {
-        return Err(Error::Other(format!(
-            "{} is already part of this task",
-            project.name
-        )));
+        return Err(Error::Other(format!("{} is already part of this task", project.name)));
     }
 
     // A task created before this repo joined may still point its root at a lone
@@ -674,11 +615,7 @@ pub(crate) fn add_checkout_inner(
     let task = state.config.task(&task_id)?;
     let mut taken: Vec<String> = existing
         .iter()
-        .filter_map(|c| {
-            PathBuf::from(&c.path)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-        })
+        .filter_map(|c| PathBuf::from(&c.path).file_name().map(|n| n.to_string_lossy().to_string()))
         .collect();
     // Match whatever the rest of the task was cut from when they agree; a
     // later repo joining work aimed at `develop` should not silently land on
@@ -686,11 +623,8 @@ pub(crate) fn add_checkout_inner(
     // But only when this repo has that branch: a task on `development` refused
     // a repo whose own line is `dev` with "invalid reference: development",
     // and there was no way to add it at all.
-    let shared = existing
-        .first()
-        .map(|c| c.base.as_str())
-        .filter(|&b| existing.iter().all(|c| c.base == b))
-        .filter(|&b| {
+    let shared =
+        existing.first().map(|c| c.base.as_str()).filter(|&b| existing.iter().all(|c| c.base == b)).filter(|&b| {
             let repo = super::repo_for(state, &project);
             git::fetch_bases(&[(repo.clone(), b.to_string())]);
             git::default_tip(&repo, b).is_some()
@@ -741,9 +675,7 @@ fn remove_checkout_inner(state: &AppState, checkout_id: String, force: bool) -> 
         let _ = git::prune_worktrees(Path::new(&project.path));
     }
 
-    state
-        .config
-        .update(|c| c.checkouts.retain(|ch| ch.id != checkout_id))?;
+    state.config.update(|c| c.checkouts.retain(|ch| ch.id != checkout_id))?;
     state.status_cache.lock().remove(&checkout_id);
 
     // The folder lost a sibling, so the description of it is now wrong.
@@ -867,11 +799,7 @@ pub async fn finish_task(
 /// ignoring that left the worktree on disk with no task pointing at it — an
 /// orphan the app could not see and the user had to clean up by hand.
 #[tauri::command]
-pub async fn delete_task(
-    app: AppHandle,
-    id: String,
-    force: bool,
-) -> Result<Vec<RepoResult>> {
+pub async fn delete_task(app: AppHandle, id: String, force: bool) -> Result<Vec<RepoResult>> {
     // git worktree remove and waiting on agents both sleep. Running them on
     // the command thread freezes every other invoke — including the ones that
     // keep the window painting — so the UI looks crashed until they finish.
@@ -896,11 +824,7 @@ fn delete_task_inner(state: &AppState, id: String, force: bool, finished: bool) 
             .filter_map(|c| {
                 let status = git::status(&PathBuf::from(&c.path)).ok()?;
                 (status.dirty_files > 0).then(|| RepoResult {
-                    repo: state
-                        .config
-                        .project(&c.project_id)
-                        .map(|p| p.name)
-                        .unwrap_or_else(|_| "(unknown)".into()),
+                    repo: state.config.project(&c.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into()),
                     checkout_id: c.id,
                     ok: false,
                     detail: format!(
@@ -942,26 +866,16 @@ fn delete_task_inner(state: &AppState, id: String, force: bool, finished: bool) 
             }
         };
 
-        results.push(RepoResult {
-            checkout_id: checkout.id,
-            repo: project.name,
-            ok,
-            detail,
-        });
+        results.push(RepoResult { checkout_id: checkout.id, repo: project.name, ok, detail });
     }
 
-    let stuck: Vec<String> = results
-        .iter()
-        .filter(|r| !r.ok)
-        .map(|r| r.checkout_id.clone())
-        .collect();
+    let stuck: Vec<String> = results.iter().filter(|r| !r.ok).map(|r| r.checkout_id.clone()).collect();
 
     if !stuck.is_empty() {
         // Keep the task so the worktrees stay reachable and the user can retry
         // with force, rather than stranding them.
         state.config.update(|c| {
-            c.checkouts
-                .retain(|ch| ch.task_id != id || stuck.contains(&ch.id));
+            c.checkouts.retain(|ch| ch.task_id != id || stuck.contains(&ch.id));
         })?;
         return Ok(results);
     }
@@ -983,12 +897,9 @@ fn delete_task_inner(state: &AppState, id: String, force: bool, finished: bool) 
         state.runs.record_task(done);
     }
     // Stale status for a deleted checkout would otherwise linger until TTL.
-    state.status_cache.lock().retain(|cid, _| {
-        !results.iter().any(|r| r.checkout_id == *cid)
-    });
+    state.status_cache.lock().retain(|cid, _| !results.iter().any(|r| r.checkout_id == *cid));
     Ok(results)
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -89,9 +89,7 @@ pub async fn serve(app: AppHandle) -> Result<Endpoint> {
     let listener = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
         .await
         .map_err(|e| crate::error::Error::Other(format!("mcp bind: {e}")))?;
-    let addr = listener
-        .local_addr()
-        .map_err(|e| crate::error::Error::Other(format!("mcp addr: {e}")))?;
+    let addr = listener.local_addr().map_err(|e| crate::error::Error::Other(format!("mcp addr: {e}")))?;
 
     let endpoint = Endpoint {
         url: format!("http://127.0.0.1:{}/mcp", addr.port()),
@@ -101,10 +99,7 @@ pub async fn serve(app: AppHandle) -> Result<Endpoint> {
     let _ = ENDPOINT.set(endpoint.clone());
 
     let ctx = Ctx { app, token, hook_token };
-    let router = Router::new()
-        .route("/mcp", post(handle))
-        .route("/hook/{pane}", post(hook))
-        .with_state(ctx);
+    let router = Router::new().route("/mcp", post(handle)).route("/hook/{pane}", post(hook)).with_state(ctx);
 
     tauri::async_runtime::spawn(async move {
         if let Err(e) = axum::serve(listener, router).await {
@@ -115,11 +110,7 @@ pub async fn serve(app: AppHandle) -> Result<Endpoint> {
     Ok(endpoint)
 }
 
-async fn handle(
-    AxumState(ctx): AxumState<Ctx>,
-    headers: HeaderMap,
-    body: Json<Value>,
-) -> impl IntoResponse {
+async fn handle(AxumState(ctx): AxumState<Ctx>, headers: HeaderMap, body: Json<Value>) -> impl IntoResponse {
     // Loopback is not authorisation on a shared machine; the token is.
     if !bearer_ok(&headers, &ctx.token) {
         return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "bad token" }))).into_response();
@@ -135,11 +126,7 @@ async fn handle(
         return StatusCode::ACCEPTED.into_response();
     }
 
-    let caller = headers
-        .get(PANE_HEADER)
-        .and_then(|v| v.to_str().ok())
-        .filter(|v| !v.is_empty())
-        .map(str::to_string);
+    let caller = headers.get(PANE_HEADER).and_then(|v| v.to_str().ok()).filter(|v| !v.is_empty()).map(str::to_string);
     let result = dispatch(&ctx.app, method, params, caller.as_deref()).await;
     let response = match result {
         Ok(value) => json!({ "jsonrpc": "2.0", "id": id, "result": value }),
@@ -178,19 +165,16 @@ async fn hook(
 /// Each CLI posts in its own shape; which one this is follows from what the
 /// pane is running, not from anything in the post.
 pub(crate) fn take_hook(ptys: &crate::pty::PtyManager, pane: &str, payload: &Value) -> bool {
-    let Some(def) = ptys
-        .info(pane)
-        .ok()
-        .and_then(|p| p.agent_id)
-        .and_then(|id| crate::agents::find(&id))
-    else {
+    let Some(def) = ptys.info(pane).ok().and_then(|p| p.agent_id).and_then(|id| crate::agents::find(&id)) else {
         return false;
     };
     if let Some(session) = crate::agents::hook_session(payload) {
         let _ = ptys.note_session(pane, session);
     }
-    ptys.report_with(pane, crate::agents::hook_tool(payload), |now| crate::agents::hook_activity(def.integration, payload, now))
-        .unwrap_or(false)
+    ptys.report_with(pane, crate::agents::hook_tool(payload), |now| {
+        crate::agents::hook_activity(def.integration, payload, now)
+    })
+    .unwrap_or(false)
 }
 
 /// Which pane is calling. Each CLI fills it in from `VILLAIN_PANE`, set for
@@ -225,15 +209,21 @@ async fn dispatch(app: &AppHandle, method: &str, params: Value, caller: Option<&
         "tools/list" => {
             let uses = app.state::<AppState>().config.read().tracker_in_use();
             let mut all = tools();
-            all.extend(crate::browser::tools::list().into_iter().chain(commands::grafana_tools()).chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()).chain(commands::tracker_tools(uses)));
+            all.extend(
+                crate::browser::tools::list()
+                    .into_iter()
+                    .chain(commands::grafana_tools())
+                    .chain(commands::s3_logs_tools())
+                    .chain(commands::spec_tools())
+                    .chain(commands::pr_images_tools())
+                    .chain(commands::finish_tools())
+                    .chain(commands::epic_tools())
+                    .chain(commands::tracker_tools(uses)),
+            );
             Ok(json!({ "tools": all }))
         }
         "tools/call" => {
-            let name = params
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or_default()
-                .to_string();
+            let name = params.get("name").and_then(|n| n.as_str()).unwrap_or_default().to_string();
             let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
             // A tool failure is reported to the model, not as a protocol error,
@@ -322,9 +312,7 @@ fn require_confirm(args: &Value, tool: &str) -> Result<()> {
     if args.get("confirm").and_then(Value::as_bool) == Some(true) {
         return Ok(());
     }
-    Err(crate::error::Error::Other(format!(
-        "{tool} needs confirm: true after the user agrees; nothing was changed"
-    )))
+    Err(crate::error::Error::Other(format!("{tool} needs confirm: true after the user agrees; nothing was changed")))
 }
 
 /// Listing transitions and dry-run cleanup are reads in all but name.
@@ -345,12 +333,7 @@ fn tools() -> Vec<Value> {
             json!({}),
             vec![],
         ),
-        tool(
-            "list_repos",
-            "Repositories registered in Layer, with their group and path.",
-            json!({}),
-            vec![],
-        ),
+        tool("list_repos", "Repositories registered in Layer, with their group and path.", json!({}), vec![]),
         tool(
             "task_diff",
             "Every file changed against the base branch across all of a task's \
@@ -573,10 +556,7 @@ fn tools() -> Vec<Value> {
 }
 
 /// Agents think in repository names, not ids.
-fn resolve_repos(
-    state: &tauri::State<'_, AppState>,
-    args: &Value,
-) -> Result<Vec<String>> {
+fn resolve_repos(state: &tauri::State<'_, AppState>, args: &Value) -> Result<Vec<String>> {
     let wanted: Vec<String> = args
         .get("repos")
         .and_then(|r| r.as_array())
@@ -590,16 +570,12 @@ fn resolve_repos(
     wanted
         .iter()
         .map(|name| {
-            projects
-                .iter()
-                .find(|p| p.name.eq_ignore_ascii_case(name))
-                .map(|p| p.id.clone())
-                .ok_or_else(|| {
-                    crate::error::Error::NotFound(format!(
-                        "no repository named {name}; known: {}",
-                        projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
-                    ))
-                })
+            projects.iter().find(|p| p.name.eq_ignore_ascii_case(name)).map(|p| p.id.clone()).ok_or_else(|| {
+                crate::error::Error::NotFound(format!(
+                    "no repository named {name}; known: {}",
+                    projects.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
+                ))
+            })
         })
         .collect()
 }
@@ -639,13 +615,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         "slack_post" => {
             let text = required(&args, "text")?.to_string();
             let context = arg(&args, "context").map(str::to_string);
-            let sent = commands::slack_notify(
-                state,
-                text,
-                context,
-                Some("agent_tool".to_string()),
-            )
-            .await?;
+            let sent = commands::slack_notify(state, text, context, Some("agent_tool".to_string())).await?;
             if !sent {
                 return Err(crate::error::Error::Other(
                     "Slack posting from agents is switched off in the app's settings; \
@@ -659,23 +629,13 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
         "add_repo" => {
             let task_id = required(&args, "task_id")?.to_string();
             let wanted = required(&args, "repo")?;
-            let project = state
-                .config
-                .read()
-                .projects
-                .into_iter()
-                .find(|p| p.name.eq_ignore_ascii_case(wanted))
-                .ok_or_else(|| {
-                    crate::error::Error::NotFound(format!(
-                        "no repository named {wanted}; see list_repos"
-                    ))
-                })?;
+            let project =
+                state.config.read().projects.into_iter().find(|p| p.name.eq_ignore_ascii_case(wanted)).ok_or_else(
+                    || crate::error::Error::NotFound(format!("no repository named {wanted}; see list_repos")),
+                )?;
 
             let project_id = project.id.clone();
-            let added = commands::blocking(app.clone(), move |s| {
-                commands::add_repo(s, &task_id, &project_id)
-            })
-            .await?;
+            let added = commands::blocking(app.clone(), move |s| commands::add_repo(s, &task_id, &project_id)).await?;
             Ok(json!({
                 "repo": project.name,
                 "path": added.checkout.path,
@@ -685,10 +645,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
 
         "pane_output" => {
             let pane_id = required(&args, "pane_id")?.to_string();
-            let lines = args
-                .get("lines")
-                .and_then(Value::as_u64)
-                .unwrap_or(200) as usize;
+            let lines = args.get("lines").and_then(Value::as_u64).unwrap_or(200) as usize;
             Ok(Value::String(commands::pane_output(&state, &pane_id, lines)?))
         }
 
@@ -702,12 +659,14 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
                 .or_else(|| {
                     let mut byname = projects.iter().filter(|p| p.name.eq_ignore_ascii_case(wanted));
                     let first = byname.next();
-                    if byname.next().is_some() { None } else { first }
+                    if byname.next().is_some() {
+                        None
+                    } else {
+                        first
+                    }
                 })
                 .ok_or_else(|| {
-                    crate::error::Error::NotFound(format!(
-                        "no single repository matches {wanted}; give the exact path"
-                    ))
+                    crate::error::Error::NotFound(format!("no single repository matches {wanted}; give the exact path"))
                 })?
                 .clone();
 
@@ -767,9 +726,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
                         .into(),
                 ));
             }
-            Ok(serde_json::to_value(
-                commands::slack_delete_posted(state, Some(links)).await?,
-            )?)
+            Ok(serde_json::to_value(commands::slack_delete_posted(state, Some(links)).await?)?)
         }
 
         "slack_cleanup" => {
@@ -801,9 +758,9 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
             Ok(serde_json::to_value(started)?)
         }
 
-        "list_panes" => Ok(serde_json::to_value(
-            commands::list_panes(state, arg(&args, "task_id").map(str::to_string)),
-        )?),
+        "list_panes" => {
+            Ok(serde_json::to_value(commands::list_panes(state, arg(&args, "task_id").map(str::to_string)))?)
+        }
 
         "handoff_prompt" => {
             let pane_id = required(&args, "pane_id")?.to_string();
@@ -821,9 +778,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
 
         "task_prs" => {
             let id = required(&args, "task_id")?.to_string();
-            Ok(serde_json::to_value(
-                commands::github_task_prs(state, id).await?,
-            )?)
+            Ok(serde_json::to_value(commands::github_task_prs(state, id).await?)?)
         }
 
         "open_prs" => {
@@ -879,8 +834,13 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
             let repo = arg(&args, "repo").unwrap_or_default().to_string();
             let step = args.get("step").and_then(Value::as_u64).unwrap_or(0) as u32;
             let (id, done) = (task_id.clone(), args.get("done").and_then(Value::as_bool).unwrap_or(true));
-            let ticked = commands::blocking(app.clone(), move |state| commands::tick_step(state, &id, &repo, step, done)).await?;
-            let _ = { use tauri::Emitter; app.emit("spec:changed", &task_id) };
+            let ticked =
+                commands::blocking(app.clone(), move |state| commands::tick_step(state, &id, &repo, step, done))
+                    .await?;
+            let _ = {
+                use tauri::Emitter;
+                app.emit("spec:changed", &task_id)
+            };
             Ok(serde_json::to_value(ticked)?)
         }
 
@@ -897,13 +857,16 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
             let note = commands::blocking(app.clone(), move |state| commands::forget_note_inner(state, &id)).await?;
             // Out of the conversation it was agreed in, so the user can see
             // later what went and why.
-            crate::messages::record_all(app, vec![crate::messages::New {
-                kind: crate::messages::Kind::Notice,
-                level: crate::messages::Level::Info,
-                title: format!("A note about {} was forgotten", note.repo),
-                body: format!("{}\n\nWhy: {reason}", note.text),
-                target: None,
-            }]);
+            crate::messages::record_all(
+                app,
+                vec![crate::messages::New {
+                    kind: crate::messages::Kind::Notice,
+                    level: crate::messages::Level::Info,
+                    title: format!("A note about {} was forgotten", note.repo),
+                    body: format!("{}\n\nWhy: {reason}", note.text),
+                    target: None,
+                }],
+            );
             crate::notes::changed(app);
             Ok(json!({ "forgot": note.id }))
         }
@@ -945,8 +908,8 @@ fn lock_config_perms(path: &std::path::Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::HeaderValue;
     use crate::config::TrackerKind;
+    use axum::http::HeaderValue;
 
     #[test]
     fn a_missing_or_wrong_bearer_is_refused() {
@@ -964,18 +927,27 @@ mod tests {
     /// feature included: a danger tool defined there is gated here too.
     fn served() -> Vec<Value> {
         let mut all = tools();
-        all.extend(commands::grafana_tools().into_iter().chain(commands::s3_logs_tools()).chain(commands::spec_tools()).chain(commands::pr_images_tools()).chain(commands::finish_tools()).chain(commands::epic_tools()));
-        all.extend(commands::tracker_tools(Some(TrackerKind::Jira)).into_iter().chain(commands::tracker_tools(Some(TrackerKind::Github))));
+        all.extend(
+            commands::grafana_tools()
+                .into_iter()
+                .chain(commands::s3_logs_tools())
+                .chain(commands::spec_tools())
+                .chain(commands::pr_images_tools())
+                .chain(commands::finish_tools())
+                .chain(commands::epic_tools()),
+        );
+        all.extend(
+            commands::tracker_tools(Some(TrackerKind::Jira))
+                .into_iter()
+                .chain(commands::tracker_tools(Some(TrackerKind::Github))),
+        );
         all
     }
 
     #[test]
     fn tools_list_names_the_danger_tier() {
         let listed = served();
-        let names: Vec<&str> = listed
-            .iter()
-            .filter_map(|t| t.get("name").and_then(Value::as_str))
-            .collect();
+        let names: Vec<&str> = listed.iter().filter_map(|t| t.get("name").and_then(Value::as_str)).collect();
         for danger in DANGER {
             assert!(names.contains(danger), "{danger} missing from tools/list");
         }
@@ -989,10 +961,7 @@ mod tests {
                 continue;
             }
             let props = &tool["inputSchema"]["properties"];
-            assert!(
-                props.get("confirm").is_some(),
-                "{name} should advertise confirm in its schema"
-            );
+            assert!(props.get("confirm").is_some(), "{name} should advertise confirm in its schema");
         }
     }
 
@@ -1001,10 +970,7 @@ mod tests {
         assert!(tool_needs_confirm("open_prs", &json!({})));
         assert!(tool_needs_confirm("forget_repo", &json!({})));
         assert!(tool_needs_confirm("slack_delete", &json!({})));
-        assert!(tool_needs_confirm(
-            "jira_transition",
-            &json!({ "transition": "Done" })
-        ));
+        assert!(tool_needs_confirm("jira_transition", &json!({ "transition": "Done" })));
         assert!(!tool_needs_confirm("jira_transition", &json!({ "key": "ACME-1" })));
         assert!(tool_needs_confirm("github_close_issue", &json!({ "key": "acme/web#1" })));
         assert!(!tool_needs_confirm("slack_cleanup", &json!({ "dry_run": true })));
@@ -1023,10 +989,7 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn mcp_json_on_disk_is_owner_readable_only() {
-        let path = std::env::temp_dir().join(format!(
-            "villain-mcp-perm-test-{}",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir().join(format!("villain-mcp-perm-test-{}", std::process::id()));
         std::fs::write(&path, b"{}").unwrap();
         lock_config_perms(&path).unwrap();
         use std::os::unix::fs::PermissionsExt;
@@ -1079,7 +1042,11 @@ mod tests {
         // again by a hook, nothing changes and nothing needs redrawing.
         assert!(!take_hook(&ptys, &claude, &json!({"hook_event_name": "UserPromptSubmit"})));
         assert_eq!(activity(&claude), Activity::Working);
-        assert!(take_hook(&ptys, &claude, &json!({"hook_event_name": "Notification", "notification_type": "permission_prompt"})));
+        assert!(take_hook(
+            &ptys,
+            &claude,
+            &json!({"hook_event_name": "Notification", "notification_type": "permission_prompt"})
+        ));
         assert_eq!(activity(&claude), Activity::Asking);
         assert!(take_hook(&ptys, &claude, &json!({"hook_event_name": "Stop"})));
         assert_eq!(activity(&claude), Activity::Done);
@@ -1139,12 +1106,7 @@ mod tests {
     fn a_title_the_agent_sets_is_read_as_it_is_printed() {
         use crate::pty::Activity;
         let ptys = crate::pty::PtyManager::default();
-        let id = agent(
-            &ptys,
-            "gemini",
-            r"printf '\033]0;\342\234\213  Action Required (x)\007'; sleep 5",
-            true,
-        );
+        let id = agent(&ptys, "gemini", r"printf '\033]0;\342\234\213  Action Required (x)\007'; sleep 5", true);
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while ptys.info(&id).unwrap().activity != Activity::Asking {
             assert!(std::time::Instant::now() < deadline, "the title was never read");

@@ -18,7 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let registered = hotKey.register(keyCode: UInt32(kVK_Space), modifiers: UInt32(cmdKey))
         if !registered {
-            NSLog("Caster: could not register ⌘Space. Disable Spotlight's shortcut in System Settings → Keyboard → Keyboard Shortcuts → Spotlight.")
+            NSLog(
+                "Caster: could not register ⌘Space. Disable Spotlight's shortcut in System Settings → Keyboard → Keyboard Shortcuts → Spotlight."
+            )
         }
     }
 
@@ -38,15 +40,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func statusItemClicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
-            let settingsItem = NSMenuItem(title: "Settings…",
-                                          action: #selector(openSettings),
-                                          keyEquivalent: ",")
+            let settingsItem = NSMenuItem(
+                title: "Settings…",
+                action: #selector(openSettings),
+                keyEquivalent: ",")
             settingsItem.target = self
             menu.addItem(settingsItem)
             menu.addItem(.separator())
-            menu.addItem(NSMenuItem(title: "Quit Caster",
-                                    action: #selector(NSApplication.terminate(_:)),
-                                    keyEquivalent: "q"))
+            menu.addItem(
+                NSMenuItem(
+                    title: "Quit Caster",
+                    action: #selector(NSApplication.terminate(_:)),
+                    keyEquivalent: "q"))
             // Attach the menu only for this click so left-click keeps toggling the panel.
             statusItem.menu = menu
             statusItem.button?.performClick(nil)

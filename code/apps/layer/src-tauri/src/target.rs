@@ -17,7 +17,10 @@ pub enum Target<'a> {
     Task(&'a str),
     /// A pane, with its task: pane ids are new every launch, and the task is
     /// where a click lands once this one is gone.
-    Pane { task: &'a str, pane: &'a str },
+    Pane {
+        task: &'a str,
+        pane: &'a str,
+    },
     Ticket(&'a str),
     /// `owner/repo#number`, as `news::identity` writes it.
     Review(&'a str),
@@ -26,7 +29,11 @@ pub enum Target<'a> {
 impl<'a> Target<'a> {
     /// A task's own place: a chat has no task to open, only the chats.
     pub fn task(task: &'a str) -> Self {
-        if task == CHAT_TASK_ID { Target::Chat } else { Target::Task(task) }
+        if task == CHAT_TASK_ID {
+            Target::Chat
+        } else {
+            Target::Task(task)
+        }
     }
 }
 

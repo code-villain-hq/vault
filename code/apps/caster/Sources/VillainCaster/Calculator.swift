@@ -23,8 +23,9 @@ enum Calculator {
     static func normalizeDecimals(_ input: String) -> String {
         var text = input
         if Locale.current.decimalSeparator != "," {
-            text = text.replacingOccurrences(of: #"(?<=\d),(?=\d{3}(?!\d))"#, with: "",
-                                             options: .regularExpression)
+            text = text.replacingOccurrences(
+                of: #"(?<=\d),(?=\d{3}(?!\d))"#, with: "",
+                options: .regularExpression)
         }
         return text.replacingOccurrences(of: ",", with: ".")
     }

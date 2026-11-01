@@ -34,25 +34,26 @@ SIZE = (1920, 1080)
 def prepare():
     source = Image.open(SOURCE).convert("RGB")
     srgb = np.asarray(source).astype(np.float32) / 255
-    linear = np.where(srgb <= .04045, srgb / 12.92, ((srgb + .055) / 1.055) ** 2.4)
+    linear = np.where(srgb <= 0.04045, srgb / 12.92, ((srgb + 0.055) / 1.055) ** 2.4)
     r, g, b = srgb.transpose(2, 0, 1)
     # Violet confidence: neutral masonry and the centre receive exactly zero.
     chroma = np.minimum(r, b) - g
-    mask = np.clip((chroma - .012) / .075, 0, 1)
+    mask = np.clip((chroma - 0.012) / 0.075, 0, 1)
     mask = mask * mask * (3 - 2 * mask)
-    y, x = np.mgrid[0:source.height, 0:source.width].astype(np.float32)
+    y, x = np.mgrid[0 : source.height, 0 : source.width].astype(np.float32)
     x /= source.width
     y /= source.height
     # Broad offset fields pass across the two sides at different times.
-    phase = 2.2 * np.arctan2(y - 1.05, (x - .5) * 1.55)
-    secondary_phase = 2 * np.pi * (.65 * y + .18 * x)
+    phase = 2.2 * np.arctan2(y - 1.05, (x - 0.5) * 1.55)
+    secondary_phase = 2 * np.pi * (0.65 * y + 0.18 * x)
     values = np.arange(65536, dtype=np.float32) / 65535
-    lut = np.rint(255 * np.where(values <= .0031308, values * 12.92,
-                                1.055 * values ** (1 / 2.4) - .055)).astype(np.uint8)
+    lut = np.rint(
+        255 * np.where(values <= 0.0031308, values * 12.92, 1.055 * values ** (1 / 2.4) - 0.055)
+    ).astype(np.uint8)
 
     def frame(seconds):
         t = 2 * np.pi * (seconds % DURATION) / DURATION
-        light = .25 * np.cos(t - phase) + .065 * np.cos(2 * t + secondary_phase)
+        light = 0.25 * np.cos(t - phase) + 0.065 * np.cos(2 * t + secondary_phase)
         gain = 1 + mask * light
         indices = np.rint(np.clip(linear * gain[..., None], 0, 1) * 65535).astype(np.uint16)
         return lut[indices]
@@ -63,15 +64,51 @@ def prepare():
 def main():
     source, mask, frame = prepare()
     out = HERE / f"{STEM}.mp4"
-    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-               "-f", "rawvideo", "-pixel_format", "rgb24", "-video_size",
-               f"{source.width}x{source.height}", "-framerate", str(FPS), "-i", "pipe:0",
-               "-vf", "scale=1920:1080:flags=lanczos,setsar=1", "-an",
-               "-c:v", "libx264", "-preset", "slow", "-crf", "10", "-tune", "stillimage",
-               "-x264-params", f"keyint={FPS * DURATION}:min-keyint={FPS * DURATION}:scenecut=0",
-               "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.1",
-               "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
-               "-movflags", "+faststart", str(out)]
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pixel_format",
+        "rgb24",
+        "-video_size",
+        f"{source.width}x{source.height}",
+        "-framerate",
+        str(FPS),
+        "-i",
+        "pipe:0",
+        "-vf",
+        "scale=1920:1080:flags=lanczos,setsar=1",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "slow",
+        "-crf",
+        "10",
+        "-tune",
+        "stillimage",
+        "-x264-params",
+        f"keyint={FPS * DURATION}:min-keyint={FPS * DURATION}:scenecut=0",
+        "-pix_fmt",
+        "yuv420p",
+        "-profile:v",
+        "high",
+        "-level:v",
+        "4.1",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-colorspace",
+        "bt709",
+        "-movflags",
+        "+faststart",
+        str(out),
+    ]
     proc = subprocess.Popen(command, stdin=subprocess.PIPE)
     try:
         for i in range(FPS * DURATION):
@@ -102,14 +139,18 @@ def main():
         "source_sha256": hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
         "source_size": [source.width, source.height],
         "output": out.name,
-        "size": list(SIZE), "fps": FPS, "duration_seconds": DURATION,
+        "size": list(SIZE),
+        "fps": FPS,
+        "duration_seconds": DURATION,
         "frames": FPS * DURATION,
         "design": "Slow soft violet light passing around fixed arch facets. No camera motion, text, strike, or sound.",
         "loop": "Analytically periodic light fields. Frame at 16s is identical to frame at 0s; duplicate endpoint omitted.",
         "validation": {
             "exact_periodic_endpoint": bool(np.array_equal(first, frame(DURATION))),
             "source_frame_seam_mean_absolute_code_difference": float(np.abs(first - last).mean()),
-            "source_frame_next_mean_absolute_code_difference": float(np.abs(first - next_frame).mean()),
+            "source_frame_next_mean_absolute_code_difference": float(
+                np.abs(first - next_frame).mean()
+            ),
             "neutral_pixels_fixed": bool(np.array_equal(frame(0)[mask == 0], frame(8)[mask == 0])),
         },
         "teams": {
@@ -118,15 +159,25 @@ def main():
             "usage": "Loop this MP4 behind your segmented camera in a virtual-camera compositor; select its virtual camera in Teams and leave Teams background effects off. The PNG can be uploaded as a static background.",
             "sources": [
                 "https://support.microsoft.com/en-gb/teams/meetings/change-your-background-in-microsoft-teams-meetings",
-                "https://techcommunity.microsoft.com/blog/microsoft365insiderblog/animated-backgrounds-in-teams-meetings/4220884"
+                "https://techcommunity.microsoft.com/blog/microsoft365insiderblog/animated-backgrounds-in-teams-meetings/4220884",
             ],
         },
         "rebuild": "python3 render_arch_light.py (requires numpy, Pillow, ffmpeg and ffprobe)",
     }
-    metadata["ffprobe"] = json.loads(subprocess.check_output([
-        "ffprobe", "-v", "error", "-show_entries",
-        "stream=codec_name,profile,width,height,pix_fmt,r_frame_rate,nb_frames,color_space,color_transfer,color_primaries:format=duration,size",
-        "-of", "json", str(out)]))
+    metadata["ffprobe"] = json.loads(
+        subprocess.check_output(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name,profile,width,height,pix_fmt,r_frame_rate,nb_frames,color_space,color_transfer,color_primaries:format=duration,size",
+                "-of",
+                "json",
+                str(out),
+            ]
+        )
+    )
     (HERE / f"{STEM}.json").write_text(json.dumps(metadata, indent=2) + "\n")
     print(json.dumps(metadata["validation"], indent=2))
 

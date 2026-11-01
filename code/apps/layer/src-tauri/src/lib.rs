@@ -11,9 +11,9 @@ mod integrations;
 mod loops;
 mod mcp;
 mod messages;
+mod news;
 mod notes;
 mod oneshot;
-mod news;
 mod phone;
 mod previous;
 mod profiles;
@@ -82,17 +82,10 @@ fn report_panics() {
             let _ = std::fs::create_dir_all(dir);
         }
         // A crash loop should not fill the disk with its own account of itself.
-        if std::fs::metadata(&path)
-            .map(|m| m.len() > 1_000_000)
-            .unwrap_or(false)
-        {
+        if std::fs::metadata(&path).map(|m| m.len() > 1_000_000).unwrap_or(false) {
             let _ = std::fs::remove_file(&path);
         }
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-        {
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
             use std::io::Write;
             let _ = writeln!(f, "{} {text}", chrono::Utc::now().to_rfc3339());
         }

@@ -9,8 +9,8 @@ const MANIFEST = new URL("./Cargo.toml", import.meta.url).pathname;
 const ISSUER = "http://127.0.0.1:7280";
 
 export interface DevCompany {
-	/** dev-id's command, when it isn't running yet. */
-	devId: string[] | null;
+  /** dev-id's command, when it isn't running yet. */
+  devId: string[] | null;
 }
 
 /**
@@ -19,51 +19,49 @@ export interface DevCompany {
  * gets `<app>_acme` beside it. Null when the developer's settings are used.
  */
 export async function devCompany(app: string, root: string, database: string) {
-	const prefix = app.toUpperCase();
-	const env = process.env;
-	const own =
-		(await Bun.file(`${root}/${app}.toml`).exists()) ||
-		Boolean(env[`${prefix}_CONFIG`]) ||
-		Boolean(env[`${prefix}_OIDC_ISSUER`]);
-	if (own) return null;
+  const prefix = app.toUpperCase();
+  const env = process.env;
+  const own =
+    (await Bun.file(`${root}/${app}.toml`).exists()) ||
+    Boolean(env[`${prefix}_CONFIG`]) ||
+    Boolean(env[`${prefix}_OIDC_ISSUER`]);
+  if (own) return null;
 
-	const url = new URL(database);
-	const name = `${app}_acme`;
-	await makeDatabase(url, name);
-	url.pathname = `/${name}`;
+  const url = new URL(database);
+  const name = `${app}_acme`;
+  await makeDatabase(url, name);
+  url.pathname = `/${name}`;
 
-	env.DATABASE_URL = url.toString();
-	env[`${prefix}_COMPANY`] = "Acme Inc";
-	env[`${prefix}_OIDC_ISSUER`] = ISSUER;
-	env[`${prefix}_OIDC_CLIENT_ID`] = app;
-	env[`${prefix}_OIDC_CLIENT_SECRET`] = "dev";
-	env[`${prefix}_SCIM_TOKEN`] = "dev";
-	const running = await fetch(`${ISSUER}/.well-known/openid-configuration`, {
-		signal: AbortSignal.timeout(500),
-	}).then(
-		(r) => r.ok,
-		() => false,
-	);
-	return {
-		devId: running ? null : ["cargo", "run", "-q", "--manifest-path", MANIFEST],
-	} satisfies DevCompany;
+  env.DATABASE_URL = url.toString();
+  env[`${prefix}_COMPANY`] = "Acme Inc";
+  env[`${prefix}_OIDC_ISSUER`] = ISSUER;
+  env[`${prefix}_OIDC_CLIENT_ID`] = app;
+  env[`${prefix}_OIDC_CLIENT_SECRET`] = "dev";
+  env[`${prefix}_SCIM_TOKEN`] = "dev";
+  const running = await fetch(`${ISSUER}/.well-known/openid-configuration`, {
+    signal: AbortSignal.timeout(500),
+  }).then(
+    (r) => r.ok,
+    () => false,
+  );
+  return {
+    devId: running ? null : ["cargo", "run", "-q", "--manifest-path", MANIFEST],
+  } satisfies DevCompany;
 }
 
 /** `name` on the developer's Postgres, made the first time. */
 async function makeDatabase(url: URL, name: string) {
-	const admin = new URL(url);
-	admin.pathname = "/postgres";
-	const db = new SQL(admin.toString());
-	try {
-		const [found] = await db`SELECT 1 FROM pg_database WHERE datname = ${name}`;
-		if (!found) await db.unsafe(`CREATE DATABASE "${name}"`);
-	} catch (e) {
-		throw new Error(
-			`Can't reach Postgres at ${url.host} (bun run db starts it): ${e}`,
-		);
-	} finally {
-		await db.close();
-	}
+  const admin = new URL(url);
+  admin.pathname = "/postgres";
+  const db = new SQL(admin.toString());
+  try {
+    const [found] = await db`SELECT 1 FROM pg_database WHERE datname = ${name}`;
+    if (!found) await db.unsafe(`CREATE DATABASE "${name}"`);
+  } catch (e) {
+    throw new Error(`Can't reach Postgres at ${url.host} (bun run db starts it): ${e}`);
+  } finally {
+    await db.close();
+  }
 }
 
 /**
@@ -72,12 +70,12 @@ async function makeDatabase(url: URL, name: string) {
  * `/api/me`.
  */
 export type DevProcess = {
-	name: string;
-	/** ANSI colour code for the prefix (33 yellow, 35 magenta, 36 cyan, …). */
-	color: number;
-	cmd: string[];
-	/** Extra env for this process only. */
-	env?: Record<string, string>;
+  name: string;
+  /** ANSI colour code for the prefix (33 yellow, 35 magenta, 36 cyan, …). */
+  color: number;
+  cmd: string[];
+  /** Extra env for this process only. */
+  env?: Record<string, string>;
 };
 
 /**
@@ -86,77 +84,74 @@ export type DevProcess = {
  * list after `devCompany`.
  */
 export async function runPrefixed(root: string, processes: DevProcess[]) {
-	const children = processes.map(({ name, color, cmd, env }) => {
-		const child = Bun.spawn(cmd, {
-			cwd: root,
-			stdout: "pipe",
-			stderr: "pipe",
-			env: { ...process.env, ...env },
-		});
-		const prefix = `\x1b[${color}m${name.padEnd(6)}\x1b[0m │ `;
-		void pipe(child.stdout, prefix);
-		void pipe(child.stderr, prefix);
-		return child;
-	});
+  const children = processes.map(({ name, color, cmd, env }) => {
+    const child = Bun.spawn(cmd, {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ...env },
+    });
+    const prefix = `\x1b[${color}m${name.padEnd(6)}\x1b[0m │ `;
+    void pipe(child.stdout, prefix);
+    void pipe(child.stderr, prefix);
+    return child;
+  });
 
-	function stopAll() {
-		for (const child of children) child.kill();
-	}
+  function stopAll() {
+    for (const child of children) child.kill();
+  }
 
-	process.on("SIGINT", stopAll);
-	process.on("SIGTERM", stopAll);
-	await Promise.race(children.map((child) => child.exited));
-	stopAll();
+  process.on("SIGINT", stopAll);
+  process.on("SIGTERM", stopAll);
+  await Promise.race(children.map((child) => child.exited));
+  stopAll();
 }
 
 async function pipe(stream: ReadableStream<Uint8Array>, prefix: string) {
-	const decoder = new TextDecoder();
-	let buffer = "";
-	for await (const chunk of stream) {
-		buffer += decoder.decode(chunk, { stream: true });
-		const lines = buffer.split("\n");
-		buffer = lines.pop() ?? "";
-		for (const line of lines) process.stdout.write(`${prefix}${line}\n`);
-	}
-	if (buffer) process.stdout.write(`${prefix}${buffer}\n`);
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for await (const chunk of stream) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) process.stdout.write(`${prefix}${line}\n`);
+  }
+  if (buffer) process.stdout.write(`${prefix}${buffer}\n`);
 }
 
 /** Short git commit for `*_VERSION`, or "" when git isn't available. */
 export function gitShortCommit(root: string): string {
-	const commit = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: root });
-	return commit.success ? commit.stdout.toString().trim() : "";
+  const commit = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: root });
+  return commit.success ? commit.stdout.toString().trim() : "";
 }
 
 export async function signInAs(base: string, who: string) {
-	const jar = new Map<string, string>();
-	const keep = (response: Response) => {
-		for (const cookie of response.headers.getSetCookie()) {
-			const [pair = ""] = cookie.split(";");
-			const at = pair.indexOf("=");
-			jar.set(pair.slice(0, at), pair.slice(at + 1));
-		}
-	};
-	const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
-	const step = async (url: string) => {
-		const response = await fetch(url, {
-			redirect: "manual",
-			headers: { cookie: cookie() },
-		});
-		keep(response);
-		const next = response.headers.get("location");
-		if (!next)
-			throw new Error(
-				`signing in ${who} stopped at ${url} (${response.status})`,
-			);
-		return new URL(next, url).toString();
-	};
-	const authorize = new URL(await step(`${base}/api/auth/oidc`));
-	authorize.searchParams.set("login_hint", who);
-	const callback = await step(authorize.toString());
-	const done = new URL(await step(callback));
-	const problem = done.searchParams.get("error");
-	if (problem) throw new Error(`couldn't sign in ${who}: ${problem}`);
-	const me = await fetch(`${base}/api/me`, { headers: { cookie: cookie() } });
-	if (!me.ok) throw new Error(`couldn't sign in ${who}: ${me.status}`);
-	return { session: cookie(), me: await me.json() };
+  const jar = new Map<string, string>();
+  const keep = (response: Response) => {
+    for (const cookie of response.headers.getSetCookie()) {
+      const [pair = ""] = cookie.split(";");
+      const at = pair.indexOf("=");
+      jar.set(pair.slice(0, at), pair.slice(at + 1));
+    }
+  };
+  const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
+  const step = async (url: string) => {
+    const response = await fetch(url, {
+      redirect: "manual",
+      headers: { cookie: cookie() },
+    });
+    keep(response);
+    const next = response.headers.get("location");
+    if (!next) throw new Error(`signing in ${who} stopped at ${url} (${response.status})`);
+    return new URL(next, url).toString();
+  };
+  const authorize = new URL(await step(`${base}/api/auth/oidc`));
+  authorize.searchParams.set("login_hint", who);
+  const callback = await step(authorize.toString());
+  const done = new URL(await step(callback));
+  const problem = done.searchParams.get("error");
+  if (problem) throw new Error(`couldn't sign in ${who}: ${problem}`);
+  const me = await fetch(`${base}/api/me`, { headers: { cookie: cookie() } });
+  if (!me.ok) throw new Error(`couldn't sign in ${who}: ${me.status}`);
+  return { session: cookie(), me: await me.json() };
 }

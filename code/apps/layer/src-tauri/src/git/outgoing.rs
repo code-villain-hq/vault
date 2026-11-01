@@ -28,10 +28,7 @@ pub fn outgoing_patch(dir: &Path, from: &str) -> Result<String> {
     super::commit_id(from)?;
     // Prefixes spelled out, as in `diff_patch`: the user's config may
     // change or drop them, and the reader looks for `+++ b/`.
-    run(
-        dir,
-        &["diff", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/", "-U0", from, "HEAD"],
-    )
+    run(dir, &["diff", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/", "-U0", from, "HEAD"])
 }
 
 #[cfg(test)]

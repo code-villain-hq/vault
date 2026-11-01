@@ -583,6 +583,9 @@ const CEILINGS: Record<string, number> = {
   // `Task` that holds it, at 669. The workspace's tracker (TKT-15), beside
   // the connections it chooses between, at 674.
   "src-tauri/src/config.rs": 675,
+  // rustfmt, once it checked the app's code too, set the one-line choice of
+  // how a conversation opens over seven lines: 601.
+  "src-tauri/src/acp/conn.rs": 620,
 };
 
 for (const f of files) {

@@ -170,15 +170,10 @@ fn with_trust(text: &str, dir: &Path) -> Option<String> {
     }
 
     let key = dir.to_string_lossy().to_string();
-    let projects = root.as_object_mut().and_then(|o| {
-        o.entry("projects")
-            .or_insert_with(|| serde_json::json!({}))
-            .as_object_mut()
-    })?;
-    let entry = projects
-        .entry(key)
-        .or_insert_with(|| serde_json::json!({}))
-        .as_object_mut()?;
+    let projects = root
+        .as_object_mut()
+        .and_then(|o| o.entry("projects").or_insert_with(|| serde_json::json!({})).as_object_mut())?;
+    let entry = projects.entry(key).or_insert_with(|| serde_json::json!({})).as_object_mut()?;
     let trusted = entry.get("hasTrustDialogAccepted") == Some(&serde_json::Value::Bool(true));
     let approved = entry
         .get("enabledMcpjsonServers")
@@ -189,9 +184,7 @@ fn with_trust(text: &str, dir: &Path) -> Option<String> {
     }
     entry.insert("hasTrustDialogAccepted".into(), serde_json::Value::Bool(true));
     if !approved {
-        let list = entry
-            .entry("enabledMcpjsonServers")
-            .or_insert_with(|| serde_json::json!([]));
+        let list = entry.entry("enabledMcpjsonServers").or_insert_with(|| serde_json::json!([]));
         match list.as_array_mut() {
             Some(list) => list.push(crate::mcp::SERVER_NAME.into()),
             None => *list = serde_json::json!([crate::mcp::SERVER_NAME]),
@@ -217,11 +210,7 @@ fn with_trust(text: &str, dir: &Path) -> Option<String> {
 /// the event lost.
 fn post_hook(event: &str) -> String {
     let whole = matches!(event, "Notification" | "SessionStart");
-    let body = if whole {
-        "--data-binary @-".to_string()
-    } else {
-        format!("-d '{{\"hook_event_name\":\"{event}\"}}'")
-    };
+    let body = if whole { "--data-binary @-".to_string() } else { format!("-d '{{\"hook_event_name\":\"{event}\"}}'") };
     let drain = if whole { "" } else { "cat >/dev/null; " };
     format!(
         "{drain}[ -n \"$VILLAIN_HOOK_URL\" ] && [ -n \"$VILLAIN_PANE\" ] && \
@@ -237,14 +226,8 @@ fn post_hook(event: &str) -> String {
 /// PreToolUse is left out: it holds up every tool call until it returns, and
 /// PostToolUse says the same thing a moment later without making anything
 /// wait.
-const HOOK_EVENTS: &[&str] = &[
-    "SessionStart",
-    "UserPromptSubmit",
-    "PostToolUse",
-    "PostToolUseFailure",
-    "Notification",
-    "Stop",
-];
+const HOOK_EVENTS: &[&str] =
+    &["SessionStart", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure", "Notification", "Stop"];
 
 /// The hooks that make Claude Code say what it is doing, as its settings file.
 ///
@@ -396,7 +379,11 @@ pub fn prepare_launch(
             // somewhere else.
             let plugin = dir.join("copilot-plugin");
             std::fs::create_dir_all(&plugin)?;
-            replace_file(&plugin.join("plugin.json"), &json(serde_json::json!({ "name": crate::mcp::SERVER_NAME })), None)?;
+            replace_file(
+                &plugin.join("plugin.json"),
+                &json(serde_json::json!({ "name": crate::mcp::SERVER_NAME })),
+                None,
+            )?;
             replace_file(&plugin.join("hooks.json"), &json(copilot_hooks()), None)?;
             launch.args = vec!["--plugin-dir".into(), plugin.to_string_lossy().into()];
             if let Some(mcp) = mcp {
@@ -439,9 +426,7 @@ fn gemini_project_settings(folder: &Path, url: Option<&str>) -> std::io::Result<
         .filter(|v| v.is_object())
         .unwrap_or_else(|| serde_json::json!({}));
     if let Some(url) = url {
-        let servers = root
-            .as_object_mut()
-            .map(|o| o.entry("mcpServers").or_insert_with(|| serde_json::json!({})));
+        let servers = root.as_object_mut().map(|o| o.entry("mcpServers").or_insert_with(|| serde_json::json!({})));
         if let Some(servers) = servers.and_then(|s| s.as_object_mut()) {
             servers.insert(
                 crate::mcp::SERVER_NAME.into(),
@@ -455,9 +440,7 @@ fn gemini_project_settings(folder: &Path, url: Option<&str>) -> std::io::Result<
             );
         }
     }
-    let context = root
-        .as_object_mut()
-        .map(|o| o.entry("context").or_insert_with(|| serde_json::json!({})));
+    let context = root.as_object_mut().map(|o| o.entry("context").or_insert_with(|| serde_json::json!({})));
     if let Some(context) = context.and_then(|c| c.as_object_mut()) {
         context.insert("fileName".into(), serde_json::json!(["AGENTS.md", "GEMINI.md"]));
     }
@@ -513,18 +496,14 @@ fn opencode_config_with(existing: Option<&str>, spec: &str, mcp_url: Option<&str
             _ => return text.to_string(),
         },
     };
-    let plugins = root
-        .as_object_mut()
-        .map(|o| o.entry("plugin").or_insert_with(|| serde_json::json!([])));
+    let plugins = root.as_object_mut().map(|o| o.entry("plugin").or_insert_with(|| serde_json::json!([])));
     if let Some(list) = plugins.and_then(|p| p.as_array_mut()) {
         if !list.iter().any(|p| p.as_str() == Some(spec)) {
             list.push(serde_json::Value::String(spec.to_string()));
         }
     }
     if let Some(url) = mcp_url {
-        let servers = root
-            .as_object_mut()
-            .map(|o| o.entry("mcp").or_insert_with(|| serde_json::json!({})));
+        let servers = root.as_object_mut().map(|o| o.entry("mcp").or_insert_with(|| serde_json::json!({})));
         if let Some(servers) = servers.and_then(|s| s.as_object_mut()) {
             servers.insert(
                 crate::mcp::SERVER_NAME.into(),
@@ -607,11 +586,7 @@ pub fn claude_hook_activity(
         "Stop" => Some(Activity::Done),
         "Notification" => {
             let kind = payload.get("notification_type").and_then(|k| k.as_str());
-            let message = payload
-                .get("message")
-                .and_then(|m| m.as_str())
-                .unwrap_or_default()
-                .to_lowercase();
+            let message = payload.get("message").and_then(|m| m.as_str()).unwrap_or_default().to_lowercase();
             let asking = match kind {
                 Some(k) => matches!(k, "permission_prompt" | "elicitation_dialog"),
                 // Older releases say only in words.
@@ -665,9 +640,7 @@ pub fn claude_title_topic(title: &str) -> Option<String> {
     let title = title.trim();
     let mut chars = title.chars();
     let words = match chars.next() {
-        Some(mark) if !mark.is_alphanumeric() && chars.next().is_some_and(char::is_whitespace) => {
-            chars.as_str().trim()
-        }
+        Some(mark) if !mark.is_alphanumeric() && chars.next().is_some_and(char::is_whitespace) => chars.as_str().trim(),
         _ => title,
     };
     if words.is_empty() || words == "Claude Code" {
@@ -705,10 +678,7 @@ pub const AGENTS: &[AgentDef] = &[
         integration: Integration::Claude,
         resume_args: Some(&["--continue"]),
         resume_by_id: Some("--resume"),
-        session_store: Some(SessionStore::SlugUnderHome {
-            dir: ".claude/projects",
-            ext: "jsonl",
-        }),
+        session_store: Some(SessionStore::SlugUnderHome { dir: ".claude/projects", ext: "jsonl" }),
         // Not Claude Code itself: Zed's adapter around the Claude Agent SDK,
         // installed on its own, with the SDK version it bundles.
         acp: Some(AcpCommand { program: "claude-agent-acp", args: &[] }),
@@ -817,7 +787,6 @@ pub fn launch_args(def: &AgentDef, prompt: Option<&str>) -> (Vec<String>, Option
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -855,8 +824,7 @@ mod tests {
 
         assert!(trust_in(&config, Path::new("/work/new-task")));
 
-        let v: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
         assert_eq!(v["projects"]["/work/new-task"]["hasTrustDialogAccepted"], true);
         // Everything already there survives, untouched.
         assert_eq!(v["autoUpdates"], true);
@@ -868,7 +836,8 @@ mod tests {
     fn a_folder_already_accepted_is_not_rewritten() {
         let dir = sandbox("noop");
         let config = dir.join(".claude.json");
-        let before = r#"{"projects":{"/work":{"hasTrustDialogAccepted":true,"enabledMcpjsonServers":["villain-layer"]}}}"#;
+        let before =
+            r#"{"projects":{"/work":{"hasTrustDialogAccepted":true,"enabledMcpjsonServers":["villain-layer"]}}}"#;
         std::fs::write(&config, before).unwrap();
 
         assert!(!trust_in(&config, Path::new("/work")));
@@ -907,8 +876,7 @@ mod tests {
         )
         .unwrap();
         assert!(trust_in(&config, Path::new("/work")));
-        let v: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
         assert_eq!(v["projects"]["/work"]["enabledMcpjsonServers"], serde_json::json!(["theirs", "villain-layer"]));
         assert_eq!(v["projects"]["/work"]["disabledMcpjsonServers"], serde_json::json!(["other"]));
         std::fs::remove_dir_all(&dir).ok();
@@ -945,7 +913,10 @@ mod tests {
         assert_eq!(ev(j!({"hook_event_name": "Stop"}), Some(Activity::Working)), Some(Activity::Done));
         assert_eq!(ev(j!({"hook_event_name": "SessionStart", "source": "resume"}), None), Some(Activity::Idle));
         assert_eq!(
-            ev(j!({"hook_event_name": "Notification", "notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"}), Some(Activity::Working)),
+            ev(
+                j!({"hook_event_name": "Notification", "notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"}),
+                Some(Activity::Working)
+            ),
             Some(Activity::Asking)
         );
         assert_eq!(
@@ -987,13 +958,18 @@ mod tests {
     #[test]
     fn a_session_start_says_which_conversation_it_is_and_only_an_id_is_taken() {
         // Sent whole: it names the conversation a restart resumes (PANE-14).
-        let start = claude_hook_settings()["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap().to_string();
+        let start =
+            claude_hook_settings()["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap().to_string();
         assert!(start.contains("--data-binary @-"));
 
         let id = "024e8fc6-e2f5-44cd-a238-12dc258b29c8";
         let said = |v: serde_json::Value| hook_session(&v);
         assert_eq!(said(serde_json::json!({"hook_event_name": "SessionStart", "session_id": id})).as_deref(), Some(id));
-        assert_eq!(said(serde_json::json!({"session_id": id.to_uppercase()})).as_deref(), Some(id), "as the CLI files it");
+        assert_eq!(
+            said(serde_json::json!({"session_id": id.to_uppercase()})).as_deref(),
+            Some(id),
+            "as the CLI files it"
+        );
         // It goes on a command line: a flag, or anything else, is not an id.
         assert_eq!(said(serde_json::json!({"session_id": "--dangerously-skip-permissions"})), None);
         assert_eq!(said(serde_json::json!({"session_id": "../../etc"})), None);

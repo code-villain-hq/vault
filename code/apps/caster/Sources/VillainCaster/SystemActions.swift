@@ -1,5 +1,5 @@
-import Foundation
 import ApplicationServices
+import Foundation
 
 /// System-level commands invoked from the launcher.
 /// Empty trash and dark mode use AppleScript — macOS shows a one-time
@@ -13,7 +13,8 @@ enum SystemActions {
         case permission, unavailable
         var errorDescription: String? {
             switch self {
-            case .permission: "Couldn't lock the screen. Allow Caster in System Settings → Privacy & Security → Accessibility, then try again."
+            case .permission:
+                "Couldn't lock the screen. Allow Caster in System Settings → Privacy & Security → Accessibility, then try again."
             case .unavailable: "Couldn't lock the screen. Try again."
             }
         }
@@ -22,12 +23,15 @@ enum SystemActions {
     /// Send macOS's Lock Screen shortcut, independent of sleep/password delay.
     /// Injection is separated so tests never post keys to the user's session.
     static func lockScreen(
-        isTrusted: () -> Bool = { AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) },
+        isTrusted: () -> Bool = {
+            AXIsProcessTrustedWithOptions(
+                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+        },
         post: (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }
     ) throws {
         guard isTrusted() else { throw LockError.permission }
         guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: true),
-              let up = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: false)
+            let up = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: false)
         else { throw LockError.unavailable }
         for event in [down, up] {
             event.flags = [.maskControl, .maskCommand]
@@ -45,19 +49,21 @@ enum SystemActions {
     /// denied or osascript fails — callers should fall back to activate().
     @discardableResult
     static func openFinder() -> Bool {
-        runAppleScript("""
-        tell application "Finder"
-          reopen
-          activate
-        end tell
-        """)
+        runAppleScript(
+            """
+            tell application "Finder"
+              reopen
+              activate
+            end tell
+            """)
     }
 
     static func toggleDarkMode() {
-        runAppleScriptInBackground("""
-        tell application "System Events" to tell appearance preferences \
-        to set dark mode to not dark mode
-        """)
+        runAppleScriptInBackground(
+            """
+            tell application "System Events" to tell appearance preferences \
+            to set dark mode to not dark mode
+            """)
     }
 
     private static func run(_ path: String, _ arguments: [String]) {

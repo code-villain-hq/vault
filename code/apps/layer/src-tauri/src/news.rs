@@ -82,11 +82,9 @@ impl Seen {
     fn tickets(&self, issues: &[crate::tickets::Ticket]) -> Vec<(String, String)> {
         let mut seen = self.tickets.lock();
         let fresh = match seen.as_ref() {
-            Some(prev) => issues
-                .iter()
-                .filter(|i| !prev.contains(&i.key))
-                .map(|i| (i.key.clone(), i.summary.clone()))
-                .collect(),
+            Some(prev) => {
+                issues.iter().filter(|i| !prev.contains(&i.key)).map(|i| (i.key.clone(), i.summary.clone())).collect()
+            }
             None => Vec::new(),
         };
         *seen = Some(issues.iter().map(|i| i.key.clone()).collect());
@@ -110,9 +108,7 @@ impl Seen {
 fn announce_now(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
     state.config.with(|c| c.ui.system_notifications)
-        && app
-            .get_webview_window("main")
-            .is_some_and(|w| !w.is_focused().unwrap_or(false))
+        && app.get_webview_window("main").is_some_and(|w| !w.is_focused().unwrap_or(false))
 }
 
 /// A review queue has come in, from wherever it was asked for.
@@ -175,9 +171,7 @@ fn banners(news: Vec<New>, heading: &str, many: &str, all: Target) -> Vec<(Strin
     if news.len() > BATCH {
         return vec![(heading.into(), format!("{} {many}", news.len()), all.to_string())];
     }
-    news.into_iter()
-        .map(|n| (n.title, n.body, n.target.unwrap_or_else(|| all.to_string())))
-        .collect()
+    news.into_iter().map(|n| (n.title, n.body, n.target.unwrap_or_else(|| all.to_string()))).collect()
 }
 
 /// Look for news while the window is away, for as long as the app runs.
@@ -219,12 +213,7 @@ mod tests {
     use crate::integrations::github::ReviewRequest;
 
     fn pr(repo: &str, number: u64) -> ReviewRequest {
-        ReviewRequest {
-            repo: repo.into(),
-            number,
-            title: format!("t{number}"),
-            ..Default::default()
-        }
+        ReviewRequest { repo: repo.into(), number, title: format!("t{number}"), ..Default::default() }
     }
 
     fn queue(mine: Vec<ReviewRequest>, team: Option<(Vec<ReviewRequest>, bool)>) -> ReviewQueue {
@@ -267,11 +256,8 @@ mod tests {
     #[test]
     fn a_ticket_is_news_once() {
         let seen = Seen::default();
-        let issue = |key: &str| crate::tickets::Ticket {
-            key: key.into(),
-            summary: format!("s {key}"),
-            ..Default::default()
-        };
+        let issue =
+            |key: &str| crate::tickets::Ticket { key: key.into(), summary: format!("s {key}"), ..Default::default() };
         assert!(seen.tickets(&[issue("ACME-1")]).is_empty());
         assert_eq!(seen.tickets(&[issue("ACME-1"), issue("ACME-2")]).len(), 1);
         assert!(seen.tickets(&[issue("ACME-1"), issue("ACME-2")]).is_empty());
@@ -281,9 +267,7 @@ mod tests {
 
     #[test]
     fn a_new_review_opens_that_pull_request() {
-        let say = |fresh: &[(String, String)]| {
-            banners(review_news(fresh), "Reviews", "waiting", Target::Reviews)
-        };
+        let say = |fresh: &[(String, String)]| banners(review_news(fresh), "Reviews", "waiting", Target::Reviews);
         let one = [("o/a#7".to_string(), "Fix it".to_string())];
         assert_eq!(say(&one), [("Review requested".into(), "o/a#7 — Fix it".into(), "review:o/a#7".into())]);
         let many: Vec<_> = (0..4).map(|i| (format!("o/a#{i}"), String::new())).collect();

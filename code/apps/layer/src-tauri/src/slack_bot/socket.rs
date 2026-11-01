@@ -130,7 +130,9 @@ async fn connect(app: &AppHandle, generation: &mut tokio::sync::watch::Receiver<
             }
             "disconnect" => {
                 return match envelope.get("reason").and_then(Value::as_str) {
-                    Some("link_disabled") => Ended::Failed("Socket Mode is off for this Slack app; turn it on under Socket Mode".into()),
+                    Some("link_disabled") => {
+                        Ended::Failed("Socket Mode is off for this Slack app; turn it on under Socket Mode".into())
+                    }
                     _ => Ended::Refresh,
                 };
             }

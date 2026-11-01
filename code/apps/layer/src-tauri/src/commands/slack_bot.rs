@@ -56,11 +56,14 @@ pub async fn slack_bot_connect(
     })
     .await??;
     if !bot_token.starts_with("xoxb-") {
-        return Err(Error::Other("the bot token starts with xoxb-: OAuth & Permissions → Bot User OAuth Token.".into()));
+        return Err(Error::Other(
+            "the bot token starts with xoxb-: OAuth & Permissions → Bot User OAuth Token.".into(),
+        ));
     }
     if !app_token.starts_with("xapp-") {
         return Err(Error::Other(
-            "the app-level token starts with xapp-: Basic Information → App-Level Tokens, with connections:write.".into(),
+            "the app-level token starts with xapp-: Basic Information → App-Level Tokens, with connections:write."
+                .into(),
         ));
     }
     let me = BotApi::new(&bot_token).whoami().await?;
@@ -79,7 +82,8 @@ pub async fn slack_bot_connect(
         let auto = c.slack_bot.as_ref().is_none_or(|b| b.auto);
         let personality = c.slack_bot.as_ref().map(|b| b.personality.clone()).unwrap_or_default();
         // A model is one agent's name for it: another agent starts on its own.
-        let model = c.slack_bot.as_ref().filter(|b| b.agent_id == agent_id).map(|b| b.model.clone()).unwrap_or_default();
+        let model =
+            c.slack_bot.as_ref().filter(|b| b.agent_id == agent_id).map(|b| b.model.clone()).unwrap_or_default();
         c.slack_bot = Some(SlackBotConfig {
             owner,
             agent_id,
@@ -199,9 +203,7 @@ fn kept_or(key: &str, typed: &str) -> Result<String> {
 
 /// `U…` or, in an Enterprise Grid, `W…`.
 fn member_id(id: &str) -> bool {
-    id.len() >= 9
-        && id.starts_with(['U', 'W'])
-        && id.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+    id.len() >= 9 && id.starts_with(['U', 'W']) && id.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
 }
 
 #[cfg(test)]

@@ -15,8 +15,8 @@ use crate::config::{AppConfig, Project};
 use crate::error::{Error, Result};
 use crate::git;
 
-use super::cleanup_remote::{judge_local, Pulls, Remote};
 use super::cleanup_folders::{leftover_folders, stray_worktrees};
+use super::cleanup_remote::{judge_local, Pulls, Remote};
 use super::panes::remove_generated;
 use super::repos::{canon, plural, store_of};
 use super::AppState;
@@ -108,12 +108,7 @@ pub(super) fn in_use(state: &AppState, cfg: &AppConfig) -> InUse {
     used.stores.extend(cfg.projects.iter().filter_map(|p| p.store.as_deref()).map(canon));
     for other in state.config.other_configs() {
         let each = |list: &str, field: &str| -> Vec<String> {
-            other[list]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|v| v[field].as_str().map(String::from))
-                .collect()
+            other[list].as_array().into_iter().flatten().filter_map(|v| v[field].as_str().map(String::from)).collect()
         };
         used.roots.extend(each("tasks", "root").iter().map(canon));
         used.branches.extend(each("tasks", "branch"));
@@ -246,7 +241,11 @@ fn records(project: &Project, store: &Path, out: &mut Vec<Planned>) {
     }
     let mut detail = Vec::new();
     if gone > 0 {
-        detail.push(format!("Git still lists {gone} worktree{} whose folder{} gone.", plural(gone), if gone == 1 { " is" } else { "s are" }));
+        detail.push(format!(
+            "Git still lists {gone} worktree{} whose folder{} gone.",
+            plural(gone),
+            if gone == 1 { " is" } else { "s are" }
+        ));
     }
     if staging {
         detail.push("A move onto the copy was interrupted and left its staging folder.".to_string());
@@ -272,20 +271,30 @@ fn unused_stores(repos: &Path, used: &InUse, out: &mut Vec<Planned>) {
         if !dir.is_dir() || dir.is_symlink() || used.stores.contains(&canon(&dir)) || !git::is_bare(&dir) {
             continue;
         }
-        let live = git::list_worktrees(&dir)
-            .map(|w| w.iter().skip(1).filter(|w| !w.prunable).count())
-            .unwrap_or(usize::MAX);
+        let live =
+            git::list_worktrees(&dir).map(|w| w.iter().skip(1).filter(|w| !w.prunable).count()).unwrap_or(usize::MAX);
         let unpushed = git::branch_tips(&dir)
             .map(|tips| tips.iter().filter(|(_, tip)| git::only_here(&dir, tip).map_or(true, |n| n > 0)).count())
             .unwrap_or(usize::MAX);
         let (verdict, detail) = if live == usize::MAX || unpushed == usize::MAX {
             (Verdict::Blocked, "Git cannot read it.".to_string())
         } else if live > 0 {
-            (Verdict::Blocked, format!("No repo uses it, but {live} worktree{} still belong{} to it.", plural(live), if live == 1 { "s" } else { "" }))
+            (
+                Verdict::Blocked,
+                format!(
+                    "No repo uses it, but {live} worktree{} still belong{} to it.",
+                    plural(live),
+                    if live == 1 { "s" } else { "" }
+                ),
+            )
         } else if unpushed > 0 {
             (
                 Verdict::Risky,
-                format!("No repo uses it, but {unpushed} branch{} in it {} commits on no origin branch.", if unpushed == 1 { "" } else { "es" }, if unpushed == 1 { "has" } else { "have" }),
+                format!(
+                    "No repo uses it, but {unpushed} branch{} in it {} commits on no origin branch.",
+                    if unpushed == 1 { "" } else { "es" },
+                    if unpushed == 1 { "has" } else { "have" }
+                ),
             )
         } else {
             (Verdict::Safe, "No repo uses it, and origin has everything in it.".to_string())
@@ -338,8 +347,7 @@ fn remove(action: &Action) -> Result<()> {
                 return Ok(std::fs::remove_dir_all(dir)?);
             }
             remove_generated(dir);
-            std::fs::remove_dir(dir)
-                .map_err(|e| Error::Other(format!("{} still holds something: {e}", dir.display())))
+            std::fs::remove_dir(dir).map_err(|e| Error::Other(format!("{} still holds something: {e}", dir.display())))
         }
         Action::Worktree(owner, wt) => git::remove_worktree(owner, &wt.to_string_lossy(), false),
         Action::Branch(repo, branch, tip) => git::delete_branch_at(repo, branch, tip),
@@ -436,7 +444,11 @@ mod tests {
         assert_eq!(verdict(&found, "folder", "OLD-1"), Some(Verdict::Safe));
         assert_eq!(verdict(&found, "folder", "OLD-2"), Some(Verdict::Safe));
         assert_eq!(verdict(&found, "folder", "OLD-3"), Some(Verdict::Blocked));
-        assert_eq!(verdict(&found, "folder", "OLD-4"), Some(Verdict::Risky), "a note of the user's is offered, never ticked");
+        assert_eq!(
+            verdict(&found, "folder", "OLD-4"),
+            Some(Verdict::Risky),
+            "a note of the user's is offered, never ticked"
+        );
         assert!(detail(&found, "folder", "OLD-4").contains("notes.txt"));
         assert!(found.iter().all(|i| !i.title.contains("DEV-1")), "the other build's task is not offered");
 
@@ -509,7 +521,11 @@ mod tests {
         assert_eq!(verdict(&found, "folder", "ACME-146"), Some(Verdict::Risky));
         let why = detail(&found, "folder", "ACME-146");
         assert!(why.contains("2 files the app did not make (2 KB)"), "{why}");
-        assert!(why.contains(".cursor/debug-8b0881.log") && why.contains("customer-portal/apps/host/.angular/cache/.tsbuildinfo"), "{why}");
+        assert!(
+            why.contains(".cursor/debug-8b0881.log")
+                && why.contains("customer-portal/apps/host/.angular/cache/.tsbuildinfo"),
+            "{why}"
+        );
         assert_eq!(verdict(&found, "folder", "ACME-1"), Some(Verdict::Safe), "empty folders lose nothing");
 
         let ids: Vec<String> = found.iter().filter(|i| i.kind == "folder").map(|i| i.id.clone()).collect();
@@ -592,7 +608,12 @@ mod tests {
         }
         assert!(detail(&alone, "store_branch", "DONE-1").contains("GitHub was not asked"));
 
-        let pr = |number, head: &str, sha: &str| BranchPr { number, head: head.into(), head_sha: sha.into(), state: PrState::Merged };
+        let pr = |number, head: &str, sha: &str| BranchPr {
+            number,
+            head: head.into(),
+            head_sha: sha.into(),
+            state: PrState::Merged,
+        };
         let pulls = Pulls {
             mine: Some(vec![pr(1, "DONE-1", &squashed[1]), pr(2, "AHEAD-1", &ahead[0])]),
             more: false,
@@ -612,7 +633,10 @@ mod tests {
 
         let ids: Vec<String> = found.iter().filter(|i| i.verdict == Verdict::Safe).map(|i| i.id.clone()).collect();
         let done = apply(&state, remote(), &ids);
-        assert!(succeeded(&done, &found, "store_branch", "DONE-1") && succeeded(&done, &found, "store_branch", "review/api-5"));
+        assert!(
+            succeeded(&done, &found, "store_branch", "DONE-1")
+                && succeeded(&done, &found, "store_branch", "review/api-5")
+        );
         assert!(!crate::git::branch_exists(&store, "DONE-1") && crate::git::branch_exists(&store, "AHEAD-1"));
         std::fs::remove_dir_all(&root).ok();
     }

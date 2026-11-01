@@ -9,11 +9,11 @@ use super::{http_client, str_at};
 
 mod flow;
 mod order;
-pub use flow::ProjectStatus;
-pub use order::Order;
 use crate::config::JiraConfig;
 use crate::error::{Error, Result};
 use crate::tickets::{AllowedValue, RequiredField, Ticket, TicketPage, TicketType};
+pub use flow::ProjectStatus;
+pub use order::Order;
 
 pub struct Jira {
     base_url: String,
@@ -47,8 +47,7 @@ pub struct Myself {
 impl Jira {
     pub fn new(cfg: &JiraConfig, token: &str) -> Result<Self> {
         super::require_https(&cfg.base_url, "The Jira site")?;
-        let auth = base64::engine::general_purpose::STANDARD
-            .encode(format!("{}:{}", cfg.email, token));
+        let auth = base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", cfg.email, token));
         Ok(Self {
             base_url: cfg.base_url.trim_end_matches('/').to_string(),
             auth: format!("Basic {auth}"),
@@ -101,9 +100,7 @@ impl Jira {
 
     /// Every issue type this site defines, with its icon inlined.
     pub async fn issue_types(&self) -> Result<Vec<TicketType>> {
-        let v = self
-            .json(self.req(reqwest::Method::GET, "/rest/api/3/issuetype"))
-            .await?;
+        let v = self.json(self.req(reqwest::Method::GET, "/rest/api/3/issuetype")).await?;
         let raw = v.as_array().cloned().unwrap_or_default();
 
         let mut out: Vec<TicketType> = Vec::new();
@@ -118,18 +115,14 @@ impl Jira {
             out.push(TicketType {
                 id: str_at(&t, "id"),
                 subtask: t.get("subtask").and_then(|b| b.as_bool()).unwrap_or(false),
-                hierarchy_level: t
-                    .get("hierarchyLevel")
-                    .and_then(|h| h.as_i64())
-                    .unwrap_or(0) as i32,
+                hierarchy_level: t.get("hierarchyLevel").and_then(|h| h.as_i64()).unwrap_or(0) as i32,
                 icon: None,
                 name,
             });
         }
         // Together, not in turn: a site with thirty types was thirty round
         // trips before the Tickets view could draw its first badge.
-        let fetched =
-            futures_util::future::join_all(icons.iter().map(|url| self.fetch_icon(url))).await;
+        let fetched = futures_util::future::join_all(icons.iter().map(|url| self.fetch_icon(url))).await;
         for (t, icon) in out.iter_mut().zip(fetched) {
             t.icon = icon;
         }
@@ -144,7 +137,9 @@ impl Jira {
         }
         // Credentials go only to this site. An icon URL is whatever the
         // site says, and on some that is a CDN or another host entirely.
-        let own = reqwest::Url::parse(url).ok().zip(reqwest::Url::parse(&self.base_url).ok())
+        let own = reqwest::Url::parse(url)
+            .ok()
+            .zip(reqwest::Url::parse(&self.base_url).ok())
             .is_some_and(|(icon, site)| icon.origin() == site.origin());
         let mut req = self.client.get(url);
         if own {
@@ -183,8 +178,17 @@ impl Jira {
     /// difference between "that is all of it" and "that is all you asked for".
     pub async fn search(&self, jql: &str, max: u32) -> Result<TicketPage> {
         let mut fields = json!([
-            "summary", "description", "status", "issuetype",
-            "priority", "assignee", "labels", "components", "parent", "created", "updated",
+            "summary",
+            "description",
+            "status",
+            "issuetype",
+            "priority",
+            "assignee",
+            "labels",
+            "components",
+            "parent",
+            "created",
+            "updated",
         ]);
         // Asked for only when this site has one; its id differs per site.
         if let Some(field) = &self.epic_field {
@@ -209,39 +213,22 @@ impl Jira {
             // Only a missing endpoint falls back: a bad JQL or a rejected token
             // retried against the old endpoint would come back as *its* error,
             // hiding the one that says what is actually wrong.
-            let v = match self
-                .json(
-                    self.req(reqwest::Method::POST, "/rest/api/3/search/jql")
-                        .json(&body),
-                )
-                .await
-            {
+            let v = match self.json(self.req(reqwest::Method::POST, "/rest/api/3/search/jql").json(&body)).await {
                 Ok(v) => v,
                 Err(Error::Other(msg)) if msg.starts_with("Jira 404") => {
-                    self.json(
-                        self.req(reqwest::Method::POST, "/rest/api/3/search")
-                            .json(&body),
-                    )
-                    .await?
+                    self.json(self.req(reqwest::Method::POST, "/rest/api/3/search").json(&body)).await?
                 }
                 Err(e) => return Err(e),
             };
 
-            let page = v
-                .get("issues")
-                .and_then(|i| i.as_array())
-                .cloned()
-                .unwrap_or_default();
+            let page = v.get("issues").and_then(|i| i.as_array()).cloned().unwrap_or_default();
             // A token with an empty page would otherwise loop for ever.
             if page.is_empty() {
                 break;
             }
             issues.extend(page.iter().map(|i| self.to_issue(i)));
 
-            token = v
-                .get("nextPageToken")
-                .and_then(|t| t.as_str())
-                .map(str::to_string);
+            token = v.get("nextPageToken").and_then(|t| t.as_str()).map(str::to_string);
             if token.is_none() {
                 break;
             }
@@ -249,25 +236,17 @@ impl Jira {
         }
 
         // Only truthfully "more" if we stopped at the cap with a page to spare.
-        Ok(TicketPage {
-            more: more && token.is_some() && issues.len() >= max as usize,
-            issues,
-        })
+        Ok(TicketPage { more: more && token.is_some() && issues.len() >= max as usize, issues })
     }
 
     pub async fn issue(&self, key: &str) -> Result<Ticket> {
-        let v = self
-            .json(self.req(reqwest::Method::GET, &format!("/rest/api/3/issue/{}", segment(key)?)))
-            .await?;
+        let v = self.json(self.req(reqwest::Method::GET, &format!("/rest/api/3/issue/{}", segment(key)?))).await?;
         Ok(self.to_issue(&v))
     }
 
     pub async fn transitions(&self, key: &str) -> Result<Vec<Transition>> {
         let v = self
-            .json(self.req(
-                reqwest::Method::GET,
-                &format!("/rest/api/3/issue/{}/transitions", segment(key)?),
-            ))
+            .json(self.req(reqwest::Method::GET, &format!("/rest/api/3/issue/{}/transitions", segment(key)?)))
             .await?;
 
         Ok(v.get("transitions")
@@ -277,11 +256,7 @@ impl Jira {
                     .map(|t| Transition {
                         id: str_at(t, "id"),
                         name: str_at(t, "name"),
-                        to_status: t
-                            .pointer("/to/name")
-                            .and_then(|s| s.as_str())
-                            .unwrap_or_default()
-                            .to_string(),
+                        to_status: t.pointer("/to/name").and_then(|s| s.as_str()).unwrap_or_default().to_string(),
                         to_id: str_at(t.get("to").unwrap_or(&Value::Null), "id"),
                         to_category: t
                             .pointer("/to/statusCategory/key")
@@ -296,11 +271,8 @@ impl Jira {
 
     pub async fn transition(&self, key: &str, transition_id: &str) -> Result<()> {
         self.json(
-            self.req(
-                reqwest::Method::POST,
-                &format!("/rest/api/3/issue/{}/transitions", segment(key)?),
-            )
-            .json(&json!({ "transition": { "id": transition_id } })),
+            self.req(reqwest::Method::POST, &format!("/rest/api/3/issue/{}/transitions", segment(key)?))
+                .json(&json!({ "transition": { "id": transition_id } })),
         )
         .await?;
         Ok(())
@@ -335,12 +307,8 @@ impl Jira {
             }
         }
 
-        let v = self
-            .json(
-                self.req(reqwest::Method::POST, "/rest/api/3/issue")
-                    .json(&json!({ "fields": fields })),
-            )
-            .await?;
+        let v =
+            self.json(self.req(reqwest::Method::POST, "/rest/api/3/issue").json(&json!({ "fields": fields }))).await?;
         Ok(str_at(&v, "key"))
     }
 
@@ -363,9 +331,7 @@ impl Jira {
     /// not, so the two can be remembered differently.
     pub async fn epic_link_field(&self) -> Result<Option<String>> {
         const EPIC_LINK: &str = "com.pyxis.greenhopper.jira:gh-epic-link";
-        let v = self
-            .json(self.req(reqwest::Method::GET, "/rest/api/3/field"))
-            .await?;
+        let v = self.json(self.req(reqwest::Method::GET, "/rest/api/3/field")).await?;
         Ok(v.as_array().and_then(|fields| {
             fields.iter().find_map(|f| {
                 (f.pointer("/schema/custom").and_then(|c| c.as_str()) == Some(EPIC_LINK))
@@ -380,34 +346,20 @@ impl Jira {
     /// Asked of Jira rather than assumed: one project makes components
     /// mandatory, another a custom field, most neither. The only way to build a
     /// form that works on every site is to be told what the form is.
-    pub async fn create_fields(
-        &self,
-        project_key: &str,
-        issue_type_id: &str,
-    ) -> Result<Vec<RequiredField>> {
+    pub async fn create_fields(&self, project_key: &str, issue_type_id: &str) -> Result<Vec<RequiredField>> {
         // Paged, fifty to a page by default. Reading the first page alone
         // lost whatever came after it — and a required field past the
         // fiftieth never reached the form, so creating failed with "X is
         // required" for a field nobody had been asked about.
-        let path = format!(
-            "/rest/api/3/issue/createmeta/{}/issuetypes/{}",
-            segment(project_key)?,
-            segment(issue_type_id)?
-        );
+        let path =
+            format!("/rest/api/3/issue/createmeta/{}/issuetypes/{}", segment(project_key)?, segment(issue_type_id)?);
         let mut fields: Vec<Value> = Vec::new();
         for _ in 0..20 {
             let at = fields.len().to_string();
             let v = self
-                .json(
-                    self.req(reqwest::Method::GET, &path)
-                        .query(&[("startAt", at.as_str()), ("maxResults", "100")]),
-                )
+                .json(self.req(reqwest::Method::GET, &path).query(&[("startAt", at.as_str()), ("maxResults", "100")]))
                 .await?;
-            let page = v
-                .get("fields")
-                .and_then(|f| f.as_array())
-                .cloned()
-                .unwrap_or_default();
+            let page = v.get("fields").and_then(|f| f.as_array()).cloned().unwrap_or_default();
             let total = v.get("total").and_then(Value::as_u64);
             let got = page.len();
             fields.extend(page);
@@ -426,11 +378,7 @@ impl Jira {
                 id: str_at(f, "fieldId"),
                 name: str_at(f, "name"),
                 required: f.get("required").and_then(Value::as_bool).unwrap_or(false),
-                kind: f
-                    .pointer("/schema/type")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
+                kind: f.pointer("/schema/type").and_then(|t| t.as_str()).unwrap_or_default().to_string(),
                 allowed: f
                     .get("allowedValues")
                     .and_then(|a| a.as_array())
@@ -498,14 +446,8 @@ impl Jira {
         // something ADF breaks on, so a list of PR links, or an agent's
         // multi-line note, arrived as one run-on line.
         let body = json!({ "body": text_to_adf(text) });
-        self.json(
-            self.req(
-                reqwest::Method::POST,
-                &format!("/rest/api/3/issue/{}/comment", segment(key)?),
-            )
-            .json(&body),
-        )
-        .await?;
+        self.json(self.req(reqwest::Method::POST, &format!("/rest/api/3/issue/{}/comment", segment(key)?)).json(&body))
+            .await?;
         Ok(())
     }
 
@@ -517,53 +459,28 @@ impl Jira {
             key,
             summary: str_at(&f, "summary"),
             description: adf_to_text(f.get("description")),
-            status: f
-                .pointer("/status/name")
-                .and_then(|s| s.as_str())
-                .unwrap_or_default()
-                .to_string(),
+            status: f.pointer("/status/name").and_then(|s| s.as_str()).unwrap_or_default().to_string(),
             status_id: str_at(f.get("status").unwrap_or(&Value::Null), "id"),
             status_category: f
                 .pointer("/status/statusCategory/key")
                 .and_then(|s| s.as_str())
                 .unwrap_or_default()
                 .to_string(),
-            issue_type: f
-                .pointer("/issuetype/name")
-                .and_then(|s| s.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            priority: f
-                .pointer("/priority/name")
-                .and_then(|s| s.as_str())
-                .map(str::to_string),
-            assignee: f
-                .pointer("/assignee/displayName")
-                .and_then(|s| s.as_str())
-                .map(str::to_string),
+            issue_type: f.pointer("/issuetype/name").and_then(|s| s.as_str()).unwrap_or_default().to_string(),
+            priority: f.pointer("/priority/name").and_then(|s| s.as_str()).map(str::to_string),
+            assignee: f.pointer("/assignee/displayName").and_then(|s| s.as_str()).map(str::to_string),
             labels: f
                 .get("labels")
                 .and_then(|l| l.as_array())
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|s| s.as_str().map(str::to_string))
-                        .collect()
-                })
+                .map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_string)).collect())
                 .unwrap_or_default(),
             components: f
                 .get("components")
                 .and_then(|c| c.as_array())
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|c| c.get("name").and_then(|n| n.as_str()).map(str::to_string))
-                        .collect()
-                })
+                .map(|a| a.iter().filter_map(|c| c.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect())
                 .unwrap_or_default(),
             epic_key: epic_key(&f, self.epic_field.as_deref()),
-            epic_summary: f
-                .pointer("/parent/fields/summary")
-                .and_then(|s| s.as_str())
-                .map(str::to_string),
+            epic_summary: f.pointer("/parent/fields/summary").and_then(|s| s.as_str()).map(str::to_string),
             created: f.get("created").and_then(|s| s.as_str()).and_then(jira_time),
             updated: f.get("updated").and_then(|s| s.as_str()).and_then(jira_time),
         }
@@ -576,11 +493,7 @@ fn epic_key(fields: &Value, epic_field: Option<&str>) -> Option<String> {
     if let Some(key) = fields.pointer("/parent/key").and_then(|k| k.as_str()) {
         return Some(key.to_string());
     }
-    fields
-        .get(epic_field?)
-        .and_then(|v| v.as_str())
-        .filter(|s| s.contains('-'))
-        .map(str::to_string)
+    fields.get(epic_field?).and_then(|v| v.as_str()).filter(|s| s.contains('-')).map(str::to_string)
 }
 
 /// Plain text as a minimal ADF document: one paragraph per non-empty line.
@@ -719,9 +632,7 @@ pub(crate) fn looks_like_a_key(text: &str) -> bool {
         return false;
     };
     !project.is_empty()
-        && project
-            .chars()
-            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        && project.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
         && project.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
         && !number.is_empty()
         && number.chars().all(|c| c.is_ascii_digit())
@@ -796,12 +707,7 @@ pub fn browse_jql(
         parts.push("statusCategory != Done".into());
     }
     // Names, not ids: they are what the site reported and what the user picked.
-    let types: Vec<String> = types
-        .iter()
-        .map(|t| t.trim())
-        .filter(|t| !t.is_empty())
-        .map(jql_string)
-        .collect();
+    let types: Vec<String> = types.iter().map(|t| t.trim()).filter(|t| !t.is_empty()).map(jql_string).collect();
     if !types.is_empty() {
         parts.push(format!("issuetype IN ({})", types.join(", ")));
     }
@@ -860,7 +766,9 @@ mod browse_tests {
         assert!(!looks_like_a_key("rounding error"));
         assert!(!looks_like_a_key("ACME-21042-fix"));
 
-        assert!(browse_jql(None, Some("ACME-9"), Whose::Anyone, false, &[], Order::Updated).contains(r#"key = "ACME-9""#));
+        assert!(
+            browse_jql(None, Some("ACME-9"), Whose::Anyone, false, &[], Order::Updated).contains(r#"key = "ACME-9""#)
+        );
         assert!(browse_jql(None, Some("rounding"), Whose::Anyone, false, &[], Order::Updated)
             .contains("text ~ \"rounding\""));
     }
@@ -880,7 +788,8 @@ mod browse_tests {
         assert_eq!(number_as_key(Some("ACME"), " 4826 ").as_deref(), Some("ACME-4826"));
         assert_eq!(number_as_key(Some(" acme "), "4826").as_deref(), Some("ACME-4826"));
         let key = number_as_key(Some("ACME"), "4826").unwrap_or_default();
-        assert!(browse_jql(Some("ACME"), Some(&key), Whose::Anyone, false, &[], Order::Updated).contains(r#"key = "ACME-4826""#));
+        assert!(browse_jql(Some("ACME"), Some(&key), Whose::Anyone, false, &[], Order::Updated)
+            .contains(r#"key = "ACME-4826""#));
 
         assert_eq!(number_as_key(None, "4826"), None, "without a project a number is only text");
         assert_eq!(number_as_key(Some("  "), "4826"), None);
@@ -917,10 +826,7 @@ mod browse_tests {
             browse_jql(Some("ACME"), None, Whose::Unassigned, false, &[], Order::Updated),
             r#"project = "ACME" AND assignee IS EMPTY AND statusCategory != Done ORDER BY updated DESC"#,
         );
-        assert_eq!(
-            browse_jql(None, None, Whose::Anyone, true, &[], Order::Updated),
-            "ORDER BY updated DESC",
-        );
+        assert_eq!(browse_jql(None, None, Whose::Anyone, true, &[], Order::Updated), "ORDER BY updated DESC",);
     }
 
     #[test]

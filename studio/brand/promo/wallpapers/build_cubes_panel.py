@@ -7,6 +7,7 @@ for narrow, nearly square surfaces such as the sign-in panel. The seam runs
 diagonally through empty ground, between the lower-left and upper-right
 clusters. Requires Google Chrome.
 """
+
 import base64
 import pathlib
 import struct
@@ -47,10 +48,19 @@ svg.write_text(f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" heigh
 <g mask="url(#right)"><use href="#cubes" x="{width - source_width}"/></g>
 </svg>''')
 with tempfile.TemporaryDirectory() as profile:
-    subprocess.run([
-        CHROME, "--headless=new", f"--user-data-dir={profile}",
-        "--hide-scrollbars", "--force-device-scale-factor=1",
-        f"--window-size={width},{height}", "--virtual-time-budget=10000",
-        f"--screenshot={png}", svg.as_uri(),
-    ], check=True, capture_output=True)
+    subprocess.run(
+        [
+            CHROME,
+            "--headless=new",
+            f"--user-data-dir={profile}",
+            "--hide-scrollbars",
+            "--force-device-scale-factor=1",
+            f"--window-size={width},{height}",
+            "--virtual-time-budget=10000",
+            f"--screenshot={png}",
+            svg.as_uri(),
+        ],
+        check=True,
+        capture_output=True,
+    )
 print(f"{stem}: {width}×{height}")

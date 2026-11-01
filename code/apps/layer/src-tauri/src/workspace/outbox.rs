@@ -29,13 +29,18 @@ pub fn identify(queue: &mut [Value]) -> bool {
 }
 
 pub fn writes(queue: &[Value]) -> Result<Vec<Write>> {
-    queue.iter().map(|op| {
-        let mut operation = op.clone();
-        let id = operation.as_object_mut().and_then(|o| o.remove(ID))
-            .and_then(|v| v.as_str().map(String::from))
-            .ok_or_else(|| Error::Other("A queued change could not be read. Its saved copy is kept.".into()))?;
-        Ok(Write { id, operation })
-    }).collect()
+    queue
+        .iter()
+        .map(|op| {
+            let mut operation = op.clone();
+            let id = operation
+                .as_object_mut()
+                .and_then(|o| o.remove(ID))
+                .and_then(|v| v.as_str().map(String::from))
+                .ok_or_else(|| Error::Other("A queued change could not be read. Its saved copy is kept.".into()))?;
+            Ok(Write { id, operation })
+        })
+        .collect()
 }
 
 pub fn acknowledge(queue: &mut Vec<Value>, ids: &[String]) -> bool {
@@ -59,8 +64,11 @@ pub fn ack(state: &AppState, ids: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::moving::{
+        move_in,
+        tests::{temp_dir, v2_profile},
+    };
     use super::*;
-    use super::super::moving::{move_in, tests::{temp_dir, v2_profile}};
 
     #[test]
     fn reads_survive_restart_and_acks_leave_newer_changes_queued() {
@@ -71,11 +79,15 @@ mod tests {
         assert!(!first.is_empty());
         assert_eq!(read(&state).unwrap(), first);
         // Reload the durable files as a restarted process would.
-        let cfg: crate::config::AppConfig = serde_json::from_slice(&std::fs::read(root.join("config.json")).unwrap()).unwrap();
+        let cfg: crate::config::AppConfig =
+            serde_json::from_slice(&std::fs::read(root.join("config.json")).unwrap()).unwrap();
         let stored = writes(&cfg.shared.outbox).unwrap();
         assert_eq!(&first[..stored.len()], stored);
         assert_eq!(crate::notes::Notes::load(&root).read_writes().unwrap(), state.notes.read_writes().unwrap());
-        state.config.update(|c| c.shared.outbox.push(serde_json::json!({"action":"delete","model":"Note","id":"later"}))).unwrap();
+        state
+            .config
+            .update(|c| c.shared.outbox.push(serde_json::json!({"action":"delete","model":"Note","id":"later"})))
+            .unwrap();
         ack(&state, &first.iter().map(|w| w.id.clone()).collect::<Vec<_>>()).unwrap();
         let remaining = read(&state).unwrap();
         assert_eq!(remaining.len(), 1);

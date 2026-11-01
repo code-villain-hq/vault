@@ -78,9 +78,7 @@ impl GitHub {
         let Some(data) = v.get("data").filter(|d| !d.is_null()) else {
             return Err(graphql_error(&v));
         };
-        Ok((0..wanted.len())
-            .filter_map(|i| data.pointer(&format!("/i{i}/issue")).and_then(to_ticket))
-            .collect())
+        Ok((0..wanted.len()).filter_map(|i| data.pointer(&format!("/i{i}/issue")).and_then(to_ticket)).collect())
     }
 
     /// File an issue, and say its number.
@@ -91,7 +89,9 @@ impl GitHub {
                     .json(&json!({ "title": title, "body": body })),
             )
             .await?;
-        v.get("number").and_then(Value::as_u64).ok_or_else(|| Error::Other("GitHub filed the issue but did not say its number".into()))
+        v.get("number")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| Error::Other("GitHub filed the issue but did not say its number".into()))
     }
 
     /// Put an issue under another as its sub-issue, out from under any other.
@@ -99,7 +99,8 @@ impl GitHub {
         // Sub-issues are named by their id, which a number is not.
         let (owner, name, number) = child;
         let v = self.json(self.req(reqwest::Method::GET, &format!("/repos/{owner}/{name}/issues/{number}"))).await?;
-        let id = v.get("id").and_then(Value::as_u64).ok_or_else(|| Error::NotFound(format!("{owner}/{name}#{number}")))?;
+        let id =
+            v.get("id").and_then(Value::as_u64).ok_or_else(|| Error::NotFound(format!("{owner}/{name}#{number}")))?;
         let (owner, name, number) = parent;
         self.json(
             self.req(reqwest::Method::POST, &format!("/repos/{owner}/{name}/issues/{number}/sub_issues"))

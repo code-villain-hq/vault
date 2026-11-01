@@ -20,9 +20,7 @@ use crate::error::{Error, Result};
 /// Make `store`, a private bare copy of `source`, fetching from where
 /// `source` fetches.
 pub fn create_store(source: &Path, store: &Path) -> Result<()> {
-    let parent = store
-        .parent()
-        .ok_or_else(|| Error::Git(format!("{} has no parent folder", store.display())))?;
+    let parent = store.parent().ok_or_else(|| Error::Git(format!("{} has no parent folder", store.display())))?;
     std::fs::create_dir_all(parent)?;
     let (from, to) = (source.to_string_lossy(), store.to_string_lossy());
     run(parent, &["clone", "--bare", "--local", "--quiet", "--", &from, &to])?;
@@ -31,10 +29,8 @@ pub fn create_store(source: &Path, store: &Path) -> Result<()> {
         // A bare clone takes branches and tags only. What `source` knows of
         // origin comes along from disk, so bases and the branch picker work
         // before the first fetch reaches the network.
-        let _ = run(
-            store,
-            &["fetch", "--quiet", "--no-tags", "--", &from, "+refs/remotes/origin/*:refs/remotes/origin/*"],
-        );
+        let _ =
+            run(store, &["fetch", "--quiet", "--no-tags", "--", &from, "+refs/remotes/origin/*:refs/remotes/origin/*"]);
         // Fetches and pushes go where the user's clone sends them, not to
         // the clone itself; a clone with no origin keeps the path.
         if let Ok(url) = run(source, &["config", "--get", "remote.origin.url"]) {
@@ -160,9 +156,8 @@ pub fn adopt_worktree(store: &Path, wt: &Path) -> Result<()> {
     if belongs_to(wt, store) {
         return Ok(());
     }
-    let old = registration(wt).ok_or_else(|| {
-        Error::Git(format!("{} is not linked to any repository", wt.display()))
-    })?;
+    let old =
+        registration(wt).ok_or_else(|| Error::Git(format!("{} is not linked to any repository", wt.display())))?;
     let source = common_dir(&old)
         .ok_or_else(|| Error::Git(format!("cannot tell which repository {} came from", wt.display())))?;
     if super::in_progress(wt).is_some() {
@@ -187,10 +182,7 @@ pub fn adopt_worktree(store: &Path, wt: &Path) -> Result<()> {
 /// Copy `branch` from `source` into `store`, with where it pushes to.
 fn copy_branch(source: &Path, store: &Path, branch: &str) -> Result<()> {
     let from = source.to_string_lossy();
-    run(
-        store,
-        &["fetch", "--quiet", "--no-tags", "--", &from, &format!("+refs/heads/{branch}:refs/heads/{branch}")],
-    )?;
+    run(store, &["fetch", "--quiet", "--no-tags", "--", &from, &format!("+refs/heads/{branch}:refs/heads/{branch}")])?;
     copy_upstream(source, store, branch);
     Ok(())
 }
@@ -393,9 +385,7 @@ fn register_in_place(store: &Path, wt: &Path, branch: &str, carry: Option<&Path>
     let linked = (|| -> Result<()> {
         let link = std::fs::read_to_string(tmp.join(".git"))?;
         let admin = PathBuf::from(
-            link.strip_prefix("gitdir:")
-                .ok_or_else(|| Error::Git("unexpected worktree link".into()))?
-                .trim(),
+            link.strip_prefix("gitdir:").ok_or_else(|| Error::Git("unexpected worktree link".into()))?.trim(),
         );
         if let Some(old) = carry {
             for file in ["index", "logs/HEAD"] {
@@ -647,7 +637,11 @@ mod tests {
         reclaim_clone(&store, &wt, "task").unwrap();
         assert!(!is_own_clone(&wt) && belongs_to(&wt, &store));
         assert_eq!(head(&wt), last);
-        assert_eq!(run(&store, &["rev-parse", "refs/heads/task"]).unwrap().trim(), last, "the unpushed commit is in the copy");
+        assert_eq!(
+            run(&store, &["rev-parse", "refs/heads/task"]).unwrap().trim(),
+            last,
+            "the unpushed commit is in the copy"
+        );
         let st = super::super::status(&wt).unwrap();
         assert_eq!((st.branch.as_str(), st.staged, st.unstaged, st.untracked), ("task", 0, 1, 1));
         assert_eq!(std::fs::read_to_string(wt.join("a.txt")).unwrap(), "edited\n");

@@ -207,7 +207,8 @@ async fn pass(app: &AppHandle, api: &BotApi, m: &Message) -> Result<()> {
         None => {
             let handle = app.clone();
             let room = thread.room.clone();
-            let pane = crate::commands::blocking(app.clone(), move |state| reopen(&handle, state, agent_id, &room)).await?;
+            let pane =
+                crate::commands::blocking(app.clone(), move |state| reopen(&handle, state, agent_id, &room)).await?;
             shown(app, &pane);
             pane
         }

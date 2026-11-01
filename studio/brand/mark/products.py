@@ -5,13 +5,21 @@ Run from this folder: python3 products.py
 Needs Swift (outline.swift reads the font with CoreText). Every mark shares
 one construction (README.md); only the letters differ.
 """
+
 import pathlib
 import re
 import subprocess
 
 HERE = pathlib.Path(__file__).parent
 FONT = HERE / "../../../code/apps/site/assets/fonts/grenze-gotisch.ttf"
-PRODUCTS = {"forge": "Forge", "layer": "Layer", "caster": "Caster", "glyph": "Glyph", "raven": "Raven", "almanac": "Almanac"}
+PRODUCTS = {
+    "forge": "Forge",
+    "layer": "Layer",
+    "caster": "Caster",
+    "glyph": "Glyph",
+    "raven": "Raven",
+    "almanac": "Almanac",
+}
 # The studio pair: C and V at 0.88 of a product initial, 1 unit apart, so
 # their cuts meet and the strike stops between them. Centred on the tile,
 # with the pair's middle at y=104.5, so the strike crosses it low as before.
@@ -35,8 +43,9 @@ TEMPLATE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role
 
 
 def outline(letter):
-    return subprocess.run(["swift", HERE / "outline.swift", FONT, letter],
-                          check=True, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(
+        ["swift", HERE / "outline.swift", FONT, letter], check=True, capture_output=True, text=True
+    ).stdout.strip()
 
 
 def points(path):
@@ -74,11 +83,14 @@ def pair(first, second):
 
 studio = TEMPLATE.format(name="Code Villain", id="cv", path=pair("C", "V")).replace(
     "<!-- Grenze Gotisch 800, 150 units, centered at x=100 with baseline y=152. -->",
-    "<!-- Grenze Gotisch 800: C and V at 0.88 of 150 units, 1 unit apart, centred. -->")
+    "<!-- Grenze Gotisch 800: C and V at 0.88 of 150 units, 1 unit apart, centred. -->",
+)
 (HERE / "mark.svg").write_text(studio)
 print("mark.svg: CV")
 
 for file, name in PRODUCTS.items():
     letter = name[0]
-    (HERE / f"{file}.svg").write_text(TEMPLATE.format(name=name, id=letter.lower(), path=outline(letter)))
+    (HERE / f"{file}.svg").write_text(
+        TEMPLATE.format(name=name, id=letter.lower(), path=outline(letter))
+    )
     print(f"{file}.svg: {letter}")

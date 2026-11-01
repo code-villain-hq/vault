@@ -67,10 +67,7 @@ pub async fn pr_images_call(state: &AppState, args: Value) -> Result<Value> {
     let (owner, name) = off_runtime(move || git::origin_slug_cached(&dir)).await??;
     let (client, _) = github_client(state)?;
     let pr = client.pull_for_branch(&owner, &name, &task.branch).await?.ok_or_else(|| {
-        Error::Other(format!(
-            "{repo} has no open pull request for {}: open it with open_prs first",
-            task.branch
-        ))
+        Error::Other(format!("{repo} has no open pull request for {}: open it with open_prs first", task.branch))
     })?;
     let shown = client.show_images(&owner, &name, pr.number, &pr.url, &images).await?;
     Ok(json!({
@@ -136,7 +133,11 @@ fn read_image(path: &Path, caption: Option<&str>) -> Result<Image> {
         return Err(Error::Other(format!("{shown} is not a file")));
     }
     if meta.len() > MAX_BYTES as u64 {
-        return Err(Error::Other(format!("{shown} is {} MB; at most {} MB", meta.len() / 1_048_576, MAX_BYTES / 1_048_576)));
+        return Err(Error::Other(format!(
+            "{shown} is {} MB; at most {} MB",
+            meta.len() / 1_048_576,
+            MAX_BYTES / 1_048_576
+        )));
     }
     let bytes = std::fs::read(path).map_err(|e| Error::Other(format!("{shown}: {e}")))?;
     let ext = github::kind_of(&bytes)

@@ -16,11 +16,8 @@ pub fn host_of(url: &str) -> Option<String> {
     // A userinfo part is someone's way of making `http://localhost@evil.test`
     // read as this machine.
     let authority = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
-    let host = if let Some(v6) = authority.strip_prefix('[') {
-        v6.split(']').next()?
-    } else {
-        authority.split(':').next()?
-    };
+    let host =
+        if let Some(v6) = authority.strip_prefix('[') { v6.split(']').next()? } else { authority.split(':').next()? };
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     (!host.is_empty()).then_some(host)
 }
@@ -34,11 +31,7 @@ pub fn is_local(host: &str) -> bool {
 /// lowercased, from a host or a URL. None for anything that is not one.
 pub fn normalize(site: &str) -> Option<String> {
     let site = site.trim();
-    let host = if site.contains("://") {
-        host_of(site)?
-    } else {
-        host_of(&format!("https://{site}"))?
-    };
+    let host = if site.contains("://") { host_of(site)? } else { host_of(&format!("https://{site}"))? };
     let host = host.strip_prefix("*.").unwrap_or(&host).to_string();
     let valid = host.contains('.') || host == "localhost";
     let clean = host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'));
@@ -93,7 +86,13 @@ mod tests {
         ] {
             assert!(allowed(url, &[]), "{url}");
         }
-        for url in ["https://example.com", "file:///etc/passwd", "chrome://settings", "javascript:alert(1)", "data:text/html,hi"] {
+        for url in [
+            "https://example.com",
+            "file:///etc/passwd",
+            "chrome://settings",
+            "javascript:alert(1)",
+            "data:text/html,hi",
+        ] {
             assert!(!allowed(url, &[]), "{url}");
         }
     }

@@ -105,11 +105,7 @@ impl Watch {
                         task_id: info.task_id.clone(),
                         title: info.title.clone(),
                         what: loop_said(info).unwrap_or(what).to_string(),
-                        level: if info.notice.as_deref() == Some("usage_limit") {
-                            Level::Error
-                        } else {
-                            Level::Info
-                        },
+                        level: if info.notice.as_deref() == Some("usage_limit") { Level::Error } else { Level::Info },
                     });
                 }
             }
@@ -128,10 +124,7 @@ impl Watch {
                     title: info.title.clone(),
                     what: match info.exit_code {
                         Some(0) => "finished".to_string(),
-                        code => format!(
-                            "exited with {}",
-                            code.map(|c| c.to_string()).unwrap_or_else(|| "?".into())
-                        ),
+                        code => format!("exited with {}", code.map(|c| c.to_string()).unwrap_or_else(|| "?".into())),
                     },
                     level: if info.exit_code == Some(0) { Level::Success } else { Level::Error },
                 });
@@ -139,13 +132,8 @@ impl Watch {
         }
 
         let present: HashSet<&String> = panes.iter().map(|(i, _)| &i.id).collect();
-        self.announced
-            .retain(|id, when| present.contains(id) && at.duration_since(*when) < REPEAT_AFTER);
-        news.retain(|n| {
-            self.announced
-                .get(&n.pane_id)
-                .is_none_or(|when| at.duration_since(*when) >= REPEAT_AFTER)
-        });
+        self.announced.retain(|id, when| present.contains(id) && at.duration_since(*when) < REPEAT_AFTER);
+        news.retain(|n| self.announced.get(&n.pane_id).is_none_or(|when| at.duration_since(*when) >= REPEAT_AFTER));
         for n in &news {
             self.announced.insert(n.pane_id.clone(), at);
         }
@@ -171,9 +159,9 @@ pub fn spawn(app: AppHandle) -> std::io::Result<()> {
                 let state = app.state::<AppState>();
                 // Three switches, not a copy of every task and checkout: this
                 // runs every few seconds for as long as the app does.
-                let (on, keep_awake, phone) = state.config.with(|c| {
-                    (c.ui.notify_waiting_agents, c.ui.keep_awake, c.phone.tailscale || c.phone.home)
-                });
+                let (on, keep_awake, phone) = state
+                    .config
+                    .with(|c| (c.ui.notify_waiting_agents, c.ui.keep_awake, c.phone.tailscale || c.phone.home));
                 let panes = state.ptys.attention();
                 awake.hold(awake::wanted(keep_awake, phone, &panes));
                 let (count, news) = watch.pass(&panes, Instant::now());
@@ -206,11 +194,7 @@ fn task_name(state: &AppState, task_id: &str) -> String {
     if task_id == CHAT_TASK_ID {
         return "Chat".to_string();
     }
-    state
-        .config
-        .task(task_id)
-        .map(|t| t.name)
-        .unwrap_or_else(|_| "a task".into())
+    state.config.task(task_id).map(|t| t.name).unwrap_or_else(|_| "a task".into())
 }
 
 /// The line a banner and a message both say about one agent.

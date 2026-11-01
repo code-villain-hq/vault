@@ -60,11 +60,14 @@ mod tests {
             ]},
         ]);
         let got: Vec<(String, String)> = statuses(&v).into_iter().map(|s| (s.name, s.category)).collect();
-        assert_eq!(got, [
-            ("Open".into(), "new".into()),
-            ("In Progress".into(), "indeterminate".into()),
-            ("Review".into(), "indeterminate".into()),
-            ("Done".into(), "done".into()),
-        ]);
+        assert_eq!(
+            got,
+            [
+                ("Open".into(), "new".into()),
+                ("In Progress".into(), "indeterminate".into()),
+                ("Review".into(), "indeterminate".into()),
+                ("Done".into(), "done".into()),
+            ]
+        );
     }
 }

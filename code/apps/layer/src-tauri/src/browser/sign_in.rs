@@ -84,19 +84,14 @@ pub fn saved_for(state: &AppState, url: &str) -> Vec<SavedSignIn> {
 /// Save a sign-in: its password to the keychain, the rest to the config.
 /// Blocking: the keychain can stop and ask.
 pub fn save(state: &AppState, site: &str, username: &str, password: &str) -> Result<SavedSignIn> {
-    let site = site_of(site).ok_or_else(|| Error::Other(format!("{site} is not a site: give one like localhost or app.example.com")))?;
+    let site = site_of(site)
+        .ok_or_else(|| Error::Other(format!("{site} is not a site: give one like localhost or app.example.com")))?;
     let username = username.trim();
     if username.is_empty() || password.is_empty() {
         return Err(Error::Other("a sign-in needs a username and a password".into()));
     }
     // The same account on the same site is replaced, not saved twice.
-    let existing = state
-        .config
-        .read()
-        .browser
-        .sign_ins
-        .into_iter()
-        .find(|s| s.site == site && s.username == username);
+    let existing = state.config.read().browser.sign_ins.into_iter().find(|s| s.site == site && s.username == username);
     let saved = existing.unwrap_or_else(|| SavedSignIn {
         id: uuid::Uuid::new_v4().simple().to_string(),
         site,
@@ -177,14 +172,15 @@ pub(super) async fn sign_in<R: Runtime>(
         }
         // Only into a password field: put into a text box, it could be read
         // back from the outline.
-        let kind = page.call_on(n, "function () { return this instanceof HTMLInputElement ? this.type : '' }", vec![]).await?;
+        let kind =
+            page.call_on(n, "function () { return this instanceof HTMLInputElement ? this.type : '' }", vec![]).await?;
         if kind.as_str() != Some("password") {
             return Err(Error::Other(format!("e{n} is not a password field: a password goes only into one")));
         }
         let key = secrets::sign_in_key(&account.id);
-        let password = crate::commands::off_runtime(move || secrets::get(&key))
-            .await??
-            .ok_or_else(|| Error::Other(format!("the password saved for {} on {site} is gone from the keychain", account.username)))?;
+        let password = crate::commands::off_runtime(move || secrets::get(&key)).await??.ok_or_else(|| {
+            Error::Other(format!("the password saved for {} on {site} is gone from the keychain", account.username))
+        })?;
         fill(page, n, &password).await?;
         state.browser.mark_secret(&page.task, n);
     }
@@ -288,7 +284,8 @@ mod tests {
         let wrong = tool("browser_sign_in", json!({ "password_field": email })).await.unwrap_err();
         assert!(wrong.to_string().contains("not a password field"), "{wrong}");
 
-        let signed = text(&tool("browser_sign_in", json!({ "username_field": email, "password_field": pw })).await.unwrap());
+        let signed =
+            text(&tool("browser_sign_in", json!({ "username_field": email, "password_field": pw })).await.unwrap());
         assert!(signed.starts_with("Filled in the saved sign-in for ada@acme.test on localhost."), "{signed}");
         assert!(signed.contains(": \"ada@acme.test\""), "the username is filled: {signed}");
         assert!(!signed.contains(secret), "{signed}");
@@ -297,7 +294,8 @@ mod tests {
             let e = tool(refused, json!({ "expression": "document.getElementById('pw').value" })).await.unwrap_err();
             assert!(e.to_string().contains("a saved password is filled into this page"), "{refused}: {e}");
         }
-        let shown = text(&tool("browser_click", json!({ "ref": ref_of(&form, "button \"Show password\"") })).await.unwrap());
+        let shown =
+            text(&tool("browser_click", json!({ "ref": ref_of(&form, "button \"Show password\"") })).await.unwrap());
         assert!(!shown.contains(secret), "hidden even when the page shows it: {shown}");
 
         let done = text(&tool("browser_click", json!({ "ref": ref_of(&form, "button \"Sign in\"") })).await.unwrap());

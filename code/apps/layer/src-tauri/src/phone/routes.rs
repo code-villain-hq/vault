@@ -125,7 +125,10 @@ async fn built<R: Runtime>(app: AppHandle<R>, path: String) -> Response {
             let cache = if html { "no-cache" } else { "public, max-age=31536000, immutable" };
             ([(header::CONTENT_TYPE, a.mime_type), (header::CACHE_CONTROL, cache.into())], a.bytes).into_response()
         }
-        None => fail(StatusCode::NOT_FOUND, format!("{path} is not in the app's build. In a dev build, run `bun run build` first.")),
+        None => fail(
+            StatusCode::NOT_FOUND,
+            format!("{path} is not in the app's build. In a dev build, run `bun run build` first."),
+        ),
     }
 }
 
@@ -191,13 +194,7 @@ where
     let stream = futures_util::stream::unfold(rx, |mut rx| async move {
         rx.recv().await.map(|line| (Ok::<_, Infallible>(line), rx))
     });
-    (
-        [
-            (header::CONTENT_TYPE, "application/x-ndjson"),
-            (header::CACHE_CONTROL, "no-store"),
-        ],
-        Body::from_stream(stream),
-    )
+    ([(header::CONTENT_TYPE, "application/x-ndjson"), (header::CACHE_CONTROL, "no-store")], Body::from_stream(stream))
         .into_response()
 }
 
@@ -262,7 +259,12 @@ struct Since {
 
 /// A pane's output (PHONE-6): its size, then what it printed after `from`
 /// (all its scrollback without one), then everything as it comes.
-async fn output<R: Runtime>(State(app): State<AppHandle<R>>, device: Device, Path(id): Path<String>, Query(q): Query<Since>) -> Response {
+async fn output<R: Runtime>(
+    State(app): State<AppHandle<R>>,
+    device: Device,
+    Path(id): Path<String>,
+    Query(q): Query<Since>,
+) -> Response {
     let state = app.state::<AppState>();
     let Ok(mut feed) = state.ptys.feed(&id) else {
         return fail(StatusCode::NOT_FOUND, "That terminal is closed.");
@@ -337,7 +339,12 @@ struct Typed {
 
 /// A line of text and Enter, or one key of the key bar, into an agent
 /// (PHONE-7).
-async fn type_into<R: Runtime>(State(app): State<AppHandle<R>>, _device: Device, Path(id): Path<String>, Json(t): Json<Typed>) -> Response {
+async fn type_into<R: Runtime>(
+    State(app): State<AppHandle<R>>,
+    _device: Device,
+    Path(id): Path<String>,
+    Json(t): Json<Typed>,
+) -> Response {
     let state = app.state::<AppState>();
     let Ok(pane) = state.ptys.info(&id) else {
         return fail(StatusCode::NOT_FOUND, "That terminal is closed.");
@@ -504,7 +511,8 @@ mod tests {
         assert_eq!(overview["groups"][0]["key"], "ACME-1");
         assert_eq!(overview["groups"][0]["panes"][0]["id"], agent.as_str());
 
-        let wrong = http.post(format!("{base}/api/pair")).json(&json!({ "code": "000000", "name": "x" })).send().await.unwrap();
+        let wrong =
+            http.post(format!("{base}/api/pair")).json(&json!({ "code": "000000", "name": "x" })).send().await.unwrap();
         assert_eq!(wrong.status(), 410, "no code showing, nothing to pair with");
 
         let mut out = get(&format!("/api/panes/{agent}/output"), Some(&token)).await.unwrap();
@@ -519,9 +527,17 @@ mod tests {
         read_until(&mut out, "got:;").await;
 
         assert_eq!(post(&format!("/api/panes/{agent}/input"), json!({ "key": "rm" })).await.unwrap().status(), 400);
-        assert_eq!(post(&format!("/api/panes/{shell}/input"), json!({ "text": "ls" })).await.unwrap().status(), 403, "never a shell");
+        assert_eq!(
+            post(&format!("/api/panes/{shell}/input"), json!({ "text": "ls" })).await.unwrap().status(),
+            403,
+            "never a shell"
+        );
         phone().inner.lock().typing = false;
-        assert_eq!(post(&format!("/api/panes/{agent}/input"), json!({ "text": "hi" })).await.unwrap().status(), 403, "typing off");
+        assert_eq!(
+            post(&format!("/api/panes/{agent}/input"), json!({ "text": "hi" })).await.unwrap().status(),
+            403,
+            "typing off"
+        );
         assert_eq!(get("/api/panes/nope/output", Some(&token)).await.unwrap().status(), 404);
 
         // The home network switched off: the same phone is turned away.

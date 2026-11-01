@@ -45,7 +45,8 @@ pub(super) fn failures(results: &[CheckResult], targets: &[Target], round: u32, 
          or you need something from the user, say so and end your turn without changing anything, and the loop \
          waits for them.\n"
     );
-    let dir = |repo: &str| targets.iter().find(|t| t.repo == repo).map(|t| t.dir.display().to_string()).unwrap_or_default();
+    let dir =
+        |repo: &str| targets.iter().find(|t| t.repo == repo).map(|t| t.dir.display().to_string()).unwrap_or_default();
     for r in results {
         if r.passed {
             text.push_str(&format!("\n`{}/` ({}): `{}` passes.\n", r.repo, dir(&r.repo), r.command));
@@ -99,7 +100,14 @@ mod tests {
             Target { repo: "web".into(), dir: "/tasks/ACME-1/web".into(), command: "bun run check".into() },
         ];
         let results = vec![
-            CheckResult { repo: "api".into(), command: "cargo test".into(), passed: true, code: Some(0), secs: 1.0, output: String::new() },
+            CheckResult {
+                repo: "api".into(),
+                command: "cargo test".into(),
+                passed: true,
+                code: Some(0),
+                secs: 1.0,
+                output: String::new(),
+            },
             CheckResult {
                 repo: "web".into(),
                 command: "bun run check".into(),

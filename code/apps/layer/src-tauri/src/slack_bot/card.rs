@@ -70,7 +70,8 @@ fn outcome(asked: &Asked) -> Option<String> {
     }
     let choice = asked.options.iter().find(|o| o.id == answer);
     let name = choice.map_or(answer, |c| c.name.as_str());
-    let mark = if choice.is_some_and(|c| c.kind.starts_with("reject")) { ":no_entry_sign:" } else { ":white_check_mark:" };
+    let mark =
+        if choice.is_some_and(|c| c.kind.starts_with("reject")) { ":no_entry_sign:" } else { ":white_check_mark:" };
     Some(format!("{mark} {}", escaped(name)))
 }
 
@@ -83,11 +84,13 @@ pub fn render(room: &str, asked: &[Asked]) -> (String, Value) {
         1 => "One thing waits for your go-ahead.".to_string(),
         n => format!("{n} things wait for your go-ahead."),
     };
-    let mut blocks = vec![json!({ "type": "section", "text": { "type": "mrkdwn", "text": format!(":raised_hand: *{head}*") } })];
+    let mut blocks =
+        vec![json!({ "type": "section", "text": { "type": "mrkdwn", "text": format!(":raised_hand: *{head}*") } })];
     for a in asked.iter().take(SHOWN_MAX) {
         let title = format!("*{}*", escaped(&readable(&a.title)));
         match outcome(a) {
-            Some(done) => blocks.push(json!({ "type": "section", "text": { "type": "mrkdwn", "text": format!("{title}  {done}") } })),
+            Some(done) => blocks
+                .push(json!({ "type": "section", "text": { "type": "mrkdwn", "text": format!("{title}  {done}") } })),
             None => {
                 blocks.push(json!({ "type": "section", "text": { "type": "mrkdwn", "text": title } }));
                 let buttons: Vec<Value> = a
@@ -143,7 +146,11 @@ mod tests {
         Asked {
             entry,
             title: title.into(),
-            options: vec![choice("allow", "Allow", "allow_once"), choice("always", "Always allow", "allow_always"), choice("deny", "Reject", "reject_once")],
+            options: vec![
+                choice("allow", "Allow", "allow_once"),
+                choice("always", "Always allow", "allow_always"),
+                choice("deny", "Reject", "reject_once"),
+            ],
             answer: answer.map(str::to_string),
         }
     }
@@ -151,7 +158,10 @@ mod tests {
     #[test]
     fn a_tools_name_reads_as_words_and_where_it_comes_from() {
         assert_eq!(readable("mcp__villain-layer__browser_navigate"), "browser navigate (Layer)");
-        assert_eq!(readable("mcp__claude_ai_Slack__slack_search_public_and_private"), "slack search public and private (Slack)");
+        assert_eq!(
+            readable("mcp__claude_ai_Slack__slack_search_public_and_private"),
+            "slack search public and private (Slack)"
+        );
         assert_eq!(readable("Edit src/main.rs"), "Edit src/main.rs");
         assert_eq!(readable("mcp__odd"), "mcp__odd");
     }
@@ -160,7 +170,10 @@ mod tests {
     fn a_waiting_question_has_a_button_per_answer_that_names_its_chat() {
         let (text, blocks) = render("/chat/a", &[asked(4, "mcp__villain-layer__grafana_labels", None)]);
         assert!(text.starts_with("One thing waits"), "{text}");
-        let buttons = blocks.as_array().unwrap().iter().find(|b| b["type"] == "actions").unwrap()["elements"].as_array().unwrap().clone();
+        let buttons = blocks.as_array().unwrap().iter().find(|b| b["type"] == "actions").unwrap()["elements"]
+            .as_array()
+            .unwrap()
+            .clone();
         assert_eq!(buttons.len(), 3);
         assert_eq!(buttons[0]["style"], "primary");
         assert_eq!(buttons[2]["style"], "danger");
@@ -170,7 +183,8 @@ mod tests {
 
     #[test]
     fn an_answered_question_says_how_and_loses_its_buttons() {
-        let (text, blocks) = render("/chat/a", &[asked(1, "Run ls", Some("deny")), asked(2, "Edit <x> & y", Some("cancelled"))]);
+        let (text, blocks) =
+            render("/chat/a", &[asked(1, "Run ls", Some("deny")), asked(2, "Edit <x> & y", Some("cancelled"))]);
         assert!(text.starts_with("Answered."), "{text}");
         let all = blocks.to_string();
         assert!(!all.contains("\"actions\""), "{all}");

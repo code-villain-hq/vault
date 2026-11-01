@@ -74,10 +74,7 @@ pub(crate) fn oneshot(
     if !how.read {
         command.args(["Read", "Glob", "Grep"]);
     }
-    command
-        .current_dir(cwd.as_ref())
-        .env_clear()
-        .envs(&env);
+    command.current_dir(cwd.as_ref()).env_clear().envs(&env);
     // No thinking: every caller is a short job whose reader is watching a
     // spinner, and a thinking block is only dead time before the answer.
     command.env("MAX_THINKING_TOKENS", "0");
@@ -91,10 +88,7 @@ pub(crate) fn oneshot(
     // Both pipes are pumped on their own threads. The prompt can be larger than
     // a pipe buffer, so writing it inline would block before claude has said
     // anything — and each side would then be waiting on the other.
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| Error::Other("claude took no input".into()))?;
+    let mut stdin = child.stdin.take().ok_or_else(|| Error::Other("claude took no input".into()))?;
     let prompt = prompt.to_string();
     std::thread::spawn(move || {
         let _ = stdin.write_all(prompt.as_bytes());
@@ -108,10 +102,7 @@ pub(crate) fn oneshot(
         })
     });
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| Error::Other("claude produced no output".into()))?;
+    let stdout = child.stdout.take().ok_or_else(|| Error::Other("claude produced no output".into()))?;
 
     let mut streamed = String::new();
     let mut result = None;
@@ -143,9 +134,7 @@ pub(crate) fn oneshot(
         }
     }
 
-    let status = child
-        .wait()
-        .map_err(|e| Error::Other(format!("claude did not finish: {e}")))?;
+    let status = child.wait().map_err(|e| Error::Other(format!("claude did not finish: {e}")))?;
     let stderr = errors.and_then(|h| h.join().ok()).unwrap_or_default();
 
     if let Some(why) = reported {

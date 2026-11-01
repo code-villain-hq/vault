@@ -21,8 +21,8 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use tokio::sync::{Notify, Semaphore};
 
-use crate::error::{Error, Result};
 use crate::config::SavedLoop;
+use crate::error::{Error, Result};
 use crate::pty::PtyManager;
 use message::{count, failures, tail};
 
@@ -270,7 +270,13 @@ impl End {
     }
 }
 
-async fn drive<H: Host>(host: Arc<H>, me: Arc<Shared>, targets: Vec<Target>, permits: Arc<Semaphore>, from: Option<SavedLoop>) {
+async fn drive<H: Host>(
+    host: Arc<H>,
+    me: Arc<Shared>,
+    targets: Vec<Target>,
+    permits: Arc<Semaphore>,
+    from: Option<SavedLoop>,
+) {
     let pane = me.view.lock().pane_id.clone();
     let end = go_round(&host, &me, &pane, &targets, &permits, from).await;
     // Quitting is not ending: the app is going, and the loop with it, to
@@ -297,7 +303,15 @@ fn kept(me: &Shared, failed_at: &Option<String>, held: bool) -> SavedLoop {
 }
 
 /// Waiting on a turn's end or a stop, and what the loop is about to do.
-fn show<H: Host>(host: &Arc<H>, me: &Shared, pane: &str, phase: Phase, note: Option<String>, looping: bool, said: Option<String>) {
+fn show<H: Host>(
+    host: &Arc<H>,
+    me: &Shared,
+    pane: &str,
+    phase: Phase,
+    note: Option<String>,
+    looping: bool,
+    said: Option<String>,
+) {
     me.set(phase, note);
     let _ = host.ptys().set_looping(pane, looping, said);
     host.changed(pane);
@@ -450,7 +464,9 @@ async fn go_round<H: Host>(
             }
             let outcome = match ran {
                 Ok(Ok(outcome)) => outcome,
-                Ok(Err(e)) => return End::stopped(&format!("{}: {e}", target.repo), Some(format!("its loop stopped: {e}"))),
+                Ok(Err(e)) => {
+                    return End::stopped(&format!("{}: {e}", target.repo), Some(format!("its loop stopped: {e}")))
+                }
                 Err(e) => return End::stopped(&format!("The check could not run: {e}"), None),
             };
             if me.stopped() || outcome.ended == check::Ended::Stopped {
@@ -474,10 +490,9 @@ async fn go_round<H: Host>(
                     target.repo,
                     CHECK_TIMEOUT.as_secs() / 60
                 )),
-                (_, Some(127)) => Some(format!(
-                    "`{}` in {} exited 127: a command it runs was not found",
-                    target.command, target.repo
-                )),
+                (_, Some(127)) => {
+                    Some(format!("`{}` in {} exited 127: a command it runs was not found", target.command, target.repo))
+                }
                 _ => None,
             };
             if let Some(why) = why {
@@ -506,7 +521,11 @@ async fn go_round<H: Host>(
         let feedback = (!passed).then(|| failures(&results, targets, round + 1, me.view.lock().rounds));
         record(me, round, results);
         if passed {
-            let note = if round == 0 { "The checks pass.".to_string() } else { format!("The checks pass, after {}.", count(round)) };
+            let note = if round == 0 {
+                "The checks pass.".to_string()
+            } else {
+                format!("The checks pass, after {}.", count(round))
+            };
             return End { phase: Phase::Passed, note, said: Some("passed its checks — your turn".into()) };
         }
         let rounds = me.view.lock().rounds;
@@ -617,7 +636,11 @@ done
         git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "one"]);
 
         let app = tauri::test::mock_app();
-        let host = Arc::new(TestHost { ptys: PtyManager::default(), sent: Mutex::new(Vec::new()), kept: Mutex::new(Vec::new()) });
+        let host = Arc::new(TestHost {
+            ptys: PtyManager::default(),
+            sent: Mutex::new(Vec::new()),
+            kept: Mutex::new(Vec::new()),
+        });
         let opts = SpawnOptions {
             task_id: "t".into(),
             checkout_id: None,
@@ -635,7 +658,13 @@ done
             title_activity: None,
             title_topic: None,
         };
-        let launch = crate::acp::Launch { mcp: None, pick: crate::acp::Pick::New, prompt: Some("start".into()), presets: Vec::new(), on_session: None };
+        let launch = crate::acp::Launch {
+            mcp: None,
+            pick: crate::acp::Pick::New,
+            prompt: Some("start".into()),
+            presets: Vec::new(),
+            on_session: None,
+        };
         let pane = host.ptys.spawn_acp(app.handle(), opts, launch).unwrap().id;
         let deadline = Instant::now() + Duration::from_secs(10);
         while host.ptys.turn(&pane).unwrap().mid || *host.ptys.turns(&pane).unwrap().borrow() == 0 {
@@ -666,7 +695,9 @@ done
         // The agent fixes it when it is told what failed, its second prompt.
         let (_app, host, pane, dir) = world(r#"if [ $n -ge 2 ]; then touch fixed; fi"#);
         let loops = Loops::default();
-        loops.start(host.clone(), &pane, checks(&dir, "test -f fixed || { echo 'fixed is missing'; exit 1; }"), 5, None).unwrap();
+        loops
+            .start(host.clone(), &pane, checks(&dir, "test -f fixed || { echo 'fixed is missing'; exit 1; }"), 5, None)
+            .unwrap();
         let view = until_ended(&loops, &pane);
 
         assert_eq!(view.phase, Phase::Passed, "{view:?}");
@@ -747,7 +778,11 @@ done
         git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "one"]);
 
         let app = tauri::test::mock_app();
-        let host = Arc::new(TestHost { ptys: PtyManager::default(), sent: Mutex::new(Vec::new()), kept: Mutex::new(Vec::new()) });
+        let host = Arc::new(TestHost {
+            ptys: PtyManager::default(),
+            sent: Mutex::new(Vec::new()),
+            kept: Mutex::new(Vec::new()),
+        });
         let opts = SpawnOptions {
             task_id: "t".into(),
             checkout_id: None,
@@ -765,21 +800,38 @@ done
             title_activity: None,
             title_topic: None,
         };
-        let launch = crate::acp::Launch { mcp: None, pick: crate::acp::Pick::New, prompt: None, presets: Vec::new(), on_session: None };
+        let launch = crate::acp::Launch {
+            mcp: None,
+            pick: crate::acp::Pick::New,
+            prompt: None,
+            presets: Vec::new(),
+            on_session: None,
+        };
         let pane = host.ptys.spawn_acp(app.handle(), opts, launch).unwrap().id;
         let wait = |what: &str, secs: u64, done: &dyn Fn() -> bool| {
             let deadline = Instant::now() + Duration::from_secs(secs);
             while !done() {
                 let text = host.ptys.transcript(&pane, 80).unwrap_or_default();
                 assert!(Instant::now() < deadline, "{what} timed out:\n{text}");
-                assert_ne!(host.ptys.info(&pane).map(|i| i.activity).ok(), Some(Activity::Asking), "{what}: the agent asked for permission:\n{text}");
+                assert_ne!(
+                    host.ptys.info(&pane).map(|i| i.activity).ok(),
+                    Some(Activity::Asking),
+                    "{what}: the agent asked for permission:\n{text}"
+                );
                 std::thread::sleep(Duration::from_millis(200));
             }
         };
         wait("opening the conversation", 60, &|| host.ptys.acp_view(&pane, None).is_ok_and(|(v, _)| v.ready));
         let (view, _) = host.ptys.acp_view(&pane, None).unwrap();
-        println!("settings: {:?}", view.settings.iter().map(|s| (&s.id, &s.current, s.options.iter().map(|o| &o.value).collect::<Vec<_>>())).collect::<Vec<_>>());
-        let mode = view.settings.iter().find(|s| s.category.as_deref() == Some("mode")).expect("the agent offers no mode");
+        println!(
+            "settings: {:?}",
+            view.settings
+                .iter()
+                .map(|s| (&s.id, &s.current, s.options.iter().map(|o| &o.value).collect::<Vec<_>>()))
+                .collect::<Vec<_>>()
+        );
+        let mode =
+            view.settings.iter().find(|s| s.category.as_deref() == Some("mode")).expect("the agent offers no mode");
         // Claude Code's `auto` judges each action itself, and runs a harmless
         // `ls` without asking, which `acceptEdits` does not.
         let edits = ["auto", "acceptedits"]
@@ -788,11 +840,15 @@ done
             .expect("no mode that works without asking");
         host.ptys.acp_set(&pane, &mode.id, &edits.value).unwrap();
         wait("changing the mode", 30, &|| {
-            host.ptys.acp_view(&pane, None).is_ok_and(|(v, _)| v.settings.iter().any(|s| s.id == mode.id && s.current == edits.value))
+            host.ptys
+                .acp_view(&pane, None)
+                .is_ok_and(|(v, _)| v.settings.iter().any(|s| s.id == mode.id && s.current == edits.value))
         });
 
         host.ptys.submit(&pane, "Reply with the one word: ready.").unwrap();
-        wait("the first turn", 180, &|| *host.ptys.turns(&pane).unwrap().borrow() >= 1 && !host.ptys.turn(&pane).unwrap().mid);
+        wait("the first turn", 180, &|| {
+            *host.ptys.turns(&pane).unwrap().borrow() >= 1 && !host.ptys.turn(&pane).unwrap().mid
+        });
 
         let loops = Loops::default();
         let check = "test \"$(cat answer.txt 2>/dev/null)\" = 42 || { echo 'answer.txt must hold exactly the number 42, and nothing else.'; exit 1; }";

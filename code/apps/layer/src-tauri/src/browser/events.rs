@@ -68,11 +68,8 @@ impl Browser {
             if inner.running.is_none() {
                 return;
             }
-            let target = e
-                .params
-                .pointer("/targetInfo/targetId")
-                .or_else(|| e.params.get("targetId"))
-                .and_then(Value::as_str);
+            let target =
+                e.params.pointer("/targetInfo/targetId").or_else(|| e.params.get("targetId")).and_then(Value::as_str);
             let Some((task, id)) = tab_of(&inner, e.session.as_deref(), target) else { return };
             let Some(tabs) = inner.tabs.get_mut(&task) else { return };
 
@@ -191,13 +188,21 @@ impl Browser {
         let Some(cdp) = self.inner.lock().running.as_ref().map(|r| r.cdp.clone()) else { return };
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
-            let Ok(info) = cdp.call("Target.getTargetInfo", serde_json::json!({ "targetId": target }), None).await else { return };
-            let get = |k: &str| info.pointer(&format!("/targetInfo/{k}")).and_then(Value::as_str).unwrap_or_default().to_string();
+            let Ok(info) = cdp.call("Target.getTargetInfo", serde_json::json!({ "targetId": target }), None).await
+            else {
+                return;
+            };
+            let get = |k: &str| {
+                info.pointer(&format!("/targetInfo/{k}")).and_then(Value::as_str).unwrap_or_default().to_string()
+            };
             let (title, url) = (get("title"), get("url"));
             let browser = &app.state::<AppState>().browser;
             let moved = {
                 let mut inner = browser.inner.lock();
-                let Some(tab) = inner.tabs.get_mut(&task).and_then(|t| t.list.iter_mut().find(|t| t.target == target)) else { return };
+                let Some(tab) = inner.tabs.get_mut(&task).and_then(|t| t.list.iter_mut().find(|t| t.target == target))
+                else {
+                    return;
+                };
                 let moved = !url.is_empty() && !url.starts_with("chrome-error:") && tab.url != url;
                 if tab.title == title && !moved {
                     return;
@@ -221,14 +226,17 @@ impl Browser {
     /// it is the one that reads them.
     fn on_window<R: Runtime>(&self, app: &AppHandle<R>, p: &Value) {
         let info = |k: &str| p.pointer(&format!("/targetInfo/{k}")).and_then(Value::as_str).map(str::to_string);
-        let (Some("page"), Some(opener), Some(target)) = (info("type").as_deref(), info("openerId"), info("targetId")) else {
+        let (Some("page"), Some(opener), Some(target)) = (info("type").as_deref(), info("openerId"), info("targetId"))
+        else {
             return;
         };
         let (task, opened) = {
             let mut inner = self.inner.lock();
             let Some((task, _)) = tab_of(&inner, None, Some(&opener)) else { return };
             inner.heard.insert(target.clone());
-            if let Some(t) = inner.tabs.get_mut(&task).and_then(|tabs| tabs.list.iter_mut().find(|t| t.target == opener)) {
+            if let Some(t) =
+                inner.tabs.get_mut(&task).and_then(|tabs| tabs.list.iter_mut().find(|t| t.target == opener))
+            {
                 t.windows.heard += 1;
             }
             // Already one of the app's: a tab it made itself.
@@ -321,8 +329,8 @@ impl Browser {
 mod tests {
     use super::*;
     use crate::browser::tests::app_with_task;
-    use serde_json::json;
     use crate::browser::tools::call;
+    use serde_json::json;
 
     fn text(content: &[Value]) -> String {
         content.iter().filter_map(|c| c.get("text").and_then(Value::as_str)).collect()
@@ -353,11 +361,8 @@ mod tests {
         let app = tauri::test::mock_app();
         let browser = Browser::default();
         browser.inner.lock().heard.insert("popup".into());
-        let destroyed = Event {
-            method: "Target.targetDestroyed".into(),
-            params: json!({ "targetId": "popup" }),
-            session: None,
-        };
+        let destroyed =
+            Event { method: "Target.targetDestroyed".into(), params: json!({ "targetId": "popup" }), session: None };
 
         browser.on_event(app.handle(), destroyed);
 
@@ -375,7 +380,11 @@ mod tests {
         let set = |asked: u32, heard: u32, ago: u64| {
             let mut inner = browser.inner.lock();
             let w = &mut inner.tabs.get_mut("t1").unwrap().list[0].windows;
-            *w = super::super::Windows { asked, heard, last_asked: Instant::now().checked_sub(Duration::from_secs(ago)) };
+            *w = super::super::Windows {
+                asked,
+                heard,
+                last_asked: Instant::now().checked_sub(Duration::from_secs(ago)),
+            };
         };
         set(1, 0, 0);
         assert!(browser.window_coming("t1"), "asked for, not yet made");

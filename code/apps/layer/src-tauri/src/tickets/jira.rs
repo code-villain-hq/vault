@@ -10,10 +10,7 @@ use crate::integrations::jira::{self, Jira};
 use super::{Find, NewTicket, Ticket, TicketPage};
 
 pub(super) async fn mine(client: &Jira, cfg: &JiraConfig) -> Result<TicketPage> {
-    let jql = cfg
-        .jql
-        .clone()
-        .unwrap_or_else(|| jira::default_jql(cfg.project_key.as_deref()));
+    let jql = cfg.jql.clone().unwrap_or_else(|| jira::default_jql(cfg.project_key.as_deref()));
     // Your own queue should be all of it: this is the list the app groups into
     // epics and reasons about, and a silent cut makes that grouping wrong.
     client.search(&jql, 500).await
@@ -82,9 +79,7 @@ pub(super) async fn file(client: &Jira, cfg: &JiraConfig, new: &NewTicket) -> Re
         .map(str::to_uppercase)
         .or_else(|| new.parent_key.as_deref().and_then(project_of))
         .or_else(|| cfg.project_key.clone())
-        .ok_or_else(|| {
-            Error::Other("no Jira project to file into — set a project key in Settings".into())
-        })?;
+        .ok_or_else(|| Error::Other("no Jira project to file into — set a project key in Settings".into()))?;
     client
         .create_issue(
             &project_key,

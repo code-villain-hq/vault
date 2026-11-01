@@ -75,7 +75,10 @@ impl GitHub {
           }
         }";
         let v = self
-            .graphql(QUERY, json!({ "q": format!("{query} archived:false sort:updated-desc"), "first": REQUESTED_LIMIT }))
+            .graphql(
+                QUERY,
+                json!({ "q": format!("{query} archived:false sort:updated-desc"), "first": REQUESTED_LIMIT }),
+            )
             .await?;
         parse_requested(&v)
     }
@@ -144,8 +147,8 @@ fn to_requested(v: &Value) -> Option<ReviewRequest> {
         _ => "none",
     };
     let reviewed_at = mine.and_then(|r| r.pointer("/commit/oid")).and_then(|o| o.as_str());
-    let new_since_review = my_review != "none"
-        && matches!(reviewed_at, Some(oid) if !head_sha.is_empty() && oid != head_sha);
+    let new_since_review =
+        my_review != "none" && matches!(reviewed_at, Some(oid) if !head_sha.is_empty() && oid != head_sha);
 
     Some(ReviewRequest {
         repo: text("/repository/nameWithOwner"),
@@ -211,7 +214,8 @@ mod tests {
 
     #[test]
     fn your_review_is_stale_once_the_head_moves_past_the_commit_it_was_of() {
-        let reviewed = |state: &str, oid: &str| one(json!({ "viewerLatestReview": { "state": state, "commit": { "oid": oid } } }));
+        let reviewed =
+            |state: &str, oid: &str| one(json!({ "viewerLatestReview": { "state": state, "commit": { "oid": oid } } }));
         let fresh = one(json!({}));
         assert_eq!(fresh.my_review, "none");
         assert!(!fresh.new_since_review, "nothing to be new since");

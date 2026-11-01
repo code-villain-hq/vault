@@ -87,11 +87,7 @@ impl BotApi {
                 "that is not a bot token. Copy the Bot User OAuth Token (xoxb-…) from OAuth & Permissions.".into(),
             ));
         }
-        Ok(Me {
-            user: str_at(&body, "user_id"),
-            name: str_at(&body, "user"),
-            team_url: str_at(&body, "url"),
-        })
+        Ok(Me { user: str_at(&body, "user_id"), name: str_at(&body, "user"), team_url: str_at(&body, "url") })
     }
 
     /// Where the Socket Mode connection goes this time: each address is good
@@ -113,7 +109,13 @@ impl BotApi {
     /// A thread's messages, oldest first, at most `cap`, and whether there
     /// were more. With `oldest`, the ones after it (and Slack adds the
     /// thread's first message). None when Slack has no such message.
-    pub async fn replies(&self, channel: &str, thread: &str, oldest: &str, cap: usize) -> Result<Option<(Vec<ThreadMessage>, bool)>> {
+    pub async fn replies(
+        &self,
+        channel: &str,
+        thread: &str,
+        oldest: &str,
+        cap: usize,
+    ) -> Result<Option<(Vec<ThreadMessage>, bool)>> {
         let mut out = Vec::new();
         let mut cursor = String::new();
         loop {
@@ -140,11 +142,8 @@ impl BotApi {
                     ts: str_at(m, "ts"),
                 });
             }
-            cursor = body
-                .pointer("/response_metadata/next_cursor")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
+            cursor =
+                body.pointer("/response_metadata/next_cursor").and_then(Value::as_str).unwrap_or_default().to_string();
             if cursor.is_empty() {
                 return Ok(Some((out, false)));
             }
@@ -211,7 +210,8 @@ impl BotApi {
     /// Post Block Kit `blocks` into a thread, with `shown` for notifications
     /// and screen readers. Returns the message's timestamp, to change it by.
     pub async fn post_blocks(&self, channel: &str, thread: &str, shown: &str, blocks: &Value) -> Result<String> {
-        let body = json!({ "channel": channel, "thread_ts": thread, "text": shown, "blocks": blocks, "unfurl_links": false });
+        let body =
+            json!({ "channel": channel, "thread_ts": thread, "text": shown, "blocks": blocks, "unfurl_links": false });
         let answer = self.post("chat.postMessage", &body).await?;
         Ok(str_at(&answer, "ts"))
     }
@@ -363,11 +363,7 @@ pub fn split_reply(text: &str, max: usize, parts: usize) -> Vec<String> {
         } else {
             let window_end = rest.char_indices().nth(max).map_or(rest.len(), |(i, _)| i);
             let window = &rest[..window_end];
-            window
-                .rfind("\n\n")
-                .or_else(|| window.rfind('\n'))
-                .filter(|&i| i > window.len() / 2)
-                .unwrap_or(window_end)
+            window.rfind("\n\n").or_else(|| window.rfind('\n')).filter(|&i| i > window.len() / 2).unwrap_or(window_end)
         };
         let mut part = String::new();
         if fence_open {

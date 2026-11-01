@@ -53,9 +53,7 @@ impl Output {
     pub(super) fn since(&self, from: Option<u64>) -> (&[u8], bool) {
         let start = self.start();
         match from {
-            Some(f) if f >= start && f <= self.total => {
-                (&self.scrollback[(f - start) as usize..], false)
-            }
+            Some(f) if f >= start && f <= self.total => (&self.scrollback[(f - start) as usize..], false),
             // A terminal that has never been drawn has nothing to clear.
             // One that is too far behind has to start again.
             other => (&self.scrollback, other.is_some()),

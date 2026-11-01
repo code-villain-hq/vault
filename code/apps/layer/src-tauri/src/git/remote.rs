@@ -39,12 +39,8 @@ pub fn origin_slug(dir: &Path) -> Result<(String, String)> {
         },
     };
 
-    let segments: Vec<&str> = normalised
-        .trim_end_matches('/')
-        .trim_end_matches(".git")
-        .split('/')
-        .filter(|s| !s.is_empty())
-        .collect();
+    let segments: Vec<&str> =
+        normalised.trim_end_matches('/').trim_end_matches(".git").split('/').filter(|s| !s.is_empty()).collect();
 
     // The first segment is the host (possibly with userinfo and a port); the
     // last two are always owner and repo.
@@ -112,11 +108,7 @@ pub fn clone_by_key(key: &str, into: &Path) -> Result<()> {
     let Err(over_ssh) = run(parent, &["clone", "--quiet", "--", &ssh, &target]) else { return Ok(()) };
     let https = format!("https://{key}.git");
     run(parent, &["clone", "--quiet", "--", &https, &target]).map(|_| ()).map_err(|over_https| {
-        Error::Other(format!(
-            "Could not clone {key}.\nOver SSH: {}\nOver HTTPS: {}",
-            said(over_ssh),
-            said(over_https)
-        ))
+        Error::Other(format!("Could not clone {key}.\nOver SSH: {}\nOver HTTPS: {}", said(over_ssh), said(over_https)))
     })
 }
 

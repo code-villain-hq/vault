@@ -140,7 +140,12 @@ impl PtyManager {
     /// Start an agent over ACP in a pane of its own (§20): `opts.program` and
     /// `args` are its ACP command. The opening prompt is `launch.prompt`,
     /// sent whole once the conversation is open, not `initial_input`.
-    pub fn spawn_acp<R: Runtime>(&self, app: &AppHandle<R>, opts: SpawnOptions, launch: acp::Launch) -> Result<PaneInfo> {
+    pub fn spawn_acp<R: Runtime>(
+        &self,
+        app: &AppHandle<R>,
+        opts: SpawnOptions,
+        launch: acp::Launch,
+    ) -> Result<PaneInfo> {
         let slot = self.reserve(&opts.cwd)?;
         let id = uuid::Uuid::new_v4().to_string();
         let started = acp::start(&opts.program, &opts.args, &opts.cwd, &opts.env, launch, &id)?;
@@ -259,7 +264,13 @@ cat > /dev/null
             title_activity: None,
             title_topic: None,
         };
-        let launch = acp::Launch { mcp: None, pick: acp::Pick::New, prompt: Some("ping".into()), presets: Vec::new(), on_session: None };
+        let launch = acp::Launch {
+            mcp: None,
+            pick: acp::Pick::New,
+            prompt: Some("ping".into()),
+            presets: Vec::new(),
+            on_session: None,
+        };
         let pane = ptys.spawn_acp(app.handle(), opts, launch).unwrap();
         assert!(pane.acp);
 
@@ -303,7 +314,13 @@ cat > /dev/null
             title_activity: None,
             title_topic: None,
         };
-        let launch = acp::Launch { mcp: None, pick: acp::Pick::New, prompt: Some("ping".into()), presets: Vec::new(), on_session: None };
+        let launch = acp::Launch {
+            mcp: None,
+            pick: acp::Pick::New,
+            prompt: Some("ping".into()),
+            presets: Vec::new(),
+            on_session: None,
+        };
         let pane = ptys.spawn_acp(app.handle(), opts, launch).unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
         while ptys.info(&pane.id).unwrap().activity != Activity::Done && Instant::now() < deadline {
@@ -356,7 +373,8 @@ cat > /dev/null
                 title_activity: None,
                 title_topic: None,
             };
-            let launch = acp::Launch { mcp: None, pick, prompt: Some(prompt.into()), presets: Vec::new(), on_session: None };
+            let launch =
+                acp::Launch { mcp: None, pick, prompt: Some(prompt.into()), presets: Vec::new(), on_session: None };
             ptys.spawn_acp(app.handle(), opts, launch).unwrap()
         };
         let done = |id: &str| {
@@ -375,7 +393,8 @@ cat > /dev/null
         let session = ptys.session(&first.id).unwrap().expect("the agent named its conversation");
         ptys.close(&first.id).unwrap();
 
-        let again = start(acp::Pick::Id(session), "What one word did you reply with before? Reply with only that word.");
+        let again =
+            start(acp::Pick::Id(session), "What one word did you reply with before? Reply with only that word.");
         let text = done(&again.id);
         let answer = text.rsplit("Reply with only that word.").next().unwrap_or_default().to_lowercase();
         assert!(answer.contains("pong"), "the conversation was not picked up: {text}");

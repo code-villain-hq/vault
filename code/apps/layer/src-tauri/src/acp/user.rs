@@ -54,10 +54,13 @@ impl Conn {
                 return false;
             }
             if let (Some(session), true) = (st.session.clone(), st.busy) {
-                fx.send.push(json!({ "jsonrpc": "2.0", "method": "session/cancel", "params": { "sessionId": session } }));
+                fx.send
+                    .push(json!({ "jsonrpc": "2.0", "method": "session/cancel", "params": { "sessionId": session } }));
             }
             for q in std::mem::take(&mut st.questions) {
-                fx.send.push(json!({ "jsonrpc": "2.0", "id": q.rpc, "result": { "outcome": { "outcome": "cancelled" } } }));
+                fx.send.push(
+                    json!({ "jsonrpc": "2.0", "id": q.rpc, "result": { "outcome": { "outcome": "cancelled" } } }),
+                );
                 st.convo.answered(q.entry, "cancelled");
             }
             st.drop_queue();

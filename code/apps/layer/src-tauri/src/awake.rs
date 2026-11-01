@@ -19,9 +19,9 @@ use crate::pty::{Activity, PaneInfo, PaneKind};
 /// asking for permission is exactly the one you would answer from the phone,
 /// and a Mac asleep is not there to answer.
 pub(crate) fn wanted(on: bool, phone: bool, panes: &[(PaneInfo, bool)]) -> bool {
-    on && panes.iter().any(|(info, _)| {
-        info.kind == PaneKind::Agent && info.running && (phone || info.activity == Activity::Working)
-    })
+    on && panes
+        .iter()
+        .any(|(info, _)| info.kind == PaneKind::Agent && info.running && (phone || info.activity == Activity::Working))
 }
 
 #[derive(Default)]

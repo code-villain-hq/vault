@@ -65,14 +65,17 @@ impl Browser {
     /// to write, and could hold what was typed.
     fn tab_to_read(&self, task: &str, id: &str) -> Result<Page> {
         let inner = self.inner.lock();
-        let cdp = inner.running.as_ref().map(|r| r.cdp.clone()).ok_or_else(|| Error::Other("the browser closed".into()))?;
+        let cdp =
+            inner.running.as_ref().map(|r| r.cdp.clone()).ok_or_else(|| Error::Other("the browser closed".into()))?;
         let tab = inner
             .tabs
             .get(task)
             .and_then(|t| t.list.iter().find(|t| t.target == id))
             .ok_or_else(|| Error::Other("that tab is closed".into()))?;
         if tab.secret.is_some() {
-            return Err(Error::Other("a saved password is filled into that tab's page: copy once it has signed in".into()));
+            return Err(Error::Other(
+                "a saved password is filled into that tab's page: copy once it has signed in".into(),
+            ));
         }
         Ok(Page::new(cdp, tab.session.clone(), task.to_string()))
     }
@@ -80,7 +83,12 @@ impl Browser {
 
 /// Copy the sign-in of the tab the agent named into `page`, the active
 /// tab; what was copied, by name.
-pub(super) async fn copy_session<R: Runtime>(app: &AppHandle<R>, state: &AppState, page: &Page, args: &Value) -> Result<String> {
+pub(super) async fn copy_session<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &AppState,
+    page: &Page,
+    args: &Value,
+) -> Result<String> {
     let browser = &state.browser;
     let task = &page.task;
     let n = args.get("from_tab").and_then(Value::as_u64).ok_or_else(|| {

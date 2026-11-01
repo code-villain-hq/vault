@@ -22,9 +22,7 @@ export async function runChecks(steps: CheckStep[]): Promise<void> {
 
 /** Snapshot of generated `.ts` files under `dir`, for drift checks. */
 export async function typesSnapshot(dir: string): Promise<string> {
-  const files = (await readdir(dir, { recursive: true }))
-    .filter((f) => f.endsWith(".ts"))
-    .sort();
+  const files = (await readdir(dir, { recursive: true })).filter((f) => f.endsWith(".ts")).sort();
   const contents = await Promise.all(files.map((f) => Bun.file(`${dir}/${f}`).text()));
   return JSON.stringify(files.map((f, i) => [f, contents[i]]));
 }

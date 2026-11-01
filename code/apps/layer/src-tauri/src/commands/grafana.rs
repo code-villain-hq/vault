@@ -3,7 +3,7 @@
 //! browser's are, and `mcp.rs` hands them their calls.
 
 use chrono::Utc;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tauri::State;
 
 use crate::config::GrafanaConfig;
@@ -68,9 +68,7 @@ fn loki(all: Vec<Datasource>) -> Vec<Datasource> {
 /// Reconnecting (a new token, say) keeps the datasource chosen, as long as
 /// it is the same site and the site still has it.
 fn kept_choice(was: Option<GrafanaConfig>, base_url: &str, loki: &[Datasource]) -> Option<String> {
-    was.filter(|g| g.base_url == base_url)
-        .and_then(|g| g.datasource)
-        .filter(|uid| loki.iter().any(|d| &d.uid == uid))
+    was.filter(|g| g.base_url == base_url).and_then(|g| g.datasource).filter(|uid| loki.iter().any(|d| &d.uid == uid))
 }
 
 pub fn grafana_owns(name: &str) -> bool {
@@ -181,15 +179,20 @@ pub async fn grafana_call(state: &AppState, name: &str, args: Value) -> Result<V
         }
 
         "grafana_logs" => {
-            let link = arg(&args, "url").map(|u| grafana::parse_explore(u, &cfg.base_url)).transpose()?.unwrap_or_default();
+            let link =
+                arg(&args, "url").map(|u| grafana::parse_explore(u, &cfg.base_url)).transpose()?.unwrap_or_default();
             let expr = arg(&args, "query").map(str::to_string).unwrap_or(link.expr);
             if expr.trim().is_empty() {
                 return Err(Error::Other("give a LogQL query, or a Grafana Explore url".into()));
             }
             let (from_ns, to_ns) = range(&args, link.from, link.to)?;
-            let uid = datasource(&client, &cfg, arg(&args, "datasource").map(str::to_string).or(link.datasource)).await?;
+            let uid =
+                datasource(&client, &cfg, arg(&args, "datasource").map(str::to_string).or(link.datasource)).await?;
             // Clamped before the cast: a huge value would wrap.
-            let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(grafana::DEFAULT_LIMIT as u64)
+            let limit = args
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(grafana::DEFAULT_LIMIT as u64)
                 .clamp(1, grafana::MAX_LIMIT as u64) as u32;
             let mut out = client.query_range(&uid, &LogQuery { expr: &expr, from_ns, to_ns, limit }).await?;
             if let Some(o) = out.as_object_mut() {

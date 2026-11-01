@@ -196,30 +196,18 @@ pub async fn tracker_call(app: &AppHandle, name: &str, args: Value) -> Result<Va
             Ok(serde_json::to_value(client.issue(&key).await?)?)
         }
 
-        "jira_issue_types" => Ok(serde_json::to_value(
-            commands::ticket_types_inner(&state, false).await?,
-        )?),
+        "jira_issue_types" => Ok(serde_json::to_value(commands::ticket_types_inner(&state, false).await?)?),
 
-        "jira_create_fields" => {
-            Ok(serde_json::to_value(
-                commands::required_fields_for(
-                    &state,
-                    required(&args, "project_key")?,
-                    required(&args, "issue_type_id")?,
-                )
+        "jira_create_fields" => Ok(serde_json::to_value(
+            commands::required_fields_for(&state, required(&args, "project_key")?, required(&args, "issue_type_id")?)
                 .await?,
-            )?)
-        }
+        )?),
 
         "jira_create_issue" => {
             let (client, cfg) = commands::jira_client(&state)?;
-            let project = arg(&args, "project_key")
-                .map(str::to_string)
-                .or_else(|| cfg.project_key.clone())
-                .ok_or_else(|| {
-                    crate::error::Error::Other(
-                        "no project_key given and none configured in the app".into(),
-                    )
+            let project =
+                arg(&args, "project_key").map(str::to_string).or_else(|| cfg.project_key.clone()).ok_or_else(|| {
+                    crate::error::Error::Other("no project_key given and none configured in the app".into())
                 })?;
 
             let key = client
@@ -249,9 +237,7 @@ pub async fn tracker_call(app: &AppHandle, name: &str, args: Value) -> Result<Va
 
         "jira_comment" => {
             let (client, _) = commands::jira_client(&state)?;
-            client
-                .comment(required(&args, "key")?, required(&args, "text")?)
-                .await?;
+            client.comment(required(&args, "key")?, required(&args, "text")?).await?;
             Ok(json!({ "ok": true }))
         }
 
@@ -263,19 +249,12 @@ pub async fn tracker_call(app: &AppHandle, name: &str, args: Value) -> Result<Va
             let Some(wanted) = arg(&args, "transition") else {
                 return Ok(serde_json::to_value(available)?);
             };
-            let found = available
-                .iter()
-                .find(|t| t.name.eq_ignore_ascii_case(wanted))
-                .ok_or_else(|| {
-                    crate::error::Error::Other(format!(
-                        "no transition named {wanted}; available: {}",
-                        available
-                            .iter()
-                            .map(|t| t.name.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ))
-                })?;
+            let found = available.iter().find(|t| t.name.eq_ignore_ascii_case(wanted)).ok_or_else(|| {
+                crate::error::Error::Other(format!(
+                    "no transition named {wanted}; available: {}",
+                    available.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", ")
+                ))
+            })?;
             client.transition(key, &found.id).await?;
             Ok(json!({ "ok": true, "status": found.to_status }))
         }
@@ -297,7 +276,10 @@ async fn github_call(state: &AppState, name: &str, args: &Value) -> Result<Value
         "github_get_issue" => {
             let one = in_workspace(&issues, required(args, "key")?)?;
             let found = client.issues(&[one]).await?;
-            let issue = found.into_iter().next().ok_or_else(|| Error::NotFound(required(args, "key").unwrap_or_default().into()))?;
+            let issue = found
+                .into_iter()
+                .next()
+                .ok_or_else(|| Error::NotFound(required(args, "key").unwrap_or_default().into()))?;
             Ok(serde_json::to_value(issue)?)
         }
         "github_create_issue" => {

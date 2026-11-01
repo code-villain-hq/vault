@@ -11,8 +11,8 @@ use crate::pty::{PaneInfo, PaneKind, SpawnOptions};
 use crate::shellenv;
 
 use super::panes_restore::remember_pane;
-use super::AppState;
 use super::task_context::write_task_context;
+use super::AppState;
 
 // ------------------------------------------------------------------- panes
 
@@ -49,22 +49,14 @@ pub(crate) fn resolve_scope(
 ) -> Result<(String, String, Option<String>)> {
     if let Some(id) = checkout_id {
         let checkout = state.config.checkout(id)?;
-        let name = state
-            .config
-            .project(&checkout.project_id)
-            .map(|p| p.name)
-            .unwrap_or_else(|_| "repo".into());
+        let name = state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "repo".into());
         return Ok((checkout.path, name, Some(id.to_string())));
     }
 
     let checkouts = state.config.checkouts_of(&task.id);
     let name = match checkouts.as_slice() {
         [] => return Err(Error::Other("this task has no repositories".into())),
-        [only] => state
-            .config
-            .project(&only.project_id)
-            .map(|p| p.name)
-            .unwrap_or_else(|_| "repo".into()),
+        [only] => state.config.project(&only.project_id).map(|p| p.name).unwrap_or_else(|_| "repo".into()),
         many => format!("{} repos", many.len()),
     };
     Ok((task.root.clone(), name, None))
@@ -123,10 +115,7 @@ pub async fn spawn_shell(
     cols: Option<u16>,
 ) -> Result<PaneInfo> {
     let handle = app.clone();
-    super::blocking(app, move |state| {
-        open_shell(&handle, state, task_id, checkout_id, rows, cols)
-    })
-    .await
+    super::blocking(app, move |state| open_shell(&handle, state, task_id, checkout_id, rows, cols)).await
 }
 
 pub(crate) fn open_shell(
@@ -184,8 +173,16 @@ pub async fn spawn_agent(
     let handle = app.clone();
     super::blocking(app, move |state| {
         start_agent(
-            &handle, state, task_id, agent_id, checkout_id, prompt,
-            Resume::newest_if(resume.unwrap_or(false)), rows, cols, acp.unwrap_or(false),
+            &handle,
+            state,
+            task_id,
+            agent_id,
+            checkout_id,
+            prompt,
+            Resume::newest_if(resume.unwrap_or(false)),
+            rows,
+            cols,
+            acp.unwrap_or(false),
         )
     })
     .await
@@ -207,11 +204,7 @@ pub async fn resumable_agents(
     super::blocking(app, move |state| {
         let task = state.config.task(&task_id)?;
         let (cwd, _, _) = resolve_scope(state, &task, checkout_id.as_deref())?;
-        Ok(if checkout_id.is_some() {
-            agents::resumable(&cwd)
-        } else {
-            resumable_for(state, &task, &cwd)
-        })
+        Ok(if checkout_id.is_some() { agents::resumable(&cwd) } else { resumable_for(state, &task, &cwd) })
     })
     .await
 }
@@ -239,13 +232,20 @@ pub(crate) enum Resume {
     Newest,
     /// A pane restarted in place (PANE-14): in the folder it ran in, on the
     /// conversation it last said it was in, or else that folder's newest.
-    Restart { cwd: String, session: Option<String> },
+    Restart {
+        cwd: String,
+        session: Option<String>,
+    },
 }
 
 impl Resume {
     /// The newest conversation, when there is one to pick up.
     pub(crate) fn newest_if(found: bool) -> Self {
-        if found { Resume::Newest } else { Resume::No }
+        if found {
+            Resume::Newest
+        } else {
+            Resume::No
+        }
     }
 
     /// What the CLI is started with to pick the conversation up. None for a
@@ -259,9 +259,8 @@ impl Resume {
         if let (Some(id), Some(flag)) = (session, def.resume_by_id) {
             return Ok(Some(vec![flag.to_string(), id.to_string()]));
         }
-        let flags = def.resume_args.ok_or_else(|| {
-            Error::Other(format!("{} cannot resume a previous session", def.name))
-        })?;
+        let flags =
+            def.resume_args.ok_or_else(|| Error::Other(format!("{} cannot resume a previous session", def.name)))?;
         Ok(Some(flags.iter().map(|f| f.to_string()).collect()))
     }
 }
@@ -280,8 +279,7 @@ pub(crate) fn start_agent(
     acp: bool,
 ) -> Result<PaneInfo> {
     let task = state.config.task(&task_id)?;
-    let def = agents::find(&agent_id)
-        .ok_or_else(|| Error::NotFound(format!("agent {agent_id}")))?;
+    let def = agents::find(&agent_id).ok_or_else(|| Error::NotFound(format!("agent {agent_id}")))?;
 
     let (mut cwd, scope, checkout_id) = resolve_scope(state, &task, checkout_id.as_deref())?;
     match &resume {
@@ -305,8 +303,8 @@ pub(crate) fn start_agent(
         remember_pane(app, state, &pane);
         return Ok(pane);
     }
-    let program = shellenv::which(def.program)
-        .ok_or_else(|| Error::NotFound(format!("{} is not on your PATH", def.program)))?;
+    let program =
+        shellenv::which(def.program).ok_or_else(|| Error::NotFound(format!("{} is not on your PATH", def.program)))?;
 
     // Resuming means handing the conversation back to the CLI, so an opening
     // prompt would only talk over it.
@@ -314,9 +312,8 @@ pub(crate) fn start_agent(
         Some(args) => (args, None),
         None => agents::launch_args(def, prompt.as_deref()),
     };
-    let initial_input = initial_input
-        .map(|text| typeable(agent_file_dir(state, &task).as_deref(), FIRST_PROMPT, &text))
-        .transpose()?;
+    let initial_input =
+        initial_input.map(|text| typeable(agent_file_dir(state, &task).as_deref(), FIRST_PROMPT, &text)).transpose()?;
 
     // The task folder keeps a `.mcp.json` of its own too, so running a CLI
     // there by hand gets the same tools the app's agents do.
@@ -448,14 +445,13 @@ pub(crate) fn typeable(dir: Option<&Path>, file: &str, text: &str) -> Result<Str
         return Ok(text.to_string());
     }
     let dir = dir.ok_or_else(|| {
-        Error::Other("this is too long to type into a terminal, and this task has no folder of its own to leave it in".into())
+        Error::Other(
+            "this is too long to type into a terminal, and this task has no folder of its own to leave it in".into(),
+        )
     })?;
     let path = dir.join(file);
     std::fs::write(&path, text)?;
-    Ok(format!(
-        "Layer has left you a message too long to type. Read {} in full, then do what it says.",
-        path.display()
-    ))
+    Ok(format!("Layer has left you a message too long to type. Read {} in full, then do what it says.", path.display()))
 }
 
 /// Type `text` into a running agent in `task`, through `typeable`.
@@ -505,11 +501,7 @@ pub(crate) fn remove_generated(dir: &Path) {
 /// the one-repo-per-task layout.
 pub(crate) fn agent_file_dir(state: &AppState, task: &Task) -> Option<PathBuf> {
     let root = PathBuf::from(&task.root);
-    let is_a_checkout = state
-        .config
-        .checkouts_of(&task.id)
-        .iter()
-        .any(|c| Path::new(&c.path) == root);
+    let is_a_checkout = state.config.checkouts_of(&task.id).iter().any(|c| Path::new(&c.path) == root);
 
     (!is_a_checkout && root.is_dir()).then_some(root)
 }
@@ -582,12 +574,7 @@ pub(crate) fn write_chat_context(state: &AppState, dir: &Path) -> Result<()> {
     if !cfg.projects.is_empty() {
         md.push_str("## Repositories\n\n| repo | group | path |\n|---|---|---|\n");
         for p in &cfg.projects {
-            md.push_str(&format!(
-                "| {} | {} | `{}` |\n",
-                p.name,
-                p.group.as_deref().unwrap_or("—"),
-                p.path,
-            ));
+            md.push_str(&format!("| {} | {} | `{}` |\n", p.name, p.group.as_deref().unwrap_or("—"), p.path,));
         }
         md.push('\n');
     }
@@ -602,12 +589,8 @@ pub(crate) fn write_chat_context(state: &AppState, dir: &Path) -> Result<()> {
                 md.push_str(&format!("{url}\n"));
             }
             for c in cfg.checkouts.iter().filter(|c| c.task_id == task.id) {
-                let repo = cfg
-                    .projects
-                    .iter()
-                    .find(|p| p.id == c.project_id)
-                    .map(|p| p.name.as_str())
-                    .unwrap_or("unknown");
+                let repo =
+                    cfg.projects.iter().find(|p| p.id == c.project_id).map(|p| p.name.as_str()).unwrap_or("unknown");
                 md.push_str(&format!("- {repo}: `{}`\n", c.path));
             }
             md.push('\n');
@@ -630,8 +613,10 @@ pub async fn spawn_chat(
     acp: Option<bool>,
 ) -> Result<PaneInfo> {
     let handle = app.clone();
-    super::blocking(app, move |state| open_chat(&handle, state, agent_id, prompt, None, Resume::No, acp.unwrap_or(false)))
-        .await
+    super::blocking(app, move |state| {
+        open_chat(&handle, state, agent_id, prompt, None, Resume::No, acp.unwrap_or(false))
+    })
+    .await
 }
 
 pub(crate) fn open_chat(
@@ -644,8 +629,7 @@ pub(crate) fn open_chat(
     resume: Resume,
     acp: bool,
 ) -> Result<PaneInfo> {
-    let def = agents::find(&agent_id)
-        .ok_or_else(|| Error::NotFound(format!("agent {agent_id}")))?;
+    let def = agents::find(&agent_id).ok_or_else(|| Error::NotFound(format!("agent {agent_id}")))?;
 
     let dir = match room {
         Some(dir) => {
@@ -662,13 +646,20 @@ pub(crate) fn open_chat(
 
     if acp {
         let cwd = dir.to_string_lossy().to_string();
-        let start = super::acp_panes::Start { task_id: CHAT_TASK_ID.to_string(), checkout_id: None, cwd, title, prompt, resume };
+        let start = super::acp_panes::Start {
+            task_id: CHAT_TASK_ID.to_string(),
+            checkout_id: None,
+            cwd,
+            title,
+            prompt,
+            resume,
+        };
         let pane = super::acp_panes::start(app, state, def, start)?;
         remember_pane(app, state, &pane);
         return Ok(pane);
     }
-    let program = shellenv::which(def.program)
-        .ok_or_else(|| Error::NotFound(format!("{} is not on your PATH", def.program)))?;
+    let program =
+        shellenv::which(def.program).ok_or_else(|| Error::NotFound(format!("{} is not on your PATH", def.program)))?;
 
     // Resuming hands the conversation back to the CLI, so an opening prompt
     // would only talk over it.
@@ -786,7 +777,9 @@ fn restart(app: &AppHandle, state: &AppState, id: &str) -> Result<PaneInfo> {
         .as_deref()
         .and_then(agents::find)
         .filter(|d| if old.acp { d.acp.is_some() } else { d.resume_args.is_some() })
-        .ok_or_else(|| Error::Other(format!("{} cannot pick its conversation back up, so a restart would lose it.", old.title)))?;
+        .ok_or_else(|| {
+            Error::Other(format!("{} cannot pick its conversation back up, so a restart would lose it.", old.title))
+        })?;
     // Checked before it is stopped: stopped, then not started, is the one
     // way this loses an agent.
     let program = match (old.acp, def.acp) {
@@ -797,7 +790,11 @@ fn restart(app: &AppHandle, state: &AppState, id: &str) -> Result<PaneInfo> {
     let session = state.ptys.session(id)?;
     // Without its id, `--continue` takes the folder's newest conversation,
     // and another agent there may be the one writing it.
-    let shared = state.ptys.list(None).into_iter().any(|p| p.id != id && p.running && p.agent_id == old.agent_id && p.cwd == old.cwd);
+    let shared = state
+        .ptys
+        .list(None)
+        .into_iter()
+        .any(|p| p.id != id && p.running && p.agent_id == old.agent_id && p.cwd == old.cwd);
     if session.is_none() && shared && !old.acp {
         return Err(Error::Other(format!(
             "Another {} is open in this folder, and this one never said which conversation it is in, so a restart could pick up the other's.",
@@ -812,7 +809,18 @@ fn restart(app: &AppHandle, state: &AppState, id: &str) -> Result<PaneInfo> {
     let started = if old.task_id == CHAT_TASK_ID {
         open_chat(app, state, agent_id, None, Some(PathBuf::from(&old.cwd)), resume, old.acp)
     } else {
-        start_agent(app, state, old.task_id.clone(), agent_id, old.checkout_id.clone(), None, resume, None, None, old.acp)
+        start_agent(
+            app,
+            state,
+            old.task_id.clone(),
+            agent_id,
+            old.checkout_id.clone(),
+            None,
+            resume,
+            None,
+            None,
+            old.acp,
+        )
     };
     let _ = state.config.update(|c| match &started {
         Ok(_) => c.saved_panes.retain(|p| p.id != id),

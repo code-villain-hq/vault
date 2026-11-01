@@ -50,9 +50,7 @@ impl GitHub {
         let mut prs = Vec::new();
         let mut after: Option<String> = None;
         loop {
-            let v = self
-                .graphql(QUERY, json!({ "q": q, "first": PAGE, "after": after }))
-                .await?;
+            let v = self.graphql(QUERY, json!({ "q": q, "first": PAGE, "after": after })).await?;
             // A page that failed is an error, not a shorter list: a branch
             // whose pull request went unread would be judged without it.
             let (page, next) = parse_my_pulls(&v)?;
@@ -136,7 +134,8 @@ mod tests {
 
     #[test]
     fn the_last_page_has_no_next_and_an_error_is_not_an_empty_list() {
-        let v = json!({ "data": { "search": { "pageInfo": { "hasNextPage": false, "endCursor": "x" }, "nodes": [] } } });
+        let v =
+            json!({ "data": { "search": { "pageInfo": { "hasNextPage": false, "endCursor": "x" }, "nodes": [] } } });
         assert_eq!(parse_my_pulls(&v).unwrap(), (vec![], None));
         let v = json!({ "data": null, "errors": [{ "message": "Field 'headRefOid' doesn't exist" }] });
         assert!(parse_my_pulls(&v).unwrap_err().to_string().contains("headRefOid"));

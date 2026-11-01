@@ -14,20 +14,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-mod integrations;
 mod browser;
+mod integrations;
 mod phone;
 mod project;
 pub mod shared;
-pub use integrations::{
-    AthenaTable, FlowStatus, GithubConfig, GrafanaConfig, JiraConfig, LogSource, ModelChoice, SlackBotConfig, SlackConfig, SlackThread,
-    StartTo, TicketFlow,
-};
 pub use browser::{BrowserConfig, SavedSignIn, SavedTabs};
+pub use integrations::{
+    AthenaTable, FlowStatus, GithubConfig, GrafanaConfig, JiraConfig, LogSource, ModelChoice, SlackBotConfig,
+    SlackConfig, SlackThread, StartTo, TicketFlow,
+};
+pub use layer_domain::TrackerKind;
 pub use phone::{PhoneConfig, PhoneDevice};
 pub use project::Project;
 pub use shared::Shared;
-pub use layer_domain::TrackerKind;
 
 /// 3: the shared setup is kept in a workspace (§25), `shared` says which.
 pub const SCHEMA_VERSION: u32 = 3;
@@ -273,7 +273,6 @@ pub struct UiPrefs {
     pub keep_awake: bool,
 }
 
-
 impl Default for UiPrefs {
     fn default() -> Self {
         Self {
@@ -502,11 +501,7 @@ impl ConfigStore {
         }
         if inner.version > SCHEMA_VERSION {
             let kept = path.with_extension(format!("json.v{}", inner.version));
-            eprintln!(
-                "config.json is from a newer build (version {}); a copy is at {}",
-                inner.version,
-                kept.display()
-            );
+            eprintln!("config.json is from a newer build (version {}); a copy is at {}", inner.version, kept.display());
         }
         let changed = inner.migrate();
 
@@ -544,7 +539,13 @@ impl ConfigStore {
     #[cfg(test)]
     pub fn for_tests(path: PathBuf, cfg: AppConfig) -> Self {
         let base = path.parent().map(PathBuf::from).unwrap_or_default();
-        Self { path, base, default_root: default_worktree_root(), inner: RwLock::new(cfg), disk: parking_lot::Mutex::new(()) }
+        Self {
+            path,
+            base,
+            default_root: default_worktree_root(),
+            inner: RwLock::new(cfg),
+            disk: parking_lot::Mutex::new(()),
+        }
     }
 
     /// Mutate the config and write it back to disk atomically.
@@ -593,12 +594,7 @@ impl ConfigStore {
     }
 
     pub fn worktree_root(&self) -> PathBuf {
-        self.inner
-            .read()
-            .worktree_root
-            .as_ref()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| self.default_root.clone())
+        self.inner.read().worktree_root.as_ref().map(PathBuf::from).unwrap_or_else(|| self.default_root.clone())
     }
 
     /// What the app's other builds and profiles on this machine have saved,
@@ -621,7 +617,8 @@ impl ConfigStore {
         });
         builds
             .flat_map(|build| {
-                let profiles = std::fs::read_dir(build.join("profiles")).into_iter().flatten().flatten().map(|e| e.path());
+                let profiles =
+                    std::fs::read_dir(build.join("profiles")).into_iter().flatten().flatten().map(|e| e.path());
                 std::iter::once(build.clone()).chain(profiles).collect::<Vec<_>>()
             })
             .filter(|folder| *folder != ours)
@@ -661,13 +658,7 @@ impl ConfigStore {
     }
 
     pub fn checkouts_of(&self, task_id: &str) -> Vec<Checkout> {
-        self.inner
-            .read()
-            .checkouts
-            .iter()
-            .filter(|c| c.task_id == task_id)
-            .cloned()
-            .collect()
+        self.inner.read().checkouts.iter().filter(|c| c.task_id == task_id).cloned().collect()
     }
 }
 
@@ -732,7 +723,8 @@ mod tests {
     #[test]
     fn a_theme_saved_as_dark_or_light_opens_in_nightshades_night_or_day() {
         for (saved, now) in [("dark", "night"), ("light", "day"), ("ayu-light", "ayu-light")] {
-            let cfg: AppConfig = serde_json::from_str(&format!(r#"{{"version":2,"ui":{{"theme":"{saved}"}}}}"#)).unwrap();
+            let cfg: AppConfig =
+                serde_json::from_str(&format!(r#"{{"version":2,"ui":{{"theme":"{saved}"}}}}"#)).unwrap();
             assert_eq!(cfg.ui.theme, now);
         }
     }

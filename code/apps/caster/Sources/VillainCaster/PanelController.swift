@@ -45,8 +45,9 @@ final class LauncherPanel: NSPanel {
 
         // ⌘S / ⌘⇧S (Shift makes charactersIgnoringModifiers "S").
         if mods.contains(.command),
-           !mods.contains(.option), !mods.contains(.control),
-           key == "s" {
+            !mods.contains(.option), !mods.contains(.control),
+            key == "s"
+        {
             onScreenshot?()
             return true
         }
@@ -74,7 +75,7 @@ final class LauncherPanel: NSPanel {
     // Escape must close no matter which view has focus; the text field's
     // delegate only sees it while the field editor is first responder.
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { // Escape
+        if event.keyCode == 53 {  // Escape
             onCancel?()
             return
         }
@@ -82,7 +83,8 @@ final class LauncherPanel: NSPanel {
     }
 }
 
-final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate {
+final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate
+{
     private let panel: LauncherPanel
     private let chrome = PanelBackground()
     private let field = NSTextField()
@@ -144,7 +146,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         let clipped = padded.intersection(screen)
         // Cocoa (bottom-left) → screencapture -R (top-left).
         let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
-        let region = "\(Int(clipped.minX)),\(Int(primaryHeight - clipped.maxY)),\(Int(clipped.width)),\(Int(clipped.height))"
+        let region =
+            "\(Int(clipped.minX)),\(Int(primaryHeight - clipped.maxY)),\(Int(clipped.width)),\(Int(clipped.height))"
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let task = Process()
@@ -152,7 +155,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             task.arguments = ["-x", "-R", region, url.path]
             try? task.run()
             task.waitUntilExit()
-            let captured = task.terminationStatus == 0
+            let captured =
+                task.terminationStatus == 0
                 && FileManager.default.fileExists(atPath: url.path)
 
             DispatchQueue.main.async {
@@ -180,7 +184,10 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     func renderPNG(to url: URL) throws {
         let bounds = chrome.bounds
         guard let rep = chrome.bitmapImageRepForCachingDisplay(in: bounds),
-              let data = { chrome.cacheDisplay(in: bounds, to: rep); return rep.representation(using: .png, properties: [:]) }()
+            let data = {
+                chrome.cacheDisplay(in: bounds, to: rep)
+                return rep.representation(using: .png, properties: [:])
+            }()
         else { throw CocoaError(.fileWriteUnknown) }
         try data.write(to: url)
     }
@@ -200,7 +207,7 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         panel.level = .floating
         // canJoinAllApplications: float above other apps' full-screen Spaces.
         panel.collectionBehavior = [
-            .canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary, .transient
+            .canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary, .transient,
         ]
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -291,8 +298,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         let visible = screen.visibleFrame
         let top = visible.minY + visible.height * 0.72
         panel.setFrame(
-            NSRect(x: visible.midX - panelWidth / 2, y: top - inputHeight,
-                   width: panelWidth, height: inputHeight),
+            NSRect(
+                x: visible.midX - panelWidth / 2, y: top - inputHeight,
+                width: panelWidth, height: inputHeight),
             display: false
         )
         field.stringValue = storedText ?? ""
@@ -324,9 +332,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
     private func restorableText() -> String? {
         let text = field.stringValue.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty,
-              answer == nil,
-              !Weather.matches(text),
-              !Help.matches(text)
+            answer == nil,
+            !Weather.matches(text),
+            !Help.matches(text)
         else { return nil }
         return field.stringValue
     }
@@ -352,7 +360,9 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         let rows = min(results.count, maxVisibleRows)
         let visibleListHeight = CGFloat(rows) * rowHeight
         // Space, not a line, separates the query from the list or the answer.
-        let listAreaHeight: CGFloat = answer != nil ? AnswerCard.height + listInset
+        let listAreaHeight: CGFloat =
+            answer != nil
+            ? AnswerCard.height + listInset
             : rows > 0 ? visibleListHeight + listInset : 0
         let totalHeight = inputRowHeight + listAreaHeight
 
@@ -368,23 +378,28 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         let inputRowY = totalHeight - inputRowHeight
         let fieldY = inputRowY + (inputRowHeight - fieldHeight) / 2
         if inlineResultField.isHidden {
-            field.frame = NSRect(x: inputSidePadding, y: fieldY,
-                                 width: panelWidth - inputSidePadding * 2, height: fieldHeight)
+            field.frame = NSRect(
+                x: inputSidePadding, y: fieldY,
+                width: panelWidth - inputSidePadding * 2, height: fieldHeight)
         } else {
             // Split the input row: query on the left, the screenshot message
             // on the right, both centred in the row.
-            inlineResultField.frame = NSRect(x: panelWidth - inputSidePadding - message.width,
-                                             y: inputRowY + (inputRowHeight - message.height) / 2,
-                                             width: message.width, height: message.height)
-            field.frame = NSRect(x: inputSidePadding, y: fieldY,
-                                 width: panelWidth - inputSidePadding * 2 - message.width - messageGap,
-                                 height: fieldHeight)
+            inlineResultField.frame = NSRect(
+                x: panelWidth - inputSidePadding - message.width,
+                y: inputRowY + (inputRowHeight - message.height) / 2,
+                width: message.width, height: message.height)
+            field.frame = NSRect(
+                x: inputSidePadding, y: fieldY,
+                width: panelWidth - inputSidePadding * 2 - message.width - messageGap,
+                height: fieldHeight)
         }
-        answerCard.frame = NSRect(x: listInset, y: listInset,
-                                  width: panelWidth - listInset * 2, height: AnswerCard.height)
+        answerCard.frame = NSRect(
+            x: listInset, y: listInset,
+            width: panelWidth - listInset * 2, height: AnswerCard.height)
         answerCard.isHidden = answer == nil
-        scrollView.frame = NSRect(x: listInset, y: listInset,
-                                  width: panelWidth - listInset * 2, height: visibleListHeight)
+        scrollView.frame = NSRect(
+            x: listInset, y: listInset,
+            width: panelWidth - listInset * 2, height: visibleListHeight)
         scrollView.isHidden = rows == 0
         // Keep the table exactly as wide as the visible clip area, otherwise
         // the selection highlight extends under the clipped edge and its
@@ -446,8 +461,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
             hide()
             return true
         case #selector(NSResponder.insertTab(_:)),
-             #selector(NSResponder.insertBacktab(_:)):
-            return true // keep focus in the input field
+            #selector(NSResponder.insertBacktab(_:)):
+            return true  // keep focus in the input field
         default:
             return false
         }
@@ -482,12 +497,11 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
         // nonactivating panel is key, but clear the target after running.
         WindowManager.targetPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         hide()
-        storedText = nil // executed — next open starts fresh
+        storedText = nil  // executed — next open starts fresh
         if let key = item.usageKey {
             UsageStore.record(key)
         }
-        do { try item.action?() }
-        catch {
+        do { try item.action?() } catch {
             show(query: field.stringValue)
             showFeedback(error.localizedDescription, isProblem: true)
         }
@@ -508,7 +522,8 @@ final class PanelController: NSObject, NSTextFieldDelegate, NSTableViewDataSourc
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("ResultCell")
-        let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? ResultCell
+        let cell =
+            tableView.makeView(withIdentifier: identifier, owner: self) as? ResultCell
             ?? ResultCell(identifier: identifier)
         cell.configure(with: results[row])
         return cell
@@ -565,15 +580,20 @@ final class ResultCell: NSTableCellView {
 
     func configure(with item: ResultItem) {
         iconView.image = item.icon
-        let text = NSMutableAttributedString(string: item.title, attributes: [
-            .font: rowFont,
-            .foregroundColor: Nightshade.fg,
-        ])
-        if let subtitle = item.subtitle {
-            text.append(NSAttributedString(string: "   " + subtitle, attributes: [
+        let text = NSMutableAttributedString(
+            string: item.title,
+            attributes: [
                 .font: rowFont,
-                .foregroundColor: Nightshade.muted,
-            ]))
+                .foregroundColor: Nightshade.fg,
+            ])
+        if let subtitle = item.subtitle {
+            text.append(
+                NSAttributedString(
+                    string: "   " + subtitle,
+                    attributes: [
+                        .font: rowFont,
+                        .foregroundColor: Nightshade.muted,
+                    ]))
         }
         label.attributedStringValue = text
         needsLayout = true
@@ -582,12 +602,14 @@ final class ResultCell: NSTableCellView {
     override func layout() {
         super.layout()
         let hasIcon = iconView.image != nil
-        iconView.frame = NSRect(x: rowContentInset, y: (bounds.height - iconSize) / 2,
-                                width: hasIcon ? iconSize : 0, height: iconSize)
+        iconView.frame = NSRect(
+            x: rowContentInset, y: (bounds.height - iconSize) / 2,
+            width: hasIcon ? iconSize : 0, height: iconSize)
         let textX: CGFloat = hasIcon ? rowContentInset + iconSize + 10 : rowContentInset
         let height = ceil(label.cell?.cellSize.height ?? 18)
-        label.frame = NSRect(x: textX, y: (bounds.height - height) / 2,
-                             width: bounds.width - textX - rowContentInset, height: height)
+        label.frame = NSRect(
+            x: textX, y: (bounds.height - height) / 2,
+            width: bounds.width - textX - rowContentInset, height: height)
     }
 
     override func setFrameSize(_ newSize: NSSize) {

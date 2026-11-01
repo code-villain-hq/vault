@@ -44,8 +44,8 @@ enum Nightshade {
     /// Contents/Resources/Fonts; `make run` next to the binary.
     static func registerFonts() {
         guard let folder = Bundle.main.resourceURL?.appendingPathComponent("Fonts"),
-              let files = try? FileManager.default.contentsOfDirectory(
-                  at: folder, includingPropertiesForKeys: nil)
+            let files = try? FileManager.default.contentsOfDirectory(
+                at: folder, includingPropertiesForKeys: nil)
         else { return }
         for file in files where file.pathExtension == "ttf" {
             CTFontManagerRegisterFontsForURL(file as CFURL, .process, nil)
@@ -83,9 +83,10 @@ extension NSColor {
     /// `#RRGGBB` in sRGB, as the tokens write it.
     convenience init(hex: String) {
         let value = UInt32(hex.dropFirst(), radix: 16) ?? 0
-        self.init(srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
-                  green: CGFloat((value >> 8) & 0xFF) / 255,
-                  blue: CGFloat(value & 0xFF) / 255,
-                  alpha: 1)
+        self.init(
+            srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
+            green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: 1)
     }
 }

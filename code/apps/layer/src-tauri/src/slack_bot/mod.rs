@@ -68,7 +68,10 @@ pub fn not_auto(settings: &[crate::acp::Setting]) -> Option<String> {
     } else if mode.options.iter().any(|o| o.value == AUTO) {
         Some(format!("the agent put it in `{}` instead, which its model may need", mode.current))
     } else {
-        Some(format!("the agent offers no `auto` mode, so it is in `{}`; its ACP adapter may be out of date", mode.current))
+        Some(format!(
+            "the agent offers no `auto` mode, so it is in `{}`; its ACP adapter may be out of date",
+            mode.current
+        ))
     }
 }
 
@@ -117,7 +120,11 @@ impl Bot {
 
     pub fn status(&self) -> Status {
         let s = self.status.lock().clone();
-        if s.state.is_empty() { Status { state: "off", error: None } } else { s }
+        if s.state.is_empty() {
+            Status { state: "off", error: None }
+        } else {
+            s
+        }
     }
 
     fn set_status(&self, state: &'static str, error: Option<String>) {
@@ -232,7 +239,14 @@ impl Bot {
     }
 
     /// One message in a thread that is changed rather than posted again.
-    async fn keep(&self, thread: &SlackThread, ts: Option<String>, shown: &str, blocks: &serde_json::Value, what: &str) -> Option<String> {
+    async fn keep(
+        &self,
+        thread: &SlackThread,
+        ts: Option<String>,
+        shown: &str,
+        blocks: &serde_json::Value,
+        what: &str,
+    ) -> Option<String> {
         let api = self.api()?;
         let done = match &ts {
             Some(ts) => api.update_blocks(&thread.channel, ts, shown, blocks).await.map(|()| ts.clone()),
@@ -241,7 +255,10 @@ impl Bot {
         match done {
             Ok(ts) => Some(ts),
             Err(e) => {
-                self.tell_error(format!("Could not show {what} in the Slack thread in {}", thread.label), e.to_string());
+                self.tell_error(
+                    format!("Could not show {what} in the Slack thread in {}", thread.label),
+                    e.to_string(),
+                );
                 ts
             }
         }
@@ -282,7 +299,14 @@ mod tests {
             personality: String::new(),
             model: model.into(),
         };
-        let thread = SlackThread { channel: "C1".into(), ts: "1.1".into(), room: "/chat/a".into(), label: "#ops".into(), link: String::new(), seen: String::new() };
+        let thread = SlackThread {
+            channel: "C1".into(),
+            ts: "1.1".into(),
+            room: "/chat/a".into(),
+            label: "#ops".into(),
+            link: String::new(),
+            seen: String::new(),
+        };
         AppConfig { slack_bot: Some(bot), slack_threads: vec![thread], ..Default::default() }
     }
 
@@ -312,7 +336,10 @@ mod tests {
             name: "Mode".into(),
             category: Some("mode".into()),
             current: current.into(),
-            options: offered.iter().map(|v| crate::acp::SettingOption { value: (*v).into(), name: (*v).into(), description: None }).collect(),
+            options: offered
+                .iter()
+                .map(|v| crate::acp::SettingOption { value: (*v).into(), name: (*v).into(), description: None })
+                .collect(),
         }
     }
 
@@ -328,7 +355,8 @@ mod tests {
 
     #[test]
     fn a_bot_saved_before_auto_mode_existed_starts_with_it_on() {
-        let old = r#"{ "owner": "UME", "agent_id": "claude", "bot_user": "UBOT", "bot_name": "drdoom", "enabled": true }"#;
+        let old =
+            r#"{ "owner": "UME", "agent_id": "claude", "bot_user": "UBOT", "bot_name": "drdoom", "enabled": true }"#;
         let bot: SlackBotConfig = serde_json::from_str(old).unwrap();
         assert!(bot.auto);
     }

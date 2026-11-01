@@ -9,8 +9,8 @@ use crate::error::{Error, Result};
 use crate::integrations::slack::Slack;
 use crate::secrets;
 
-use super::AppState;
 use super::diff::RepoResult;
+use super::AppState;
 
 // ------------------------------------------------------------------- slack
 
@@ -68,10 +68,7 @@ pub(crate) fn slack_client(state: &AppState) -> Result<(Slack, SlackConfig)> {
 /// These three are the MCP server's `slack_delete`, `slack_diagnose` and
 /// `slack_cleanup`. Nothing in the UI calls them, so they are not registered
 /// as commands.
-pub async fn slack_delete_posted(
-    state: State<'_, AppState>,
-    links: Option<Vec<String>>,
-) -> Result<Vec<RepoResult>> {
+pub async fn slack_delete_posted(state: State<'_, AppState>, links: Option<Vec<String>>) -> Result<Vec<RepoResult>> {
     let (client, _) = slack_client(&state)?;
 
     let targets: Vec<crate::integrations::slack::Posted> = match links {
@@ -81,10 +78,7 @@ pub async fn slack_delete_posted(
                 crate::integrations::slack::parse_permalink(l).or_else(|| {
                     // Bare "channel ts" pairs are accepted too.
                     let (c, t) = l.split_once(char::is_whitespace)?;
-                    Some(crate::integrations::slack::Posted {
-                        channel: c.trim().to_string(),
-                        ts: t.trim().to_string(),
-                    })
+                    Some(crate::integrations::slack::Posted { channel: c.trim().to_string(), ts: t.trim().to_string() })
                 })
             })
             .collect(),
@@ -92,9 +86,7 @@ pub async fn slack_delete_posted(
     };
 
     if targets.is_empty() {
-        return Err(Error::Other(
-            "nothing to delete: no recorded messages, and no usable links given".into(),
-        ));
+        return Err(Error::Other("nothing to delete: no recorded messages, and no usable links given".into()));
     }
 
     let mut results = Vec::new();
@@ -103,23 +95,13 @@ pub async fn slack_delete_posted(
             Ok(()) => (true, "deleted".to_string()),
             Err(e) => (false, e.to_string()),
         };
-        results.push(RepoResult {
-            checkout_id: t.ts.clone(),
-            repo: t.channel.clone(),
-            ok,
-            detail,
-        });
+        results.push(RepoResult { checkout_id: t.ts.clone(), repo: t.channel.clone(), ok, detail });
     }
 
     // Forget whatever is now gone, so a retry does not report it again.
-    let gone: Vec<String> = results
-        .iter()
-        .filter(|r| r.ok || r.detail == "already gone")
-        .map(|r| r.checkout_id.clone())
-        .collect();
-    state
-        .config
-        .update(|c| c.slack_posted.retain(|p| !gone.contains(&p.ts)))?;
+    let gone: Vec<String> =
+        results.iter().filter(|r| r.ok || r.detail == "already gone").map(|r| r.checkout_id.clone()).collect();
+    state.config.update(|c| c.slack_posted.retain(|p| !gone.contains(&p.ts)))?;
 
     Ok(results)
 }
@@ -142,9 +124,7 @@ pub async fn slack_cleanup(state: State<'_, AppState>, dry_run: bool) -> Result<
     let (client, cfg) = slack_client(&state)?;
     let (bot_id, scopes) = client.scopes().await?;
     if bot_id.is_empty() {
-        return Err(Error::Other(
-            "this token is not a bot token, so it has no messages of its own".into(),
-        ));
+        return Err(Error::Other("this token is not a bot token, so it has no messages of its own".into()));
     }
 
     let channel_id = client.channel_id(&cfg.channel).await.map_err(|e| {
@@ -178,10 +158,7 @@ pub async fn slack_cleanup(state: State<'_, AppState>, dry_run: bool) -> Result<
     // whose delete had failed, ones in a channel used before this one, and
     // ones older than the scan reaches — and since only this bot can delete
     // them, nothing could reach them after that.
-    state.config.update(|c| {
-        c.slack_posted
-            .retain(|p| !(p.channel == channel_id && deleted.contains(&p.ts)))
-    })?;
+    state.config.update(|c| c.slack_posted.retain(|p| !(p.channel == channel_id && deleted.contains(&p.ts))))?;
     Ok(serde_json::json!({ "deleted": deleted.len(), "failed": failures }))
 }
 
@@ -197,16 +174,10 @@ pub async fn set_slack_channel(state: State<'_, AppState>, channel: String) -> R
         return Err(Error::NotConfigured("Slack"));
     }
     // Changing the channel keeps the switches under it as they were.
-    let cfg = SlackConfig {
-        channel: channel.clone(),
-        ..state.config.read().slack.unwrap_or_default()
-    };
-    let token = super::off_runtime(|| secrets::get(secrets::SLACK_BOT))
-        .await??
-        .ok_or(Error::NotConfigured("Slack"))?;
-    let posted = Slack::new(&token)
-        .post(&channel, "Layer notifications will be posted here. :white_check_mark:", None)
-        .await?;
+    let cfg = SlackConfig { channel: channel.clone(), ..state.config.read().slack.unwrap_or_default() };
+    let token = super::off_runtime(|| secrets::get(secrets::SLACK_BOT)).await??.ok_or(Error::NotConfigured("Slack"))?;
+    let posted =
+        Slack::new(&token).post(&channel, "Layer notifications will be posted here. :white_check_mark:", None).await?;
     state.config.update(|c| c.slack = Some(cfg))?;
     record_post(&state, posted);
     Ok(())
@@ -240,4 +211,3 @@ pub fn set_slack_prefs(state: State<AppState>, prefs: SlackConfig) -> Result<()>
         }
     })
 }
-

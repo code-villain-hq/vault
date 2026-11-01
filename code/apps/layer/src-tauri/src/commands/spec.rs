@@ -291,7 +291,8 @@ impl Spec {
         if self.record(&slot, kind).is_some() {
             return false;
         }
-        let texts: Vec<String> = self.copies(&slot, kind).into_iter().filter_map(|(_, c)| c).map(|c| c.trim().to_string()).collect();
+        let texts: Vec<String> =
+            self.copies(&slot, kind).into_iter().filter_map(|(_, c)| c).map(|c| c.trim().to_string()).collect();
         texts.len() > 1 && texts.iter().any(|t| *t != texts[0])
     }
 
@@ -374,7 +375,8 @@ pub(super) fn slot_of(spec: &Spec, part: Part, checkout_id: Option<&str>) -> Res
         return Ok(Slot::shared(part));
     }
     let id = checkout_id.ok_or_else(|| Error::Other("say whose tasks".into()))?;
-    let home = spec.homes.iter().find(|h| h.checkout.id == id).ok_or_else(|| Error::NotFound(format!("checkout {id}")))?;
+    let home =
+        spec.homes.iter().find(|h| h.checkout.id == id).ok_or_else(|| Error::NotFound(format!("checkout {id}")))?;
     Ok(Slot::tasks(&home.folder))
 }
 
@@ -409,7 +411,12 @@ pub struct RepoFailure {
 /// date from now, in every repository (SPEC-7). An agent whose proposal it
 /// was is told (SPEC-24). Empty text removes a file.
 #[tauri::command]
-pub async fn approve_spec(app: tauri::AppHandle, task_id: String, texts: Vec<PartText>, kind: Option<Kind>) -> Result<Approved> {
+pub async fn approve_spec(
+    app: tauri::AppHandle,
+    task_id: String,
+    texts: Vec<PartText>,
+    kind: Option<Kind>,
+) -> Result<Approved> {
     super::blocking(app, move |state| {
         let task = state.config.task(&task_id)?;
         let spec = spec_of(state, &task);
@@ -436,7 +443,12 @@ pub async fn approve_spec(app: tauri::AppHandle, task_id: String, texts: Vec<Par
     .await
 }
 
-pub(super) fn approve(spec: &Spec, task: &Task, texts: &[(Slot, String)], kind: Option<Kind>) -> Result<Vec<RepoFailure>> {
+pub(super) fn approve(
+    spec: &Spec,
+    task: &Task,
+    texts: &[(Slot, String)],
+    kind: Option<Kind>,
+) -> Result<Vec<RepoFailure>> {
     if texts.is_empty() {
         return Ok(Vec::new());
     }
@@ -466,7 +478,8 @@ pub(super) fn approve(spec: &Spec, task: &Task, texts: &[(Slot, String)], kind: 
 
     let mut failed = Vec::new();
     for home in &spec.homes {
-        let mine: Vec<&(Slot, String)> = texts.iter().filter(|(s, _)| s.repo.as_ref().is_none_or(|r| *r == home.folder)).collect();
+        let mine: Vec<&(Slot, String)> =
+            texts.iter().filter(|(s, _)| s.repo.as_ref().is_none_or(|r| *r == home.folder)).collect();
         if mine.is_empty() {
             continue;
         }
@@ -524,7 +537,8 @@ fn approve_in(home: &Home, task: &Task, texts: &[&(Slot, String)], kind: Kind, w
             words.push(word);
         }
     }
-    let message = format!("Approve the {} for {}.", and_list(&words), task.issue_key.as_deref().unwrap_or(&task.branch));
+    let message =
+        format!("Approve the {} for {}.", and_list(&words), task.issue_key.as_deref().unwrap_or(&task.branch));
     let paths: Vec<String> = files.iter().map(|f| format!("{rel}/{f}")).collect();
     git::commit_only(Path::new(&home.checkout.path), &paths.iter().map(String::as_str).collect::<Vec<_>>(), &message)?;
     Ok(())
@@ -619,7 +633,12 @@ mod tests {
     }
 
     fn git_init(dir: &Path) {
-        for args in [&["init", "-q", "-b", "main"][..], &["config", "user.email", "t@villain.local"], &["config", "user.name", "T"], &["commit", "-q", "--allow-empty", "-m", "init"]] {
+        for args in [
+            &["init", "-q", "-b", "main"][..],
+            &["config", "user.email", "t@villain.local"],
+            &["config", "user.name", "T"],
+            &["commit", "-q", "--allow-empty", "-m", "init"],
+        ] {
             git::run_for_tests(dir, args).unwrap();
         }
     }
@@ -666,7 +685,11 @@ mod tests {
         assert!(s.draft(&Slot::shared(Part::Requirements)).is_none(), "an approved draft is let go");
 
         approve(&s, &task(), &[(Slot::tasks("api"), "- [ ] 1. a2".into())], None).unwrap();
-        assert_eq!(s.notes().stale, vec![Slot::shared(Part::Design), Slot::tasks("web")], "one repository's tasks leave the other's out of date");
+        assert_eq!(
+            s.notes().stale,
+            vec![Slot::shared(Part::Design), Slot::tasks("web")],
+            "one repository's tasks leave the other's out of date"
+        );
         std::fs::remove_dir_all(&root).ok();
     }
 
@@ -674,7 +697,13 @@ mod tests {
     fn a_copy_an_agent_edited_is_seen_as_changed_outside_the_app_and_its_ticks_are_not() {
         let root = root();
         let s = spec(&root, &["api", "web"], false);
-        approve(&s, &task(), &[(Slot::shared(Part::Requirements), REQS.into()), (Slot::tasks("api"), "- [ ] 1. a\n- [ ] 2. b".into())], None).unwrap();
+        approve(
+            &s,
+            &task(),
+            &[(Slot::shared(Part::Requirements), REQS.into()), (Slot::tasks("api"), "- [ ] 1. a\n- [ ] 2. b".into())],
+            None,
+        )
+        .unwrap();
         let kind = s.kind();
 
         let tasks = s.homes[0].dir.join("tasks.md");
@@ -682,11 +711,16 @@ mod tests {
         assert!(s.outside(&Slot::tasks("api"), kind).is_empty(), "a tick is no change");
         assert!(s.approved(&Slot::tasks("api")).unwrap().contains("- [x] 1. a"), "the tab shows the tick");
 
-        std::fs::write(s.homes[1].dir.join("requirements.md"), "## Requirements\n- R-1: something nobody agreed").unwrap();
+        std::fs::write(s.homes[1].dir.join("requirements.md"), "## Requirements\n- R-1: something nobody agreed")
+            .unwrap();
         let changed = s.outside(&Slot::shared(Part::Requirements), kind);
         assert_eq!(changed.len(), 1);
         assert_eq!(changed[0].0.folder, "web");
-        assert_eq!(s.approved(&Slot::shared(Part::Requirements)).unwrap().trim(), REQS, "what was approved still stands");
+        assert_eq!(
+            s.approved(&Slot::shared(Part::Requirements)).unwrap().trim(),
+            REQS,
+            "what was approved still stands"
+        );
         std::fs::remove_dir_all(&root).ok();
     }
 
@@ -709,7 +743,13 @@ mod tests {
         let root = root();
         let s = spec(&root, &["api"], false);
         approve(&s, &task(), &[(Slot::shared(Part::Requirements), "## Requirements\n- R-1: x".into())], None).unwrap();
-        approve(&s, &task(), &[(Slot::shared(Part::Requirements), "## Expected behaviour\n- R-1: x".into())], Some(Kind::Bugfix)).unwrap();
+        approve(
+            &s,
+            &task(),
+            &[(Slot::shared(Part::Requirements), "## Expected behaviour\n- R-1: x".into())],
+            Some(Kind::Bugfix),
+        )
+        .unwrap();
         assert!(s.homes[0].dir.join("bugfix.md").is_file());
         assert!(!s.homes[0].dir.join("requirements.md").exists());
         assert!(!root.join(DRAFTS).join(APPROVED).join("requirements.md").exists());
@@ -730,8 +770,14 @@ mod tests {
         std::fs::write(s.homes[0].dir.join("design.md"), "an agent's design").unwrap();
         approve(&s, &task(), &[(Slot::shared(Part::Requirements), format!("{REQS}\n- R-2: more"))], None).unwrap();
         for h in &s.homes {
-            let log = git::run_for_tests(Path::new(&h.checkout.path), &["log", "--format=%s", "--name-only", "-1"]).unwrap();
-            assert_eq!(log.trim(), "Approve the requirements for ACME-12.\n\nspecs/ACME-12/requirements.md", "{}", h.folder);
+            let log =
+                git::run_for_tests(Path::new(&h.checkout.path), &["log", "--format=%s", "--name-only", "-1"]).unwrap();
+            assert_eq!(
+                log.trim(),
+                "Approve the requirements for ACME-12.\n\nspecs/ACME-12/requirements.md",
+                "{}",
+                h.folder
+            );
         }
         std::fs::remove_dir_all(&root).ok();
     }

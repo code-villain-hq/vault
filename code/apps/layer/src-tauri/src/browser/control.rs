@@ -132,7 +132,11 @@ impl Browser {
             let inner = self.inner.lock();
             let tab = inner.active(task);
             let dialog = tab.and_then(|t| t.dialog.clone()).ok_or_else(|| Error::Other("no dialog is open".into()))?;
-            let cdp = inner.running.as_ref().map(|r| r.cdp.clone()).ok_or_else(|| Error::Other("the browser closed".into()))?;
+            let cdp = inner
+                .running
+                .as_ref()
+                .map(|r| r.cdp.clone())
+                .ok_or_else(|| Error::Other("the browser closed".into()))?;
             (cdp, tab.map(|t| t.session.clone()).unwrap_or_default(), dialog)
         };
         let mut params = json!({ "accept": accept });

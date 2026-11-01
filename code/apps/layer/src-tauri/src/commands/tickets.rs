@@ -110,10 +110,7 @@ pub async fn tickets_by_key(state: State<'_, AppState>, keys: Vec<String>) -> Re
 /// than assumed, preferring one actually called Task when there is one.
 pub(crate) async fn default_ticket_type(state: &AppState) -> Result<String> {
     let types = ticket_types_inner(state, false).await?;
-    let plain: Vec<&TicketType> = types
-        .iter()
-        .filter(|t| t.hierarchy_level == 0 && !t.subtask)
-        .collect();
+    let plain: Vec<&TicketType> = types.iter().filter(|t| t.hierarchy_level == 0 && !t.subtask).collect();
     plain
         .iter()
         .find(|t| t.name.eq_ignore_ascii_case("task"))
@@ -204,12 +201,7 @@ pub async fn start_work_on_ticket(
     // twice and fail deep inside git. Unless a suffix asks for a distinct
     // branch, point at what already exists.
     if branch_suffix.as_deref().unwrap_or_default().trim().is_empty() {
-        if let Some(existing) = state
-            .config
-            .read()
-            .tasks
-            .iter()
-            .find(|t| t.issue_key.as_deref() == Some(key.as_str()))
+        if let Some(existing) = state.config.read().tasks.iter().find(|t| t.issue_key.as_deref() == Some(key.as_str()))
         {
             return Err(Error::Other(format!(
                 "{key} already has a task on branch {}. Open that one, or pass a \

@@ -26,7 +26,14 @@ pub struct Started {
 /// Start `program` as an ACP agent in `cwd`, in its own process group, with
 /// the login shell's environment and `env` over it (PANE-4), as pane
 /// `pane_id`.
-pub fn start(program: &str, args: &[String], cwd: &str, env: &[(String, String)], launch: Launch, pane_id: &str) -> Result<Started> {
+pub fn start(
+    program: &str,
+    args: &[String],
+    cwd: &str,
+    env: &[(String, String)],
+    launch: Launch,
+    pane_id: &str,
+) -> Result<Started> {
     use std::os::unix::process::CommandExt;
     let mut cmd = std::process::Command::new(program);
     cmd.args(args)
@@ -51,7 +58,9 @@ impl Started {
     /// Hand the agent to its pane and start talking to it.
     pub fn run(self, pane: Box<dyn Pane>) {
         let Started { conn, mut child, lines, .. } = self;
-        let (Some(mut stdin), Some(stdout), Some(mut stderr)) = (child.stdin.take(), child.stdout.take(), child.stderr.take()) else {
+        let (Some(mut stdin), Some(stdout), Some(mut stderr)) =
+            (child.stdin.take(), child.stdout.take(), child.stderr.take())
+        else {
             let _ = child.kill();
             let _ = child.wait();
             return;
@@ -60,7 +69,12 @@ impl Started {
         // the agent's stdin.
         std::thread::spawn(move || {
             for line in lines {
-                if stdin.write_all(line.as_bytes()).and_then(|_| stdin.write_all(b"\n")).and_then(|_| stdin.flush()).is_err() {
+                if stdin
+                    .write_all(line.as_bytes())
+                    .and_then(|_| stdin.write_all(b"\n"))
+                    .and_then(|_| stdin.flush())
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -126,7 +140,9 @@ mod tests {
             fn topic(&self, _: String) {}
             fn session(&self, _: &str) {}
             fn failed(&self, _: &str) {}
-            fn exited(&self, code: Option<i32>) { let _ = self.0.send(code); }
+            fn exited(&self, code: Option<i32>) {
+                let _ = self.0.send(code);
+            }
         }
         let dir = std::env::temp_dir().to_string_lossy().to_string();
         let args = vec!["-c".to_string(), "head -n 1; exit 3".to_string()];

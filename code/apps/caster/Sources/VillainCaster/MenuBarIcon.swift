@@ -9,7 +9,8 @@ import AppKit
 enum MenuBarIcon {
     /// The mark's C, in its 200-unit tile coordinates (y down). `make
     /// design-check` fails when it drifts from studio/brand/mark/caster.svg.
-    private static let letter = "M93.83 73.28Q93.42 78.08 92.95 83.05Q92.48 88.01 92.27 93.49Q92.07 98.96 92.07 105.56Q92.07 118.07 94.03 124.89Q96.00 131.72 99.70 134.40Q103.40 137.09 108.63 137.09L130.23 137.06L130.23 149.90Q127.80 150.50 123.52 151.22Q119.25 151.94 114.70 152.46Q110.15 152.99 106.73 153.35Q103.32 153.71 102.53 153.71Q91.50 153.71 83.71 149.09Q75.93 144.47 71.83 134.70Q67.73 124.94 67.73 109.49Q67.73 100.70 69.01 93.41Q70.28 86.12 72.23 81.14Q74.48 78.38 78.68 75.01Q82.88 71.63 87.78 68.51ZM99.78 137.39L99.78 68.87Q99.78 67.58 100.63 64.94Q101.48 62.30 102.63 59.09L107.82 59.33L107.82 128.84Q107.82 129.74 106.77 132.06Q105.72 134.39 104.07 137.39ZM130.17 91.73L118.83 91.73L116.67 74.15Q115.23 73.58 112.95 73.01Q110.67 72.44 108.55 72.02Q106.43 71.60 105.27 71.60Q103.88 71.60 103.06 71.62Q102.23 71.63 101.48 71.78L102.63 59.09Q103.25 58.79 103.88 58.71Q104.52 58.64 105.12 58.64Q108.30 58.64 113.11 59.16Q117.93 59.69 123.06 60.35Q128.18 61.01 131.97 61.58Z"
+    private static let letter =
+        "M93.83 73.28Q93.42 78.08 92.95 83.05Q92.48 88.01 92.27 93.49Q92.07 98.96 92.07 105.56Q92.07 118.07 94.03 124.89Q96.00 131.72 99.70 134.40Q103.40 137.09 108.63 137.09L130.23 137.06L130.23 149.90Q127.80 150.50 123.52 151.22Q119.25 151.94 114.70 152.46Q110.15 152.99 106.73 153.35Q103.32 153.71 102.53 153.71Q91.50 153.71 83.71 149.09Q75.93 144.47 71.83 134.70Q67.73 124.94 67.73 109.49Q67.73 100.70 69.01 93.41Q70.28 86.12 72.23 81.14Q74.48 78.38 78.68 75.01Q82.88 71.63 87.78 68.51ZM99.78 137.39L99.78 68.87Q99.78 67.58 100.63 64.94Q101.48 62.30 102.63 59.09L107.82 59.33L107.82 128.84Q107.82 129.74 106.77 132.06Q105.72 134.39 104.07 137.39ZM130.17 91.73L118.83 91.73L116.67 74.15Q115.23 73.58 112.95 73.01Q110.67 72.44 108.55 72.02Q106.43 71.60 105.27 71.60Q103.88 71.60 103.06 71.62Q102.23 71.63 101.48 71.78L102.63 59.09Q103.25 58.79 103.88 58.71Q104.52 58.64 105.12 58.64Q108.30 58.64 113.11 59.16Q117.93 59.69 123.06 60.35Q128.18 61.01 131.97 61.58Z"
 
     // On the tile: the bar's top at 108, 15 tall; the cut 7 either side.
     private static let barTop: CGFloat = 108
@@ -37,8 +38,9 @@ enum MenuBarIcon {
             path.transform(using: transform)
 
             let context = NSGraphicsContext.current
-            let bar = NSRect(x: 0, y: size / 2 + (barTop - bounds.midY) * scale,
-                             width: size, height: barHeight * scale)
+            let bar = NSRect(
+                x: 0, y: size / 2 + (barTop - bounds.midY) * scale,
+                width: size, height: barHeight * scale)
             strike.setFill()
             bar.fill()
             // Cut the bar around the letter's strokes, then set the letter.
@@ -80,9 +82,11 @@ enum MenuBarIcon {
                 if let c = point(), let p = point() {
                     // Quadratic as cubic: control points two-thirds of the way to c.
                     let start = path.currentPoint
-                    path.curve(to: p,
-                               controlPoint1: CGPoint(x: start.x + 2 / 3 * (c.x - start.x), y: start.y + 2 / 3 * (c.y - start.y)),
-                               controlPoint2: CGPoint(x: p.x + 2 / 3 * (c.x - p.x), y: p.y + 2 / 3 * (c.y - p.y)))
+                    path.curve(
+                        to: p,
+                        controlPoint1: CGPoint(
+                            x: start.x + 2 / 3 * (c.x - start.x), y: start.y + 2 / 3 * (c.y - start.y)),
+                        controlPoint2: CGPoint(x: p.x + 2 / 3 * (c.x - p.x), y: p.y + 2 / 3 * (c.y - p.y)))
                 }
             case "Z", "z": path.close()
             default: return path

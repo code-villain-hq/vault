@@ -64,7 +64,9 @@ pub async fn epic_call(app: &AppHandle, name: &str, args: Value, caller: Option<
     let pane = caller.and_then(|p| state.ptys.info(p).ok());
     let epic_id = match arg(&args, "epic_id") {
         Some(id) => id.to_string(),
-        None => pane.as_ref().map(|p| p.task_id.clone()).ok_or_else(|| Error::Other("name the epic: epic_id".into()))?,
+        None => {
+            pane.as_ref().map(|p| p.task_id.clone()).ok_or_else(|| Error::Other("name the epic: epic_id".into()))?
+        }
     };
     let epic = state.config.task(&epic_id)?;
     if !epic.epic {
@@ -121,7 +123,8 @@ async fn subtasks(app: &AppHandle, epic: &Task) -> Result<Value> {
             Some((client, _)) => super::github::task_prs(&state, client, &task.id).await.unwrap_or_default(),
             None => Vec::new(),
         };
-        let live: Vec<_> = prs.iter().filter(|r| r.pr.as_ref().is_some_and(|p| p.merged || p.state == "open")).collect();
+        let live: Vec<_> =
+            prs.iter().filter(|r| r.pr.as_ref().is_some_and(|p| p.merged || p.state == "open")).collect();
         let waits = waiting_for(app, &task).await.unwrap_or_default();
         // Verdicts only from the open ones, as the task list reads them: a
         // merged pull request's reviews are not fetched.

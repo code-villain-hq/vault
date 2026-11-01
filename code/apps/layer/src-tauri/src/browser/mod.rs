@@ -35,11 +35,11 @@ use cdp::Cdp;
 pub use control::{Dialog, Driver};
 pub use page::Page;
 pub use panel::AgentAction;
+use panel::Watch;
+use requests::Asked;
 pub use requests::SiteRequest;
 pub use tabs::TabInfo;
 use tabs::Tabs;
-use panel::Watch;
-use requests::Asked;
 
 /// Whether there is a Chrome to run. Reads the disk.
 pub fn chrome_installed() -> bool {
@@ -344,9 +344,7 @@ async fn make_tab(cdp: &Arc<Cdp>, user_agent: Option<&str>, viewport: Viewport) 
 /// A page Chrome has, as one of the app's tabs: the app's own new tab, or
 /// a window a page opened (BRW-14).
 async fn attach(cdp: &Arc<Cdp>, target: String, user_agent: Option<&str>, viewport: Viewport) -> Result<Tab> {
-    let attached = cdp
-        .call("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None)
-        .await?;
+    let attached = cdp.call("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None).await?;
     let session = attached
         .get("sessionId")
         .and_then(Value::as_str)
@@ -438,9 +436,10 @@ mod tests {
     /// This machine's page `home` at `/`, and a second page at `/two`.
     pub(super) async fn serve(home: &'static str) -> String {
         use axum::{response::Html, routing::get, Router};
-        let router = Router::new()
-            .route("/", get(move || async move { Html(home) }))
-            .route("/two", get(|| async { Html("<html><head><title>Two</title></head><body><p>The second page</p></body></html>") }));
+        let router = Router::new().route("/", get(move || async move { Html(home) })).route(
+            "/two",
+            get(|| async { Html("<html><head><title>Two</title></head><body><p>The second page</p></body></html>") }),
+        );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://localhost:{}", listener.local_addr().unwrap().port());
         tokio::spawn(async move { axum::serve(listener, router).await });
@@ -553,6 +552,9 @@ mod tests {
         let p = json!({ "type": "warning", "args": [{ "type": "string", "value": "slow" }, { "type": "number", "value": 3 }] });
         assert_eq!(console_line("Runtime.consoleAPICalled", &p), "[warning] slow 3");
         let e = json!({ "exceptionDetails": { "text": "Uncaught", "exception": { "description": "TypeError: x is undefined\n    at f (a.js:1)" } } });
-        assert_eq!(console_line("Runtime.exceptionThrown", &e), "[error] TypeError: x is undefined\n      at f (a.js:1)");
+        assert_eq!(
+            console_line("Runtime.exceptionThrown", &e),
+            "[error] TypeError: x is undefined\n      at f (a.js:1)"
+        );
     }
 }

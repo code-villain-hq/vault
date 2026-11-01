@@ -66,7 +66,10 @@ pub async fn finish_call(app: &AppHandle, args: Value, caller: Option<&str>) -> 
 
     let landed = merged_heads(&state, &task.id).await?;
     let wanted = args.get("transition").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
-    let ticket = match (task.issue_key.as_deref(), state.config.with(|c| c.tracker_in_use() == Some(crate::config::TrackerKind::Jira))) {
+    let ticket = match (
+        task.issue_key.as_deref(),
+        state.config.with(|c| c.tracker_in_use() == Some(crate::config::TrackerKind::Jira)),
+    ) {
         (Some(key), true) => Some((key.to_string(), closing(&state, key, wanted).await?)),
         _ if wanted.is_some() => {
             return Err(Error::Other(format!("{} has no Jira ticket to move; nothing was changed", task.name)));
@@ -160,7 +163,11 @@ async fn closing(state: &AppState, key: &str, wanted: Option<&str>) -> Result<Cl
 /// The one named, by transition or status, or else the one into the
 /// project's merged status, or else the only one. `Err` gives back a name
 /// that matched nothing.
-fn pick<'a>(done: &[Transition], wanted: Option<&'a str>, merged: Option<&str>) -> std::result::Result<Option<Transition>, &'a str> {
+fn pick<'a>(
+    done: &[Transition],
+    wanted: Option<&'a str>,
+    merged: Option<&str>,
+) -> std::result::Result<Option<Transition>, &'a str> {
     if let Some(w) = wanted {
         return done
             .iter()
@@ -181,7 +188,13 @@ mod tests {
     use super::*;
 
     fn to(name: &str, status: &str, id: &str) -> Transition {
-        Transition { id: format!("t{id}"), name: name.into(), to_status: status.into(), to_id: id.into(), to_category: "done".into() }
+        Transition {
+            id: format!("t{id}"),
+            name: name.into(),
+            to_status: status.into(),
+            to_id: id.into(),
+            to_category: "done".into(),
+        }
     }
 
     #[test]

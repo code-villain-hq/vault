@@ -242,7 +242,11 @@ pub fn gap(thread: Vec<ThreadMessage>, seen: &str, upto: &str, bot_user: &str, o
 
 /// The newer of two Slack timestamps.
 pub fn newest<'a>(a: &'a str, b: &'a str) -> &'a str {
-    if order(b) > order(a) { b } else { a }
+    if order(b) > order(a) {
+        b
+    } else {
+        a
+    }
 }
 
 /// A Slack timestamp (`1760270400.000100`) as something that sorts: compared
@@ -253,7 +257,11 @@ fn order(ts: &str) -> (u64, u64) {
     (secs.parse().unwrap_or(0), micros.get(..6).and_then(|m| m.parse().ok()).unwrap_or(0))
 }
 
-fn transcript(messages: &[ThreadMessage], name: impl Fn(&ThreadMessage) -> String, text: impl Fn(&str) -> String) -> String {
+fn transcript(
+    messages: &[ThreadMessage],
+    name: impl Fn(&ThreadMessage) -> String,
+    text: impl Fn(&str) -> String,
+) -> String {
     let mut p = String::new();
     for m in messages {
         p.push_str(&format!("**{}** ({}):\n{}\n\n", name(m), when(&m.ts), quote(&text(&m.text))));
@@ -380,8 +388,18 @@ mod tests {
         ];
         let gap = gap(thread.clone(), "100.5", "104.0", BOT, ME);
         let texts: Vec<_> = gap.iter().map(|m| m.text.as_str()).collect();
-        assert_eq!(texts, ["the next release has profiles", "deploy finished"], "not its own reply, nor what came after");
-        let p = passed("write the notes", &gap, false, |m| if m.user.is_empty() { "CI".into() } else { "Michael".into() }, |t| t.to_string());
+        assert_eq!(
+            texts,
+            ["the next release has profiles", "deploy finished"],
+            "not its own reply, nor what came after"
+        );
+        let p = passed(
+            "write the notes",
+            &gap,
+            false,
+            |m| if m.user.is_empty() { "CI".into() } else { "Michael".into() },
+            |t| t.to_string(),
+        );
         assert!(p.starts_with("[Slack] write the notes\n\nSaid in the thread since you last heard from it"), "{p}");
         assert!(p.contains("**Michael** (") && p.contains("> the next release has profiles"), "{p}");
         assert!(p.contains("**CI** (") && !p.contains("Doom looked"), "{p}");
@@ -402,7 +420,10 @@ mod tests {
         let texts: Vec<_> = gap(thread.clone(), "", "104.0", BOT, ME).into_iter().map(|m| m.text).collect();
         assert_eq!(texts, ["<@UBOT> are you an evil villain?"]);
         let only_others = vec![said("U2", "100.1", "hi"), said(ME, "104.0", "<@UBOT> hello")];
-        assert!(gap(only_others, "", "104.0", BOT, ME).is_empty(), "with nothing the owner said before, nothing is known to be new");
+        assert!(
+            gap(only_others, "", "104.0", BOT, ME).is_empty(),
+            "with nothing the owner said before, nothing is known to be new"
+        );
     }
 
     #[test]
@@ -422,8 +443,18 @@ mod tests {
     #[test]
     fn the_opening_prompt_holds_the_request_the_thread_and_how_replies_travel() {
         let thread = vec![
-            ThreadMessage { user: "U2".into(), bot_name: None, text: "prod is down\nsince 9".into(), ts: "1760270400.000100".into() },
-            ThreadMessage { user: String::new(), bot_name: Some("PagerDuty".into()), text: "alert".into(), ts: "x".into() },
+            ThreadMessage {
+                user: "U2".into(),
+                bot_name: None,
+                text: "prod is down\nsince 9".into(),
+                ts: "1760270400.000100".into(),
+            },
+            ThreadMessage {
+                user: String::new(),
+                bot_name: Some("PagerDuty".into()),
+                text: "alert".into(),
+                ts: "x".into(),
+            },
         ];
         let opening = Opening {
             owner: "Michael",
@@ -466,7 +497,12 @@ mod tests {
             personality: "  You are Doctor Doom.\nSpeak of yourself as Doom.  ",
         };
         let p = opening.prompt(|_| String::new(), |t| t.to_string());
-        assert!(p.contains("Who you are in Slack, in Michael's words:\n\n> You are Doctor Doom.\n> Speak of yourself as Doom."), "{p}");
+        assert!(
+            p.contains(
+                "Who you are in Slack, in Michael's words:\n\n> You are Doctor Doom.\n> Speak of yourself as Doom."
+            ),
+            "{p}"
+        );
         assert!(p.ends_with("stay as they would be without it."), "{p}");
     }
 }

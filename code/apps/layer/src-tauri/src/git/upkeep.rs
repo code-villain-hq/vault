@@ -59,10 +59,7 @@ pub fn list_worktrees(repo: &Path) -> Result<Vec<WorktreeEntry>> {
 
 /// Where `origin` fetches from.
 pub fn origin_url(repo: &Path) -> Option<String> {
-    run(repo, &["config", "--get", "remote.origin.url"])
-        .ok()
-        .map(|u| u.trim().to_string())
-        .filter(|u| !u.is_empty())
+    run(repo, &["config", "--get", "remote.origin.url"]).ok().map(|u| u.trim().to_string()).filter(|u| !u.is_empty())
 }
 
 /// Whether two remote URLs name the same repository, however they are
@@ -116,10 +113,7 @@ fn tip(repo: &Path, refname: &str) -> Option<String> {
 fn count(repo: &Path, args: &[&str]) -> Result<usize> {
     let mut all = vec!["rev-list", "--count"];
     all.extend_from_slice(args);
-    run(repo, &all)?
-        .trim()
-        .parse()
-        .map_err(|_| Error::Git("rev-list gave no count".into()))
+    run(repo, &all)?.trim().parse().map_err(|_| Error::Git("rev-list gave no count".into()))
 }
 
 /// Fetch origin into the app's copy, and forget the branches origin deleted.
@@ -202,9 +196,7 @@ pub fn fast_forward(clone: &Path, store: &Path, branch: &str) -> Result<Forwarde
     }
     let moved = count(clone, &[target.as_str(), "--not", ours.as_str()])?;
 
-    let here = list_worktrees(clone)?
-        .into_iter()
-        .find(|w| w.branch.as_deref() == Some(branch) && !w.prunable);
+    let here = list_worktrees(clone)?.into_iter().find(|w| w.branch.as_deref() == Some(branch) && !w.prunable);
     match here {
         Some(w) => {
             let wt = Path::new(&w.path);
@@ -245,7 +237,13 @@ fn from_branches(store: &Path, theirs: &str, base: &str) -> Option<(UpdateBy, St
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_secs() as i64;
     let refs = run(
         store,
-        &["for-each-ref", "--sort=-committerdate", "--count=40", "--format=%(refname)%00%(committerdate:unix)", "refs/remotes/origin"],
+        &[
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--count=40",
+            "--format=%(refname)%00%(committerdate:unix)",
+            "refs/remotes/origin",
+        ],
     )
     .ok()?;
     let (mut merged, mut rebased) = (0, 0);
@@ -321,7 +319,10 @@ fn from_landings(store: &Path, theirs: &str, base: &str) -> Option<(UpdateBy, St
     } else if squashed * 2 >= n {
         None
     } else {
-        Some((UpdateBy::Rebase, format!("{base} is a straight line of commits as they were written: pull requests are rebased onto it")))
+        Some((
+            UpdateBy::Rebase,
+            format!("{base} is a straight line of commits as they were written: pull requests are rebased onto it"),
+        ))
     }
 }
 
@@ -386,7 +387,8 @@ pub fn origin_branches(store: &Path, base: &str) -> Result<Vec<OriginBranch>> {
     }
     let merged = run(store, &["for-each-ref", "--format=%(refname)", "--merged", &theirs, "refs/remotes/origin"])?;
     let merged: std::collections::HashSet<&str> = merged.lines().collect();
-    let out = run(store, &["for-each-ref", "--format=%(refname)%00%(objectname)%00%(authoremail)", "refs/remotes/origin"])?;
+    let out =
+        run(store, &["for-each-ref", "--format=%(refname)%00%(objectname)%00%(authoremail)", "refs/remotes/origin"])?;
     Ok(out
         .lines()
         .filter_map(|l| {
@@ -409,10 +411,7 @@ pub fn origin_branches(store: &Path, base: &str) -> Result<Vec<OriginBranch>> {
 
 /// The email git writes commits here as, lowercased.
 pub fn user_email(repo: &Path) -> Option<String> {
-    run(repo, &["config", "--get", "user.email"])
-        .ok()
-        .map(|e| e.trim().to_ascii_lowercase())
-        .filter(|e| !e.is_empty())
+    run(repo, &["config", "--get", "user.email"]).ok().map(|e| e.trim().to_ascii_lowercase()).filter(|e| !e.is_empty())
 }
 
 /// Delete `branch` on origin if it is still at `tip_was` there.
@@ -610,7 +609,11 @@ mod tests {
         run(mate, &["push", "-q", "origin", "main", "release"]).unwrap();
         fetch_store(store).unwrap();
         let (by, why) = update_style(store, "main")?;
-        let counted = if habit == "merge" { "3 of its recent branches merged main in, 0" } else { "3 of its recent branches were rebased onto main, 0" };
+        let counted = if habit == "merge" {
+            "3 of its recent branches merged main in, 0"
+        } else {
+            "3 of its recent branches were rebased onto main, 0"
+        };
         assert!(why.starts_with(counted), "the release branch counts for nothing: {why}");
         Some(by)
     }
@@ -642,7 +645,8 @@ mod tests {
             run(&mate, &["switch", "-q", "-c", &format!("pr{n}")]).unwrap();
             commit_in(&mate, &format!("pr{n}.txt"), "work", None);
             run(&mate, &["switch", "-q", "main"]).unwrap();
-            run(&mate, &["merge", "-q", "--no-ff", "-m", &format!("Merge pull request #{n}"), &format!("pr{n}")]).unwrap();
+            run(&mate, &["merge", "-q", "--no-ff", "-m", &format!("Merge pull request #{n}"), &format!("pr{n}")])
+                .unwrap();
         }
         run(&mate, &["push", "-q", "origin", "HEAD:main"]).unwrap();
         fetch_store(&store).unwrap();
@@ -688,8 +692,13 @@ mod tests {
 
         let mut found = origin_branches(&store, "main").unwrap();
         found.sort_by(|a, b| a.name.cmp(&b.name));
-        let seen: Vec<(&str, bool, &str)> = found.iter().map(|b| (b.name.as_str(), b.in_base, b.author.as_str())).collect();
-        assert_eq!(seen, vec![("landed", true, "t@villain.local"), ("work", false, "t@villain.local")], "main itself is not listed");
+        let seen: Vec<(&str, bool, &str)> =
+            found.iter().map(|b| (b.name.as_str(), b.in_base, b.author.as_str())).collect();
+        assert_eq!(
+            seen,
+            vec![("landed", true, "t@villain.local"), ("work", false, "t@villain.local")],
+            "main itself is not listed"
+        );
 
         // Pushed to after it was judged: the lease refuses.
         let judged = found[1].tip.clone();

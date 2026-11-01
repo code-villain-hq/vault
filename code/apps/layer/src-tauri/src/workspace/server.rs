@@ -120,7 +120,11 @@ fn capitalised(text: &str) -> String {
     let mut chars = text.chars();
     let first: String = chars.next().map(|c| c.to_uppercase().collect()).unwrap_or_default();
     let text = first + chars.as_str();
-    if text.ends_with('.') { text } else { text + "." }
+    if text.ends_with('.') {
+        text
+    } else {
+        text + "."
+    }
 }
 
 pub async fn ways(origin: &str) -> Result<Ways> {

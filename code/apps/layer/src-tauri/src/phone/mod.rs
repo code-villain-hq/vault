@@ -309,10 +309,10 @@ pub fn status(state: &AppState) -> PhoneStatus {
             .into_iter()
             .map(|d| DeviceView { connected: inner.open.contains_key(&d.id), device: d })
             .collect(),
-        pairing: inner.pairing.as_ref().map(|p| PairingView {
-            code: p.code().to_string(),
-            seconds_left: p.left(now).as_secs(),
-        }),
+        pairing: inner
+            .pairing
+            .as_ref()
+            .map(|p| PairingView { code: p.code().to_string(), seconds_left: p.left(now).as_secs() }),
     }
 }
 
@@ -321,7 +321,9 @@ pub fn start_pairing(app: &AppHandle) -> Result<PairingView> {
     let view = {
         let mut inner = phone().inner.lock();
         if inner.server.is_none() {
-            return Err(Error::Other("Turn on Tailscale or the home network first, so the phone can reach the app.".into()));
+            return Err(Error::Other(
+                "Turn on Tailscale or the home network first, so the phone can reach the app.".into(),
+            ));
         }
         let now = Instant::now();
         let p = Pairing::new(now);

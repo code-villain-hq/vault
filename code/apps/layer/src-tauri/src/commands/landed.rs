@@ -142,7 +142,11 @@ mod tests {
         assert_eq!(git::changed_count(&dir, "main", Some(&merged), git::Scope::Branch), 0);
 
         commit(&dir, "more.tf");
-        assert_eq!(moves_to(&dir, Some(&point), "main", &merged), Some(merged.clone()), "work after the merge keeps it");
+        assert_eq!(
+            moves_to(&dir, Some(&point), "main", &merged),
+            Some(merged.clone()),
+            "work after the merge keeps it"
+        );
         assert_eq!(git::changed_count(&dir, "main", Some(&merged), git::Scope::Branch), 1);
         std::fs::remove_dir_all(&dir).ok();
     }

@@ -234,11 +234,7 @@ impl PaneMeta {
     /// agent at "out of budget" for as long as the words were in the tail, and
     /// an answered trust question lingered the same way.
     fn take_report(&mut self, activity: Activity) -> bool {
-        let activity = if activity == Activity::Done && !self.prompted {
-            Activity::Idle
-        } else {
-            activity
-        };
+        let activity = if activity == Activity::Done && !self.prompted { Activity::Idle } else { activity };
         // A turn ends once: Claude Code's idle notice after its Stop hook,
         // or a title repainted, says done again about the same one.
         let ended = activity == Activity::Done && !matches!(self.reported, Some((Activity::Done, _)));
@@ -503,19 +499,11 @@ impl PtyManager {
         if !pane.watched.load(Ordering::Acquire) {
             return;
         }
-        if pane
-            .flush_scheduled
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_err()
-        {
+        if pane.flush_scheduled.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
             return;
         }
         let quiet = pane.last_flush.lock().elapsed();
-        let mut wait = if keyed || quiet >= OUTPUT_COALESCE {
-            OUTPUT_GATHER
-        } else {
-            OUTPUT_COALESCE - quiet
-        };
+        let mut wait = if keyed || quiet >= OUTPUT_COALESCE { OUTPUT_GATHER } else { OUTPUT_COALESCE - quiet };
         let app = app.clone();
         let pane = pane.clone();
         let id = id.to_string();
@@ -560,7 +548,10 @@ impl PtyManager {
                     pane.flush_scheduled.store(false, Ordering::Release);
                     // A write may have landed between the take and the clear.
                     // Re-arm rather than drop those bytes until the next read.
-                    let more = { let out = pane.output.lock(); out.sent < out.total };
+                    let more = {
+                        let out = pane.output.lock();
+                        out.sent < out.total
+                    };
                     if more
                         && pane
                             .flush_scheduled
@@ -679,12 +670,8 @@ impl PtyManager {
         let slot = self.reserve(&opts.cwd)?;
 
         let system = portable_pty::native_pty_system();
-        let size = PtySize {
-            rows: opts.rows.unwrap_or(30),
-            cols: opts.cols.unwrap_or(100),
-            pixel_width: 0,
-            pixel_height: 0,
-        };
+        let size =
+            PtySize { rows: opts.rows.unwrap_or(30), cols: opts.cols.unwrap_or(100), pixel_width: 0, pixel_height: 0 };
 
         // One at a time. Panes start from several threads at once (restoring,
         // MCP calls, the blocking pool), and macOS's openpty called from two
@@ -719,22 +706,16 @@ impl PtyManager {
             cmd.env(k, v);
         }
 
-        let mut child = pair
-            .slave
-            .spawn_command(cmd)
-            .map_err(|e| Error::Pty(format!("spawn {}: {e}", opts.program)))?;
+        let mut child =
+            pair.slave.spawn_command(cmd).map_err(|e| Error::Pty(format!("spawn {}: {e}", opts.program)))?;
         drop(pair.slave);
 
         // Started but not yet anyone's: failing past here must not leave it
         // running with nothing able to see or stop it.
-        let ends = pair
-            .master
-            .try_clone_reader()
-            .map_err(|e| Error::Pty(format!("clone reader: {e}")))
-            .and_then(|r| {
-                let w = pair.master.take_writer().map_err(|e| Error::Pty(format!("take writer: {e}")))?;
-                Ok((r, w))
-            });
+        let ends = pair.master.try_clone_reader().map_err(|e| Error::Pty(format!("clone reader: {e}"))).and_then(|r| {
+            let w = pair.master.take_writer().map_err(|e| Error::Pty(format!("take writer: {e}")))?;
+            Ok((r, w))
+        });
         let (reader, mut writer) = match ends {
             Ok(ends) => ends,
             Err(e) => {
@@ -794,8 +775,7 @@ impl PtyManager {
                             let (found, title) = {
                                 let mut out = pane.output.lock();
                                 out.push(&buf[..n]);
-                                let tail = &out.scrollback
-                                    [out.scrollback.len().saturating_sub(NOTICE_TAIL)..];
+                                let tail = &out.scrollback[out.scrollback.len().saturating_sub(NOTICE_TAIL)..];
                                 let found = if scan { notice_in(tail, &mut scratch) } else { None };
                                 let title = reads_title
                                     .then(|| {
@@ -845,10 +825,7 @@ impl PtyManager {
                                     meta.notice_at = now;
                                     meta.settle();
                                     if found.is_some() {
-                                        let _ = app.emit(
-                                            "pty:notice",
-                                            NoticeEvent { pane_id: &id, notice: found },
-                                        );
+                                        let _ = app.emit("pty:notice", NoticeEvent { pane_id: &id, notice: found });
                                     } else {
                                         // Answered: the count and the dot
                                         // say so now, not at the next poll.
@@ -910,11 +887,7 @@ impl PtyManager {
     }
 
     fn get(&self, id: &str) -> Result<Arc<Pane>> {
-        self.panes
-            .lock()
-            .get(id)
-            .cloned()
-            .ok_or_else(|| Error::NotFound(format!("pane {id}")))
+        self.panes.lock().get(id).cloned().ok_or_else(|| Error::NotFound(format!("pane {id}")))
     }
 
     /// True when the keys changed what the pane reads as — a question
@@ -938,9 +911,7 @@ impl PtyManager {
             meta.typed(data);
             meta.activity(watched, Utc::now()) != before
         };
-        input
-            .send(data.as_bytes().to_vec())
-            .map_err(|_| Error::Pty("the terminal has closed".into()))?;
+        input.send(data.as_bytes().to_vec()).map_err(|_| Error::Pty("the terminal has closed".into()))?;
         Ok(changed)
     }
 
@@ -978,12 +949,7 @@ impl PtyManager {
         pane.meta.lock().last_input = Instant::now();
         let master = master.lock();
         master
-            .resize(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
+            .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
             .map_err(|e| Error::Pty(format!("resize: {e}")))?;
         Ok(())
     }
@@ -1005,12 +971,8 @@ impl PtyManager {
             meta.activity(true, Utc::now()) != before
         };
         let (bytes, reset) = out.since(since);
-        let catchup = Catchup {
-            data: base64::engine::general_purpose::STANDARD.encode(bytes),
-            end: out.total,
-            reset,
-            seen,
-        };
+        let catchup =
+            Catchup { data: base64::engine::general_purpose::STANDARD.encode(bytes), end: out.total, reset, seen };
         out.sent = out.total;
         Ok(catchup)
     }
@@ -1280,11 +1242,8 @@ impl PtyManager {
         // agents froze the UI for fifteen seconds.
         let panes: Vec<Arc<Pane>> = {
             let mut map = self.panes.lock();
-            let ids: Vec<String> = map
-                .iter()
-                .filter(|(_, p)| pred(&p.meta.lock().info))
-                .map(|(id, _)| id.clone())
-                .collect();
+            let ids: Vec<String> =
+                map.iter().filter(|(_, p)| pred(&p.meta.lock().info)).map(|(id, _)| id.clone()).collect();
             ids.into_iter().filter_map(|id| map.remove(&id)).collect()
         };
         if panes.is_empty() {
@@ -1340,9 +1299,10 @@ fn log_run<R: Runtime>(app: &AppHandle<R>, pane: &Pane, code: Option<i32>) {
             conn.tokens()
         }
         // A terminal says nothing of them; Claude Code's transcript does.
-        Io::Pty { .. } => info.agent_id.as_deref().and_then(|agent| {
-            crate::agents::transcript_tokens(agent, &info.cwd, &conversations, born, Utc::now())
-        }),
+        Io::Pty { .. } => info
+            .agent_id
+            .as_deref()
+            .and_then(|agent| crate::agents::transcript_tokens(agent, &info.cwd, &conversations, born, Utc::now())),
     };
     crate::runs::record(app, crate::runs::Ended { info, born, stopping, code, tokens, turns, tally });
 }
@@ -1550,18 +1510,15 @@ mod tests {
     #[ignore]
     fn echo_latency() {
         use tauri::Listener;
-        for (label, script) in [
-            ("quiet", "exec cat"),
-            ("beside a 20ms printer", "(while :; do printf .; sleep 0.02; done) & exec cat"),
-        ] {
+        for (label, script) in
+            [("quiet", "exec cat"), ("beside a 20ms printer", "(while :; do printf .; sleep 0.02; done) & exec cat")]
+        {
             let app = tauri::test::mock_app();
             let ptys = PtyManager::default();
             let (tx, rx) = std::sync::mpsc::channel::<(Instant, String)>();
             app.listen_any("pty:output", move |e| {
                 let v: serde_json::Value = serde_json::from_str(e.payload()).unwrap();
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(v["data"].as_str().unwrap())
-                    .unwrap();
+                let bytes = base64::engine::general_purpose::STANDARD.decode(v["data"].as_str().unwrap()).unwrap();
                 let _ = tx.send((Instant::now(), String::from_utf8_lossy(&bytes).to_string()));
             });
             let pane = ptys
@@ -1648,10 +1605,7 @@ mod tests {
             .unwrap()
         };
         let text = |c: &Catchup| {
-            String::from_utf8_lossy(
-                &base64::engine::general_purpose::STANDARD.decode(&c.data).unwrap(),
-            )
-            .to_string()
+            String::from_utf8_lossy(&base64::engine::general_purpose::STANDARD.decode(&c.data).unwrap()).to_string()
         };
         let wait_for = |id: &str, since: Option<u64>, want: &str| -> Catchup {
             let deadline = Instant::now() + Duration::from_secs(10);
@@ -1685,11 +1639,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(300));
         let started = Instant::now();
         ptys.close(&shell.id).unwrap();
-        assert!(
-            started.elapsed() < Duration::from_secs(3),
-            "closing a shell took {:?}",
-            started.elapsed()
-        );
+        assert!(started.elapsed() < Duration::from_secs(3), "closing a shell took {:?}", started.elapsed());
     }
 
     /// openpty on a busy Mac failed with "Device not configured" and worked a
@@ -1697,9 +1647,25 @@ mod tests {
     #[test]
     fn opening_a_terminal_is_tried_again_before_it_fails() {
         let mut tries = 0;
-        assert_eq!(retried(|| { tries += 1; if tries < 3 { Err("busy") } else { Ok(tries) } }), Ok(3));
+        assert_eq!(
+            retried(|| {
+                tries += 1;
+                if tries < 3 {
+                    Err("busy")
+                } else {
+                    Ok(tries)
+                }
+            }),
+            Ok(3)
+        );
         let (mut tries, started) = (0, Instant::now());
-        assert_eq!(retried(|| { tries += 1; Err::<(), _>("gone") }), Err("gone"));
+        assert_eq!(
+            retried(|| {
+                tries += 1;
+                Err::<(), _>("gone")
+            }),
+            Err("gone")
+        );
         assert_eq!(tries, 6, "and gives up");
         // Its waits add up to 620ms. A loaded CI runner oversleeps each, and
         // a one-second bound failed there: this only catches waiting on and on.

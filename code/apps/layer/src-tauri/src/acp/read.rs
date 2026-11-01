@@ -31,8 +31,14 @@ pub(super) fn topic(title: &str) -> String {
 
 /// What Claude Code records of a local command (a slash command it runs
 /// itself, not the model) in the transcript, each in its own element.
-const LOCAL_COMMAND_TAGS: &[&str] =
-    &["command-name", "command-message", "command-args", "local-command-stdout", "local-command-stderr", "local-command-caveat"];
+const LOCAL_COMMAND_TAGS: &[&str] = &[
+    "command-name",
+    "command-message",
+    "command-args",
+    "local-command-stdout",
+    "local-command-stderr",
+    "local-command-caveat",
+];
 
 /// What the user wrote, out of a message a conversation replays: without
 /// Claude Code's record of its local commands. `claude-agent-acp` replays
@@ -52,7 +58,11 @@ pub(super) fn user_words(text: &str) -> String {
     }
     // Only where something was cut: a message streamed in pieces keeps the
     // spaces between them.
-    if cut { out.trim().to_string() } else { out }
+    if cut {
+        out.trim().to_string()
+    } else {
+        out
+    }
 }
 
 /// The text of a content block: text as it is, anything else named.
@@ -60,11 +70,12 @@ pub(super) fn block_text(block: Option<&Value>) -> String {
     let Some(block) = block else { return String::new() };
     match block.get("type").and_then(Value::as_str) {
         Some("text") => str_at(block, "text").unwrap_or_default(),
-        Some("resource_link") => format!("[{}]", str_at(block, "name").or_else(|| str_at(block, "uri")).unwrap_or_default()),
-        Some("resource") => block
-            .get("resource")
-            .and_then(|r| str_at(r, "text").or_else(|| str_at(r, "uri")))
-            .unwrap_or_default(),
+        Some("resource_link") => {
+            format!("[{}]", str_at(block, "name").or_else(|| str_at(block, "uri")).unwrap_or_default())
+        }
+        Some("resource") => {
+            block.get("resource").and_then(|r| str_at(r, "text").or_else(|| str_at(r, "uri"))).unwrap_or_default()
+        }
         Some("image") => "[image]".into(),
         Some("audio") => "[audio]".into(),
         _ => String::new(),
@@ -125,7 +136,10 @@ mod tests {
 
     #[test]
     fn tool_output_loses_the_fence_around_it_and_keeps_fences_inside_it() {
-        assert_eq!(unfence("```\n<tool_use_error>no</tool_use_error>\n```".into()), "<tool_use_error>no</tool_use_error>");
+        assert_eq!(
+            unfence("```\n<tool_use_error>no</tool_use_error>\n```".into()),
+            "<tool_use_error>no</tool_use_error>"
+        );
         assert_eq!(unfence("```console\n$ ls\na b\n```\n".into()), "$ ls\na b");
         let two = "```\na\n```\ntext\n```\nb\n```";
         assert_eq!(unfence(two.into()), two);

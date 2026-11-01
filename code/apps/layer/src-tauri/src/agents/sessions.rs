@@ -18,9 +18,7 @@ pub struct Resumable {
 /// Claude Code and friends key their transcripts by working directory, with
 /// every non-alphanumeric character turned into a dash.
 fn slug(path: &str) -> String {
-    path.chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-        .collect()
+    path.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
 }
 
 /// Where `agent_id` keeps its transcripts for `cwd`, if it keeps them by folder.
@@ -118,15 +116,9 @@ mod tests {
     #[test]
     fn slugs_a_working_directory_the_way_the_clis_do() {
         // Matches the directories Claude Code actually creates.
-        assert_eq!(
-            slug("/Users/you/code/villain-layer"),
-            "-Users-you-code-villain-layer"
-        );
+        assert_eq!(slug("/Users/you/code/villain-layer"), "-Users-you-code-villain-layer");
         // A dot becomes a dash too, which is why hidden folders double up.
-        assert_eq!(
-            slug("/Users/you/.villain-worktrees/ACME-123/api"),
-            "-Users-you--villain-worktrees-ACME-123-api"
-        );
+        assert_eq!(slug("/Users/you/.villain-worktrees/ACME-123/api"), "-Users-you--villain-worktrees-ACME-123-api");
     }
 
     #[test]

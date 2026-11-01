@@ -26,10 +26,12 @@ enum TimeLookup {
 
         let time = timeFormatter.string(from: now)
         let diffSeconds = zone.secondsFromGMT(for: now) - TimeZone.current.secondsFromGMT(for: now)
-        let diffText = diffSeconds == 0
+        let diffText =
+            diffSeconds == 0
             ? "same as here"
             : String(format: "%+g h", Double(diffSeconds) / 3600)
-        let cityName = zone.identifier.split(separator: "/").last
+        let cityName =
+            zone.identifier.split(separator: "/").last
             .map { $0.replacingOccurrences(of: "_", with: " ") } ?? zone.identifier
 
         return ("= \(time) \(weekdayFormatter.string(from: now)) · \(cityName) \(diffText)", time)
@@ -68,7 +70,7 @@ enum TimeLookup {
 
     private static func resolve(_ place: String) -> TimeZone? {
         if let id = aliases[place] { return TimeZone(identifier: id) }
-        if let zone = TimeZone(abbreviation: place.uppercased()) { return zone } // CET, PST, UTC…
+        if let zone = TimeZone(abbreviation: place.uppercased()) { return zone }  // CET, PST, UTC…
         if let hit = cities.first(where: { $0.name == place }) { return TimeZone(identifier: hit.id) }
         // Loose matches need some length or every letter combo hits a city.
         if place.count >= 3, let hit = cities.first(where: { $0.name.hasPrefix(place) }) {

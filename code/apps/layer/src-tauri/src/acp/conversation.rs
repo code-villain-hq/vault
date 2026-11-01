@@ -61,12 +61,7 @@ impl Conversation {
         // Entries let go from the front the window drops itself, by `base`.
         // Only a revision it cannot have seen means starting again.
         let reset = since.is_none_or(|s| s > self.rev);
-        let entries = self
-            .entries
-            .iter()
-            .filter(|e| reset || since.is_none_or(|s| e.rev > s))
-            .cloned()
-            .collect();
+        let entries = self.entries.iter().filter(|e| reset || since.is_none_or(|s| e.rev > s)).cloned().collect();
         Changes { rev: self.rev, base: self.base, len: self.base + self.entries.len(), reset, entries }
     }
 
@@ -585,7 +580,10 @@ mod tests {
     fn a_replay_shows_what_the_user_wrote_not_the_agents_record_of_its_own_commands() {
         let mut c = Conversation::default();
         c.apply(&chunk("user_message_chunk", "<command-name>/model</command-name>\n            <command-message>model</command-message>\n            <command-args>default</command-args>"));
-        c.apply(&chunk("user_message_chunk", "<local-command-stdout>Set model to claude-opus-4-6[1m]</local-command-stdout>"));
+        c.apply(&chunk(
+            "user_message_chunk",
+            "<local-command-stdout>Set model to claude-opus-4-6[1m]</local-command-stdout>",
+        ));
         c.apply(&chunk("user_message_chunk", "Say hi in one word."));
         c.apply(&chunk("agent_message_chunk", "Hi!"));
         let all = c.changes(None).entries;
@@ -595,7 +593,10 @@ mod tests {
         // A message replayed in pieces is still one, spaces and all.
         c.apply(&chunk("user_message_chunk", "Now say "));
         c.apply(&chunk("user_message_chunk", "bye."));
-        assert_eq!(c.changes(None).entries[2].body, Body::User { text: "Now say bye.".into(), queued: false, dropped: false });
+        assert_eq!(
+            c.changes(None).entries[2].body,
+            Body::User { text: "Now say bye.".into(), queued: false, dropped: false }
+        );
     }
 
     #[test]
@@ -643,7 +644,9 @@ mod tests {
         call(&mut c, "a", "in_progress");
         call(&mut c, "a", "completed");
         call(&mut c, "a", "completed");
-        c.apply(&json!({ "sessionUpdate": "tool_call", "toolCallId": "b", "title": "Run tests", "status": "in_progress" }));
+        c.apply(
+            &json!({ "sessionUpdate": "tool_call", "toolCallId": "b", "title": "Run tests", "status": "in_progress" }),
+        );
         call(&mut c, "b", "failed");
         c.apply(&json!({ "sessionUpdate": "tool_call", "toolCallId": "c", "title": "Grep", "status": "completed" }));
         assert_eq!(c.calls, crate::runs::ToolCalls { calls: 3, failed: 1 });
