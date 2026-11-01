@@ -30,7 +30,8 @@ use crate::topics::{SetUp, cut};
 pub(crate) const PROTOCOL_VERSION: &str = "2025-06-18";
 
 const TOPIC_NAMED: &str = "SELECT id, name, sticks_to, icon, group_name, kind \
-     FROM topics WHERE workspace_id = $1 AND lower(name) = lower($2)";
+     FROM topics WHERE workspace_id = $1 AND lower(name) = lower($2) \
+     ORDER BY created_at LIMIT 1";
 const SUB_TOPIC_NAMED: &str = "SELECT id, name FROM topics \
      WHERE workspace_id = $1 AND parent_id = $2 AND lower(name) = lower($3)";
 const NEXT_POSITION: &str = "SELECT COALESCE(max(position) + 1, 0) FROM blocks \
@@ -344,12 +345,22 @@ async fn call(
         "read_topic" => {
             let args: ElsewhereArgs = read(arguments)?;
             let named = cut(&args.topic, 80);
-            let row: Option<TopicRow> = sqlx::query_as(TOPIC_NAMED)
-                .bind(asking.actor.workspace_id)
-                .bind(&named)
-                .fetch_optional(&state.pool)
+            // Its own sub-topic first, when another topic has the same name.
+            let sub = this_or_sub(state, asking, &named)
                 .await
-                .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
+                .ok()
+                .map(|row| row.0);
+            let row: Option<TopicRow> = match sub {
+                Some(id) => sqlx::query_as(TOPIC_BY_ID)
+                    .bind(asking.actor.workspace_id)
+                    .bind(id),
+                None => sqlx::query_as(TOPIC_NAMED)
+                    .bind(asking.actor.workspace_id)
+                    .bind(&named),
+            }
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|_| "Almanac couldn't look at its topics.".to_string())?;
             let Some((id, ..)) = row else {
                 return Err(format!(
                     "No topic is called {named}. The topics: {}.",
@@ -363,7 +374,7 @@ async fn call(
                 .await
                 .map_err(|_| "Almanac couldn't read that topic.".to_string())?
                 .ok_or("That topic is gone.")?;
-            let sub = this_or_sub(state, asking, &named).await.is_ok();
+            let sub = sub.is_some();
             Ok(format!(
                 "{}\n\n{}",
                 match sub {
@@ -550,7 +561,8 @@ async fn call(
             let mut args: ChangeArgs = read(arguments)?;
             // A topic's own talk changes its topic and its sub-topics.
             if asking.mode == Mode::Topic {
-                args.topic = this_or_sub(state, asking, &args.topic).await?.1;
+                let (id, name, ..) = this_or_sub(state, asking, &args.topic).await?;
+                (args.id, args.topic) = (Some(id), name);
                 args.sticks_to = None;
             }
             let change = change(state, asking, args).await?;
@@ -738,6 +750,10 @@ struct ProposedPointArgs {
 struct ChangeArgs {
     #[serde(default)]
     topic: String,
+    /// The topic itself, once a topic's talk has found it: another may
+    /// have the same name.
+    #[serde(skip)]
+    id: Option<Uuid>,
     name: Option<String>,
     sticks_to: Option<String>,
     icon: Option<String>,
@@ -987,10 +1003,10 @@ async fn change(
             .as_deref()
             .is_some_and(|n| n.eq_ignore_ascii_case(&named))
     });
-    let row: Option<TopicRow> = match &renamed {
-        Some(change) => sqlx::query_as(TOPIC_BY_ID)
+    let row: Option<TopicRow> = match args.id.or(renamed.as_ref().map(|c| c.topic_id)) {
+        Some(id) => sqlx::query_as(TOPIC_BY_ID)
             .bind(asking.actor.workspace_id)
-            .bind(change.topic_id),
+            .bind(id),
         None => sqlx::query_as(TOPIC_NAMED)
             .bind(asking.actor.workspace_id)
             .bind(&named),
