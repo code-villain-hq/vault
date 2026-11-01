@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Almanac: adding blocks by hand</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 72ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.choices { color: var(--muted); max-width: 84ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.mode { display: grid; gap: 8px; align-content: start; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* A piece of a topic's page, at its real size. */
+.pane { --hue: var(--data-1); background: var(--panel); color: var(--fg); border-radius: var(--radius-lg); padding: 24px 32px 28px; display: flex; flex-direction: column; gap: 28px; position: relative; min-height: 100%; }
+.pane svg { flex: none; }
+.block { display: flex; flex-direction: column; gap: 8px; position: relative; }
+.btitle { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.btitle .more { margin-left: auto; color: var(--muted); }
+.list li { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.list li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--hue); flex: none; }
+.new { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--type-ui-small-size); padding: 4px 6px; }
+.callout { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border-radius: var(--radius-md); padding: 10px 14px; }
+.callout svg { color: var(--warn); margin-top: 2px; }
+.callout.note svg { color: var(--muted); }
+.table { border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; font-size: var(--type-ui-small-size); }
+.table .tr { display: grid; grid-template-columns: 1.1fr 1fr 1fr; }
+.table .tr > * { padding: 6px 10px; border-top: 1px solid var(--line); min-height: 30px; display: flex; align-items: center; gap: 6px; }
+.table .tr > * + * { border-left: 1px solid var(--line); }
+.table .th > * { border-top: 0; color: var(--muted); background: var(--surface); }
+.table .tr > b { font-weight: 700; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--fg) var(--chip-tint), transparent); }
+.pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--data-2); }
+.para p { font-size: var(--type-body-size); line-height: var(--type-body-leading); max-width: 62ch; }
+.para p + p { margin-top: 10px; }
+.src { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* What's proposed. */
+.add { align-self: flex-start; }
+.add svg { color: var(--muted); }
+.menu { position: absolute; z-index: 2; width: 220px; padding: 4px; box-shadow: none; }
+.menu .ui-option { display: flex; align-items: center; gap: 10px; padding: 0 8px; height: 30px; }
+.menu .ui-option svg { color: var(--muted); }
+.menu .ui-option.is-active svg { color: var(--fg); }
+.menu .sep { height: 1px; background: var(--line); margin: 4px 0; }
+.menu .sub { margin-left: auto; color: var(--faint); }
+.menu .hint { color: var(--faint); font-size: var(--type-ui-small-size); padding: 4px 8px 2px; }
+.menu .key { margin-left: auto; }
+.hovered { outline: 0; }
+.writing { border-radius: var(--radius-md); box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); margin: -4px -8px; padding: 4px 8px; }
+.ph { color: var(--faint); }
+.caret { display: inline-block; width: 1.5px; height: 1.1em; background: var(--fg); vertical-align: text-bottom; margin-left: 1px; }
+.keys { color: var(--faint); font-size: var(--type-ui-small-size); display: flex; gap: 14px; flex-wrap: wrap; }
+.keys .ui-kbd { margin-right: 4px; }
+.htitle { font-size: var(--type-title-size); font-weight: 700; line-height: var(--type-title-leading); }
+
+/* The Fields dialog. */
+.backdrop { position: absolute; inset: 0; border-radius: var(--radius-lg); }
+.dialog { position: relative; z-index: 1; width: 470px; margin: 24px auto; padding: 20px; display: grid; gap: 16px; }
+.dialog h3 { font-size: var(--type-title-size); font-weight: 700; }
+.dialog p.say { color: var(--muted); font-size: var(--type-ui-small-size); margin-top: 2px; }
+.fields { display: grid; gap: 6px; }
+.frow { display: grid; grid-template-columns: 14px 1fr 130px 22px; gap: 8px; align-items: center; }
+.frow .grip { color: var(--faint); }
+.frow .ui-field { height: 30px; padding: 0 10px; display: flex; align-items: center; gap: 6px; }
+.frow .kind { justify-content: space-between; color: var(--fg); }
+.frow .kind svg { color: var(--muted); }
+.frow .x { color: var(--faint); display: grid; place-items: center; }
+.frow.fixed .ui-field { background: transparent; color: var(--muted); padding-left: 0; }
+.opts { grid-column: 2 / 4; display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 4px; }
+.addfield { color: var(--muted); display: flex; align-items: center; gap: 8px; font-size: var(--type-ui-small-size); padding-left: 22px; }
+.foot { display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Adding blocks by hand</h1>
+  <p>Today a talk makes every block. By hand you can only add a row to a collection (+ New) and a picture at the end of a page. Proposed: you add any block of the set yourself, and write what it starts with in place. A talk still keeps things the same way; your blocks are ordinary blocks it reads and tidies like its own.</p>
+</header>
+
+<section class="step">
+  <h2><span class="n">1</span> Add a block, where Add a picture is</h2>
+  <ul class="choices">
+    <li><b>One button at the end of the page</b>, in Add a picture's place: Add a block. A picture is one of the kinds, and a photo dropped on the button still makes one.</li>
+    <li><b>The set's kinds, by the names Settings → Blocks uses.</b> A collection starts as a list, a checklist or a table, because its fields pick its picture; View as and Fields change it after.</li>
+    <li>On a row's own page the same button adds the block to that page.</li>
+  </ul>
+  <div class="modes">
+    <div class="mode"><div class="mode-label">Today, night</div><div data-theme="night" data-use="end-today"></div></div>
+    <div class="mode"><div class="mode-label">Today, day</div><div data-theme="day" data-use="end-today"></div></div>
+    <div class="mode"><div class="mode-label">Proposed, night</div><div data-theme="night" data-use="end-proposed"></div></div>
+    <div class="mode"><div class="mode-label">Proposed, day</div><div data-theme="day" data-use="end-proposed"></div></div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">2</span> Between blocks: Add below, in the block's ⋯</h2>
+  <ul class="choices">
+    <li><b>No + in every gap.</b> The ⋯ each block already has (Move up, Width, Rename, Remove) gets Add below, with the same kinds. Nothing new shows until you ask (principle 1, show less), and it works for blocks side by side at half width, where a gap has no clear "between".</li>
+    <li><b>⌘K</b> offers the same on a topic's page: Add a heading, Add a paragraph, Add a checklist… at the end.</li>
+  </ul>
+  <div class="modes">
+    <div class="mode"><div class="mode-label">Proposed, night</div><div data-theme="night" data-use="below"></div></div>
+    <div class="mode"><div class="mode-label">Proposed, day</div><div data-theme="day" data-use="below"></div></div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">3</span> What it starts with is written in place</h2>
+  <ul class="choices">
+    <li><b>A heading, a paragraph or a callout</b> opens with a line to write in, where it will read. Enter keeps it; in a paragraph Enter starts the next passage and ⇧Enter breaks the line. Esc, or leaving it empty, takes the block off again.</li>
+    <li><b>A list, a checklist or a table</b> opens on its title, then its first row (the + New that's there today). A table starts with one field, Notes.</li>
+    <li><b>A click on any passage, heading or callout writes in it</b>, as a click on a row's value does today. Without it a block you added could never be corrected.</li>
+    <li>What you write is "You wrote" as its source, so the page and a talk tell it apart from what Claude found.</li>
+  </ul>
+  <div class="modes">
+    <div class="mode"><div class="mode-label">Proposed, night: a paragraph, then a table</div><div data-theme="night" data-use="writing"></div></div>
+    <div class="mode"><div class="mode-label">Proposed, day</div><div data-theme="day" data-use="writing"></div></div>
+  </div>
+</section>
+
+<section class="step">
+  <h2><span class="n">4</span> A collection's fields, by hand</h2>
+  <ul class="choices">
+    <li><b>Fields… in a collection's ⋯</b>, beside View as: each field's name and kind, in order. Add a field, drag one to move it, ✕ to remove it; a choice and a status name their words, a number its unit.</li>
+    <li>The kinds are the ones a talk uses: Text, Number, Day, Choice, Status, Check, Photo, Link; eight at most, as now.</li>
+    <li>Removing a field rows fill is the one thing that asks first: "Katzensicher is filled in 3 rows. This can't be undone."</li>
+  </ul>
+  <div class="modes">
+    <div class="mode"><div class="mode-label">Proposed, night</div><div data-theme="night" data-use="fields"></div></div>
+    <div class="mode"><div class="mode-label">Proposed, day</div><div data-theme="day" data-use="fields"></div></div>
+  </div>
+</section>
+
+</div>
+
+<!-- The pieces each mode draws. -->
+<template id="end-today">
+  <div class="pane">
+    <div class="block">
+      <div class="btitle">Notes</div>
+      <ul class="list"><li>Monstera</li><li>Grünlilie umtopfen</li></ul>
+      <div class="new"><i data-i="plus"></i>New</div>
+    </div>
+    <div class="callout"><i data-i="warn"></i><span>Lilien sind für Katzen giftig, auch ihr Blütenstaub.</span></div>
+    <div class="block">
+      <div class="btitle">Pflanzen</div>
+      <div class="table">
+        <div class="tr th"><span>Name</span><span>Licht</span><span>Gießen</span></div>
+        <div class="tr"><b>Monstera</b><span><span class="pill">Hell, indirekt</span></span><span>Wöchentlich</span></div>
+        <div class="tr"><b>Grünlilie</b><span><span class="pill">Hell</span></span><span>Wöchentlich</span></div>
+      </div>
+      <div class="new"><i data-i="plus"></i>New</div>
+    </div>
+    <button class="ui-button add"><i data-i="imageplus"></i>Add a picture</button>
+  </div>
+</template>
+
+<template id="end-proposed">
+  <div class="pane" style="padding-bottom: 300px">
+    <div class="block">
+      <div class="btitle">Notes</div>
+      <ul class="list"><li>Monstera</li><li>Grünlilie umtopfen</li></ul>
+      <div class="new"><i data-i="plus"></i>New</div>
+    </div>
+    <div class="callout"><i data-i="warn"></i><span>Lilien sind für Katzen giftig, auch ihr Blütenstaub.</span></div>
+    <div class="block">
+      <div class="btitle">Pflanzen</div>
+      <div class="table">
+        <div class="tr th"><span>Name</span><span>Licht</span><span>Gießen</span></div>
+        <div class="tr"><b>Monstera</b><span><span class="pill">Hell, indirekt</span></span><span>Wöchentlich</span></div>
+        <div class="tr"><b>Grünlilie</b><span><span class="pill">Hell</span></span><span>Wöchentlich</span></div>
+      </div>
+      <div class="new"><i data-i="plus"></i>New</div>
+    </div>
+    <div style="position: relative">
+      <button class="ui-button add" aria-expanded="true"><i data-i="plus"></i>Add a block</button>
+      <div class="ui-menu menu" style="top: 34px; left: 0">
+        <div class="ui-option"><i data-i="heading"></i>Heading</div>
+        <div class="ui-option"><i data-i="text"></i>Paragraph</div>
+        <div class="ui-option"><i data-i="info"></i>Callout</div>
+        <div class="sep"></div>
+        <div class="ui-option"><i data-i="list"></i>List</div>
+        <div class="ui-option is-active"><i data-i="checks"></i>Checklist</div>
+        <div class="ui-option"><i data-i="table"></i>Table</div>
+        <div class="sep"></div>
+        <div class="ui-option"><i data-i="image"></i>Picture</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="below">
+  <div class="pane" style="padding-bottom: 190px">
+    <div class="block">
+      <div class="btitle">Notes</div>
+      <ul class="list"><li>Monstera</li><li>Grünlilie umtopfen</li></ul>
+    </div>
+    <div class="block">
+      <div class="btitle">Pflanzen<span class="more"><i data-i="dots"></i></span></div>
+      <div class="table">
+        <div class="tr th"><span>Name</span><span>Licht</span><span>Gießen</span></div>
+        <div class="tr"><b>Monstera</b><span><span class="pill">Hell, indirekt</span></span><span>Wöchentlich</span></div>
+        <div class="tr"><b>Grünlilie</b><span><span class="pill">Hell</span></span><span>Wöchentlich</span></div>
+        <div class="tr"><b>Bogenhanf</b><span><span class="pill">Egal</span></span><span>Monatlich</span></div>
+      </div>
+      <div class="ui-menu menu" style="top: 26px; right: -6px; width: 190px">
+        <div class="ui-option">View as</div>
+        <div class="ui-option">Fields…</div>
+        <div class="ui-option">Half width</div>
+        <div class="ui-option">Move up</div>
+        <div class="ui-option is-active">Add below<span class="sub"><i data-i="right"></i></span></div>
+        <div class="ui-option">Rename…</div>
+        <div class="ui-option">Remove…</div>
+      </div>
+      <div class="ui-menu menu" style="top: 146px; right: 184px; width: 170px">
+        <div class="ui-option"><i data-i="heading"></i>Heading</div>
+        <div class="ui-option is-active"><i data-i="text"></i>Paragraph</div>
+        <div class="ui-option"><i data-i="info"></i>Callout</div>
+        <div class="sep"></div>
+        <div class="ui-option"><i data-i="list"></i>List</div>
+        <div class="ui-option"><i data-i="checks"></i>Checklist</div>
+        <div class="ui-option"><i data-i="table"></i>Table</div>
+        <div class="sep"></div>
+        <div class="ui-option"><i data-i="image"></i>Picture</div>
+      </div>
+    </div>
+    <div class="callout"><i data-i="warn"></i><span>Lilien sind für Katzen giftig.</span></div>
+  </div>
+</template>
+
+<template id="writing">
+  <div class="pane">
+    <div class="block">
+      <div class="btitle">Pflanzen</div>
+      <div class="table">
+        <div class="tr th"><span>Name</span><span>Licht</span><span>Gießen</span></div>
+        <div class="tr"><b>Monstera</b><span><span class="pill">Hell, indirekt</span></span><span>Wöchentlich</span></div>
+      </div>
+    </div>
+    <div class="block para">
+      <p class="writing">Im Winter seltener gießen: die Erde trocknet langsamer, wenn die Heizung läuft und wenig Licht kommt<span class="caret"></span></p>
+      <div class="keys"><span><span class="ui-kbd">↵</span>keep, next passage</span><span><span class="ui-kbd">⇧↵</span>new line</span><span><span class="ui-kbd">esc</span>stop</span></div>
+    </div>
+    <div class="block">
+      <div class="btitle writing" style="color: var(--fg); font-size: var(--type-ui-size)"><span class="caret" style="margin: 0 -1px 0 0"></span><span class="ph">Name this table</span></div>
+      <div class="table">
+        <div class="tr th" style="grid-template-columns: 1fr 1.6fr"><span>Name</span><span>Notes</span></div>
+      </div>
+      <div class="new"><i data-i="plus"></i>New</div>
+    </div>
+  </div>
+</template>
+
+<template id="fields">
+  <div class="pane" style="padding: 0; min-height: 430px">
+    <div class="ui-backdrop backdrop"></div>
+    <div class="ui-dialog dialog">
+      <div>
+        <h3>Fields of Pflanzen</h3>
+        <p class="say">Every row has its name, and these.</p>
+      </div>
+      <div class="fields">
+        <div class="frow fixed"><span></span><span class="ui-field">Name</span><span class="ui-field">Each row's name</span><span></span></div>
+        <div class="frow"><span class="grip"><i data-i="grip"></i></span><span class="ui-field">Licht</span><span class="ui-field kind">Choice<i data-i="down"></i></span><span class="x"><i data-i="x"></i></span></div>
+        <div class="frow"><span></span><div class="opts"><span class="pill">Hell, indirekt</span><span class="pill">Hell</span><span class="pill">Egal</span><span class="new" style="padding: 1px 4px"><i data-i="plus"></i>Word</span></div><span></span></div>
+        <div class="frow"><span class="grip"><i data-i="grip"></i></span><span class="ui-field">Gießen</span><span class="ui-field kind">Text<i data-i="down"></i></span><span class="x"><i data-i="x"></i></span></div>
+        <div class="frow"><span class="grip"><i data-i="grip"></i></span><span class="ui-field">Katzensicher</span><span class="ui-field kind">Check<i data-i="down"></i></span><span class="x"><i data-i="x"></i></span></div>
+        <div class="addfield"><i data-i="plus"></i>Add a field</div>
+      </div>
+      <div class="foot"><button class="ui-button">Cancel</button><button class="ui-button ui-button-primary">Save</button></div>
+    </div>
+  </div>
+</template>
+
+<script>
+// Lucide's paths, as the app draws them.
+const ICONS = {
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  imageplus: '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  heading: '<path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/>',
+  text: '<path d="M15 4v16"/><path d="M19 4H9.5a4.5 4.5 0 0 0 0 9H13"/><path d="M19 4v16"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  list: '<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
+  checks: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  table: '<path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>',
+  dots: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  grip: '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+};
+for (const slot of document.querySelectorAll("[data-use]")) {
+  slot.append(document.getElementById(slot.dataset.use).content.cloneNode(true));
+  slot.style.height = "100%";
+}
+for (const i of document.querySelectorAll("i[data-i]")) {
+  i.outerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[i.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>
