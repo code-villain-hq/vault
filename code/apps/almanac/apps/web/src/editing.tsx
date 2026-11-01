@@ -4,12 +4,13 @@
 // talk does, so they work offline. Guests, and pages only to look at, get
 // neither.
 
-import type { Block, Cell, Field, Point } from "@almanac/types";
+import type { Block, Cell, Field, Point, Reminder } from "@almanac/types";
 import { Plus } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
 import { cellOf } from "./collection";
+import { doneFor, isDue, markDone, markNotDone } from "./reminders";
 import { Button } from "./ui";
-import { useIsGuest, useWorkspace } from "./workspace";
+import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
 /** The kinds a person picks from the field's own options. */
 const PICKED = new Set(["status", "choice"]);
@@ -17,7 +18,8 @@ const PICKED = new Set(["status", "choice"]);
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * What a person typed, as the field keeps it: a number from "9,95",
+ * What a person typed, as the field keeps it and as the server reads a
+ * talk's: a number from "9,95" or "3,4 kg" in a field of kilograms,
  * nothing for "", and null for what isn't a number in a number's field.
  */
 function cellFrom(field: Field, typed: string | boolean): Cell | undefined | null {
@@ -25,7 +27,11 @@ function cellFrom(field: Field, typed: string | boolean): Cell | undefined | nul
   const words = typed.trim();
   if (!words) return undefined;
   if (field.kind === "number") {
-    const n = Number(words.replace(/\s/g, "").replace(",", "."));
+    const lower = words.toLowerCase();
+    const unit = field.unit.toLowerCase();
+    const bare = unit && lower.endsWith(unit) ? lower.slice(0, -unit.length) : lower;
+    const plain = bare.replace(/\s/g, "").replaceAll(",", ".");
+    const n = plain ? Number(plain) : Number.NaN;
     return Number.isFinite(n) ? n : null;
   }
   return words;
@@ -39,6 +45,44 @@ export function useSetCell() {
     if (cell === undefined) delete cells[field.name];
     else cells[field.name] = cell;
     sync.update("Point", row.id, { cells });
+  };
+}
+
+/** The reminders that ring for checklist items, by item. */
+export function useItemReminders(): Map<string, Reminder> {
+  const reminders = useRecords("Reminder");
+  return useMemo(
+    () =>
+      new Map(
+        reminders
+          .filter((r) => r.point_id && (r.status === "on" || r.status === "done"))
+          .map((r) => [r.point_id as string, r]),
+      ),
+    [reminders],
+  );
+}
+
+/**
+ * Whether a row to tick is done: its `check`, or, with a reminder, done
+ * for the last day it was due, until it comes due again.
+ */
+export function itemDone(row: Point, check: Field, reminder: Reminder | undefined): boolean {
+  if (!reminder) return cellOf(row, check) === true;
+  return doneFor(reminder) !== undefined && !isDue(reminder);
+}
+
+/**
+ * Ticks a row by its `check`, or unticks it when it's done. A row a
+ * reminder rings for ticks the reminder instead, as everywhere a row ticks.
+ */
+export function useTick() {
+  const { sync } = useWorkspace();
+  const rings = useItemReminders();
+  return (row: Point, check: Field) => {
+    const reminder = rings.get(row.id);
+    const done = itemDone(row, check, reminder);
+    if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
+    sync.update("Point", row.id, { cells: { ...row.cells, [check.name]: !done } });
   };
 }
 
@@ -60,6 +104,7 @@ export function EditCell({
 }) {
   const guest = useIsGuest();
   const set = useSetCell();
+  const tick = useTick();
   const [editing, setEditing] = useState(false);
   if (guest || field.kind === "photo") return <>{children}</>;
   const cell = cellOf(row, field);
@@ -69,7 +114,7 @@ export function EditCell({
       <button
         type="button"
         title={`${cell === true ? "Untick" : "Tick"} ${field.name}`}
-        onClick={() => set(row, field, cell === true ? undefined : true)}
+        onClick={() => tick(row, field)}
         className={`${look} cursor-pointer`}
         style={{ textAlign: "inherit" }}
       >

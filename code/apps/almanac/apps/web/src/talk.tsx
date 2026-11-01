@@ -132,7 +132,8 @@ export function TalkPanel({
   const width = useKeptWidth("talk", TALK_WIDTH);
 
   const send = () => {
-    if (!text.trim() && picking.photos.length === 0) return;
+    // One question at a time in a topic: the next waits for this answer.
+    if (asking?.arriving || (!text.trim() && picking.photos.length === 0)) return;
     onAsk(text, talkId, picking.photos);
     setText("");
     picking.clear();

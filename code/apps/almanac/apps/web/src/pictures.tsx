@@ -193,7 +193,7 @@ export function CoverHead({ topic, children }: { topic: Topic; children: ReactNo
 }
 
 /** The photo field a row's photo goes in: its collection's first. */
-export function photoField(block: Block): Field | undefined {
+function photoField(block: Block): Field | undefined {
   return block.fields.find((f) => f.kind === "photo");
 }
 
@@ -337,7 +337,8 @@ function Figure({ point, editable = false }: { point: Point; editable?: boolean 
 
 /**
  * A picture's caption, written in place: Add a caption shows on hover while
- * there's none, and leaving the line keeps what's written.
+ * there's none, and leaving the line keeps what's written; Escape keeps
+ * what was there.
  */
 function Caption({ point }: { point: Point }) {
   const { sync } = useWorkspace();
@@ -347,10 +348,13 @@ function Caption({ point }: { point: Point }) {
     setWas(point.text);
     setText(point.text);
   }
+  const dropping = useRef(false);
   const keep = () => {
     const caption = text.trim();
-    if (caption === point.text) return;
-    sync.update("Point", point.id, { text: caption, cells: point.cells });
+    if (dropping.current) dropping.current = false;
+    else if (caption !== point.text) {
+      sync.update("Point", point.id, { text: caption, cells: point.cells });
+    }
   };
   return (
     <input
@@ -360,6 +364,7 @@ function Caption({ point }: { point: Point }) {
       onKeyDown={(event) => {
         if (event.key === "Enter") event.currentTarget.blur();
         if (event.key === "Escape") {
+          dropping.current = true;
           setText(point.text);
           event.currentTarget.blur();
         }

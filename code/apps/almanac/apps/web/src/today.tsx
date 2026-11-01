@@ -5,25 +5,25 @@
 import type { Reminder, Topic } from "@almanac/types";
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { today, weekdayWords } from "./format";
+import { weekdayWords } from "./format";
 import { hueOf } from "./hues";
 import { topicIcon } from "./icons";
 import { useTopics } from "./layout";
-import { doneFor, isDue, markDone, markNotDone } from "./reminders";
+import { doneFor, isDue, markDone, markNotDone, useToday } from "./reminders";
 import { useRecords, useWorkspace } from "./workspace";
 
 export function Today({ topics }: { topics: Topic[] }) {
   const { workspace, sync } = useWorkspace();
   const all = useRecords("Reminder");
   const every = useTopics();
-  const now = today();
+  const now = useToday();
   const byId = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics]);
   const due = useMemo(
     () =>
       all
-        .filter((r) => isDue(r) && byId.has(r.topic_id))
+        .filter((r) => isDue(r, now) && byId.has(r.topic_id))
         .sort((a, b) => a.due_on.localeCompare(b.due_on) || (a.at ?? "").localeCompare(b.at ?? "")),
-    [all, byId],
+    [all, byId, now],
   );
   const ticked = useMemo(
     () => all.filter((r) => doneFor(r) === now && byId.has(r.topic_id)),

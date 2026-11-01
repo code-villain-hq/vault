@@ -24,7 +24,6 @@ import { pictureOf, picturesFor, pictureWidth } from "./collection";
  */
 export function viewOf(block: Block, points: Point[]): string {
   if (block.kind === "you") return "you";
-  if (!SET_KINDS.has(block.kind)) return "";
   if (block.kind === "heading") return block.title.trim() ? "heading" : "";
   if (block.kind === "collection") return pictureOf(block, points);
   return points.length > 0 ? block.kind : "";
@@ -44,7 +43,7 @@ export function widthOf(view: string, block: Block, points: Point[]): string {
 }
 
 /** The widths a person picks between: half the page or the whole. */
-export const WIDTHS = ["1/2", "whole"];
+const WIDTHS = ["1/2", "whole"];
 
 /** The width the app picks for a block. */
 export function ownWidth(view: string, block: Block, points: Point[]): string {
@@ -103,11 +102,3 @@ export const VIEW_ICONS: Record<string, LucideIcon> = {
   figures: Hash,
   steps: ListOrdered,
 };
-
-/**
- * The one set of blocks every page is made of: a heading, a paragraph and
- * a callout for words, a collection, rows with fields, for the rest: a
- * list, a checklist, rows with pages of their own; and a picture, photos
- * that explain by themselves, a diagram or a sketch.
- */
-export const SET_KINDS = new Set(["heading", "paragraph", "callout", "collection", "picture"]);

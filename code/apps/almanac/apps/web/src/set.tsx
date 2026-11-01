@@ -31,7 +31,7 @@ import {
   numberOf,
   sumOf,
 } from "./collection";
-import { EditCell, NewRow, useSetCell } from "./editing";
+import { EditCell, itemDone, NewRow, useItemReminders, useSetCell, useTick } from "./editing";
 import {
   addDays,
   amountWords,
@@ -45,7 +45,7 @@ import {
 } from "./format";
 import { usePhoto } from "./photos";
 import { inline } from "./prose";
-import { doneFor, isDue, markDone, markNotDone } from "./reminders";
+import { isDue } from "./reminders";
 import { when, years } from "./timeline";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
@@ -111,34 +111,11 @@ export function named(point: Point): boolean {
   return !!point.source && (!!point.source_url || !/^from\b/i.test(point.source));
 }
 
-/** The reminders that ring for checklist items, by item. */
-export function useItemReminders(): Map<string, Reminder> {
-  const reminders = useRecords("Reminder");
-  return useMemo(
-    () =>
-      new Map(
-        reminders
-          .filter((r) => r.point_id && (r.status === "on" || r.status === "done"))
-          .map((r) => [r.point_id as string, r]),
-      ),
-    [reminders],
-  );
-}
-
-/**
- * Whether a row to tick is done: its `check`, or, with a reminder, done
- * for the last day it was due, until it comes due again.
- */
-export function itemDone(row: Point, check: Field, reminder: Reminder | undefined): boolean {
-  if (!reminder) return cellOf(row, check) === true;
-  return doneFor(reminder) !== undefined && !isDue(reminder);
-}
-
 /**
  * A box to tick a row by its `check`. A row with a `reminder` ticks that
  * instead. Guests see it, not tick it.
  */
-export function Tick({
+function Tick({
   row,
   check,
   reminder,
@@ -149,8 +126,8 @@ export function Tick({
   reminder?: Reminder;
   className?: string;
 }) {
-  const { sync } = useWorkspace();
   const guest = useIsGuest();
+  const tick = useTick();
   const done = itemDone(row, check, reminder);
   const Icon = done ? CircleCheck : Circle;
   const look = `shrink-0 ${done ? "text-accent" : "text-faint"}`;
@@ -170,10 +147,7 @@ export function Tick({
       type="button"
       aria-pressed={done}
       aria-label={`${row.text}: ${done ? "done" : "to do"}`}
-      onClick={() => {
-        if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
-        sync.update("Point", row.id, { cells: { ...row.cells, [check.name]: !done } });
-      }}
+      onClick={() => tick(row, check)}
       className={`grid place-items-center rounded-full hover:text-muted ${look} ${className}`}
     >
       <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -182,7 +156,7 @@ export function Tick({
 }
 
 /** A timeline's lines, with the years right-aligned in a column of their own. */
-export function TimelineRail({ children }: { children: ReactNode }) {
+function TimelineRail({ children }: { children: ReactNode }) {
   return (
     <div className="@container">
       <ol
@@ -195,7 +169,7 @@ export function TimelineRail({ children }: { children: ReactNode }) {
 }
 
 /** A line on a timeline: the year, a mark on the rail (longer for a span), then what happened. */
-export function TimelineLine({
+function TimelineLine({
   year,
   span,
   seen,
@@ -371,10 +345,6 @@ function rest(fields: Field[], row: Point): string {
     .join(" · ");
 }
 
-/**
- * A collection, as the picture the page draws it with (`block.view`): its
- * fields pick it, or a person did with View as.
- */
 /** The kinds a row's line shows as a coloured pill, not words. */
 const TOLD_BY_TONE = new Set(["status", "choice"]);
 
@@ -392,11 +362,6 @@ const CHOICE_PILLS = [
   "bg-choice-5/15",
 ];
 
-/**
- * How a status's or a choice's word looks: a status still open at first
- * (its first option), done at its last and under way between, as a
- * board's lanes; a choice's options a dot each.
- */
 /** The colour of a choice's word, its dot: by its place among the options. */
 export function choiceDot(field: Field, value: string): string {
   const at = field.options.indexOf(value);
@@ -411,6 +376,11 @@ function choiceTint(fields: Field[], row: Point): CSSProperties | undefined {
   return at >= 0 ? ({ "--tint": `var(--choice-${(at % 5) + 1})` } as CSSProperties) : undefined;
 }
 
+/**
+ * How a status's or a choice's word looks: a status still open at first
+ * (its first option), done at its last and under way between, as a
+ * board's lanes; a choice's options a dot each.
+ */
 export function Pill({ field, value }: { field: Field; value: string }) {
   const at = field.options.indexOf(value);
   if (field.kind === "status") {
@@ -522,7 +492,7 @@ function TallyWord({
  * one bar of them all, open first and done last, and each lane's count
  * under it. Only when it groups: two lanes or more, and one with two rows.
  */
-export function Tally({
+function Tally({
   rows,
   field,
   chosen = null,
@@ -576,10 +546,6 @@ export function Tally({
 /** A colour as words, "#a78bfa": a figure shows it as a swatch. */
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
-/**
- * Figures: a tile a row, its value large over its name, as a dashboard's
- * numbers. The value is its number, or else the first cell it has.
- */
 /** The field a figure shows large: its number, or else the first that isn't a tone. */
 export function figureField(fields: Field[]): Field | undefined {
   const shown = fields.filter((f) => f.kind !== "photo" && f.kind !== "check");
@@ -590,6 +556,10 @@ export function figureField(fields: Field[]): Field | undefined {
   );
 }
 
+/**
+ * Figures: a tile a row, its value large over its name, as a dashboard's
+ * numbers. The value is its number, or else the first cell it has.
+ */
 function Figures({ rows, fields }: { rows: Point[]; fields: Field[] }) {
   const shown = fields.filter((f) => f.kind !== "photo" && f.kind !== "check");
   const value = figureField(fields);
@@ -663,22 +633,17 @@ function StepMark({
   n: number;
   className: string;
 }) {
-  const { sync } = useWorkspace();
   const guest = useIsGuest();
-  const rings = useItemReminders();
+  const tick = useTick();
   const look = `relative grid size-7 shrink-0 place-items-center rounded-full font-semibold text-xs tabular-nums ${className}`;
   const face = done ? <Check size={14} strokeWidth={2.5} aria-hidden="true" /> : n;
   if (!check || guest) return <span className={look}>{face}</span>;
-  const reminder = rings.get(row.id);
   return (
     <button
       type="button"
       aria-pressed={done}
       aria-label={`${row.text}: ${done ? "done" : "to do"}`}
-      onClick={() => {
-        if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
-        sync.update("Point", row.id, { cells: { ...row.cells, [check.name]: !done } });
-      }}
+      onClick={() => tick(row, check)}
       className={`${look} hover:opacity-80`}
     >
       {face}
@@ -741,6 +706,10 @@ export function Collection({ block, rows }: { block: Block; rows: Point[] }) {
   );
 }
 
+/**
+ * A collection, as the picture the page draws it with (`block.view`): its
+ * fields pick it, or a person did with View as.
+ */
 function Picture({ block, rows }: { block: Block; rows: Point[] }) {
   const fields = filled(block, rows);
   const of = (...kinds: string[]) => fields.find((f) => kinds.includes(f.kind));
@@ -762,7 +731,8 @@ function Picture({ block, rows }: { block: Block; rows: Point[] }) {
         <RowChecklist rows={rows} check={check} fields={fields.filter((f) => f !== check)} />
       ) : null;
     case "board": {
-      const status = of("status", "choice");
+      // A status picks the board, so it's the lanes; a choice only when there's none.
+      const status = of("status") ?? of("choice");
       return status ? (
         <Board rows={rows} status={status} fields={fields.filter((f) => f !== status)} />
       ) : null;
@@ -858,11 +828,6 @@ function ticksOf(first: number, last: number): number[] {
   return ticks;
 }
 
-/**
- * A timeline's years on one axis, a dot an event and a bar a span, so where
- * they cluster shows at a glance; a lane per status or choice when one
- * tells them apart, with how many each.
- */
 /** Past this many rows, a timeline under its axis shows the first few, with All. */
 const AXIS_LIST_SHOWS = 8;
 
@@ -880,8 +845,10 @@ function AxisTimeline({
   day: Field;
   fields: Field[];
 }) {
-  const [lane, setLane] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   const [all, setAll] = useState(false);
+  // A pick whose lane has emptied shows every row again.
+  const lane = picked !== null && rows.some((row) => laneWord(row, by) === picked) ? picked : null;
   const shown = lane === null ? rows : rows.filter((row) => laneWord(row, by) === lane);
   const cut = lane === null && !all && shown.length > AXIS_LIST_SHOWS + 2;
   const listed = cut ? byDay(shown, day).slice(0, AXIS_LIST_SHOWS) : shown;
@@ -892,7 +859,7 @@ function AxisTimeline({
         rows={rows}
         by={by}
         chosen={lane}
-        onChoose={(word) => setLane((was) => (was === word ? null : word))}
+        onChoose={(word) => setPicked(lane === word ? null : word)}
       />
       {/* Picked, the lane's word would only say it again on every row. */}
       <RowTimeline
@@ -919,6 +886,11 @@ function laneWord(row: Point, by: Field | undefined): string {
   return typeof cell === "string" ? cell : "";
 }
 
+/**
+ * A timeline's years on one axis, a dot an event and a bar a span, so where
+ * they cluster shows at a glance; a lane per status or choice when one
+ * tells them apart, with how many each.
+ */
 function TimeAxis({
   placed,
   rows,
@@ -947,7 +919,7 @@ function TimeAxis({
         if (inLane.length === 0) return null;
         const colour = by && lane ? laneColour(by, i, lanes.length - 1) : "bg-hue";
         return (
-          <Fragment key={lane || "-"}>
+          <Fragment key={`lane-${lane}`}>
             {by && (
               <button
                 type="button"
@@ -1176,7 +1148,6 @@ function Board({ rows, status, fields }: { rows: Point[]; status: Field; fields:
   );
 }
 
-/** Cards: a card per row, its photo on top, its name, then each field it fills. */
 /**
  * Cards: a card a row, its photo over its name, then its cells, each by
  * its field's name; words past a line read under the name without it, and

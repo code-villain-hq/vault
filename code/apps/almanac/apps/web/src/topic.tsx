@@ -1,11 +1,10 @@
 // A topic's page: its blocks in order, on a grid of twelve columns, each one
-// of the set (a heading, a paragraph, a callout or a collection), the
-// questions it waits on, and the talk beside it. A section, and a
-// collection's row, opens on a page of its own, in the page's place, and so
-// does the topic's
-// About: its name, what it sticks to, what it knows about you and its
-// blocks. The workspace's own topic, Almanac, has the index of the others
-// for its page.
+// of the set (a heading, a paragraph, a callout, a collection or a
+// picture), the questions it waits on, and the talk beside it. A section,
+// and a collection's row, opens on a page of its own, in the page's place,
+// and so does the topic's About: its name, what it sticks to, what it knows
+// about you and its blocks. The workspace's own topic, Almanac, has the
+// index of the others for its page.
 
 import type { Block, ClaudeKeyInfo, Field, Point, Question, Reminder, Topic } from "@almanac/types";
 import { Dialog } from "@base-ui/react/dialog";
@@ -36,7 +35,7 @@ import {
 } from "react";
 import { type Asking, useTopicTalks } from "./asking";
 import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf, sumOf } from "./collection";
-import { EditCell } from "./editing";
+import { EditCell, itemDone, useItemReminders } from "./editing";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { hueOf, hueStyle } from "./hues";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
@@ -61,14 +60,12 @@ import {
   Collection,
   choiceDot,
   figureField,
-  itemDone,
   LINES,
-  named,
   Opens,
   type PageTo,
   Paragraphs,
   Photo,
-  useItemReminders,
+  RemovePoint,
 } from "./set";
 import type { Schema } from "./sync";
 import { TalkPanel, useTalks } from "./talk";
@@ -204,6 +201,8 @@ export function TopicPage() {
       draft={search.ask ?? ""}
       asking={asking}
       onAsk={(text, talk, photos) => {
+        // One question at a time in a topic.
+        if (asking?.arriving) return;
         if (talk === null) open(null);
         void ask(text, talk, photos, section ? { section, row: row?.id } : undefined);
       }}
@@ -387,6 +386,7 @@ function TopicView({
               about={section}
               field={bar}
               picking={picking}
+              busy={asking?.arriving ?? false}
               onAsk={(text, photos) => onAsk(text, null, photos)}
             />
           )}
@@ -493,11 +493,7 @@ function Blocks({ page }: { page: PageParts }) {
   return (
     <div className="page-grid">
       {page.blocks.map((block) => (
-        <div
-          key={block.id}
-          data-width={block.width}
-          data-narrow={NARROW.has(block.width) || undefined}
-        >
+        <div key={block.id} data-width={block.width}>
           <BlockView block={block} page={page} />
         </div>
       ))}
@@ -508,7 +504,7 @@ function Blocks({ page }: { page: PageParts }) {
 function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
   const all = usePage(topic);
   const page = useMemo(() => onThePage(all), [all]);
-  // An answer may go in a block the page leaves out, which keeps nothing yet.
+  // Where Add it keeps a question's point: the page's first paragraph.
   const home = keeping(page.blocks);
   const topics = useTopics();
   const parent = parentOf(topic, topics);
@@ -727,7 +723,11 @@ function SectionPageBody({
 }) {
   const page = usePage(topic);
   const talks = useRecords("Talk");
-  const own = useMemo(() => onThePage(page, row?.id ?? null), [page, row?.id]);
+  // Only a row's page has blocks of its own; a section's shows what's kept under it.
+  const own = useMemo(
+    () => (row ? onThePage(page, row.id) : { ...page, blocks: [], points: [] }),
+    [page, row],
+  );
   const points = page.points.filter((p) => p.theme === section);
   const questions = page.questions.filter((q) => q.theme === section);
   const reminders = page.reminders.filter((r) => r.theme === section);
@@ -782,6 +782,8 @@ function SectionPageBody({
             {block.title && <h2 className="text-xs text-faint">{block.title}</h2>}
             {block.kind === "collection" ? (
               <Collection block={block} rows={held} />
+            ) : block.kind === "picture" ? (
+              <Pictures block={block} points={held} />
             ) : (
               <Points points={held} passages={passages.has(block.id)} />
             )}
@@ -898,6 +900,7 @@ const HOLDS: Record<string, [kind: string, one: string, many: string]> = {
   paragraph: ["Paragraph", "point", "points"],
   callout: ["Callout", "point", "points"],
   collection: ["Collection", "row", "rows"],
+  picture: ["Picture", "photo", "photos"],
 };
 
 /** What a block holds, for its line on About: "Collection · 3 rows", "Heading". */
@@ -1317,9 +1320,6 @@ function keeping(blocks: Block[]): Block | undefined {
   return blocks.find((b) => b.kind === "paragraph");
 }
 
-/** The widths that read at a glance, and so hold out narrower. */
-const NARROW = new Set(["1/4", "1/3"]);
-
 /** A block's name, for its menu and its dialogs. */
 function blockName(block: Block): string {
   return block.title || (block.kind === "picture" ? "This picture" : "This block");
@@ -1374,7 +1374,6 @@ function GallerySample({ sample }: { sample: Sample }) {
     reminders: [],
   };
   const block = drawn(sample.block, sample.points);
-  const width = block.width;
   return (
     <section aria-label={sample.name} className="flex flex-col gap-4 py-6 first:pt-2">
       <div className="flex flex-col gap-0.5">
@@ -1386,7 +1385,7 @@ function GallerySample({ sample }: { sample: Sample }) {
       ) : (
         // At its view's width, as a page lays it out.
         <div className="page-grid" data-alone>
-          <div data-width={width} data-narrow={NARROW.has(width) || undefined}>
+          <div data-width={block.width}>
             <BlockView block={block} page={{ ...page, blocks: [block] }} />
           </div>
         </div>
@@ -2037,31 +2036,17 @@ function Starters({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => voi
 }
 
 /**
- * A theme's points: on a card, short notes with their source after them; in
- * a document, passages to read, with their source and their talk under them.
- * On the topic's page a note shows only a named source.
+ * A section's points from a block that isn't a collection or a picture:
+ * short notes with their source after them, or a paragraph's passages to
+ * read, with their source and their talk under them.
  */
-function Points({
-  points,
-  passages = false,
-  glance = false,
-}: {
-  points: Point[];
-  passages?: boolean;
-  /** On the topic's page, not a section's own. */
-  glance?: boolean;
-}) {
-  const { sync } = useWorkspace();
-  const guest = useIsGuest();
+function Points({ points, passages = false }: { points: Point[]; passages?: boolean }) {
   const talks = useRecords("Talk");
-  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   return (
     <ul className={passages ? "flex flex-col gap-4" : "flex flex-col gap-1.5"}>
-      <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
       {points.map((point) => {
         const source =
           point.source &&
-          (!glance || named(point)) &&
           (point.source_url ? (
             <a href={point.source_url} target="_blank" rel="noreferrer" className="ui-link">
               {point.source}
@@ -2113,22 +2098,7 @@ function Points({
                 {source && <span className="text-xs text-faint"> {source}</span>}
               </p>
             )}
-            {!guest && (
-              <RowAction
-                label="Remove this point…"
-                onClick={() =>
-                  setConfirmation({
-                    title: "Remove this point?",
-                    body: "It leaves the page for everyone in the workspace. This can't be undone.",
-                    action: "Remove point",
-                    onConfirm: () => sync.delete("Point", point.id),
-                  })
-                }
-                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-              >
-                <X size={13} strokeWidth={1.75} aria-hidden="true" />
-              </RowAction>
-            )}
+            <RemovePoint point={point} />
           </li>
         );
       })}
@@ -2159,15 +2129,22 @@ function Dates({ reminders }: { reminders: Reminder[] }) {
   );
 }
 
-/** A question Almanac waits on, where it's about; its point goes in `block`. */
+/**
+ * A question Almanac waits on, where it's about. Add it keeps its point in
+ * `block`, or in a paragraph of its own after the page's last block when
+ * the page has none.
+ */
 function Ask({ question, block }: { question: Question; block?: Block }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
   const add = () => {
-    if (question.point && block) {
+    if (question.point) {
+      const into =
+        block?.id ?? sync.create("Block", { topic_id: question.topic_id, kind: "paragraph" });
       sync.create("Point", {
         topic_id: question.topic_id,
-        block_id: block.id,
+        block_id: into,
+        theme: question.theme ?? undefined,
         text: question.point,
         source: question.source ?? "You said",
         talk_id: question.talk_id ?? undefined,
@@ -2200,6 +2177,7 @@ function AskBar({
   about,
   field,
   picking,
+  busy,
   onAsk,
 }: {
   topic: Topic;
@@ -2207,6 +2185,8 @@ function AskBar({
   about?: string;
   field: RefObject<HTMLInputElement | null>;
   picking: Picking;
+  /** An answer is on its way: what's written waits for it. */
+  busy: boolean;
   onAsk: (text: string, photos: Picked[]) => void;
 }) {
   const [text, setText] = useState("");
@@ -2227,7 +2207,7 @@ function AskBar({
       className="flex w-full flex-col gap-2 px-6 pb-4 sm:px-10"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!text.trim() && picking.photos.length === 0) return;
+        if (busy || (!text.trim() && picking.photos.length === 0)) return;
         onAsk(text, picking.photos);
         setText("");
         picking.clear();

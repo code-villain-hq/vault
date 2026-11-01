@@ -29,6 +29,8 @@ export interface Asking {
   text: string;
   answerId: string | null;
   problem: string | null;
+  /** Until it's done or has a problem: the topic takes no other question meanwhile. */
+  arriving: boolean;
 }
 
 interface Talks {
@@ -59,10 +61,8 @@ export function TalksProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [asking, setAsking] = useState<Record<string, Asking>>({});
   const [open, setOpenTalks] = useState<Record<string, string>>({});
-  // The number of each topic's latest question: an earlier answer still
-  // arriving there changes nothing.
-  const count = useRef(0);
-  const latest = useRef(new Map<string, number>());
+  // The topics with an answer on its way, which take no other question.
+  const arriving = useRef(new Set<string>());
 
   const setOpen = useCallback((topicId: string, talk: string | undefined) => {
     setOpenTalks(({ [topicId]: _, ...rest }) =>
@@ -79,18 +79,21 @@ export function TalksProvider({ children }: { children: ReactNode }) {
       about?: About,
     ) => {
       const text = question.trim();
-      if (!text && photos.length === 0) return;
+      if ((!text && photos.length === 0) || arriving.current.has(topicId)) return;
+      arriving.current.add(topicId);
       const asked = talkId
         ? sync.query("Message").filter((m) => m.talk_id === talkId && m.role === "you").length
         : 0;
-      const number = ++count.current;
-      latest.current.set(topicId, number);
       const update = (change: Partial<Asking>) =>
         setAsking((all) => {
           const a = all[topicId];
-          if (!a || latest.current.get(topicId) !== number) return all;
-          return { ...all, [topicId]: { ...a, ...change } };
+          return a ? { ...all, [topicId]: { ...a, ...change } } : all;
         });
+      // Done, or with a problem: the topic may be asked again.
+      const finish = (change: Partial<Asking>) => {
+        arriving.current.delete(topicId);
+        update({ ...change, arriving: false });
+      };
       setAsking((all) => ({
         ...all,
         [topicId]: {
@@ -101,6 +104,7 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           text: "",
           answerId: null,
           problem: null,
+          arriving: true,
         },
       }));
       const path = `/api/w/${workspace.id}/topics/${topicId}/ask`;
@@ -128,21 +132,22 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           }),
         });
       } catch {
-        update({ problem: "Can't reach Almanac. Check your connection, then ask again." });
+        finish({ problem: "Can't reach Almanac. Check your connection, then ask again." });
         return;
       }
       if (!response.ok || !response.body) {
         const error = (await response.json().catch(() => null)) as { message?: string } | null;
-        update({ problem: messageOf(new Error(error?.message ?? UNKNOWN_PROBLEM)) });
+        finish({ problem: messageOf(new Error(error?.message ?? UNKNOWN_PROBLEM)) });
         return;
       }
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";
       let said = "";
-      for (;;) {
-        const { value, done } = await reader.read().catch(() => ({ value: "", done: true }));
-        if (done) break;
-        buffer += value;
+      let ended = false;
+      while (!ended) {
+        const read = await reader.read().catch(() => null);
+        if (!read || read.done) break;
+        buffer += read.value;
         let end = buffer.indexOf("\n\n");
         while (end >= 0) {
           const block = buffer.slice(0, end);
@@ -155,7 +160,12 @@ export function TalksProvider({ children }: { children: ReactNode }) {
             .map((line) => line.slice(6))
             .join("\n");
           if (!event || !data) continue;
-          const body = JSON.parse(data) as { talk_id?: string; text?: string; message_id?: string };
+          let body: { talk_id?: string; text?: string; message_id?: string };
+          try {
+            body = JSON.parse(data);
+          } catch {
+            continue;
+          }
           if (event === "talk" && body.talk_id) {
             const talk = body.talk_id;
             update({ talkId: talk });
@@ -164,17 +174,28 @@ export function TalksProvider({ children }: { children: ReactNode }) {
             setOpenTalks((all) => (all[topicId] === "new" ? { ...all, [topicId]: talk } : all));
             const { pathname, search } = router.state.location;
             if (pathname.endsWith(`/topics/${topicId}`) && (search as TopicSearch).talk === "new") {
-              void router.navigate({ to: ".", search: { talk }, replace: true });
+              // Still on the section or row it was asked from; the draft is sent.
+              void router.navigate({
+                to: ".",
+                search: ({ ask: _, ...rest }: TopicSearch) => ({ ...rest, talk }),
+                replace: true,
+              });
             }
           } else if (event === "text") {
             said += body.text ?? "";
             update({ text: said });
           } else if (event === "done") {
-            update({ answerId: body.message_id ?? null });
+            finish({ answerId: body.message_id ?? null });
+            ended = true;
           } else if (event === "problem") {
-            update({ problem: body.text ?? UNKNOWN_PROBLEM });
+            finish({ problem: body.text ?? UNKNOWN_PROBLEM });
+            ended = true;
           }
         }
+      }
+      // The connection dropped before the answer was done.
+      if (!ended) {
+        finish({ problem: "The answer stopped arriving. Check your connection, then ask again." });
       }
     },
     [workspace.id, place, sync, router],

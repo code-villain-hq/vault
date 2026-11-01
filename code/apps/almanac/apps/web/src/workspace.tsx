@@ -49,9 +49,12 @@ export function WorkspaceProvider({
   const [connection, setConnection] = useState<{
     sync: SyncClient<Schema>;
     refusals: EventTarget;
+    /** Who it's open for, where: after a switch it serves nothing. */
+    opened: string;
   } | null>(null);
   const userId = me.user.id;
   const workspaceId = workspace.id;
+  const opens = `${place.id} ${userId} ${workspaceId}`;
 
   useEffect(() => {
     const refusals = new EventTarget();
@@ -64,7 +67,7 @@ export function WorkspaceProvider({
       onRefused: (message) =>
         refusals.dispatchEvent(new CustomEvent("refused", { detail: message })),
     });
-    setConnection({ sync, refusals });
+    setConnection({ sync, refusals, opened: `${place.id} ${userId} ${workspaceId}` });
     void sync.start();
     const online = () => sync.retryNow();
     window.addEventListener("online", online);
@@ -74,9 +77,11 @@ export function WorkspaceProvider({
     };
   }, [place, userId, workspaceId]);
 
-  if (!connection) return null;
+  // Until the switched-to workspace opens, nothing shows the last one's.
+  if (!connection || connection.opened !== opens) return null;
+  const { sync, refusals } = connection;
   return (
-    <Context.Provider value={{ place, me, workspace, ...connection }}>{children}</Context.Provider>
+    <Context.Provider value={{ place, me, workspace, sync, refusals }}>{children}</Context.Provider>
   );
 }
 
@@ -87,8 +92,8 @@ export function useWorkspace(): WorkspaceContext {
 }
 
 /**
- * Whether you're an admin of the workspace. Only admins change which apps
- * it watches and make their keys; the server refuses the rest, so the app
+ * Whether you're an admin of the workspace. Only admins set who answers and
+ * with what (the web, the key); the server refuses the rest, so the app
  * doesn't offer it.
  */
 export function useIsAdmin(): boolean {
@@ -96,8 +101,8 @@ export function useIsAdmin(): boolean {
 }
 
 /**
- * Whether you're a guest: you watch only the apps you're added to, and of
- * the settings see only your account.
+ * Whether you're a guest: you see none of the topics, and of the settings
+ * only your account.
  */
 export function useIsGuest(): boolean {
   return isGuest(useWorkspace().workspace.role);
@@ -129,9 +134,4 @@ export function useRecords<K extends ModelKind>(model: K): Schema[K]["record"][]
 
 export function useSyncStatus() {
   return useSyncStore((sync) => sync.status());
-}
-
-/** True while the record has local changes the server hasn't confirmed. */
-export function useIsPending(model: ModelKind, id: string) {
-  return useSyncStore((sync) => sync.isPending(model, id));
 }

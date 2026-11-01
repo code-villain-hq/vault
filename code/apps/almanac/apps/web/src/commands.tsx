@@ -20,11 +20,10 @@ import {
 import { useMemo } from "react";
 import { fold } from "./format";
 import { NavIcon, topicIcon } from "./icons";
-import { useNewTopic, useTopics } from "./layout";
+import { useNewTopic, useOpenSettings, useSignOut, useTopics } from "./layout";
 import { isDesktop } from "./platform";
 import { plain } from "./prose";
-import { placeName } from "./server";
-import { signOut, useSession, workspaceEntries } from "./session";
+import { useSession, workspaceEntries } from "./session";
 import type { TopicSearch } from "./topic";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
 
@@ -33,6 +32,7 @@ export function AlmanacMenus() {
   const { workspace } = useWorkspace();
   const guest = useIsGuest();
   const navigate = useNavigate();
+  const openSettings = useOpenSettings();
   const goTo: GoTo[] = [
     {
       key: "c",
@@ -59,28 +59,21 @@ export function AlmanacMenus() {
             ],
           },
         ]}
-        onSettings={
-          isDesktop
-            ? () =>
-                void navigate({
-                  to: guest ? "/$workspace/settings/account" : "/$workspace/settings/claude",
-                  params: { workspace: workspace.url_key },
-                })
-            : undefined
-        }
+        onSettings={isDesktop ? openSettings : undefined}
       />
     </>
   );
 }
 
 function useAlmanacCommands(query: string): Command[] {
-  const { workspace, place } = useWorkspace();
+  const { workspace } = useWorkspace();
   const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
   const topics = useTopics();
   const newTopic = useNewTopic();
   const kept = useKept(query);
+  const out = useSignOut();
 
   const commands = useMemo(() => {
     const ws = workspace.url_key;
@@ -141,25 +134,9 @@ function useAlmanacCommands(query: string): Command[] {
           run: () => void navigate({ to: "/$workspace", params: { workspace: e.key } }),
         })),
     );
-    // A workspace on this Mac has no one to sign out.
-    if (place.kind !== "mac") {
-      list.push({
-        id: "sign-out",
-        group: "Account",
-        label: place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out",
-        run: () =>
-          void signOut(place).then((ok) =>
-            ok
-              ? navigate({ to: "/" })
-              : navigate({
-                  to: "/$workspace/settings/account",
-                  params: { workspace: workspace.url_key },
-                }),
-          ),
-      });
-    }
+    if (out) list.push({ id: "sign-out", group: "Account", label: out.label, run: out.run });
     return list;
-  }, [workspace, place, session, navigate, topics, guest, newTopic]);
+  }, [workspace, session, navigate, topics, guest, newTopic, out]);
 
   return useMemo(() => [...matching(commands, query), ...kept], [commands, query, kept]);
 }
@@ -214,9 +191,21 @@ function useKept(query: string): Command[] {
     ): Kept => ({ id, icon, text, words: fold(`${text} ${more}`), open });
     return topics.map((topic) => {
       const own = points.filter((p) => p.topic_id === topic.id);
-      // Blocks on the page itself, not on a row's: a hit scrolls to them.
-      const onPage = blocks.filter((b) => b.topic_id === topic.id && !b.row_id && b.title);
-      const shown = new Set(onPage.map((b) => b.id));
+      const byId = new Map(own.map((p) => [p.id, p]));
+      const its = blocks.filter((b) => b.topic_id === topic.id);
+      // The row whose page a block sits on, while the row is there.
+      const rowOf = new Map(
+        its.flatMap((b) => {
+          const row = b.row_id ? byId.get(b.row_id) : undefined;
+          return row ? [[b.id, row] as const] : [];
+        }),
+      );
+      // A hit on a block scrolls to it, on the page or on its row's.
+      const toBlock = (id: string) => {
+        const row = rowOf.get(id);
+        return open(topic.id, row ? { section: row.text, row: row.id } : {}, `block-${id}`);
+      };
+      const shown = new Set(its.filter((b) => !b.row_id).map((b) => b.id));
       const due = reminders.filter(
         (r) => r.topic_id === topic.id && (r.status === "on" || r.status === "done"),
       );
@@ -229,8 +218,8 @@ function useKept(query: string): Command[] {
       const of = (p: Point) =>
         you.has(p.block_id)
           ? open(topic.id, { about: true })
-          : !p.theme && shown.has(p.block_id)
-            ? open(topic.id, {}, `block-${p.block_id}`)
+          : rowOf.has(p.block_id) || (!p.theme && shown.has(p.block_id))
+            ? toBlock(p.block_id)
             : at(p.theme);
       return {
         topic,
@@ -238,9 +227,9 @@ function useKept(query: string): Command[] {
           ...[...sections].map((theme) =>
             thing(`section-${topic.id}-${theme}`, FileText, theme, at(theme)),
           ),
-          ...onPage.map((b) =>
-            thing(`block-${b.id}`, Table2, b.title, open(topic.id, {}, `block-${b.id}`)),
-          ),
+          ...its
+            .filter((b) => b.title && (!b.row_id || rowOf.has(b.id)))
+            .map((b) => thing(`block-${b.id}`, Table2, b.title, toBlock(b.id))),
           ...own.map((p) =>
             thing(
               `point-${p.id}`,

@@ -30,10 +30,10 @@ const TEMPLATES: { value: string; label: string; blocks: string; Icon: LucideIco
   {
     value: "routine",
     label: "Routine",
-    blocks: "Routine · Shelf · Advice",
+    blocks: "Routine · Your shelf · Advice",
     Icon: CalendarDays,
   },
-  { value: "collection", label: "Collection", blocks: "To do · Cards", Icon: Sprout },
+  { value: "collection", label: "Collection", blocks: "To do · Notes", Icon: Sprout },
   { value: "study", label: "Study", blocks: "Reading · Terms · What it says", Icon: BookOpen },
 ];
 

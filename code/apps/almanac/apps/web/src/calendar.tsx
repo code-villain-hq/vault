@@ -13,7 +13,6 @@ import {
   dueWords,
   rhythmWords,
   timeWords,
-  today,
   weekdayShort,
   weekdayWords,
   weekOf,
@@ -29,6 +28,7 @@ import {
   NotifyBell,
   occurrences,
   ReminderMenu,
+  useToday,
 } from "./reminders";
 import { Empty, Section } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
@@ -37,8 +37,8 @@ export function CalendarPage() {
   const { workspace } = useWorkspace();
   const all = useRecords("Reminder");
   const topics = useTopics();
-  const [week, setWeek] = useState(() => weekOf(today()));
-  const now = today();
+  const now = useToday();
+  const [week, setWeek] = useState(() => weekOf(now));
   const reminders = useMemo(
     () =>
       all
@@ -239,7 +239,7 @@ function Row({
       </span>
       {/* Over the card's corner on hover, so a narrow day keeps its words. */}
       <span className="absolute top-1 right-1 rounded-md bg-surface opacity-0 focus-within:opacity-100 group-hover/card:opacity-100 has-[[aria-expanded=true]]:opacity-100">
-        <ReminderMenu sync={sync} reminder={reminder} />
+        <ReminderMenu sync={sync} reminder={reminder} day={day} />
       </span>
     </li>
   );

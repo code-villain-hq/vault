@@ -1,7 +1,7 @@
-// Trend and Parts: a number kept each time it's measured, and a whole split
-// into its parts. They draw as the studio's charts do (Raven's charts.tsx):
-// one axis, a 2px line in the ink, a hairline grid, a tooltip on hover,
-// and the parts in steps of the ink, so there are no colours to learn.
+// A trend: a number kept each time it's measured. It draws as the studio's
+// charts do (Raven's charts.tsx): one axis, a 2px line in the topic's hue
+// (with a line per name, the next in the choices' colours), a hairline
+// grid, a tooltip on hover.
 
 import type { Point } from "@almanac/types";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -78,7 +78,7 @@ function timeMarks(first: string, last: string): { at: number; label: string }[]
 }
 
 /** A trend's measurements, oldest first, and the mark it aims at: its point with no day. */
-export function measured(points: Point[]): { measurements: Point[]; goal?: Point } {
+function measured(points: Point[]): { measurements: Point[]; goal?: Point } {
   const measurements = points
     .filter((p) => p.amount !== null && DAY.test(p.happened))
     .sort((a, b) => a.happened.localeCompare(b.happened) || a.position - b.position);
@@ -113,17 +113,11 @@ export function TrendSet({
   name,
   points,
   heading,
-  below,
-  listed,
 }: {
   name: string;
   points: Point[];
   /** Above it, naming what's measured. */
   heading?: ReactNode;
-  /** Under it, such as the reminder to measure again. */
-  below?: ReactNode;
-  /** On a section's own page: each measurement, a line each, newest first. */
-  listed?: (point: Point) => ReactNode;
 }) {
   const { ref, width } = useWidth();
   const [hovered, setHovered] = useState<number | null>(null);
@@ -331,20 +325,15 @@ export function TrendSet({
           </div>
         )}
       </div>
-      <ul className={listed ? "mt-2 flex flex-col gap-0.5" : "sr-only"}>
+      {/* The measurements, newest first, for those who can't see the line. */}
+      <ul className="sr-only">
         {[...measurements].reverse().map((p) => (
-          <li
-            key={p.id}
-            className="group -mx-2.5 flex min-h-7.5 items-center gap-3 rounded-md px-2.5 py-1 hover:bg-hover"
-          >
-            <span className="w-24 shrink-0 text-muted text-xs">{dayWords(p.happened)}</span>
-            <span className="shrink-0 font-semibold tabular-nums">{words(p.amount ?? 0)}</span>
-            <span className="min-w-0 flex-1 truncate text-faint text-xs">{p.text}</span>
-            {listed?.(p)}
+          <li key={p.id}>
+            {dayWords(p.happened)}: {words(p.amount ?? 0)}
+            {p.text && `, ${p.text}`}
           </li>
         ))}
       </ul>
-      {below}
     </section>
   );
 }

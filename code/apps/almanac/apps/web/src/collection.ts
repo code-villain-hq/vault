@@ -7,7 +7,7 @@ import { amountWords, dateWords, today } from "./format";
 import { when } from "./timeline";
 
 /** The pictures a collection is drawn as, in the order View as offers them. */
-export const PICTURES = [
+const PICTURES = [
   "line",
   "checklist",
   "steps",
@@ -106,7 +106,7 @@ const STEPS_MOST = 12;
  * Whether a collection is a few names each with a short value of its own,
  * "Gewicht 3,4 kg", "Schlaf 12–16 h": a tile each, the value large.
  */
-export function figuresOf(fields: Field[], rows: Point[]): boolean {
+function figuresOf(fields: Field[], rows: Point[]): boolean {
   const [only, ...more] = fields;
   return (
     rows.length >= 2 &&

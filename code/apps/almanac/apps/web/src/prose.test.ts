@@ -70,3 +70,9 @@ test("a link shows its name, in bold too", () => {
   );
   expect(plain("Bei [Scorett](https://example.com) **billig**")).toBe("Bei Scorett billig");
 });
+
+test("a link keeps the parentheses in its address", () => {
+  expect(html("See [Foo](https://en.wikipedia.org/wiki/Foo_(bar)).")).toContain(
+    '<a href="https://en.wikipedia.org/wiki/Foo_(bar)" target="_blank" rel="noreferrer" class="ui-link">Foo</a>.',
+  );
+});

@@ -87,7 +87,7 @@ export function inline(text: string): ReactNode {
 }
 
 /** "[Scorett Outlet](https://…)", and its name and address as the split leaves them. */
-const LINK = /\[([^\]]+)\]\s?\((https?:\/\/[^\s)]+)\)/;
+const LINK = /\[([^\]]+)\]\s?\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/;
 
 /** Links as their name, opening the page: "[Scorett Outlet](https://…)". */
 function linked(text: string, at: number): ReactNode {

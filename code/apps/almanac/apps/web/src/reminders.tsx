@@ -5,7 +5,7 @@ import type { Reminder } from "@almanac/types";
 import type { SyncClient } from "@code-villain/sync-client";
 import { type Confirmation, ConfirmDialog, MoreMenu } from "@code-villain/web";
 import { Bell } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { addDays, daysBetween, today } from "./format";
 import type { Schema } from "./sync";
 
@@ -15,7 +15,8 @@ export function occurrences(reminder: Reminder, from: string, to: string): strin
   const days: string[] = [];
   let day = reminder.due_on;
   const every = reminder.every_days ?? 0;
-  // A date already past stays on its day: it's still to do.
+  // One that repeats starts at its first time on or after `from`; one that
+  // doesn't stays on its day.
   if (every > 0 && daysBetween(day, from) > 0) {
     day = addDays(day, Math.ceil(daysBetween(day, from) / every) * every);
   }
@@ -28,8 +29,29 @@ export function occurrences(reminder: Reminder, from: string, to: string): strin
 }
 
 /** Whether a reminder that's on is due by today and not done. */
-export function isDue(reminder: Reminder): boolean {
-  return reminder.status === "on" && daysBetween(reminder.due_on, today()) >= 0;
+export function isDue(reminder: Reminder, now = today()): boolean {
+  return reminder.status === "on" && daysBetween(reminder.due_on, now) >= 0;
+}
+
+/** Today, which turns over at midnight while the page stays open. */
+export function useToday(): string {
+  const [now, setNow] = useState(today);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: set again for the next midnight once the day turns
+  useEffect(() => {
+    const check = () => setNow(today());
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    // A second past midnight, and again on coming back: a sleeping Mac holds timers.
+    const timer = setTimeout(check, midnight.getTime() - Date.now() + 1000);
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [now]);
+  return now;
 }
 
 /**
@@ -93,15 +115,27 @@ export function NotifyBell({ reminder }: { reminder: Reminder }) {
   );
 }
 
-/** Done, the bell, and removing it. */
-export function ReminderMenu({ sync, reminder }: { sync: SyncClient<Schema>; reminder: Reminder }) {
+/**
+ * Done for `day` (the next time, unless said), while that day can be done,
+ * as its tick does; the bell; and removing it.
+ */
+export function ReminderMenu({
+  sync,
+  reminder,
+  day = reminder.due_on,
+}: {
+  sync: SyncClient<Schema>;
+  reminder: Reminder;
+  day?: string;
+}) {
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const doable = reminder.status === "on" && canDo(reminder, day);
   return (
     <>
       <MoreMenu
         label={`More for ${reminder.title}`}
         items={[
-          { label: "Done", onSelect: () => markDone(sync, reminder) },
+          ...(doable ? [{ label: "Done", onSelect: () => markDone(sync, reminder, day) }] : []),
           {
             label: reminder.notify ? "Don't notify the Mac" : "Notify the Mac",
             onSelect: () => sync.update("Reminder", reminder.id, { notify: !reminder.notify }),

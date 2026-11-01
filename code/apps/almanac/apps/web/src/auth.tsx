@@ -379,7 +379,7 @@ export function StartPage() {
     <TextField
       label="Workspace"
       required
-      placeholder="My apps"
+      placeholder="My topics"
       value={workspace}
       onChange={(e) => setWorkspace(e.target.value)}
     />
@@ -422,7 +422,7 @@ export function StartPage() {
           {busy ? "Starting…" : "Start on this Mac"}
         </Button>
         <p className="text-center text-xs text-faint">
-          Watches the apps on this Mac. Only you see it.
+          Keeps your topics on this Mac. Only you see them.
         </p>
       </form>
       <Or />

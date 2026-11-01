@@ -74,7 +74,8 @@ const fetched = new Map<string, Promise<string>>();
 
 /** An object URL for a sent photo, once it's here. */
 export function usePhoto(place: Place, workspaceId: string, id: string): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+  // The photo fetched last, by id, so another id never shows the one before.
+  const [got, setGot] = useState<{ id: string; url: string } | null>(null);
   useEffect(() => {
     // A sample's photo is the app's own file, at its address already.
     if (ownFile(id)) return;
@@ -92,12 +93,13 @@ export function usePhoto(place: Place, workspaceId: string, id: string): string 
       photo.catch(() => fetched.delete(id));
       fetched.set(id, photo);
     }
-    photo.then((u) => current && setUrl(u)).catch(() => {});
+    photo.then((url) => current && setGot({ id, url })).catch(() => {});
     return () => {
       current = false;
     };
   }, [place, workspaceId, id]);
-  return ownFile(id) ? id : url;
+  if (ownFile(id)) return id;
+  return got?.id === id ? got.url : null;
 }
 
 /** Whether a photo's id is the address of one of the app's own files. */

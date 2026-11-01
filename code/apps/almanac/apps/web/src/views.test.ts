@@ -51,9 +51,7 @@ describe("the one set", () => {
     expect(viewOf(block("paragraph"), [point("", "Water weekly")])).toBe("paragraph");
   });
 
-  test("leaves out a block of a kind from before the set, and keeps You for About", () => {
-    expect(viewOf(block("chips"), [point("", "Water weekly")])).toBe("");
-    expect(viewOf(block("bullets"), [point("", "Water weekly")])).toBe("");
+  test("keeps You for About", () => {
     expect(viewOf(block("you", "You"), [])).toBe("you");
   });
 

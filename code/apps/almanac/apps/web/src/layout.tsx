@@ -40,7 +40,7 @@ import { groupsOf, hueOf } from "./hues";
 import { Initial, NavIcon, topicIcon } from "./icons";
 import { NewTopicDialog, useNewTopicKey } from "./new-topic";
 import { isDesktop } from "./platform";
-import { bundled, type Place, placeName, setCurrentPlace } from "./server";
+import { bundled, placeName, setCurrentPlace } from "./server";
 import {
   defaultWorkspace,
   rememberWorkspace,
@@ -119,7 +119,6 @@ export function useTopics(): Topic[] {
   return useMemo(() => [...topics].sort((a, b) => a.position - b.position), [topics]);
 }
 
-/** Whether a topic is the workspace's own, Almanac, which knows the others. */
 /** The topic `topic` sits under, while it's there. */
 export function parentOf(topic: Topic, topics: Topic[]): Topic | undefined {
   return topic.parent_id ? topics.find((t) => t.id === topic.parent_id) : undefined;
@@ -130,6 +129,7 @@ export function childrenOf(topic: Topic, topics: Topic[]): Topic[] {
   return topics.filter((t) => t.parent_id === topic.id);
 }
 
+/** Whether a topic is the workspace's own, Almanac, which knows the others. */
 export function isOwn(topic: Topic) {
   return topic.kind === "almanac";
 }
@@ -207,11 +207,6 @@ export function NotFound() {
   );
 }
 
-/** The open topic's id, from the address. */
-export function useTopicId(): string | undefined {
-  return (useParams({ strict: false }) as { topic?: string }).topic;
-}
-
 /**
  * The bar at the top of each page: where it sits (the workspace, unless
  * said), its title, anything shown by it (`meta`), then the page's controls.
@@ -264,9 +259,43 @@ export function PageBody({ children }: { children: ReactNode }) {
   );
 }
 
-/** Where a place is, in a sentence: "almanac.codevillain.eu", or "this Mac". */
-export function placeWords(place: Place) {
-  return place.kind === "mac" ? "Almanac on this Mac" : placeName(place);
+/** Opens Settings at its first page you have: Claude, or a guest's Account. */
+export function useOpenSettings() {
+  const { workspace } = useWorkspace();
+  const guest = useIsGuest();
+  const navigate = useNavigate();
+  return useCallback(
+    () =>
+      void navigate({
+        to: guest ? "/$workspace/settings/account" : "/$workspace/settings/claude",
+        params: { workspace: workspace.url_key },
+      }),
+    [navigate, guest, workspace.url_key],
+  );
+}
+
+/**
+ * Signing out of the open workspace's server, as the menu and ⌘K offer it:
+ * then home, or to Account, which says why it couldn't. None on this Mac,
+ * which has no one to sign out.
+ */
+export function useSignOut() {
+  const { place, workspace } = useWorkspace();
+  const navigate = useNavigate();
+  return useMemo(() => {
+    if (place.kind === "mac") return null;
+    return {
+      label: place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out",
+      run: async () => {
+        if (await signOut(place)) await navigate({ to: "/" });
+        else
+          await navigate({
+            to: "/$workspace/settings/account",
+            params: { workspace: workspace.url_key },
+          });
+      },
+    };
+  }, [place, workspace.url_key, navigate]);
 }
 
 /** The workspace frame: sidebar and page, and the dialog that starts a topic. */
@@ -564,17 +593,13 @@ function byPlace(entries: WorkspaceEntry[]) {
 
 function WorkspaceMenu() {
   const { place, workspace } = useWorkspace();
-  const guest = useIsGuest();
   const session = useSession();
   const navigate = useNavigate();
   const groups = byPlace(session.status === "signed-in" ? workspaceEntries(session.places) : []);
   const item =
     "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
-  const settings = (page: "claude" | "members" | "account") =>
-    void navigate({
-      to: `/$workspace/settings/${page}`,
-      params: { workspace: workspace.url_key },
-    });
+  const openSettings = useOpenSettings();
+  const out = useSignOut();
 
   return (
     <Menu.Root>
@@ -628,7 +653,7 @@ function WorkspaceMenu() {
               </Menu.Group>
             ))}
             <Menu.Separator className="my-1 h-px bg-line" />
-            <Menu.Item className={item} onClick={() => settings(guest ? "account" : "claude")}>
+            <Menu.Item className={item} onClick={openSettings}>
               Settings
             </Menu.Item>
             {isDesktop && (
@@ -641,19 +666,9 @@ function WorkspaceMenu() {
                 Sign in to a server…
               </Menu.Item>
             )}
-            {place.kind !== "mac" && (
-              <Menu.Item
-                className={item}
-                onClick={async () => {
-                  if (await signOut(place)) await navigate({ to: "/" });
-                  else
-                    await navigate({
-                      to: "/$workspace/settings/account",
-                      params: { workspace: workspace.url_key },
-                    });
-                }}
-              >
-                {place.kind === "server" ? `Sign out of ${placeName(place)}` : "Sign out"}
+            {out && (
+              <Menu.Item className={item} onClick={out.run}>
+                {out.label}
               </Menu.Item>
             )}
           </Menu.Popup>
