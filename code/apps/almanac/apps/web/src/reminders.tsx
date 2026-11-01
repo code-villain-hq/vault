@@ -33,6 +33,18 @@ export function isDue(reminder: Reminder): boolean {
 }
 
 /**
+ * Whether a reminder can be done on `day`: the next day it's due, or, while
+ * it's late, any day from then to today, which are all that same time still
+ * to do. The times after it come round again.
+ */
+export function canDo(reminder: Reminder, day: string, now = today()): boolean {
+  if (day === reminder.due_on) return true;
+  return (
+    reminder.status === "on" && daysBetween(reminder.due_on, day) > 0 && daysBetween(day, now) >= 0
+  );
+}
+
+/**
  * Done for the day it was due, which keeps it there, ticked: one that
  * repeats comes back its rhythm after that day, or after today when it was
  * late; one that doesn't is finished.

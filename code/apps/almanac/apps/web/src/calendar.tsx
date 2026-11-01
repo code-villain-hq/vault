@@ -22,8 +22,8 @@ import {
 import { topicIcon } from "./icons";
 import { PageBody, PageHeader, useTopics } from "./layout";
 import {
+  canDo,
   doneFor,
-  isDue,
   markDone,
   markNotDone,
   NotifyBell,
@@ -198,9 +198,7 @@ function Row({
   const { workspace, sync } = useWorkspace();
   const Icon = topicIcon(topic?.icon ?? "");
   const time = timeWords(reminder.at);
-  // Only the next time it's due can be done; the ones after it come round again.
-  const next =
-    done || day === reminder.due_on || (isDue(reminder) && daysBetween(reminder.due_on, day) <= 0);
+  const next = done || canDo(reminder, day);
   const when = late ? dueWords(day) : time;
   return (
     <li className="group/card relative flex min-w-0 flex-col gap-1.5 rounded-md bg-surface px-2.5 py-2">
