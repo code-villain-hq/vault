@@ -6,7 +6,7 @@ BUNDLE = build/$(APP_NAME).app
 # across rebuilds; ad-hoc ("-") re-prompts after every install.
 SIGN_IDENTITY = $(shell security find-identity -v -p codesigning 2>/dev/null | grep -q "VillainCaster Dev" && echo "VillainCaster Dev" || echo -)
 
-.PHONY: build run app icon install release clean design design-check
+.PHONY: build run app icon install release clean design design-check check fmt
 
 build:
 	swift build -c release
@@ -95,6 +95,17 @@ design-check:
 	done; \
 	grep -qF "$(MARK_PATH)" Sources/VillainCaster/MenuBarIcon.swift || stale="$$stale Sources/VillainCaster/MenuBarIcon.swift"; \
 	if [ -n "$$stale" ]; then echo "Out of date with the vault:$$stale. Run make design (and copy the mark's C path into MenuBarIcon.swift)."; exit 1; fi
+
+# Swift that isn't generated: Design/ holds copies of the vault's tokens.
+SWIFT = Package.swift $(shell find Sources Tests -name '*.swift' -not -path '*/Design/*')
+
+# swift-format (`.swift-format`) and the tests. CI runs it.
+check:
+	swift format lint --strict $(SWIFT)
+	swift test
+
+fmt:
+	swift format -i $(SWIFT)
 
 clean:
 	rm -rf .build build

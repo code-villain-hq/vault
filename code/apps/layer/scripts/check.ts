@@ -8,6 +8,8 @@ const root = new URL("..", import.meta.url).pathname;
 const kitClient = `${root}../../kit/sync/client`;
 // The parts every studio web app shares (`code/kit/web`).
 const kitWeb = `${root}../../kit/web`;
+// The dev tooling every app's scripts share (`code/kit/dev-id`).
+const kitDevId = `${root}../../kit/dev-id`;
 const biome = `${root}web/node_modules/.bin/biome`;
 
 await runChecks([
@@ -15,8 +17,9 @@ await runChecks([
   ["design copies are current", () => $`bun scripts/sync-design.ts --check`.cwd(root)],
   ["bun test (app)", () => $`bun test scripts`.cwd(root)],
   ["tsc (app)", () => $`bunx tsc`.cwd(root)],
+  ["tsc (scripts)", () => $`bunx tsc -p scripts`.cwd(root)],
   ["app build", () => $`bunx vite build`.cwd(root).quiet()],
-  ["cargo fmt (server)", () => $`cargo fmt -p layer-domain -p layer-sync -p layer-server --check`.cwd(root)],
+  ["cargo fmt", () => $`cargo fmt --all --check`.cwd(root)],
   ["cargo clippy", () => $`cargo clippy --workspace --all-targets -- -D warnings`.cwd(root)],
   ["cargo test (app)", () => $`cargo test -p villain-layer --lib --quiet`.cwd(root)],
   ["cargo test (server)", () => $`cargo test -p layer-domain -p layer-sync -p layer-server --quiet`.cwd(root)],
@@ -31,6 +34,7 @@ await runChecks([
   // The kit's client, with its own settings: Biome checks only under its root.
   ["biome (sync kit)", () => $`${biome} check .`.cwd(kitClient)],
   ["biome (web kit)", () => $`${biome} check .`.cwd(kitWeb)],
+  ["biome (dev-id kit)", () => $`${biome} check .`.cwd(kitDevId)],
   [
     "tsc (web)",
     async () => {

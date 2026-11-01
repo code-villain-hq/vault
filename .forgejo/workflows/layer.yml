@@ -1,5 +1,5 @@
 # `bun run check` for Layer on every push that touches it: the guard, design
-# copies up to date, the app's tests, tsc and build, rustfmt on the server,
+# copies up to date, the app's tests, tsc and build, rustfmt,
 # clippy, the app's and the server's Rust tests, generated types up to date,
 # and the web app's Biome, tsc, tests and build. It runs on the MacBook's
 # runner (label `macos`), because the app and its PTY tests are macOS-only.

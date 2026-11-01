@@ -1,0 +1,31 @@
+# The Rust kits' fmt, clippy and tests on every push that touches them
+# (`code/kit/dev-id/check-kits.ts`). Each kit is a package of its own,
+# outside every app's Cargo workspace, so the apps' checks format it but
+# never lint or test it. The kits' TypeScript is checked by every app's
+# `bun run check`. It runs on the MacBook's runner (label `macos`).
+#
+# On push only, never on pull_request: the runner is the Mac itself, and a
+# pull request from someone else's fork would run their code there.
+name: kit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "code/kit/**"
+      - ".forgejo/workflows/kit.yml"
+
+jobs:
+  check:
+    runs-on: macos
+    defaults:
+      run:
+        working-directory: code/kit
+    env:
+      # Line numbers for a failing test's backtrace, without the rest of the
+      # debug info: less to compile and link.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@v4
+      # The build is kept between jobs, so a push recompiles what changed.
+      - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/kit-target" bun dev-id/check-kits.ts

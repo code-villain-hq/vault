@@ -6,7 +6,7 @@ function chat(id: string, activity: PaneInfo["activity"], running = true): PaneI
   return {
     id, task_id: "chat", checkout_id: null, kind: "agent", title: "Claude Code", agent_id: "claude",
     cwd: `/tmp/_chat/${id}`, running, exit_code: running ? null : 0, started_at: "", last_output_at: "",
-    notice: null, activity, activity_since: "", topic: null,
+    notice: null, activity, activity_since: "", topic: null, acp: false,
   };
 }
 

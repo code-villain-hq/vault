@@ -7,6 +7,8 @@ const root = new URL("..", import.meta.url).pathname;
 const kitClient = `${root}../../kit/sync/client`;
 // The parts every studio web app shares (`code/kit/web`).
 const kitWeb = `${root}../../kit/web`;
+// The dev tooling every app's scripts share (`code/kit/dev-id`).
+const kitDevId = `${root}../../kit/dev-id`;
 // ALMANAC_CHECK_SKIP_DESKTOP leaves the desktop app out, for a quicker check
 // that doesn't wait for Tauri to build.
 const crates = process.env.ALMANAC_CHECK_SKIP_DESKTOP
@@ -36,6 +38,7 @@ await runChecks([
   // The kit's client, with its own settings: Biome checks only under its root.
   ["biome (sync kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitClient)],
   ["biome (web kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitWeb)],
+  ["biome (dev-id kit)", () => $`${root}node_modules/.bin/biome check .`.cwd(kitDevId)],
   ["typecheck", () => $`bun run typecheck`.cwd(root)],
   [
     "bun test",

@@ -5,7 +5,7 @@ import type { AuthoredPr, CheckoutPr } from "../src/lib/types";
 function pr(extra: Partial<AuthoredPr> = {}): AuthoredPr {
   return {
     repo: "acme/api", number: 7, title: "t", url: "https://github.com/acme/api/pull/7", draft: false,
-    updated_at: "", checks: "passing", review: "approved", approved_by: ["ana"], changes_by: [],
+    updated_at: "", head: "feature", base: "main", checks: "passing", review: "approved", approved_by: ["ana"], changes_by: [],
     waiting_on: [], unresolved: 0, unresolved_more: false, conflicts: false, ...extra,
   };
 }

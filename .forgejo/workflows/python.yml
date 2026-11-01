@@ -1,0 +1,23 @@
+# Ruff's format and lint for the vault's Python (`ruff.toml`) on every push
+# that touches it. It runs on the MacBook's runner (label `macos`).
+#
+# On push only, never on pull_request: the runner is the Mac itself, and a
+# pull request from someone else's fork would run their code there.
+name: python
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "**.py"
+      - "ruff.toml"
+      - ".forgejo/workflows/python.yml"
+
+jobs:
+  check:
+    runs-on: macos
+    steps:
+      - uses: actions/checkout@v4
+      # uv isn't on the runner's PATH.
+      - run: $HOME/.local/bin/uvx ruff@0.15.12 format --check
+      - run: $HOME/.local/bin/uvx ruff@0.15.12 check

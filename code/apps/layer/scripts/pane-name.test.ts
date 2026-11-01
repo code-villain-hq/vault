@@ -6,7 +6,7 @@ function pane(title: string, topic: string | null): PaneInfo {
   return {
     id: "p", task_id: "t", checkout_id: null, kind: "agent", title, agent_id: "claude",
     cwd: "/tmp", running: true, exit_code: null, started_at: "", last_output_at: "",
-    notice: null, activity: "idle", activity_since: "", topic,
+    notice: null, activity: "idle", activity_since: "", topic, acp: false,
   };
 }
 
@@ -25,8 +25,8 @@ describe("what a pane is called (PANE-12)", () => {
 
 describe("what can be restarted on its conversation (PANE-14)", () => {
   const agents: AgentStatus[] = [
-    { id: "claude", name: "Claude Code", program: "claude", installed: true, path: "/bin/claude", resumes: true },
-    { id: "gemini", name: "Gemini CLI", program: "gemini", installed: true, path: "/bin/gemini", resumes: false },
+    { id: "claude", name: "Claude Code", program: "claude", installed: true, path: "/bin/claude", resumes: true, acp: true },
+    { id: "gemini", name: "Gemini CLI", program: "gemini", installed: true, path: "/bin/gemini", resumes: false, acp: false },
   ];
   test("an agent whose CLI resumes, running or exited", () => {
     expect(canRestart(pane("Claude Code", null), agents)).toBe(true);

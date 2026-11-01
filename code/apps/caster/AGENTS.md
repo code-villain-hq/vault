@@ -13,6 +13,7 @@ Caster wears Nightshade in night and day, following the system's appearance. Rea
 - The menu bar glyph is the C from `studio/brand/mark/caster.svg` with its strike, drawn in colour (see "Menu bar glyph" in `studio/brand/mark/README.md`). If the mark changes, run `make design` and copy the new C path into `MenuBarIcon.swift`. Then run `make icon` for the app icon.
 
 `make design-check` writes nothing and fails if any copy has drifted from the vault. CI runs it.
+`make check` runs swift-format's lint (`.swift-format`) and the tests, and CI runs it too; `make fmt` formats.
 
 ## Seeing a change
 

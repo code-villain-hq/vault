@@ -30,7 +30,7 @@ it does, feature by feature, is in
    action, one way to run blocking work.
 4. **Prove it.** `bun run check` must pass. It runs the guard, the
    design copies' check, the frontend's tests, tsc, the frontend build,
-   rustfmt on the server, clippy, the app's and the server's Rust tests,
+   rustfmt, clippy, the app's and the server's Rust tests,
    the generated types' check, then the web app's Biome, tsc, tests and
    build (`scripts/check.ts`; `bun run db` first).
    A UI change is looked at and

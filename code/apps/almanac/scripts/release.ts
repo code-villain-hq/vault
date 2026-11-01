@@ -112,8 +112,10 @@ async function api(method: string, path: string, body?: BodyInit, json = true): 
 function builtDmg(): string {
   const dir = `${BUNDLE}/dmg`;
   const built = readdirSync(dir).filter((f) => f.endsWith(".dmg") && f.includes(version));
-  if (built.length !== 1) fail(`expected one ${version} .dmg in ${dir}, found ${built.length}.`);
-  return join(dir, built[0]);
+  const [dmg] = built;
+  if (built.length !== 1 || !dmg)
+    fail(`expected one ${version} .dmg in ${dir}, found ${built.length}.`);
+  return join(dir, dmg);
 }
 
 // ---------------------------------------------------------------------------
