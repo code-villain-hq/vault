@@ -130,7 +130,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
                       <Menu.Popup className="ui-menu min-w-40 p-1 outline-none">
                         {item.groups.map((group, n) => (
                           <Menu.Group key={group[0]?.label ?? n}>
-                            {n > 0 && <div role="separator" className="mx-1 my-1 h-px bg-line" />}
+                            {n > 0 && <hr className="mx-1 my-1 h-px border-0 bg-line" />}
                             {group.map((action) => (
                               <MoreMenuOption key={action.label} action={action} />
                             ))}

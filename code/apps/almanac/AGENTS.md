@@ -92,8 +92,8 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   their line in every view.
 - A picture block (`picture`) shows photos large, a point each: its photo
   in its one cell (`PICTURE_CELL`, `photo`) and its text the caption, which
-  may be empty there only. Add a picture at the end of a page (and of a
-  row's page) makes one with the photos picked or dropped; on the block,
+  may be empty there only. Add a block's Picture (below) makes one with
+  the photos picked, as does a photo dropped on Add a block; on the block,
   more are dropped or added, a caption written in place and a photo taken
   off with ✕ (`Pictures` in `pictures.tsx`). One photo takes half the
   page, more the whole. A talk adds them with add_items' `photo`, "photo
@@ -102,6 +102,21 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   value changes it in place (in the table, on cards, on the row's page),
   and "+ New" under the collection adds a row. Both write the row's
   `cells` through the sync engine; guests and samples get neither.
+  "Fields…" in its ⋯ (`fields.tsx`) changes its fields as change_block
+  does: name, kind, a number's unit, a choice's or status's words, eight
+  at most, in order. A renamed field takes its cells along; removing one
+  that rows fill asks first, and takes their cells off.
+- A page is written by hand too (`writing.tsx`, `adding.tsx`): Add a
+  block at the end of a page (and of a row's page), Add below in a
+  block's ⋯ and ⌘K's "Add a …" add a heading, paragraph, callout, list,
+  checklist, table or picture. A block with nothing in it doesn't show,
+  so a new one is written in place first and kept with its first words
+  or row in one transaction (Esc, or leaving it empty, takes it off). A
+  paragraph's Enter goes on to the next passage; a list, checklist or
+  table opens on its title, then its first row, and stays on "+ New". A
+  checklist starts with a "Done" check, a table with "Notes". A click on
+  a passage, a heading or a callout writes in it; emptied, a passage
+  goes. Hand-made points have no source. Guests get none of it.
 
 Settings → Claude isn't synced. `GET /api/w/{id}/claude` says who answers:
 on this Mac Claude Code (`via` `claude_code`, with whether it's ready),

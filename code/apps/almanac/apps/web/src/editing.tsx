@@ -11,6 +11,7 @@ import { cellOf } from "./collection";
 import { doneFor, isDue, markDone, markNotDone } from "./reminders";
 import { Button } from "./ui";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
+import { useAdding } from "./writing";
 
 /** The kinds a person picks from the field's own options. */
 const PICKED = new Set(["status", "choice"]);
@@ -231,12 +232,14 @@ function TypeIn({
 
 /**
  * "+ New" under a collection: a row's name, then its fields in one line,
- * Tab between them, Enter adds it and starts the next.
+ * Tab between them, Enter adds it and starts the next. A collection just
+ * added opens on it, for its next row.
  */
 export function NewRow({ block, rows }: { block: Block; rows: Point[] }) {
   const { sync } = useWorkspace();
   const guest = useIsGuest();
-  const [open, setOpen] = useState(false);
+  const adding = useAdding();
+  const [open, setOpen] = useState(adding?.fresh === block.id);
   const [name, setName] = useState("");
   const [typed, setTyped] = useState<Record<string, string | boolean>>({});
   const first = useRef<HTMLInputElement>(null);
@@ -258,6 +261,7 @@ export function NewRow({ block, rows }: { block: Block; rows: Point[] }) {
     setOpen(false);
     setName("");
     setTyped({});
+    if (adding?.fresh === block.id) adding.settle();
   };
   const add = () => {
     if (!name.trim()) return;

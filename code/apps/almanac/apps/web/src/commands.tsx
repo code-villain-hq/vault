@@ -1,6 +1,6 @@
 // What ⌘K offers in Almanac, and the "G" keys, in the shared menus of
-// `code/kit/web`: Calendar, the topics, a new topic, settings, workspaces,
-// and what the topics keep.
+// `code/kit/web`: on a topic's page a block to add, Calendar, the topics,
+// a new topic, settings, workspaces, and what the topics keep.
 import type { Point } from "@almanac/types";
 import { type Command, CommandMenu, type GoTo, matching, Shortcuts } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
@@ -26,6 +26,7 @@ import { plain } from "./prose";
 import { useSession, workspaceEntries } from "./session";
 import type { TopicSearch } from "./topic";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
+import { ADDS, useAdder } from "./writing";
 
 /** The command menu and the shortcuts list, for the workspace frame. */
 export function AlmanacMenus() {
@@ -74,10 +75,23 @@ function useAlmanacCommands(query: string): Command[] {
   const newTopic = useNewTopic();
   const kept = useKept(query);
   const out = useSignOut();
+  const add = useAdder();
 
   const commands = useMemo(() => {
     const ws = workspace.url_key;
+    // On a topic's page, first: a block of the set at its end.
+    const adds: Command[] =
+      add && !guest
+        ? ADDS.flat().map(({ kind, name, icon }) => ({
+            id: `add-${kind}`,
+            group: "This page",
+            label: `Add a ${name.toLowerCase()}`,
+            icon: <NavIcon icon={icon} />,
+            run: () => add(kind),
+          }))
+        : [];
     const list: Command[] = [
+      ...adds,
       {
         id: "calendar",
         group: "Go to",
@@ -136,7 +150,7 @@ function useAlmanacCommands(query: string): Command[] {
     );
     if (out) list.push({ id: "sign-out", group: "Account", label: out.label, run: out.run });
     return list;
-  }, [workspace, session, navigate, topics, guest, newTopic, out]);
+  }, [workspace, session, navigate, topics, guest, newTopic, out, add]);
 
   return useMemo(() => [...matching(commands, query), ...kept], [commands, query, kept]);
 }

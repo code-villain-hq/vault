@@ -11,7 +11,7 @@ import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import { holdsPhoto, MOST_PHOTOS, photosIn, pick } from "./photos";
 import { apiUrl, authHeaders, credentialsFor } from "./server";
 import { Photo } from "./set";
-import { useIsGuest, useRecords, useWorkspace } from "./workspace";
+import { useIsGuest, useWorkspace } from "./workspace";
 
 /** The field a row's photo goes in when its collection has none yet. */
 const PHOTO_FIELD: Field = { name: "Foto", kind: "photo", unit: "", goal: null, options: [] };
@@ -58,7 +58,7 @@ function useSetting(set: (id: string) => void, many = false) {
 }
 
 /** Takes a photo dropped on its box, with a ring while one is dragged over. */
-function DropBox({
+export function DropBox({
   onDrop,
   className,
   children,
@@ -380,31 +380,18 @@ function Caption({ point }: { point: Point }) {
 }
 
 /**
- * Add a picture, at the end of a page: a picture block of its own with the
- * photos picked or dropped, after the page's last block. On a row's page
- * (`row`) it sits there.
+ * A picture block of its own with the photos picked or dropped, each pick
+ * or drop a block of its own, which `make` puts on the page and names.
+ * Add a block (`adding.tsx`) picks them.
  */
-export function AddPicture({ topic, row = null }: { topic: Topic; row?: string | null }) {
+export function useAddPictures(topic: string, make: () => string) {
   const { sync } = useWorkspace();
-  const guest = useIsGuest();
-  const blocks = useRecords("Block");
   const into = useRef<string | null>(null);
   const count = useRef(0);
   const setting = useSetting((photo) => {
-    if (!into.current) {
-      const ofTopic = blocks.filter((b) => b.topic_id === topic.id);
-      into.current = sync.create("Block", {
-        topic_id: topic.id,
-        kind: "picture",
-        title: "",
-        facets: [],
-        fields: [],
-        row_id: row ?? undefined,
-        position: Math.max(-1, ...ofTopic.map((b) => b.position)) + 1,
-      });
-    }
+    into.current ??= make();
     sync.create("Point", {
-      topic_id: topic.id,
+      topic_id: topic,
       block_id: into.current,
       text: "",
       cells: { [PICTURE_CELL]: photo },
@@ -412,25 +399,10 @@ export function AddPicture({ topic, row = null }: { topic: Topic; row?: string |
       position: count.current++,
     });
   }, true);
-  if (guest) return null;
-  // Each pick or drop starts a block of its own.
   const take = (files: FileList | null) => {
     into.current = null;
     count.current = 0;
     void setting.take(files);
   };
-  return (
-    <DropBox onDrop={take} className="-mx-2 flex items-center gap-2 self-start rounded-md px-2">
-      <PickButton
-        label="Add a picture: a diagram, a sketch, a screenshot. Or drop one here."
-        onPick={take}
-        many
-        className="ui-button -ml-2 h-7 gap-1.5 px-2 text-xs text-faint hover:text-muted"
-      >
-        <ImagePlus size={14} strokeWidth={1.75} aria-hidden="true" />
-        {setting.busy ? "Adding…" : "Add a picture"}
-      </PickButton>
-      {setting.problem && <p className="text-xs text-warn-ink">{setting.problem}</p>}
-    </DropBox>
-  );
+  return { busy: setting.busy, problem: setting.problem, take };
 }

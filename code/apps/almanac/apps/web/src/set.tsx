@@ -48,6 +48,7 @@ import { inline } from "./prose";
 import { isDue } from "./reminders";
 import { when, years } from "./timeline";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
+import { NextPassage, Passage } from "./writing";
 
 /** A line's measure, for lines that read across. */
 export const LINES = "max-w-[86ch]";
@@ -260,17 +261,21 @@ function Sources({ points }: { points: Point[] }) {
   );
 }
 
-/** Paragraphs: a point each, at a reading measure. */
-export function Paragraphs({ points }: { points: Point[] }) {
+/**
+ * Paragraphs: a point each, at a reading measure, which a click writes in.
+ * One just added (`block`) goes on with its next passage.
+ */
+export function Paragraphs({ block, points }: { block?: Block; points: Point[] }) {
   return (
     <div className="flex max-w-measure flex-col gap-2">
       {points.map((point) => (
         <p key={point.id} className="group flex items-start gap-2">
           <NewDot point={point} className="mt-2" />
-          <span className="min-w-0 flex-1">{inline(point.text)}</span>
+          <Passage point={point}>{inline(point.text)}</Passage>
           <RemovePoint point={point} />
         </p>
       ))}
+      {block && <NextPassage block={block} points={points} />}
       <Sources points={points} />
     </div>
   );
@@ -309,7 +314,10 @@ function Rings({ reminder }: { reminder: Reminder }) {
   );
 }
 
-/** A callout: what to keep in mind, in a box that stands out; warn if any point is one. */
+/**
+ * A callout: what to keep in mind, in a box that stands out, which a click
+ * writes in; warn if any point is one.
+ */
 export function Callout({ points }: { points: Point[] }) {
   const warn = points.some((p) => p.look === "warn");
   const Icon = warn ? TriangleAlert : Info;
@@ -324,7 +332,7 @@ export function Callout({ points }: { points: Point[] }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {points.map((point) => (
           <p key={point.id} className="group flex items-start gap-2">
-            <span className="min-w-0 flex-1">{inline(point.text)}</span>
+            <Passage point={point}>{inline(point.text)}</Passage>
             <RemovePoint point={point} />
           </p>
         ))}

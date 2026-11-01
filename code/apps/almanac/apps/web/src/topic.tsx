@@ -33,9 +33,11 @@ import {
   useRef,
   useState,
 } from "react";
+import { AddBlock, DraftBlock, draftWidth, type PageAdding, usePageAdding } from "./adding";
 import { type Asking, useTopicTalks } from "./asking";
 import { cellOf, cellWords, checkOf, filled, lanesOf, numberOf, sumOf } from "./collection";
 import { EditCell, itemDone, useItemReminders } from "./editing";
+import { FieldsDialog } from "./fields";
 import { ago, dateWords, dayKey, dueWords, rhythmWords, timeWords } from "./format";
 import { hueOf, hueStyle } from "./hues";
 import { TOPIC_ICON_NAMES, topicIcon } from "./icons";
@@ -50,7 +52,7 @@ import {
   useDrop,
   usePicking,
 } from "./picking";
-import { AddPicture, CoverHead, Pictures, RowPhoto } from "./pictures";
+import { CoverHead, Pictures, RowPhoto } from "./pictures";
 import { about, inline } from "./prose";
 import { NotifyBell, ReminderMenu } from "./reminders";
 import { type Sample, samples } from "./samples";
@@ -73,6 +75,7 @@ import { Today } from "./today";
 import { Button, Empty, Section } from "./ui";
 import { ownWidth, shownAs, VIEW_ICONS, VIEW_NAMES, viewOf, viewsFor, widthOf } from "./views";
 import { LookOnly, useIsGuest, useRecords, useSyncStatus, useWorkspace } from "./workspace";
+import { AddingContext, addActions, EditHeading, useAdding } from "./writing";
 
 /**
  * `?talk=` opens the talk panel (`new` for a new talk); `?ask=` starts it
@@ -488,15 +491,27 @@ function onThePage(page: PageParts, row: string | null = null): PageParts {
   return { ...page, blocks: shown, points: page.points.filter((p) => ids.has(p.block_id)) };
 }
 
-/** Blocks on the page's grid, each at its width. */
-function Blocks({ page }: { page: PageParts }) {
+/**
+ * Blocks on the page's grid, each at its width, and the one being added
+ * after the block it goes after, or at the end.
+ */
+function Blocks({ page, adding }: { page: PageParts; adding?: PageAdding }) {
+  const draft = adding?.draft;
+  const drafting = draft && adding && (
+    <div key="draft" data-width={draftWidth(draft.kind)}>
+      <DraftBlock adding={adding} draft={draft} />
+    </div>
+  );
+  const after = draft?.after && page.blocks.some((b) => b.id === draft.after) ? draft.after : null;
   return (
     <div className="page-grid">
-      {page.blocks.map((block) => (
+      {page.blocks.map((block) => [
         <div key={block.id} data-width={block.width}>
           <BlockView block={block} page={page} />
-        </div>
-      ))}
+        </div>,
+        block.id === after && drafting,
+      ])}
+      {!after && drafting}
     </div>
   );
 }
@@ -504,6 +519,9 @@ function Blocks({ page }: { page: PageParts }) {
 function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) => void }) {
   const all = usePage(topic);
   const page = useMemo(() => onThePage(all), [all]);
+  const guest = useIsGuest();
+  const adding = usePageAdding(topic, page.blocks, all.blocks);
+  const drafting = adding.draft !== null;
   // Where Add it keeps a question's point: the page's first paragraph.
   const home = keeping(page.blocks);
   const topics = useTopics();
@@ -511,7 +529,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
   const children = useMemo(() => childrenOf(topic, topics), [topic, topics]);
 
   return (
-    <>
+    <AddingContext.Provider value={guest ? null : adding}>
       <CoverHead topic={topic}>
         {parent && <UpTo topic={parent} />}
         <TitleToAbout topic={topic} />
@@ -525,7 +543,7 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
         </section>
       )}
       {children.length > 0 && <SubTopics topics={children} />}
-      {page.blocks.length === 0 && children.length === 0 && (
+      {page.blocks.length === 0 && children.length === 0 && !drafting && (
         <div className="flex flex-col gap-1">
           <p className="font-medium">Nothing kept yet.</p>
           <p className="text-muted">
@@ -534,10 +552,10 @@ function TopicPageBody({ topic, onAsk }: { topic: Topic; onAsk: (text: string) =
           </p>
         </div>
       )}
-      {page.blocks.length > 0 && <Blocks page={page} />}
-      <AddPicture topic={topic} />
-      {page.points.length === 0 && <Starters topic={topic} onAsk={onAsk} />}
-    </>
+      {(page.blocks.length > 0 || drafting) && <Blocks page={page} adding={adding} />}
+      {!guest && <AddBlock adding={adding} />}
+      {page.points.length === 0 && !drafting && <Starters topic={topic} onAsk={onAsk} />}
+    </AddingContext.Provider>
   );
 }
 
@@ -723,11 +741,13 @@ function SectionPageBody({
 }) {
   const page = usePage(topic);
   const talks = useRecords("Talk");
+  const guest = useIsGuest();
   // Only a row's page has blocks of its own; a section's shows what's kept under it.
   const own = useMemo(
     () => (row ? onThePage(page, row.id) : { ...page, blocks: [], points: [] }),
     [page, row],
   );
+  const adding = usePageAdding(topic, own.blocks, page.blocks, row?.id ?? null);
   const points = page.points.filter((p) => p.theme === section);
   const questions = page.questions.filter((q) => q.theme === section);
   const reminders = page.reminders.filter((r) => r.theme === section);
@@ -757,12 +777,12 @@ function SectionPageBody({
     );
   }
   return (
-    <>
+    <AddingContext.Provider value={row && !guest ? adding : null}>
       <BackTo topic={topic} />
       <p className="text-title font-semibold">{section}</p>
       {row && <RowFields row={row} />}
-      {own.blocks.length > 0 && <Blocks page={own} />}
-      {row && <AddPicture topic={topic} row={row.id} />}
+      {(own.blocks.length > 0 || (row && adding.draft)) && <Blocks page={own} adding={adding} />}
+      {row && !guest && <AddBlock adding={adding} />}
       {reminders.length > 0 && <Dates reminders={reminders} />}
       {questions.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Waiting on you">
@@ -816,7 +836,7 @@ function SectionPageBody({
           </ul>
         </section>
       )}
-    </>
+    </AddingContext.Provider>
   );
 }
 
@@ -1404,7 +1424,7 @@ function BlockView({ block, page }: { block: Block; page: PageParts }) {
     case "paragraph":
       return (
         <BlockFrame {...frame}>
-          <Paragraphs points={points} />
+          <Paragraphs block={block} points={points} />
         </BlockFrame>
       );
     case "callout":
@@ -1466,11 +1486,12 @@ function BlockFrame({
       aria-label={title || blockName(block)}
     >
       <div className="relative flex min-h-6 items-center gap-2">
-        {title && (
-          <h2 className={`min-w-0 truncate ${lead ? "font-semibold" : "text-xs text-faint"}`}>
-            {title}
-          </h2>
-        )}
+        {title &&
+          (lead ? (
+            <EditHeading block={block} />
+          ) : (
+            <h2 className="min-w-0 truncate text-xs text-faint">{title}</h2>
+          ))}
         {aside && <span className="ml-auto shrink-0">{aside}</span>}
         {/* Over the line on hover, so a half block's title keeps its room. */}
         <span className="absolute inset-y-0 right-0 flex items-center gap-3 bg-bg pl-3 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 has-[[data-stays]]:opacity-100">
@@ -1577,9 +1598,10 @@ function Glide({ view, children }: { view: string; children: ReactNode }) {
 }
 
 /**
- * ⋯ beside a block's title, or its line on About: move it, make it half
- * the page or the whole, rename it, or remove it and what it keeps. It
- * shows while `className`'s hover holds.
+ * ⋯ beside a block's title, or its line on About: a collection's fields,
+ * half the page or the whole, move it, add a block below it (on a page,
+ * not About), rename it, or remove it and what it keeps. It shows while
+ * `className`'s hover holds.
  */
 function BlockMenu({
   block,
@@ -1595,7 +1617,9 @@ function BlockMenu({
   const guest = useIsGuest();
   const points = useRecords("Point");
   const kept = useRecords("Block").find((b) => b.id === block.id);
+  const adding = useAdding();
   const [renaming, setRenaming] = useState(false);
+  const [fielding, setFielding] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   if (guest) return null;
   const at = blocks.findIndex((b) => b.id === block.id);
@@ -1633,9 +1657,15 @@ function BlockMenu({
       <MoreMenu
         label={`More for ${name}`}
         items={[
+          ...(block.kind === "collection"
+            ? [{ label: "Fields…", onSelect: () => setFielding(true) }]
+            : []),
+          ...resize,
           ...(at > 0 ? [{ label: "Move up", onSelect: () => move(-1) }] : []),
           ...(at < blocks.length - 1 ? [{ label: "Move down", onSelect: () => move(1) }] : []),
-          ...resize,
+          ...(adding
+            ? [{ label: "Add below", groups: addActions((kind) => adding.start(kind, block.id)) }]
+            : []),
           { label: "Rename…", onSelect: () => setRenaming(true) },
           {
             label: "Remove…",
@@ -1653,6 +1683,9 @@ function BlockMenu({
         ]}
       />
       {renaming && <RenameBlock block={block} onClose={() => setRenaming(false)} />}
+      {fielding && kept && (
+        <FieldsDialog block={kept} rows={held} onClose={() => setFielding(false)} />
+      )}
       <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />
     </span>
   );
