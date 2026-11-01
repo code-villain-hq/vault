@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use std::net::{Ipv4Addr, SocketAddr};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use almanac_domain::Role;
@@ -19,6 +20,35 @@ use uuid::Uuid;
 /// A server's state for tests: no secure cookies, and no Claude key.
 pub fn state(pool: PgPool) -> AppState {
     AppState::new(pool, false, Claude::new(None))
+}
+
+/// The stand-in for Claude Code's ACP adapter (`claude-code.ts`, run by
+/// bun), as a program in `dir`. Returns it, and the file its sessions are
+/// logged to.
+pub fn claude_code_stand_in(dir: &Path) -> (PathBuf, PathBuf) {
+    let bun = std::env::split_paths(&std::env::var("PATH").unwrap())
+        .map(|dir| dir.join("bun"))
+        .find(|bun| bun.is_file())
+        .expect("bun on the PATH");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/claude-code.ts");
+    let log = dir.join("sessions.jsonl");
+    let adapter = dir.join("claude-agent-acp");
+    std::fs::write(
+        &adapter,
+        format!(
+            "#!/bin/sh\nexec '{}' '{}' '{}'\n",
+            bun.display(),
+            script.display(),
+            log.display()
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(
+        &adapter,
+        std::os::unix::fs::PermissionsExt::from_mode(0o755),
+    )
+    .unwrap();
+    (adapter, log)
 }
 
 pub struct App {

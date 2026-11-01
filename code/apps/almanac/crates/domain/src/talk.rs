@@ -322,6 +322,64 @@ pub struct AskRequest {
     /// answer is about it, and keeps what it finds in its cells and under
     /// its name.
     pub row: Option<Uuid>,
+    /// The desktop app answers with Claude Code on the asker's Mac: a
+    /// server hands it the question (`question`, a [`HandedQuestion`])
+    /// and waits for what it made of it ([`Answered`]).
+    pub here: Option<bool>,
+}
+
+/// A question a server hands to the asker's Mac, for Claude Code there.
+/// It reaches Almanac's tools at the server's `/api/mcp` with `token`,
+/// which lasts as long as the question, and says what it made of it at
+/// `/api/answered` with the same token.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct HandedQuestion {
+    pub token: String,
+    /// Almanac's prompt: how to answer, and the page.
+    pub system: String,
+    /// What they ask, with the talk so far.
+    pub prompt: String,
+    /// The talk's photos, after the prompt.
+    pub photos: Vec<HandedPhoto>,
+    /// Whether it may search the web and read pages.
+    pub web: bool,
+    /// Almanac's tools it may use.
+    pub tools: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct HandedPhoto {
+    pub media_type: String,
+    pub data: String,
+}
+
+/// Why the Mac gave no answer. Claude Code not installed or signed out
+/// hands the question back, and the server's key answers when it has one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum NotAnswered {
+    NotInstalled,
+    SignedOut,
+    Trouble,
+}
+
+/// What Claude Code on the asker's Mac made of a [`HandedQuestion`]
+/// (`POST /api/answered`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct Answered {
+    pub text: Option<String>,
+    /// The pages it read, in order.
+    pub read: Option<Vec<String>>,
+    /// Why it stopped: `end_turn`, `max_tokens`, `refusal`, `cancelled`.
+    pub stop: Option<String>,
+    pub not_answered: Option<NotAnswered>,
+    /// What went wrong, in its words, with `trouble`.
+    pub said: Option<String>,
 }
 
 impl Validate for TalkCreate {

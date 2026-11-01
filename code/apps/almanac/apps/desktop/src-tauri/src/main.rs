@@ -2,13 +2,18 @@
 //! notifications for reminders, links opened in the browser, the session token kept in the system keychain, and
 //! `almanac://` links, which bring a sign-in in the browser back to the app;
 //! the web app calls them when it runs here. It also runs Almanac itself for
-//! the workspaces on this Mac (`this_mac`).
+//! the workspaces on this Mac (`this_mac`), and answers a server's questions
+//! with Claude Code here (`here`).
 
 // Don't open a console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod here;
 mod this_mac;
 
+use almanac_domain::{Answered, ClaudeCodeInfo, HandedQuestion};
+use here::Here;
+use tauri::ipc::Channel;
 use tauri::{Manager, RunEvent, State};
 use this_mac::{Place, ThisMac};
 use tracing_subscriber::layer::SubscriberExt;
@@ -70,6 +75,27 @@ fn mac_user_name() -> String {
     this_mac::account_name()
 }
 
+/// Whether Claude Code on this Mac can answer for the server at `origin`.
+#[tauri::command]
+async fn claude_here(here: State<'_, Here>, origin: String) -> Result<ClaudeCodeInfo, String> {
+    here.check(&origin).await
+}
+
+/// Answers a question the server at `origin` handed over with Claude Code
+/// on this Mac, sending each piece of the answer as it's written.
+#[tauri::command]
+async fn answer_here(
+    here: State<'_, Here>,
+    origin: String,
+    question: HandedQuestion,
+    piece: Channel<String>,
+) -> Result<Answered, String> {
+    here.answer(&origin, question, |text| {
+        let _ = piece.send(text.to_string());
+    })
+    .await
+}
+
 fn main() {
     tracing_subscriber::registry()
         .with(
@@ -84,10 +110,9 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            app.manage(ThisMac::new(
-                app.path().app_data_dir()?,
-                app.handle().clone(),
-            ));
+            let data = app.path().app_data_dir()?;
+            app.manage(Here::new(data.join("claude")));
+            app.manage(ThisMac::new(data, app.handle().clone()));
             app.state::<ThisMac>().resume();
             Ok(())
         })
@@ -97,7 +122,9 @@ fn main() {
             forget_session_token,
             this_mac,
             start_on_this_mac,
-            mac_user_name
+            mac_user_name,
+            claude_here,
+            answer_here
         ])
         .build(tauri::generate_context!())
         .expect("Almanac failed to start");

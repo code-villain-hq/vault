@@ -73,10 +73,16 @@ Claude Code gets what the topic sticks to, its page and the talk, and
 only Almanac's own tools: not your files, your shell, or your Claude Code
 settings. It may search the web, which Settings → Claude turns off.
 
-A company server answers with Claude through the API. Set the key in
-Settings → Claude: it stays on the server, in a table that never syncs,
-and the page shows only its last four characters. `ANTHROPIC_API_KEY`, or
-`[claude] api_key` in the settings file, stands in for it.
+On a company server, the desktop app still answers with Claude Code on
+your Mac: the server hands it the question, and Claude Code works through
+the server's own tools, so what it keeps lands on the server. Settings →
+Claude turns it off, for this Mac.
+
+In the browser, or when Claude Code on your Mac can't, a company server
+answers with Claude through the API. Set the key in Settings → Claude: it
+stays on the server, in a table that never syncs, and the page shows only
+its last four characters. `ANTHROPIC_API_KEY`, or `[claude] api_key` in
+the settings file, stands in for it.
 
 ## Running it for a company
 

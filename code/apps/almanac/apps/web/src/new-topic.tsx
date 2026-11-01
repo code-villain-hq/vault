@@ -8,6 +8,7 @@ import { CreateDialog, messageOf, shortcutFree } from "@code-villain/web";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { answerHere, asksHere } from "./here";
 import { topicIcon } from "./icons";
 import { isOwn, parentOf, useTopics } from "./layout";
 import { StartsAs } from "./topic-dialog";
@@ -47,7 +48,7 @@ export function NewTopicDialog({ name, onClose }: { name: string | null; onClose
 }
 
 function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) {
-  const { workspace } = useWorkspace();
+  const { workspace, place } = useWorkspace();
   const navigate = useNavigate();
   const [name, setName] = useState(first);
   const [sticksTo, setSticksTo] = useState("");
@@ -67,7 +68,10 @@ function NewTopicForm({ first, onDone }: { first: string; onDone: () => void }) 
       if (sticksTo.trim()) body.sticks_to = sticksTo.trim();
       if (template) body.template = template;
       if (parent) body.parent_id = parent;
-      const { id } = await api<StartedTopic>("POST", `/api/w/${workspace.id}/topics`, body);
+      if (asksHere(place)) body.here = true;
+      const { id, set_up } = await api<StartedTopic>("POST", `/api/w/${workspace.id}/topics`, body);
+      // Claude Code on this Mac sets it up, as the topic opens.
+      if (set_up) void answerHere(place, set_up);
       onDone();
       await navigate({
         to: "/$workspace/topics/$topic",

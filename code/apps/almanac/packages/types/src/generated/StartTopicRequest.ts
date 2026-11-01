@@ -22,4 +22,9 @@ from_message?: string,
 /**
  * Which of its sub-topics, counting from 0; its proposal without.
  */
-sub_topic?: number, };
+sub_topic?: number, 
+/**
+ * The desktop app sets it up with Claude Code on the asker's Mac: a
+ * server hands it the question (`set_up`).
+ */
+here?: boolean, };

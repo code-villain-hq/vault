@@ -12,6 +12,7 @@ pub mod company;
 pub mod config;
 pub mod error;
 pub mod groups;
+pub mod handed;
 pub mod kept;
 pub mod keys;
 pub mod layout;

@@ -8,8 +8,8 @@
 //! proposed takes what it names from the parent's page: it moves there.
 
 use almanac_domain::{
-    Actor, Field, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX, StartTopicRequest,
-    StartedTopic, TEMPLATE_NAMES, TopicChange, Transaction, template,
+    Actor, Answered, Field, ICONS, ModelKind, Operation, Proposal, STICKS_TO_MAX,
+    StartTopicRequest, StartedTopic, TEMPLATE_NAMES, TopicChange, Transaction, template,
 };
 use almanac_sync::Origin;
 use axum::Json;
@@ -17,13 +17,15 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use tokio::sync::oneshot;
 use uuid::Uuid;
 
-use crate::acp::Question;
+use crate::acp::{Failure, Question};
 use crate::auth::Member;
 use crate::error::AppError;
+use crate::handed;
 use crate::kept::{fields, offer, patch_fields};
-use crate::mcp::{Asking, Mode};
+use crate::mcp::{Asking, Mode, Open};
 use crate::page::Page;
 use crate::state::AppState;
 
@@ -303,14 +305,43 @@ pub async fn start(
         _ => None,
     };
     write(&state, actor, operations).await?;
+    // On a server, the desktop app sets it up with Claude Code on the
+    // asker's Mac: the question goes back with the topic.
+    let mut handed = None;
+    let their_mac = match proposed.is_none() && request.here == Some(true) {
+        true if state.claude_code.is_none() => {
+            let (name, sticks_to): (String, String) = sqlx::query_as(TOPIC)
+                .bind(id)
+                .bind(actor.workspace_id)
+                .fetch_one(&state.pool)
+                .await?;
+            let prompt = set_up_prompt(&state, actor, &name, &sticks_to, picked.as_ref()).await?;
+            let (asking, answered) = Asking::new(actor, id, Mode::SetUp).handed();
+            let open = state.questions.open(asking);
+            let system = format!("{SET_UP}\n\n{SET_UP_WITH_TOOL}");
+            handed = Some(handed::question(&Question {
+                system: &system,
+                prompt: &prompt,
+                images: &[],
+                web: false,
+                tools: Mode::SetUp.tools(),
+                token: &open.token,
+            }));
+            Some((open, answered))
+        }
+        _ => None,
+    };
     if proposed.is_none() {
         tokio::spawn(async move {
-            if let Err(error) = set_up(&state, actor, id, &given, picked).await {
+            if let Err(error) = set_up(&state, actor, id, &given, picked, their_mac).await {
                 tracing::warn!(%error, topic = %id, "couldn't set up the topic");
             }
         });
     }
-    Ok((StatusCode::CREATED, Json(StartedTopic { id })))
+    Ok((
+        StatusCode::CREATED,
+        Json(StartedTopic { id, set_up: handed }),
+    ))
 }
 
 /// `POST /api/w/{id}/messages/{message_id}/undo`: puts back what an answer
@@ -378,6 +409,10 @@ pub async fn undo(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// A set-up handed to the asker's Mac: its token, open until it's done,
+/// and where the Mac says it is.
+type TheirMac = (Open, oneshot::Receiver<Answered>);
+
 /// Has Claude write the rest of a new topic, leaving what you `given` as
 /// it is: what it sticks to becomes a brief with all of yours in it. A template you `picked` laid out its page already, its cards
 /// block named once Claude says what the cards are; otherwise the page
@@ -389,13 +424,23 @@ async fn set_up(
     id: Uuid,
     given: &[&str],
     picked: Option<(String, Option<Uuid>)>,
+    their_mac: Option<TheirMac>,
 ) -> Result<(), AppError> {
     let (name, sticks_to): (String, String) = sqlx::query_as(TOPIC)
         .bind(id)
         .bind(actor.workspace_id)
         .fetch_one(&state.pool)
         .await?;
-    let set_up = match ask_set_up(state, actor, id, &name, &sticks_to, picked.as_ref()).await {
+    let asked = ask_set_up(
+        state,
+        actor,
+        id,
+        &name,
+        &sticks_to,
+        picked.as_ref(),
+        their_mac,
+    );
+    let set_up = match asked.await {
         Ok(set_up) => set_up,
         Err(error) => {
             tracing::warn!(%error, topic = %id, "Claude didn't set up the topic");
@@ -473,21 +518,20 @@ fn with_theirs(theirs: &str, written: &str) -> String {
     }
 }
 
-/// What Claude sets up for a new topic, or nothing when there's no Claude
-/// or it didn't answer.
-async fn ask_set_up(
+/// What a new topic's set-up is asked: its name, what it sticks to, the
+/// template picked, the groups so far and the icons.
+async fn set_up_prompt(
     state: &AppState,
     actor: Actor,
-    id: Uuid,
     name: &str,
     sticks_to: &str,
     picked: Option<&(String, Option<Uuid>)>,
-) -> Result<Option<SetUp>, AppError> {
+) -> Result<String, sqlx::Error> {
     let groups: Vec<String> = sqlx::query_scalar(GROUPS)
         .bind(actor.workspace_id)
         .fetch_all(&state.pool)
         .await?;
-    let prompt = format!(
+    Ok(format!(
         "The topic's name: {name}\nWhat it sticks to: {}\nThe template they picked: {}\nThe existing groups: {}\nThe icons: {}",
         if sticks_to.is_empty() {
             "(empty)"
@@ -501,7 +545,34 @@ async fn ask_set_up(
             groups.join(", ")
         },
         ICONS.join(", "),
-    );
+    ))
+}
+
+/// What Claude sets up for a new topic, or nothing when there's no Claude
+/// or it didn't answer. Handed to the asker's Mac, what Claude Code there
+/// did; when it can't, the server's key does it.
+#[allow(clippy::too_many_arguments)]
+async fn ask_set_up(
+    state: &AppState,
+    actor: Actor,
+    id: Uuid,
+    name: &str,
+    sticks_to: &str,
+    picked: Option<&(String, Option<Uuid>)>,
+    their_mac: Option<TheirMac>,
+) -> Result<Option<SetUp>, AppError> {
+    if let Some((open, answered)) = their_mac {
+        match handed::wait(answered, std::future::pending()).await {
+            Ok(_) => return Ok(open.asking.take_set_up()),
+            // Claude Code there can't: the key does it, below.
+            Err(Failure::NotInstalled | Failure::SignedOut) => {}
+            Err(failure) => {
+                tracing::info!(?failure, topic = %id, "their Mac didn't set up the topic");
+                return Ok(None);
+            }
+        }
+    }
+    let prompt = set_up_prompt(state, actor, name, sticks_to, picked).await?;
     match state.answerer().await? {
         Some(claude_code) => {
             let open = state.questions.open(Asking::new(actor, id, Mode::SetUp));

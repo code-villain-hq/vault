@@ -593,12 +593,19 @@ pub struct StartTopicRequest {
     pub from_message: Option<Uuid>,
     /// Which of its sub-topics, counting from 0; its proposal without.
     pub sub_topic: Option<u32>,
+    /// The desktop app sets it up with Claude Code on the asker's Mac: a
+    /// server hands it the question (`set_up`).
+    pub here: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct StartedTopic {
     pub id: Uuid,
+    /// The set-up for Claude Code on the asker's Mac, when it asked
+    /// (`here`) and the server has a set-up to do.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_up: Option<crate::HandedQuestion>,
 }
 
 impl Validate for TopicCreate {

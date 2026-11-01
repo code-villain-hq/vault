@@ -2,6 +2,7 @@
 // at another page, and each topic keeps the talk open in it, so coming
 // back finds both where you left them.
 
+import type { HandedQuestion } from "@almanac/types";
 import { messageOf, UNKNOWN_PROBLEM } from "@code-villain/web";
 import { useRouter } from "@tanstack/react-router";
 import {
@@ -13,6 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { answerHere, asksHere } from "./here";
 import type { Picked } from "./photos";
 import { apiUrl, authHeaders, credentialsFor } from "./server";
 import type { TopicSearch } from "./topic";
@@ -119,6 +121,7 @@ export function TalksProvider({ children }: { children: ReactNode }) {
             text,
             ...(about ? { about: about.section } : {}),
             ...(about?.row ? { row: about.row } : {}),
+            ...(asksHere(place) ? { here: true } : {}),
             ...(photos.length > 0
               ? {
                   photos: photos.map(({ media_type, data, width, height }) => ({
@@ -160,7 +163,11 @@ export function TalksProvider({ children }: { children: ReactNode }) {
             .map((line) => line.slice(6))
             .join("\n");
           if (!event || !data) continue;
-          let body: { talk_id?: string; text?: string; message_id?: string };
+          let body: {
+            talk_id?: string;
+            text?: string;
+            message_id?: string;
+          } & Partial<HandedQuestion>;
           try {
             body = JSON.parse(data);
           } catch {
@@ -184,6 +191,12 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           } else if (event === "text") {
             said += body.text ?? "";
             update({ text: said });
+          } else if (event === "question") {
+            // Claude Code on this Mac answers; the server writes it, then says done.
+            void answerHere(place, body as HandedQuestion, (piece) => {
+              said += piece;
+              update({ text: said });
+            });
           } else if (event === "done") {
             finish({ answerId: body.message_id ?? null });
             ended = true;

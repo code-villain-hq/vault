@@ -75,7 +75,7 @@ pub async fn show(
 }
 
 /// Whether it can answer, as Settings shows it.
-async fn how_it_is(adapter: &Adapter) -> ClaudeCodeInfo {
+pub async fn how_it_is(adapter: &Adapter) -> ClaudeCodeInfo {
     let (state, version, problem) = match adapter.check().await {
         Ok(version) => ("ready", version, None),
         Err(Failure::NotInstalled) => ("not_installed", None, None),

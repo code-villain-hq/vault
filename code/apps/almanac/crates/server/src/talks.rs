@@ -31,6 +31,7 @@ use crate::acp::{Adapter, Failure, Kind, Question};
 use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
+use crate::handed;
 use crate::kept::{Answering, FieldArg, ItemArg, Kept, PointChange, RowArg, fields, reminder};
 use crate::keys::WEB;
 use crate::mcp::{Asking, Mode};
@@ -483,13 +484,17 @@ pub async fn ask(
     photos::write_with(&state, actor, &transaction, question_id, &uploads).await?;
 
     let own = kind == "almanac";
+    let here = request.here == Some(true);
     let (events, heard) = mpsc::unbounded_channel::<Event>();
     let _ = events.send(json_event("talk", json!({ "talk_id": talk_id })));
     tokio::spawn(async move {
         let row = request.row.and_then(|id| page.row(id));
         let about = (!own).then(|| about_line(about.as_deref(), row));
         let about = about.as_deref().filter(|a| !a.is_empty());
-        answer(&state, actor, &page, own, talk_id, &text, about, events).await;
+        answer(
+            &state, actor, &page, own, talk_id, &text, about, here, events,
+        )
+        .await;
     });
     let stream = futures::stream::unfold(heard, |mut heard| async move {
         heard.recv().await.map(|event| (Ok(event), heard))
@@ -514,6 +519,7 @@ async fn answer(
     talk_id: Uuid,
     question: &str,
     about: Option<&str>,
+    here: bool,
     events: mpsc::UnboundedSender<Event>,
 ) {
     let answer_id = Uuid::now_v7();
@@ -532,9 +538,13 @@ async fn answer(
         answer_id,
         unnamed,
     };
-    let answerer = state.answerer().await.ok().flatten();
-    let said = match answerer {
-        Some(claude_code) => {
+    let by = match state.answerer().await.ok().flatten() {
+        Some(adapter) => Some(By::Adapter(adapter)),
+        None if here => Some(By::TheirMac),
+        None => None,
+    };
+    let said = match by {
+        Some(by) => {
             let asked = Asked {
                 page,
                 own,
@@ -542,7 +552,7 @@ async fn answer(
                 about,
                 unnamed,
             };
-            say_with_claude_code(state, claude_code, actor, &asked, &events).await
+            say_with_claude_code(state, by, actor, &asked, &events).await
         }
         None => say(state, actor, page, own, talk_id, about, &events)
             .await
@@ -673,11 +683,21 @@ fn about_line(about: Option<&str>, row: Option<(usize, &str, &str)>) -> String {
     }
 }
 
+/// Who answers with Almanac's tools: Claude Code or ChatGPT on this Mac,
+/// or Claude Code on the asker's Mac, which the server hands the question.
+#[derive(Clone, Copy)]
+enum By<'a> {
+    Adapter(&'a Adapter),
+    TheirMac,
+}
+
 /// Claude Code's or ChatGPT's answer to the talk's last question, streamed
-/// to `events`, with what Almanac's tools kept meanwhile.
+/// to `events`, with what Almanac's tools kept meanwhile. Handed to the
+/// asker's Mac, it streams there; when Claude Code there can't answer, the
+/// server's key does, if it has one.
 async fn say_with_claude_code(
     state: &AppState,
-    claude_code: &Adapter,
+    by: By<'_>,
     actor: Actor,
     asked: &Asked<'_>,
     events: &mpsc::UnboundedSender<Event>,
@@ -732,9 +752,8 @@ async fn say_with_claude_code(
         .iter()
         .flat_map(|line| line.images.iter().map(|i| i.id))
         .collect();
-    let open = state
-        .questions
-        .open(Asking::new(actor, page.id, mode).on(kept));
+    let (asking, handed) = Asking::new(actor, page.id, mode).on(kept).handed();
+    let open = state.questions.open(asking);
     let tools = mode.tools();
     let (prompt, images) = talk_prompt(&said);
     let question = Question {
@@ -745,13 +764,37 @@ async fn say_with_claude_code(
         tools,
         token: &open.token,
     };
-    let answer = claude_code
-        .ask(&question, |piece| {
-            let _ = events.send(json_event("text", json!({ "text": piece })));
-        })
-        .await
-        .map_err(|failure| problem_of(claude_code.kind(), failure))?;
-    let name = claude_code.kind().name();
+    let (answer, kind) = match by {
+        By::Adapter(adapter) => {
+            let answer = adapter
+                .ask(&question, |piece| {
+                    let _ = events.send(json_event("text", json!({ "text": piece })));
+                })
+                .await;
+            (answer, adapter.kind())
+        }
+        By::TheirMac => {
+            let _ = events.send(json_event("question", json!(handed::question(&question))));
+            let answer = handed::wait(handed, events.closed()).await;
+            (answer, Kind::ClaudeCode)
+        }
+    };
+    let answer = match answer {
+        Err(Failure::NotInstalled | Failure::SignedOut)
+            if matches!(by, By::TheirMac) && has_key(state).await =>
+        {
+            drop(open);
+            return say(state, actor, page, own, talk_id, about, events)
+                .await
+                .map(|text| Said {
+                    text,
+                    sources: Vec::new(),
+                    kept: None,
+                });
+        }
+        answer => answer.map_err(|failure| problem_of(kind, failure))?,
+    };
+    let name = kind.name();
     match answer.stop.as_str() {
         "refusal" => {
             return Err(Problem(format!(
@@ -923,6 +966,12 @@ fn host(url: &str) -> String {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
     let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     host.strip_prefix("www.").unwrap_or(host).to_string()
+}
+
+/// Whether the server has a key for the Messages API, to answer what the
+/// asker's Mac hands back.
+async fn has_key(state: &AppState) -> bool {
+    matches!(state.claude.key(&state.pool).await, Ok(Some(_)))
 }
 
 /// Claude's answer to the talk's last question, through the Messages API,

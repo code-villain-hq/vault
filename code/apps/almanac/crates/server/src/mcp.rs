@@ -4,15 +4,17 @@
 //! its bearer, so a tool call lands on the question it belongs to and on
 //! nothing else; the token goes when the answer is done. A tool doesn't
 //! write: it collects what the answer keeps ([`Kept`]), and the talk
-//! writes it with the answer, in one transaction.
+//! writes it with the answer, in one transaction. On a server, Claude Code
+//! on the asker's Mac calls it the same way, for a question the server
+//! handed it ([`crate::handed`]).
 
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use almanac_domain::{
-    Actor, FIELD_KINDS, ICONS, PageLayout, Proposal, ProposedPoint, SET_KINDS, STICKS_TO_MAX,
-    TEMPLATE_NAMES, TopicChange, TopicPatch,
+    Actor, Answered, FIELD_KINDS, ICONS, PageLayout, Proposal, ProposedPoint, SET_KINDS,
+    STICKS_TO_MAX, TEMPLATE_NAMES, TopicChange, TopicPatch,
 };
 use axum::Json;
 use axum::extract::State;
@@ -21,6 +23,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
+use tokio::sync::oneshot;
 use uuid::Uuid;
 
 use crate::kept::{self, FieldArg, ItemArg, Kept, PointChange, RowArg, reminder};
@@ -99,6 +102,8 @@ pub struct Asking {
     pub mode: Mode,
     pub kept: Mutex<Kept>,
     pub set_up: Mutex<Option<SetUp>>,
+    /// Where the asker's Mac says what it made of a question handed to it.
+    pub handed: Mutex<Option<oneshot::Sender<Answered>>>,
 }
 
 impl Asking {
@@ -109,7 +114,18 @@ impl Asking {
             mode,
             kept: Mutex::new(Kept::default()),
             set_up: Mutex::new(None),
+            handed: Mutex::new(None),
         }
+    }
+
+    /// Handed to the asker's Mac: where it'll say what it made of it.
+    pub fn handed(self) -> (Self, oneshot::Receiver<Answered>) {
+        let (said, answered) = oneshot::channel();
+        let asking = Asking {
+            handed: Mutex::new(Some(said)),
+            ..self
+        };
+        (asking, answered)
     }
 
     /// Keeping on a page: its copy, with the talk's photos.
@@ -153,7 +169,7 @@ impl Questions {
         }
     }
 
-    fn get(&self, token: &str) -> Option<Arc<Asking>> {
+    pub(crate) fn get(&self, token: &str) -> Option<Arc<Asking>> {
         self.0.lock().ok()?.get(token).cloned()
     }
 }

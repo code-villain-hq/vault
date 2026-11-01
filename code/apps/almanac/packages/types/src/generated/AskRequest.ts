@@ -22,4 +22,10 @@ about?: string,
  * answer is about it, and keeps what it finds in its cells and under
  * its name.
  */
-row?: string, };
+row?: string, 
+/**
+ * The desktop app answers with Claude Code on the asker's Mac: a
+ * server hands it the question (`question`, a [`HandedQuestion`])
+ * and waits for what it made of it ([`Answered`]).
+ */
+here?: boolean, };

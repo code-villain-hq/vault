@@ -92,3 +92,13 @@ The sync status sits at the foot of the sidebar, a dot and a word:
 - The app opens on its own `<app>://` link, which the browser uses to hand back the sign-in.
 - Sign-in tokens live in the keychain, one entry per server.
 - Notifications come from the inbox, and the dock badge counts what's unread.
+
+## Claude
+
+Almanac is the reference here. Where you ask Claude something in the desktop app, Claude Code on your Mac answers first, as you're signed in to it, wherever the workspace is: on this Mac or on a server. The server's key answers only when Claude Code can't, or when you've said so.
+
+- On a server's workspace, the server writes the question and hands it to your Mac. Claude Code works through the server's own tools, with a token that lasts that one question, so the answer and what it changed land on the server like any other change.
+- Claude Code gets none of your settings and no tool that reads or writes the Mac: only the app's, and the web's when the workspace allows it.
+- Not installed or signed out, it hands the question back, and the server's key answers. With no key either, the problem says what to do: "Claude Code isn't signed in on this Mac. …"
+- Settings → Claude has "Answer with Claude Code on this Mac", on by default. It's yours, on this Mac, not the workspace's.
+- In the browser, the server's key answers. So does work nobody asks for, such as a night's triage.

@@ -26,29 +26,7 @@ use sqlx::PgPool;
 /// real port for it to call. Returns the file its sessions are logged to,
 /// and the server, which stops when the test lets go of it.
 async fn with_claude_code(pool: PgPool, dir: &Path) -> (App, PathBuf, Serving) {
-    let bun = std::env::split_paths(&std::env::var("PATH").unwrap())
-        .map(|dir| dir.join("bun"))
-        .find(|bun| bun.is_file())
-        .expect("bun on the PATH");
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/claude-code.ts");
-    let log = dir.join("sessions.jsonl");
-    let adapter = dir.join("claude-agent-acp");
-    std::fs::write(
-        &adapter,
-        format!(
-            "#!/bin/sh\nexec '{}' '{}' '{}'\n",
-            bun.display(),
-            script.display(),
-            log.display()
-        ),
-    )
-    .unwrap();
-    std::fs::set_permissions(
-        &adapter,
-        std::os::unix::fs::PermissionsExt::from_mode(0o755),
-    )
-    .unwrap();
-
+    let (adapter, log) = common::claude_code_stand_in(dir);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     // The stand-in starts in well under a second; one that hangs is tried

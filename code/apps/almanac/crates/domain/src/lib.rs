@@ -27,9 +27,9 @@ pub use protocol::{
     TransactionResult,
 };
 pub use talk::{
-    AskRequest, BlockWas, LayoutMove, Message, MessageCreate, MessagePatch, PageLayout, Photo,
-    PhotoUpload, PointWas, Proposal, ProposedPoint, ProposedReminder, Source, Talk, TalkCreate,
-    TalkPatch, TopicChange,
+    Answered, AskRequest, BlockWas, HandedPhoto, HandedQuestion, LayoutMove, Message,
+    MessageCreate, MessagePatch, NotAnswered, PageLayout, Photo, PhotoUpload, PointWas, Proposal,
+    ProposedPoint, ProposedReminder, Source, Talk, TalkCreate, TalkPatch, TopicChange,
 };
 pub use topic::{
     BLOCK_VIEWS, BLOCK_WIDTHS, Block, BlockCreate, BlockPatch, Cell, FACET_ICONS, FIELD_KINDS,

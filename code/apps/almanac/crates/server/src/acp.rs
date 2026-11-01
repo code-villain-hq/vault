@@ -132,6 +132,18 @@ pub struct Answer {
     paragraph: bool,
 }
 
+impl Answer {
+    /// An answer the asker's Mac told the server ([`crate::handed`]).
+    pub fn said(text: String, read: Vec<String>, stop: String) -> Self {
+        Answer {
+            text,
+            read,
+            stop,
+            paragraph: false,
+        }
+    }
+}
+
 /// When a check found it ready, and the adapter's version.
 type Ready = Option<(Instant, Option<String>)>;
 

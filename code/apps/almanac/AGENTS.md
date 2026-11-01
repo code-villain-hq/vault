@@ -151,9 +151,23 @@ Two ways to the same answers, and the same prompts:
   prompt replaces Codex's own through `model_instructions_file`, one file
   per question. It's signed in to once from Settings, in the browser
   (ACP `authenticate`, `chat-gpt`), apart from the user's Codex.
+- **On a server, Claude Code on the asker's Mac** (`handed.rs`), in the
+  desktop app: Claude Code there answers first, wherever the workspace is
+  (`studio/design/behaviour.md`, "Claude"). The app asks with `here`
+  (`AskRequest`, `StartTopicRequest`); the server writes the question as
+  for its own Claude Code, opens its token and hands it over, as the
+  `question` event of a talk or `set_up` of a new topic
+  (`HandedQuestion`). The desktop app runs Claude Code on it (`here.rs`,
+  `answer_here`) with this server's `/api/mcp`, and the web app posts what
+  came of it to `POST /api/answered` with the same token (`Answered`). Not
+  installed or signed out there, the key answers instead; with no key the
+  talk says what to do. A question nobody answers in 11 minutes, or whose
+  asker left, stops. Settings → Claude has "Answer with Claude Code on
+  this Mac", kept in the app on that Mac (`here.ts`), on by default.
 - **On a server, the Messages API** (`claude.rs`, with the key; Rust has no
   SDK): `claude-opus-5-5`, adaptive thinking, the server-side refusal
-  fallback, web search off.
+  fallback, web search off. It answers in the browser, and in the desktop
+  app when Claude Code there can't or is turned off.
 
 The other way round, other apps read Almanac (`reading.rs`,
 `POST /api/mcp/read`): `list_topics`, `read_topic` and `search`, nothing

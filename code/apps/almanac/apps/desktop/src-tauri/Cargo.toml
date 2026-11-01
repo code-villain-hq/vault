@@ -12,6 +12,7 @@ tauri-build = { version = "2.7", features = [] }
 tauri = { version = "2.12", features = [] }
 keyring = "4.2"
 code-villain-desktop.workspace = true
+almanac-domain.workspace = true
 almanac-server.workspace = true
 almanac-sync.workspace = true
 serde.workspace = true

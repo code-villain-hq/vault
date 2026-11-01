@@ -1,10 +1,12 @@
 import type { ClaudeCodeInfo, ClaudeKeyInfo, ReadToken, ReadTokenInfo } from "@almanac/types";
 import { type AccessConfig, accountPages, messageOf, useApi } from "@code-villain/web";
 import { CircleCheck, Terminal } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 import { dateWords, dayKey } from "./format";
+import { answersHere, claudeHere, setAnswersHere } from "./here";
 import { PageBody, PageHeader } from "./layout";
+import { isDesktop } from "./platform";
 import { apiUrl } from "./server";
 import { loadSession, signedIn, signOut } from "./session";
 import { BlockGallery } from "./topic";
@@ -28,7 +30,8 @@ export const { MembersPage, AccountPage } = accountPages({
 /**
  * Settings → Claude: who answers. On this Mac that's Claude Code, as you're
  * signed in to it, or ChatGPT, and whether it may search the web. On a server it's the
- * key Almanac answers with, which stays on the server and never syncs.
+ * key Almanac answers with, which stays on the server and never syncs; in the
+ * desktop app, Claude Code on this Mac answers first there too.
  */
 export function ClaudePage() {
   const { workspace, place } = useWorkspace();
@@ -46,7 +49,10 @@ export function ClaudePage() {
         ) : data.via === "claude_code" ? (
           <ClaudeCode data={data} path={path} reload={reload} />
         ) : (
-          <TheKey data={data} path={path} reload={reload} />
+          <>
+            {isDesktop && place.kind !== "mac" && <ClaudeHere />}
+            <TheKey data={data} path={path} reload={reload} />
+          </>
         )}
         {/* A guest sees no topics, so there's nothing to read. */}
         {!guest && <Reading />}
@@ -138,24 +144,7 @@ function ClaudeCode({ data, path, reload }: ClaudeProps) {
             </fieldset>
           )}
           {code?.state === "ready" ? (
-            <div className="flex items-start gap-2.5">
-              <CircleCheck
-                size={15}
-                strokeWidth={1.75}
-                aria-hidden="true"
-                className="mt-0.5 shrink-0 text-ok"
-              />
-              <div>
-                <p className="font-semibold">{who.name} on this Mac</p>
-                <p className="text-muted">
-                  {who.key === "chatgpt"
-                    ? "Signed in for Almanac, through"
-                    : "As you're signed in to it, through"}{" "}
-                  {who.adapter}
-                  {code.version ? ` ${code.version}` : ""}.
-                </p>
-              </div>
-            </div>
+            <Ready who={who} code={code} />
           ) : (
             code && <CantReach who={who} code={code} path={path} reload={reload} />
           )}
@@ -258,6 +247,99 @@ function Reading() {
             </Button>
           )}
         </div>
+        <ErrorMessage>{problem}</ErrorMessage>
+      </div>
+    </Section>
+  );
+}
+
+/** It can answer on this Mac. */
+function Ready({ who, code }: { who: Who; code: ClaudeCodeInfo }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <CircleCheck
+        size={15}
+        strokeWidth={1.75}
+        aria-hidden="true"
+        className="mt-0.5 shrink-0 text-ok"
+      />
+      <div>
+        <p className="font-semibold">{who.name} on this Mac</p>
+        <p className="text-muted">
+          {who.key === "chatgpt"
+            ? "Signed in for Almanac, through"
+            : "As you're signed in to it, through"}{" "}
+          {who.adapter}
+          {code.version ? ` ${code.version}` : ""}.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A server's workspace in the desktop app: Claude Code on this Mac answers
+ * first, and the server's key only when it can't. Yours, on this Mac, not
+ * the workspace's.
+ */
+function ClaudeHere() {
+  const { place } = useWorkspace();
+  const [on, setOn] = useState(answersHere);
+  const [code, setCode] = useState<ClaudeCodeInfo | null>(null);
+  const [problem, setProblem] = useState("");
+  const check = useCallback(async () => {
+    setProblem("");
+    try {
+      setCode(await claudeHere(place));
+    } catch (e) {
+      setProblem(messageOf(e));
+    }
+  }, [place]);
+  useEffect(() => {
+    if (on) void check();
+  }, [on, check]);
+  const turn = (value: boolean) => {
+    setAnswersHere(value);
+    setOn(value);
+  };
+  return (
+    <Section title="Claude Code on this Mac">
+      <div className="flex max-w-2xl flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <p className="min-w-0 flex-1">Answer with Claude Code on this Mac</p>
+          <fieldset className="ui-segmented" aria-label="Answer with Claude Code on this Mac">
+            {(
+              [
+                [true, "On"],
+                [false, "Off"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                className="ui-segment"
+                aria-pressed={on === value}
+                onClick={() => on !== value && turn(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </fieldset>
+        </div>
+        {on &&
+          (code?.state === "ready" ? (
+            <Ready who={WHO[0]} code={code} />
+          ) : code ? (
+            <CantReach who={WHO[0]} code={code} path="" reload={check} />
+          ) : (
+            !problem && <p className="text-muted">Looking for Claude Code on this Mac…</p>
+          ))}
+        <p className="text-muted">
+          {on
+            ? "Talks and new topics go to Claude Code here, as you're signed in to it, with only Almanac's tools on the server. The key below answers only when Claude Code can't."
+            : "The key below answers, as it does in the browser."}{" "}
+          This is yours, on this Mac.
+        </p>
         <ErrorMessage>{problem}</ErrorMessage>
       </div>
     </Section>
@@ -370,7 +452,7 @@ function Command({ text }: { text: string }) {
 
 /** A company server answers with a key, set here or in its settings. */
 function TheKey({ data, path, reload }: ClaudeProps) {
-  const { workspace } = useWorkspace();
+  const { workspace, place } = useWorkspace();
   const admin = useIsAdmin();
   const [key, setKey] = useState("");
   const [problem, setProblem] = useState("");
@@ -398,7 +480,9 @@ function TheKey({ data, path, reload }: ClaudeProps) {
             ? `Almanac answers with the key ending in ${data.ends_with ?? "…"}.`
             : data.from_settings
               ? "Almanac answers with the key in its server's settings."
-              : "There's no key yet, so Almanac can't answer or set up topics."}
+              : isDesktop && place.kind !== "mac"
+                ? "There's no key yet, so Almanac can't answer in the browser, or here when Claude Code can't."
+                : "There's no key yet, so Almanac can't answer or set up topics."}
         </p>
         <p className="text-muted">
           Talks go to Claude through the Anthropic API, with what the topic sticks to and what its
