@@ -23,6 +23,7 @@ const DUE: &str = "SELECT r.id, r.workspace_id, r.topic_id, r.title, t.name, r.d
      WHERE r.status = 'on' AND r.notify \
      AND r.due_on + COALESCE(r.at, time '09:00') <= $1 \
      AND r.notified_for IS DISTINCT FROM r.due_on \
+     AND EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace_id = r.workspace_id) \
      ORDER BY r.due_on, r.at LIMIT 50";
 const SOMEONE: &str = "SELECT user_id FROM workspace_members \
      WHERE workspace_id = $1 ORDER BY role <> 'admin', created_at LIMIT 1";
@@ -69,7 +70,8 @@ pub async fn tell(state: &AppState, due: &broadcast::Sender<Due>) -> Result<usiz
         let data: Map<_, _> = [("notified_for".to_string(), json!(due_on))]
             .into_iter()
             .collect();
-        write(
+        // One that can't be marked is left for the next look, not the rest.
+        let marked = write(
             state,
             actor,
             vec![Operation::Update {
@@ -78,7 +80,11 @@ pub async fn tell(state: &AppState, due: &broadcast::Sender<Due>) -> Result<usiz
                 data,
             }],
         )
-        .await?;
+        .await;
+        if let Err(error) = marked {
+            tracing::warn!(%error, %id, "couldn't mark a reminder told");
+            continue;
+        }
         let _ = due.send(Due {
             workspace_id,
             id,
