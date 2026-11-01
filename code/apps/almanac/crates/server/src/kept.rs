@@ -1025,6 +1025,17 @@ impl Kept {
             let gone = in_gone || self.is_gone(point.id);
             let Some(was) = self.refs.points.get(i) else {
                 if !gone {
+                    // A row made and ticked in the same answer.
+                    let mut cells = point.cells.0.clone();
+                    if let Some((_, done)) = self.checked.iter().find(|(c, _)| *c == point.id)
+                        && let Some(check) = self
+                            .blocks
+                            .iter()
+                            .find(|b| b.id == point.block_id)
+                            .and_then(check_of)
+                    {
+                        cells.insert(check.to_string(), Cell::Check(*done));
+                    }
                     operations.push(Operation::Create {
                         model: ModelKind::Point,
                         id: point.id,
@@ -1034,7 +1045,7 @@ impl Kept {
                             ("theme", json!(point.theme)),
                             ("text", json!(point.text)),
                             ("look", json!(point.look)),
-                            ("cells", json!(point.cells.0)),
+                            ("cells", json!(cells)),
                             ("done", json!(point.done)),
                             ("position", json!(point.position)),
                             ("source", json!(point.source)),
@@ -1852,7 +1863,7 @@ pub fn cell(field: &Field, value: &Value, photos: &[Uuid]) -> Result<Option<Cell
             Cell::Text(cut(&words, 2000))
         }
         "link" => return Err(format!("{name} is a web page's address, from https://.")),
-        _ => Cell::Text(cut(&words, 200)),
+        _ => Cell::Text(cut(&words, 2000)),
     }))
 }
 
