@@ -54,6 +54,11 @@ fn main() {
         .expect("Postrider failed to start");
     app.run(|app, event| {
         if let RunEvent::Exit = event {
+            // ⌘Q comes here once macOS is quitting the app, with its window
+            // still up: take it away first, so quitting looks done while
+            // Postrider and its Postgres stop.
+            #[cfg(target_os = "macos")]
+            let _ = app.hide();
             tauri::async_runtime::block_on(app.state::<ThisMac>().stop());
         }
     });

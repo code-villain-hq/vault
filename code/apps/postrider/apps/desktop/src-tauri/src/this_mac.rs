@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use code_villain_claude::{Adapter, Kind};
 use code_villain_desktop::{LocalPostgres, LocalServer};
@@ -86,26 +86,43 @@ impl ThisMac {
             ..
         })) = std::mem::replace(&mut *running, Ok(None))
         {
+            let began = Instant::now();
             server.stop().await;
             pool.close().await;
+            let server_stopped = began.elapsed();
             if let Err(error) = postgres.stop().await {
                 tracing::warn!("Postgres didn't stop cleanly: {error}");
             }
+            tracing::info!(
+                "stopped in {} ms (the server in {} ms)",
+                began.elapsed().as_millis(),
+                server_stopped.as_millis()
+            );
         }
     }
 }
 
 async fn start(dir: &Path) -> Result<Running, String> {
+    let began = Instant::now();
     let postgres = LocalPostgres::start(&dir.join("postgres"), POSTGRES_PORT)
         .await
         .map_err(|e| e.to_string())?;
+    let postgres_started = began.elapsed();
     match start_server(&postgres, dir).await {
-        Ok((server, pool, token)) => Ok(Running {
-            postgres,
-            server,
-            pool,
-            token,
-        }),
+        Ok((server, pool, token)) => {
+            tracing::info!(
+                "Postrider on this Mac at {} in {} ms (Postgres in {} ms)",
+                server.origin(),
+                began.elapsed().as_millis(),
+                postgres_started.as_millis()
+            );
+            Ok(Running {
+                postgres,
+                server,
+                pool,
+                token,
+            })
+        }
         Err(e) => {
             tracing::error!("Postrider didn't start: {e}");
             let _ = postgres.stop().await;
@@ -154,6 +171,5 @@ async fn start_server(
     })
     .await
     .map_err(|e| e.to_string())?;
-    tracing::info!("Postrider on this Mac at {}", server.origin());
     Ok((server, pool, token))
 }

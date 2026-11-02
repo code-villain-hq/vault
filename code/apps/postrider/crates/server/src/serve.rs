@@ -35,9 +35,13 @@ pub async fn serve(
     }
 
     let (stopping, stopped) = oneshot::channel();
+    let watching = mail.clone();
     let server = axum::serve(listener, app(state, None))
         .with_graceful_shutdown(async move {
             shutdown.await;
+            // The long polls answer at once: only what changes mail is
+            // waited for.
+            watching.stop();
             let _ = stopping.send(());
         })
         .into_future();

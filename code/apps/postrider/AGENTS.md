@@ -83,7 +83,13 @@ address, IMAP server, user name, hue) and the calendar server
 (`Calendar`, with whose colour each of its calendars wears). Passwords
 never sync and never touch Postgres: the server signs in once before it
 keeps an account, then puts the password in the macOS keychain under
-"Postrider", by address (`secrets.rs`).
+"Postrider", by address (`secrets.rs`). A build signed ad hoc, as
+`bun run build:desktop` signs it, is new to the keychain: its first start
+waits, connecting, until the person has typed their Mac's password once
+for each account and the calendar.
+
+Quitting takes the window away first (`main.rs`), then stops the server,
+whose Inbox long polls answer at once (`Mail::stop`), and its Postgres.
 
 Mail is read live. For each account the server keeps an IMAP connection
 open (`mail.rs`): it copies the Inbox's summaries, waits with IDLE, and

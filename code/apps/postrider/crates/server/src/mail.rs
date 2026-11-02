@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
@@ -206,12 +206,14 @@ impl Mail {
         self.bump();
     }
 
-    /// Stops every watcher, when the server stops.
+    /// Stops every watcher, when the server stops. The Inbox's long polls
+    /// answer now, so the server needn't wait for them.
     pub fn stop(&self) {
         for (_, watcher) in self.lock_watchers().drain() {
             watcher.task.abort();
         }
         self.lock_readers().clear();
+        self.bump();
     }
 
     pub fn version(&self) -> i64 {
@@ -553,12 +555,14 @@ impl Mail {
         tries: &mut usize,
         wake: &Notify,
     ) -> Result<Infallible, Failure> {
+        let began = Instant::now();
         let mut session = self.sign_in(account).await?;
         let idle = session.capabilities().await?.has_str("IDLE");
         if imap::sync_inbox(&mut session, &self.pool, account.id).await? {
             self.bump();
         }
         self.set(account.id, AccountState::Online, None);
+        tracing::debug!(address = %account.address, "online in {} ms", began.elapsed().as_millis());
         let set_aside = self.set_newsletters_aside(account).await;
         {
             let mut failed = self.set_aside_failed.lock().expect("never poisoned");
