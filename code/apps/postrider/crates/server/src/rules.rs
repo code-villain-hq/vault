@@ -792,7 +792,9 @@ mod tests {
         assert_eq!(rules_in(&script), vec![code(), kept, newsletters]);
         assert!(script.contains(
             "if anyof (allof (exists \"list-unsubscribe\", not anyof (allof (exists \"auto-submitted\", \
-             not header :is \"auto-submitted\" \"no\"), address :localpart :contains \"from\" [\"account\", "
+             not header :is \"auto-submitted\" \"no\", not exists \"list-unsubscribe-post\", \
+             not header :is \"precedence\" [\"bulk\", \"list\"]), \
+             address :localpart :contains \"from\" [\"account\", "
         ));
         assert!(script.contains(
             "address :domain :matches \"from\" [\"account.*\", \"accounts.*\", \"auth.*\", \"id.*\", \

@@ -9,10 +9,12 @@
 //! A notice is mail about something of yours: a sign-in, your account, an
 //! order, a payment, a delivery. Google's say where to unsubscribe as
 //! newsletters do, so the link alone doesn't tell them apart. A machine
-//! that says it sent the mail by itself (`Auto-Submitted`, RFC 3834), or an
-//! address that names what it's about (`noreply-accounts@`,
-//! `auto-confirm@`, `accounts.google.com`), sends notices; they stay in the
-//! Inbox. Keep in Inbox is there for the senders this still gets wrong.
+//! that says it sent the mail by itself (`Auto-Submitted`, RFC 3834), but
+//! not to many (newsletters say so too, to keep auto-replies away, and
+//! then offer one click to leave or say `Precedence: bulk`), or an address
+//! that names what it's about (`noreply-accounts@`, `auto-confirm@`,
+//! `accounts.google.com`), sends notices; they stay in the Inbox. Keep in
+//! Inbox is there for the senders this still gets wrong.
 //!
 //! `GET /api/w/{workspace}/newsletters` reads each account's Newsletters
 //! of the last [`DAYS`] days, by sender: how often each writes, and how much
@@ -74,7 +76,7 @@ const TIMEOUT: Duration = Duration::from_secs(20);
 const FIELDS: &str = "FROM LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST";
 
 /// The header fields a notice is told by.
-const NOTICE_FIELDS: &str = "FROM AUTO-SUBMITTED";
+const NOTICE_FIELDS: &str = "FROM AUTO-SUBMITTED LIST-UNSUBSCRIBE-POST PRECEDENCE";
 
 /// What a notice's address says it's about, in English, German or Swedish:
 /// your account and signing in; an order, its bill and its payment; its
@@ -118,6 +120,39 @@ const NOTICE_WORDS: &[&str] = &[
     "messag",
     "inmail",
 ];
+
+/// Senders' names that say nothing of who sends, written plain: the page
+/// names those senders by their organisation.
+const GENERIC_NAMES: &[&str] = &[
+    "notification",
+    "notifications",
+    "noreply",
+    "donotreply",
+    "newsletter",
+    "news",
+    "info",
+    "team",
+    "theteam",
+    "hello",
+    "hi",
+    "updates",
+    "update",
+    "marketing",
+    "mailer",
+    "support",
+    "service",
+    "contact",
+    "mail",
+    "email",
+    "admin",
+];
+
+/// What a domain may have between its organisation and its top-level
+/// domain: `co` in `amazon.co.uk`.
+const SECOND_LEVEL: &[&str] = &["ac", "co", "com", "edu", "gov", "ne", "net", "or", "org"];
+
+/// What `Precedence` says of mail sent to many.
+const BULK: &[&str] = &["bulk", "list"];
 
 /// The first part of a host that sends only notices: accounts.google.com,
 /// id.apple.com.
@@ -189,15 +224,16 @@ impl Mail {
     /// moves the Inbox's newsletters to Newsletters, but those from senders
     /// kept in the Inbox.
     pub(crate) async fn set_newsletters_aside(&self, account: &MailAccount) -> Result<(), Failure> {
-        let notices_back: Option<bool> = sqlx::query_scalar(
-            "SELECT notices_back_at IS NOT NULL FROM newsletters_set_aside WHERE account_id = $1",
+        let done: Option<(bool, bool)> = sqlx::query_as(
+            "SELECT notices_back_at IS NOT NULL, bulk_aside_at IS NOT NULL \
+             FROM newsletters_set_aside WHERE account_id = $1",
         )
         .bind(account.id)
         .fetch_optional(&self.pool)
         .await?;
-        match notices_back {
-            Some(true) => return Ok(()),
-            Some(false) => return self.bring_notices_back(account).await,
+        match done {
+            Some((true, true)) => return Ok(()),
+            Some((notices_back, _)) => return self.sort_again(account, notices_back).await,
             None => {}
         }
         let place = self.folder_for(account, FolderRole::Newsletters).await?;
@@ -206,16 +242,7 @@ impl Mail {
             rules.push(Rule::newsletters(&place));
             self.put_rules(account, &rules).await?;
         }
-        let kept: Vec<When> = rules
-            .iter()
-            .filter(|rule| rule.path == "INBOX")
-            .flat_map(|rule| rule.when.clone())
-            .collect();
-        let query = if kept.is_empty() {
-            rules::search(&[When::Unsubscribe], "")
-        } else {
-            rules::search(&kept, "HEADER List-Unsubscribe \"\" NOT ")
-        };
+        let query = unsubscribe_search(&rules, "");
         let headed = self
             .on_server(account, |session| {
                 let query = query.clone();
@@ -233,8 +260,8 @@ impl Mail {
             .move_out(account, "INBOX", &uids, &[], &place.path)
             .await?;
         sqlx::query(
-            "INSERT INTO newsletters_set_aside (account_id, notices_back_at) VALUES ($1, now()) \
-             ON CONFLICT DO NOTHING",
+            "INSERT INTO newsletters_set_aside (account_id, notices_back_at, bulk_aside_at) \
+             VALUES ($1, now(), now()) ON CONFLICT DO NOTHING",
         )
         .bind(account.id)
         .execute(&self.pool)
@@ -243,15 +270,39 @@ impl Mail {
         Ok(())
     }
 
-    /// For an account set aside when every mail with a link to unsubscribe
-    /// was a newsletter, once: writes the rule again, so that it leaves
-    /// notices in the Inbox, and moves the notices it set aside back there.
-    async fn bring_notices_back(&self, account: &MailAccount) -> Result<(), Failure> {
+    /// For an account set aside before Postrider told mail apart as it does
+    /// now, once: writes the rule again, so that it tells them apart too.
+    /// Set aside when every mail with a link to unsubscribe was a newsletter
+    /// (`notices_back` not yet), it moves the notices back to the Inbox;
+    /// else it sets aside the newsletters it took for notices, since they
+    /// said a machine sent them.
+    async fn sort_again(&self, account: &MailAccount, notices_back: bool) -> Result<(), Failure> {
         let rules = self.rules(account).await?;
+        let place = self.newsletters_folder(account).await?;
         if rules.iter().any(Rule::is_newsletters) {
             self.put_rules(account, &rules).await?;
+            if notices_back && let Some(place) = &place {
+                let query = unsubscribe_search(&rules, "HEADER Auto-Submitted \"\" ");
+                let headed = self
+                    .on_server(account, |session| {
+                        let query = query.clone();
+                        Box::pin(async move {
+                            imap::headers(session, "INBOX", &query, NOTICE_FIELDS).await
+                        })
+                    })
+                    .await?;
+                let uids: Vec<u32> = headed
+                    .iter()
+                    .filter(|mail| !notice(mail))
+                    .map(|mail| mail.uid)
+                    .collect();
+                let moved = self
+                    .move_out(account, "INBOX", &uids, &[], &place.path)
+                    .await?;
+                tracing::info!(address = %account.address, "set {} newsletters aside again", moved.count);
+            }
         }
-        if let Some(place) = self.newsletters_folder(account).await? {
+        if !notices_back && let Some(place) = place {
             let query = rules::search(&[When::Unsubscribe], "");
             let headed = self
                 .on_server(account, |session| {
@@ -272,7 +323,9 @@ impl Mail {
             tracing::info!(address = %account.address, "moved {} notices back", moved.count);
         }
         sqlx::query(
-            "UPDATE newsletters_set_aside SET notices_back_at = now() WHERE account_id = $1",
+            "UPDATE newsletters_set_aside \
+             SET notices_back_at = coalesce(notices_back_at, now()), bulk_aside_at = now() \
+             WHERE account_id = $1",
         )
         .bind(account.id)
         .execute(&self.pool)
@@ -433,11 +486,12 @@ impl Mail {
 }
 
 /// Whether mail from `address`, with this `Auto-Submitted`, is a notice:
-/// sent by a machine by itself, or from an address that says what about.
-pub(crate) fn is_notice(address: &str, auto_submitted: Option<&str>) -> bool {
+/// sent by a machine by itself, and not to many (`bulk`), or from an
+/// address that says what about.
+pub(crate) fn is_notice(address: &str, auto_submitted: Option<&str>, bulk: bool) -> bool {
     let address = address.trim().to_lowercase();
     let (local, host) = address.rsplit_once('@').unwrap_or((&address, ""));
-    auto_submitted.is_some_and(|said| !said.trim().eq_ignore_ascii_case("no"))
+    (!bulk && auto_submitted.is_some_and(|said| !said.trim().eq_ignore_ascii_case("no")))
         || NOTICE_WORDS.iter().any(|word| local.contains(word))
         || host
             .split_once('.')
@@ -454,12 +508,29 @@ pub(crate) fn notice_test() -> String {
             .join(", ")
     };
     format!(
-        "anyof (allof (exists \"auto-submitted\", not header :is \"auto-submitted\" \"no\"), \
+        "anyof (allof (exists \"auto-submitted\", not header :is \"auto-submitted\" \"no\", \
+         not exists \"list-unsubscribe-post\", not header :is \"precedence\" [{}]), \
          address :localpart :contains \"from\" [{}], \
          address :domain :matches \"from\" [{}])",
+        strings(BULK, ""),
         strings(NOTICE_WORDS, ""),
         strings(NOTICE_HOSTS, ".*")
     )
+}
+
+/// The Inbox's mail with a link to unsubscribe that `also` finds, but not
+/// from the senders kept in the Inbox.
+fn unsubscribe_search(rules: &[Rule], also: &str) -> String {
+    let kept: Vec<When> = rules
+        .iter()
+        .filter(|rule| rule.path == "INBOX")
+        .flat_map(|rule| rule.when.clone())
+        .collect();
+    if kept.is_empty() {
+        rules::search(&[When::Unsubscribe], also)
+    } else {
+        rules::search(&kept, &format!("HEADER List-Unsubscribe \"\" {also}NOT "))
+    }
 }
 
 /// Whether a mail, by its [`NOTICE_FIELDS`], is a notice.
@@ -474,11 +545,16 @@ fn notice(headed: &Headed) -> bool {
     else {
         return false;
     };
-    let auto_submitted = message
-        .headers()
-        .get("Auto-Submitted")
-        .map(|header| String::from_utf8_lossy(header.raw_value()).into_owned());
-    is_notice(address, auto_submitted.as_deref())
+    let raw = |field: &str| {
+        message
+            .headers()
+            .get(field)
+            .map(|header| String::from_utf8_lossy(header.raw_value()).into_owned())
+    };
+    let bulk = raw("List-Unsubscribe-Post").is_some()
+        || raw("Precedence")
+            .is_some_and(|said| BULK.iter().any(|b| said.trim().eq_ignore_ascii_case(b)));
+    is_notice(address, raw("Auto-Submitted").as_deref(), bulk)
 }
 
 /// A newsletter from its header fields; `None` without a sender.
@@ -486,12 +562,7 @@ fn read(headed: Headed, local: bool) -> Option<Sent> {
     let message = MessageParser::new().parse_headers(&headed.header)?;
     let from = message.from().and_then(|list| list.first());
     let address = from.as_ref()?.address()?.trim().to_lowercase();
-    let name = from
-        .as_ref()
-        .and_then(|f| f.name())
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .map_or_else(|| address.clone(), str::to_string);
+    let name = sender_name(from.as_ref().and_then(|f| f.name()), &address);
     let raw = |field: &str| {
         message
             .headers()
@@ -508,6 +579,41 @@ fn read(headed: Headed, local: bool) -> Option<Sent> {
         address,
         way,
     })
+}
+
+/// What the page calls a sender: the name it gives, unless it gives none
+/// or one that says nothing ("Notification", "Info"), then its
+/// organisation.
+fn sender_name(name: Option<&str>, address: &str) -> String {
+    let plain = |name: &str| {
+        name.chars()
+            .filter(char::is_ascii_alphanumeric)
+            .collect::<String>()
+            .to_ascii_lowercase()
+    };
+    match name.map(str::trim).filter(|name| !name.is_empty()) {
+        Some(name) if !GENERIC_NAMES.contains(&plain(name).as_str()) => name.to_string(),
+        _ => organisation(address).unwrap_or_else(|| address.to_string()),
+    }
+}
+
+/// The organisation a mail address belongs to, by the part of its domain
+/// before the suffix: `weave.engineering` is Weave, `m.learn.coursera.org`
+/// Coursera, `amazon.co.uk` Amazon.
+fn organisation(address: &str) -> Option<String> {
+    let host = address.rsplit_once('@')?.1.to_ascii_lowercase();
+    let mut labels: Vec<&str> = host.split('.').filter(|label| !label.is_empty()).collect();
+    labels.pop()?;
+    if labels.len() > 1
+        && labels
+            .last()
+            .is_some_and(|label| SECOND_LEVEL.contains(label))
+    {
+        labels.pop();
+    }
+    let mut chars = labels.pop()?.chars();
+    let first = chars.next()?;
+    Some(first.to_uppercase().chain(chars).collect())
 }
 
 /// The best way `List-Unsubscribe` offers: one click, else a mail, else a
@@ -977,25 +1083,70 @@ mod tests {
     #[test]
     fn notices_are_told_from_newsletters() {
         // Google's notices of a sign-in say where to unsubscribe.
-        assert!(is_notice("noreply-accounts@google.com", None));
-        assert!(is_notice("no-reply@accounts.google.com", None));
-        assert!(is_notice("appleid@id.apple.com", None));
-        assert!(is_notice("auto-confirm@amazon.de", None));
-        assert!(is_notice("shipment-tracking@amazon.de", None));
-        assert!(is_notice("Buchungsbestaetigung@bahn.de", None));
-        assert!(is_notice("kvitto@coop.se", None));
-        assert!(is_notice("noreply@forge.test", Some(" auto-generated")));
-        assert!(is_notice("messaging-digest-noreply@linkedin.com", None));
-        assert!(is_notice("messages-noreply@linkedin.com", None));
+        assert!(is_notice("noreply-accounts@google.com", None, false));
+        assert!(is_notice("no-reply@accounts.google.com", None, false));
+        assert!(is_notice("appleid@id.apple.com", None, false));
+        assert!(is_notice("auto-confirm@amazon.de", None, false));
+        assert!(is_notice("shipment-tracking@amazon.de", None, false));
+        assert!(is_notice("Buchungsbestaetigung@bahn.de", None, false));
+        assert!(is_notice("kvitto@coop.se", None, false));
+        assert!(is_notice(
+            "noreply@forge.test",
+            Some(" auto-generated"),
+            false
+        ));
+        assert!(is_notice(
+            "messaging-digest-noreply@linkedin.com",
+            None,
+            false
+        ));
+        assert!(is_notice("messages-noreply@linkedin.com", None, false));
         // Their newsletters don't.
-        assert!(!is_notice("googleplay-noreply@google.com", None));
-        assert!(!is_notice("store-news@amazon.de", None));
-        assert!(!is_notice("newsletter@coop.se", Some("no")));
-        assert!(!is_notice("info@fitness24seven.test", None));
-        assert!(!is_notice("news@identity.test", None));
-        assert!(!is_notice("updates-noreply@linkedin.com", None));
+        assert!(!is_notice("googleplay-noreply@google.com", None, false));
+        assert!(!is_notice("store-news@amazon.de", None, false));
+        assert!(!is_notice("newsletter@coop.se", Some("no"), false));
+        assert!(!is_notice("info@fitness24seven.test", None, false));
+        assert!(!is_notice("news@identity.test", None, false));
+        assert!(!is_notice("updates-noreply@linkedin.com", None, false));
         // netcup's advisories come from its newsletter: that stays one.
-        assert!(!is_notice("newsletter@netcup.com", None));
+        assert!(!is_notice("newsletter@netcup.com", None, false));
+        assert!(!is_notice("notification@weave.engineering", None, false));
+        // Newsletters may say a machine sent them, to keep auto-replies away,
+        // and then say they went to many.
+        assert!(!is_notice(
+            "no-reply@m.learn.coursera.org",
+            Some("auto-generated"),
+            true
+        ));
+        assert!(is_notice(
+            "noreply-accounts@google.com",
+            Some("auto-generated"),
+            true
+        ));
+    }
+
+    #[test]
+    fn a_sender_that_says_nothing_is_named_by_its_organisation() {
+        let named = |name, address| sender_name(name, address);
+        assert_eq!(
+            named(Some("Notification"), "notification@weave.engineering"),
+            "Weave"
+        );
+        assert_eq!(
+            named(Some(" no-reply "), "no-reply@m.learn.coursera.org"),
+            "Coursera"
+        );
+        assert_eq!(named(Some("The Team"), "team@amazon.co.uk"), "Amazon");
+        assert_eq!(named(None, "newsletter@heise.test"), "Heise");
+        assert_eq!(
+            named(
+                Some("Deep Teaching Solutions"),
+                "no-reply@m.learn.coursera.org"
+            ),
+            "Deep Teaching Solutions"
+        );
+        assert_eq!(named(Some("Anna"), "anna@weber.test"), "Anna");
+        assert_eq!(named(None, "root@localhost"), "root@localhost");
     }
 
     #[test]

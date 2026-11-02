@@ -238,7 +238,9 @@ A newsletter is mail that carries `List-Unsubscribe` and isn't a notice
 account, an order, a payment, a delivery, a message someone wrote you.
 Google and LinkedIn put the header on their notices too, so `is_notice`
 tells them by what the header can't: an `Auto-Submitted` other than `no`
-(RFC 3834), a word in the sender's local part (`NOTICE_WORDS`: account,
+(RFC 3834) on mail that doesn't say it went to many (newsletters send it
+too, to keep auto-replies away, with one click to leave or
+`Precedence: bulk`), a word in the sender's local part (`NOTICE_WORDS`: account,
 security, login, order, receipt, payment, shipping, confirm, message, …
 in English, German and Swedish) or a host that sends only notices
 (`NOTICE_HOSTS`: `accounts.google.com`, `id.apple.com`). The rule's Sieve says the same (`notice_test`); IMAP
@@ -251,11 +253,16 @@ there's none), after the account's other rules, so a rule of yours still
 wins. It moves the Inbox's newsletters there too, and notes the account in
 `newsletters_set_aside`, so a rule you take away stays away. An account
 set aside before notices were told apart (`notices_back_at` empty) gets
-its rule written again and its notices moved back to the Inbox, once. The
+its rule written again and its notices moved back to the Inbox, once. One
+whose notices came back while `Auto-Submitted` alone made a notice
+(`bulk_aside_at` empty) gets its rule written again and the newsletters
+that said a machine sent them set aside, once (`sort_again`). The
 folder is a role folder (`FolderRole::Newsletters`), named "Newsletters".
 
 The page (`newsletters.tsx`, `GET /newsletters`) reads each account's
-Newsletters of the last 90 days by sender: how often each writes
+Newsletters of the last 90 days by sender (named as its newest mail
+names it, or by its organisation when that name is none or says nothing,
+"Notification": `sender_name`): how often each writes
 (`rhythm.ts`) and how much of it you opened, the least read first. It
 leads with the ones you never open and a button for all of them. It reads
 once, not every 15 seconds, since a read fetches every header of those 90
