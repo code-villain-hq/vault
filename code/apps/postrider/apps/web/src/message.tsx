@@ -1,7 +1,7 @@
 import { ago, shortcutFree } from "@code-villain/web";
 import type { Attachment, MailSummary, Message } from "@postrider/types";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Paperclip } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, type LucideIcon, Paperclip } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
 import { initial, mailKey, rememberOpened } from "./inbox";
@@ -78,17 +78,30 @@ export function MailPage() {
     <>
       <PageHeader
         title={summary ? subject : "Mail"}
-        parent={
+        back={
           <Link
             to="/$workspace"
             params={{ workspace: workspace.url_key }}
-            className="hover:text-fg"
+            className="ui-button -ml-2 gap-1.5 px-2 text-xs text-muted"
             title="Back to the Inbox (Esc)"
           >
+            <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
             Inbox
           </Link>
         }
-      />
+      >
+        {index >= 0 && (
+          <>
+            <span className="text-xs text-muted tabular-nums">
+              {index + 1} of {mails.length}
+            </span>
+            <div className="-mr-2 flex">
+              <MailStep mail={mails[index - 1]} icon={ChevronUp} label="Previous mail (K)" />
+              <MailStep mail={mails[index + 1]} icon={ChevronDown} label="Next mail (J)" />
+            </div>
+          </>
+        )}
+      </PageHeader>
       <PageBody>
         <article className="letter" aria-label={subject}>
           {summary && (
@@ -130,6 +143,38 @@ export function MailPage() {
         </article>
       </PageBody>
     </>
+  );
+}
+
+/** An arrow to the mail above or below this one in the Inbox, if there is one. */
+function MailStep({
+  mail,
+  icon: Icon,
+  label,
+}: {
+  mail: MailSummary | undefined;
+  icon: LucideIcon;
+  label: string;
+}) {
+  const { workspace } = useWorkspace();
+  const arrow = <Icon size={16} strokeWidth={1.75} aria-hidden="true" />;
+  if (!mail) {
+    return (
+      <button type="button" className="ui-button ui-icon-button" aria-label={label} disabled>
+        {arrow}
+      </button>
+    );
+  }
+  return (
+    <Link
+      to="/$workspace/mail/$account/$uid"
+      params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
+      className="ui-button ui-icon-button"
+      aria-label={label}
+      title={label}
+    >
+      {arrow}
+    </Link>
   );
 }
 

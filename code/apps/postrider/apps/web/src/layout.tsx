@@ -110,10 +110,13 @@ export function NotFound() {
 export function PageHeader({
   title,
   parent,
+  back,
   children,
 }: {
   title: string;
   parent?: ReactNode;
+  /** A button back to where the page was opened from, in the parent's place. */
+  back?: ReactNode;
   children?: ReactNode;
 }) {
   const { workspace } = useWorkspace();
@@ -124,10 +127,14 @@ export function PageHeader({
         data-tauri-drag-region="deep"
       >
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
-          <span className="shrink-0">{parent ?? workspace.name}</span>
-          <span aria-hidden="true" className="text-faint">
-            ›
-          </span>
+          {back ?? (
+            <>
+              <span className="shrink-0">{parent ?? workspace.name}</span>
+              <span aria-hidden="true" className="text-faint">
+                ›
+              </span>
+            </>
+          )}
           <span className="truncate font-medium text-fg" aria-current="page">
             {title}
           </span>

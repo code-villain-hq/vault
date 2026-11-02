@@ -256,11 +256,10 @@
   outline-offset: -2px;
 }
 
-/* A mail, opened in the Inbox's place: its sender, its files, then its words. */
+/* A mail, opened in the Inbox's place and as wide: its sender, its files, then its words. */
 .letter {
   display: grid;
   gap: 16px;
-  max-width: 760px;
   padding: 20px 24px 32px;
 }
 .letter-head {
