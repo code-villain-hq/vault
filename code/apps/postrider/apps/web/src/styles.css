@@ -714,6 +714,8 @@ label.compose-from:focus-within {
   display: block;
   width: 100%;
   border: 0;
+  /* The mail inside sees day, whatever the app's theme: see `paper()`. */
+  color-scheme: light;
 }
 
 /* The shared frame becomes a horizontal navigation row below 560px. */

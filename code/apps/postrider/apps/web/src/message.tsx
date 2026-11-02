@@ -512,6 +512,10 @@ document.addEventListener("keydown", (event) => {
  * The frame's document: the mail's HTML under a policy that runs only
  * Postrider's script (by a nonce the mail can't know) and lets nothing post
  * back, on white paper whatever the app's theme, as senders design for.
+ * A mail that also offers a dark look (`color-scheme: light dark`) would
+ * turn the paper dark at night and keep its own dark text: black on black.
+ * So the paper stays light by a rule after the mail's, and the frame tells
+ * the mail it's day (`.paper iframe` in the styles), so its dark rules sleep.
  * Newsletters often make html and body 100% tall, `!important`: in a frame
  * that grows to its content that is no height at all, so a rule after the
  * mail's, and surer than theirs, keeps them as tall as what they hold.
@@ -530,5 +534,6 @@ html { background: Canvas; color: CanvasText; height: auto !important; min-heigh
 body { margin: 0; padding: 20px 24px; font: 14px/1.5 -apple-system, system-ui, sans-serif; overflow-wrap: break-word; height: auto !important; min-height: 0 !important; }
 img { max-width: 100%; height: auto; }
 </style></head><body>${body}
-<style>html:root, html:root > body { height: auto !important; min-height: 0 !important; max-height: none !important; }</style></body></html>`;
+<style>html:root { color-scheme: only light !important; }
+html:root, html:root > body { height: auto !important; min-height: 0 !important; max-height: none !important; }</style></body></html>`;
 }
