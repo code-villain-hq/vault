@@ -6,8 +6,9 @@
 //! yours, so a rule of yours still wins). Postrider writes that rule once
 //! for each account, after its first sync, and moves the Inbox's
 //! newsletters with it ([`Mail::set_newsletters_aside`]); a rule you take
-//! away stays away. When what makes a newsletter or a notice changes, it
-//! sorts the account's mail again by it, once ([`Mail::sort_again`]).
+//! away stays away. When what makes a newsletter or a notice changes, or
+//! how the passes sort, it sorts the account's mail again by it, once
+//! ([`Mail::sort_again`]).
 //!
 //! A notice is mail about something of yours: a sign-in, your account, an
 //! order, a payment, a delivery. Google's say where to unsubscribe as
@@ -320,8 +321,8 @@ impl Mail {
             rules.push(Rule::newsletters(&place));
             self.put_rules(account, &rules).await?;
         }
-        let query = inbox_search(&rules, &rules::search(&[When::Unsubscribe], ""));
-        let uids = self.notices(account, "INBOX", &query, false).await?;
+        let query = but_yours(&rules, "INBOX", &rules::search(&[When::Unsubscribe], ""));
+        let (_, uids) = self.notices(account, "INBOX", &query, false).await?;
         let moved = self
             .move_out(account, "INBOX", &uids, &[], &place.path)
             .await?;
@@ -342,9 +343,12 @@ impl Mail {
     /// notice now ([`sorting`]), once for each change to it: writes the
     /// rule again, moves the notices in Newsletters back to the Inbox, and
     /// sets aside the Inbox's newsletters, but those from senders kept
-    /// there. A rule you took away stays away, and so do newsletters: only
-    /// notices come back. It subscribes the folders Postrider sorts into
-    /// too, so the account's other mail apps show them.
+    /// there. It reads all of Newsletters, but what a rule of yours sorts
+    /// there: a notice comes back however it got there, and whatever the
+    /// server's SEARCH finds. A rule you took away stays away, and so do
+    /// newsletters: only notices come back. It subscribes the folders
+    /// Postrider sorts into too, so the account's other mail apps show
+    /// them.
     async fn sort_again(&self, account: &MailAccount, by: &str) -> Result<(), Failure> {
         let rules = self.rules(account).await?;
         let sets_aside = rules.iter().any(Rule::is_newsletters);
@@ -352,17 +356,22 @@ impl Mail {
             self.put_rules(account, &rules).await?;
         }
         if let Some(place) = self.newsletters_folder(account).await? {
-            let newsletters = rules::search(&[When::Unsubscribe], "");
-            let uids = self
-                .notices(account, &place.path, &newsletters, true)
+            let (read, uids) = self
+                .notices(
+                    account,
+                    &place.path,
+                    &but_yours(&rules, &place.path, "ALL"),
+                    true,
+                )
                 .await?;
             let back = self
                 .move_out(account, &place.path, &uids, &[], "INBOX")
                 .await?;
             let mut aside = 0;
             if sets_aside {
-                let query = inbox_search(&rules, &newsletters);
-                let uids = self.notices(account, "INBOX", &query, false).await?;
+                let newsletters = rules::search(&[When::Unsubscribe], "");
+                let query = but_yours(&rules, "INBOX", &newsletters);
+                let (_, uids) = self.notices(account, "INBOX", &query, false).await?;
                 aside = self
                     .move_out(account, "INBOX", &uids, &[], &place.path)
                     .await?
@@ -370,9 +379,13 @@ impl Mail {
             }
             tracing::info!(
                 address = %account.address,
-                "sorted again: {} notices back, {aside} newsletters aside",
+                "sorted again: {} of the {read} in Newsletters are notices, {} went back; \
+                 {aside} newsletters aside",
+                uids.len(),
                 back.count
             );
+        } else {
+            tracing::info!(address = %account.address, "sorted again: no Newsletters");
         }
         self.subscribe_folders(account, &rules).await?;
         sqlx::query("UPDATE newsletters_set_aside SET sorted_by = $2 WHERE account_id = $1")
@@ -383,26 +396,27 @@ impl Mail {
         Ok(())
     }
 
-    /// The mail `query` finds in the folder at `path` that's a notice, or,
-    /// not `notices`, that isn't.
+    /// How much mail `query` finds in the folder at `path`, and which of it
+    /// is a notice, or, not `notices`, isn't.
     async fn notices(
         &self,
         account: &MailAccount,
         path: &str,
         query: &str,
         notices: bool,
-    ) -> Result<Vec<u32>, Failure> {
+    ) -> Result<(usize, Vec<u32>), Failure> {
         let headed = self
             .on_server(account, |session| {
                 let (path, query) = (path.to_string(), query.to_string());
                 Box::pin(async move { imap::headers(session, &path, &query, NOTICE_FIELDS).await })
             })
             .await?;
-        Ok(headed
+        let uids = headed
             .iter()
             .filter(|mail| notice(mail) == notices)
             .map(|mail| mail.uid)
-            .collect())
+            .collect();
+        Ok((headed.len(), uids))
     }
 
     /// Subscribes the folders Postrider puts mail in: Archive, Trash, Junk,
@@ -698,10 +712,15 @@ pub(crate) fn notice_test() -> String {
     )
 }
 
+/// How the passes sort, besides what the newsletters' rule says: counted up
+/// when they change, so each account's mail is sorted again by them.
+const PASSES: u32 = 2;
+
 /// What makes a newsletter or a notice, as the newsletters' rule says it in
-/// Sieve: when it changes, each account's mail is sorted again.
+/// Sieve, and how the passes sort ([`PASSES`]): when it changes, each
+/// account's mail is sorted again.
 fn sorting() -> String {
-    When::Unsubscribe.test(true)
+    format!("{PASSES} {}", When::Unsubscribe.test(true))
 }
 
 /// Mail from a mailing service that offers to unsubscribe in its text,
@@ -731,18 +750,19 @@ pub(crate) fn from_a_service_search() -> String {
     )
 }
 
-/// The Inbox's mail that `what` finds, but not from the senders kept in
-/// the Inbox.
-fn inbox_search(rules: &[Rule], what: &str) -> String {
-    let kept: Vec<When> = rules
+/// The mail that `what` finds in the folder at `path`, but not what a rule
+/// of yours sorts there: from senders kept in the Inbox, or sorted into
+/// Newsletters.
+fn but_yours(rules: &[Rule], path: &str, what: &str) -> String {
+    let yours: Vec<When> = rules
         .iter()
-        .filter(|rule| rule.path == "INBOX")
+        .filter(|rule| rule.path == path && !rule.is_newsletters())
         .flat_map(|rule| rule.when.clone())
         .collect();
-    if kept.is_empty() {
+    if yours.is_empty() {
         what.to_string()
     } else {
-        rules::search(&kept, &format!("{what} NOT "))
+        rules::search(&yours, &format!("{what} NOT "))
     }
 }
 
@@ -1387,6 +1407,34 @@ mod tests {
             Some("auto-generated"),
             true
         ));
+    }
+
+    #[test]
+    fn newsletters_are_read_whole_but_what_your_rules_sort_there() {
+        let rule = |path: &str, from: &str| Rule {
+            folder: path.into(),
+            path: path.into(),
+            when: vec![When::From(from.into())],
+        };
+        let newsletters = Place {
+            path: "INBOX.Newsletters".into(),
+            name: "Newsletters".into(),
+            role: Some(FolderRole::Newsletters),
+        };
+        let rules = vec![
+            rule("INBOX", "ica.se"),
+            rule("INBOX.Newsletters", "shop.test"),
+            Rule::newsletters(&newsletters),
+        ];
+        assert_eq!(
+            but_yours(&rules, "INBOX.Newsletters", "ALL"),
+            "ALL NOT FROM \"shop.test\""
+        );
+        assert_eq!(
+            but_yours(&rules, "INBOX", "HEADER List-Unsubscribe \"\""),
+            "HEADER List-Unsubscribe \"\" NOT FROM \"ica.se\""
+        );
+        assert_eq!(but_yours(&rules[2..], "INBOX.Newsletters", "ALL"), "ALL");
     }
 
     #[test]

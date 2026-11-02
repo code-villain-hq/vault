@@ -270,11 +270,15 @@ there's none), after the account's other rules, so a rule of yours still
 wins. It moves the Inbox's newsletters there too, and notes the account in
 `newsletters_set_aside`, so a rule you take away stays away, with what
 made a newsletter or a notice then (`sorted_by`: the rule's test in
-Sieve). When that changes, the account's mail is sorted again by it, once
-(`sort_again`): its rule is written again, the notices in Newsletters go
-back to the Inbox, and the Inbox's newsletters go to Newsletters, but
-those from senders kept in the Inbox. Change the words, and every account
-follows on its next start; there's nothing else to note. Both passes
+Sieve, after `PASSES`, counted up when the passes change). When that
+changes, the account's mail is sorted again by it, once (`sort_again`):
+its rule is written again, the notices in Newsletters go back to the
+Inbox, and the Inbox's newsletters go to Newsletters, but those from
+senders kept in the Inbox. It reads all of Newsletters, but what a rule
+of yours sorts there, so a notice comes back however it got there and
+whatever the server's SEARCH finds; the log says how many it read, found
+and moved. Change the words, and every account follows on its next start;
+there's nothing else to note. Both passes
 subscribe the folders Postrider puts mail in (Archive, Trash, Junk,
 Newsletters and those its rules sort into), since the account's other
 mail apps show only subscribed ones; a folder Postrider makes is
