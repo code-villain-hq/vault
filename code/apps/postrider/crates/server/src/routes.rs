@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, caldav, connect, folders, mail, ws};
+use crate::{accounts, archive, caldav, connect, files, folders, mail, reply, ws};
 
 /// The API, plus the built web app from `web_dir` when given.
 pub fn app(state: AppState, web_dir: Option<&std::path::Path>) -> Router {
@@ -34,6 +34,9 @@ pub fn router(state: AppState) -> Router {
         .route("/sync/ws", get(ws::handler))
         .route("/inbox", get(mail::inbox))
         .route("/mails/{account_id}/{uid}", get(mail::open))
+        .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
+        .route("/mails/{account_id}/{uid}/reply", post(reply::reply))
+        .route("/mails/{account_id}/{uid}/files/{index}", get(files::file))
         .route("/folders", get(folders::folders))
         .route("/folders/{key}", get(folders::folder))
         .route("/search", get(folders::search))

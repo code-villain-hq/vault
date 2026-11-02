@@ -5,15 +5,19 @@
 //! [`router`] directly.
 
 pub mod accounts;
+pub mod archive;
 pub mod auth;
 pub mod caldav;
 pub mod connect;
 pub mod error;
+pub mod files;
 pub mod folders;
 pub mod imap;
 pub mod local;
 pub mod mail;
 pub mod message;
+pub mod preview;
+pub mod reply;
 pub mod routes;
 pub mod secrets;
 mod serve;

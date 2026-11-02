@@ -331,6 +331,88 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+/* A reply, as the storyboard's composer: To and Subject on lines of their
+   own, the text with room, and the account it goes from beside Send. */
+.compose {
+  display: grid;
+  padding: 6px 18px 14px;
+}
+.compose-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  min-width: 0;
+}
+.compose-label {
+  width: 56px;
+  flex: none;
+  color: var(--faint);
+}
+.compose-to {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  color: var(--fg);
+  font-weight: 600;
+}
+.compose-text {
+  min-height: 236px;
+  padding: 12px 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+.compose-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+.compose-from {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: var(--type-ui-small-size);
+}
+.compose-from select {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+label.compose-from:hover {
+  background: var(--hover);
+}
+label.compose-from:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.files button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: inherit;
+}
+.files li:has(button:hover) {
+  background: var(--hover);
+}
+
 /* A mail in HTML keeps its own look, on paper the app's theme doesn't touch. */
 .paper {
   overflow: hidden;

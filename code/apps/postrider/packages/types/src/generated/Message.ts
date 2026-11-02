@@ -17,7 +17,12 @@ text: string,
  * Its HTML when it has some, with its inline pictures written in as
  * `data:` URLs. The page shows it, without scripts, in place of `text`.
  */
-html: string | null, attachments: Array<Attachment>, account_id: string, 
+html: string | null, attachments: Array<Attachment>, 
+/**
+ * Who a reply goes to when it isn't the sender: its Reply-To, by name
+ * or address.
+ */
+reply_to: string | null, account_id: string, 
 /**
  * The folder it's in, by its key ([`Folder::key`]); `None` for a mail
  * in the Inbox's copy.

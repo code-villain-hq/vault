@@ -24,6 +24,8 @@ type Mail = {
   day: number;
   at: string;
   read?: boolean;
+  /** A PDF that came with it, and the line it says. */
+  file?: { name: string; says: string };
 };
 
 const accounts: {
@@ -199,7 +201,8 @@ const accounts: {
         {
           from: "Uberspace <hallo@uberspace.test>",
           subject: "Rechnung November",
-          body: "Für November buchen wir 10 € ab.",
+          body: "Für November buchen wir 10 € ab. Die Rechnung hängt an.",
+          file: { name: "Rechnung November.pdf", says: "Uberspace - Rechnung November: 10 EUR" },
           day: 1,
           at: "08:00",
         },
@@ -251,19 +254,63 @@ function arrived(date: Date): string {
 
 function message(to: string, mail: Mail): string {
   const date = when(mail.day, mail.at);
-  return [
+  const head = [
     `From: ${mail.from}`,
     `To: ${mail.to ?? to}`,
     `Subject: ${header(mail.subject)}`,
     `Date: ${date.toUTCString().replace("GMT", "+0000")}`,
     `Message-ID: <${crypto.randomUUID()}@postrider.test>`,
     "MIME-Version: 1.0",
+  ];
+  const text = [
     "Content-Type: text/plain; charset=utf-8",
     "Content-Transfer-Encoding: 8bit",
     "",
     mail.body,
     "",
+  ];
+  if (!mail.file) return [...head, ...text].join("\r\n");
+  const boundary = `postrider-${crypto.randomUUID()}`;
+  return [
+    ...head,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    ...text,
+    `--${boundary}`,
+    `Content-Type: application/pdf; name="${mail.file.name}"`,
+    `Content-Disposition: attachment; filename="${mail.file.name}"`,
+    "Content-Transfer-Encoding: base64",
+    "",
+    ...(pdf(mail.file.says)
+      .toString("base64")
+      .match(/.{1,76}/g) ?? []),
+    `--${boundary}--`,
+    "",
   ].join("\r\n");
+}
+
+/** A one-page PDF that says `line` (ASCII), for a mail's file. */
+function pdf(line: string): Buffer {
+  const content = `BT /F1 14 Tf 72 760 Td (${line.replace(/[()\\]/g, "\\$&")}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = objects.map((object, i) => {
+    const at = body.length;
+    body += `${i + 1} 0 obj\n${object}\nendobj\n`;
+    return at;
+  });
+  const xref = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  body += offsets.map((at) => `${String(at).padStart(10, "0")} 00000 n \n`).join("");
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(body, "latin1");
 }
 
 /** A small IMAP client: enough to sign in, look and append. */

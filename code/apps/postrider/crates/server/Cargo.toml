@@ -16,6 +16,7 @@ code-villain-auth.workspace = true
 code-villain-sync.workspace = true
 futures.workspace = true
 keyring.workspace = true
+lettre.workspace = true
 mail-parser.workspace = true
 postrider-domain.workspace = true
 postrider-sync.workspace = true

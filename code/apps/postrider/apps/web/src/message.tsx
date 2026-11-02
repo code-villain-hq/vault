@@ -1,27 +1,46 @@
-import { ago, shortcutFree } from "@code-villain/web";
+import {
+  ago,
+  apiUrl,
+  authHeaders,
+  credentialsFor,
+  type Place,
+  shortcutFree,
+  UNKNOWN_PROBLEM,
+} from "@code-villain/web";
 import type { Attachment, MailSummary, Message } from "@postrider/types";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { ArrowLeft, ChevronDown, ChevronUp, type LucideIcon, Paperclip } from "lucide-react";
+import {
+  Archive,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  type LucideIcon,
+  Paperclip,
+  Reply,
+} from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
-import { listedMails, markSeen } from "./folders";
+import { ReplyDialog } from "./compose";
+import { forgetListed, listedMails, markSeen } from "./folders";
 import { type From, initial, mailKey, openedFrom, rememberOpened } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
-import { isDesktop, openInBrowser } from "./platform";
+import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
 import { ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /**
  * `/$workspace/mail/$account/$uid`: a mail, opened in the place of the list
  * it was opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`).
- * Esc goes back to it; J and K open the next and the previous one in it.
+ * Esc goes back to it; J and K open the next and the previous one in it;
+ * E archives it and opens the next; R answers it.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
   const from = useSearch({ strict: false }) as From;
-  const { workspace, place } = useWorkspace();
-  const { inbox } = useInbox();
+  const { workspace, place, refusals } = useWorkspace();
+  const { inbox, leave, stay } = useInbox();
+  const { refresh } = useFolders();
   const accounts = useAccounts();
   const navigate = useNavigate();
   const back = useBack(from);
@@ -29,6 +48,7 @@ export function MailPage() {
   const listed = from.folder !== undefined || from.q !== undefined;
   const mails = listed ? listedMails(from) : (inbox?.mails ?? []);
   const index = mails.findIndex((mail) => mailKey(mail) === key);
+  const [replying, setReplying] = useState(false);
   const [opened, setOpened] = useState<{ key: string; message?: Message; error?: string }>();
   const message = opened?.key === key ? opened.message : undefined;
   const error = opened?.key === key ? opened.error : undefined;
@@ -37,6 +57,9 @@ export function MailPage() {
 
   const folder = from.folder;
   const q = from.q;
+  // Read now: its folder's unread count goes down once it's open.
+  const unread = useRef(false);
+  unread.current = summary?.seen === false;
   useEffect(() => {
     rememberOpened(key);
     const stop = new AbortController();
@@ -50,24 +73,58 @@ export function MailPage() {
     ).then(
       (answer) => {
         setOpened({ key, message: answer });
-        if (folder !== undefined) markSeen({ folder, q }, key);
+        if (folder === undefined) return;
+        markSeen({ folder, q }, key);
+        if (unread.current) refresh();
       },
       (problem: unknown) => {
         if (!stop.signal.aborted) setOpened({ key, error: messageOf(problem) });
       },
     );
     return () => stop.abort();
-  }, [workspace.id, place, account, uid, key, folder, q]);
+  }, [workspace.id, place, account, uid, key, folder, q, refresh]);
+
+  const open = (mail: MailSummary | undefined) => {
+    if (!mail) return;
+    void navigate({
+      to: "/$workspace/mail/$account/$uid",
+      params: { workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) },
+      search: openedFrom(mail, from),
+    });
+  };
+
+  // Archived mail in Archive stays where it is.
+  const archivable = summary !== undefined && summary.folder?.toLowerCase() !== "archive";
+
+  /**
+   * Moves it to its account's Archive and opens the next mail at once, or
+   * goes back after the last. A server that refuses says so in the frame's
+   * status, and the mail comes back to the Inbox.
+   */
+  const archive = () => {
+    if (!summary || !archivable) return;
+    const fromInbox = (summary.folder ?? "inbox").toLowerCase() === "inbox";
+    if (fromInbox) leave(summary.account_id, summary.uid);
+    if (listed) forgetListed(from, key);
+    const inFolder = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+    api(
+      "POST",
+      `/api/w/${workspace.id}/mails/${account}/${uid}/archive${inFolder}`,
+      undefined,
+      place,
+    ).then(
+      () => refresh(),
+      (problem: unknown) => {
+        if (fromInbox) stay(summary.account_id, summary.uid);
+        refusals.dispatchEvent(new CustomEvent("refused", { detail: messageOf(problem) }));
+      },
+    );
+    const next = mails[index + 1] ?? mails[index - 1];
+    if (index >= 0 && next) open(next);
+    else back.go();
+  };
 
   useEffect(() => {
-    const open = (mail: MailSummary | undefined) => {
-      if (!mail) return;
-      void navigate({
-        to: "/$workspace/mail/$account/$uid",
-        params: { workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) },
-        search: openedFrom(mail, from),
-      });
-    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (!shortcutFree(event)) return;
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
@@ -78,6 +135,12 @@ export function MailPage() {
         event.preventDefault();
         // Lists are newest first: J goes down, to older mail.
         if (index >= 0) open(mails[index + (key === "j" ? 1 : -1)]);
+      } else if (key === "e") {
+        event.preventDefault();
+        archive();
+      } else if (key === "r" && summary) {
+        event.preventDefault();
+        setReplying(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -105,6 +168,28 @@ export function MailPage() {
           </a>
         }
       >
+        {summary && (
+          <button
+            type="button"
+            className="ui-button ui-icon-button"
+            aria-label="Reply (R)"
+            title="Reply (R)"
+            onClick={() => setReplying(true)}
+          >
+            <Reply size={16} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        )}
+        {archivable && (
+          <button
+            type="button"
+            className="ui-button ui-icon-button"
+            aria-label="Archive (E)"
+            title="Archive (E)"
+            onClick={archive}
+          >
+            <Archive size={16} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        )}
         {index >= 0 && (
           <>
             <span className="shrink-0 text-xs whitespace-nowrap text-muted tabular-nums">
@@ -158,7 +243,14 @@ export function MailPage() {
             </header>
           )}
           {error && <ErrorMessage>{error}</ErrorMessage>}
-          {message && message.attachments.length > 0 && <Attachments files={message.attachments} />}
+          {message && message.attachments.length > 0 && (
+            <Attachments
+              files={message.attachments}
+              path={`/api/w/${workspace.id}/mails/${account}/${uid}/files`}
+              folder={folder}
+              place={place}
+            />
+          )}
           {message &&
             (message.html ? (
               <MailHtml html={message.html} />
@@ -167,6 +259,15 @@ export function MailPage() {
             ))}
         </article>
       </PageBody>
+      {summary && (
+        <ReplyDialog
+          key={key}
+          open={replying}
+          onClose={() => setReplying(false)}
+          summary={summary}
+          message={message}
+        />
+      )}
     </>
   );
 }
@@ -236,19 +337,77 @@ function MailStep({
   );
 }
 
-/** The files that came with a mail, by name and size. */
-function Attachments({ files }: { files: Attachment[] }) {
+/**
+ * The files that came with a mail, by name and size. One clicked opens: in
+ * the desktop app it's saved in Downloads and opened there; in a browser,
+ * downloaded. One that can't be read says why under them.
+ */
+function Attachments({
+  files,
+  path,
+  folder,
+  place,
+}: {
+  files: Attachment[];
+  path: string;
+  folder: string | undefined;
+  place: Place;
+}) {
+  const [error, setError] = useState<string>();
+  // The server knows a file by its place among them.
+  const numbered = useMemo(() => files.map((file, at) => ({ ...file, at })), [files]);
+  const open = (index: number, name: string) => {
+    setError(undefined);
+    const inFolder = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+    openFile(apiUrl(`${path}/${index}${inFolder}`, place), place, name).catch((problem: unknown) =>
+      setError(messageOf(problem)),
+    );
+  };
   return (
-    <ul className="files" aria-label="Attachments">
-      {files.map((file) => (
-        <li key={`${file.name}:${file.size}`}>
-          <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
-          <span className="truncate">{file.name}</span>
-          <span className="text-faint tabular-nums">{bytes(file.size)}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="grid gap-2">
+      <ul className="files" aria-label="Attachments">
+        {numbered.map((file) => (
+          <li key={file.at}>
+            <button
+              type="button"
+              className="min-w-0"
+              title={`Open ${file.name}`}
+              onClick={() => open(file.at, file.name)}
+            >
+              <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
+              <span className="truncate">{file.name}</span>
+              <span className="text-faint tabular-nums">{bytes(file.size)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+    </div>
   );
+}
+
+/** Reads a mail's file from the server and opens it, or downloads it. */
+async function openFile(url: string, place: Place, name: string) {
+  const response = await fetch(url, {
+    credentials: credentialsFor(place),
+    headers: authHeaders(place),
+  });
+  if (!response.ok) {
+    const said = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(said?.message ?? UNKNOWN_PROBLEM);
+  }
+  const content = new Uint8Array(await response.arrayBuffer());
+  if (isDesktop) {
+    await saveAndOpen(name, content);
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(
+    new Blob([content], { type: response.headers.get("content-type") ?? "" }),
+  );
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
 }
 
 /** "820 bytes", "14 KB", "2.3 MB". */

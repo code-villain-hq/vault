@@ -1,10 +1,12 @@
 //! Postrider's desktop app. It shows the web app (apps/web), opens links in
-//! the browser, and runs Postrider's server for this Mac (`this_mac`), which
-//! the web app asks for when it runs here.
+//! the browser and a mail's files from Downloads (`files`), and runs
+//! Postrider's server for this Mac (`this_mac`), which the web app asks for
+//! when it runs here.
 
 // Don't open a console window next to the app on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod files;
 mod this_mac;
 
 use tauri::{Manager, RunEvent, State};
@@ -31,7 +33,7 @@ fn main() {
             app.state::<ThisMac>().resume();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![this_mac])
+        .invoke_handler(tauri::generate_handler![this_mac, files::open_file])
         .build(tauri::generate_context!())
         .expect("Postrider failed to start");
     app.run(|app, event| {

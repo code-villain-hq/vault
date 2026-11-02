@@ -356,6 +356,71 @@ pub async fn mark_read(session: &mut Session, folder: &str, uid: i64) -> Result<
     Ok(())
 }
 
+/// Moves a mail to another folder (MOVE, RFC 6851).
+pub async fn move_mail(
+    session: &mut Session,
+    from: &str,
+    uid: i64,
+    to: &str,
+) -> Result<(), Failure> {
+    session.select(from).await?;
+    session.uid_mv(uid.to_string(), to).await?;
+    Ok(())
+}
+
+/// Marks a mail answered, as sending its reply does.
+pub async fn mark_answered(session: &mut Session, folder: &str, uid: i64) -> Result<(), Failure> {
+    session.select(folder).await?;
+    session
+        .uid_store(uid.to_string(), "+FLAGS.SILENT (\\Answered)")
+        .await?
+        .try_collect::<Vec<_>>()
+        .await?;
+    Ok(())
+}
+
+/// Puts a mail in a folder, read: a sent one in Sent.
+pub async fn put(session: &mut Session, folder: &str, raw: &[u8]) -> Result<(), Failure> {
+    session.append(folder, Some("(\\Seen)"), None, raw).await?;
+    Ok(())
+}
+
+/// Makes a folder for `role`, called `name`, beside the account's others:
+/// under `INBOX.` where its server keeps them so. It's subscribed, so the
+/// account's other mail apps show it too. One made meanwhile will do.
+pub async fn make_folder(
+    session: &mut Session,
+    name: &str,
+    role: FolderRole,
+) -> Result<Place, Failure> {
+    let names: Vec<_> = session
+        .list(Some(""), Some("*"))
+        .await?
+        .try_collect()
+        .await?;
+    let under_inbox = names.iter().find_map(|listed| {
+        let delimiter = listed.delimiter()?;
+        let rest = listed.name().strip_prefix("INBOX")?;
+        rest.starts_with(delimiter)
+            .then(|| format!("INBOX{delimiter}"))
+    });
+    let path = format!("{}{name}", under_inbox.unwrap_or_default());
+    match session.create(&path).await {
+        Ok(()) => {}
+        Err(async_imap::error::Error::No(answer))
+            if answer.to_ascii_lowercase().contains("exists") => {}
+        Err(e) => return Err(e.into()),
+    }
+    if let Err(e) = session.subscribe(&path).await {
+        tracing::info!("couldn't subscribe to {path}: {e}");
+    }
+    Ok(Place {
+        path,
+        name: name.to_string(),
+        role: Some(role),
+    })
+}
+
 /// A folder on an account's server.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Place {
@@ -757,9 +822,8 @@ pub fn summarize(raw: &[u8], arrived: Option<DateTime<Utc>>) -> Summary {
         .unwrap_or_default();
     let snippet = message
         .as_ref()
-        .and_then(|m| m.body_preview(400))
-        .map(|text| one_line(&text))
-        .map(|text| text.chars().take(160).collect())
+        .and_then(|m| m.body_preview(4000))
+        .map(|text| crate::preview::preview(&text))
         .unwrap_or_default();
     let dated = message
         .as_ref()

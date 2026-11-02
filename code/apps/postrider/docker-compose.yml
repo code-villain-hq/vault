@@ -37,6 +37,18 @@ services:
       - "127.0.0.1:3143:31143"
       - "127.0.0.1:4190:34190"
 
+  # SMTP (3025), where replies go instead of out: Mailpit keeps every mail
+  # it's given and sends none on. Read them at http://127.0.0.1:3026.
+  smtp:
+    image: axllent/mailpit:v1.32.0
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "127.0.0.1:3025:1025"
+      - "127.0.0.1:3026:8025"
+
   # CalDAV (5232), as Radicale on calendar.lazarski.nu.
   calendar:
     image: ghcr.io/kozea/radicale:3.8.3

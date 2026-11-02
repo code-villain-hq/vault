@@ -15,14 +15,25 @@ import { useRecords, useWorkspace } from "./workspace";
 /** Waits between tries while the server can't be reached, in seconds. */
 const RETRY = [2, 5, 15, 30];
 
+/** How often the folders' unread counts are asked again while the app shows. */
+const FOLDERS_MS = 60_000;
+
 type InboxState = {
   /** Undefined until the server first answers. */
   inbox?: Inbox;
   /** The server stopped answering; the Inbox shown is the last it sent. */
   offline: boolean;
+  /** Takes a mail out of the Inbox at once, as it's archived. */
+  leave: (accountId: string, uid: number) => void;
+  /** Puts it back, when its server refused. */
+  stay: (accountId: string, uid: number) => void;
 };
 
-const Context = createContext<InboxState>({ offline: false });
+const Context = createContext<InboxState>({
+  offline: false,
+  leave: () => undefined,
+  stay: () => undefined,
+});
 
 /**
  * Keeps the workspace's Inbox up to date while mounted: it asks once, then
@@ -31,7 +42,8 @@ const Context = createContext<InboxState>({ offline: false });
  */
 export function InboxProvider({ children }: { children: ReactNode }) {
   const { workspace, place } = useWorkspace();
-  const [state, setState] = useState<InboxState>({ offline: false });
+  const [state, setState] = useState<{ inbox?: Inbox; offline: boolean }>({ offline: false });
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     const stop = new AbortController();
@@ -64,8 +76,30 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     return () => stop.abort();
   }, [workspace.id, place]);
 
+  const leave = useCallback(
+    (accountId: string, uid: number) =>
+      setLeaving((keys) => new Set(keys).add(`${accountId}:${uid}`)),
+    [],
+  );
+  const stay = useCallback(
+    (accountId: string, uid: number) =>
+      setLeaving((keys) => {
+        const kept = new Set(keys);
+        kept.delete(`${accountId}:${uid}`);
+        return kept;
+      }),
+    [],
+  );
+  const shown = useMemo<InboxState>(() => {
+    const inbox = state.inbox && {
+      ...state.inbox,
+      mails: state.inbox.mails.filter((mail) => !leaving.has(`${mail.account_id}:${mail.uid}`)),
+    };
+    return { inbox, offline: state.offline, leave, stay };
+  }, [state, leaving, leave, stay]);
+
   return (
-    <Context.Provider value={state}>
+    <Context.Provider value={shown}>
       <FoldersProvider version={state.inbox?.version}>{children}</FoldersProvider>
     </Context.Provider>
   );
@@ -82,7 +116,8 @@ const FoldersContext = createContext<FoldersState>({ folders: [], refresh: () =>
 /**
  * The workspace's folders with what's unread in them, read live: asked
  * when the sidebar shows, when the Inbox changes (an account connected,
- * mail came), and when a folder's list is opened.
+ * mail came), when a folder's list or its unread mail is opened, and
+ * every minute while the app shows, for mail filed or read elsewhere.
  */
 function FoldersProvider({ version, children }: { version?: number; children: ReactNode }) {
   const { workspace, place } = useWorkspace();
@@ -100,6 +135,18 @@ function FoldersProvider({ version, children }: { version?: number; children: Re
   }, [workspace.id, place, version, asked]);
 
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
+  useEffect(() => {
+    const ask = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const timer = setInterval(ask, FOLDERS_MS);
+    document.addEventListener("visibilitychange", ask);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", ask);
+    };
+  }, [refresh]);
+
   const state = useMemo(() => ({ folders, refresh }), [folders, refresh]);
   return <FoldersContext.Provider value={state}>{children}</FoldersContext.Provider>;
 }

@@ -36,6 +36,16 @@ export function markSeen(from: From, key: string) {
   });
 }
 
+/** A mail that left the list it was opened from, as when it's archived. */
+export function forgetListed(from: From, key: string) {
+  const listing = listings.get(listKey(from));
+  if (!listing) return;
+  listings.set(listKey(from), {
+    ...listing,
+    mails: listing.mails.filter((mail) => mailKey(mail) !== key),
+  });
+}
+
 /** A folder's or a search's mail, from every account's server. */
 function useListing(from: From, path: string | undefined) {
   const { workspace, place } = useWorkspace();

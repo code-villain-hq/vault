@@ -89,7 +89,7 @@ impl Mail {
     }
 
     /// An account's folders, as its server listed them last, else now.
-    async fn places(&self, account: &MailAccount) -> Result<Vec<Place>, Failure> {
+    pub(crate) async fn places(&self, account: &MailAccount) -> Result<Vec<Place>, Failure> {
         if let Some(places) = self.lock_places().get(&account.id) {
             return Ok(places.clone());
         }
@@ -101,7 +101,11 @@ impl Mail {
     }
 
     /// The account's folder that `key` names: the Inbox, or one of its own.
-    async fn place(&self, account: &MailAccount, key: &str) -> Result<Option<Place>, Failure> {
+    pub(crate) async fn place(
+        &self,
+        account: &MailAccount,
+        key: &str,
+    ) -> Result<Option<Place>, Failure> {
         if key.eq_ignore_ascii_case("inbox") {
             return Ok(Some(Place::inbox()));
         }
@@ -218,25 +222,7 @@ impl Mail {
         uid: i64,
     ) -> Result<Message, AppError> {
         let account = self.account(workspace_id, account_id).await?;
-        let refused = |failure: Failure| AppError::refused(failure.message());
-        let place = self
-            .place(&account, key)
-            .await
-            .map_err(refused)?
-            .ok_or_else(|| {
-                AppError::not_found(format!(
-                    "{} has no folder called {key} any more.",
-                    account.name
-                ))
-            })?;
-        let raw = self
-            .on_server(&account, |session| {
-                let path = place.path.clone();
-                Box::pin(async move { imap::source(session, &path, None, uid).await })
-            })
-            .await
-            .map_err(refused)?
-            .ok_or_else(|| AppError::not_found("This mail isn't in its folder any more."))?;
+        let (place, raw) = self.source_of(&account, Some(key), uid).await?;
         let known = self
             .lock_lines()
             .get(&(account.id, place.path.clone()))
@@ -254,7 +240,7 @@ impl Mail {
 }
 
 /// What the sidebar calls a folder for its role, whatever its server does.
-fn role_name(role: FolderRole) -> String {
+pub(crate) fn role_name(role: FolderRole) -> String {
     match role {
         FolderRole::Sent => "Sent",
         FolderRole::Archive => "Archive",

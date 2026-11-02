@@ -46,7 +46,7 @@ const RETRY: [u64; 5] = [5, 15, 30, 60, 300];
 pub(crate) type KeptLines = HashMap<(Uuid, String), (i64, HashMap<i64, Summary>)>;
 
 pub struct Mail {
-    pool: PgPool,
+    pub(crate) pool: PgPool,
     secrets: Secrets,
     /// Goes up whenever an Inbox or an account's state changes.
     version: watch::Sender<i64>,
@@ -244,60 +244,21 @@ impl Mail {
         uid: i64,
     ) -> Result<Message, AppError> {
         let account = self.account(workspace_id, account_id).await?;
-        type Row = (
-            String,
-            String,
-            String,
-            String,
-            DateTime<Utc>,
-            bool,
-            i64,
-            Option<Vec<u8>>,
-        );
+        type Row = (String, String, String, String, DateTime<Utc>, bool);
         let row: Option<Row> = sqlx::query_as(
-            "SELECT m.from_name, m.from_address, m.subject, m.snippet, m.date, m.seen, \
-             i.uid_validity, s.raw FROM inbox_mails m \
-             JOIN inboxes i ON i.account_id = m.account_id \
-             LEFT JOIN mail_sources s ON s.account_id = m.account_id AND s.uid = m.uid \
-             WHERE m.account_id = $1 AND m.uid = $2",
+            "SELECT from_name, from_address, subject, snippet, date, seen FROM inbox_mails \
+             WHERE account_id = $1 AND uid = $2",
         )
         .bind(account_id)
         .bind(uid)
         .fetch_optional(&self.pool)
         .await?;
-        let Some((from_name, from_address, subject, snippet, date, seen, validity, kept)) = row
-        else {
+        let Some((from_name, from_address, subject, snippet, date, seen)) = row else {
             return Err(AppError::not_found(
                 "This mail isn't in the Inbox any more.",
             ));
         };
-
-        let raw = match kept {
-            Some(raw) => raw,
-            None => {
-                let raw = self
-                    .on_server(&account, |session| {
-                        Box::pin(imap::source(session, "INBOX", Some(validity), uid))
-                    })
-                    .await
-                    .map_err(|failure| AppError::refused(failure.message()))?
-                    .ok_or_else(|| {
-                        AppError::not_found("This mail isn't on the server any more.")
-                    })?;
-                // Kept only while its line is: a mail gone meanwhile keeps nothing.
-                sqlx::query(
-                    "INSERT INTO mail_sources (account_id, uid, raw) \
-                     SELECT account_id, uid, $3 FROM inbox_mails WHERE account_id = $1 AND uid = $2 \
-                     ON CONFLICT DO NOTHING",
-                )
-                .bind(account_id)
-                .bind(uid)
-                .bind(&raw)
-                .execute(&self.pool)
-                .await?;
-                raw
-            }
-        };
+        let raw = self.inbox_source(&account, uid).await?;
 
         if !seen {
             let mail = Arc::clone(self);
@@ -317,6 +278,99 @@ impl Mail {
             to_name: None,
         };
         Ok(message::read(&raw, summary))
+    }
+
+    /// A mail's source, and the folder it's in: the Inbox, or the one `key`
+    /// names. Reading it marks nothing.
+    pub(crate) async fn source_of(
+        &self,
+        account: &MailAccount,
+        key: Option<&str>,
+        uid: i64,
+    ) -> Result<(Place, Vec<u8>), AppError> {
+        let Some(key) = key else {
+            return Ok((Place::inbox(), self.inbox_source(account, uid).await?));
+        };
+        let refused = |failure: Failure| AppError::refused(failure.message());
+        let place = self
+            .place(account, key)
+            .await
+            .map_err(refused)?
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "{} has no folder called {key} any more.",
+                    account.name
+                ))
+            })?;
+        let raw = self
+            .on_server(account, |session| {
+                let path = place.path.clone();
+                Box::pin(async move { imap::source(session, &path, None, uid).await })
+            })
+            .await
+            .map_err(refused)?
+            .ok_or_else(|| AppError::not_found("This mail isn't in its folder any more."))?;
+        Ok((place, raw))
+    }
+
+    /// An Inbox mail's source: the copy kept here once it was opened, else
+    /// read from its server, and kept.
+    async fn inbox_source(&self, account: &MailAccount, uid: i64) -> Result<Vec<u8>, AppError> {
+        let row: Option<(i64, Option<Vec<u8>>)> = sqlx::query_as(
+            "SELECT i.uid_validity, s.raw FROM inbox_mails m \
+             JOIN inboxes i ON i.account_id = m.account_id \
+             LEFT JOIN mail_sources s ON s.account_id = m.account_id AND s.uid = m.uid \
+             WHERE m.account_id = $1 AND m.uid = $2",
+        )
+        .bind(account.id)
+        .bind(uid)
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some((validity, kept)) = row else {
+            return Err(AppError::not_found(
+                "This mail isn't in the Inbox any more.",
+            ));
+        };
+        if let Some(raw) = kept {
+            return Ok(raw);
+        }
+        let raw = self
+            .on_server(account, |session| {
+                Box::pin(imap::source(session, "INBOX", Some(validity), uid))
+            })
+            .await
+            .map_err(|failure| AppError::refused(failure.message()))?
+            .ok_or_else(|| AppError::not_found("This mail isn't on the server any more."))?;
+        // Kept only while its line is: a mail gone meanwhile keeps nothing.
+        sqlx::query(
+            "INSERT INTO mail_sources (account_id, uid, raw) \
+             SELECT account_id, uid, $3 FROM inbox_mails WHERE account_id = $1 AND uid = $2 \
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(account.id)
+        .bind(uid)
+        .bind(&raw)
+        .execute(&self.pool)
+        .await?;
+        Ok(raw)
+    }
+
+    /// Takes a mail's line out of the Inbox's copy at once, when it has
+    /// left the Inbox: before the watcher hears so from its server.
+    pub(crate) async fn forget_inbox_line(
+        &self,
+        account_id: Uuid,
+        uid: i64,
+    ) -> Result<(), sqlx::Error> {
+        let deleted = sqlx::query("DELETE FROM inbox_mails WHERE account_id = $1 AND uid = $2")
+            .bind(account_id)
+            .bind(uid)
+            .execute(&self.pool)
+            .await?;
+        if deleted.rows_affected() > 0 {
+            self.bump();
+        }
+        Ok(())
     }
 
     /// Marks an opened mail read, on its server, and in the Inbox's copy
@@ -368,16 +422,7 @@ impl Mail {
 
     /// Signs in to the account's server with its password from the keychain.
     async fn sign_in(&self, account: &MailAccount) -> Result<Session, Failure> {
-        let password = self
-            .secrets
-            .get(&account.address)
-            .await
-            .map_err(|e| Failure::Offline(format!("couldn't read the keychain: {e}")))?
-            .ok_or_else(|| {
-                Failure::Refused(
-                    "Its password isn't in the keychain. Add the account again.".into(),
-                )
-            })?;
+        let password = self.password(account).await?;
         let port = u16::try_from(account.port).unwrap_or(993);
         imap::sign_in(&Login {
             host: &account.host,
@@ -386,6 +431,19 @@ impl Mail {
             password: &password,
         })
         .await
+    }
+
+    /// The account's password, from the keychain: for IMAP and SMTP alike.
+    pub(crate) async fn password(&self, account: &MailAccount) -> Result<String, Failure> {
+        self.secrets
+            .get(&account.address)
+            .await
+            .map_err(|e| Failure::Offline(format!("couldn't read the keychain: {e}")))?
+            .ok_or_else(|| {
+                Failure::Refused(
+                    "Its password isn't in the keychain. Add the account again.".into(),
+                )
+            })
     }
 
     /// Keeps one account's copy up to date for as long as it's watched.
@@ -508,7 +566,7 @@ pub async fn inbox(
 
 #[derive(Deserialize)]
 pub struct OpenParams {
-    folder: Option<String>,
+    pub(crate) folder: Option<String>,
 }
 
 /// `GET /api/w/{workspace}/mails/{account}/{uid}[?folder=<key>]`: a mail

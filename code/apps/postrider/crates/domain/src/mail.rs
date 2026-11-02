@@ -372,6 +372,35 @@ pub struct Message {
     /// `data:` URLs. The page shows it, without scripts, in place of `text`.
     pub html: Option<String>,
     pub attachments: Vec<Attachment>,
+    /// Who a reply goes to when it isn't the sender: its Reply-To, by name
+    /// or address.
+    pub reply_to: Option<String>,
+}
+
+/// R: a reply to a mail, as the page sends it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct Reply {
+    /// The account it goes from: the one the mail came to when left out.
+    pub from_account: Option<Uuid>,
+    /// The folder the mail is in, by its key: the Inbox when left out.
+    pub folder: Option<String>,
+    pub text: String,
+}
+
+impl Validate for Reply {
+    fn validate(&self) -> Result<(), ValidationError> {
+        if self.text.trim().is_empty() {
+            return Err(ValidationError("Write something first.".into()));
+        }
+        if self.text.len() > 1_000_000 {
+            return Err(ValidationError(
+                "A reply holds up to a million characters.".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A file that came with a mail.
