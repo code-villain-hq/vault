@@ -235,13 +235,13 @@ with `reading`; Undo puts them back.
 
 A newsletter is mail that carries `List-Unsubscribe` and isn't a notice
 (`newsletters.rs`). A notice is about something of yours: a sign-in, the
-account, an order, a payment, a delivery. Google puts the header on its
-notices too, so `is_notice` tells them by what the header can't: an
-`Auto-Submitted` other than `no` (RFC 3834), a word in the sender's
-local part (`NOTICE_WORDS`: account, security, login, order, receipt,
-payment, shipping, confirm, … in English, German and Swedish) or a host
-that sends only notices (`NOTICE_HOSTS`: `accounts.google.com`,
-`id.apple.com`). The rule's Sieve says the same (`notice_test`); IMAP
+account, an order, a payment, a delivery, a message someone wrote you.
+Google and LinkedIn put the header on their notices too, so `is_notice`
+tells them by what the header can't: an `Auto-Submitted` other than `no`
+(RFC 3834), a word in the sender's local part (`NOTICE_WORDS`: account,
+security, login, order, receipt, payment, shipping, confirm, message, …
+in English, German and Swedish) or a host that sends only notices
+(`NOTICE_HOSTS`: `accounts.google.com`, `id.apple.com`). The rule's Sieve says the same (`notice_test`); IMAP
 SEARCH can't, so what it finds is read again by `FROM AUTO-SUBMITTED`.
 Keep in Inbox is the fix for a sender it still gets wrong.
 

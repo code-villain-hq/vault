@@ -314,7 +314,7 @@ const accounts: {
           leave: "mail",
         }),
         ...newsletters({
-          from: "LinkedIn <messages-noreply@linkedin.test>",
+          from: "LinkedIn <updates-noreply@linkedin.test>",
           subjects: [
             "Du bist in 12 Suchen aufgetaucht",
             "Neue Jobs für dich",

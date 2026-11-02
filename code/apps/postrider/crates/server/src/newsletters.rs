@@ -78,7 +78,8 @@ const NOTICE_FIELDS: &str = "FROM AUTO-SUBMITTED";
 
 /// What a notice's address says it's about, in English, German or Swedish:
 /// your account and signing in; an order, its bill and its payment; its
-/// delivery; a booking, or a confirmation of anything.
+/// delivery; a booking, or a confirmation of anything; a message someone
+/// wrote you, as LinkedIn's messaging-digest-noreply@ says.
 const NOTICE_WORDS: &[&str] = &[
     "account",
     "konto",
@@ -114,6 +115,8 @@ const NOTICE_WORDS: &[&str] = &[
     "confirm",
     "bestaetig",
     "bekraftelse",
+    "messag",
+    "inmail",
 ];
 
 /// The first part of a host that sends only notices: accounts.google.com,
@@ -982,12 +985,17 @@ mod tests {
         assert!(is_notice("Buchungsbestaetigung@bahn.de", None));
         assert!(is_notice("kvitto@coop.se", None));
         assert!(is_notice("noreply@forge.test", Some(" auto-generated")));
+        assert!(is_notice("messaging-digest-noreply@linkedin.com", None));
+        assert!(is_notice("messages-noreply@linkedin.com", None));
         // Their newsletters don't.
         assert!(!is_notice("googleplay-noreply@google.com", None));
         assert!(!is_notice("store-news@amazon.de", None));
         assert!(!is_notice("newsletter@coop.se", Some("no")));
         assert!(!is_notice("info@fitness24seven.test", None));
         assert!(!is_notice("news@identity.test", None));
+        assert!(!is_notice("updates-noreply@linkedin.com", None));
+        // netcup's advisories come from its newsletter: that stays one.
+        assert!(!is_notice("newsletter@netcup.com", None));
     }
 
     #[test]
