@@ -3604,6 +3604,7 @@ dependencies = [
  "anyhow",
  "async-imap",
  "axum",
+ "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "code-villain-auth",

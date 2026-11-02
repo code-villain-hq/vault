@@ -1,7 +1,8 @@
 //! The unified Inbox: one watcher per account keeps its copy up to date
 //! ([`crate::imap`]) and says where its server stands; the web app reads
 //! the whole of it at `GET /api/w/{workspace}/inbox`, and waits there for
-//! the next change with `?after=`.
+//! the next change with `?after=`. A mail opened from it is read at
+//! `GET /api/w/{workspace}/mails/{account}/{uid}`.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -9,9 +10,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
-use postrider_domain::{AccountState, AccountStatus, Inbox, MailAccount, MailSummary};
+use futures::future::BoxFuture;
+use postrider_domain::{AccountState, AccountStatus, Inbox, MailAccount, MailSummary, Message};
 use serde::Deserialize;
 use sqlx::PgPool;
 use tokio::sync::watch;
@@ -21,6 +23,7 @@ use uuid::Uuid;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::imap::{self, Failure, Login, Session};
+use crate::message;
 use crate::secrets::Secrets;
 use crate::state::AppState;
 
@@ -45,6 +48,9 @@ pub struct Mail {
     version: watch::Sender<i64>,
     statuses: Mutex<HashMap<Uuid, AccountStatus>>,
     watchers: Mutex<HashMap<Uuid, AbortHandle>>,
+    /// A connection per account for opening mail, kept between mails: the
+    /// watcher's own waits in IDLE.
+    readers: Mutex<HashMap<Uuid, Session>>,
 }
 
 impl Mail {
@@ -55,6 +61,7 @@ impl Mail {
             version: watch::Sender::new(1),
             statuses: Mutex::default(),
             watchers: Mutex::default(),
+            readers: Mutex::default(),
         }
     }
 
@@ -90,6 +97,7 @@ impl Mail {
             task.abort();
         }
         self.lock_statuses().remove(&account_id);
+        self.lock_readers().remove(&account_id);
         self.bump();
     }
 
@@ -98,6 +106,7 @@ impl Mail {
         for (_, task) in self.lock_watchers().drain() {
             task.abort();
         }
+        self.lock_readers().clear();
     }
 
     pub fn version(&self) -> i64 {
@@ -176,6 +185,161 @@ impl Mail {
         })
     }
 
+    /// A mail of the workspace's, opened: from the copy of its source kept
+    /// here, else from its server, which then keeps it. Opening marks it
+    /// read on the server, as any mail app does, without waiting for it.
+    pub async fn open(
+        self: &Arc<Self>,
+        workspace_id: Uuid,
+        account_id: Uuid,
+        uid: i64,
+    ) -> Result<Message, AppError> {
+        let account: Option<serde_json::Value> = sqlx::query_scalar(
+            "SELECT to_jsonb(a.*) FROM mail_accounts a WHERE id = $1 AND workspace_id = $2",
+        )
+        .bind(account_id)
+        .bind(workspace_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        let account: MailAccount = account
+            .and_then(|row| serde_json::from_value(row).ok())
+            .ok_or_else(|| AppError::not_found("That account isn't here any more."))?;
+        type Row = (
+            String,
+            String,
+            String,
+            String,
+            DateTime<Utc>,
+            bool,
+            i64,
+            Option<Vec<u8>>,
+        );
+        let row: Option<Row> = sqlx::query_as(
+            "SELECT m.from_name, m.from_address, m.subject, m.snippet, m.date, m.seen, \
+             i.uid_validity, s.raw FROM inbox_mails m \
+             JOIN inboxes i ON i.account_id = m.account_id \
+             LEFT JOIN mail_sources s ON s.account_id = m.account_id AND s.uid = m.uid \
+             WHERE m.account_id = $1 AND m.uid = $2",
+        )
+        .bind(account_id)
+        .bind(uid)
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some((from_name, from_address, subject, snippet, date, seen, validity, kept)) = row
+        else {
+            return Err(AppError::not_found(
+                "This mail isn't in the Inbox any more.",
+            ));
+        };
+
+        let raw = match kept {
+            Some(raw) => raw,
+            None => {
+                let raw = self
+                    .on_server(&account, |session| {
+                        Box::pin(imap::source(session, validity, uid))
+                    })
+                    .await
+                    .map_err(|failure| AppError::refused(failure.message()))?
+                    .ok_or_else(|| {
+                        AppError::not_found("This mail isn't on the server any more.")
+                    })?;
+                // Kept only while its line is: a mail gone meanwhile keeps nothing.
+                sqlx::query(
+                    "INSERT INTO mail_sources (account_id, uid, raw) \
+                     SELECT account_id, uid, $3 FROM inbox_mails WHERE account_id = $1 AND uid = $2 \
+                     ON CONFLICT DO NOTHING",
+                )
+                .bind(account_id)
+                .bind(uid)
+                .bind(&raw)
+                .execute(&self.pool)
+                .await?;
+                raw
+            }
+        };
+
+        if !seen {
+            let mail = Arc::clone(self);
+            tokio::spawn(async move { mail.mark_read(account, uid).await });
+        }
+
+        let summary = MailSummary {
+            account_id,
+            uid,
+            from_name,
+            from_address,
+            subject,
+            snippet,
+            date,
+            seen: true,
+        };
+        Ok(message::read(&raw, summary))
+    }
+
+    /// Marks an opened mail read, on its server and in the copy. Offline,
+    /// it stays unread until it's opened again.
+    async fn mark_read(&self, account: MailAccount, uid: i64) {
+        let marked = self
+            .on_server(&account, |session| Box::pin(imap::mark_read(session, uid)))
+            .await;
+        if let Err(failure) = marked {
+            tracing::info!(address = %account.address, "couldn't mark read: {}", failure.message());
+            return;
+        }
+        let updated =
+            sqlx::query("UPDATE inbox_mails SET seen = true WHERE account_id = $1 AND uid = $2")
+                .bind(account.id)
+                .bind(uid)
+                .execute(&self.pool)
+                .await;
+        if updated.is_ok_and(|done| done.rows_affected() > 0) {
+            self.bump();
+        }
+    }
+
+    /// Does `work` over the account's connection for reading, opened when
+    /// there's none. One the server has closed since is opened again.
+    async fn on_server<T>(
+        &self,
+        account: &MailAccount,
+        work: impl for<'s> Fn(&'s mut Session) -> BoxFuture<'s, Result<T, Failure>>,
+    ) -> Result<T, Failure> {
+        let kept = self.lock_readers().remove(&account.id);
+        if let Some(mut session) = kept
+            && let Ok(done) = work(&mut session).await
+        {
+            self.lock_readers().insert(account.id, session);
+            return Ok(done);
+        }
+        let mut session = self.sign_in(account).await?;
+        let done = work(&mut session).await?;
+        self.lock_readers().insert(account.id, session);
+        Ok(done)
+    }
+
+    /// Signs in to the account's server with its password from the keychain.
+    async fn sign_in(&self, account: &MailAccount) -> Result<Session, Failure> {
+        let password = self
+            .secrets
+            .get(&account.address)
+            .await
+            .map_err(|e| Failure::Offline(format!("couldn't read the keychain: {e}")))?
+            .ok_or_else(|| {
+                Failure::Refused(
+                    "Its password isn't in the keychain. Add the account again.".into(),
+                )
+            })?;
+        let port = u16::try_from(account.port).unwrap_or(993);
+        imap::sign_in(&Login {
+            host: &account.host,
+            port,
+            username: &account.username,
+            password: &password,
+        })
+        .await
+    }
+
     /// Keeps one account's copy up to date for as long as it's watched.
     async fn run(self: Arc<Self>, account: MailAccount) {
         let mut tries = 0;
@@ -208,24 +372,7 @@ impl Mail {
         account: &MailAccount,
         tries: &mut usize,
     ) -> Result<Infallible, Failure> {
-        let password = self
-            .secrets
-            .get(&account.address)
-            .await
-            .map_err(|e| Failure::Offline(format!("couldn't read the keychain: {e}")))?
-            .ok_or_else(|| {
-                Failure::Refused(
-                    "Its password isn't in the keychain. Add the account again.".into(),
-                )
-            })?;
-        let port = u16::try_from(account.port).unwrap_or(993);
-        let mut session = imap::sign_in(&Login {
-            host: &account.host,
-            port,
-            username: &account.username,
-            password: &password,
-        })
-        .await?;
+        let mut session = self.sign_in(account).await?;
         let idle = session.capabilities().await?.has_str("IDLE");
         if imap::sync_inbox(&mut session, &self.pool, account.id).await? {
             self.bump();
@@ -266,6 +413,10 @@ impl Mail {
     fn lock_watchers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, AbortHandle>> {
         self.watchers.lock().expect("never poisoned")
     }
+
+    fn lock_readers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Session>> {
+        self.readers.lock().expect("never poisoned")
+    }
 }
 
 /// Waits in IDLE until the server says something changed, or [`IDLE`]
@@ -297,4 +448,19 @@ pub async fn inbox(
         state.mail.changed_since(after).await;
     }
     Ok(Json(state.mail.inbox(member.actor.workspace_id).await?))
+}
+
+/// `GET /api/w/{workspace}/mails/{account}/{uid}`: a mail from the Inbox,
+/// opened, which marks it read.
+pub async fn open(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, account_id, uid)): Path<(Uuid, Uuid, i64)>,
+) -> Result<Json<Message>, AppError> {
+    Ok(Json(
+        state
+            .mail
+            .open(member.actor.workspace_id, account_id, uid)
+            .await?,
+    ))
 }

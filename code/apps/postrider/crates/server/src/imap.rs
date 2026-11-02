@@ -317,6 +317,41 @@ pub async fn sync_inbox(
     Ok(changed)
 }
 
+/// A mail's whole source, from the account's Inbox, without marking it
+/// read. `None` when it's no longer there, or the Inbox's UIDs changed
+/// meaning since `validity`.
+pub async fn source(
+    session: &mut Session,
+    validity: i64,
+    uid: i64,
+) -> Result<Option<Vec<u8>>, Failure> {
+    let mailbox = session.select("INBOX").await?;
+    if i64::from(mailbox.uid_validity.unwrap_or(0)) != validity {
+        return Ok(None);
+    }
+    let fetches: Vec<Fetch> = session
+        .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
+        .await?
+        .try_collect()
+        .await?;
+    Ok(fetches
+        .iter()
+        .find(|f| f.uid.map(i64::from) == Some(uid))
+        .and_then(|f| f.body())
+        .map(<[u8]>::to_vec))
+}
+
+/// Marks a mail in the Inbox read, as opening it does.
+pub async fn mark_read(session: &mut Session, uid: i64) -> Result<(), Failure> {
+    session.select("INBOX").await?;
+    session
+        .uid_store(uid.to_string(), "+FLAGS.SILENT (\\Seen)")
+        .await?
+        .try_collect::<Vec<_>>()
+        .await?;
+    Ok(())
+}
+
 fn is_seen(fetch: &Fetch) -> bool {
     fetch.flags().any(|flag| flag == Flag::Seen)
 }

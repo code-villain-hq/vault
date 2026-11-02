@@ -5,8 +5,9 @@ account, read over IMAP, with today's events from a CalDAV server (Radicale)
 above it. [`storyboards/a-day-with-your-mail.html`](storyboards/a-day-with-your-mail.html)
 is the approved storyboard; build from it, a step at a time, not beyond it.
 Step 1 is built: the unified Inbox, today, and Settings → Accounts.
-Mails don't open yet, and composing, Sieve rules, newsletters, the ask
-field and the week view are still to come.
+A mail opens in the Inbox's place; Esc goes back, J and K move. Archiving,
+replying, composing, Sieve rules, newsletters, the ask field and the week
+view are still to come.
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -70,6 +71,13 @@ An account's state (`connecting`, `online`, `offline`, `refused`) comes
 with it. Offline it tries again, waiting longer each time; refused
 (a wrong password) it waits until the account is connected again.
 
+A mail opens with `GET /api/w/{id}/mails/{account}/{uid}`: the server
+fetches its source over IMAP once and keeps it (`mail_sources`, gone with
+its line in the Inbox), so it opens again offline, and marks it read on
+the server. `message.rs` reads the source: who it went to, its text, its
+HTML with inline pictures written in, its attachments. The page shows the
+HTML in a frame where no script runs and pictures load without a referrer.
+
 Today is read live too: `GET /api/w/{id}/day?from&to` asks the CalDAV
 server for every calendar's events (`caldav.rs`). A calendar wears the hue
 of the account it's named after.
@@ -82,13 +90,14 @@ of the account it's named after.
   others. Accounts and the calendar are made by the server, after it
   signs in (`POST /accounts`, `/calendar`), never by the web app.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
-  `mail.rs`), CalDAV (`caldav.rs`), connecting accounts (`connect.rs`) and
+  `mail.rs`), reading a mail (`message.rs`), CalDAV (`caldav.rs`), connecting accounts (`connect.rs`) and
   the keychain (`secrets.rs`). `local.rs` is the one person on this Mac,
   who signs in to nothing. `serve.rs` runs it until told to stop, for
   `main.rs` (development) and the desktop app alike.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `inbox.tsx` is the Inbox and
-  today, `settings.tsx` the accounts, `mail.tsx` the live Inbox.
+  today, `message.tsx` an opened mail, `settings.tsx` the accounts,
+  `mail.tsx` the live Inbox.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
   for this Mac, with `code/kit/desktop`.
 - `migrations`: SQL schema, applied by the server on start.

@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
 import { InboxPage } from "./inbox";
 import { Home, NotFound, WorkspaceLayout } from "./layout";
+import { MailPage } from "./message";
 import { AccountsPage } from "./settings";
 
 const root = createRootRoute({ component: Outlet, notFoundComponent: NotFound });
@@ -42,6 +43,11 @@ const workspace = createRoute({
 });
 
 const inbox = createRoute({ getParentRoute: () => workspace, path: "/", component: InboxPage });
+const mail = createRoute({
+  getParentRoute: () => workspace,
+  path: "/mail/$account/$uid",
+  component: MailPage,
+});
 const accounts = createRoute({
   getParentRoute: () => workspace,
   path: "/settings/accounts",
@@ -52,7 +58,7 @@ const routeTree = root.addChildren([
   index,
   login,
   signedIn,
-  workspace.addChildren([inbox, accounts]),
+  workspace.addChildren([inbox, mail, accounts]),
 ]);
 
 export const router = createRouter({ routeTree });

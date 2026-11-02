@@ -251,6 +251,34 @@ pub struct Inbox {
     pub mails: Vec<MailSummary>,
 }
 
+/// A mail opened from the Inbox: its line in the list, and the whole of it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Message {
+    #[serde(flatten)]
+    #[ts(flatten)]
+    pub summary: MailSummary,
+    /// Who else it went to (To, then Cc): names, or addresses without one.
+    pub to: Vec<String>,
+    /// Its text: the sender's, or made from its HTML.
+    pub text: String,
+    /// Its HTML when it has some, with its inline pictures written in as
+    /// `data:` URLs. The page shows it, without scripts, in place of `text`.
+    pub html: Option<String>,
+    pub attachments: Vec<Attachment>,
+}
+
+/// A file that came with a mail.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Attachment {
+    /// "Invoice.pdf", or "Attachment" when the mail gives no name.
+    pub name: String,
+    /// In bytes.
+    #[ts(type = "number")]
+    pub size: i64,
+}
+
 /// An event in a day, from the calendar server.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]

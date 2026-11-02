@@ -1,5 +1,6 @@
+import { shortcutFree } from "@code-villain/web";
 import type { AccountStatus, Day, MailAccount, MailSummary } from "@postrider/types";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { FIRST_HOUR, HOURS, hoursIntoTrack, inLanes, nextUp } from "./day";
@@ -26,21 +27,93 @@ export function InboxPage() {
         <AccountProblems accounts={accounts} statuses={inbox?.accounts ?? []} />
         {inbox &&
           (inbox.mails.length ? (
-            <ol className="mails" aria-label="Mail">
-              {inbox.mails.map((mail) => (
-                <MailRow
-                  key={`${mail.account_id}:${mail.uid}`}
-                  mail={mail}
-                  account={byId.get(mail.account_id)}
-                  now={now}
-                />
-              ))}
-            </ol>
+            <MailList mails={inbox.mails} byId={byId} now={now} />
           ) : (
             <Empty title="Nothing here." />
           ))}
       </PageBody>
     </>
+  );
+}
+
+/** A mail's key in the list, and in the page that opens it. */
+export function mailKey(mail: { account_id: string; uid: number }): string {
+  return `${mail.account_id}:${mail.uid}`;
+}
+
+/** The mail opened last, so the Inbox comes back to it. */
+let lastOpened: string | undefined;
+
+export function rememberOpened(key: string) {
+  lastOpened = key;
+}
+
+/**
+ * The Inbox's mail: J and K (and the arrows) move through it, Enter or O
+ * opens the one they're on.
+ */
+function MailList({
+  mails,
+  byId,
+  now,
+}: {
+  mails: MailSummary[];
+  byId: Map<string, MailAccount>;
+  now: Date;
+}) {
+  const { workspace } = useWorkspace();
+  const navigate = useNavigate();
+  const list = useRef<HTMLOListElement>(null);
+  // By key, so new mail at the top doesn't move it to another.
+  const [focusedKey, setFocusedKey] = useState(lastOpened);
+  const focused = Math.max(
+    0,
+    mails.findIndex((mail) => mailKey(mail) === focusedKey),
+  );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!shortcutFree(event)) return;
+      // Letters whatever the case (Caps Lock, Shift).
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      const step =
+        key === "j" || key === "ArrowDown" ? 1 : key === "k" || key === "ArrowUp" ? -1 : 0;
+      if (step) {
+        event.preventDefault();
+        const next = mails[Math.min(Math.max(focused + step, 0), mails.length - 1)];
+        if (next) setFocusedKey(mailKey(next));
+      } else if ((key === "Enter" && event.target === document.body) || key === "o") {
+        const mail = mails[focused];
+        if (!mail) return;
+        event.preventDefault();
+        rememberOpened(mailKey(mail));
+        void navigate({
+          to: "/$workspace/mail/$account/$uid",
+          params: { workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) },
+        });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  useEffect(() => {
+    list.current?.querySelector(`[data-index="${focused}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [focused]);
+
+  return (
+    <ol ref={list} className="mails" aria-label="Mail">
+      {mails.map((mail, index) => (
+        <MailRow
+          key={mailKey(mail)}
+          mail={mail}
+          index={index}
+          focused={index === focused}
+          account={byId.get(mail.account_id)}
+          now={now}
+        />
+      ))}
+    </ol>
   );
 }
 
@@ -56,34 +129,50 @@ function useNow(): Date {
 
 function MailRow({
   mail,
+  index,
+  focused,
   account,
   now,
 }: {
   mail: MailSummary;
+  index: number;
+  focused: boolean;
   account: MailAccount | undefined;
   now: Date;
 }) {
+  const { workspace } = useWorkspace();
   const unread = !mail.seen;
   return (
-    <li
-      className={`mail ${unread ? "unread" : ""}`}
-      style={hue(account?.hue ?? 1)}
-      title={account ? `${mail.from_address}, to ${account.name}` : mail.from_address}
-    >
-      {unread ? <span className="ui-live-dot" role="img" aria-label="Unread" /> : <span />}
-      <span className="av" aria-hidden="true">
-        {mail.from_name.trim().charAt(0).toUpperCase()}
-      </span>
-      <span className="who">{mail.from_name}</span>
-      <span className="line">
-        <b>{mail.subject || "(no subject)"}</b>
-        {mail.snippet && ` — ${mail.snippet}`}
-      </span>
-      <time className="when" dateTime={mail.date} title={new Date(mail.date).toLocaleString()}>
-        {mailTime(mail.date, now)}
-      </time>
+    <li>
+      <Link
+        to="/$workspace/mail/$account/$uid"
+        params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
+        onClick={() => rememberOpened(mailKey(mail))}
+        className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""}`}
+        style={hue(account?.hue ?? 1)}
+        title={account ? `${mail.from_address}, to ${account.name}` : mail.from_address}
+        data-index={index}
+      >
+        {unread ? <span className="ui-live-dot" role="img" aria-label="Unread" /> : <span />}
+        <span className="av" aria-hidden="true">
+          {initial(mail.from_name)}
+        </span>
+        <span className="who">{mail.from_name}</span>
+        <span className="line">
+          <b>{mail.subject || "(no subject)"}</b>
+          {mail.snippet && ` — ${mail.snippet}`}
+        </span>
+        <time className="when" dateTime={mail.date} title={new Date(mail.date).toLocaleString()}>
+          {mailTime(mail.date, now)}
+        </time>
+      </Link>
     </li>
   );
+}
+
+/** A sender's first letter, for their avatar. */
+export function initial(name: string): string {
+  return name.trim().charAt(0).toUpperCase();
 }
 
 /** An account Postrider can't read right now says so, above the mail. */

@@ -12,6 +12,7 @@ pub mod error;
 pub mod imap;
 pub mod local;
 pub mod mail;
+pub mod message;
 pub mod routes;
 pub mod secrets;
 mod serve;

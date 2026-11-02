@@ -33,6 +33,7 @@ pub fn router(state: AppState) -> Router {
         .route("/sync/transactions", post(transaction))
         .route("/sync/ws", get(ws::handler))
         .route("/inbox", get(mail::inbox))
+        .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/day", get(caldav::day))
         .route("/accounts", post(connect::add_account))
         .route("/accounts/{id}", delete(connect::remove_account))

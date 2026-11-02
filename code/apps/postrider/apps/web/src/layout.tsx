@@ -3,12 +3,15 @@ import {
   AppVersion,
   type Command,
   CommandMenu,
+  type ShortcutSection,
   matching,
   Redirect,
   SearchButton,
   Shortcuts,
   ShortcutsButton,
+  SidebarEdge,
   SyncIndicator,
+  useSidebarWidth,
 } from "@code-villain/web";
 import {
   Link,
@@ -100,19 +103,39 @@ export function NotFound() {
 }
 
 /**
- * The bar at the top of each page: its title, then the page's controls.
- * In the desktop app the native title bar is hidden, so this bar and the
- * sidebar's top row are what the window is moved by.
+ * The bar at the top of each page: where you are, then the page's
+ * controls. In the desktop app the native title bar is hidden, so this bar
+ * and the sidebar's top row are what the window is moved by.
  */
-export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
+export function PageHeader({
+  title,
+  parent,
+  children,
+}: {
+  title: string;
+  parent?: ReactNode;
+  children?: ReactNode;
+}) {
+  const { workspace } = useWorkspace();
   return (
-    <header
-      className="app-topbar flex min-h-12 shrink-0 items-center gap-3 px-2"
-      data-tauri-drag-region="deep"
-    >
-      <h1 className="truncate text-xs font-semibold">{title}</h1>
-      <div className="ml-auto flex min-w-0 items-center gap-3">{children}</div>
-    </header>
+    <>
+      <header
+        className="app-topbar flex min-h-12 shrink-0 items-center gap-3 px-4"
+        data-tauri-drag-region="deep"
+      >
+        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs text-muted">
+          <span className="shrink-0">{parent ?? workspace.name}</span>
+          <span aria-hidden="true" className="text-faint">
+            ›
+          </span>
+          <span className="truncate font-medium text-fg" aria-current="page">
+            {title}
+          </span>
+        </nav>
+        <div className="ml-auto flex min-w-0 items-center gap-3">{children}</div>
+      </header>
+      <h1 className="sr-only">{title}</h1>
+    </>
   );
 }
 
@@ -123,10 +146,12 @@ export function PageBody({ children }: { children: ReactNode }) {
 
 /** The workspace frame: sidebar and page. */
 function Shell() {
+  const sidebar = useSidebarWidth();
   return (
     <>
-      <div className="app-shell flex h-full bg-bg">
+      <div className="app-shell flex h-full bg-bg" style={sidebar.style}>
         <Sidebar />
+        <SidebarEdge width={sidebar.width} onChange={sidebar.setWidth} />
         <main className="workspace-content mb-2 mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-bg">
           <Outlet />
         </main>
@@ -146,7 +171,7 @@ function Sidebar() {
   const inSettings = pathname.includes("/settings/");
   return (
     <aside
-      className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
+      className="app-sidebar flex w-(--sidebar-width) shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
       aria-label="Sidebar"
     >
       <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
@@ -187,7 +212,6 @@ function MailNav() {
       <Link
         to="/$workspace"
         params={{ workspace: workspace.url_key }}
-        activeOptions={{ exact: true }}
         className={navLink}
         title="Inbox (G then I)"
       >
@@ -307,6 +331,24 @@ function WorkspaceMenu() {
   );
 }
 
+/** Postrider's own shortcuts; the kit's list adds "Anywhere" and "Menus". */
+const SECTIONS: ShortcutSection[] = [
+  {
+    title: "The Inbox",
+    keys: [
+      ["J K or ↓ ↑", "Next and previous mail"],
+      ["Enter or O", "Open the mail"],
+    ],
+  },
+  {
+    title: "A mail",
+    keys: [
+      ["J K", "The next and previous mail, opened"],
+      ["Esc", "Back to the Inbox"],
+    ],
+  },
+];
+
 /** ⌘K and the shortcuts list: the Inbox, settings, and the other workspaces. */
 function Menus() {
   const { workspace } = useWorkspace();
@@ -317,6 +359,7 @@ function Menus() {
       <CommandMenu useCommands={useCommands} placeholder="Type a command…" />
       <Shortcuts
         goTo={[{ key: "i", name: "Inbox", go: () => void navigate({ to: "/$workspace", params }) }]}
+        sections={SECTIONS}
         onSettings={
           isDesktop
             ? () => void navigate({ to: "/$workspace/settings/accounts", params })
