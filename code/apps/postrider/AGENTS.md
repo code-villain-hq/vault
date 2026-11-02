@@ -4,11 +4,13 @@ Postrider is the studio's mail and calendar app: one Inbox for every
 account, read over IMAP, with today's events from a CalDAV server (Radicale)
 above it. [`storyboards/a-day-with-your-mail.html`](storyboards/a-day-with-your-mail.html)
 is the approved storyboard; build from it, a step at a time, not beyond it.
-Step 1's reading is built: the unified Inbox, today, Sent, Archive and
-the other folders in the sidebar, Search mail (/), and Settings → Accounts.
-A mail opens in its list's place; Esc goes back, J and K move. Archiving,
-replying, composing, Sieve rules, newsletters, the ask field and the week
-view are still to come.
+Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
+Trash and the other folders in the sidebar, Search mail (/), Settings →
+Accounts, and on a mail E to archive it, R to reply and its files to open.
+A mail opens in its list's place; Esc goes back, J and K move. The desktop
+app notifies of new mail and counts what's unread on the dock. Sieve
+rules (step 2), writing a new mail and "More professional" (3),
+newsletters (4) and the week (5) are still to come.
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -35,12 +37,14 @@ Run `bun run design:sync` after changing them in the vault.
 ## Commands
 
 - `bun run db`: Postgres (5438) and the stand-ins in Docker: Dovecot for
-  IMAP (3143) and Radicale for CalDAV (5232). Both take any user name with
-  the password `dev`. `bun run db:reset` wipes them.
+  IMAP (3143), Radicale for CalDAV (5232) and Mailpit for SMTP (3025),
+  which keeps what's sent and sends nothing on (read it at
+  http://127.0.0.1:3026). They take any user name with the password
+  `dev`. `bun run db:reset` wipes them.
 - `bun run seed`: the storyboard's morning: two accounts (Code Villain and
-  Lazarski) with ten mails and a few folders (Sent, Archive, Rechnungen…),
-  and their calendars with today's events. A folder that has mail isn't
-  filled again.
+  Lazarski) with ten mails (one with a PDF) and a few folders (Sent,
+  Archive, Junk, Trash, Rechnungen…), and their calendars with today's
+  events. A folder that has mail isn't filled again.
 - `bun run dev`: the Rust server (:7880) plus the web app (:5178, proxies
   `/api`), for the person on this Mac, as the desktop app runs it. The
   server writes this launch's session to `.dev-session` and Vite signs
@@ -90,7 +94,11 @@ newest mail; `/search?q=` asks every folder but Drafts, Trash and Junk for
 the mail with every word in it (IMAP `TEXT`). A mail opened from them is
 `/mails/{account}/{uid}?folder=<key>`, read from its server each time.
 What the lists showed is kept in memory, so a folder opened again reads
-only its new mail.
+only its new mail. An account keeps up to three connections for this
+(`READERS`), beside its watcher's, and a search reads that many of its
+folders at once. The sidebar asks for the folders again when the Inbox
+changes, when a folder or unread mail is opened, and every minute while
+the app shows.
 
 Today is read live too: `GET /api/w/{id}/day?from&to` asks the CalDAV
 server for every calendar's events (`caldav.rs`). A calendar wears the hue
@@ -98,7 +106,29 @@ of the account Settings picked for it (`Calendar.accounts`, by its href),
 else of the account it's named after, else of the one at the server's
 domain. Radicale names a calendar without a name by its path, so Settings
 lists them (`GET /api/w/{id}/calendars`) with their next event to tell
-them by.
+them by. The last day read is kept (`kept_days`): when the server can't be
+reached, the page shows it, "Offline · as of 10:52".
+
+## What changes mail
+
+Every change happens on the account's server; the Inbox follows it there.
+
+- E archives (`archive.rs`): the mail moves to its account's Archive
+  (made when there's none) and the next one opens.
+- R replies (`reply.rs`, `compose.tsx`): to the mail's Reply-To, else its
+  sender, from the account it came to, in its thread, quoting it. It goes
+  over SMTP: the IMAP server with `imap.` read as `smtp.`, on 465 with
+  TLS, with the same password; the stand-ins at 127.0.0.1 use Mailpit on
+  3025. A copy goes to Sent and the mail is marked answered. Esc keeps
+  what you wrote, in memory, until the page reloads; ⌘Enter sends.
+- A mail's files (`files.rs`) come by their place among its attachments.
+  The desktop app saves one in Downloads and opens it
+  (`apps/desktop/src-tauri/src/files.rs`); the browser downloads it.
+
+New unread mail is a notification in the desktop app (more than three at
+once are one), through `code/kit/notify`, and the dock badge counts the
+Inbox's unread mail (`mail.tsx`, `platform.ts`). What a server has when its
+account comes online doesn't notify.
 
 ## Layout
 
@@ -109,17 +139,21 @@ them by.
   signs in (`POST /accounts`, `/calendar`), never by the web app.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
   `mail.rs`, the folders and search in `folders.rs`), reading a mail
-  (`message.rs`), CalDAV (`caldav.rs`), connecting accounts (`connect.rs`)
-  and the keychain (`secrets.rs`). `local.rs` is the one person on this Mac,
-  who signs in to nothing. `serve.rs` runs it until told to stop, for
-  `main.rs` (development) and the desktop app alike.
+  (`message.rs`, its list line in `preview.rs`), archiving, replying and
+  files (`archive.rs`, `reply.rs`, `files.rs`), CalDAV (`caldav.rs`),
+  connecting accounts (`connect.rs`) and the keychain (`secrets.rs`).
+  `local.rs` is the one person on this Mac, who signs in to nothing.
+  `serve.rs` runs it until told to stop, for `main.rs` (development) and
+  the desktop app alike.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `inbox.tsx` is the Inbox and
   today, `folders.tsx` a folder, a search and the search field,
-  `message.tsx` an opened mail, `settings.tsx` the accounts and
-  calendars, `mail.tsx` the live Inbox and the folder list.
+  `message.tsx` an opened mail, `compose.tsx` a reply, `settings.tsx`
+  the accounts and calendars, `mail.tsx` the live Inbox, notifications
+  and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
-  for this Mac, with `code/kit/desktop`.
+  for this Mac, with `code/kit/desktop`; `main.rs` notifies with
+  `code/kit/notify`; `files.rs` opens a mail's files.
 - `migrations`: SQL schema, applied by the server on start.
 - `dev`: the stand-ins' settings.
 
