@@ -15,6 +15,7 @@ key: string,
  */
 name: string, role: FolderRole | null, 
 /**
- * How many of its mails are unread, in every account.
+ * How many of its mails are unread, in every account; in Newsletters,
+ * those that came since you last looked there.
  */
 unread: number, };

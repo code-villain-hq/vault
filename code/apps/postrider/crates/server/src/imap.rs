@@ -586,6 +586,28 @@ pub async fn unseen(session: &mut Session, folder: &str) -> Result<u32, Failure>
         .unwrap_or(0))
 }
 
+/// How many of a folder's mails came after `looked` (its UIDVALIDITY and
+/// UIDNEXT when you last looked) and are unread: none when that's unknown,
+/// or its UIDs mean other mails now.
+pub async fn unseen_since(
+    session: &mut Session,
+    folder: &str,
+    looked: Option<(u32, u32)>,
+) -> Result<u32, Failure> {
+    let Some((validity, next)) = looked else {
+        return Ok(0);
+    };
+    // Opened again, not asked with STATUS: a session that has it open
+    // already may answer STATUS with what it saw when it opened it.
+    let opened = session.examine(folder).await?;
+    if opened.uid_validity != Some(validity) || opened.uid_next.is_some_and(|now| now <= next) {
+        return Ok(0);
+    }
+    // `n:*` holds the newest mail even when its UID is below n.
+    let found = session.uid_search(format!("UID {next}:* UNSEEN")).await?;
+    Ok(u32::try_from(found.into_iter().filter(|uid| *uid >= next).count()).unwrap_or(u32::MAX))
+}
+
 /// A folder as LIST names it.
 struct Listed {
     path: String,
@@ -906,6 +928,7 @@ async fn lines(
 }
 
 /// A mail's header fields, with when it came and whether it's read.
+#[derive(Clone)]
 pub struct Headed {
     pub uid: u32,
     pub arrived: Option<DateTime<Utc>>,
@@ -923,6 +946,59 @@ pub async fn headers(
 ) -> Result<Vec<Headed>, Failure> {
     session.examine(folder).await?;
     let uids: Vec<u32> = session.uid_search(query).await?.into_iter().collect();
+    fetch_headers(session, &uids, fields).await
+}
+
+/// A folder's mail with its header `fields`, as [`all_headers`] keeps it:
+/// under the folder's UIDVALIDITY, with its UIDNEXT when it was read.
+#[derive(Clone, Default)]
+pub struct KeptHeaders {
+    pub validity: u32,
+    pub next: u32,
+    pub mails: HashMap<u32, Headed>,
+}
+
+/// Every mail in `folder` with its header `fields`, read without marking
+/// anything read: from `kept`, but what came since, while the folder's UIDs
+/// still mean what they did, and with whether each is read now.
+pub async fn all_headers(
+    session: &mut Session,
+    folder: &str,
+    fields: &str,
+    mut kept: KeptHeaders,
+) -> Result<KeptHeaders, Failure> {
+    let mailbox = session.examine(folder).await?;
+    let validity = mailbox.uid_validity.unwrap_or(0);
+    if kept.validity != validity {
+        kept = KeptHeaders {
+            validity,
+            ..KeptHeaders::default()
+        };
+    }
+    kept.next = mailbox.uid_next.unwrap_or(0);
+    let there: HashSet<u32> = session.uid_search("ALL").await?;
+    let seen: HashSet<u32> = session.uid_search("SEEN").await?;
+    kept.mails.retain(|uid, _| there.contains(uid));
+    for (uid, mail) in &mut kept.mails {
+        mail.seen = seen.contains(uid);
+    }
+    let mut new: Vec<u32> = there
+        .into_iter()
+        .filter(|uid| !kept.mails.contains_key(uid))
+        .collect();
+    new.sort_unstable();
+    for headed in fetch_headers(session, &new, fields).await? {
+        kept.mails.insert(headed.uid, headed);
+    }
+    Ok(kept)
+}
+
+/// The header `fields` of the mails at `uids` in the folder selected.
+async fn fetch_headers(
+    session: &mut Session,
+    uids: &[u32],
+    fields: &str,
+) -> Result<Vec<Headed>, Failure> {
     let mut headed = Vec::new();
     for batch in uids.chunks(BATCH * 10) {
         let set = batch

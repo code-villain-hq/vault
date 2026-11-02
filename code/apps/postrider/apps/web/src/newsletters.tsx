@@ -1,9 +1,10 @@
 // Newsletters: every sender whose mail carries a link to unsubscribe, the
-// least read first, led by the ones you never open. Unsubscribing asks
-// nothing: it archives what the sender sent, and the request waits 10
-// seconds on the server, so Undo really undoes it. A sender that takes
-// unsubscribing only on its page gets the page opened, or among several,
-// a link to it.
+// least read first, led by the ones you never open. Each column's head sorts
+// by it, remembered on this device, and / finds a sender by any name it
+// wrote as. Unsubscribing asks nothing: it archives what the sender sent,
+// and the request waits 10 seconds on the server, so Undo really undoes it.
+// A sender that takes unsubscribing only on its page gets the page opened,
+// or among several, a link to it.
 
 import { messageOf, shortcutFree } from "@code-villain/web";
 import type {
@@ -17,13 +18,24 @@ import type {
   Unsubscribed,
 } from "@postrider/types";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, RequestError } from "./api";
-import { AccountProblems, initial } from "./inbox";
+import { AccountProblems, initial, useNow } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
-import { hue, useAccounts, useFolders } from "./mail";
+import { hue, mailTime, useAccounts, useFolders } from "./mail";
 import { isDesktop, openInBrowser } from "./platform";
-import { leastReadFirst, neverOpened, opened, rhythm, senderKey } from "./rhythm";
+import {
+  FIRST_SORT,
+  finds,
+  neverOpened,
+  opened,
+  rhythm,
+  type Sort,
+  type SortBy,
+  senderKey,
+  sorted,
+} from "./rhythm";
 import { Button, Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -47,13 +59,16 @@ export function NewslettersPage() {
   const { workspace, place } = useWorkspace();
   const accounts = useAccounts();
   const byId = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
-  const { moved } = useFolders();
+  const { moved, refresh, folders } = useFolders();
   const navigate = useNavigate();
+  const now = useNow();
   const base = `/api/w/${workspace.id}/newsletters`;
 
-  // Read once, and again after Undo: each read asks every account's server
-  // for 90 days of headers. The first time an account comes online, its
-  // Inbox newsletters move here: until they have, read every 5 seconds.
+  // Read when the page opens, after Undo, and when new newsletters came:
+  // the sidebar counts them. Each read is looking, so the count goes; the
+  // server reads only what came since its last read. The first time an
+  // account comes online, its Inbox newsletters move here: until they have,
+  // read every 5 seconds.
   const [data, setData] = useState<Newsletters>();
   const [error, setError] = useState("");
   const load = useCallback(() => {
@@ -61,10 +76,11 @@ export function NewslettersPage() {
       (read) => {
         setData(read);
         setError("");
+        refresh();
       },
       (problem) => setError(messageOf(problem)),
     );
-  }, [base, place]);
+  }, [base, place, refresh]);
   useEffect(load, [load]);
   const moving = data?.setting_aside.some((s) => s.problem === null) ?? false;
   useEffect(() => {
@@ -72,6 +88,23 @@ export function NewslettersPage() {
     const timer = setTimeout(load, 5000);
     return () => clearTimeout(timer);
   }, [moving, data, load]);
+  const fresh = folders.find((f) => f.role === "newsletters")?.unread ?? 0;
+  const loaded = data !== undefined;
+  useEffect(() => {
+    if (fresh > 0 && loaded) load();
+  }, [fresh, loaded, load]);
+
+  const [sort, setSort] = useState(storedSort);
+  const sortBy = (by: SortBy) => {
+    const next = { by, reversed: sort.by === by && !sort.reversed };
+    setSort(next);
+    try {
+      localStorage.setItem(SORT_KEY, JSON.stringify(next));
+    } catch {
+      // Not kept: it sorts so until the page closes.
+    }
+  };
+  const [find, setFind] = useState("");
 
   // The senders this page unsubscribed from or kept stay in their place,
   // with what happened, though their mail has left Newsletters.
@@ -80,11 +113,19 @@ export function NewslettersPage() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
 
-  const rows = useMemo(() => {
+  const all = useMemo(() => {
     const read = (data?.newsletters ?? []).filter((n) => !done.has(senderKey(n)));
-    return [...read, ...[...done.values()].map((d) => d.row)].sort(leastReadFirst);
+    return [...read, ...[...done.values()].map((d) => d.row)];
   }, [data, done]);
-  const never = rows.filter((n) => neverOpened(n) && !done.has(senderKey(n)));
+  const never = all.filter((n) => neverOpened(n) && !done.has(senderKey(n)));
+  const rows = useMemo(
+    () =>
+      sorted(
+        all.filter((n) => finds(n, find)),
+        sort,
+      ),
+    [all, find, sort],
+  );
 
   const updateBatch = useCallback((id: string, change: Partial<Batch>) => {
     setBatches((all) => {
@@ -265,7 +306,9 @@ export function NewslettersPage() {
 
   return (
     <>
-      <PageHeader title="Newsletters" />
+      <PageHeader title="Newsletters">
+        <FindSender text={find} onChange={setFind} />
+      </PageHeader>
       <PageBody>
         <div className="newsletters">
           {data && data.problems.length > 0 && (
@@ -275,13 +318,16 @@ export function NewslettersPage() {
             <SettingAsideLines
               accounts={accounts}
               settingAside={data.setting_aside}
-              showMoving={rows.length > 0}
+              notSorted={data.not_sorted}
+              showMoving={all.length > 0}
             />
           )}
           {bulk ? (
             <BulkLead id={bulk[0]} batch={bulk[1]} done={done} onUndo={undo} />
           ) : (
-            never.length > 0 && (
+            // While you look for one sender, the ones you never open wait.
+            never.length > 0 &&
+            !find.trim() && (
               <div className="lead">
                 {never.length === 1 ? (
                   <div>
@@ -309,7 +355,7 @@ export function NewslettersPage() {
           {!data && !error && <p className="px-3 text-muted">Reading your newsletters…</p>}
           {!data && error && <ErrorMessage>{error}</ErrorMessage>}
           {data &&
-            rows.length === 0 &&
+            all.length === 0 &&
             (moving ? (
               <Empty title="Moving your newsletters here">
                 The first time, Postrider moves the mail in your Inbox with a link to unsubscribe
@@ -320,33 +366,135 @@ export function NewslettersPage() {
                 Mail with a link to unsubscribe comes here, instead of to your Inbox.
               </Empty>
             ))}
-          {rows.length > 0 && (
-            <ol ref={listRef} aria-label="Newsletters">
-              {rows.map((row, index) => {
-                const key = senderKey(row);
-                const what = done.get(key)?.done;
-                return (
-                  <SenderRow
-                    key={key}
-                    row={row}
-                    index={index}
-                    focused={index === focused}
-                    account={byId.get(row.account_id)}
-                    done={what}
-                    batch={what ? batches.get(what.batch) : undefined}
-                    busy={busy}
-                    onUnsubscribe={() => void unsubscribe([row])}
-                    onKeep={() => void keep(row)}
-                    onUndo={undo}
-                    onSelect={() => setFocusedKey(key)}
-                  />
-                );
-              })}
-            </ol>
+          {all.length > 0 && (
+            <div className="nl-table">
+              <SortHeads sort={sort} onSort={sortBy} />
+              {rows.length === 0 && (
+                <p className="nl-none text-muted">No senders match “{find.trim()}”.</p>
+              )}
+              <ol ref={listRef} aria-label="Newsletters">
+                {rows.map((row, index) => {
+                  const key = senderKey(row);
+                  const what = done.get(key)?.done;
+                  return (
+                    <SenderRow
+                      key={key}
+                      row={row}
+                      index={index}
+                      focused={index === focused}
+                      now={now}
+                      account={byId.get(row.account_id)}
+                      done={what}
+                      batch={what ? batches.get(what.batch) : undefined}
+                      busy={busy}
+                      onUnsubscribe={() => void unsubscribe([row])}
+                      onKeep={() => void keep(row)}
+                      onUndo={undo}
+                      onSelect={() => setFocusedKey(key)}
+                    />
+                  );
+                })}
+              </ol>
+            </div>
           )}
         </div>
       </PageBody>
     </>
+  );
+}
+
+/** Where the page's order is kept on this device. */
+const SORT_KEY = "postrider.newsletters.sort";
+
+/** The order chosen last on this device, else the least read first. */
+function storedSort(): Sort {
+  try {
+    const kept = JSON.parse(localStorage.getItem(SORT_KEY) ?? "null") as Partial<Sort> | null;
+    if (kept && kept.by && kept.by in HEADS)
+      return { by: kept.by, reversed: kept.reversed === true };
+  } catch {
+    // Nothing kept, or nothing to keep it in.
+  }
+  return FIRST_SORT;
+}
+
+/** The heads, by what each sorts. */
+const HEADS: Record<SortBy, string> = {
+  name: "Sender",
+  newest: "Last wrote",
+  often: "How often",
+  opened: "Opened",
+};
+
+/** The columns' heads: one clicked sorts by it, clicked again the other way. */
+function SortHeads({ sort, onSort }: { sort: Sort; onSort: (by: SortBy) => void }) {
+  return (
+    <div className="nl-heads" role="toolbar" aria-label="Sort the senders">
+      {(Object.entries(HEADS) as [SortBy, string][]).map(([by, label]) => {
+        const on = sort.by === by;
+        const Arrow = sort.reversed ? ArrowUp : ArrowDown;
+        return (
+          <button
+            key={by}
+            type="button"
+            className={`sort sort-${by} ${on ? "on" : ""}`}
+            aria-pressed={on}
+            onClick={() => onSort(by)}
+          >
+            {label}
+            {on && <Arrow size={12} strokeWidth={2} aria-hidden="true" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * "Find a sender", in the top bar where the other lists search: / goes to
+ * it; Enter or ↓ goes on to the senders it found, Esc empties it.
+ */
+function FindSender({ text, onChange }: { text: string; onChange: (text: string) => void }) {
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || !shortcutFree(event)) return;
+      event.preventDefault();
+      field.current?.focus();
+      field.current?.select();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  return (
+    <div role="search" className="search find ui-field">
+      <Search size={14} strokeWidth={1.75} aria-hidden="true" />
+      <input
+        ref={field}
+        type="search"
+        value={text}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            onChange("");
+            field.current?.blur();
+          } else if (event.key === "Enter" || event.key === "ArrowDown") {
+            event.preventDefault();
+            field.current?.blur();
+          }
+        }}
+        placeholder="Find a sender"
+        aria-label="Find a sender"
+        spellCheck={false}
+      />
+      {!text && (
+        <kbd className="ui-kbd" aria-hidden="true">
+          /
+        </kbd>
+      )}
+    </div>
   );
 }
 
@@ -396,6 +544,7 @@ function SenderRow({
   row,
   index,
   focused,
+  now,
   account,
   done,
   batch,
@@ -408,6 +557,7 @@ function SenderRow({
   row: Newsletter;
   index: number;
   focused: boolean;
+  now: Date;
   account: MailAccount | undefined;
   done: Done | undefined;
   batch: Batch | undefined;
@@ -441,14 +591,19 @@ function SenderRow({
       >
         {row.name}
       </Link>
-      <span className="rh">{rhythm(row)}</span>
-      {done ? (
-        <span className={`op note ${warning ? "text-danger-ink" : ""}`}>
-          {warning || <DoneWords done={done} name={row.name} />}
-        </span>
-      ) : (
-        <span className="op">{opened(row)}</span>
-      )}
+      <span className="lw" title={new Date(row.newest).toLocaleString()}>
+        {mailTime(row.newest, now)}
+      </span>
+      <span className="meta">
+        <span className="rh">{rhythm(row)}</span>
+        {done ? (
+          <span className={`op note ${warning ? "text-danger-ink" : ""}`}>
+            {warning || <DoneWords done={done} name={row.name} />}
+          </span>
+        ) : (
+          <span className="op">{opened(row)}</span>
+        )}
+      </span>
       <span className="act">
         {done ? (
           alone &&
@@ -539,34 +694,40 @@ function openPage(url: string) {
 }
 
 /** The accounts whose newsletters aren't here yet: still moving, or why
- * moving them failed. */
+ * moving them failed; and those whose mail couldn't be sorted again. */
 function SettingAsideLines({
   accounts,
   settingAside,
+  notSorted,
   showMoving,
 }: {
   accounts: MailAccount[];
   settingAside: SettingAside[];
+  notSorted: SettingAside[];
   showMoving: boolean;
 }) {
   const lines = accounts.flatMap((account) => {
     const aside = settingAside.find((s) => s.account_id === account.id);
+    const unsorted = notSorted.find((s) => s.account_id === account.id)?.problem;
+    if (unsorted) return [{ account, problem: unsorted, again: true }];
     return aside && (aside.problem !== null || showMoving)
-      ? [{ account, problem: aside.problem }]
+      ? [{ account, problem: aside.problem, again: false }]
       : [];
   });
   if (!lines.length) return null;
   return (
     <ul className="problems">
-      {lines.map(({ account, problem }) => (
+      {lines.map(({ account, problem, again }) => (
         <li key={account.id} className={problem ? "text-danger-ink" : ""}>
           <span className="av sm" style={hue(account.hue)} aria-hidden="true">
             {account.name.charAt(0).toUpperCase()}
           </span>
           <span>
-            {problem
-              ? `${account.name}: its newsletters stay in the Inbox for now. ${problem} Postrider tries again the next time it connects.`
-              : `Moving ${account.name}'s newsletters here from its Inbox…`}
+            {again
+              ? `${account.name}: couldn't sort its newsletters and notices again. ${problem} Postrider tries again the next time it connects.`
+              : problem
+                ? `${account.name}: its newsletters stay in the Inbox for now. ${problem} Postrider tries again the next time it connects.`
+                : `Moving ${account.name}'s newsletters here from its Inbox…`}
           </span>
         </li>
       ))}

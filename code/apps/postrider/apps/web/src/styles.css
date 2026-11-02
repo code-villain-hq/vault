@@ -383,9 +383,11 @@ input.crumb-name {
 }
 
 /* Newsletters, the least read first, led by the ones you never open, as
-   wide as the window: the name takes what's free, how often and how much
-   read stand at the right. A sender's buttons show on its row's hover; one
-   unsubscribed from goes faint. */
+   wide as the window: the name takes what's free, when it last wrote, how
+   often and how much read stand at the right, under heads that sort by
+   them. The heads and the rows share one grid, so their columns line up;
+   its first and last columns are empty, the rows' edges. A sender's
+   buttons show on its row's hover; one unsubscribed from goes faint. */
 .newsletters {
   padding: 22px 16px 24px;
 }
@@ -405,14 +407,70 @@ input.crumb-name {
   margin-left: auto;
   flex: none;
 }
+.search.find {
+  flex: 0 1 280px;
+}
+.nl-table {
+  display: grid;
+  grid-template-columns: 0 26px minmax(0, 1fr) 84px 130px 140px auto 0;
+  column-gap: 12px;
+}
+.nl-heads,
+.nl-table ol,
 .nl {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 140px 140px auto;
-  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+.nl-heads {
+  padding-bottom: 4px;
+}
+.nl-heads .sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  max-width: 100%;
+  height: 28px;
+  color: var(--faint);
+  font-size: var(--type-ui-small-size);
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+.nl-heads .sort:hover,
+.nl-heads .sort.on {
+  color: var(--fg);
+}
+.nl-heads .sort:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.nl-heads .sort-name {
+  grid-column: 2 / 4;
+}
+.nl-heads .sort-newest {
+  grid-column: 4;
+}
+.nl-heads .sort-often {
+  grid-column: 5;
+}
+.nl-heads .sort-opened {
+  grid-column: 6;
+}
+.nl-none {
+  grid-column: 2 / -2;
+  padding: 12px 0;
+}
+.nl {
   align-items: center;
   height: 44px;
-  padding: 0 12px 0 8px;
   border-radius: var(--radius-md);
+}
+.nl .av {
+  grid-column: 2;
+}
+.nl .meta {
+  display: contents;
 }
 .nl .name {
   overflow: hidden;
@@ -424,6 +482,7 @@ input.crumb-name {
 .nl .name:focus-visible {
   text-decoration: underline;
 }
+.nl .lw,
 .nl .rh,
 .nl .op {
   overflow: hidden;
@@ -451,7 +510,8 @@ input.crumb-name {
 .nl.gone .av {
   opacity: 0.5;
 }
-/* On a phone a sender takes two lines, and its buttons a third when chosen. */
+/* On a phone a sender takes two lines, and its buttons a third when chosen;
+   the heads wrap above them. */
 @media (width < 560px) {
   .newsletters {
     padding-inline: 4px;
@@ -462,12 +522,25 @@ input.crumb-name {
   .newsletters .lead .ui-button {
     margin-left: 0;
   }
+  .nl-table,
+  .nl-table ol {
+    display: block;
+  }
+  .nl-heads {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+    padding: 0 12px 4px;
+  }
+  .nl-none {
+    padding-inline: 12px;
+  }
   .nl {
     grid-template-columns: 26px minmax(0, 1fr) auto;
-    grid-template-areas: "av name rh" ". op op" ". act act";
-    row-gap: 4px;
+    grid-template-areas: "av name lw" ". meta meta" ". act act";
+    gap: 4px 12px;
     height: auto;
-    padding-block: 8px;
+    padding: 8px 12px 8px 8px;
   }
   .nl .av {
     grid-area: av;
@@ -475,11 +548,17 @@ input.crumb-name {
   .nl .name {
     grid-area: name;
   }
-  .nl .rh {
-    grid-area: rh;
+  .nl .lw {
+    grid-area: lw;
+  }
+  .nl .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 12px;
+    grid-area: meta;
+    min-width: 0;
   }
   .nl .op {
-    grid-area: op;
     white-space: normal;
   }
   .nl .act {

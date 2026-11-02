@@ -12,4 +12,10 @@ export type Newsletters = { newsletters: Array<Newsletter>, problems: Array<Acco
  * The accounts whose Inbox newsletters aren't here yet: the first time
  * an account comes online, Postrider moves them.
  */
-setting_aside: Array<SettingAside>, };
+setting_aside: Array<SettingAside>, 
+/**
+ * The accounts whose mail Postrider couldn't sort again, by what makes
+ * a newsletter or a notice now, and why. It tries again the next time
+ * each connects.
+ */
+not_sorted: Array<SettingAside>, };

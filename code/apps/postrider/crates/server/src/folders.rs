@@ -65,14 +65,21 @@ impl Mail {
     }
 
     /// An account's folders with what's unread in each, as its server says
-    /// now. Offline, the folders it had, with nothing counted.
+    /// now: in Newsletters, what came since you last looked there
+    /// ([`Mail::last_looked`]). Offline, the folders it had, with nothing
+    /// counted.
     async fn count_folders(&self, account: &MailAccount) -> Vec<(Place, u32)> {
+        let looked = self.last_looked(account).await;
         let counted = self
             .on_server(account, |session| {
                 Box::pin(async move {
                     let mut counted = Vec::new();
                     for place in imap::folders(session).await? {
-                        let unseen = imap::unseen(session, &place.path).await?;
+                        let unseen = if place.role == Some(FolderRole::Newsletters) {
+                            imap::unseen_since(session, &place.path, looked).await?
+                        } else {
+                            imap::unseen(session, &place.path).await?
+                        };
                         counted.push((place, unseen));
                     }
                     Ok(counted)

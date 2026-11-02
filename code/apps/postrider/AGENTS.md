@@ -275,18 +275,27 @@ mail apps show only subscribed ones; a folder Postrider makes is
 subscribed as it's made. The folder is a role folder
 (`FolderRole::Newsletters`), named "Newsletters".
 
-The page (`newsletters.tsx`, `GET /newsletters`) reads each account's
-Newsletters of the last 90 days by sender (named as its newest mail
-names it, or by its organisation when that name is none or says nothing,
-"Notification": `sender_name`): how often each writes
-(`rhythm.ts`) and how much of it you opened, the least read first. It
-leads with the ones you never open and a button for all of them. It reads
-once, not every 15 seconds, since a read fetches every header of those 90
-days, except while an account's newsletters are still being set aside
-(`setting_aside`): then it says so and reads every 5 seconds until they
-are. When setting them aside failed, it says why (kept in memory,
-`set_aside_failed`); the account tries again when it next connects.
-The page is as wide as the window.
+The page (`newsletters.tsx`, `GET /newsletters`) reads all of each
+account's Newsletters by sender, so nothing in the folder is left off it
+(named as its newest mail names it, or by its organisation when that
+name is none or says nothing, "Notification": `sender_name`; `names`
+keeps every name it wrote as): when each last wrote, how often it writes
+(`rhythm.ts`) and how much of it you opened, the least read first. Each
+column's head sorts by it, clicked again the other way, and the order is
+kept on this device (`localStorage`). / finds a sender by any of its
+names or its address; a find with no sender says so. It leads with the
+ones you never open that wrote in the last month, and a button for all
+of them, but not while you find one. The server keeps the headers it
+read (`KeptHeaders`, by UIDVALIDITY), so each read fetches only what came
+since. Reading the page is looking at it: it notes Newsletters' UIDNEXT
+(`looked_uid` in `newsletters_set_aside`), and the sidebar counts the
+unread newsletters that came after (`unseen_since`); when there are, the
+open page reads again. It reads once otherwise, except while an
+account's newsletters are still being set aside (`setting_aside`): then
+it says so and reads every 5 seconds until they are. When setting them
+aside or sorting them again failed, it says why (kept in memory,
+`set_aside_failed`, as `setting_aside` or `not_sorted`); the account
+tries again when it next connects. The page is as wide as the window.
 
 A sender's name, or Enter, opens what it sent (`SenderList`, at
 `/newsletters/{address}`): every account's Newsletters asked for that

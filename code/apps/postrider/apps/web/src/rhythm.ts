@@ -1,9 +1,9 @@
 // The Newsletters page's words for a sender: how often it writes, and how
-// much of it you open.
+// much of it you open; and the orders and the finding its list offers.
 
 import type { Newsletter } from "@postrider/types";
 
-type Counted = Pick<Newsletter, "sent" | "opened" | "per_week">;
+type Counted = Pick<Newsletter, "sent" | "opened" | "per_week" | "recent">;
 
 /** How often it writes: "Daily", "3 a week", "Weekly". */
 export function rhythm({ sent, per_week: perWeek }: Counted): string {
@@ -21,9 +21,12 @@ export function opened({ sent, opened }: Counted): string {
   return opened === 0 ? "Never opened" : `Opened ${opened} of ${sent}`;
 }
 
-/** Never opened, and sent more than once: the ones the page leads with. */
-export function neverOpened({ sent, opened }: Counted): boolean {
-  return opened === 0 && sent >= 2;
+/**
+ * Never opened, sent more than once, and still writing (in the last month):
+ * the ones the page leads with.
+ */
+export function neverOpened({ sent, opened, recent }: Counted): boolean {
+  return opened === 0 && sent >= 2 && recent > 0;
 }
 
 /** The least read first; of those alike, who sends most. As the server sorts. */
@@ -32,6 +35,56 @@ export function leastReadFirst(a: Newsletter, b: Newsletter): number {
   return (
     read(a) - read(b) || b.sent - a.sent || a.name.toLowerCase().localeCompare(b.name.toLowerCase())
   );
+}
+
+/** What the senders can be sorted by, each by its column's head. */
+export type SortBy = "name" | "newest" | "often" | "opened";
+
+/** An order, the way its head first sorts it, or the other way round. */
+export type Sort = { by: SortBy; reversed: boolean };
+
+/** How the page first sorts: the least read first. */
+export const FIRST_SORT: Sort = { by: "opened", reversed: false };
+
+const byName = (a: Newsletter, b: Newsletter) =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+
+/** How often it writes, as `rhythm` says it: once is least often. */
+const often = (n: Newsletter) => (n.sent <= 1 ? 0 : n.per_week);
+
+/**
+ * Each head's order: the names from A, the newest mail first, who writes
+ * most often first, the least read first.
+ */
+const ORDERS: Record<SortBy, (a: Newsletter, b: Newsletter) => number> = {
+  name: (a, b) => byName(a, b) || a.address.localeCompare(b.address),
+  newest: (a, b) => Date.parse(b.newest) - Date.parse(a.newest) || byName(a, b),
+  often: (a, b) => often(b) - often(a) || b.sent - a.sent || byName(a, b),
+  opened: leastReadFirst,
+};
+
+/** The senders in `sort`'s order. */
+export function sorted(senders: Newsletter[], sort: Sort): Newsletter[] {
+  const order = ORDERS[sort.by];
+  return [...senders].sort((a, b) => (sort.reversed ? order(b, a) : order(a, b)));
+}
+
+/** Lower case, without accents: "Zoë" is found by "zoe". */
+function plain(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+/**
+ * Whether a sender has every word of `text` in a name its mail gave or in
+ * its address: "dimitrios" finds LinkedIn's messages, whoever wrote last.
+ */
+export function finds(sender: Newsletter, text: string): boolean {
+  const words = plain(text).split(/\s+/).filter(Boolean);
+  const said = plain([sender.name, ...sender.names, sender.address].join(" "));
+  return words.every((word) => said.includes(word));
 }
 
 /** A sender, the same in each list: its account and address. */

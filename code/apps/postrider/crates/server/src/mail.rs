@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 use crate::auth::Member;
 use crate::error::AppError;
-use crate::imap::{self, Failure, Login, Place, Session, Summary};
+use crate::imap::{self, Failure, KeptHeaders, Login, Place, Session, Summary};
 use crate::message;
 use crate::secrets::Secrets;
 use crate::state::AppState;
@@ -77,6 +77,9 @@ pub struct Mail {
     pub(crate) lines: Mutex<KeptLines>,
     /// Why setting each account's newsletters aside failed, until it works.
     pub(crate) set_aside_failed: Mutex<HashMap<Uuid, String>>,
+    /// What the Newsletters page read of each account's Newsletters (by
+    /// path), so it reads only what came since.
+    pub(crate) newsletter_headers: Mutex<HashMap<(Uuid, String), KeptHeaders>>,
 }
 
 impl Mail {
@@ -92,6 +95,7 @@ impl Mail {
             places: Mutex::default(),
             lines: Mutex::default(),
             set_aside_failed: Mutex::default(),
+            newsletter_headers: Mutex::default(),
         }
     }
 

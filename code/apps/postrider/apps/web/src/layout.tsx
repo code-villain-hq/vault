@@ -282,13 +282,13 @@ function SyncButton() {
 /**
  * The Inbox, Newsletters, Sent, Archive, Drafts, Junk and Trash, then the
  * accounts' own folders, each once however many accounts have it, with
- * what's unread in them: not in Newsletters, Drafts or Trash, where it means
- * nothing.
+ * what's unread in them: not in Drafts or Trash, where it means nothing. In
+ * Newsletters, only what came since you last looked there.
  */
 function MailNav() {
   const { workspace } = useWorkspace();
   const unread = useUnread();
-  const { sent, archive, drafts, junk, trash, others } = useShownFolders();
+  const { newsletters, sent, archive, drafts, junk, trash, others } = useShownFolders();
   const list = useOpenList();
   return (
     <nav aria-label="Mail" className="flex flex-col gap-4">
@@ -312,6 +312,7 @@ function MailNav() {
         >
           <NavIcon icon={Newspaper} />
           Newsletters
+          <Unread count={newsletters?.unread ?? 0} what="new" />
         </Link>
         {sent && <FolderLink folder={sent} icon={Send} open={list} title="Sent (G then S)" />}
         {archive && (
@@ -349,6 +350,7 @@ function useShownFolders() {
   const { folders } = useFolders();
   return useMemo(
     () => ({
+      newsletters: folders.find((f) => f.role === "newsletters"),
       sent: folders.find((f) => f.role === "sent"),
       archive: folders.find((f) => f.role === "archive"),
       drafts: folders.find((f) => f.role === "drafts"),
@@ -390,12 +392,12 @@ function FolderLink({
   );
 }
 
-function Unread({ count }: { count: number }) {
+function Unread({ count, what = "unread" }: { count: number; what?: string }) {
   if (count <= 0) return null;
   return (
     <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-muted tabular-nums">
       <span className="ui-live-dot" aria-hidden="true" />
-      <span aria-label={`${count} unread`}>{count}</span>
+      <span aria-label={`${count} ${what}`}>{count}</span>
     </span>
   );
 }
@@ -519,6 +521,7 @@ const SECTIONS: ShortcutSection[] = [
       ["J K or ↓ ↑", "Next and previous sender"],
       ["Enter or O", "Open its newest mail"],
       ["U", "Unsubscribe from it"],
+      ["/", "Find a sender"],
     ],
   },
   {

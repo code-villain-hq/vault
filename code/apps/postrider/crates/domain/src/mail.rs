@@ -356,7 +356,8 @@ pub struct Folder {
     /// "Sent", or the folder's own name: "Rechnungen", "Projects / Layer".
     pub name: String,
     pub role: Option<FolderRole>,
-    /// How many of its mails are unread, in every account.
+    /// How many of its mails are unread, in every account; in Newsletters,
+    /// those that came since you last looked there.
     #[ts(type = "number")]
     pub unread: i64,
 }
@@ -621,16 +622,20 @@ pub struct MoveMail {
 #[ts(export)]
 pub struct Newsletter {
     pub account_id: Uuid,
-    /// "Zalando", or the address when its mail gives no name.
+    /// "Zalando", or the address when its mail gives no name: as its
+    /// newest mail says.
     pub name: String,
+    /// Every name its mail gives, the newest first: LinkedIn's
+    /// messaging-digest-noreply@ writes as each person who wrote you.
+    pub names: Vec<String>,
     pub address: String,
-    /// How many mails it sent in the last 90 days, and how many of those
-    /// you opened.
+    /// How many of its mails are in Newsletters, and how many of those you
+    /// opened.
     pub sent: u32,
     pub opened: u32,
     /// How many of them came in the last 30 days.
     pub recent: u32,
-    /// How many it sends a week, since its first mail in those 90 days.
+    /// How many it sends a week, since its first mail there.
     pub per_week: f64,
     /// Its newest mail in Newsletters, to open.
     #[ts(type = "number")]
@@ -648,10 +653,14 @@ pub struct Newsletters {
     /// The accounts whose Inbox newsletters aren't here yet: the first time
     /// an account comes online, Postrider moves them.
     pub setting_aside: Vec<SettingAside>,
+    /// The accounts whose mail Postrider couldn't sort again, by what makes
+    /// a newsletter or a notice now, and why. It tries again the next time
+    /// each connects.
+    pub not_sorted: Vec<SettingAside>,
 }
 
-/// An account whose newsletters are still being set aside, and why that
-/// failed, when it did.
+/// An account whose newsletters are still being set aside, or sorted
+/// again, and why that failed, when it did.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct SettingAside {

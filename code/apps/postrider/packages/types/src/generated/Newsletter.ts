@@ -6,12 +6,18 @@
  */
 export type Newsletter = { account_id: string, 
 /**
- * "Zalando", or the address when its mail gives no name.
+ * "Zalando", or the address when its mail gives no name: as its
+ * newest mail says.
  */
-name: string, address: string, 
+name: string, 
 /**
- * How many mails it sent in the last 90 days, and how many of those
- * you opened.
+ * Every name its mail gives, the newest first: LinkedIn's
+ * messaging-digest-noreply@ writes as each person who wrote you.
+ */
+names: Array<string>, address: string, 
+/**
+ * How many of its mails are in Newsletters, and how many of those you
+ * opened.
  */
 sent: number, opened: number, 
 /**
@@ -19,7 +25,7 @@ sent: number, opened: number,
  */
 recent: number, 
 /**
- * How many it sends a week, since its first mail in those 90 days.
+ * How many it sends a week, since its first mail there.
  */
 per_week: number, 
 /**

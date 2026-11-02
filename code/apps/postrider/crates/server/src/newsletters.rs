@@ -21,9 +21,11 @@
 //! newsletter; they stay in the Inbox. Keep in Inbox is there for the
 //! senders this still gets wrong.
 //!
-//! `GET /api/w/{workspace}/newsletters` reads each account's Newsletters
-//! of the last [`DAYS`] days, by sender: how often each writes, and how much
-//! of it you opened (`\Seen`), the least read first.
+//! `GET /api/w/{workspace}/newsletters` reads all of each account's
+//! Newsletters, by sender: how often each writes, when it last did, and how
+//! much of it you opened (`\Seen`), the least read first. Read once, only
+//! what came since is read again. Reading it is looking: the number beside
+//! Newsletters in the sidebar is what came since, unread ([`Mail::looked`]).
 //!
 //! Unsubscribing asks nothing. It archives what the sender sent at once,
 //! and sends the request [`WAIT`] later, so Undo really undoes it: the
@@ -64,9 +66,6 @@ use crate::mail::Mail;
 use crate::reply::{is_this_mac, send};
 use crate::rules::{self, Moved, Rule, When};
 use crate::state::AppState;
-
-/// How far back the page reads.
-const DAYS: i64 = 90;
 
 /// What the page counts as lately: "They sent you … in the last month."
 const RECENT: i64 = 30;
@@ -472,7 +471,8 @@ impl Mail {
         Ok(listing(&accounts, read, HashMap::new()))
     }
 
-    /// The account's newsletters of the last [`DAYS`] days, by sender.
+    /// All of the account's newsletters, by sender: what the page read
+    /// before, and what came since. Reading them is looking ([`Mail::looked`]).
     async fn newsletters_of(
         &self,
         account: &MailAccount,
@@ -481,19 +481,65 @@ impl Mail {
         let Some(place) = self.newsletters_folder(account).await? else {
             return Ok(Vec::new());
         };
-        let query = format!(
-            "SINCE {}",
-            (now - TimeDelta::days(DAYS)).format("%-d-%b-%Y")
-        );
-        let headed = self
+        let key = (account.id, place.path.clone());
+        let kept = self
+            .lock_newsletter_headers()
+            .get(&key)
+            .cloned()
+            .unwrap_or_default();
+        let headers = self
             .on_server(account, |session| {
-                let (path, query) = (place.path.clone(), query.clone());
-                Box::pin(async move { imap::headers(session, &path, &query, FIELDS).await })
+                let (path, kept) = (place.path.clone(), kept.clone());
+                Box::pin(async move { imap::all_headers(session, &path, FIELDS, kept).await })
             })
             .await?;
+        self.lock_newsletter_headers().insert(key, headers.clone());
+        self.looked(account, headers.validity, headers.next).await?;
         let local = is_this_mac(&account.host);
-        let sent = headed.into_iter().filter_map(|h| read(h, local)).collect();
+        let sent = headers
+            .mails
+            .into_values()
+            .filter_map(|h| read(h, local))
+            .collect();
         Ok(by_sender(account.id, sent, now))
+    }
+
+    /// Notes where the account's Newsletters stood when you looked: what
+    /// comes after, unread, is new ([`imap::unseen_since`]).
+    async fn looked(&self, account: &MailAccount, validity: u32, next: u32) -> Result<(), Failure> {
+        sqlx::query(
+            "UPDATE newsletters_set_aside SET looked_validity = $2, looked_uid = $3 \
+             WHERE account_id = $1",
+        )
+        .bind(account.id)
+        .bind(i64::from(validity))
+        .bind(i64::from(next))
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Where the account's Newsletters stood when you last looked: its
+    /// UIDVALIDITY and UIDNEXT then.
+    pub(crate) async fn last_looked(&self, account: &MailAccount) -> Option<(u32, u32)> {
+        let looked: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT looked_validity, looked_uid FROM newsletters_set_aside \
+             WHERE account_id = $1 AND looked_uid IS NOT NULL",
+        )
+        .bind(account.id)
+        .fetch_optional(&self.pool)
+        .await
+        .inspect_err(|e| tracing::warn!("couldn't read when Newsletters was looked at: {e}"))
+        .ok()
+        .flatten();
+        let (validity, next) = looked?;
+        Some((u32::try_from(validity).ok()?, u32::try_from(next).ok()?))
+    }
+
+    fn lock_newsletter_headers(
+        &self,
+    ) -> std::sync::MutexGuard<'_, HashMap<(Uuid, String), imap::KeptHeaders>> {
+        self.newsletter_headers.lock().expect("never poisoned")
     }
 
     /// What these senders sent to the account's Newsletters, by address.
@@ -885,9 +931,16 @@ fn by_sender(account_id: Uuid, sent: Vec<Sent>, now: DateTime<Utc>) -> Vec<Newsl
             // A week at least, or one mail yesterday reads as daily.
             let weeks = (now - oldest).num_minutes().max(7 * 24 * 60) / 60;
             let sent = count(mails.len());
+            let mut names: Vec<String> = Vec::new();
+            for mail in by_newest(&mails) {
+                if !names.contains(&mail.name) {
+                    names.push(mail.name.clone());
+                }
+            }
             Some(Newsletter {
                 account_id,
                 name: newest.name.clone(),
+                names,
                 address,
                 sent,
                 opened: count(mails.iter().filter(|mail| mail.seen).count()),
@@ -904,6 +957,13 @@ fn by_sender(account_id: Uuid, sent: Vec<Sent>, now: DateTime<Utc>) -> Vec<Newsl
             })
         })
         .collect()
+}
+
+/// A sender's mail, the newest first.
+fn by_newest(mails: &[Sent]) -> Vec<&Sent> {
+    let mut sorted: Vec<&Sent> = mails.iter().collect();
+    sorted.sort_by_key(|mail| std::cmp::Reverse((mail.arrived, mail.uid)));
+    sorted
 }
 
 /// The least read first; of those alike, who sends most.
@@ -982,6 +1042,7 @@ pub async fn list(
     let mut newsletters = Vec::new();
     let mut problems = Vec::new();
     let mut setting_aside = Vec::new();
+    let mut not_sorted = Vec::new();
     for (account, read) in accounts.iter().zip(read) {
         match read {
             Ok(found) => {
@@ -990,6 +1051,11 @@ pub async fn list(
                     setting_aside.push(SettingAside {
                         account_id: account.id,
                         problem: failed.get(&account.id).cloned(),
+                    });
+                } else if let Some(problem) = failed.get(&account.id) {
+                    not_sorted.push(SettingAside {
+                        account_id: account.id,
+                        problem: Some(problem.clone()),
                     });
                 }
             }
@@ -1008,6 +1074,7 @@ pub async fn list(
         newsletters,
         problems,
         setting_aside,
+        not_sorted,
     }))
 }
 
@@ -1400,6 +1467,38 @@ mod tests {
             address: address.into(),
             way: None,
         }
+    }
+
+    #[test]
+    fn a_sender_that_writes_as_several_keeps_every_name() {
+        let now = Utc::now();
+        let as_who = |uid, days_ago, name: &str| Sent {
+            name: name.into(),
+            ..mail(
+                uid,
+                days_ago,
+                true,
+                "messaging-digest-noreply@linkedin.com",
+                now,
+            )
+        };
+        let newsletters = by_sender(
+            Uuid::nil(),
+            vec![
+                as_who(1, 1, "Dimitrios Kombas via LinkedIn"),
+                as_who(2, 0, "Anna Berg via LinkedIn"),
+                as_who(3, 2, "Dimitrios Kombas via LinkedIn"),
+            ],
+            now,
+        );
+        let [linkedin] = newsletters.as_slice() else {
+            panic!("one sender");
+        };
+        assert_eq!(linkedin.name, "Anna Berg via LinkedIn");
+        assert_eq!(
+            linkedin.names,
+            ["Anna Berg via LinkedIn", "Dimitrios Kombas via LinkedIn"]
+        );
     }
 
     #[test]
