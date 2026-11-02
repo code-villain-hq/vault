@@ -1,9 +1,10 @@
 // Fills the stand-in mail and calendar servers (`bun run db`) with the
 // storyboard's morning, and adds both to the workspace: the Code Villain
-// and Lazarski accounts with their Inboxes and a few folders, and their
-// calendars, with today's events. Needs `bun run dev` running. Safe to run
-// again: a folder that has mail isn't filled twice, and today's events are
-// written over; `bun run db:reset` starts them over. Local development only.
+// and Lazarski accounts with their Inboxes and a few folders (Drafts, Junk
+// and Trash among them), and their calendars, with today's events. Needs
+// `bun run dev` running. Safe to run again: a folder that has mail isn't
+// filled twice, and today's events are written over; `bun run db:reset`
+// starts them over. Local development only.
 
 import { connect, type Socket } from "node:net";
 
@@ -82,6 +83,26 @@ const accounts: {
           body: "Hallo,\n\nwann wird hideout auf U8 umgezogen?\n\nMichael",
           day: 4,
           at: "09:30",
+          read: true,
+        },
+      ],
+      Drafts: [],
+      Junk: [
+        {
+          from: "Prize Desk <winner@prizes.test>",
+          subject: "You have won a MacBook!!!",
+          body: "Click here to claim your prize before midnight.",
+          day: 0,
+          at: "03:12",
+        },
+      ],
+      Trash: [
+        {
+          from: "Newsletter <news@shop.test>",
+          subject: "Autumn sale: 20% off",
+          body: "Only this week.",
+          day: 5,
+          at: "11:00",
           read: true,
         },
       ],

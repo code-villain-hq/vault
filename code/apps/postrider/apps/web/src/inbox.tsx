@@ -244,7 +244,8 @@ export function AccountProblems({
 
 /** An event is drawn at least this wide, in pixels, so its name fits. */
 const NARROWEST = 80;
-const LANE = 40;
+/** A row of events: one 32px event and the gap under it. */
+const LANE = 36;
 
 const dayName = new Intl.DateTimeFormat("en", { weekday: "long", month: "short", day: "numeric" });
 
@@ -292,7 +293,7 @@ function Today({ now }: { now: Date }) {
           ))}
         {note && <span>{note}</span>}
       </div>
-      <div ref={track} className="track" style={{ height: lanes * LANE + 18 }}>
+      <div ref={track} className="track" style={{ height: lanes * LANE + 22 }}>
         {placed.map(({ event, lane, from, to }) => (
           <div
             key={`${event.calendar}:${event.start}:${event.title}`}

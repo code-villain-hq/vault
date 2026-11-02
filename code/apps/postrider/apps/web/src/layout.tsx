@@ -27,11 +27,14 @@ import {
   ArrowLeft,
   Check,
   ChevronsUpDown,
+  FilePen,
   Folder,
   Inbox,
   type LucideIcon,
   Mail,
+  MailWarning,
   Send,
+  Trash2,
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { InboxProvider, useFolders, useUnread } from "./mail";
@@ -222,14 +225,14 @@ function Sidebar() {
 }
 
 /**
- * The Inbox, Sent and Archive, then the accounts' own folders, each once
- * however many accounts have it, with what's unread in them. Drafts,
- * Trash and Junk wait for writing mail.
+ * The Inbox, Sent, Archive, Drafts, Junk and Trash, then the accounts' own
+ * folders, each once however many accounts have it, with what's unread in
+ * them: not in Drafts or Trash, where it means nothing.
  */
 function MailNav() {
   const { workspace } = useWorkspace();
   const unread = useUnread();
-  const { sent, archive, others } = useShownFolders();
+  const { sent, archive, drafts, junk, trash, others } = useShownFolders();
   const list = useOpenList();
   return (
     <nav aria-label="Mail" className="flex flex-col gap-4">
@@ -249,6 +252,9 @@ function MailNav() {
         {archive && (
           <FolderLink folder={archive} icon={Archive} open={list} title="Archive (G then A)" />
         )}
+        {drafts && <FolderLink folder={drafts} icon={FilePen} open={list} quiet />}
+        {junk && <FolderLink folder={junk} icon={MailWarning} open={list} />}
+        {trash && <FolderLink folder={trash} icon={Trash2} open={list} quiet />}
       </div>
       {others.length > 0 && (
         <div className="flex flex-col gap-0.5">
@@ -273,13 +279,16 @@ function useOpenList(): string | undefined {
   return from.q === undefined ? (from.folder?.toLowerCase() ?? "") : undefined;
 }
 
-/** The folders the sidebar shows: Sent, Archive, and the rest but Drafts, Trash and Junk. */
+/** The folders the sidebar shows: each with a role, then the rest. */
 function useShownFolders() {
   const { folders } = useFolders();
   return useMemo(
     () => ({
       sent: folders.find((f) => f.role === "sent"),
       archive: folders.find((f) => f.role === "archive"),
+      drafts: folders.find((f) => f.role === "drafts"),
+      junk: folders.find((f) => f.role === "junk"),
+      trash: folders.find((f) => f.role === "trash"),
       others: folders.filter((f) => f.role === null),
     }),
     [folders],
@@ -291,12 +300,15 @@ function FolderLink({
   icon,
   open,
   title,
+  quiet = false,
 }: {
   folder: MailFolder;
   icon: LucideIcon;
   /** The list of the mail open now (`useOpenList`). */
   open: string | undefined;
   title?: string;
+  /** Without what's unread in it. */
+  quiet?: boolean;
 }) {
   const { workspace } = useWorkspace();
   return (
@@ -308,7 +320,7 @@ function FolderLink({
     >
       <NavIcon icon={icon} />
       <span className="truncate">{folder.name}</span>
-      <Unread count={folder.unread} />
+      {!quiet && <Unread count={folder.unread} />}
     </Link>
   );
 }
