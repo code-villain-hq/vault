@@ -66,6 +66,8 @@ export async function api<T>(
   if (response.status === 401 && !path.startsWith("/api/auth/")) onSessionEnded(place);
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
+  // Stopped while the answer was read: the caller asked for nothing more.
+  signal?.throwIfAborted();
   if (!response.ok) {
     const error = data as ApiError | null;
     throw new RequestError(
