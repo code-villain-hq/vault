@@ -233,14 +233,26 @@ with `reading`; Undo puts them back.
 
 ## Newsletters
 
-A newsletter is any sender whose mail carries `List-Unsubscribe`
-(`newsletters.rs`). The first time an account comes online, Postrider adds
-a rule to its Sieve script that files such mail in its Newsletters folder
-(made where there's none), after the account's other rules, so a rule of
-yours still wins. It moves the Inbox's newsletters there too, and notes
-the account in `newsletters_set_aside`, so a rule you take away stays
-away. The folder is a role folder (`FolderRole::Newsletters`), named
-"Newsletters".
+A newsletter is mail that carries `List-Unsubscribe` and isn't a notice
+(`newsletters.rs`). A notice is about something of yours: a sign-in, the
+account, an order, a payment, a delivery. Google puts the header on its
+notices too, so `is_notice` tells them by what the header can't: an
+`Auto-Submitted` other than `no` (RFC 3834), a word in the sender's
+local part (`NOTICE_WORDS`: account, security, login, order, receipt,
+payment, shipping, confirm, … in English, German and Swedish) or a host
+that sends only notices (`NOTICE_HOSTS`: `accounts.google.com`,
+`id.apple.com`). The rule's Sieve says the same (`notice_test`); IMAP
+SEARCH can't, so what it finds is read again by `FROM AUTO-SUBMITTED`.
+Keep in Inbox is the fix for a sender it still gets wrong.
+
+The first time an account comes online, Postrider adds a rule to its
+Sieve script that files newsletters in its Newsletters folder (made where
+there's none), after the account's other rules, so a rule of yours still
+wins. It moves the Inbox's newsletters there too, and notes the account in
+`newsletters_set_aside`, so a rule you take away stays away. An account
+set aside before notices were told apart (`notices_back_at` empty) gets
+its rule written again and its notices moved back to the Inbox, once. The
+folder is a role folder (`FolderRole::Newsletters`), named "Newsletters".
 
 The page (`newsletters.tsx`, `GET /newsletters`) reads each account's
 Newsletters of the last 90 days by sender: how often each writes

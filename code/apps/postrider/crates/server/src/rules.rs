@@ -76,7 +76,8 @@ pub enum When {
     Subject(String),
     /// From this mailing list, by its List-Id.
     List(String),
-    /// With a link to unsubscribe (`List-Unsubscribe`): a newsletter.
+    /// With a link to unsubscribe (`List-Unsubscribe`), and not a notice: a
+    /// newsletter ([`crate::newsletters::is_notice`]).
     Unsubscribe,
 }
 
@@ -88,7 +89,7 @@ impl When {
             When::To(who) => format!("To {who}"),
             When::Subject(words) => format!("Subject has “{words}”"),
             When::List(list) => format!("List {list}"),
-            When::Unsubscribe => "Has an unsubscribe link".into(),
+            When::Unsubscribe => "Is a newsletter".into(),
         }
     }
 
@@ -103,7 +104,10 @@ impl When {
             When::To(who) => address("[\"to\", \"cc\"]", who),
             When::Subject(words) => format!("header :contains \"subject\" {}", sieve_string(words)),
             When::List(list) => format!("header :contains \"list-id\" {}", sieve_string(list)),
-            When::Unsubscribe => "exists \"list-unsubscribe\"".into(),
+            When::Unsubscribe => format!(
+                "allof (exists \"list-unsubscribe\", not {})",
+                crate::newsletters::notice_test()
+            ),
         }
     }
 
@@ -116,7 +120,8 @@ impl When {
             When::To(who) => format!("OR TO {0} CC {0}", quoted(who)),
             When::Subject(words) => format!("SUBJECT {}", quoted(words)),
             When::List(list) => format!("HEADER List-Id {}", quoted(list)),
-            // An empty string is in every mail that has the header.
+            // An empty string is in every mail that has the header. SEARCH
+            // can't tell a notice: what it finds is read again.
             When::Unsubscribe => "HEADER List-Unsubscribe \"\"".into(),
         }
     }
@@ -786,7 +791,12 @@ mod tests {
         let script = script(&[newsletters.clone(), kept.clone(), code()]);
         assert_eq!(rules_in(&script), vec![code(), kept, newsletters]);
         assert!(script.contains(
-            "if anyof (exists \"list-unsubscribe\") {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}"
+            "if anyof (allof (exists \"list-unsubscribe\", not anyof (allof (exists \"auto-submitted\", \
+             not header :is \"auto-submitted\" \"no\"), address :localpart :contains \"from\" [\"account\", "
+        ));
+        assert!(script.contains(
+            "address :domain :matches \"from\" [\"account.*\", \"accounts.*\", \"auth.*\", \"id.*\", \
+             \"login.*\", \"security.*\", \"signin.*\"]))) {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}"
         ));
         assert_eq!(
             search(&[When::Unsubscribe], ""),
