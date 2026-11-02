@@ -51,6 +51,7 @@ pub fn router(state: AppState) -> Router {
         .route("/folders/{key}/rename", post(folders::rename))
         .route("/search", get(folders::search))
         .route("/newsletters", get(newsletters::list))
+        .route("/newsletters/sender", get(newsletters::sender))
         .route("/newsletters/unsubscribe", post(newsletters::unsubscribe))
         .route(
             "/newsletters/unsubscribed/{id}",

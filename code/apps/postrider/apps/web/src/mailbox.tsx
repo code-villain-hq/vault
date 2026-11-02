@@ -2,7 +2,7 @@ import { useKeptWidth, WidthEdge, type Widths } from "@code-villain/web";
 import { Outlet, useLocation, useParams, useSearch } from "@tanstack/react-router";
 import { type CSSProperties, useMemo } from "react";
 import { Ask } from "./ask";
-import { FolderList, SearchList } from "./folders";
+import { FolderList, SearchList, SenderList } from "./folders";
 import { type From, InboxList, mailKey, NoAccounts } from "./inbox";
 import { PageBody } from "./layout";
 import { useAccounts } from "./mail";
@@ -50,19 +50,22 @@ export function MailboxLayout() {
 
 function ListColumn({ from, open }: { from: From; open: string | undefined }) {
   if (from.q !== undefined) return <SearchList q={from.q} open={open} />;
+  if (from.sender !== undefined) return <SenderList sender={from.sender} open={open} />;
   if (from.folder !== undefined) return <FolderList folder={from.folder} open={open} />;
   return <InboxList open={open} />;
 }
 
 /**
  * The list the page shows, by its route, and the mail open from it, by
- * its key in that list: the Inbox, a folder, a search, or a mail's `From`.
+ * its key in that list: the Inbox, a folder, a search, a sender's mail, or
+ * a mail's `From`.
  */
 function useShownList(): { from: From; open?: string } {
   const { workspace } = useWorkspace();
   const { pathname } = useLocation();
-  const { folder, account, uid } = useParams({ strict: false }) as {
+  const { folder, sender, account, uid } = useParams({ strict: false }) as {
     folder?: string;
+    sender?: string;
     account?: string;
     uid?: string;
   };
@@ -71,14 +74,15 @@ function useShownList(): { from: From; open?: string } {
   return useMemo(() => {
     if (account !== undefined && uid !== undefined) {
       return {
-        from: { folder: search.folder, q: search.q },
+        from: { folder: search.folder, q: search.q, sender: search.sender },
         open: mailKey({ folder: search.folder, account_id: account, uid: Number(uid) }),
       };
     }
     if (folder !== undefined) return { from: { folder } };
+    if (sender !== undefined) return { from: { folder: "newsletters", sender } };
     if (searching) return { from: { q: search.q ?? "" } };
     return { from: {} };
-  }, [account, uid, folder, searching, search.folder, search.q]);
+  }, [account, uid, folder, sender, searching, search.folder, search.q, search.sender]);
 }
 
 /** The right-hand column with no mail open in it. */

@@ -107,6 +107,9 @@ its line in the Inbox), so it opens again offline, and marks it read on
 the server. `message.rs` reads the source: who it went to, its text, its
 HTML with inline pictures written in, its attachments. The page shows the
 HTML in a frame where no script runs and pictures load without a referrer.
+The frame is as tall as the mail says it is; a last style sets the mail's
+`html` and `body` to `height: auto`, since newsletters that make them 100%
+tall would otherwise fold the frame to nothing.
 
 Only the Inbox is followed and kept. The other folders are read when
 they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
@@ -248,6 +251,13 @@ days, except while an account's newsletters are still being set aside
 (`setting_aside`): then it says so and reads every 5 seconds until they
 are. When setting them aside failed, it says why (kept in memory,
 `set_aside_failed`); the account tries again when it next connects.
+The page is as wide as the window.
+
+A sender's name, or Enter, opens what it sent (`SenderList`, at
+`/newsletters/{address}`): every account's Newsletters asked for that
+sender (`GET /newsletters/sender?address=`, IMAP `FROM`), in the list
+column. A mail opened from it keeps `sender` in its search, so Esc goes
+back to the sender's list, and Esc there back to the page.
 
 - Unsubscribe (`POST /newsletters/unsubscribe`, U) asks nothing. It
   archives what the sender sent at once, and the request goes 10 seconds

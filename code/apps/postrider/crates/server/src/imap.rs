@@ -766,12 +766,12 @@ pub async fn newest(
     Ok(Lines { validity, lines })
 }
 
-/// The newest `count` mails in a folder with every one of `words` in them,
-/// in a header or the text.
+/// The newest `count` mails in a folder that `query` (an IMAP search, as
+/// [`words_query`] and [`from_query`] write it) finds.
 pub async fn search(
     session: &mut Session,
     folder: &str,
-    words: &[String],
+    query: &str,
     count: usize,
     known: &HashMap<i64, Summary>,
     known_validity: i64,
@@ -779,7 +779,7 @@ pub async fn search(
     let mailbox = session.examine(folder).await?;
     let validity = i64::from(mailbox.uid_validity.unwrap_or(0));
     let mut uids: Vec<i64> = session
-        .uid_search(search_query(words))
+        .uid_search(query)
         .await?
         .into_iter()
         .map(i64::from)
@@ -796,14 +796,12 @@ pub async fn search(
     Ok(Lines { validity, lines })
 }
 
+/// The mails with every one of `words` in them, in a header or the text:
 /// `TEXT "word"` for each word, quoted; in UTF-8 when one needs it.
-fn search_query(words: &[String]) -> String {
+pub fn words_query(words: &[String]) -> String {
     let terms = words
         .iter()
-        .map(|word| {
-            let quoted = word.replace('\\', "\\\\").replace('"', "\\\"");
-            format!("TEXT \"{quoted}\"")
-        })
+        .map(|word| format!("TEXT {}", quoted(word)))
         .collect::<Vec<_>>()
         .join(" ");
     if words.iter().all(|word| word.is_ascii()) {
@@ -811,6 +809,20 @@ fn search_query(words: &[String]) -> String {
     } else {
         format!("CHARSET UTF-8 {terms}")
     }
+}
+
+/// The mails from `address`: `FROM "address"`, in UTF-8 when it needs it.
+pub fn from_query(address: &str) -> String {
+    let term = format!("FROM {}", quoted(address));
+    if address.is_ascii() {
+        term
+    } else {
+        format!("CHARSET UTF-8 {term}")
+    }
+}
+
+fn quoted(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// What the list shows of these mails in the open folder: read or not from
@@ -1215,16 +1227,25 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_eq!(
-            search_query(&words("contract anna")),
+            words_query(&words("contract anna")),
             "TEXT \"contract\" TEXT \"anna\""
         );
         assert_eq!(
-            search_query(&words(r#"say "hi"\"#)),
+            words_query(&words(r#"say "hi"\"#)),
             r#"TEXT "say" TEXT "\"hi\"\\""#
         );
         assert_eq!(
-            search_query(&words("Entwürfe")),
+            words_query(&words("Entwürfe")),
             "CHARSET UTF-8 TEXT \"Entwürfe\""
+        );
+    }
+
+    #[test]
+    fn a_sender_is_asked_for_quoted() {
+        assert_eq!(from_query("news@coop.se"), "FROM \"news@coop.se\"");
+        assert_eq!(
+            from_query("nyheter@förening.se"),
+            "CHARSET UTF-8 FROM \"nyheter@förening.se\""
         );
     }
 }

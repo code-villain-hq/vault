@@ -62,6 +62,7 @@ const mail = createRoute({
   validateSearch: (search: Record<string, unknown>): From => ({
     folder: text(search.folder),
     q: text(search.q),
+    sender: text(search.sender),
   }),
   component: MailPage,
 });
@@ -74,6 +75,12 @@ const search = createRoute({
   getParentRoute: () => mailbox,
   path: "/search",
   validateSearch: (search: Record<string, unknown>): { q?: string } => ({ q: text(search.q) }),
+  component: NoMailOpen,
+});
+// What one sender sent, from the Newsletters page: by its address.
+const sender = createRoute({
+  getParentRoute: () => mailbox,
+  path: "/newsletters/$sender",
   component: NoMailOpen,
 });
 const newsletters = createRoute({
@@ -92,7 +99,7 @@ const routeTree = root.addChildren([
   login,
   signedIn,
   workspace.addChildren([
-    mailbox.addChildren([inbox, mail, folder, search]),
+    mailbox.addChildren([inbox, mail, folder, search, sender]),
     newsletters,
     accounts,
   ]),

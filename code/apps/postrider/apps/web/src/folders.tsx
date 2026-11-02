@@ -1,6 +1,6 @@
 import { shortcutFree } from "@code-villain/web";
 import type { Folder, FolderLink, Listing, RenameFolder } from "@postrider/types";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { api, messageOf } from "./api";
@@ -35,7 +35,9 @@ function watch(watcher: () => void) {
 }
 
 function listKey(from: From): string {
-  return from.q === undefined ? `folder:${from.folder?.toLowerCase()}` : `search:${from.q}`;
+  if (from.q !== undefined) return `search:${from.q}`;
+  if (from.sender !== undefined) return `sender:${from.sender.toLowerCase()}`;
+  return `folder:${from.folder?.toLowerCase()}`;
 }
 
 /** The mails of the list a mail was opened from, as it shows them. */
@@ -139,6 +141,57 @@ export function FolderList({ folder, open }: { folder: string; open: string | un
       <PageHeader
         title={name}
         crumb={shown?.role === null ? <FolderName folder={shown} /> : undefined}
+      >
+        <SearchField />
+      </PageHeader>
+      <PageBody>
+        <Mails from={from} open={open} listing={listing} error={error} waiting={waiting} />
+      </PageBody>
+    </>
+  );
+}
+
+/**
+ * What one sender sent, in Newsletters, every account's: where its name on
+ * the Newsletters page leads, and back. Esc with no mail open goes back to
+ * the Newsletters page.
+ */
+export function SenderList({ sender, open }: { sender: string; open: string | undefined }) {
+  const { workspace } = useWorkspace();
+  const { minutes } = useFolders();
+  const navigate = useNavigate();
+  const from = useMemo(() => ({ folder: "newsletters", sender }), [sender]);
+  const { listing, error, waiting } = useListing(
+    from,
+    `/newsletters/sender?${new URLSearchParams({ address: sender })}`,
+    minutes,
+  );
+  const name = listing?.mails[0]?.from_name || sender;
+
+  const reading = open !== undefined;
+  useEffect(() => {
+    if (reading) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !shortcutFree(event)) return;
+      event.preventDefault();
+      void navigate({ to: "/$workspace/newsletters", params: { workspace: workspace.url_key } });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [reading, navigate, workspace.url_key]);
+  return (
+    <>
+      <PageHeader
+        title={name}
+        parent={
+          <Link
+            to="/$workspace/newsletters"
+            params={{ workspace: workspace.url_key }}
+            className="hover:text-ink"
+          >
+            Newsletters
+          </Link>
+        }
       >
         <SearchField />
       </PageHeader>

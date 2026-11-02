@@ -224,8 +224,8 @@ export function NewslettersPage() {
     );
   };
 
-  // J and K move through the senders; Enter or O opens the newest mail of
-  // the one they're on, U unsubscribes from it.
+  // J and K move through the senders; Enter or O opens what the one they're
+  // on sent, U unsubscribes from it.
   const [focusedKey, setFocusedKey] = useState<string>();
   const focused = Math.max(
     0,
@@ -245,7 +245,7 @@ export function NewslettersPage() {
         if (next) setFocusedKey(senderKey(next));
       } else if (row && ((key === "Enter" && event.target === document.body) || key === "o")) {
         event.preventDefault();
-        void navigate(newestMail(workspace.url_key, row));
+        void navigate(senderMail(workspace.url_key, row));
       } else if (row && key === "u" && !done.has(senderKey(row))) {
         event.preventDefault();
         void unsubscribe([row]);
@@ -435,7 +435,7 @@ function SenderRow({
         {initial(row.name)}
       </span>
       <Link
-        {...newestMail(workspace.url_key, row)}
+        {...senderMail(workspace.url_key, row)}
         className="name"
         title={account ? `${row.address}, to ${account.name}` : row.address}
       >
@@ -524,12 +524,11 @@ function mails(count: number): string {
   return `${count} ${count === 1 ? "mail" : "mails"}`;
 }
 
-/** A sender's newest mail, opened from Newsletters. */
-function newestMail(workspace: string, row: Newsletter) {
+/** What a sender sent, in the list column, to open beside it. */
+function senderMail(workspace: string, row: Newsletter) {
   return {
-    to: "/$workspace/mail/$account/$uid",
-    params: { workspace, account: row.account_id, uid: String(row.newest_uid) },
-    search: { folder: "newsletters" },
+    to: "/$workspace/newsletters/$sender",
+    params: { workspace, sender: row.address },
   } as const;
 }
 

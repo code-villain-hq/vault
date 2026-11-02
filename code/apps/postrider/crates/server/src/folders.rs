@@ -222,13 +222,13 @@ impl Mail {
         }
         let accounts = self.accounts(workspace_id).await?;
         let here = self.found_here(&accounts, &words).await?;
-        let words = &words;
+        let query = &imap::words_query(&words);
         let read = join_all(accounts.iter().map(|account| async move {
             let mut places = vec![Place::inbox()];
             places.extend(self.places(account).await?.into_iter().filter(searched));
             // A few folders at once, each over a connection of its own.
             let found: Vec<Vec<MailSummary>> = stream::iter(places)
-                .map(|place| async move { self.read(account, &place, Some(words)).await })
+                .map(|place| async move { self.read(account, &place, Some(query)).await })
                 .buffer_unordered(READERS)
                 .try_collect()
                 .await?;
@@ -341,27 +341,24 @@ impl Mail {
         Ok(found)
     }
 
-    /// A folder's newest mail, or what `words` find in it, as the list
-    /// shows it. Lines read before aren't read again.
-    async fn read(
+    /// A folder's newest mail, or what `query` (an IMAP search) finds in
+    /// it, as the list shows it. Lines read before aren't read again.
+    pub(crate) async fn read(
         &self,
         account: &MailAccount,
         place: &Place,
-        words: Option<&[String]>,
+        query: Option<&str>,
     ) -> Result<Vec<MailSummary>, Failure> {
         let at = (account.id, place.path.clone());
         let (validity, known) = self.lock_lines().get(&at).cloned().unwrap_or_default();
         let read = self
             .on_server(account, |session| {
-                let (path, known, words) = (
-                    place.path.clone(),
-                    known.clone(),
-                    words.map(<[String]>::to_vec),
-                );
+                let (path, known, query) =
+                    (place.path.clone(), known.clone(), query.map(str::to_string));
                 Box::pin(async move {
-                    match words {
-                        Some(words) => {
-                            imap::search(session, &path, &words, FOUND, &known, validity).await
+                    match query {
+                        Some(query) => {
+                            imap::search(session, &path, &query, FOUND, &known, validity).await
                         }
                         None => imap::newest(session, &path, NEWEST, &known, validity).await,
                     }
@@ -481,7 +478,7 @@ fn has_words(mail: &MailSummary, words: &[String]) -> bool {
 
 /// Every account's mails as one list, newest first, and why any account
 /// couldn't be read; with what this Mac has of it (`here`), if anything.
-fn listing(
+pub(crate) fn listing(
     accounts: &[MailAccount],
     read: Vec<Result<Vec<MailSummary>, Failure>>,
     mut here: HashMap<Uuid, Vec<MailSummary>>,

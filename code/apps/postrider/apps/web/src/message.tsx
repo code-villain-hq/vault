@@ -53,6 +53,7 @@ export function MailPage() {
 
   const folder = from.folder;
   const q = from.q;
+  const writer = from.sender;
   // Read now: its folder's unread count goes down once it's open.
   const unread = useRef(false);
   unread.current = summary?.seen === false;
@@ -70,7 +71,7 @@ export function MailPage() {
       (answer) => {
         setOpened({ key, message: answer });
         if (folder === undefined) return;
-        markSeen({ folder, q }, key);
+        markSeen({ folder, q, sender: writer }, key);
         if (unread.current) refresh();
       },
       (problem: unknown) => {
@@ -78,7 +79,7 @@ export function MailPage() {
       },
     );
     return () => stop.abort();
-  }, [workspace.id, place, account, uid, key, folder, q, refresh]);
+  }, [workspace.id, place, account, uid, key, folder, q, writer, refresh]);
 
   const open = (mail: MailSummary | undefined) => {
     if (!mail) return;
@@ -261,6 +262,7 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
   const { workspace } = useWorkspace();
   const { folders } = useFolders();
   const navigate = useNavigate();
+  const listed = useListedMails(from);
   const params = { workspace: workspace.url_key };
   if (from.q !== undefined) {
     const search = { q: from.q };
@@ -268,6 +270,15 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
       name: "Search",
       href: `/${workspace.url_key}/search?${new URLSearchParams(search)}`,
       go: () => void navigate({ to: "/$workspace/search", params, search }),
+    };
+  }
+  if (from.sender !== undefined) {
+    const sender = from.sender;
+    return {
+      name: listed[0]?.from_name || sender,
+      href: `/${workspace.url_key}/newsletters/${encodeURIComponent(sender)}`,
+      go: () =>
+        void navigate({ to: "/$workspace/newsletters/$sender", params: { ...params, sender } }),
     };
   }
   const folder = from.folder;
@@ -496,6 +507,9 @@ document.addEventListener("keydown", (event) =>
  * The frame's document: the mail's HTML under a policy that runs only
  * Postrider's script (by a nonce the mail can't know) and lets nothing post
  * back, on white paper whatever the app's theme, as senders design for.
+ * Newsletters often make html and body 100% tall, `!important`: in a frame
+ * that grows to its content that is no height at all, so a rule after the
+ * mail's, and surer than theirs, keeps them as tall as what they hold.
  */
 function paper(html: string): string {
   const nonce = crypto.randomUUID();
@@ -510,5 +524,6 @@ function paper(html: string): string {
 html { background: Canvas; color: CanvasText; height: auto !important; min-height: 0 !important; }
 body { margin: 0; padding: 20px 24px; font: 14px/1.5 -apple-system, system-ui, sans-serif; overflow-wrap: break-word; height: auto !important; min-height: 0 !important; }
 img { max-width: 100%; height: auto; }
-</style></head><body>${body}</body></html>`;
+</style></head><body>${body}
+<style>html:root, html:root > body { height: auto !important; min-height: 0 !important; max-height: none !important; }</style></body></html>`;
 }

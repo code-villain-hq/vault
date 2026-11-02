@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, TimeDelta, Utc};
 use futures::future::join_all;
@@ -30,16 +30,19 @@ use lettre::message::Mailbox;
 use lettre::message::header::ContentType;
 use mail_parser::MessageParser;
 use postrider_domain::{
-    AccountState, AccountStatus, FolderRole, KeptInInbox, MailAccount, Newsletter, Newsletters,
-    SenderProblem, Senders, SettingAside, UnsubscribeSent, Unsubscribed, Unsubscribing, Validate,
+    AccountState, AccountStatus, FolderRole, KeptInInbox, Listing, MailAccount, Newsletter,
+    Newsletters, SenderProblem, Senders, SettingAside, UnsubscribeSent, Unsubscribed,
+    Unsubscribing, Validate,
 };
 use reqwest::Url;
+use serde::Deserialize;
 use tokio::sync::watch;
 use tokio::task::AbortHandle;
 use uuid::Uuid;
 
 use crate::auth::Member;
 use crate::error::AppError;
+use crate::folders::listing;
 use crate::imap::{self, Failure, Headed, Place};
 use crate::mail::Mail;
 use crate::reply::{is_this_mac, send};
@@ -179,6 +182,25 @@ impl Mail {
             .await?
             .into_iter()
             .find(|place| place.role == Some(FolderRole::Newsletters)))
+    }
+
+    /// A sender's newest mail in Newsletters, from every account it writes
+    /// to.
+    pub async fn sender_mail(
+        &self,
+        workspace_id: Uuid,
+        address: &str,
+    ) -> Result<Listing, AppError> {
+        let accounts = self.accounts(workspace_id).await?;
+        let query = &imap::from_query(address);
+        let read = join_all(accounts.iter().map(|account| async move {
+            match self.newsletters_folder(account).await? {
+                Some(place) => self.read(account, &place, Some(query)).await,
+                None => Ok(Vec::new()),
+            }
+        }))
+        .await;
+        Ok(listing(&accounts, read, HashMap::new()))
     }
 
     /// The account's newsletters of the last [`DAYS`] days, by sender.
@@ -555,6 +577,26 @@ pub async fn list(
         problems,
         setting_aside,
     }))
+}
+
+#[derive(Deserialize)]
+pub struct SenderParams {
+    address: String,
+}
+
+/// `GET /api/w/{workspace}/newsletters/sender?address=`: what a sender
+/// sent, newest first.
+pub async fn sender(
+    State(state): State<AppState>,
+    member: Member,
+    Query(params): Query<SenderParams>,
+) -> Result<Json<Listing>, AppError> {
+    Ok(Json(
+        state
+            .mail
+            .sender_mail(member.actor.workspace_id, &params.address)
+            .await?,
+    ))
 }
 
 /// `POST /api/w/{workspace}/newsletters/unsubscribe`: archives what the

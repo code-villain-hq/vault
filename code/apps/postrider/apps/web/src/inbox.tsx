@@ -41,11 +41,12 @@ export function mailKey(mail: { folder?: string | null; account_id: string; uid:
 }
 
 /** Which list a mail was opened from: the Inbox, a folder, or a search. */
-export type From = { folder?: string; q?: string };
+export type From = { folder?: string; q?: string; sender?: string };
 
 /** The mail page's search for a mail of the list `from`. */
 export function openedFrom(mail: MailSummary, from: From): From {
   if (from.q !== undefined) return { folder: mail.folder ?? undefined, q: from.q };
+  if (from.sender !== undefined) return { folder: from.folder, sender: from.sender };
   return from.folder ? { folder: from.folder } : {};
 }
 
