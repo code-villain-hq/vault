@@ -33,6 +33,7 @@ import {
   type LucideIcon,
   Mail,
   MailWarning,
+  Newspaper,
   RefreshCw,
   Send,
   SquarePen,
@@ -279,9 +280,10 @@ function SyncButton() {
 }
 
 /**
- * The Inbox, Sent, Archive, Drafts, Junk and Trash, then the accounts' own
- * folders, each once however many accounts have it, with what's unread in
- * them: not in Drafts or Trash, where it means nothing.
+ * The Inbox, Newsletters, Sent, Archive, Drafts, Junk and Trash, then the
+ * accounts' own folders, each once however many accounts have it, with
+ * what's unread in them: not in Newsletters, Drafts or Trash, where it means
+ * nothing.
  */
 function MailNav() {
   const { workspace } = useWorkspace();
@@ -301,6 +303,15 @@ function MailNav() {
           <NavIcon icon={Inbox} />
           Inbox
           <Unread count={unread} />
+        </Link>
+        <Link
+          to="/$workspace/newsletters"
+          params={{ workspace: workspace.url_key }}
+          className={`${navLink} ${list === "newsletters" ? "active" : ""}`}
+          title="Newsletters (G then N)"
+        >
+          <NavIcon icon={Newspaper} />
+          Newsletters
         </Link>
         {sent && <FolderLink folder={sent} icon={Send} open={list} title="Sent (G then S)" />}
         {archive && (
@@ -503,6 +514,14 @@ const SECTIONS: ShortcutSection[] = [
     ],
   },
   {
+    title: "Newsletters",
+    keys: [
+      ["J K or ↓ ↑", "Next and previous sender"],
+      ["Enter or O", "Open its newest mail"],
+      ["U", "Unsubscribe from it"],
+    ],
+  },
+  {
     title: "A mail",
     keys: [
       ["J K", "The next and previous mail, opened"],
@@ -532,6 +551,11 @@ function Menus() {
   const params = { workspace: workspace.url_key };
   const goTo = [
     { key: "i", name: "Inbox", go: () => void navigate({ to: "/$workspace", params }) },
+    {
+      key: "n",
+      name: "Newsletters",
+      go: () => void navigate({ to: "/$workspace/newsletters", params }),
+    },
   ];
   for (const [key, folder] of [
     ["s", sent],
@@ -589,6 +613,14 @@ function useCommands(query: string): Command[] {
         hint: "G I",
         icon: <NavIcon icon={Inbox} />,
         run: () => void navigate({ to: "/$workspace", params }),
+      },
+      {
+        id: "newsletters",
+        group: "Go to",
+        label: "Newsletters",
+        hint: "G N",
+        icon: <NavIcon icon={Newspaper} />,
+        run: () => void navigate({ to: "/$workspace/newsletters", params }),
       },
       ...[
         { folder: sent, icon: Send, hint: "G S" },

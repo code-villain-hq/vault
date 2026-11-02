@@ -27,7 +27,52 @@ type Mail = {
   read?: boolean;
   /** A PDF that came with it, and the line it says. */
   file?: { name: string; says: string };
+  /** More header lines, such as `List-Unsubscribe`. */
+  headers?: string[];
 };
+
+// Where a one-click unsubscribe goes on this Mac. Nothing listens there
+// unless you test it, and then Postrider says it couldn't reach them.
+const oneClick = "http://127.0.0.1:7899/unsubscribe";
+
+/**
+ * A sender's newsletters of the last 90 days: one every `every` days, at
+ * `at`, the newest `first` days ago, with every `opened`th read (0: none).
+ * `leave` is how it takes unsubscribing: a mail, one click, or a page.
+ */
+function newsletters(sender: {
+  from: string;
+  subjects: string[];
+  body: string;
+  every: number;
+  first?: number;
+  at: string;
+  opened: number;
+  leave: "mail" | "click" | "page";
+}): Mail[] {
+  const address = sender.from.match(/<(.+)>/)?.[1] ?? sender.from;
+  const domain = address.split("@")[1];
+  const links = {
+    mail: `<mailto:leave@${domain}?subject=unsubscribe>`,
+    click: `<${oneClick}/${domain}>, <mailto:leave@${domain}>`,
+    page: `<https://${domain}/abmelden>`,
+  }[sender.leave];
+  const headers = [`List-Id: <news.${domain}>`, `List-Unsubscribe: ${links}`];
+  if (sender.leave === "click") headers.push("List-Unsubscribe-Post: List-Unsubscribe=One-Click");
+  const mail: Mail[] = [];
+  for (let day = sender.first ?? 0, n = 0; day < 90; day += sender.every, n++) {
+    mail.push({
+      from: sender.from,
+      subject: sender.subjects[n % sender.subjects.length] ?? "",
+      body: sender.body,
+      day,
+      at: sender.at,
+      read: sender.opened > 0 && n % sender.opened === 0,
+      headers,
+    });
+  }
+  return mail;
+}
 
 const accounts: {
   name: string;
@@ -135,6 +180,42 @@ const accounts: {
           read: true,
         },
       ],
+      Newsletters: [
+        ...newsletters({
+          from: "The Pragmatic Engineer <gergely@pragmatic.test>",
+          subjects: [
+            "The Pulse: AI tools in teams",
+            "Inside a platform team",
+            "The Pulse: hiring is back",
+          ],
+          body: "This week: what we learned from 400 engineers about their tools.",
+          every: 7,
+          first: 1,
+          at: "16:00",
+          opened: 1,
+          leave: "click",
+        }),
+        ...newsletters({
+          from: "This Week in Rust <twir@rust.test>",
+          subjects: ["This Week in Rust 620", "This Week in Rust 621", "This Week in Rust 622"],
+          body: "Hello and welcome to another issue of This Week in Rust!",
+          every: 7,
+          first: 2,
+          at: "05:00",
+          opened: 2,
+          leave: "mail",
+        }),
+        ...newsletters({
+          from: "Product Hunt Daily <hello@producthunt.test>",
+          subjects: ["Today's top products", "5 AI tools you missed", "The best of the week"],
+          body: "Here's what launched today.",
+          every: 1,
+          first: 0,
+          at: "09:15",
+          opened: 0,
+          leave: "click",
+        }),
+      ],
     },
   },
   {
@@ -218,6 +299,83 @@ const accounts: {
           read: true,
         },
       ],
+      Newsletters: [
+        ...newsletters({
+          from: "Zalando <news@zalando.test>",
+          subjects: [
+            "Neu eingetroffen: Herbstjacken",
+            "Nur heute: 20 % extra",
+            "Deine Lieblingsmarken im Sale",
+          ],
+          body: "Entdecke die neuen Styles der Saison.",
+          every: 1,
+          at: "10:30",
+          opened: 0,
+          leave: "mail",
+        }),
+        ...newsletters({
+          from: "LinkedIn <messages-noreply@linkedin.test>",
+          subjects: [
+            "Du bist in 12 Suchen aufgetaucht",
+            "Neue Jobs für dich",
+            "Anna Weber hat etwas geteilt",
+          ],
+          body: "Sieh dir an, was in deinem Netzwerk passiert.",
+          every: 2,
+          at: "08:45",
+          opened: 0,
+          leave: "click",
+        }),
+        ...newsletters({
+          from: "MediaMarkt <newsletter@mediamarkt.test>",
+          subjects: ["Tiefpreisspätschicht", "Die besten Deals der Woche"],
+          body: "Nur solange der Vorrat reicht.",
+          every: 7,
+          first: 3,
+          at: "18:00",
+          opened: 0,
+          leave: "mail",
+        }),
+        ...newsletters({
+          from: "Spotify <no-reply@spotify.test>",
+          subjects: ["Neue Musik für dich", "Dein Mix der Woche"],
+          body: "Frische Songs, ausgewählt für dich.",
+          every: 7,
+          first: 4,
+          at: "12:00",
+          opened: 0,
+          leave: "page",
+        }),
+        ...newsletters({
+          from: "BahnBonus <bahnbonus@bahn.test>",
+          subjects: ["Ihre Punkte im Überblick", "Prämien im November"],
+          body: "Ihr aktueller Punktestand und neue Prämien.",
+          every: 14,
+          first: 5,
+          at: "09:00",
+          opened: 3,
+          leave: "page",
+        }),
+        ...newsletters({
+          from: "heise online <newsletter@heise.test>",
+          subjects: ["heise-Newsletter: Die Nachrichten des Tages", "c't-Newsletter"],
+          body: "Die wichtigsten Meldungen des Tages.",
+          every: 1,
+          at: "06:30",
+          opened: 1,
+          leave: "click",
+        }),
+        ...newsletters({
+          from: "Babylon Kino <programm@babylon.test>",
+          subjects: ["Das Programm der Woche"],
+          body: "Diese Woche im Babylon: Filme, Gäste und Reihen.",
+          every: 7,
+          first: 1,
+          at: "11:00",
+          opened: 1,
+          leave: "page",
+        }),
+      ],
       Rechnungen: [
         {
           from: "Uberspace <hallo@uberspace.test>",
@@ -281,6 +439,7 @@ function message(to: string, mail: Mail): string {
     `Subject: ${header(mail.subject)}`,
     `Date: ${date.toUTCString().replace("GMT", "+0000")}`,
     `Message-ID: <${crypto.randomUUID()}@postrider.test>`,
+    ...(mail.headers ?? []),
     "MIME-Version: 1.0",
   ];
   const text = [

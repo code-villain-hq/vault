@@ -36,6 +36,34 @@ pub struct Rule {
     pub when: Vec<When>,
 }
 
+impl Rule {
+    /// Where its test goes in the script: 0 for yours, 1 to keep senders in
+    /// the Inbox, 2 for newsletters.
+    fn place(&self) -> u8 {
+        if self.when.contains(&When::Unsubscribe) {
+            2
+        } else if self.path == "INBOX" {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// The rule that puts newsletters in `newsletters`.
+    pub fn newsletters(newsletters: &Place) -> Rule {
+        Rule {
+            folder: newsletters.name.clone(),
+            path: newsletters.path.clone(),
+            when: vec![When::Unsubscribe],
+        }
+    }
+
+    /// Whether it's the rule for newsletters.
+    pub fn is_newsletters(&self) -> bool {
+        self.when.contains(&When::Unsubscribe)
+    }
+}
+
 /// What a rule looks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,6 +76,8 @@ pub enum When {
     Subject(String),
     /// From this mailing list, by its List-Id.
     List(String),
+    /// With a link to unsubscribe (`List-Unsubscribe`): a newsletter.
+    Unsubscribe,
 }
 
 impl When {
@@ -58,6 +88,7 @@ impl When {
             When::To(who) => format!("To {who}"),
             When::Subject(words) => format!("Subject has “{words}”"),
             When::List(list) => format!("List {list}"),
+            When::Unsubscribe => "Has an unsubscribe link".into(),
         }
     }
 
@@ -72,6 +103,7 @@ impl When {
             When::To(who) => address("[\"to\", \"cc\"]", who),
             When::Subject(words) => format!("header :contains \"subject\" {}", sieve_string(words)),
             When::List(list) => format!("header :contains \"list-id\" {}", sieve_string(list)),
+            When::Unsubscribe => "exists \"list-unsubscribe\"".into(),
         }
     }
 
@@ -84,6 +116,8 @@ impl When {
             When::To(who) => format!("OR TO {0} CC {0}", quoted(who)),
             When::Subject(words) => format!("SUBJECT {}", quoted(words)),
             When::List(list) => format!("HEADER List-Id {}", quoted(list)),
+            // An empty string is in every mail that has the header.
+            When::Unsubscribe => "HEADER List-Unsubscribe \"\"".into(),
         }
     }
 
@@ -94,15 +128,21 @@ impl When {
     }
 
     pub fn text(&self) -> &str {
-        let (When::From(text) | When::To(text) | When::Subject(text) | When::List(text)) = self;
-        text
+        match self {
+            When::From(text) | When::To(text) | When::Subject(text) | When::List(text) => text,
+            When::Unsubscribe => "",
+        }
     }
 }
 
-/// Postrider's script for these rules.
+/// Postrider's script for these rules. Sieve stops at the first that
+/// matches, so yours come first, then the senders kept in the Inbox, then
+/// newsletters: a newsletter you sort into a folder goes there.
 pub fn script(rules: &[Rule]) -> String {
     let mut script = String::from(HEADER);
-    for rule in rules.iter().filter(|rule| !rule.when.is_empty()) {
+    let mut ordered: Vec<&Rule> = rules.iter().filter(|rule| !rule.when.is_empty()).collect();
+    ordered.sort_by_key(|rule| rule.place());
+    for rule in ordered {
         let said = serde_json::to_string(rule).expect("a rule is JSON");
         let tests = rule
             .when
@@ -150,7 +190,7 @@ fn sieve_string(text: &str) -> String {
 
 /// An IMAP SEARCH for mail that matches any of `when`, with the CHARSET it
 /// needs in front.
-fn search(when: &[When], first: &str) -> String {
+pub(crate) fn search(when: &[When], first: &str) -> String {
     fn any(keys: &[String]) -> String {
         match keys {
             [] => "ALL".into(),
@@ -728,6 +768,29 @@ mod tests {
         assert_eq!(
             search(&[When::Subject("Grüße".into())], "UID 5:* "),
             "CHARSET UTF-8 UID 5:* SUBJECT \"Grüße\""
+        );
+    }
+
+    #[test]
+    fn newsletters_come_after_yours_and_the_senders_kept() {
+        let newsletters = Rule::newsletters(&Place {
+            path: "INBOX.Newsletters".into(),
+            name: "Newsletters".into(),
+            role: None,
+        });
+        let kept = Rule {
+            folder: "Inbox".into(),
+            path: "INBOX".into(),
+            when: vec![When::From("news@bahn.test".into())],
+        };
+        let script = script(&[newsletters.clone(), kept.clone(), code()]);
+        assert_eq!(rules_in(&script), vec![code(), kept, newsletters]);
+        assert!(script.contains(
+            "if anyof (exists \"list-unsubscribe\") {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}"
+        ));
+        assert_eq!(
+            search(&[When::Unsubscribe], ""),
+            "HEADER List-Unsubscribe \"\""
         );
     }
 

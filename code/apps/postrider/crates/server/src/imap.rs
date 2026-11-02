@@ -577,7 +577,7 @@ struct Listed {
 
 /// Names for the folders that say no role of their own, from the names
 /// mail apps give them, in English and German.
-const ROLE_NAMES: [(FolderRole, &[&str]); 5] = [
+const ROLE_NAMES: [(FolderRole, &[&str]); 6] = [
     (
         FolderRole::Sent,
         &[
@@ -608,6 +608,7 @@ const ROLE_NAMES: [(FolderRole, &[&str]); 5] = [
         FolderRole::Junk,
         &["junk", "spam", "junk e-mail", "junk-e-mail"],
     ),
+    (FolderRole::Newsletters, &["newsletters", "newsletter"]),
 ];
 
 /// The folders worth showing, by name: every one that can hold mail but
@@ -871,6 +872,54 @@ async fn lines(
             })
         })
         .collect())
+}
+
+/// A mail's header fields, with when it came and whether it's read.
+pub struct Headed {
+    pub uid: u32,
+    pub arrived: Option<DateTime<Utc>>,
+    pub seen: bool,
+    pub header: Vec<u8>,
+}
+
+/// The header `fields` of each mail in `folder` that `query` finds, read
+/// without marking anything read.
+pub async fn headers(
+    session: &mut Session,
+    folder: &str,
+    query: &str,
+    fields: &str,
+) -> Result<Vec<Headed>, Failure> {
+    session.examine(folder).await?;
+    let uids: Vec<u32> = session.uid_search(query).await?.into_iter().collect();
+    let mut headed = Vec::new();
+    for batch in uids.chunks(BATCH * 10) {
+        let set = batch
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        let fetches: Vec<Fetch> = session
+            .uid_fetch(
+                set,
+                format!("(UID FLAGS INTERNALDATE BODY.PEEK[HEADER.FIELDS ({fields})])"),
+            )
+            .await?
+            .try_collect()
+            .await?;
+        for fetch in &fetches {
+            let Some(uid) = fetch.uid else {
+                continue;
+            };
+            headed.push(Headed {
+                uid,
+                arrived: fetch.internal_date().map(|d| d.with_timezone(&Utc)),
+                seen: is_seen(fetch),
+                header: fetch.header().unwrap_or_default().to_vec(),
+            });
+        }
+    }
+    Ok(headed)
 }
 
 fn is_seen(fetch: &Fetch) -> bool {

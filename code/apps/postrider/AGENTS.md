@@ -16,8 +16,10 @@ field at the foot of the list, where you ask Postrider something or tell
 it how to sort, and it makes the rule on the mail server, or sorts by
 reading on this Mac what no server rule can tell, says what it did, and
 Undo puts it back. Step 3 is built: C writes a new mail, and "More
-professional" writes yours again before you send it. Newsletters (4) and
-the week (5) are still to come.
+professional" writes yours again before you send it. Step 4 is built:
+newsletters skip the Inbox for a page of their own (G then N), the ones
+you never open first, and Unsubscribe asks nothing. The week (5) is still
+to come.
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -226,6 +228,39 @@ When Claude Code or a server fails, it tries again five minutes later.
 `stop_sorting` takes reading rules away with the whole rule, or alone
 with `reading`; Undo puts them back.
 
+## Newsletters
+
+A newsletter is any sender whose mail carries `List-Unsubscribe`
+(`newsletters.rs`). The first time an account comes online, Postrider adds
+a rule to its Sieve script that files such mail in its Newsletters folder
+(made where there's none), after the account's other rules, so a rule of
+yours still wins. It moves the Inbox's newsletters there too, and notes
+the account in `newsletters_set_aside`, so a rule you take away stays
+away. The folder is a role folder (`FolderRole::Newsletters`), named
+"Newsletters".
+
+The page (`newsletters.tsx`, `GET /newsletters`) reads each account's
+Newsletters of the last 90 days by sender: how often each writes
+(`rhythm.ts`) and how much of it you opened, the least read first. It
+leads with the ones you never open and a button for all of them. It reads
+once, not every 15 seconds, since a read fetches every header of those 90
+days.
+
+- Unsubscribe (`POST /newsletters/unsubscribe`, U) asks nothing. It
+  archives what the sender sent at once, and the request goes 10 seconds
+  later, so Undo (`POST /newsletters/undo/{id}`) really undoes it: the
+  one-click POST of RFC 8058 (no redirects followed), else a mail to its
+  `mailto:` over the account's SMTP. A sender with only a page to
+  unsubscribe on gets its page opened when it's the one unsubscribed, and
+  a link to it when it's among several. `GET /newsletters/unsubscribed/{id}`
+  waits for the requests and says which failed.
+- Keep in Inbox (`POST /newsletters/keep`), beyond the storyboard, writes
+  a rule that keeps the sender's mail in the Inbox, ahead of the
+  newsletters' rule, and moves its mail back there.
+
+Undo writes the rules back as they were and moves back the mail it moved.
+Like the ask field's, what it needs is kept in memory.
+
 ## Layout
 
 - `crates/domain`: models, validation, sync protocol types (no database).
@@ -240,7 +275,8 @@ with `reading`; Undo puts them back.
   (`rewrite.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
   ask field's answers (`ask.rs`), sorting rules (`rules.rs`, written
-  over ManageSieve by `sieve.rs`) and sorting by reading (`reading.rs`).
+  over ManageSieve by `sieve.rs`), sorting by reading (`reading.rs`) and
+  newsletters (`newsletters.rs`).
   `local.rs` is the one person on this Mac, who signs in to nothing.
   `serve.rs` runs it until told to stop, for `main.rs` (development) and
   the desktop app alike.
@@ -248,7 +284,8 @@ with `reading`; Undo puts them back.
 - `apps/web`: React + Base UI + Tailwind. `mailbox.tsx` is the list
   column beside the open mail, `inbox.tsx` the Inbox and today,
   `folders.tsx` a folder, a search and the search field, `message.tsx` an
-  opened mail, `compose.tsx` a reply and a new mail, `ask.tsx` the ask field and its
+  opened mail, `compose.tsx` a reply and a new mail, `newsletters.tsx` the
+  Newsletters, `ask.tsx` the ask field and its
   answer, `settings.tsx` the accounts and calendars, `mail.tsx` the live
   Inbox, notifications and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres

@@ -421,6 +421,7 @@ pub(crate) fn role_name(role: FolderRole) -> String {
         FolderRole::Drafts => "Drafts",
         FolderRole::Trash => "Trash",
         FolderRole::Junk => "Junk",
+        FolderRole::Newsletters => "Newsletters",
     }
     .into()
 }

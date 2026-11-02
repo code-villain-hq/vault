@@ -318,15 +318,19 @@ pub enum FolderRole {
     Drafts,
     Trash,
     Junk,
+    /// Where mail with an unsubscribe link goes, past the Inbox: Postrider's
+    /// own, by its name.
+    Newsletters,
 }
 
 impl FolderRole {
-    pub const ALL: [FolderRole; 5] = [
+    pub const ALL: [FolderRole; 6] = [
         FolderRole::Sent,
         FolderRole::Archive,
         FolderRole::Drafts,
         FolderRole::Trash,
         FolderRole::Junk,
+        FolderRole::Newsletters,
     ];
 
     /// Its key in addresses, where it stands for each account's own.
@@ -337,6 +341,7 @@ impl FolderRole {
             FolderRole::Drafts => "drafts",
             FolderRole::Trash => "trash",
             FolderRole::Junk => "junk",
+            FolderRole::Newsletters => "newsletters",
         }
     }
 }
@@ -608,6 +613,120 @@ pub struct RenameFolder {
 #[ts(export)]
 pub struct MoveMail {
     pub to: String,
+}
+
+/// A sender whose mail carries an unsubscribe link, as the Newsletters page
+/// shows it: how often it writes, and how much of that you open.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Newsletter {
+    pub account_id: Uuid,
+    /// "Zalando", or the address when its mail gives no name.
+    pub name: String,
+    pub address: String,
+    /// How many mails it sent in the last 90 days, and how many of those
+    /// you opened.
+    pub sent: u32,
+    pub opened: u32,
+    /// How many of them came in the last 30 days.
+    pub recent: u32,
+    /// How many it sends a week, since its first mail in those 90 days.
+    pub per_week: f64,
+    /// Its newest mail in Newsletters, to open.
+    #[ts(type = "number")]
+    pub newest_uid: i64,
+    pub newest: DateTime<Utc>,
+}
+
+/// The Newsletters page: every account's, least read first. An account
+/// that couldn't be read says why.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Newsletters {
+    pub newsletters: Vec<Newsletter>,
+    pub problems: Vec<AccountStatus>,
+}
+
+/// A sender in an account's Newsletters.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct NewsletterRef {
+    pub account_id: Uuid,
+    pub address: String,
+}
+
+/// The senders to unsubscribe from, or to keep in the Inbox.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Senders {
+    pub senders: Vec<NewsletterRef>,
+}
+
+impl Validate for Senders {
+    fn validate(&self) -> Result<(), ValidationError> {
+        if self.senders.is_empty() {
+            return Err(ValidationError("Name a sender.".into()));
+        }
+        if self.senders.len() > 100 {
+            return Err(ValidationError(
+                "That's more than 100 senders at once.".into(),
+            ));
+        }
+        if self.senders.iter().any(|s| s.address.trim().is_empty()) {
+            return Err(ValidationError("A sender has no address.".into()));
+        }
+        Ok(())
+    }
+}
+
+/// What unsubscribing did, sender by sender. The requests it sends go 10
+/// seconds later, unless Undo comes first.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Unsubscribed {
+    /// What Undo and the requests' outcome name.
+    pub id: Uuid,
+    pub senders: Vec<Unsubscribing>,
+    /// Whether a request waits to go.
+    pub waiting: bool,
+}
+
+/// One sender unsubscribed from: its mail archived, and how it takes
+/// unsubscribing.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Unsubscribing {
+    pub account_id: Uuid,
+    pub address: String,
+    pub archived: u32,
+    /// A request to stop goes to it: one click, or a mail.
+    pub asked: bool,
+    /// Its page, when it takes unsubscribing only there: to open.
+    pub page: Option<String>,
+}
+
+/// How the requests went, once they did: those that failed, and why.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct UnsubscribeSent {
+    pub failed: Vec<SenderProblem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SenderProblem {
+    pub account_id: Uuid,
+    pub address: String,
+    pub message: String,
+}
+
+/// What keeping senders in the Inbox did: the rule that keeps them there,
+/// and their mail moved back.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct KeptInInbox {
+    pub id: Uuid,
+    pub moved: u32,
 }
 
 #[cfg(test)]

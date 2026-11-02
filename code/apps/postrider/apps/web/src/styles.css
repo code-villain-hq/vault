@@ -382,6 +382,114 @@ input.crumb-name {
   outline-offset: -2px;
 }
 
+/* Newsletters, the least read first, led by the ones you never open. A
+   sender's buttons show on its row's hover; one unsubscribed from goes faint. */
+.newsletters {
+  padding: 22px 16px 24px;
+}
+.newsletters .lead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 900px;
+  padding: 0 12px 16px;
+}
+.newsletters .lead b {
+  font-weight: 700;
+}
+.newsletters .lead span {
+  color: var(--muted);
+}
+.newsletters .lead .ui-button {
+  margin-left: auto;
+  flex: none;
+}
+.nl {
+  display: grid;
+  grid-template-columns: 26px 200px 110px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  max-width: 900px;
+  height: 44px;
+  padding: 0 12px 0 8px;
+  border-radius: var(--radius-md);
+}
+.nl .name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  outline: none;
+}
+.nl .name:focus-visible {
+  text-decoration: underline;
+}
+.nl .rh,
+.nl .op {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--type-ui-small-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nl .act {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nl:not(.gone):not(:hover):not(.focused):not(:focus-within) .act {
+  visibility: hidden;
+}
+.nl:hover,
+.nl.focused {
+  background: var(--hover);
+}
+.nl.gone .name {
+  color: var(--faint);
+  font-weight: 400;
+}
+.nl.gone .av {
+  opacity: 0.5;
+}
+/* On a phone a sender takes two lines, and its buttons a third when chosen. */
+@media (width < 560px) {
+  .newsletters {
+    padding-inline: 4px;
+  }
+  .newsletters .lead {
+    flex-wrap: wrap;
+  }
+  .newsletters .lead .ui-button {
+    margin-left: 0;
+  }
+  .nl {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    grid-template-areas: "av name rh" ". op op" ". act act";
+    row-gap: 4px;
+    height: auto;
+    padding-block: 8px;
+  }
+  .nl .av {
+    grid-area: av;
+  }
+  .nl .name {
+    grid-area: name;
+  }
+  .nl .rh {
+    grid-area: rh;
+  }
+  .nl .op {
+    grid-area: op;
+    white-space: normal;
+  }
+  .nl .act {
+    grid-area: act;
+  }
+  .nl:not(.gone):not(:hover):not(.focused):not(:focus-within) .act {
+    display: none;
+  }
+}
+
 /* A mail, opened beside its list: its sender, its files, then its words. */
 .letter {
   display: grid;

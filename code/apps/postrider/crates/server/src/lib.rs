@@ -17,6 +17,7 @@ pub mod imap;
 pub mod local;
 pub mod mail;
 pub mod message;
+pub mod newsletters;
 pub mod preview;
 pub mod reading;
 pub mod reply;

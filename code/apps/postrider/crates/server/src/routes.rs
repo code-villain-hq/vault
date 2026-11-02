@@ -10,7 +10,9 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, archive, ask, caldav, connect, files, folders, mail, reply, rewrite, ws};
+use crate::{
+    accounts, archive, ask, caldav, connect, files, folders, mail, newsletters, reply, rewrite, ws,
+};
 
 /// The API, plus the built web app from `web_dir` when given.
 pub fn app(state: AppState, web_dir: Option<&std::path::Path>) -> Router {
@@ -48,6 +50,14 @@ pub fn router(state: AppState) -> Router {
         .route("/folders/{key}", get(folders::folder))
         .route("/folders/{key}/rename", post(folders::rename))
         .route("/search", get(folders::search))
+        .route("/newsletters", get(newsletters::list))
+        .route("/newsletters/unsubscribe", post(newsletters::unsubscribe))
+        .route(
+            "/newsletters/unsubscribed/{id}",
+            get(newsletters::unsubscribed),
+        )
+        .route("/newsletters/keep", post(newsletters::keep))
+        .route("/newsletters/undo/{id}", post(newsletters::undo))
         .route("/day", get(caldav::day))
         .route("/calendars", get(caldav::calendars))
         .route("/accounts", post(connect::add_account))

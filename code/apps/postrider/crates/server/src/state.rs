@@ -33,6 +33,8 @@ pub struct AppState {
     pub asking: Questions<Asking>,
     /// What answers changed, for Undo.
     pub answers: Answers,
+    /// What unsubscribing and keeping in the Inbox changed, for Undo.
+    pub newsletters: crate::newsletters::Undos,
 }
 
 impl AppState {
@@ -48,6 +50,7 @@ impl AppState {
             claude_code: None,
             asking: Questions::default(),
             answers: Answers::default(),
+            newsletters: crate::newsletters::Undos::default(),
         }
     }
 

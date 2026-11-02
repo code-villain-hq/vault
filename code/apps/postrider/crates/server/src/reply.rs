@@ -284,7 +284,7 @@ fn addresses(typed: &str) -> Result<Mailboxes, AppError> {
 }
 
 /// Sends `message` over the account's SMTP server.
-async fn send(
+pub(crate) async fn send(
     account: &MailAccount,
     password: String,
     message: lettre::Message,
@@ -329,7 +329,7 @@ fn smtp_host(imap_host: &str) -> String {
     }
 }
 
-fn is_this_mac(host: &str) -> bool {
+pub(crate) fn is_this_mac(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 

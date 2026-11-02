@@ -3,6 +3,7 @@ import type { From } from "./inbox";
 import { Home, NotFound, WorkspaceLayout } from "./layout";
 import { MailboxLayout, NoMailOpen } from "./mailbox";
 import { MailPage } from "./message";
+import { NewslettersPage } from "./newsletters";
 import { AccountsPage } from "./settings";
 
 const root = createRootRoute({ component: Outlet, notFoundComponent: NotFound });
@@ -75,6 +76,11 @@ const search = createRoute({
   validateSearch: (search: Record<string, unknown>): { q?: string } => ({ q: text(search.q) }),
   component: NoMailOpen,
 });
+const newsletters = createRoute({
+  getParentRoute: () => workspace,
+  path: "/newsletters",
+  component: NewslettersPage,
+});
 const accounts = createRoute({
   getParentRoute: () => workspace,
   path: "/settings/accounts",
@@ -85,7 +91,11 @@ const routeTree = root.addChildren([
   index,
   login,
   signedIn,
-  workspace.addChildren([mailbox.addChildren([inbox, mail, folder, search]), accounts]),
+  workspace.addChildren([
+    mailbox.addChildren([inbox, mail, folder, search]),
+    newsletters,
+    accounts,
+  ]),
 ]);
 
 export const router = createRouter({ routeTree });

@@ -552,6 +552,13 @@ impl Mail {
             self.bump();
         }
         self.set(account.id, AccountState::Online, None);
+        if let Err(failure) = self.set_newsletters_aside(account).await {
+            tracing::warn!(
+                address = %account.address,
+                "couldn't set the newsletters aside: {}",
+                failure.message()
+            );
+        }
         self.asked(account.id);
         *tries = 0;
         loop {

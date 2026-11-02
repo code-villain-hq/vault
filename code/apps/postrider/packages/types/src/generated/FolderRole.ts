@@ -3,4 +3,4 @@
 /**
  * What a folder is for, as its server says (RFC 6154) or its name does.
  */
-export type FolderRole = "sent" | "archive" | "drafts" | "trash" | "junk";
+export type FolderRole = "sent" | "archive" | "drafts" | "trash" | "junk" | "newsletters";
