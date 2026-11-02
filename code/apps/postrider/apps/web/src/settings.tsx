@@ -7,7 +7,7 @@ import type {
   MailAccountConnect,
   ServerCalendar,
 } from "@postrider/types";
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, useAccounts, useAccountStatus } from "./mail";
@@ -54,7 +54,9 @@ const STATE_WORDS: Record<AccountState, string> = {
 };
 
 function AccountRow({ account }: { account: MailAccount }) {
-  const { workspace } = useWorkspace();
+  const { workspace, sync } = useWorkspace();
+  const [name, setName] = useState(account.name);
+  const cancelled = useRef(false);
   const status = useAccountStatus(account.id);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,14 +73,45 @@ function AccountRow({ account }: { account: MailAccount }) {
     }
   };
 
+  // Renamed where it's written, as the kit's names are: kept when you
+  // leave the field or press Enter.
+  const rename = () => {
+    const trimmed = name.trim();
+    if (cancelled.current || !trimmed || trimmed === account.name) {
+      cancelled.current = false;
+      setName(account.name);
+      return;
+    }
+    setError(null);
+    try {
+      sync.update("MailAccount", account.id, { name: trimmed });
+    } catch (problem) {
+      setError(messageOf(problem));
+      setName(account.name);
+    }
+  };
+
   return (
     <li className="flex flex-col gap-3 rounded-md bg-surface px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="av" style={hue(account.hue)} aria-hidden="true">
           {account.name.charAt(0).toUpperCase()}
         </span>
-        <div className="flex min-w-0 flex-col">
-          <span className="truncate font-medium">{account.name}</span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <input
+            aria-label="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={rename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") {
+                cancelled.current = true;
+                e.currentTarget.blur();
+              }
+            }}
+            className="-ml-2 h-7 w-full rounded-md px-2 font-medium ui-field"
+          />
           <span className="truncate text-xs text-muted">
             {account.address} · {account.host}
           </span>
