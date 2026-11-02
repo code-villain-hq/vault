@@ -8,4 +8,8 @@ export type Day = { events: Array<Event>,
 /**
  * Why the calendar couldn't be read, when it couldn't.
  */
-error: string | null, };
+error: string | null, 
+/**
+ * When it couldn't: when `events` were read, the last time it could.
+ */
+read_at: string | null, };

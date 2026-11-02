@@ -275,7 +275,12 @@ function Today({ now }: { now: Date }) {
       </Link>
     );
   } else if (day?.error) {
-    note = day.error;
+    // Unread now: the events shown are the last ones it could read.
+    note = day.read_at ? (
+      <span title={day.error}>Offline · as of {clockTime(new Date(day.read_at))}</span>
+    ) : (
+      day.error
+    );
   } else if (day) {
     note = nextUp(events, now);
   }

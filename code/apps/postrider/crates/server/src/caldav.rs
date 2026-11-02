@@ -585,20 +585,70 @@ pub async fn day(
         return Ok(Json(Day {
             events: Vec::new(),
             error: None,
+            read_at: None,
         }));
     };
     Ok(Json(
         match read_day(&state, &calendar, &accounts, params.from, params.to).await {
-            Ok(events) => Day {
-                events,
-                error: None,
-            },
-            Err(error) => Day {
-                events: Vec::new(),
-                error: Some(error),
-            },
+            Ok(events) => {
+                keep_day(&state, calendar.id, &params, &events).await?;
+                Day {
+                    events,
+                    error: None,
+                    read_at: None,
+                }
+            }
+            Err(error) => {
+                let (events, read_at) = kept_day(&state, calendar.id, &params)
+                    .await?
+                    .map_or((Vec::new(), None), |(events, at)| (events, Some(at)));
+                Day {
+                    events,
+                    error: Some(error),
+                    read_at,
+                }
+            }
         },
     ))
+}
+
+/// Keeps the day just read, in place of the one before.
+async fn keep_day(
+    state: &AppState,
+    calendar_id: Uuid,
+    day: &DayParams,
+    events: &[Event],
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO kept_days (calendar_id, day_from, day_to, events, read_at) \
+         VALUES ($1, $2, $3, $4, now()) \
+         ON CONFLICT (calendar_id) DO UPDATE SET day_from = $2, day_to = $3, events = $4, read_at = now()",
+    )
+    .bind(calendar_id)
+    .bind(day.from)
+    .bind(day.to)
+    .bind(serde_json::to_value(events).map_err(AppError::internal)?)
+    .execute(&state.pool)
+    .await?;
+    Ok(())
+}
+
+/// The day last read from the calendar, and when, if it's this one.
+async fn kept_day(
+    state: &AppState,
+    calendar_id: Uuid,
+    day: &DayParams,
+) -> Result<Option<(Vec<Event>, DateTime<Utc>)>, AppError> {
+    let kept: Option<(serde_json::Value, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT events, read_at FROM kept_days \
+         WHERE calendar_id = $1 AND day_from = $2 AND day_to = $3",
+    )
+    .bind(calendar_id)
+    .bind(day.from)
+    .bind(day.to)
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(kept.and_then(|(events, at)| Some((serde_json::from_value(events).ok()?, at))))
 }
 
 /// `GET /api/w/{workspace}/calendars`: the calendars on the server, for

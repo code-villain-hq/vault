@@ -436,6 +436,8 @@ pub struct Day {
     pub events: Vec<Event>,
     /// Why the calendar couldn't be read, when it couldn't.
     pub error: Option<String>,
+    /// When it couldn't: when `events` were read, the last time it could.
+    pub read_at: Option<DateTime<Utc>>,
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T, ValidationError> {
