@@ -201,12 +201,15 @@ pub struct Renamed {
     pub rules: Vec<Rule>,
 }
 
-/// Mail a rule moved from the Inbox, to move back on Undo: what in `path`
-/// matches `when`, from UID `since` on.
+/// Mail an answer moved, to move back to `back` on Undo: what in `path`
+/// matches `when`, from UID `since` on, and below `until` when it moved
+/// only what it named.
 #[derive(Debug, Clone)]
 pub struct Moved {
     pub path: String,
+    pub back: String,
     pub since: u32,
+    pub until: Option<u32>,
     pub when: Vec<When>,
     pub count: usize,
 }
@@ -356,7 +359,9 @@ impl Mail {
             .await?;
         Ok(Moved {
             path: path.to_string(),
+            back: "INBOX".into(),
             since,
+            until: None,
             when: when.to_vec(),
             count,
         })
@@ -373,7 +378,9 @@ impl Mail {
         if uids.is_empty() {
             return Ok(Moved {
                 path: path.to_string(),
+                back: "INBOX".into(),
                 since: 0,
+                until: None,
                 when: Vec::new(),
                 count: 0,
             });
@@ -403,14 +410,86 @@ impl Mail {
             .await?;
         Ok(Moved {
             path: path.to_string(),
+            back: "INBOX".into(),
             since,
+            until: None,
             when: Vec::new(),
             count,
         })
     }
 
-    /// Moves mail a rule moved back to the Inbox: what came to its folder
-    /// since and matches it.
+    /// Moves mail from the folder `from` to `to`, as the keys do: these
+    /// UIDs, those of them still there, or with none, what matches `when`.
+    /// Undo moves back only what it moved, to where it was.
+    pub(crate) async fn move_out(
+        &self,
+        account: &MailAccount,
+        from: &str,
+        uids: &[u32],
+        when: &[When],
+        to: &str,
+    ) -> Result<Moved, Failure> {
+        let mut moved = Moved {
+            path: to.to_string(),
+            back: from.to_string(),
+            since: 0,
+            until: Some(0),
+            when: Vec::new(),
+            count: 0,
+        };
+        // Neither would be every mail there.
+        if uids.is_empty() && when.is_empty() {
+            return Ok(moved);
+        }
+        let query = if uids.is_empty() {
+            search(when, "")
+        } else {
+            format!("UID {}", uid_set(uids))
+        };
+        let (since, until, gone) = self
+            .on_server(account, |session| {
+                let (query, from, to) = (query.clone(), from.to_string(), to.to_string());
+                Box::pin(async move {
+                    let since = session
+                        .status(&to, "(UIDNEXT)")
+                        .await?
+                        .uid_next
+                        .unwrap_or(1);
+                    session.select(&from).await?;
+                    let there: Vec<u32> = session.uid_search(&query).await?.into_iter().collect();
+                    if there.is_empty() {
+                        return Ok((since, since, there));
+                    }
+                    session.uid_mv(uid_set(&there), &to).await?;
+                    // What came to it meanwhile is what moved.
+                    let until = session
+                        .status(&to, "(UIDNEXT)")
+                        .await?
+                        .uid_next
+                        .unwrap_or(u32::MAX);
+                    Ok((since, until, there))
+                })
+            })
+            .await?;
+        if from == "INBOX" {
+            for uid in &gone {
+                self.forget_inbox_line(account.id, i64::from(*uid)).await?;
+            }
+        }
+        if let Some((_, lines)) = self.lock_lines().get_mut(&(account.id, from.to_string())) {
+            for uid in &gone {
+                lines.remove(&i64::from(*uid));
+            }
+        }
+        moved.since = since;
+        moved.until = Some(until);
+        moved.count = gone.len();
+        Ok(moved)
+    }
+
+    /// Moves mail an answer moved back where it was: what came to its
+    /// folder since and matches what it looked for; what it moved alone,
+    /// when it knows.
     pub(crate) async fn move_back(
         &self,
         account: &MailAccount,
@@ -419,10 +498,14 @@ impl Mail {
         if moved.count == 0 {
             return Ok(());
         }
-        let query = search(&moved.when, &format!("UID {}:* ", moved.since));
-        let since = moved.since;
+        let (since, until) = (moved.since, moved.until);
+        let range = match until {
+            Some(until) => format!("UID {since}:{} ", until.saturating_sub(1).max(since)),
+            None => format!("UID {since}:* "),
+        };
+        let query = search(&moved.when, &range);
         self.on_server(account, |session| {
-            let (query, path) = (query.clone(), moved.path.clone());
+            let (query, path, back) = (query.clone(), moved.path.clone(), moved.back.clone());
             Box::pin(async move {
                 session.select(&path).await?;
                 // `n:*` takes in the newest mail even when its UID is below n.
@@ -430,10 +513,10 @@ impl Mail {
                     .uid_search(&query)
                     .await?
                     .into_iter()
-                    .filter(|uid| *uid >= since)
+                    .filter(|uid| *uid >= since && until.is_none_or(|until| *uid < until))
                     .collect();
                 if !uids.is_empty() {
-                    session.uid_mv(uid_set(&uids), "INBOX").await?;
+                    session.uid_mv(uid_set(&uids), &back).await?;
                 }
                 Ok(())
             })

@@ -2,8 +2,9 @@
 //! it what to do, and Claude Code on this Mac answers
 //! (`studio/design/behaviour.md`, "Claude"), as you're signed in to it, in
 //! an empty folder of its own, with Postrider's tools and nothing else:
-//! finding senders and mail, reading a mail, and sorting, with rules on the
-//! mail server (`rules.rs`) or by reading on this Mac (`reading.rs`). It
+//! finding senders and mail, reading a mail, moving mail as the keys do,
+//! and sorting, with rules on the mail server (`rules.rs`) or by reading on
+//! this Mac (`reading.rs`). It
 //! calls them at [`MCP_PATH`] with a token that lasts the one question.
 //! What an answer changed, Undo puts back. Postrider runs only on this Mac,
 //! so there's no key and no question handed over.
@@ -21,12 +22,13 @@ use chrono::{Local, Utc};
 use code_villain_claude::mcp::{self, Called, Tools};
 use code_villain_claude::{App, Failure, Question, bearer};
 use mail_parser::MessageParser;
-use postrider_domain::{Answer, Asked, FolderLink, MailAccount, MailSummary};
+use postrider_domain::{Answer, Asked, FolderLink, FolderRole, MailAccount, MailSummary};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::auth::Member;
 use crate::error::AppError;
+use crate::imap::Place;
 use crate::mail::Mail;
 use crate::message;
 use crate::reading::ReadingRule;
@@ -67,7 +69,7 @@ pub struct Done {
     workspace_id: Uuid,
     /// Each account's rules before the answer changed them.
     before: Vec<(MailAccount, Vec<Rule>)>,
-    /// The mail it moved out of the Inbox.
+    /// The mail it moved.
     moved: Vec<(MailAccount, Moved)>,
     /// The folders it made, by their path.
     made: Vec<(MailAccount, String)>,
@@ -95,6 +97,7 @@ const TOOLS: &[&str] = &[
     "find_senders",
     "find_mail",
     "read_mail",
+    "move_mail",
     "sort_into",
     "sort_by_reading",
     "stop_sorting",
@@ -139,6 +142,38 @@ fn definitions() -> Vec<Value> {
                     "uid": { "type": "integer" },
                 },
                 "required": ["account", "uid"],
+            },
+        }),
+        json!({
+            "name": "move_mail",
+            "description": "Moves mail now, as the keys in the app do: to trash deletes it \
+                (the Trash keeps it, and Undo puts it back), archive archives it, inbox puts \
+                it back in the Inbox, and any other name moves it to that folder, made where \
+                there's none. from takes addresses, or a domain for anyone there: all their \
+                mail in the Inbox, or in folder when it's named. mails are mails by what \
+                find_mail said. accounts (addresses) says where; without it, every account. \
+                It answers with what it did.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "to": { "type": "string" },
+                    "from": addresses,
+                    "folder": { "type": "string" },
+                    "mails": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "account": { "type": "string" },
+                                "folder": { "type": "string" },
+                                "uid": { "type": "integer" },
+                            },
+                            "required": ["account", "uid"],
+                        },
+                    },
+                    "accounts": addresses,
+                },
+                "required": ["to"],
             },
         }),
         json!({
@@ -239,6 +274,7 @@ impl Tools for Asking {
             "find_senders" => self.find_senders(&arguments).await,
             "find_mail" => self.find_mail(&arguments).await,
             "read_mail" => self.read_mail(&arguments).await,
+            "move_mail" => self.move_mail(&arguments).await,
             "sort_into" => self.sort_into(&arguments).await,
             "sort_by_reading" => self.sort_by_reading(&arguments).await,
             "stop_sorting" => self.stop_sorting(&arguments).await,
@@ -337,6 +373,138 @@ impl Asking {
             .await
             .map_err(|e| e.message)?;
         Ok(as_read(&raw, account.id, READ_AT_MOST))
+    }
+
+    async fn move_mail(&self, arguments: &Value) -> Result<String, String> {
+        let to = text(arguments, "to")?;
+        let from: Vec<When> = strings(arguments, "from")
+            .into_iter()
+            .map(|who| When::From(who.trim_start_matches('@').to_lowercase()))
+            .collect();
+        let folder = arguments["folder"]
+            .as_str()
+            .map(str::trim)
+            .filter(|f| !f.is_empty() && !f.eq_ignore_ascii_case("none"));
+        // The mails it names, by account and the folder they're in.
+        let mut mails: Vec<(Uuid, Option<String>, u32)> = Vec::new();
+        for mail in arguments["mails"].as_array().into_iter().flatten() {
+            let account = self.account_by_address(mail["account"].as_str().unwrap_or(""))?;
+            let uid = mail["uid"]
+                .as_u64()
+                .and_then(|uid| u32::try_from(uid).ok())
+                .ok_or("Say each mail by its account and uid.")?;
+            let folder = mail["folder"]
+                .as_str()
+                .map(str::trim)
+                .filter(|f| !f.is_empty() && !f.eq_ignore_ascii_case("none"))
+                .map(str::to_lowercase);
+            mails.push((account.id, folder, uid));
+        }
+        if from.is_empty() && mails.is_empty() {
+            return Err("Say which mail: from whom, or the mails find_mail found.".into());
+        }
+        let named = strings(arguments, "accounts");
+        let accounts: Vec<MailAccount> = if named.is_empty() {
+            self.accounts.clone()
+        } else {
+            named
+                .iter()
+                .map(|n| self.account_by_address(n).cloned())
+                .collect::<Result<_, _>>()?
+        };
+        let mut done = self.done.lock().await;
+        let mut moved = 0;
+        let mut moved_in = Vec::new();
+        let mut shown: Option<Place> = None;
+        for account in &accounts {
+            let failed =
+                |failure: crate::imap::Failure| format!("{}: {}", account.name, failure.message());
+            // Where each lot is, and which of it: what's from them, or these UIDs.
+            let mut lots: Vec<(Option<String>, Vec<u32>)> = Vec::new();
+            if !from.is_empty() {
+                lots.push((folder.map(str::to_lowercase), Vec::new()));
+            }
+            for (_, key, uid) in mails.iter().filter(|(id, _, _)| *id == account.id) {
+                match lots
+                    .iter_mut()
+                    .find(|(k, uids)| k == key && !uids.is_empty())
+                {
+                    Some((_, uids)) => uids.push(*uid),
+                    None => lots.push((key.clone(), vec![*uid])),
+                }
+            }
+            if lots.is_empty() {
+                continue;
+            }
+            let (place, made) = self.mail.destination(account, to).await.map_err(failed)?;
+            let mut here = 0;
+            for (key, uids) in lots {
+                let there = match key {
+                    None => Some(Place::inbox()),
+                    Some(key) => self.mail.place(account, &key).await.map_err(failed)?,
+                };
+                let Some(there) = there.filter(|there| there.path != place.path) else {
+                    continue;
+                };
+                let when = if uids.is_empty() {
+                    from.as_slice()
+                } else {
+                    &[]
+                };
+                let out = self
+                    .mail
+                    .move_out(account, &there.path, &uids, when, &place.path)
+                    .await
+                    .map_err(failed)?;
+                if out.count > 0 {
+                    here += out.count;
+                    done.moved.push((account.clone(), out));
+                }
+            }
+            if here == 0 {
+                // Made for nothing: it goes again.
+                if made {
+                    let _ = self.mail.remove_if_empty(account, &place.path).await;
+                }
+                continue;
+            }
+            if made {
+                done.made.push((account.clone(), place.path.clone()));
+            }
+            moved += here;
+            moved_in.push(account.name.clone());
+            shown = Some(place);
+        }
+        let Some(place) = shown else {
+            return Ok(format!(
+                "Nothing moved: no mail like that was there to go to {to}."
+            ));
+        };
+        if place.path != "INBOX" {
+            done.folder = Some(FolderLink {
+                key: place.key(),
+                name: place.name.clone(),
+            });
+        }
+        let mails = match moved {
+            1 => "1 mail".to_string(),
+            n => format!("{n} mails"),
+        };
+        let did = match place.role {
+            Some(FolderRole::Trash) => {
+                format!(
+                    "Deleted {mails}: they're in **{}**, to get back from",
+                    place.name
+                )
+            }
+            Some(FolderRole::Archive) => format!("Archived {mails}"),
+            _ if place.path == "INBOX" => format!("Put {mails} back in the **Inbox**"),
+            _ => format!("Moved {mails} to **{}**", place.name),
+        };
+        Ok(format!(
+            "Done. Tell them so, in their language: {did} {}.",
+            self.in_accounts(&moved_in)
+        ))
     }
 
     async fn sort_into(&self, arguments: &Value) -> Result<String, String> {
@@ -963,7 +1131,9 @@ async fn prompt(mail: &Arc<Mail>, workspace_id: Uuid, accounts: &[MailAccount]) 
         "You are Postrider, the mail and calendar app on this Mac. The person asks you \
          something about their mail, or tells you what to do, in the field at the foot of \
          the app. Answer in the language they wrote in, in one to three short sentences, \
-         with no lists, headings or tables. Put names, senders and folders in **bold**.\n\
+         with no lists, headings or tables. Put names, senders and folders in **bold**. \
+         Everything you write shows, so write only the answer, once you're done: not what \
+         you're about to do.\n\
          \n\
          Their accounts: {accounts}.\n\
          Their folders: {folders}. A folder with the same name in more than one account is \
@@ -982,6 +1152,13 @@ async fn prompt(mail: &Arc<Mail>, workspace_id: Uuid, accounts: &[MailAccount]) 
          When a tool says what it did, say that, in its words; add a sentence only for what \
          they should know, such as a sender you didn't find. Sort only what they asked \
          for.\n\
+         \n\
+         To delete, archive or move mail now, move_mail it, as their keys would: to trash \
+         to delete. For all of a sender's mail, find them with find_senders and move_mail \
+         from their addresses; for some mails, find them with find_mail. The Trash keeps \
+         what's deleted and Undo puts it back, so do it when they ask, without asking \
+         first. move_mail moves what's there; sort_into sorts what comes from now on too. \
+         Do what they asked; you may offer the other in a sentence.\n\
          \n\
          Sorting that needs reading a mail, like \"anything that looks like an invoice\", \
          can't be a rule on the mail server: sort_by_reading does it, on this Mac while \

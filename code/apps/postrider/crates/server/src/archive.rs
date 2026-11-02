@@ -45,7 +45,7 @@ impl Mail {
                     ))
                 })?,
         };
-        let to = self.destination(&account, to).await.map_err(refused)?;
+        let (to, _) = self.destination(&account, to).await.map_err(refused)?;
         if from.path == to.path {
             return Ok(());
         }
@@ -64,14 +64,22 @@ impl Mail {
         Ok(())
     }
 
-    /// The account's folder `key` names, made when it has none.
-    async fn destination(&self, account: &MailAccount, key: &str) -> Result<Place, Failure> {
+    /// The account's folder `key` names, made when it has none; and
+    /// whether a folder of its own was.
+    pub(crate) async fn destination(
+        &self,
+        account: &MailAccount,
+        key: &str,
+    ) -> Result<(Place, bool), Failure> {
         if key.eq_ignore_ascii_case("inbox") {
-            return Ok(Place::inbox());
+            return Ok((Place::inbox(), false));
         }
-        match FolderRole::ALL.into_iter().find(|role| role.key() == key) {
-            Some(role) => self.folder_for(account, role).await,
-            None => Ok(self.folder_named(account, key).await?.0),
+        match FolderRole::ALL
+            .into_iter()
+            .find(|role| role.key().eq_ignore_ascii_case(key))
+        {
+            Some(role) => Ok((self.folder_for(account, role).await?, false)),
+            None => self.folder_named(account, key).await,
         }
     }
 

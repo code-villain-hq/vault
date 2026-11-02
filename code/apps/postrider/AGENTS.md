@@ -168,9 +168,13 @@ The field at the foot of the list (`ask.tsx`) sends what you typed to
 you're signed in to it, through `code/kit/claude`, in an empty folder of
 its own and with Postrider's tools only, reached at `/api/ai/mcp` with a
 token that lasts the one question: `find_senders`, `find_mail`,
-`read_mail`, `sort_into`, `sort_by_reading`, `stop_sorting` and
-`rename_folder`. What the field can do, the page can do too: V moves a
-mail, a folder's name renames it. The prompt names the accounts,
+`read_mail`, `move_mail`, `sort_into`, `sort_by_reading`, `stop_sorting`
+and `rename_folder`. What the field can do, the page can do too, and the
+other way round: V moves a mail, a folder's name renames it, and
+`move_mail` deletes, archives and moves as ⌫, E and V do, a sender's mail
+or the mails `find_mail` found. It asks nothing first: the Trash keeps
+what's deleted, and Undo moves back only what it moved (the UIDs it got
+in their new folder), to the folder each came from. The prompt names the accounts,
 their folders and their rules, so "Dependabot too" adds to the rule it
 means. One question at a time; there's no talk to scroll back.
 Not installed or signed out, the answer says what to do.
