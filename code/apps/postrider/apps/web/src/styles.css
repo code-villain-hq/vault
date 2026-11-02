@@ -193,6 +193,34 @@
   background: var(--signal);
 }
 
+/* "Search mail", in the top bar. */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 240px;
+  height: 28px;
+  padding: 0 6px 0 10px;
+  color: var(--faint);
+}
+.search input {
+  min-width: 0;
+  flex: 1;
+  background: none;
+  color: var(--fg);
+  font-size: var(--type-ui-small-size);
+  outline: none;
+}
+.search input::placeholder {
+  color: var(--faint);
+}
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+.search .ui-kbd {
+  margin-left: auto;
+}
+
 /* An account Postrider can't read right now, above its mail. */
 .problems {
   display: grid;

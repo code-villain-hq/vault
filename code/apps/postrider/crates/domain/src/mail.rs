@@ -220,12 +220,15 @@ pub struct AccountStatus {
     pub message: Option<String>,
 }
 
-/// A mail in the Inbox, as the list shows it.
+/// A mail, as a list shows it: the Inbox, a folder, or what a search found.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct MailSummary {
     pub account_id: Uuid,
-    /// Its IMAP UID in the account's Inbox.
+    /// The folder it's in, by its key ([`Folder::key`]); `None` for a mail
+    /// in the Inbox's copy.
+    pub folder: Option<String>,
+    /// Its IMAP UID in that folder.
     #[ts(type = "number")]
     pub uid: i64,
     /// "Anna Weber", or the address when the mail gives no name.
@@ -237,6 +240,8 @@ pub struct MailSummary {
     pub date: DateTime<Utc>,
     /// Read (`\Seen`), on the server.
     pub seen: bool,
+    /// Who it went to, in a list of sent mail, where that's what matters.
+    pub to_name: Option<String>,
 }
 
 /// The unified Inbox: every account's newest mail, newest first.
@@ -251,7 +256,56 @@ pub struct Inbox {
     pub mails: Vec<MailSummary>,
 }
 
-/// A mail opened from the Inbox: its line in the list, and the whole of it.
+/// What a folder is for, as its server says (RFC 6154) or its name does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum FolderRole {
+    Sent,
+    Archive,
+    Drafts,
+    Trash,
+    Junk,
+}
+
+impl FolderRole {
+    /// Its key in addresses, where it stands for each account's own.
+    pub fn key(self) -> &'static str {
+        match self {
+            FolderRole::Sent => "sent",
+            FolderRole::Archive => "archive",
+            FolderRole::Drafts => "drafts",
+            FolderRole::Trash => "trash",
+            FolderRole::Junk => "junk",
+        }
+    }
+}
+
+/// A folder, once for all the accounts that have one by its name, or for
+/// its role: each account's Sent is one Sent.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Folder {
+    /// What addresses call it: its role's key ("sent"), else its name.
+    pub key: String,
+    /// "Sent", or the folder's own name: "Rechnungen", "Projects / Layer".
+    pub name: String,
+    pub role: Option<FolderRole>,
+    /// How many of its mails are unread, in every account.
+    #[ts(type = "number")]
+    pub unread: i64,
+}
+
+/// Mail read live from the servers: a folder's newest, or what a search
+/// found, newest first. An account that couldn't be read says why.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Listing {
+    pub mails: Vec<MailSummary>,
+    pub problems: Vec<AccountStatus>,
+}
+
+/// A mail opened from a list: its line in the list, and the whole of it.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Message {

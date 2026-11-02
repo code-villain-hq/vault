@@ -115,6 +115,7 @@ mod tests {
     fn summary() -> MailSummary {
         MailSummary {
             account_id: Uuid::nil(),
+            folder: None,
             uid: 1,
             from_name: "Anna Weber".into(),
             from_address: "anna@example.test".into(),
@@ -122,6 +123,7 @@ mod tests {
             snippet: String::new(),
             date: Utc::now(),
             seen: false,
+            to_name: None,
         }
     }
 

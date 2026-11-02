@@ -1,5 +1,6 @@
-//! Reading an account's Inbox over IMAP: signing in, keeping a copy of its
-//! newest mail in `inbox_mails`, and listening for more with IDLE.
+//! Reading an account's mail over IMAP: signing in, keeping a copy of its
+//! Inbox's newest mail in `inbox_mails`, and listening for more with IDLE;
+//! and, live, its folders, their newest mail, and searches.
 //!
 //! The copy holds what the list shows (sender, subject, the start of the
 //! text, when it came, read or not) for the newest [`KEEP`] mails. It's
@@ -12,9 +13,11 @@ use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use async_imap::types::{Fetch, Flag};
+use async_imap::types::{Fetch, Flag, NameAttribute};
+use base64::Engine;
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
+use postrider_domain::FolderRole;
 use sqlx::PgPool;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
@@ -317,16 +320,17 @@ pub async fn sync_inbox(
     Ok(changed)
 }
 
-/// A mail's whole source, from the account's Inbox, without marking it
-/// read. `None` when it's no longer there, or the Inbox's UIDs changed
-/// meaning since `validity`.
+/// A mail's whole source, from one of the account's folders, without
+/// marking it read. `None` when it's no longer there, or the folder's UIDs
+/// changed meaning since `validity`, when that's known.
 pub async fn source(
     session: &mut Session,
-    validity: i64,
+    folder: &str,
+    validity: Option<i64>,
     uid: i64,
 ) -> Result<Option<Vec<u8>>, Failure> {
-    let mailbox = session.select("INBOX").await?;
-    if i64::from(mailbox.uid_validity.unwrap_or(0)) != validity {
+    let mailbox = session.examine(folder).await?;
+    if validity.is_some_and(|v| i64::from(mailbox.uid_validity.unwrap_or(0)) != v) {
         return Ok(None);
     }
     let fetches: Vec<Fetch> = session
@@ -341,9 +345,9 @@ pub async fn source(
         .map(<[u8]>::to_vec))
 }
 
-/// Marks a mail in the Inbox read, as opening it does.
-pub async fn mark_read(session: &mut Session, uid: i64) -> Result<(), Failure> {
-    session.select("INBOX").await?;
+/// Marks a mail read, as opening it does.
+pub async fn mark_read(session: &mut Session, folder: &str, uid: i64) -> Result<(), Failure> {
+    session.select(folder).await?;
     session
         .uid_store(uid.to_string(), "+FLAGS.SILENT (\\Seen)")
         .await?
@@ -352,15 +356,368 @@ pub async fn mark_read(session: &mut Session, uid: i64) -> Result<(), Failure> {
     Ok(())
 }
 
+/// A folder on an account's server.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Place {
+    /// What the server calls it, as commands name it: `INBOX.Rechnungen`.
+    pub path: String,
+    /// What Postrider shows: "Rechnungen", "Projects / Layer".
+    pub name: String,
+    pub role: Option<FolderRole>,
+}
+
+impl Place {
+    /// The Inbox, as a folder like the others.
+    pub fn inbox() -> Place {
+        Place {
+            path: "INBOX".into(),
+            name: "Inbox".into(),
+            role: None,
+        }
+    }
+
+    /// Its key, the same for each account's: its role's, else its name.
+    pub fn key(&self) -> String {
+        self.role
+            .map_or_else(|| self.name.clone(), |role| role.key().to_string())
+    }
+
+    /// Whether it's the folder `key` names: by role, or by name in any case.
+    pub fn is(&self, key: &str) -> bool {
+        self.key().to_lowercase() == key.to_lowercase()
+    }
+}
+
+/// The account's folders, but the Inbox.
+pub async fn folders(session: &mut Session) -> Result<Vec<Place>, Failure> {
+    let names: Vec<_> = session
+        .list(Some(""), Some("*"))
+        .await?
+        .try_collect()
+        .await?;
+    let listed = names
+        .iter()
+        .map(|name| {
+            let attributes = name.attributes();
+            let selectable = !attributes.iter().any(|a| match a {
+                NameAttribute::NoSelect => true,
+                NameAttribute::Extension(other) => other.eq_ignore_ascii_case("\\NonExistent"),
+                _ => false,
+            });
+            let role = attributes.iter().find_map(|a| match a {
+                NameAttribute::Sent => Some(FolderRole::Sent),
+                NameAttribute::Archive => Some(FolderRole::Archive),
+                NameAttribute::Drafts => Some(FolderRole::Drafts),
+                NameAttribute::Trash => Some(FolderRole::Trash),
+                NameAttribute::Junk => Some(FolderRole::Junk),
+                _ => None,
+            });
+            Listed {
+                path: name.name().to_string(),
+                delimiter: name.delimiter().map(str::to_string),
+                role,
+                selectable,
+            }
+        })
+        .collect();
+    Ok(places(listed))
+}
+
+/// How many of a folder's mails are unread.
+pub async fn unseen(session: &mut Session, folder: &str) -> Result<u32, Failure> {
+    Ok(session
+        .status(folder, "(UNSEEN)")
+        .await?
+        .unseen
+        .unwrap_or(0))
+}
+
+/// A folder as LIST names it.
+struct Listed {
+    path: String,
+    delimiter: Option<String>,
+    role: Option<FolderRole>,
+    selectable: bool,
+}
+
+/// Names for the folders that say no role of their own, from the names
+/// mail apps give them, in English and German.
+const ROLE_NAMES: [(FolderRole, &[&str]); 5] = [
+    (
+        FolderRole::Sent,
+        &[
+            "sent",
+            "sent messages",
+            "sent items",
+            "sent mail",
+            "gesendet",
+            "gesendete objekte",
+            "gesendete elemente",
+        ],
+    ),
+    (FolderRole::Archive, &["archive", "archives", "archiv"]),
+    (FolderRole::Drafts, &["drafts", "entwürfe"]),
+    (
+        FolderRole::Trash,
+        &[
+            "trash",
+            "deleted messages",
+            "deleted items",
+            "bin",
+            "papierkorb",
+            "gelöschte objekte",
+            "gelöschte elemente",
+        ],
+    ),
+    (
+        FolderRole::Junk,
+        &["junk", "spam", "junk e-mail", "junk-e-mail"],
+    ),
+];
+
+/// The folders worth showing, by name: every one that can hold mail but
+/// the Inbox. Under `INBOX.`, as some servers keep them, they read as their
+/// own; a folder in a folder reads "Projects / Layer". A top folder that
+/// says no role gets one by its name, when no other has that role.
+fn places(listed: Vec<Listed>) -> Vec<Place> {
+    let mut taken: Vec<FolderRole> = listed.iter().filter_map(|l| l.role).collect();
+    let mut places = Vec::new();
+    for folder in listed {
+        if !folder.selectable || folder.path.eq_ignore_ascii_case("INBOX") {
+            continue;
+        }
+        let decoded = folder_name(&folder.path);
+        let parts: Vec<&str> = match folder.delimiter.as_deref() {
+            Some(delimiter) if !delimiter.is_empty() => decoded.split(delimiter).collect(),
+            _ => vec![decoded.as_str()],
+        };
+        let parts = match parts.split_first() {
+            Some((first, rest)) if first.eq_ignore_ascii_case("INBOX") && !rest.is_empty() => {
+                rest.to_vec()
+            }
+            _ => parts,
+        };
+        let name = parts.join(" / ");
+        let role = folder.role.or_else(|| {
+            let lower = name.to_lowercase();
+            let role = ROLE_NAMES
+                .iter()
+                .find(|(_, names)| parts.len() == 1 && names.contains(&lower.as_str()))
+                .map(|(role, _)| *role)
+                .filter(|role| !taken.contains(role))?;
+            taken.push(role);
+            Some(role)
+        });
+        places.push(Place {
+            path: folder.path,
+            name,
+            role,
+        });
+    }
+    places
+}
+
+/// A folder's name as IMAP sends it, in modified UTF-7 (RFC 3501, 5.1.3):
+/// `Entw&APw-rfe` is "Entwürfe".
+fn folder_name(path: &str) -> String {
+    let mut name = String::new();
+    let mut rest = path;
+    while let Some(start) = rest.find('&') {
+        name.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let Some(end) = after.find('-') else {
+            name.push_str(&rest[start..]);
+            return name;
+        };
+        let encoded = &after[..end];
+        let units: Option<Vec<u16>> = base64::engine::general_purpose::STANDARD_NO_PAD
+            .decode(encoded.replace(',', "/"))
+            .ok()
+            .filter(|bytes| bytes.len() % 2 == 0)
+            .map(|bytes| {
+                bytes
+                    .chunks(2)
+                    .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+                    .collect()
+            });
+        match units {
+            _ if encoded.is_empty() => name.push('&'),
+            Some(units) => name.push_str(&String::from_utf16_lossy(&units)),
+            None => name.push_str(&rest[start..start + end + 2]),
+        }
+        rest = &after[end + 1..];
+    }
+    name.push_str(rest);
+    name
+}
+
+/// A mail in a folder, as a list shows it.
+#[derive(Debug, Clone)]
+pub struct Line {
+    pub uid: i64,
+    pub summary: Summary,
+    pub seen: bool,
+}
+
+/// Mails read from a folder, under its UIDVALIDITY.
+pub struct Lines {
+    pub validity: i64,
+    pub lines: Vec<Line>,
+}
+
+/// A folder's newest `count` mails. What `known` has (read under
+/// `known_validity`) isn't read again.
+pub async fn newest(
+    session: &mut Session,
+    folder: &str,
+    count: u32,
+    known: &HashMap<i64, Summary>,
+    known_validity: i64,
+) -> Result<Lines, Failure> {
+    let mailbox = session.examine(folder).await?;
+    let validity = i64::from(mailbox.uid_validity.unwrap_or(0));
+    let mut uids = Vec::new();
+    if mailbox.exists > 0 {
+        let first = mailbox.exists.saturating_sub(count - 1).max(1);
+        let fetches: Vec<Fetch> = session
+            .fetch(format!("{first}:*"), "(UID)")
+            .await?
+            .try_collect()
+            .await?;
+        uids = fetches
+            .iter()
+            .filter_map(|f| f.uid.map(i64::from))
+            .collect();
+    }
+    let empty = HashMap::new();
+    let known = if validity == known_validity {
+        known
+    } else {
+        &empty
+    };
+    let lines = lines(session, &uids, known).await?;
+    Ok(Lines { validity, lines })
+}
+
+/// The newest `count` mails in a folder with every one of `words` in them,
+/// in a header or the text.
+pub async fn search(
+    session: &mut Session,
+    folder: &str,
+    words: &[String],
+    count: usize,
+    known: &HashMap<i64, Summary>,
+    known_validity: i64,
+) -> Result<Lines, Failure> {
+    let mailbox = session.examine(folder).await?;
+    let validity = i64::from(mailbox.uid_validity.unwrap_or(0));
+    let mut uids: Vec<i64> = session
+        .uid_search(search_query(words))
+        .await?
+        .into_iter()
+        .map(i64::from)
+        .collect();
+    uids.sort_unstable_by(|a, b| b.cmp(a));
+    uids.truncate(count);
+    let empty = HashMap::new();
+    let known = if validity == known_validity {
+        known
+    } else {
+        &empty
+    };
+    let lines = lines(session, &uids, known).await?;
+    Ok(Lines { validity, lines })
+}
+
+/// `TEXT "word"` for each word, quoted; in UTF-8 when one needs it.
+fn search_query(words: &[String]) -> String {
+    let terms = words
+        .iter()
+        .map(|word| {
+            let quoted = word.replace('\\', "\\\\").replace('"', "\\\"");
+            format!("TEXT \"{quoted}\"")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    if words.iter().all(|word| word.is_ascii()) {
+        terms
+    } else {
+        format!("CHARSET UTF-8 {terms}")
+    }
+}
+
+/// What the list shows of these mails in the open folder: read or not from
+/// the server, the rest from `known`, else read too.
+async fn lines(
+    session: &mut Session,
+    uids: &[i64],
+    known: &HashMap<i64, Summary>,
+) -> Result<Vec<Line>, Failure> {
+    if uids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let set = |uids: &[i64]| {
+        uids.iter()
+            .map(i64::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let fetches: Vec<Fetch> = session
+        .uid_fetch(set(uids), "(UID FLAGS)")
+        .await?
+        .try_collect()
+        .await?;
+    let seen: HashMap<i64, bool> = fetches
+        .iter()
+        .filter_map(|f| f.uid.map(|uid| (i64::from(uid), is_seen(f))))
+        .collect();
+    let mut read: HashMap<i64, Summary> = HashMap::new();
+    let missing: Vec<i64> = uids
+        .iter()
+        .filter(|uid| !known.contains_key(uid))
+        .copied()
+        .collect();
+    for batch in missing.chunks(BATCH) {
+        let fetches: Vec<Fetch> = session
+            .uid_fetch(
+                set(batch),
+                format!("(UID INTERNALDATE BODY.PEEK[]<0.{PEEK}>)"),
+            )
+            .await?
+            .try_collect()
+            .await?;
+        for fetch in &fetches {
+            let Some(uid) = fetch.uid.map(i64::from) else {
+                continue;
+            };
+            let arrived = fetch.internal_date().map(|d| d.with_timezone(&Utc));
+            read.insert(uid, summarize(fetch.body().unwrap_or_default(), arrived));
+        }
+    }
+    Ok(uids
+        .iter()
+        .filter_map(|uid| {
+            let summary = known.get(uid).or_else(|| read.get(uid))?.clone();
+            Some(Line {
+                uid: *uid,
+                summary,
+                seen: *seen.get(uid)?,
+            })
+        })
+        .collect())
+}
+
 fn is_seen(fetch: &Fetch) -> bool {
     fetch.flags().any(|flag| flag == Flag::Seen)
 }
 
 /// What the list shows of a mail.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Summary {
     pub from_name: String,
     pub from_address: String,
+    /// The first it went to, by name, else address.
+    pub to_name: String,
     pub subject: String,
     pub snippet: String,
     pub date: DateTime<Utc>,
@@ -384,6 +741,15 @@ pub fn summarize(raw: &[u8], arrived: Option<DateTime<Utc>>) -> Summary {
         .map(str::trim)
         .filter(|name| !name.is_empty())
         .map_or_else(|| from_address.clone(), str::to_string);
+    let to = message
+        .as_ref()
+        .and_then(|m| m.to())
+        .and_then(|list| list.first());
+    let to_name = to
+        .and_then(|t| t.name().map(str::trim).filter(|name| !name.is_empty()))
+        .or_else(|| to.and_then(|t| t.address()))
+        .unwrap_or_default()
+        .to_string();
     let subject = message
         .as_ref()
         .and_then(|m| m.subject())
@@ -402,6 +768,7 @@ pub fn summarize(raw: &[u8], arrived: Option<DateTime<Utc>>) -> Summary {
     Summary {
         from_name,
         from_address,
+        to_name,
         subject,
         snippet,
         date: arrived.or(dated).unwrap_or_else(Utc::now),
@@ -555,5 +922,78 @@ mod tests {
         assert_eq!(failure.message(), "Authentication failed.");
         let failure = Failure::Offline("styx.uberspace.de didn't answer".into());
         assert_eq!(failure.message(), "styx.uberspace.de didn't answer.");
+    }
+
+    fn listed(path: &str, role: Option<FolderRole>) -> Listed {
+        Listed {
+            path: path.into(),
+            delimiter: Some(".".into()),
+            role,
+            selectable: true,
+        }
+    }
+
+    #[test]
+    fn folders_read_by_their_names_and_roles() {
+        let mut parent = listed("INBOX.Projects", None);
+        parent.selectable = false;
+        let places = places(vec![
+            listed("INBOX", None),
+            listed("INBOX.Sent", Some(FolderRole::Sent)),
+            listed("INBOX.Gesendet", None),
+            listed("INBOX.Archiv", None),
+            listed("INBOX.Entw&APw-rfe", None),
+            parent,
+            listed("INBOX.Projects.Layer", None),
+            listed("Rechnungen", None),
+        ]);
+        let shown: Vec<(&str, Option<FolderRole>)> = places
+            .iter()
+            .map(|place| (place.name.as_str(), place.role))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("Sent", Some(FolderRole::Sent)),
+                // Sent is taken: this one stays a folder of its own.
+                ("Gesendet", None),
+                ("Archiv", Some(FolderRole::Archive)),
+                ("Entwürfe", Some(FolderRole::Drafts)),
+                ("Projects / Layer", None),
+                ("Rechnungen", None),
+            ]
+        );
+        assert_eq!(places[2].key(), "archive");
+        assert!(places[5].is("rechnungen"));
+    }
+
+    #[test]
+    fn folder_names_decode_modified_utf7() {
+        assert_eq!(folder_name("Entw&APw-rfe"), "Entwürfe");
+        assert_eq!(folder_name("Gel&APY-schte Objekte"), "Gelöschte Objekte");
+        assert_eq!(folder_name("Tom &- Jerry"), "Tom & Jerry");
+        assert_eq!(folder_name("&ZeVnLIqe-"), "日本語");
+        assert_eq!(folder_name("Plain"), "Plain");
+    }
+
+    #[test]
+    fn a_search_asks_for_every_word_quoted() {
+        let words = |text: &str| {
+            text.split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            search_query(&words("contract anna")),
+            "TEXT \"contract\" TEXT \"anna\""
+        );
+        assert_eq!(
+            search_query(&words(r#"say "hi"\"#)),
+            r#"TEXT "say" TEXT "\"hi\"\\""#
+        );
+        assert_eq!(
+            search_query(&words("Entwürfe")),
+            "CHARSET UTF-8 TEXT \"Entwürfe\""
+        );
     }
 }

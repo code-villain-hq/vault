@@ -4,6 +4,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { FIRST_HOUR, HOURS, hoursIntoTrack, inLanes, nextUp } from "./day";
+import { SearchField } from "./folders";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
 import { buttonClass, Empty } from "./ui";
@@ -21,7 +22,9 @@ export function InboxPage() {
   if (!accounts.length) return <NoAccounts />;
   return (
     <>
-      <PageHeader title="Inbox" />
+      <PageHeader title="Inbox">
+        <SearchField />
+      </PageHeader>
       <PageBody>
         <Today now={now} />
         <AccountProblems accounts={accounts} statuses={inbox?.accounts ?? []} />
@@ -36,9 +39,18 @@ export function InboxPage() {
   );
 }
 
-/** A mail's key in the list, and in the page that opens it. */
-export function mailKey(mail: { account_id: string; uid: number }): string {
-  return `${mail.account_id}:${mail.uid}`;
+/** A mail's key in its list, and in the page that opens it: UIDs count per folder. */
+export function mailKey(mail: { folder?: string | null; account_id: string; uid: number }): string {
+  return `${mail.folder?.toLowerCase() ?? ""}:${mail.account_id}:${mail.uid}`;
+}
+
+/** Which list a mail was opened from: the Inbox, a folder, or a search. */
+export type From = { folder?: string; q?: string };
+
+/** The mail page's search for a mail of the list `from`. */
+export function openedFrom(mail: MailSummary, from: From): From {
+  if (from.q !== undefined) return { folder: mail.folder ?? undefined, q: from.q };
+  return from.folder ? { folder: from.folder } : {};
 }
 
 /** The mail opened last, so the Inbox comes back to it. */
@@ -49,17 +61,19 @@ export function rememberOpened(key: string) {
 }
 
 /**
- * The Inbox's mail: J and K (and the arrows) move through it, Enter or O
- * opens the one they're on.
+ * A list of mail, the Inbox's or another's: J and K (and the arrows) move
+ * through it, Enter or O opens the one they're on.
  */
-function MailList({
+export function MailList({
   mails,
   byId,
   now,
+  from = {},
 }: {
   mails: MailSummary[];
   byId: Map<string, MailAccount>;
   now: Date;
+  from?: From;
 }) {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
@@ -90,6 +104,7 @@ function MailList({
         void navigate({
           to: "/$workspace/mail/$account/$uid",
           params: { workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) },
+          search: openedFrom(mail, from),
         });
       }
     };
@@ -111,6 +126,7 @@ function MailList({
           focused={index === focused}
           account={byId.get(mail.account_id)}
           now={now}
+          from={from}
         />
       ))}
     </ol>
@@ -118,7 +134,7 @@ function MailList({
 }
 
 /** The clock, a minute at a time: for the line for now, and "in 20 min". */
-function useNow(): Date {
+export function useNow(): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
@@ -133,20 +149,25 @@ function MailRow({
   focused,
   account,
   now,
+  from,
 }: {
   mail: MailSummary;
   index: number;
   focused: boolean;
   account: MailAccount | undefined;
   now: Date;
+  from: From;
 }) {
   const { workspace } = useWorkspace();
   const unread = !mail.seen;
+  // Sent mail names who it went to.
+  const who = mail.to_name ?? mail.from_name;
   return (
     <li>
       <Link
         to="/$workspace/mail/$account/$uid"
         params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
+        search={openedFrom(mail, from)}
         onClick={() => rememberOpened(mailKey(mail))}
         className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""}`}
         style={hue(account?.hue ?? 1)}
@@ -155,9 +176,9 @@ function MailRow({
       >
         {unread ? <span className="ui-live-dot" role="img" aria-label="Unread" /> : <span />}
         <span className="av" aria-hidden="true">
-          {initial(mail.from_name)}
+          {initial(who)}
         </span>
-        <span className="who">{mail.from_name}</span>
+        <span className="who">{mail.to_name === null ? who : `To ${who}`}</span>
         <span className="line">
           <b>{mail.subject || "(no subject)"}</b>
           {mail.snippet && ` — ${mail.snippet}`}
@@ -176,7 +197,7 @@ export function initial(name: string): string {
 }
 
 /** An account Postrider can't read right now says so, above the mail. */
-function AccountProblems({
+export function AccountProblems({
   accounts,
   statuses,
 }: {

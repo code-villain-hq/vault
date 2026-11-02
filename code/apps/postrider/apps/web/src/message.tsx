@@ -1,28 +1,33 @@
 import { ago, shortcutFree } from "@code-villain/web";
 import type { Attachment, MailSummary, Message } from "@postrider/types";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { ArrowLeft, ChevronDown, ChevronUp, type LucideIcon, Paperclip } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
-import { initial, mailKey, rememberOpened } from "./inbox";
+import { listedMails, markSeen } from "./folders";
+import { type From, initial, mailKey, openedFrom, rememberOpened } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
-import { hue, useAccounts, useInbox } from "./mail";
+import { hue, useAccounts, useFolders, useInbox } from "./mail";
 import { isDesktop, openInBrowser } from "./platform";
 import { ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /**
- * `/$workspace/mail/$account/$uid`: a mail, opened in the Inbox's place.
- * Esc goes back; J and K open the next and the previous one.
+ * `/$workspace/mail/$account/$uid`: a mail, opened in the place of the list
+ * it was opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`).
+ * Esc goes back to it; J and K open the next and the previous one in it.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
+  const from = useSearch({ strict: false }) as From;
   const { workspace, place } = useWorkspace();
   const { inbox } = useInbox();
   const accounts = useAccounts();
   const navigate = useNavigate();
-  const key = `${account}:${uid}`;
-  const mails = inbox?.mails ?? [];
+  const back = useBack(from);
+  const key = mailKey({ folder: from.folder, account_id: account, uid: Number(uid) });
+  const listed = from.folder !== undefined || from.q !== undefined;
+  const mails = listed ? listedMails(from) : (inbox?.mails ?? []);
   const index = mails.findIndex((mail) => mailKey(mail) === key);
   const [opened, setOpened] = useState<{ key: string; message?: Message; error?: string }>();
   const message = opened?.key === key ? opened.message : undefined;
@@ -30,23 +35,29 @@ export function MailPage() {
   // Its line in the Inbox shows at once; the rest comes from its server.
   const summary: MailSummary | undefined = message ?? mails[index];
 
+  const folder = from.folder;
+  const q = from.q;
   useEffect(() => {
     rememberOpened(key);
     const stop = new AbortController();
+    const inFolder = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
     api<Message>(
       "GET",
-      `/api/w/${workspace.id}/mails/${account}/${uid}`,
+      `/api/w/${workspace.id}/mails/${account}/${uid}${inFolder}`,
       undefined,
       place,
       stop.signal,
     ).then(
-      (answer) => setOpened({ key, message: answer }),
+      (answer) => {
+        setOpened({ key, message: answer });
+        if (folder !== undefined) markSeen({ folder, q }, key);
+      },
       (problem: unknown) => {
         if (!stop.signal.aborted) setOpened({ key, error: messageOf(problem) });
       },
     );
     return () => stop.abort();
-  }, [workspace.id, place, account, uid, key]);
+  }, [workspace.id, place, account, uid, key, folder, q]);
 
   useEffect(() => {
     const open = (mail: MailSummary | undefined) => {
@@ -54,6 +65,7 @@ export function MailPage() {
       void navigate({
         to: "/$workspace/mail/$account/$uid",
         params: { workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) },
+        search: openedFrom(mail, from),
       });
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -61,10 +73,10 @@ export function MailPage() {
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       if (key === "Escape") {
         event.preventDefault();
-        void navigate({ to: "/$workspace", params: { workspace: workspace.url_key } });
+        back.go();
       } else if (key === "j" || key === "k") {
         event.preventDefault();
-        // The Inbox is newest first: J goes down it, to older mail.
+        // Lists are newest first: J goes down, to older mail.
         if (index >= 0) open(mails[index + (key === "j" ? 1 : -1)]);
       }
     };
@@ -79,25 +91,38 @@ export function MailPage() {
       <PageHeader
         title={summary ? subject : "Mail"}
         back={
-          <Link
-            to="/$workspace"
-            params={{ workspace: workspace.url_key }}
+          <a
+            href={back.href}
+            onClick={(event) => {
+              event.preventDefault();
+              back.go();
+            }}
             className="ui-button -ml-2 gap-1.5 px-2 text-xs text-muted"
-            title="Back to the Inbox (Esc)"
+            title={`Back to ${back.name} (Esc)`}
           >
             <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
-            Inbox
-          </Link>
+            {back.name}
+          </a>
         }
       >
         {index >= 0 && (
           <>
-            <span className="text-xs text-muted tabular-nums">
+            <span className="shrink-0 text-xs whitespace-nowrap text-muted tabular-nums">
               {index + 1} of {mails.length}
             </span>
             <div className="-mr-2 flex">
-              <MailStep mail={mails[index - 1]} icon={ChevronUp} label="Previous mail (K)" />
-              <MailStep mail={mails[index + 1]} icon={ChevronDown} label="Next mail (J)" />
+              <MailStep
+                mail={mails[index - 1]}
+                from={from}
+                icon={ChevronUp}
+                label="Previous mail (K)"
+              />
+              <MailStep
+                mail={mails[index + 1]}
+                from={from}
+                icon={ChevronDown}
+                label="Next mail (J)"
+              />
             </div>
           </>
         )}
@@ -146,13 +171,45 @@ export function MailPage() {
   );
 }
 
-/** An arrow to the mail above or below this one in the Inbox, if there is one. */
+/** Where Esc and the back button go: the list the mail was opened from. */
+function useBack(from: From): { name: string; href: string; go: () => void } {
+  const { workspace } = useWorkspace();
+  const { folders } = useFolders();
+  const navigate = useNavigate();
+  const params = { workspace: workspace.url_key };
+  if (from.q !== undefined) {
+    const search = { q: from.q };
+    return {
+      name: "Search",
+      href: `/${workspace.url_key}/search?${new URLSearchParams(search)}`,
+      go: () => void navigate({ to: "/$workspace/search", params, search }),
+    };
+  }
+  const folder = from.folder;
+  if (folder !== undefined) {
+    const shown = folders.find((f) => f.key.toLowerCase() === folder.toLowerCase());
+    return {
+      name: shown?.name ?? folder,
+      href: `/${workspace.url_key}/folders/${encodeURIComponent(folder)}`,
+      go: () => void navigate({ to: "/$workspace/folders/$folder", params: { ...params, folder } }),
+    };
+  }
+  return {
+    name: "Inbox",
+    href: `/${workspace.url_key}`,
+    go: () => void navigate({ to: "/$workspace", params }),
+  };
+}
+
+/** An arrow to the mail above or below this one in its list, if there is one. */
 function MailStep({
   mail,
+  from,
   icon: Icon,
   label,
 }: {
   mail: MailSummary | undefined;
+  from: From;
   icon: LucideIcon;
   label: string;
 }) {
@@ -169,6 +226,7 @@ function MailStep({
     <Link
       to="/$workspace/mail/$account/$uid"
       params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
+      search={openedFrom(mail, from)}
       className="ui-button ui-icon-button"
       aria-label={label}
       title={label}

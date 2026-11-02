@@ -9,6 +9,7 @@ pub mod auth;
 pub mod caldav;
 pub mod connect;
 pub mod error;
+pub mod folders;
 pub mod imap;
 pub mod local;
 pub mod mail;

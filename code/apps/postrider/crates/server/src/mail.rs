@@ -22,7 +22,7 @@ use uuid::Uuid;
 
 use crate::auth::Member;
 use crate::error::AppError;
-use crate::imap::{self, Failure, Login, Session};
+use crate::imap::{self, Failure, Login, Place, Session, Summary};
 use crate::message;
 use crate::secrets::Secrets;
 use crate::state::AppState;
@@ -41,6 +41,10 @@ const LONG_POLL: Duration = Duration::from_secs(25);
 /// the last.
 const RETRY: [u64; 5] = [5, 15, 30, 60, 300];
 
+/// What lists showed of each account's folders: by account and path, the
+/// folder's UIDVALIDITY and its mails' lines by UID.
+pub(crate) type KeptLines = HashMap<(Uuid, String), (i64, HashMap<i64, Summary>)>;
+
 pub struct Mail {
     pool: PgPool,
     secrets: Secrets,
@@ -51,6 +55,11 @@ pub struct Mail {
     /// A connection per account for opening mail, kept between mails: the
     /// watcher's own waits in IDLE.
     readers: Mutex<HashMap<Uuid, Session>>,
+    /// Each account's folders, as its server listed them last.
+    pub(crate) places: Mutex<HashMap<Uuid, Vec<Place>>>,
+    /// What the lists showed of the mail in each account's folders (by
+    /// path), under the folder's UIDVALIDITY, so it isn't read again.
+    pub(crate) lines: Mutex<KeptLines>,
 }
 
 impl Mail {
@@ -62,6 +71,8 @@ impl Mail {
             statuses: Mutex::default(),
             watchers: Mutex::default(),
             readers: Mutex::default(),
+            places: Mutex::default(),
+            lines: Mutex::default(),
         }
     }
 
@@ -78,6 +89,40 @@ impl Mail {
             self.watch(account);
         }
         Ok(())
+    }
+
+    /// The workspace's accounts, in their order.
+    pub(crate) async fn accounts(
+        &self,
+        workspace_id: Uuid,
+    ) -> Result<Vec<MailAccount>, sqlx::Error> {
+        Ok(sqlx::query_scalar(
+            "SELECT to_jsonb(a.*) FROM mail_accounts a WHERE workspace_id = $1 ORDER BY position",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .filter_map(|row: serde_json::Value| serde_json::from_value(row).ok())
+        .collect())
+    }
+
+    /// One of the workspace's accounts.
+    pub(crate) async fn account(
+        &self,
+        workspace_id: Uuid,
+        account_id: Uuid,
+    ) -> Result<MailAccount, AppError> {
+        let account: Option<serde_json::Value> = sqlx::query_scalar(
+            "SELECT to_jsonb(a.*) FROM mail_accounts a WHERE id = $1 AND workspace_id = $2",
+        )
+        .bind(account_id)
+        .bind(workspace_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        account
+            .and_then(|row| serde_json::from_value(row).ok())
+            .ok_or_else(|| AppError::not_found("That account isn't here any more."))
     }
 
     /// Starts watching an account, or starts again with what it is now.
@@ -98,6 +143,8 @@ impl Mail {
         }
         self.lock_statuses().remove(&account_id);
         self.lock_readers().remove(&account_id);
+        self.lock_places().remove(&account_id);
+        self.lock_lines().retain(|(id, _), _| *id != account_id);
         self.bump();
     }
 
@@ -167,6 +214,7 @@ impl Mail {
                 |(account_id, uid, from_name, from_address, subject, snippet, date, seen)| {
                     MailSummary {
                         account_id,
+                        folder: None,
                         uid,
                         from_name,
                         from_address,
@@ -174,6 +222,7 @@ impl Mail {
                         snippet,
                         date,
                         seen,
+                        to_name: None,
                     }
                 },
             )
@@ -194,16 +243,7 @@ impl Mail {
         account_id: Uuid,
         uid: i64,
     ) -> Result<Message, AppError> {
-        let account: Option<serde_json::Value> = sqlx::query_scalar(
-            "SELECT to_jsonb(a.*) FROM mail_accounts a WHERE id = $1 AND workspace_id = $2",
-        )
-        .bind(account_id)
-        .bind(workspace_id)
-        .fetch_optional(&self.pool)
-        .await?;
-        let account: MailAccount = account
-            .and_then(|row| serde_json::from_value(row).ok())
-            .ok_or_else(|| AppError::not_found("That account isn't here any more."))?;
+        let account = self.account(workspace_id, account_id).await?;
         type Row = (
             String,
             String,
@@ -237,7 +277,7 @@ impl Mail {
             None => {
                 let raw = self
                     .on_server(&account, |session| {
-                        Box::pin(imap::source(session, validity, uid))
+                        Box::pin(imap::source(session, "INBOX", Some(validity), uid))
                     })
                     .await
                     .map_err(|failure| AppError::refused(failure.message()))?
@@ -261,11 +301,12 @@ impl Mail {
 
         if !seen {
             let mail = Arc::clone(self);
-            tokio::spawn(async move { mail.mark_read(account, uid).await });
+            tokio::spawn(async move { mail.mark_read(account, "INBOX".into(), uid).await });
         }
 
         let summary = MailSummary {
             account_id,
+            folder: None,
             uid,
             from_name,
             from_address,
@@ -273,18 +314,25 @@ impl Mail {
             snippet,
             date,
             seen: true,
+            to_name: None,
         };
         Ok(message::read(&raw, summary))
     }
 
-    /// Marks an opened mail read, on its server and in the copy. Offline,
-    /// it stays unread until it's opened again.
-    async fn mark_read(&self, account: MailAccount, uid: i64) {
+    /// Marks an opened mail read, on its server, and in the Inbox's copy
+    /// when it's there. Offline, it stays unread until it's opened again.
+    pub(crate) async fn mark_read(&self, account: MailAccount, folder: String, uid: i64) {
         let marked = self
-            .on_server(&account, |session| Box::pin(imap::mark_read(session, uid)))
+            .on_server(&account, |session| {
+                let folder = folder.clone();
+                Box::pin(async move { imap::mark_read(session, &folder, uid).await })
+            })
             .await;
         if let Err(failure) = marked {
             tracing::info!(address = %account.address, "couldn't mark read: {}", failure.message());
+            return;
+        }
+        if folder != "INBOX" {
             return;
         }
         let updated =
@@ -300,7 +348,7 @@ impl Mail {
 
     /// Does `work` over the account's connection for reading, opened when
     /// there's none. One the server has closed since is opened again.
-    async fn on_server<T>(
+    pub(crate) async fn on_server<T>(
         &self,
         account: &MailAccount,
         work: impl for<'s> Fn(&'s mut Session) -> BoxFuture<'s, Result<T, Failure>>,
@@ -417,6 +465,14 @@ impl Mail {
     fn lock_readers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Session>> {
         self.readers.lock().expect("never poisoned")
     }
+
+    pub(crate) fn lock_places(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Vec<Place>>> {
+        self.places.lock().expect("never poisoned")
+    }
+
+    pub(crate) fn lock_lines(&self) -> std::sync::MutexGuard<'_, KeptLines> {
+        self.lines.lock().expect("never poisoned")
+    }
 }
 
 /// Waits in IDLE until the server says something changed, or [`IDLE`]
@@ -450,17 +506,27 @@ pub async fn inbox(
     Ok(Json(state.mail.inbox(member.actor.workspace_id).await?))
 }
 
-/// `GET /api/w/{workspace}/mails/{account}/{uid}`: a mail from the Inbox,
-/// opened, which marks it read.
+#[derive(Deserialize)]
+pub struct OpenParams {
+    folder: Option<String>,
+}
+
+/// `GET /api/w/{workspace}/mails/{account}/{uid}[?folder=<key>]`: a mail
+/// from the Inbox, or from a folder, opened, which marks it read.
 pub async fn open(
     State(state): State<AppState>,
     member: Member,
     Path((_, account_id, uid)): Path<(Uuid, Uuid, i64)>,
+    Query(params): Query<OpenParams>,
 ) -> Result<Json<Message>, AppError> {
-    Ok(Json(
-        state
-            .mail
-            .open(member.actor.workspace_id, account_id, uid)
-            .await?,
-    ))
+    let workspace_id = member.actor.workspace_id;
+    Ok(Json(match params.folder {
+        Some(folder) => {
+            state
+                .mail
+                .open_in(workspace_id, account_id, &folder, uid)
+                .await?
+        }
+        None => state.mail.open(workspace_id, account_id, uid).await?,
+    }))
 }

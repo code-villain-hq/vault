@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
-import { InboxPage } from "./inbox";
+import { FolderPage, SearchPage } from "./folders";
+import { type From, InboxPage } from "./inbox";
 import { Home, NotFound, WorkspaceLayout } from "./layout";
 import { MailPage } from "./message";
 import { AccountsPage } from "./settings";
@@ -46,7 +47,23 @@ const inbox = createRoute({ getParentRoute: () => workspace, path: "/", componen
 const mail = createRoute({
   getParentRoute: () => workspace,
   path: "/mail/$account/$uid",
+  // The list it was opened from: a folder, by its key, or a search.
+  validateSearch: (search: Record<string, unknown>): From => ({
+    folder: text(search.folder),
+    q: text(search.q),
+  }),
   component: MailPage,
+});
+const folder = createRoute({
+  getParentRoute: () => workspace,
+  path: "/folders/$folder",
+  component: FolderPage,
+});
+const search = createRoute({
+  getParentRoute: () => workspace,
+  path: "/search",
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({ q: text(search.q) }),
+  component: SearchPage,
 });
 const accounts = createRoute({
   getParentRoute: () => workspace,
@@ -58,7 +75,7 @@ const routeTree = root.addChildren([
   index,
   login,
   signedIn,
-  workspace.addChildren([inbox, mail, accounts]),
+  workspace.addChildren([inbox, mail, folder, search, accounts]),
 ]);
 
 export const router = createRouter({ routeTree });

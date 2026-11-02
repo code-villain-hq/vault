@@ -2,7 +2,7 @@
 import type { Attachment } from "./Attachment";
 
 /**
- * A mail opened from the Inbox: its line in the list, and the whole of it.
+ * A mail opened from a list: its line in the list, and the whole of it.
  */
 export type Message = { 
 /**
@@ -19,7 +19,12 @@ text: string,
  */
 html: string | null, attachments: Array<Attachment>, account_id: string, 
 /**
- * Its IMAP UID in the account's Inbox.
+ * The folder it's in, by its key ([`Folder::key`]); `None` for a mail
+ * in the Inbox's copy.
+ */
+folder: string | null, 
+/**
+ * Its IMAP UID in that folder.
  */
 uid: number, 
 /**
@@ -33,4 +38,8 @@ snippet: string, date: string,
 /**
  * Read (`\Seen`), on the server.
  */
-seen: boolean, };
+seen: boolean, 
+/**
+ * Who it went to, in a list of sent mail, where that's what matters.
+ */
+to_name: string | null, };

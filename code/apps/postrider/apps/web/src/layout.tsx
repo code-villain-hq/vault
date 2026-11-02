@@ -13,6 +13,7 @@ import {
   SyncIndicator,
   useSidebarWidth,
 } from "@code-villain/web";
+import type { Folder as MailFolder } from "@postrider/types";
 import {
   Link,
   Outlet,
@@ -21,9 +22,19 @@ import {
   useParams,
   useRouter,
 } from "@tanstack/react-router";
-import { ArrowLeft, Check, ChevronsUpDown, Inbox, Mail } from "lucide-react";
+import {
+  Archive,
+  ArrowLeft,
+  Check,
+  ChevronsUpDown,
+  Folder,
+  Inbox,
+  type LucideIcon,
+  Mail,
+  Send,
+} from "lucide-react";
 import { type ReactNode, useMemo } from "react";
-import { InboxProvider, useUnread } from "./mail";
+import { InboxProvider, useFolders, useUnread } from "./mail";
 import { isDesktop } from "./platform";
 import { setCurrentPlace } from "./server";
 import {
@@ -210,28 +221,105 @@ function Sidebar() {
   );
 }
 
-/** The Inbox, with what's unread in it. */
+/**
+ * The Inbox, Sent and Archive, then the accounts' own folders, each once
+ * however many accounts have it, with what's unread in them. Drafts,
+ * Trash and Junk wait for writing mail.
+ */
 function MailNav() {
   const { workspace } = useWorkspace();
   const unread = useUnread();
+  const { sent, archive, others } = useShownFolders();
+  const list = useOpenList();
   return (
-    <nav aria-label="Mail" className="flex flex-col gap-0.5">
-      <Link
-        to="/$workspace"
-        params={{ workspace: workspace.url_key }}
-        className={navLink}
-        title="Inbox (G then I)"
-      >
-        <NavIcon icon={Inbox} />
-        Inbox
-        {unread > 0 && (
-          <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-muted tabular-nums">
-            <span className="ui-live-dot" aria-hidden="true" />
-            <span aria-label={`${unread} unread`}>{unread}</span>
-          </span>
+    <nav aria-label="Mail" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-0.5">
+        <Link
+          to="/$workspace"
+          params={{ workspace: workspace.url_key }}
+          activeOptions={{ exact: true }}
+          className={`${navLink} ${list === "" ? "active" : ""}`}
+          title="Inbox (G then I)"
+        >
+          <NavIcon icon={Inbox} />
+          Inbox
+          <Unread count={unread} />
+        </Link>
+        {sent && <FolderLink folder={sent} icon={Send} open={list} title="Sent (G then S)" />}
+        {archive && (
+          <FolderLink folder={archive} icon={Archive} open={list} title="Archive (G then A)" />
         )}
-      </Link>
+      </div>
+      {others.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          <span className="px-2 pb-1 text-xs text-faint">Folders</span>
+          {others.map((folder) => (
+            <FolderLink key={folder.key} folder={folder} icon={Folder} open={list} />
+          ))}
+        </div>
+      )}
     </nav>
+  );
+}
+
+/**
+ * The list an opened mail belongs to, by its folder's key in lower case:
+ * "" for the Inbox; undefined on any other page, or for a search.
+ */
+function useOpenList(): string | undefined {
+  const { pathname, search } = useLocation();
+  if (!pathname.includes("/mail/")) return undefined;
+  const from = search as { folder?: string; q?: string };
+  return from.q === undefined ? (from.folder?.toLowerCase() ?? "") : undefined;
+}
+
+/** The folders the sidebar shows: Sent, Archive, and the rest but Drafts, Trash and Junk. */
+function useShownFolders() {
+  const { folders } = useFolders();
+  return useMemo(
+    () => ({
+      sent: folders.find((f) => f.role === "sent"),
+      archive: folders.find((f) => f.role === "archive"),
+      others: folders.filter((f) => f.role === null),
+    }),
+    [folders],
+  );
+}
+
+function FolderLink({
+  folder,
+  icon,
+  open,
+  title,
+}: {
+  folder: MailFolder;
+  icon: LucideIcon;
+  /** The list of the mail open now (`useOpenList`). */
+  open: string | undefined;
+  title?: string;
+}) {
+  const { workspace } = useWorkspace();
+  return (
+    <Link
+      to="/$workspace/folders/$folder"
+      params={{ workspace: workspace.url_key, folder: folder.key }}
+      className={`${navLink} ${open === folder.key.toLowerCase() ? "active" : ""}`}
+      title={title}
+    >
+      <NavIcon icon={icon} />
+      <span className="truncate">{folder.name}</span>
+      <Unread count={folder.unread} />
+    </Link>
+  );
+}
+
+function Unread({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-muted tabular-nums">
+      <span className="ui-live-dot" aria-hidden="true" />
+      <span aria-label={`${count} unread`}>{count}</span>
+    </span>
   );
 }
 
@@ -341,31 +429,51 @@ function WorkspaceMenu() {
 /** Postrider's own shortcuts; the kit's list adds "Anywhere" and "Menus". */
 const SECTIONS: ShortcutSection[] = [
   {
-    title: "The Inbox",
+    title: "The Inbox, a folder, a search",
     keys: [
       ["J K or ↓ ↑", "Next and previous mail"],
       ["Enter or O", "Open the mail"],
+      ["/", "Search mail"],
     ],
   },
   {
     title: "A mail",
     keys: [
       ["J K", "The next and previous mail, opened"],
-      ["Esc", "Back to the Inbox"],
+      ["Esc", "Back to its list"],
     ],
   },
 ];
 
-/** ⌘K and the shortcuts list: the Inbox, settings, and the other workspaces. */
+/** ⌘K and the shortcuts list: the Inbox, the folders, settings, and the other workspaces. */
 function Menus() {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
+  const { sent, archive } = useShownFolders();
   const params = { workspace: workspace.url_key };
+  const goTo = [
+    { key: "i", name: "Inbox", go: () => void navigate({ to: "/$workspace", params }) },
+  ];
+  for (const [key, folder] of [
+    ["s", sent],
+    ["a", archive],
+  ] as const) {
+    if (!folder) continue;
+    goTo.push({
+      key,
+      name: folder.name,
+      go: () =>
+        void navigate({
+          to: "/$workspace/folders/$folder",
+          params: { ...params, folder: folder.key },
+        }),
+    });
+  }
   return (
     <>
       <CommandMenu useCommands={useCommands} placeholder="Type a command…" />
       <Shortcuts
-        goTo={[{ key: "i", name: "Inbox", go: () => void navigate({ to: "/$workspace", params }) }]}
+        goTo={goTo}
         sections={SECTIONS}
         onSettings={
           isDesktop
@@ -381,6 +489,7 @@ function useCommands(query: string): Command[] {
   const { workspace } = useWorkspace();
   const session = useSession();
   const navigate = useNavigate();
+  const { sent, archive, others } = useShownFolders();
 
   const commands = useMemo(() => {
     const params = { workspace: workspace.url_key };
@@ -393,6 +502,28 @@ function useCommands(query: string): Command[] {
         icon: <NavIcon icon={Inbox} />,
         run: () => void navigate({ to: "/$workspace", params }),
       },
+      ...[
+        { folder: sent, icon: Send, hint: "G S" },
+        { folder: archive, icon: Archive, hint: "G A" },
+        ...others.map((folder) => ({ folder, icon: Folder, hint: undefined })),
+      ].flatMap(({ folder, icon, hint }): Command[] =>
+        folder
+          ? [
+              {
+                id: `folder-${folder.key}`,
+                group: "Go to",
+                label: folder.name,
+                hint,
+                icon: <NavIcon icon={icon} />,
+                run: () =>
+                  void navigate({
+                    to: "/$workspace/folders/$folder",
+                    params: { ...params, folder: folder.key },
+                  }),
+              },
+            ]
+          : [],
+      ),
       {
         id: "settings-accounts",
         group: "Settings",
@@ -411,7 +542,7 @@ function useCommands(query: string): Command[] {
       });
     }
     return list;
-  }, [workspace, session, navigate]);
+  }, [workspace, session, navigate, sent, archive, others]);
 
   return matching(commands, query);
 }

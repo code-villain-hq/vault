@@ -1,8 +1,9 @@
-import type { AccountStatus, Inbox, MailAccount } from "@postrider/types";
+import type { AccountStatus, Folder, Inbox, MailAccount } from "@postrider/types";
 import {
   createContext,
   type CSSProperties,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -63,7 +64,48 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     return () => stop.abort();
   }, [workspace.id, place]);
 
-  return <Context.Provider value={state}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={state}>
+      <FoldersProvider version={state.inbox?.version}>{children}</FoldersProvider>
+    </Context.Provider>
+  );
+}
+
+type FoldersState = {
+  folders: Folder[];
+  /** Asks the servers again, as after a folder's mail was read. */
+  refresh: () => void;
+};
+
+const FoldersContext = createContext<FoldersState>({ folders: [], refresh: () => undefined });
+
+/**
+ * The workspace's folders with what's unread in them, read live: asked
+ * when the sidebar shows, when the Inbox changes (an account connected,
+ * mail came), and when a folder's list is opened.
+ */
+function FoldersProvider({ version, children }: { version?: number; children: ReactNode }) {
+  const { workspace, place } = useWorkspace();
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [asked, setAsked] = useState(0);
+
+  useEffect(() => {
+    const stop = new AbortController();
+    api<Folder[]>("GET", `/api/w/${workspace.id}/folders`, undefined, place, stop.signal).then(
+      setFolders,
+      // Offline, the folders stay as they were.
+      () => undefined,
+    );
+    return () => stop.abort();
+  }, [workspace.id, place, version, asked]);
+
+  const refresh = useCallback(() => setAsked((n) => n + 1), []);
+  const state = useMemo(() => ({ folders, refresh }), [folders, refresh]);
+  return <FoldersContext.Provider value={state}>{children}</FoldersContext.Provider>;
+}
+
+export function useFolders(): FoldersState {
+  return useContext(FoldersContext);
 }
 
 function sleep(seconds: number, signal: AbortSignal) {

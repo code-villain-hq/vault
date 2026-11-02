@@ -1,9 +1,9 @@
 // Fills the stand-in mail and calendar servers (`bun run db`) with the
 // storyboard's morning, and adds both to the workspace: the Code Villain
-// and Lazarski accounts, and their calendars, with today's events. Needs
-// `bun run dev` running. Safe to run again: an Inbox that has mail isn't
-// filled twice, and today's events are written over; `bun run db:reset`
-// starts them over. Local development only.
+// and Lazarski accounts with their Inboxes and a few folders, and their
+// calendars, with today's events. Needs `bun run dev` running. Safe to run
+// again: a folder that has mail isn't filled twice, and today's events are
+// written over; `bun run db:reset` starts them over. Local development only.
 
 import { connect, type Socket } from "node:net";
 
@@ -16,6 +16,8 @@ const password = "dev";
 
 type Mail = {
   from: string;
+  /** Who it went to, when not the account: mail it sent. */
+  to?: string;
   subject: string;
   body: string;
   /** Days before today, and the time it came. */
@@ -24,7 +26,14 @@ type Mail = {
   read?: boolean;
 };
 
-const accounts: { name: string; address: string; calendar: string; mail: Mail[] }[] = [
+const accounts: {
+  name: string;
+  address: string;
+  calendar: string;
+  mail: Mail[];
+  /** Its other folders, by their paths, and their mail. */
+  folders: Record<string, Mail[]>;
+}[] = [
   {
     name: "Code Villain",
     address: "contact@codevillain.test",
@@ -53,6 +62,57 @@ const accounts: { name: string; address: string; calendar: string; mail: Mail[] 
         read: true,
       },
     ],
+    folders: {
+      Sent: [
+        {
+          from: "Michael Lazarski <contact@codevillain.test>",
+          to: "Anna Weber <anna@weber.test>",
+          subject: "Re: Layer trial",
+          body: "Hi Anna,\n\ngood to hear the trial went well. I'll write about teams this week.\n\nMichael",
+          day: 1,
+          at: "17:20",
+          read: true,
+        },
+        {
+          from: "Michael Lazarski <contact@codevillain.test>",
+          to: "Uberspace <hallo@uberspace.test>",
+          subject: "Umzug auf U8",
+          body: "Hallo,\n\nwann wird hideout auf U8 umgezogen?\n\nMichael",
+          day: 4,
+          at: "09:30",
+          read: true,
+        },
+      ],
+      Archive: [
+        {
+          from: "Pocket ID <id@codevillain.test>",
+          subject: "Welcome to Pocket ID",
+          body: "Your account at id.codevillain.test is ready.",
+          day: 12,
+          at: "14:02",
+          read: true,
+        },
+      ],
+      Rechnungen: [
+        {
+          from: "Netcup <noreply@netcup.test>",
+          subject: "Ihre Rechnung für Oktober",
+          body: "Ihre Rechnung über 12,34 € liegt im Kundenbereich.",
+          day: 2,
+          at: "06:10",
+        },
+      ],
+      "Projekte/Layer": [
+        {
+          from: "Anna Weber <anna@weber.test>",
+          subject: "Layer trial: what we noticed",
+          body: "Hi Michael,\n\nthree things we noticed in the trial: restoring panes, ⌘K focus and the theme picker.\n\nAnna",
+          day: 6,
+          at: "11:45",
+          read: true,
+        },
+      ],
+    },
   },
   {
     name: "Lazarski",
@@ -113,6 +173,46 @@ const accounts: { name: string; address: string; calendar: string; mail: Mail[] 
         read: true,
       },
     ],
+    folders: {
+      Gesendet: [
+        {
+          from: "Michael Lazarski <michael@lazarski.test>",
+          to: "Kristina <kristina@lazarski.test>",
+          subject: "Re: Samstag",
+          body: "Ja, 18 Uhr passt. Ich bringe Nachtisch mit.",
+          day: 0,
+          at: "08:05",
+          read: true,
+        },
+      ],
+      Archiv: [
+        {
+          from: "DB Fernverkehr <buchung@bahn.test>",
+          subject: "Ihre Fahrkarte: Hamburg → Berlin, So 16. Nov",
+          body: "Vielen Dank für Ihre Buchung.",
+          day: 9,
+          at: "19:12",
+          read: true,
+        },
+      ],
+      Rechnungen: [
+        {
+          from: "Uberspace <hallo@uberspace.test>",
+          subject: "Rechnung November",
+          body: "Für November buchen wir 10 € ab.",
+          day: 1,
+          at: "08:00",
+        },
+        {
+          from: "Telekom <rechnung@telekom.test>",
+          subject: "Ihre Mobilfunk-Rechnung",
+          body: "Ihre Rechnung für Oktober ist da.",
+          day: 8,
+          at: "05:30",
+          read: true,
+        },
+      ],
+    },
   },
 ];
 
@@ -153,7 +253,7 @@ function message(to: string, mail: Mail): string {
   const date = when(mail.day, mail.at);
   return [
     `From: ${mail.from}`,
-    `To: ${to}`,
+    `To: ${mail.to ?? to}`,
     `Subject: ${header(mail.subject)}`,
     `Date: ${date.toUTCString().replace("GMT", "+0000")}`,
     `Message-ID: <${crypto.randomUUID()}@postrider.test>`,
@@ -223,20 +323,27 @@ class Imap {
   }
 }
 
-async function fillInbox(address: string, mail: Mail[]): Promise<boolean> {
+/** Fills the account's folders that are still empty; whether it filled the Inbox. */
+async function fillMail(address: string, folders: Record<string, Mail[]>): Promise<boolean> {
   const client = await Imap.open();
   try {
     await client.run(`LOGIN "${address}" "${password}"`);
-    const status = await client.run("STATUS INBOX (MESSAGES)");
-    if (!/MESSAGES 0\)/.test(status)) return false;
-    // Oldest first, as it would have come.
-    for (const one of [...mail].reverse()) {
-      const flags = one.read ? "(\\Seen)" : "()";
-      const date = arrived(when(one.day, one.at));
-      await client.run(`APPEND INBOX ${flags} ${date}`, message(address, one));
+    let filled = false;
+    for (const [folder, mail] of Object.entries(folders)) {
+      // There already, it says NO.
+      if (folder !== "INBOX") await client.run(`CREATE "${folder}"`).catch(() => undefined);
+      const status = await client.run(`STATUS "${folder}" (MESSAGES)`);
+      if (!/MESSAGES 0\)/.test(status)) continue;
+      // Oldest first, as it would have come.
+      for (const one of [...mail].reverse()) {
+        const flags = one.read ? "(\\Seen)" : "()";
+        const date = arrived(when(one.day, one.at));
+        await client.run(`APPEND "${folder}" ${flags} ${date}`, message(address, one));
+      }
+      if (folder === "INBOX") filled = true;
     }
     await client.run("LOGOUT").catch(() => undefined);
-    return true;
+    return filled;
   } finally {
     client.close();
   }
@@ -323,7 +430,7 @@ if (!workspace) throw new Error("the dev server made no workspace");
 const w = `/api/w/${workspace.id}`;
 
 for (const account of accounts) {
-  const filled = await fillInbox(account.address, account.mail);
+  const filled = await fillMail(account.address, { INBOX: account.mail, ...account.folders });
   console.log(
     `${account.address}: ${filled ? `${account.mail.length} mails` : "has mail already"}`,
   );
