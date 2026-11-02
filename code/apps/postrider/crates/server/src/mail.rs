@@ -41,6 +41,10 @@ const LONG_POLL: Duration = Duration::from_secs(25);
 /// the last.
 const RETRY: [u64; 5] = [5, 15, 30, 60, 300];
 
+/// How many connections an account keeps for reading, beside its watcher's:
+/// a search reads that many of its folders at once.
+pub(crate) const READERS: usize = 3;
+
 /// What lists showed of each account's folders: by account and path, the
 /// folder's UIDVALIDITY and its mails' lines by UID.
 pub(crate) type KeptLines = HashMap<(Uuid, String), (i64, HashMap<i64, Summary>)>;
@@ -52,9 +56,9 @@ pub struct Mail {
     version: watch::Sender<i64>,
     statuses: Mutex<HashMap<Uuid, AccountStatus>>,
     watchers: Mutex<HashMap<Uuid, AbortHandle>>,
-    /// A connection per account for opening mail, kept between mails: the
-    /// watcher's own waits in IDLE.
-    readers: Mutex<HashMap<Uuid, Session>>,
+    /// Connections per account for reading (a mail, a folder, a search),
+    /// kept between uses, up to [`READERS`]: the watcher's own waits in IDLE.
+    readers: Mutex<HashMap<Uuid, Vec<Session>>>,
     /// Each account's folders, as its server listed them last.
     pub(crate) places: Mutex<HashMap<Uuid, Vec<Place>>>,
     /// What the lists showed of the mail in each account's folders (by
@@ -400,24 +404,34 @@ impl Mail {
         }
     }
 
-    /// Does `work` over the account's connection for reading, opened when
-    /// there's none. One the server has closed since is opened again.
+    /// Does `work` over one of the account's connections for reading,
+    /// opened when none is free. One the server has closed since is opened
+    /// again.
     pub(crate) async fn on_server<T>(
         &self,
         account: &MailAccount,
         work: impl for<'s> Fn(&'s mut Session) -> BoxFuture<'s, Result<T, Failure>>,
     ) -> Result<T, Failure> {
-        let kept = self.lock_readers().remove(&account.id);
+        let kept = self.lock_readers().get_mut(&account.id).and_then(Vec::pop);
         if let Some(mut session) = kept
             && let Ok(done) = work(&mut session).await
         {
-            self.lock_readers().insert(account.id, session);
+            self.keep_reader(account.id, session);
             return Ok(done);
         }
         let mut session = self.sign_in(account).await?;
         let done = work(&mut session).await?;
-        self.lock_readers().insert(account.id, session);
+        self.keep_reader(account.id, session);
         Ok(done)
+    }
+
+    /// Keeps a connection for the next reading, unless enough are kept.
+    fn keep_reader(&self, account_id: Uuid, session: Session) {
+        let mut readers = self.lock_readers();
+        let kept = readers.entry(account_id).or_default();
+        if kept.len() < READERS {
+            kept.push(session);
+        }
     }
 
     /// Signs in to the account's server with its password from the keychain.
@@ -520,7 +534,7 @@ impl Mail {
         self.watchers.lock().expect("never poisoned")
     }
 
-    fn lock_readers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Session>> {
+    fn lock_readers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Vec<Session>>> {
         self.readers.lock().expect("never poisoned")
     }
 

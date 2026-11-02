@@ -13,6 +13,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use futures::future::join_all;
+use futures::{StreamExt, TryStreamExt, stream};
 use postrider_domain::{
     AccountState, AccountStatus, Folder, FolderRole, Listing, MailAccount, MailSummary, Message,
 };
@@ -22,7 +23,7 @@ use uuid::Uuid;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::imap::{self, Failure, Line, Place};
-use crate::mail::Mail;
+use crate::mail::{Mail, READERS};
 use crate::message;
 use crate::state::AppState;
 
@@ -157,11 +158,13 @@ impl Mail {
                     Some(FolderRole::Drafts | FolderRole::Trash | FolderRole::Junk)
                 )
             }));
-            let mut found = Vec::new();
-            for place in &places {
-                found.extend(self.read(account, place, Some(words)).await?);
-            }
-            Ok(found)
+            // A few folders at once, each over a connection of its own.
+            let found: Vec<Vec<MailSummary>> = stream::iter(places)
+                .map(|place| async move { self.read(account, &place, Some(words)).await })
+                .buffer_unordered(READERS)
+                .try_collect()
+                .await?;
+            Ok(found.concat())
         }))
         .await;
         Ok(listing(&accounts, read))
