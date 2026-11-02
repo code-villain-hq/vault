@@ -8,32 +8,24 @@ import {
   UNKNOWN_PROBLEM,
 } from "@code-villain/web";
 import type { Attachment, MailSummary, Message } from "@postrider/types";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import {
-  Archive,
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp,
-  type LucideIcon,
-  Paperclip,
-  Reply,
-} from "lucide-react";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { Archive, ArrowLeft, Paperclip, Reply, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
 import { ReplyDialog } from "./compose";
-import { forgetListed, listedMails, markSeen } from "./folders";
+import { forgetListed, markSeen, useListedMails } from "./folders";
 import { type From, initial, mailKey, openedFrom, rememberOpened } from "./inbox";
-import { PageBody, PageHeader } from "./layout";
+import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
 import { ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /**
- * `/$workspace/mail/$account/$uid`: a mail, opened in the place of the list
- * it was opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`).
- * Esc goes back to it; J and K open the next and the previous one in it;
- * E archives it and opens the next; R answers it.
+ * `/$workspace/mail/$account/$uid`: a mail, opened beside the list it was
+ * opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`). Esc
+ * closes it; J and K open the next and the previous one in it; E archives
+ * it and ⌫ deletes it, and the next opens; R answers it.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
@@ -46,7 +38,8 @@ export function MailPage() {
   const back = useBack(from);
   const key = mailKey({ folder: from.folder, account_id: account, uid: Number(uid) });
   const listed = from.folder !== undefined || from.q !== undefined;
-  const mails = listed ? listedMails(from) : (inbox?.mails ?? []);
+  const listedMails = useListedMails(from);
+  const mails = listed ? listedMails : (inbox?.mails ?? []);
   const index = mails.findIndex((mail) => mailKey(mail) === key);
   const [replying, setReplying] = useState(false);
   const [opened, setOpened] = useState<{ key: string; message?: Message; error?: string }>();
@@ -93,23 +86,25 @@ export function MailPage() {
     });
   };
 
-  // Archived mail in Archive stays where it is.
-  const archivable = summary !== undefined && summary.folder?.toLowerCase() !== "archive";
+  // Mail in Archive stays there, and mail in Trash is deleted only by its server.
+  const kept = summary?.folder?.toLowerCase();
+  const archivable = summary !== undefined && kept !== "archive";
+  const deletable = summary !== undefined && kept !== "trash";
 
   /**
-   * Moves it to its account's Archive and opens the next mail at once, or
-   * goes back after the last. A server that refuses says so in the frame's
-   * status, and the mail comes back to the Inbox.
+   * Moves it to its account's Archive or Trash and opens the next mail at
+   * once, or closes it after the last. A server that refuses says so in
+   * the frame's status, and the mail comes back to the Inbox.
    */
-  const archive = () => {
-    if (!summary || !archivable) return;
+  const fileAway = (to: "archive" | "trash") => {
+    if (!summary || !(to === "archive" ? archivable : deletable)) return;
     const fromInbox = (summary.folder ?? "inbox").toLowerCase() === "inbox";
     if (fromInbox) leave(summary.account_id, summary.uid);
     if (listed) forgetListed(from, key);
-    const inFolder = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+    const query = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
     api(
       "POST",
-      `/api/w/${workspace.id}/mails/${account}/${uid}/archive${inFolder}`,
+      `/api/w/${workspace.id}/mails/${account}/${uid}/${to}${query}`,
       undefined,
       place,
     ).then(
@@ -137,7 +132,10 @@ export function MailPage() {
         if (index >= 0) open(mails[index + (key === "j" ? 1 : -1)]);
       } else if (key === "e") {
         event.preventDefault();
-        archive();
+        fileAway("archive");
+      } else if (key === "Backspace" || key === "Delete") {
+        event.preventDefault();
+        fileAway("trash");
       } else if (key === "r" && summary) {
         event.preventDefault();
         setReplying(true);
@@ -151,72 +149,40 @@ export function MailPage() {
   const sender = accounts.find((a) => a.id === summary?.account_id);
   return (
     <>
-      <PageHeader
-        title={summary ? subject : "Mail"}
-        back={
-          <a
-            href={back.href}
-            onClick={(event) => {
-              event.preventDefault();
-              back.go();
-            }}
-            className="ui-button -ml-2 gap-1.5 px-2 text-xs text-muted"
-            title={`Back to ${back.name} (Esc)`}
-          >
-            <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
-            {back.name}
-          </a>
-        }
+      <header
+        className="app-topbar flex min-h-12 shrink-0 items-center gap-1 px-4"
+        data-tauri-drag-region="deep"
       >
-        {summary && (
-          <button
-            type="button"
-            className="ui-button ui-icon-button"
-            aria-label="Reply (R)"
-            title="Reply (R)"
-            onClick={() => setReplying(true)}
-          >
-            <Reply size={16} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        )}
-        {archivable && (
-          <button
-            type="button"
-            className="ui-button ui-icon-button"
-            aria-label="Archive (E)"
-            title="Archive (E)"
-            onClick={archive}
-          >
-            <Archive size={16} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        )}
-        {index >= 0 && (
-          <>
-            <span className="shrink-0 text-xs whitespace-nowrap text-muted tabular-nums">
-              {index + 1} of {mails.length}
-            </span>
-            <div className="-mr-2 flex">
-              <MailStep
-                mail={mails[index - 1]}
-                from={from}
-                icon={ChevronUp}
-                label="Previous mail (K)"
-              />
-              <MailStep
-                mail={mails[index + 1]}
-                from={from}
-                icon={ChevronDown}
-                label="Next mail (J)"
-              />
-            </div>
-          </>
-        )}
-      </PageHeader>
+        {/* Only a narrow window, showing the mail in its list's place, needs a way back. */}
+        <a
+          href={back.href}
+          onClick={(event) => {
+            event.preventDefault();
+            back.go();
+          }}
+          className="reader-back ui-button -ml-2 gap-1.5 px-2 text-xs text-muted"
+          title={`Back to ${back.name} (Esc)`}
+        >
+          <ArrowLeft size={14} strokeWidth={1.75} aria-hidden="true" className="text-faint" />
+          {back.name}
+        </a>
+        <div className="-mr-2 ml-auto flex items-center gap-1">
+          {summary && (
+            <ReaderButton icon={Reply} label="Reply (R)" onClick={() => setReplying(true)} />
+          )}
+          {archivable && (
+            <ReaderButton icon={Archive} label="Archive (E)" onClick={() => fileAway("archive")} />
+          )}
+          {deletable && (
+            <ReaderButton icon={Trash2} label="Delete (⌫)" onClick={() => fileAway("trash")} />
+          )}
+        </div>
+      </header>
       <PageBody>
         <article className="letter" aria-label={subject}>
           {summary && (
             <header className="letter-head">
-              <p className="text-title font-semibold">{subject}</p>
+              <h2 className="text-title font-semibold">{subject}</h2>
               <div className="from" style={hue(sender?.hue ?? 1)}>
                 <span className="av" aria-hidden="true">
                   {initial(summary.from_name)}
@@ -302,38 +268,26 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
   };
 }
 
-/** An arrow to the mail above or below this one in its list, if there is one. */
-function MailStep({
-  mail,
-  from,
+/** One of the open mail's tools, in its top bar. */
+function ReaderButton({
   icon: Icon,
   label,
+  onClick,
 }: {
-  mail: MailSummary | undefined;
-  from: From;
-  icon: LucideIcon;
+  icon: typeof Reply;
   label: string;
+  onClick: () => void;
 }) {
-  const { workspace } = useWorkspace();
-  const arrow = <Icon size={16} strokeWidth={1.75} aria-hidden="true" />;
-  if (!mail) {
-    return (
-      <button type="button" className="ui-button ui-icon-button" aria-label={label} disabled>
-        {arrow}
-      </button>
-    );
-  }
   return (
-    <Link
-      to="/$workspace/mail/$account/$uid"
-      params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
-      search={openedFrom(mail, from)}
+    <button
+      type="button"
       className="ui-button ui-icon-button"
       aria-label={label}
       title={label}
+      onClick={onClick}
     >
-      {arrow}
-    </Link>
+      <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+    </button>
   );
 }
 

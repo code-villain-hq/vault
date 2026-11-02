@@ -1,8 +1,8 @@
 import { shortcutFree } from "@code-villain/web";
 import type { Listing } from "@postrider/types";
-import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { api, messageOf } from "./api";
 import { AccountProblems, type From, MailList, mailKey, useNow } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
@@ -13,24 +13,38 @@ import { useWorkspace } from "./workspace";
 /**
  * The lists a folder or a search showed last, by `listKey`: shown at once
  * when opened again, while the servers are asked, and stepped through
- * from a mail opened from them.
+ * from a mail opened from them. The list beside an open mail follows it.
  */
 const listings = new Map<string, Listing>();
+const watchers = new Set<() => void>();
+let version = 0;
+
+function keep(key: string, listing: Listing) {
+  listings.set(key, listing);
+  version += 1;
+  for (const watcher of watchers) watcher();
+}
+
+function watch(watcher: () => void) {
+  watchers.add(watcher);
+  return () => void watchers.delete(watcher);
+}
 
 function listKey(from: From): string {
   return from.q === undefined ? `folder:${from.folder?.toLowerCase()}` : `search:${from.q}`;
 }
 
-/** The mails of the list a mail was opened from, as it showed them. */
-export function listedMails(from: From) {
+/** The mails of the list a mail was opened from, as it shows them. */
+export function useListedMails(from: From) {
+  useSyncExternalStore(watch, () => version);
   return listings.get(listKey(from))?.mails ?? [];
 }
 
-/** A mail of a folder's or a search's, now read: so it shows read on the way back. */
+/** A mail of a folder's or a search's, now read: so it shows read in its list. */
 export function markSeen(from: From, key: string) {
   const listing = listings.get(listKey(from));
   if (!listing) return;
-  listings.set(listKey(from), {
+  keep(listKey(from), {
     ...listing,
     mails: listing.mails.map((mail) => (mailKey(mail) === key ? { ...mail, seen: true } : mail)),
   });
@@ -40,7 +54,7 @@ export function markSeen(from: From, key: string) {
 export function forgetListed(from: From, key: string) {
   const listing = listings.get(listKey(from));
   if (!listing) return;
-  listings.set(listKey(from), {
+  keep(listKey(from), {
     ...listing,
     mails: listing.mails.filter((mail) => mailKey(mail) !== key),
   });
@@ -51,37 +65,38 @@ function useListing(from: From, path: string | undefined) {
   const { workspace, place } = useWorkspace();
   const { refresh } = useFolders();
   const key = listKey(from);
-  const [read, setRead] = useState<{ key: string; listing?: Listing; error?: string }>();
+  const [failed, setFailed] = useState<{ key: string; error: string }>();
+  useSyncExternalStore(watch, () => version);
 
   useEffect(() => {
     if (!path) return;
     const stop = new AbortController();
     api<Listing>("GET", `/api/w/${workspace.id}${path}`, undefined, place, stop.signal).then(
       (listing) => {
-        listings.set(key, listing);
-        setRead({ key, listing });
+        setFailed(undefined);
+        keep(key, listing);
         // What's unread may have changed since the sidebar asked.
         refresh();
       },
       (problem: unknown) => {
-        if (!stop.signal.aborted) setRead({ key, error: messageOf(problem) });
+        if (!stop.signal.aborted) setFailed({ key, error: messageOf(problem) });
       },
     );
     return () => stop.abort();
   }, [workspace.id, place, path, key, refresh]);
 
-  const fresh = read?.key === key;
+  const error = failed?.key === key ? failed.error : undefined;
+  const listing = listings.get(key);
   return {
-    listing: (fresh ? read.listing : undefined) ?? listings.get(key),
-    error: fresh ? read.error : undefined,
+    listing,
+    error,
     // Nothing to show yet: the servers are being asked.
-    waiting: !fresh && !listings.has(key),
+    waiting: !listing && !error,
   };
 }
 
-/** `/$workspace/folders/$folder`: a folder's newest mail, every account's. */
-export function FolderPage() {
-  const { folder } = useParams({ strict: false }) as { folder: string };
+/** A folder's newest mail, every account's, in the list column. */
+export function FolderList({ folder, open }: { folder: string; open: string | undefined }) {
   const { folders } = useFolders();
   const name = folders.find((f) => f.key.toLowerCase() === folder.toLowerCase())?.name ?? folder;
   const from = useMemo(() => ({ folder }), [folder]);
@@ -92,15 +107,17 @@ export function FolderPage() {
         <SearchField />
       </PageHeader>
       <PageBody>
-        <Mails from={from} listing={listing} error={error} waiting={waiting} />
+        <Mails from={from} open={open} listing={listing} error={error} waiting={waiting} />
       </PageBody>
     </>
   );
 }
 
-/** `/$workspace/search?q=`: the mail with every word in it, in every folder. */
-export function SearchPage() {
-  const { q = "" } = useSearch({ strict: false }) as { q?: string };
+/**
+ * The mail with every word of `q` in it, in every folder, in the list
+ * column. Esc with no mail open goes back to the Inbox.
+ */
+export function SearchList({ q, open }: { q: string; open: string | undefined }) {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const from = useMemo(() => ({ q }), [q]);
@@ -109,7 +126,9 @@ export function SearchPage() {
     q.trim() ? `/search?${new URLSearchParams({ q })}` : undefined,
   );
 
+  const reading = open !== undefined;
   useEffect(() => {
+    if (reading) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || !shortcutFree(event)) return;
       event.preventDefault();
@@ -117,7 +136,7 @@ export function SearchPage() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate, workspace.url_key]);
+  }, [reading, navigate, workspace.url_key]);
 
   return (
     <>
@@ -128,6 +147,7 @@ export function SearchPage() {
         {q.trim() ? (
           <Mails
             from={from}
+            open={open}
             listing={listing}
             error={error}
             waiting={waiting}
@@ -146,12 +166,14 @@ export function SearchPage() {
 /** A list from the servers: why an account couldn't be read, then its mail. */
 function Mails({
   from,
+  open,
   listing,
   error,
   waiting,
   none = "Nothing here.",
 }: {
   from: From;
+  open: string | undefined;
   listing: Listing | undefined;
   error: string | undefined;
   waiting: boolean;
@@ -173,7 +195,7 @@ function Mails({
     <>
       <AccountProblems accounts={accounts} statuses={listing.problems} />
       {listing.mails.length ? (
-        <MailList mails={listing.mails} byId={byId} now={now} from={from} />
+        <MailList mails={listing.mails} byId={byId} now={now} from={from} open={open} />
       ) : (
         <Empty title={none} />
       )}

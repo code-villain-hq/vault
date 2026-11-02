@@ -8,18 +8,14 @@ import { SearchField } from "./folders";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
 import { buttonClass, Empty } from "./ui";
-import { useRecords, useSyncStatus, useWorkspace } from "./workspace";
+import { useRecords, useWorkspace } from "./workspace";
 
-/** `/$workspace`: today's events, then one Inbox for every account. */
-export function InboxPage() {
+/** The Inbox, in the list column: today's events, then one Inbox for every account. */
+export function InboxList({ open }: { open: string | undefined }) {
   const { inbox } = useInbox();
   const accounts = useAccounts();
-  const { ready } = useSyncStatus();
   const now = useNow();
   const byId = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
-
-  if (!ready) return null;
-  if (!accounts.length) return <NoAccounts />;
   return (
     <>
       <PageHeader title="Inbox">
@@ -30,7 +26,7 @@ export function InboxPage() {
         <AccountProblems accounts={accounts} statuses={inbox?.accounts ?? []} />
         {inbox &&
           (inbox.mails.length ? (
-            <MailList mails={inbox.mails} byId={byId} now={now} />
+            <MailList mails={inbox.mails} byId={byId} now={now} open={open} />
           ) : (
             <Empty title="Nothing here." />
           ))}
@@ -62,24 +58,28 @@ export function rememberOpened(key: string) {
 
 /**
  * A list of mail, the Inbox's or another's: J and K (and the arrows) move
- * through it, Enter or O opens the one they're on.
+ * through it, Enter or O opens the one they're on. With a mail open beside
+ * it (`open`, its key), the mail takes the keys and the list follows it.
  */
 export function MailList({
   mails,
   byId,
   now,
   from = {},
+  open,
 }: {
   mails: MailSummary[];
   byId: Map<string, MailAccount>;
   now: Date;
   from?: From;
+  open?: string;
 }) {
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const list = useRef<HTMLOListElement>(null);
   // By key, so new mail at the top doesn't move it to another.
-  const [focusedKey, setFocusedKey] = useState(lastOpened);
+  const [focusedKey, setFocusedKey] = useState(open ?? lastOpened);
+  if (open !== undefined && open !== focusedKey) setFocusedKey(open);
   const focused = Math.max(
     0,
     mails.findIndex((mail) => mailKey(mail) === focusedKey),
@@ -87,7 +87,7 @@ export function MailList({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!shortcutFree(event)) return;
+      if (open !== undefined || !shortcutFree(event)) return;
       // Letters whatever the case (Caps Lock, Shift).
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       const step =
@@ -124,6 +124,7 @@ export function MailList({
           mail={mail}
           index={index}
           focused={index === focused}
+          selected={mailKey(mail) === open}
           account={byId.get(mail.account_id)}
           now={now}
           from={from}
@@ -143,10 +144,12 @@ export function useNow(): Date {
   return now;
 }
 
+/** A mail's lines in a list: who and when, its subject, then how it starts. */
 function MailRow({
   mail,
   index,
   focused,
+  selected,
   account,
   now,
   from,
@@ -154,6 +157,7 @@ function MailRow({
   mail: MailSummary;
   index: number;
   focused: boolean;
+  selected: boolean;
   account: MailAccount | undefined;
   now: Date;
   from: From;
@@ -169,7 +173,8 @@ function MailRow({
         params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
         search={openedFrom(mail, from)}
         onClick={() => rememberOpened(mailKey(mail))}
-        className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""}`}
+        className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""} ${selected ? "selected" : ""}`}
+        aria-current={selected ? "true" : undefined}
         style={hue(account?.hue ?? 1)}
         title={account ? `${mail.from_address}, to ${account.name}` : mail.from_address}
         data-index={index}
@@ -179,13 +184,11 @@ function MailRow({
           {initial(who)}
         </span>
         <span className="who">{mail.to_name === null ? who : `To ${who}`}</span>
-        <span className="line">
-          <b>{mail.subject || "(no subject)"}</b>
-          {mail.snippet && ` — ${mail.snippet}`}
-        </span>
         <time className="when" dateTime={mail.date} title={new Date(mail.date).toLocaleString()}>
           {mailTime(mail.date, now)}
         </time>
+        <span className="subject">{mail.subject || "(no subject)"}</span>
+        {mail.snippet && <span className="snippet">{mail.snippet}</span>}
       </Link>
     </li>
   );
@@ -373,7 +376,7 @@ function useWidth(element: { current: HTMLElement | null }): number {
 }
 
 /** A workspace that reads no mail yet: the one thing to do is add an account. */
-function NoAccounts() {
+export function NoAccounts() {
   const { workspace } = useWorkspace();
   return (
     <>

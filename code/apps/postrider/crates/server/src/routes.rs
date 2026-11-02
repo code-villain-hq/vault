@@ -35,6 +35,7 @@ pub fn router(state: AppState) -> Router {
         .route("/inbox", get(mail::inbox))
         .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
+        .route("/mails/{account_id}/{uid}/trash", post(archive::trash))
         .route("/mails/{account_id}/{uid}/reply", post(reply::reply))
         .route("/mails/{account_id}/{uid}/files/{index}", get(files::file))
         .route("/folders", get(folders::folders))

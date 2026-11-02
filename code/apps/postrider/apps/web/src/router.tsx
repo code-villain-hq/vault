@@ -1,7 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
-import { FolderPage, SearchPage } from "./folders";
-import { type From, InboxPage } from "./inbox";
+import type { From } from "./inbox";
 import { Home, NotFound, WorkspaceLayout } from "./layout";
+import { MailboxLayout, NoMailOpen } from "./mailbox";
 import { MailPage } from "./message";
 import { AccountsPage } from "./settings";
 
@@ -43,9 +43,19 @@ const workspace = createRoute({
   component: WorkspaceLayout,
 });
 
-const inbox = createRoute({ getParentRoute: () => workspace, path: "/", component: InboxPage });
-const mail = createRoute({
+/**
+ * The Inbox, a folder or a search, in the list column, and the mail open
+ * from it beside it: the list is the layout's, the mail the child's.
+ */
+const mailbox = createRoute({
   getParentRoute: () => workspace,
+  id: "mailbox",
+  component: MailboxLayout,
+});
+
+const inbox = createRoute({ getParentRoute: () => mailbox, path: "/", component: NoMailOpen });
+const mail = createRoute({
+  getParentRoute: () => mailbox,
   path: "/mail/$account/$uid",
   // The list it was opened from: a folder, by its key, or a search.
   validateSearch: (search: Record<string, unknown>): From => ({
@@ -55,15 +65,15 @@ const mail = createRoute({
   component: MailPage,
 });
 const folder = createRoute({
-  getParentRoute: () => workspace,
+  getParentRoute: () => mailbox,
   path: "/folders/$folder",
-  component: FolderPage,
+  component: NoMailOpen,
 });
 const search = createRoute({
-  getParentRoute: () => workspace,
+  getParentRoute: () => mailbox,
   path: "/search",
   validateSearch: (search: Record<string, unknown>): { q?: string } => ({ q: text(search.q) }),
-  component: SearchPage,
+  component: NoMailOpen,
 });
 const accounts = createRoute({
   getParentRoute: () => workspace,
@@ -75,7 +85,7 @@ const routeTree = root.addChildren([
   index,
   login,
   signedIn,
-  workspace.addChildren([inbox, mail, folder, search, accounts]),
+  workspace.addChildren([mailbox.addChildren([inbox, mail, folder, search]), accounts]),
 ]);
 
 export const router = createRouter({ routeTree });

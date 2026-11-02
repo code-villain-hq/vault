@@ -118,7 +118,7 @@
 
 /* Today, above the Inbox: 8 to 22 on one track, with a line for now. */
 .today {
-  padding: 16px 24px 6px;
+  padding: 16px 16px 6px;
 }
 .dayhead {
   display: flex;
@@ -204,9 +204,10 @@
 /* "Search mail", in the top bar. */
 .search {
   display: flex;
+  flex: 0 1 240px;
   align-items: center;
   gap: 8px;
-  width: 240px;
+  min-width: 120px;
   height: 28px;
   padding: 0 6px 0 10px;
   color: var(--faint);
@@ -233,7 +234,7 @@
 .problems {
   display: grid;
   gap: 4px;
-  padding: 6px 24px;
+  padding: 6px 16px;
   color: var(--muted);
   font-size: var(--type-ui-small-size);
 }
@@ -243,41 +244,89 @@
   gap: 8px;
 }
 
-/* The Inbox: no dividers; unread reads in weight and the live dot. */
+/* The Inbox, a folder or a search, beside the mail open from it: two
+   panels on the frame. A narrow window shows one of them at a time, the
+   mail with a way back to its list. */
+.mailbox {
+  container: mailbox / inline-size;
+}
+.mailbox .page-content {
+  border-radius: var(--radius-lg);
+}
+.mail-list {
+  width: min(var(--list-width), 50%);
+}
+.mail-reader .reader-back {
+  display: none;
+}
+@container mailbox (width < 720px) {
+  .mail-list {
+    flex: 1;
+    width: auto;
+  }
+  .mailbox[data-reading] .mail-list,
+  .mailbox:not([data-reading]) .mail-reader,
+  .mailbox .sidebar-edge {
+    display: none;
+  }
+  .mail-reader .reader-back {
+    display: inline-flex;
+  }
+}
+
+/* A list of mail, no dividers: who and when, the subject, how it starts.
+   Unread reads in weight and the live dot; the open mail is selected. */
 .mails {
   display: grid;
   gap: 1px;
-  padding: 6px 12px 12px;
+  padding: 6px 8px 12px;
 }
 .mail {
   display: grid;
-  grid-template-columns: 8px 26px minmax(0, 150px) minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: 8px 26px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "dot av who when"
+    ". av subject subject"
+    ". . snippet snippet";
+  column-gap: 10px;
+  row-gap: 1px;
   align-items: center;
-  height: 40px;
-  padding: 0 12px 0 8px;
+  padding: 8px 12px 8px 6px;
   border-radius: var(--radius-md);
 }
-.mail .who,
-.mail .line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.mail > :first-child {
+  grid-area: dot;
 }
-.mail .line {
-  color: var(--faint);
+.mail .av {
+  grid-area: av;
+  align-self: start;
 }
-.mail .line b {
-  color: var(--fg);
-  font-weight: 400;
+.mail .who {
+  grid-area: who;
 }
 .mail .when {
+  grid-area: when;
   color: var(--faint);
   font-size: var(--type-ui-small-size);
   font-variant-numeric: tabular-nums;
 }
+.mail .subject {
+  grid-area: subject;
+}
+.mail .snippet {
+  grid-area: snippet;
+  color: var(--faint);
+  font-size: var(--type-ui-small-size);
+}
+.mail .who,
+.mail .subject,
+.mail .snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .mail.unread .who,
-.mail.unread .line b {
+.mail.unread .subject {
   font-weight: 700;
 }
 .mail.unread .when {
@@ -287,12 +336,15 @@
 .mail.focused {
   background: var(--hover);
 }
+.mail.selected {
+  background: var(--selected);
+}
 .mail:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
-/* A mail, opened in the Inbox's place and as wide: its sender, its files, then its words. */
+/* A mail, opened beside its list: its sender, its files, then its words. */
 .letter {
   display: grid;
   gap: 16px;
@@ -491,16 +543,8 @@ label.compose-from:focus-within {
     width: 100%;
     margin-left: 0;
   }
-  .today,
-  .problems,
   .letter {
     padding-inline: 1rem;
-  }
-  .mail {
-    grid-template-columns: 8px 26px minmax(0, 1fr) auto;
-  }
-  .mail .who {
-    display: none;
   }
 }
 

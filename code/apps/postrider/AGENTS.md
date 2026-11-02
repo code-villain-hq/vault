@@ -6,9 +6,10 @@ above it. [`storyboards/a-day-with-your-mail.html`](storyboards/a-day-with-your-
 is the approved storyboard; build from it, a step at a time, not beyond it.
 Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
 Trash and the other folders in the sidebar, Search mail (/), Settings →
-Accounts, and on a mail E to archive it, R to reply and its files to open.
-A mail opens in its list's place; Esc goes back, J and K move. The desktop
-app notifies of new mail and counts what's unread on the dock. Sieve
+Accounts, and on a mail E to archive it, ⌫ to delete it, R to reply and
+its files to open. A mail opens beside its list, in three columns: the
+sidebar, the list, the mail. Esc closes it, J and K move. A narrow window
+shows the list or the mail, with a way back. The desktop app notifies of new mail and counts what's unread on the dock. Sieve
 rules (step 2), writing a new mail and "More professional" (3),
 newsletters (4) and the week (5) are still to come.
 
@@ -113,8 +114,9 @@ reached, the page shows it, "Offline · as of 10:52".
 
 Every change happens on the account's server; the Inbox follows it there.
 
-- E archives (`archive.rs`): the mail moves to its account's Archive
-  (made when there's none) and the next one opens.
+- E archives and ⌫ deletes (`archive.rs`): the mail moves to its
+  account's Archive or Trash (made when there's none) and the next one
+  opens. Mail in Trash stays there; its server empties it.
 - R replies (`reply.rs`, `compose.tsx`): to the mail's Reply-To, else its
   sender, from the account it came to, in its thread, quoting it. It goes
   over SMTP: the IMAP server with `imap.` read as `smtp.`, on 465 with
@@ -146,9 +148,10 @@ account comes online doesn't notify.
   `serve.rs` runs it until told to stop, for `main.rs` (development) and
   the desktop app alike.
 - `packages/types`: generated from Rust. Never edit by hand.
-- `apps/web`: React + Base UI + Tailwind. `inbox.tsx` is the Inbox and
-  today, `folders.tsx` a folder, a search and the search field,
-  `message.tsx` an opened mail, `compose.tsx` a reply, `settings.tsx`
+- `apps/web`: React + Base UI + Tailwind. `mailbox.tsx` is the list
+  column beside the open mail, `inbox.tsx` the Inbox and today,
+  `folders.tsx` a folder, a search and the search field, `message.tsx` an
+  opened mail, `compose.tsx` a reply, `settings.tsx`
   the accounts and calendars, `mail.tsx` the live Inbox, notifications
   and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres

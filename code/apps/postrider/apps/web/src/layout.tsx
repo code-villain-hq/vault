@@ -454,7 +454,10 @@ const SECTIONS: ShortcutSection[] = [
     title: "A mail",
     keys: [
       ["J K", "The next and previous mail, opened"],
-      ["Esc", "Back to its list"],
+      ["R", "Reply"],
+      ["E", "Archive, and open the next"],
+      ["⌫", "Delete, and open the next"],
+      ["Esc", "Close it"],
     ],
   },
 ];
