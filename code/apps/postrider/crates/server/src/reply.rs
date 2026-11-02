@@ -2,6 +2,8 @@
 //! takes what you wrote ([`Reply`]) and sends it over SMTP from the account
 //! the mail came to, or the one you picked, to whom it asks replies to go.
 //! Then a copy goes to that account's Sent and the mail is marked answered.
+//! A new mail, with C, is `POST /api/w/{workspace}/mails` ([`NewMail`]),
+//! sent the same way.
 //!
 //! SMTP is the account's IMAP server (`imap.` read as `smtp.`) on 465, with
 //! TLS, and the same user name and password. The stand-ins at 127.0.0.1 are
@@ -15,11 +17,11 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Local};
 use lettre::message::header::ContentType;
-use lettre::message::{Mailbox, MessageBuilder};
+use lettre::message::{Mailbox, Mailboxes, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use mail_parser::MessageParser;
-use postrider_domain::{FolderRole, MailAccount, Reply, Validate};
+use postrider_domain::{FolderRole, MailAccount, NewMail, Reply, Validate};
 use uuid::Uuid;
 
 use crate::auth::Member;
@@ -53,20 +55,10 @@ impl Mail {
             Some(id) if id != account_id => self.account(workspace_id, id).await?,
             _ => account.clone(),
         };
-        let name: String = sqlx::query_scalar("SELECT name FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_one(&self.pool)
-            .await?;
         let (place, raw) = self
             .source_of(&account, reply.folder.as_deref(), uid)
             .await?;
-        let from = Mailbox::new(
-            Some(name),
-            sender
-                .address
-                .parse()
-                .map_err(|_| AppError::invalid("This account's address isn't one to send from."))?,
-        );
+        let from = self.sender(&sender, user_id).await?;
         let message = compose(&raw, from, &reply.text)?;
         let password = self
             .password(&sender)
@@ -89,6 +81,44 @@ impl Mail {
             }
         });
         Ok(())
+    }
+
+    /// Sends `mail`, a new one, from the account it names.
+    pub async fn send_new(
+        self: &Arc<Self>,
+        workspace_id: Uuid,
+        user_id: Uuid,
+        mail: &NewMail,
+    ) -> Result<(), AppError> {
+        mail.validate()?;
+        let sender = self.account(workspace_id, mail.from_account).await?;
+        let from = self.sender(&sender, user_id).await?;
+        let message = write_new(from, &mail.to, &mail.subject, &mail.text)?;
+        let password = self
+            .password(&sender)
+            .await
+            .map_err(|failure| AppError::refused(failure.message()))?;
+        send(&sender, password, message.clone()).await?;
+        let this = Arc::clone(self);
+        tokio::spawn(async move { this.file_sent(&sender, message.formatted()).await });
+        Ok(())
+    }
+
+    /// Whom mail from `account` comes from: you, by name, at its address.
+    pub(crate) async fn sender(
+        &self,
+        account: &MailAccount,
+        user_id: Uuid,
+    ) -> Result<Mailbox, AppError> {
+        let name: String = sqlx::query_scalar("SELECT name FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+        let address = account
+            .address
+            .parse()
+            .map_err(|_| AppError::invalid("This account's address isn't one to send from."))?;
+        Ok(Mailbox::new(Some(name), address))
     }
 
     /// Puts a sent mail in its account's Sent, as the account's other mail
@@ -190,6 +220,69 @@ fn compose(raw: &[u8], from: Mailbox, text: &str) -> Result<lettre::Message, App
         .map_err(|e| AppError::invalid(format!("This reply can't be sent: {e}.")))
 }
 
+/// A new mail from `from` to `to`, the addresses you typed.
+fn write_new(
+    from: Mailbox,
+    to: &str,
+    subject: &str,
+    text: &str,
+) -> Result<lettre::Message, AppError> {
+    let to = addresses(to)?;
+    let domain = from.email.domain().to_string();
+    lettre::Message::builder()
+        .from(from)
+        .mailbox(lettre::message::header::To::from(to))
+        .subject(subject.trim())
+        .message_id(Some(format!("<{}@{domain}>", Uuid::now_v7())))
+        .date_now()
+        .header(ContentType::TEXT_PLAIN)
+        .body(text.trim_end().replace("\r\n", "\n"))
+        .map_err(|e| AppError::invalid(format!("This mail can't be sent: {e}.")))
+}
+
+/// The addresses in what you typed in To: "anna@example.test", or "Anna
+/// Weber <anna@example.test>", with commas or semicolons between. One
+/// that isn't an address stops it, named, rather than going missing.
+fn addresses(typed: &str) -> Result<Mailboxes, AppError> {
+    let mut parts = Vec::new();
+    let (mut part, mut quoted, mut angled) = (String::new(), false, false);
+    for c in typed.chars() {
+        match c {
+            '"' => quoted = !quoted,
+            '<' if !quoted => angled = true,
+            '>' if !quoted => angled = false,
+            ',' | ';' if !quoted && !angled => {
+                parts.push(std::mem::take(&mut part));
+                continue;
+            }
+            _ => {}
+        }
+        part.push(c);
+    }
+    parts.push(part);
+    let mut to = Mailboxes::new();
+    for part in parts.iter().map(|p| p.trim()).filter(|p| !p.is_empty()) {
+        // The parser stops where an address ends: what's left must be none.
+        let whole = if part.contains('<') {
+            part.ends_with('>')
+        } else {
+            !part.contains(char::is_whitespace)
+        };
+        match part.parse::<Mailbox>() {
+            Ok(mailbox) if whole => to.push(mailbox),
+            _ => {
+                return Err(AppError::invalid(format!(
+                    "\u{201c}{part}\u{201d} isn't an address to send to."
+                )));
+            }
+        }
+    }
+    if to.iter().next().is_none() {
+        return Err(AppError::invalid("Say whom it goes to."));
+    }
+    Ok(to)
+}
+
 /// Sends `message` over the account's SMTP server.
 async fn send(
     account: &MailAccount,
@@ -238,6 +331,19 @@ fn smtp_host(imap_host: &str) -> String {
 
 fn is_this_mac(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
+/// `POST /api/w/{workspace}/mails`: sends a new mail.
+pub async fn send_new(
+    State(state): State<AppState>,
+    member: Member,
+    Json(mail): Json<NewMail>,
+) -> Result<StatusCode, AppError> {
+    state
+        .mail
+        .send_new(member.actor.workspace_id, member.actor.user_id, &mail)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `POST /api/w/{workspace}/mails/{account}/{uid}/reply`: sends a reply.
@@ -302,6 +408,47 @@ Does it work for three Macs?\r\n\
         let sent = String::from_utf8(compose(mail.as_bytes(), from(), "Ja.").unwrap().formatted())
             .unwrap();
         assert!(sent.contains("Subject: AW: Layer for our team?"), "{sent}");
+    }
+
+    #[test]
+    fn a_new_mail_goes_to_every_address() {
+        let sent = write_new(
+            from(),
+            "Anna Weber <anna@example.test>; \"Doe, Jo\" <jo@example.test>, kim@example.test,",
+            " Layer ",
+            "Hi.",
+        )
+        .unwrap();
+        let sent = String::from_utf8(sent.formatted()).unwrap();
+        // lettre quotes names, and writes one with a comma in base64.
+        assert!(
+            sent.contains(
+                "To: \"Anna Weber\" <anna@example.test>, =?utf-8?b?RG9lLCBKbw==?= \
+                 <jo@example.test>, kim@example.test\r\n"
+            ),
+            "{sent}"
+        );
+        assert!(sent.contains("Subject: Layer\r\n"), "{sent}");
+        assert!(sent.contains("@lazarski.test>\r\n"), "{sent}");
+    }
+
+    #[test]
+    fn what_isnt_an_address_is_named() {
+        for typed in [
+            "anna",
+            "anna@example.test kim",
+            "Anna <anna@example.test",
+            " , ",
+        ] {
+            assert!(addresses(typed).is_err(), "{typed}");
+        }
+        assert_eq!(
+            addresses("a@example.test;b@example.test")
+                .unwrap()
+                .iter()
+                .count(),
+            2
+        );
     }
 
     #[test]

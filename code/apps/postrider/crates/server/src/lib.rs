@@ -20,6 +20,7 @@ pub mod message;
 pub mod preview;
 pub mod reading;
 pub mod reply;
+pub mod rewrite;
 pub mod routes;
 pub mod rules;
 pub mod secrets;

@@ -411,6 +411,85 @@ impl Validate for Reply {
     }
 }
 
+/// C: a new mail, as the page sends it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct NewMail {
+    /// The account it goes from.
+    pub from_account: Uuid,
+    /// Whom it goes to: addresses, or names with them ("Anna Weber
+    /// <anna@example.test>"), with commas between.
+    pub to: String,
+    pub subject: String,
+    pub text: String,
+}
+
+impl Validate for NewMail {
+    fn validate(&self) -> Result<(), ValidationError> {
+        if self.to.trim().is_empty() {
+            return Err(ValidationError("Say whom it goes to.".into()));
+        }
+        if self.text.trim().is_empty() {
+            return Err(ValidationError("Write something first.".into()));
+        }
+        if self.text.len() > 1_000_000 || self.subject.len() > 1_000 || self.to.len() > 10_000 {
+            return Err(ValidationError(
+                "A mail holds up to a million characters.".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// More professional: what you wrote, to be written again as a mail.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct Rewrite {
+    pub text: String,
+    /// The account it goes from.
+    pub from_account: Option<Uuid>,
+    /// Whom it goes to, as the page names them, for the greeting.
+    pub to: Option<String>,
+    pub subject: Option<String>,
+    /// The mail it answers, read for what it's about and how they speak.
+    pub replying: Option<MailRef>,
+}
+
+impl Validate for Rewrite {
+    fn validate(&self) -> Result<(), ValidationError> {
+        if self.text.trim().is_empty() {
+            return Err(ValidationError("Write something first.".into()));
+        }
+        if self.text.len() > 20_000 {
+            return Err(ValidationError(
+                "That's too long to rewrite: up to 20,000 characters.".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A mail, by where it is: its account, its folder and its UID there.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct MailRef {
+    pub account_id: Uuid,
+    /// The folder's key: the Inbox when left out.
+    pub folder: Option<String>,
+    #[ts(type = "number")]
+    pub uid: i64,
+}
+
+/// What you wrote, written again.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Rewritten {
+    pub text: String,
+}
+
 /// A file that came with a mail.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]

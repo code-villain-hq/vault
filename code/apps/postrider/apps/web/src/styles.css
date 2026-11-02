@@ -421,8 +421,9 @@ input.crumb-name {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* A reply, as the storyboard's composer: To and Subject on lines of their
-   own, the text with room, and the account it goes from beside Send. */
+/* A reply or a new mail, as the storyboard's composer: To and Subject on
+   lines of their own, the text with room, and the account it goes from
+   beside More professional and Send. */
 .compose {
   display: grid;
   padding: 6px 18px 14px;
@@ -446,6 +447,20 @@ input.crumb-name {
   padding: 3px 10px 3px 3px;
   color: var(--fg);
   font-weight: 600;
+}
+.compose-input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.compose-input::placeholder {
+  color: var(--faint);
 }
 .compose-text {
   min-height: 236px;

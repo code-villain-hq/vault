@@ -15,8 +15,9 @@ new mail and counts what's unread on the dock. Step 2 is built too: the
 field at the foot of the list, where you ask Postrider something or tell
 it how to sort, and it makes the rule on the mail server, or sorts by
 reading on this Mac what no server rule can tell, says what it did, and
-Undo puts it back. Writing a new mail and "More professional"
-(3), newsletters (4) and the week (5) are still to come.
+Undo puts it back. Step 3 is built: C writes a new mail, and "More
+professional" writes yours again before you send it. Newsletters (4) and
+the week (5) are still to come.
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -152,6 +153,16 @@ Every change happens on the account's server; the Inbox follows it there.
   TLS, with the same password; the stand-ins at 127.0.0.1 use Mailpit on
   3025. A copy goes to Sent and the mail is marked answered. Esc keeps
   what you wrote, in memory, until the page reloads; ⌘Enter sends.
+- C writes a new mail (`POST /mails`, `reply.rs`; the sidebar's pen and
+  ⌘K too). To suggests people who wrote to you; picking one sends it from
+  the account they wrote to, unless you pick another, and else from the
+  account the last new mail went from. Commas or semicolons part
+  addresses, and one that isn't whole is named.
+- More professional (`rewrite.rs`, `POST /rewrite`), beside Send in a
+  reply and a new mail, has Claude Code on this Mac write yours again, in
+  your language, with every fact kept and no tools. A reply's mail comes
+  along for how formally you speak, as a stranger's words. Back to yours,
+  or ⌘Z, puts yours back; writing again forgets it.
 - A mail's files (`files.rs`) come by their place among its attachments.
   The desktop app saves one in Downloads and opens it
   (`apps/desktop/src-tauri/src/files.rs`); the browser downloads it.
@@ -225,7 +236,8 @@ with `reading`; Undo puts them back.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
   `mail.rs`, the folders and search in `folders.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`), archiving, replying and
-  files (`archive.rs`, `reply.rs`, `files.rs`), CalDAV (`caldav.rs`),
+  files (`archive.rs`, `reply.rs`, `files.rs`), More professional
+  (`rewrite.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
   ask field's answers (`ask.rs`), sorting rules (`rules.rs`, written
   over ManageSieve by `sieve.rs`) and sorting by reading (`reading.rs`).
@@ -236,7 +248,7 @@ with `reading`; Undo puts them back.
 - `apps/web`: React + Base UI + Tailwind. `mailbox.tsx` is the list
   column beside the open mail, `inbox.tsx` the Inbox and today,
   `folders.tsx` a folder, a search and the search field, `message.tsx` an
-  opened mail, `compose.tsx` a reply, `ask.tsx` the ask field and its
+  opened mail, `compose.tsx` a reply and a new mail, `ask.tsx` the ask field and its
   answer, `settings.tsx` the accounts and calendars, `mail.tsx` the live
   Inbox, notifications and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres

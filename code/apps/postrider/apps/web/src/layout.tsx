@@ -35,9 +35,11 @@ import {
   MailWarning,
   RefreshCw,
   Send,
+  SquarePen,
   Trash2,
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
+import { NewMailProvider, useNewMail } from "./compose";
 import { InboxProvider, useFolders, useInbox, useUnread } from "./mail";
 import { isDesktop } from "./platform";
 import { setCurrentPlace } from "./server";
@@ -175,7 +177,7 @@ export function PageBody({ children }: { children: ReactNode }) {
 function Shell() {
   const sidebar = useSidebarWidth();
   return (
-    <>
+    <NewMailProvider>
       <div className="app-shell flex h-full bg-bg" style={sidebar.style}>
         <Sidebar />
         <SidebarEdge width={sidebar.width} onChange={sidebar.setWidth} />
@@ -184,7 +186,7 @@ function Shell() {
         </main>
       </div>
       <Menus />
-    </>
+    </NewMailProvider>
   );
 }
 
@@ -214,7 +216,10 @@ function Sidebar() {
             <span className="font-display text-wordmark font-bold">Postrider</span>
           </div>
         )}
-        <SearchButton />
+        <div className="sidebar-actions flex items-center gap-1">
+          <SearchButton />
+          <NewMailButton />
+        </div>
       </div>
       <div className="workspace-switcher">
         <WorkspaceMenu />
@@ -234,6 +239,22 @@ function Sidebar() {
         <ShortcutsButton />
       </div>
     </aside>
+  );
+}
+
+/** Beside search, as in every app: a new mail, as C opens it. */
+function NewMailButton() {
+  const newMail = useNewMail();
+  return (
+    <button
+      type="button"
+      aria-label="New mail"
+      title="New mail (C)"
+      onClick={newMail}
+      className="ui-button ui-icon-button"
+    >
+      <SquarePen size={15} strokeWidth={1.75} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -492,6 +513,15 @@ const SECTIONS: ShortcutSection[] = [
       ["Esc", "Close it"],
     ],
   },
+  {
+    title: "Writing",
+    keys: [
+      ["C", "New mail"],
+      ["⌘Enter", "Send"],
+      ["⌘Z", "Back to yours, after More professional"],
+      ["Esc", "Close it, keeping what you wrote"],
+    ],
+  },
 ];
 
 /** ⌘K and the shortcuts list: the Inbox, the folders, settings, and the other workspaces. */
@@ -539,10 +569,19 @@ function useCommands(query: string): Command[] {
   const session = useSession();
   const navigate = useNavigate();
   const { sent, archive, others } = useShownFolders();
+  const newMail = useNewMail();
 
   const commands = useMemo(() => {
     const params = { workspace: workspace.url_key };
     const list: Command[] = [
+      {
+        id: "new-mail",
+        group: "Actions",
+        label: "New mail",
+        hint: "C",
+        icon: <NavIcon icon={SquarePen} />,
+        run: newMail,
+      },
       {
         id: "inbox",
         group: "Go to",
@@ -591,7 +630,7 @@ function useCommands(query: string): Command[] {
       });
     }
     return list;
-  }, [workspace, session, navigate, sent, archive, others]);
+  }, [workspace, session, navigate, sent, archive, others, newMail]);
 
   return matching(commands, query);
 }

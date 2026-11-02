@@ -19,8 +19,9 @@ pub use account::{Me, Role, UserInfo, WorkspaceInfo, clean_name, normalize_email
 pub use mail::{
     AccountState, AccountStatus, Answer, Asked, Attachment, Calendar, CalendarConnect,
     CalendarCreate, CalendarPatch, Day, Event, Folder, FolderLink, FolderRole, HUES, Inbox,
-    Listing, MailAccount, MailAccountConnect, MailAccountCreate, MailAccountPatch, MailSummary,
-    Message, MoveMail, RenameFolder, Reply, ServerCalendar,
+    Listing, MailAccount, MailAccountConnect, MailAccountCreate, MailAccountPatch, MailRef,
+    MailSummary, Message, MoveMail, NewMail, RenameFolder, Reply, Rewrite, Rewritten,
+    ServerCalendar,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{
