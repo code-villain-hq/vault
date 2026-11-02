@@ -102,9 +102,10 @@ function AnswerCard({ said, onClose }: { said: Said; onClose: () => void }) {
     <section
       aria-label="Postrider's answer"
       aria-live="polite"
-      className="flex min-h-0 flex-col gap-2.5 overflow-y-auto rounded-lg bg-surface px-4 py-3"
+      className="flex min-h-0 flex-col rounded-lg bg-surface"
     >
-      <div className="flex items-start gap-2">
+      {/* The question and its X stay in view; a long answer scrolls under them. */}
+      <div className="flex shrink-0 items-start gap-2 px-4 pt-3 pb-2.5">
         <p className="min-w-0 flex-1 text-xs text-faint">{said.question}</p>
         <button
           type="button"
@@ -116,9 +117,11 @@ function AnswerCard({ said, onClose }: { said: Said; onClose: () => void }) {
           <X size={13} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
-      {!answer && !problem && <p className="text-faint">Postrider is thinking…</p>}
-      <ErrorMessage>{problem}</ErrorMessage>
-      {answer && <Answered answer={answer} />}
+      <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto overscroll-contain px-4 pb-3">
+        {!answer && !problem && <p className="text-faint">Postrider is thinking…</p>}
+        <ErrorMessage>{problem}</ErrorMessage>
+        {answer && <Answered answer={answer} />}
+      </div>
     </section>
   );
 }
