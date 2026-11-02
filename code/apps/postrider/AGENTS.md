@@ -110,7 +110,11 @@ they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
 account's folders, each once by its role (Sent, Archive, Drafts, Trash,
 Junk) or its name, with what's unread; `/folders/{key}` is a folder's
 newest mail; `/search?q=` asks every folder but Drafts, Trash and Junk for
-the mail with every word in it (IMAP `TEXT`). A mail opened from them is
+the mail with every word in it (IMAP `TEXT`). Before the servers answer,
+`/search?q=&here=true` finds the words in what this Mac has already, the
+Inbox's copy and the lines the lists read, by sender, subject and start;
+the page shows that at once, with "Asking the servers…" under it. An
+account that can't be asked shows what this Mac has of it. A mail opened from them is
 `/mails/{account}/{uid}?folder=<key>`, read from its server each time.
 What the lists showed is kept in memory, so a folder opened again reads
 only its new mail. An account keeps up to three connections for this

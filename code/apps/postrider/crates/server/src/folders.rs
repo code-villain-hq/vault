@@ -6,12 +6,16 @@
 //!
 //! Only the Inbox is followed and kept in Postgres. The rest is asked for
 //! when it's shown; what the lists showed is kept in memory, so a folder
-//! opened again reads only its new mail.
+//! opened again reads only its new mail. A search finds what this Mac has
+//! of it first (`/search?q=&here=true`), at once, while the servers are
+//! asked, and an account that can't be asked shows that.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use futures::{StreamExt, TryStreamExt, stream};
 use postrider_domain::{
@@ -198,11 +202,12 @@ impl Mail {
             }
         }))
         .await;
-        Ok(listing(&accounts, read))
+        Ok(listing(&accounts, read, HashMap::new()))
     }
 
     /// The mails with every word of `query` in them, in the Inbox and the
-    /// folders of every account: not in Drafts, Trash or Junk.
+    /// folders of every account: not in Drafts, Trash or Junk. An account
+    /// that can't be asked shows what this Mac has of it.
     pub async fn search(
         self: &Arc<Self>,
         workspace_id: Uuid,
@@ -216,15 +221,11 @@ impl Mail {
             });
         }
         let accounts = self.accounts(workspace_id).await?;
+        let here = self.found_here(&accounts, &words).await?;
         let words = &words;
         let read = join_all(accounts.iter().map(|account| async move {
             let mut places = vec![Place::inbox()];
-            places.extend(self.places(account).await?.into_iter().filter(|place| {
-                !matches!(
-                    place.role,
-                    Some(FolderRole::Drafts | FolderRole::Trash | FolderRole::Junk)
-                )
-            }));
+            places.extend(self.places(account).await?.into_iter().filter(searched));
             // A few folders at once, each over a connection of its own.
             let found: Vec<Vec<MailSummary>> = stream::iter(places)
                 .map(|place| async move { self.read(account, &place, Some(words)).await })
@@ -234,7 +235,110 @@ impl Mail {
             Ok(found.concat())
         }))
         .await;
-        Ok(listing(&accounts, read))
+        Ok(listing(&accounts, read, here))
+    }
+
+    /// What a search finds in what this Mac has read already, without
+    /// asking a server: shown at once, while [`Mail::search`] asks them.
+    pub async fn search_here(&self, workspace_id: Uuid, query: &str) -> Result<Listing, AppError> {
+        let words: Vec<String> = query.split_whitespace().map(str::to_string).collect();
+        let accounts = self.accounts(workspace_id).await?;
+        let mut here = self.found_here(&accounts, &words).await?;
+        let read = accounts
+            .iter()
+            .map(|account| Ok(here.remove(&account.id).unwrap_or_default()))
+            .collect();
+        Ok(listing(&accounts, read, HashMap::new()))
+    }
+
+    /// The mails with every word in what a list shows of them, each
+    /// account's: in the Inbox's copy, and in the lines the lists and
+    /// searches read from the folders a search asks. Their read state is
+    /// the servers' to tell: a folder's line shows read until they answer.
+    async fn found_here(
+        &self,
+        accounts: &[MailAccount],
+        words: &[String],
+    ) -> Result<HashMap<Uuid, Vec<MailSummary>>, AppError> {
+        let mut found: HashMap<Uuid, Vec<MailSummary>> = HashMap::new();
+        if words.is_empty() {
+            return Ok(found);
+        }
+        let ids: Vec<Uuid> = accounts.iter().map(|account| account.id).collect();
+        type Row = (
+            Uuid,
+            i64,
+            String,
+            String,
+            String,
+            String,
+            DateTime<Utc>,
+            bool,
+        );
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT account_id, uid, from_name, from_address, subject, snippet, date, seen \
+             FROM inbox_mails WHERE account_id = ANY($1)",
+        )
+        .bind(&ids)
+        .fetch_all(&self.pool)
+        .await?;
+        let inbox = Place::inbox();
+        for (account_id, uid, from_name, from_address, subject, snippet, date, seen) in rows {
+            let mail = MailSummary {
+                account_id,
+                folder: Some(inbox.key()),
+                uid,
+                from_name,
+                from_address,
+                subject,
+                snippet,
+                date,
+                seen,
+                to_name: None,
+            };
+            if has_words(&mail, words) {
+                found.entry(account_id).or_default().push(mail);
+            }
+        }
+        let places = self.lock_places().clone();
+        let kept = self.lock_lines();
+        for ((account_id, path), (_, lines)) in kept.iter() {
+            let place = if *path == inbox.path {
+                inbox.clone()
+            } else {
+                let Some(place) = places
+                    .get(account_id)
+                    .and_then(|places| places.iter().find(|place| place.path == *path))
+                else {
+                    continue;
+                };
+                place.clone()
+            };
+            if !ids.contains(account_id) || !searched(&place) {
+                continue;
+            }
+            let mails = found.entry(*account_id).or_default();
+            for (uid, line) in lines {
+                // The Inbox's copy has it already, with its read state.
+                if place.path == inbox.path
+                    && mails
+                        .iter()
+                        .any(|mail| mail.uid == *uid && mail.folder == Some(inbox.key()))
+                {
+                    continue;
+                }
+                let line = Line {
+                    uid: *uid,
+                    summary: line.clone(),
+                    seen: true,
+                };
+                let mail = summary(*account_id, &place, line);
+                if has_words(&mail, words) {
+                    mails.push(mail);
+                }
+            }
+        }
+        Ok(found)
     }
 
     /// A folder's newest mail, or what `words` find in it, as the list
@@ -346,22 +450,57 @@ fn summary(account_id: Uuid, place: &Place, line: Line) -> MailSummary {
     }
 }
 
+/// Whether a search asks the folder: not Drafts, Trash or Junk.
+fn searched(place: &Place) -> bool {
+    !matches!(
+        place.role,
+        Some(FolderRole::Drafts | FolderRole::Trash | FolderRole::Junk)
+    )
+}
+
+/// Whether every word is in what a list shows of the mail, in any case:
+/// who sent it, to whom, its subject and its start. The servers look in
+/// all of it.
+fn has_words(mail: &MailSummary, words: &[String]) -> bool {
+    let shown = [
+        &mail.from_name,
+        &mail.from_address,
+        &mail.subject,
+        &mail.snippet,
+    ]
+    .into_iter()
+    .chain(mail.to_name.as_ref())
+    .map(|text| text.to_lowercase())
+    .collect::<Vec<_>>()
+    .join("\n");
+    words
+        .iter()
+        .all(|word| shown.contains(&word.to_lowercase()))
+}
+
 /// Every account's mails as one list, newest first, and why any account
-/// couldn't be read.
-fn listing(accounts: &[MailAccount], read: Vec<Result<Vec<MailSummary>, Failure>>) -> Listing {
+/// couldn't be read; with what this Mac has of it (`here`), if anything.
+fn listing(
+    accounts: &[MailAccount],
+    read: Vec<Result<Vec<MailSummary>, Failure>>,
+    mut here: HashMap<Uuid, Vec<MailSummary>>,
+) -> Listing {
     let mut mails = Vec::new();
     let mut problems = Vec::new();
     for (account, read) in accounts.iter().zip(read) {
         match read {
             Ok(found) => mails.extend(found),
-            Err(failure) => problems.push(AccountStatus {
-                account_id: account.id,
-                state: match failure {
-                    Failure::Offline(_) => AccountState::Offline,
-                    Failure::Refused(_) => AccountState::Refused,
-                },
-                message: Some(failure.message()),
-            }),
+            Err(failure) => {
+                mails.extend(here.remove(&account.id).unwrap_or_default());
+                problems.push(AccountStatus {
+                    account_id: account.id,
+                    state: match failure {
+                        Failure::Offline(_) => AccountState::Offline,
+                        Failure::Refused(_) => AccountState::Refused,
+                    },
+                    message: Some(failure.message()),
+                });
+            }
         }
     }
     mails.sort_by(|a, b| b.date.cmp(&a.date).then(b.uid.cmp(&a.uid)));
@@ -410,18 +549,55 @@ pub async fn rename(
 #[derive(Deserialize)]
 pub struct SearchParams {
     q: String,
+    /// Only what this Mac has, without asking the servers.
+    #[serde(default)]
+    here: bool,
 }
 
-/// `GET /api/w/{workspace}/search?q=`: the mail with every word in it.
+/// `GET /api/w/{workspace}/search?q=`: the mail with every word in it;
+/// with `here=true`, what this Mac has of it, at once.
 pub async fn search(
     State(state): State<AppState>,
     member: Member,
     Query(params): Query<SearchParams>,
 ) -> Result<Json<Listing>, AppError> {
-    Ok(Json(
-        state
-            .mail
-            .search(member.actor.workspace_id, &params.q)
-            .await?,
-    ))
+    let workspace_id = member.actor.workspace_id;
+    Ok(Json(if params.here {
+        state.mail.search_here(workspace_id, &params.q).await?
+    } else {
+        state.mail.search(workspace_id, &params.q).await?
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn invoice() -> MailSummary {
+        MailSummary {
+            account_id: Uuid::nil(),
+            folder: Some("Sent".into()),
+            uid: 4,
+            from_name: "Netcup".into(),
+            from_address: "noreply@netcup.test".into(),
+            subject: "Ihre Rechnung für November".into(),
+            snippet: "Den Betrag buchen wir am 5. November ab.".into(),
+            date: Utc::now(),
+            seen: true,
+            to_name: Some("Kristina".into()),
+        }
+    }
+
+    #[test]
+    fn a_mail_here_has_every_word_in_any_case() {
+        let words = |text: &str| {
+            text.split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        assert!(has_words(&invoice(), &words("netcup RECHNUNG")));
+        assert!(has_words(&invoice(), &words("für betrag")));
+        assert!(has_words(&invoice(), &words("kristina")));
+        assert!(!has_words(&invoice(), &words("netcup Oktober")));
+    }
 }

@@ -16,11 +16,15 @@ import { useWorkspace } from "./workspace";
  * from a mail opened from them. The list beside an open mail follows it.
  */
 const listings = new Map<string, Listing>();
+/** The lists that are only what this Mac had, while the servers are asked. */
+const partial = new Set<string>();
 const watchers = new Set<() => void>();
 let version = 0;
 
-function keep(key: string, listing: Listing) {
+function keep(key: string, listing: Listing, here = false) {
   listings.set(key, listing);
+  if (here) partial.add(key);
+  else partial.delete(key);
   version += 1;
   for (const watcher of watchers) watcher();
 }
@@ -44,24 +48,33 @@ export function useListedMails(from: From) {
 export function markSeen(from: From, key: string) {
   const listing = listings.get(listKey(from));
   if (!listing) return;
-  keep(listKey(from), {
-    ...listing,
-    mails: listing.mails.map((mail) => (mailKey(mail) === key ? { ...mail, seen: true } : mail)),
-  });
+  keep(
+    listKey(from),
+    {
+      ...listing,
+      mails: listing.mails.map((mail) => (mailKey(mail) === key ? { ...mail, seen: true } : mail)),
+    },
+    partial.has(listKey(from)),
+  );
 }
 
 /** A mail that left the list it was opened from, as when it's archived. */
 export function forgetListed(from: From, key: string) {
   const listing = listings.get(listKey(from));
   if (!listing) return;
-  keep(listKey(from), {
-    ...listing,
-    mails: listing.mails.filter((mail) => mailKey(mail) !== key),
-  });
+  keep(
+    listKey(from),
+    { ...listing, mails: listing.mails.filter((mail) => mailKey(mail) !== key) },
+    partial.has(listKey(from)),
+  );
 }
 
-/** A folder's or a search's mail, from every account's server. */
-function useListing(from: From, path: string | undefined, again = 0) {
+/**
+ * A folder's or a search's mail, from every account's server. `here` asks
+ * for what this Mac has of it, shown at once the first time, until the
+ * servers answer.
+ */
+function useListing(from: From, path: string | undefined, again = 0, here?: string) {
   const { workspace, place } = useWorkspace();
   const { refresh } = useFolders();
   const { synced } = useInbox();
@@ -72,8 +85,19 @@ function useListing(from: From, path: string | undefined, again = 0) {
   useEffect(() => {
     if (!path) return;
     const stop = new AbortController();
+    let answered = false;
+    if (here && !listings.has(key)) {
+      api<Listing>("GET", `/api/w/${workspace.id}${here}`, undefined, place, stop.signal).then(
+        (listing) => {
+          if (!answered) keep(key, listing, true);
+        },
+        // The servers' answer says what's wrong.
+        () => undefined,
+      );
+    }
     api<Listing>("GET", `/api/w/${workspace.id}${path}`, undefined, place, stop.signal).then(
       (listing) => {
+        answered = true;
         setFailed(undefined);
         keep(key, listing);
         // What's unread may have changed since the sidebar asked.
@@ -84,7 +108,7 @@ function useListing(from: From, path: string | undefined, again = 0) {
       },
     );
     return () => stop.abort();
-  }, [workspace.id, place, path, key, refresh, synced, again]);
+  }, [workspace.id, place, path, here, key, refresh, synced, again]);
 
   const error = failed?.key === key ? failed.error : undefined;
   const listing = listings.get(key);
@@ -93,6 +117,8 @@ function useListing(from: From, path: string | undefined, again = 0) {
     error,
     // Nothing to show yet: the servers are being asked.
     waiting: !listing && !error,
+    // What this Mac had shows, and the servers are being asked.
+    asking: partial.has(key) && !error,
   };
 }
 
@@ -229,9 +255,11 @@ export function SearchList({ q, open }: { q: string; open: string | undefined })
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const from = useMemo(() => ({ q }), [q]);
-  const { listing, error, waiting } = useListing(
+  const { listing, error, waiting, asking } = useListing(
     from,
     q.trim() ? `/search?${new URLSearchParams({ q })}` : undefined,
+    0,
+    `/search?${new URLSearchParams({ q, here: "true" })}`,
   );
 
   const reading = open !== undefined;
@@ -259,6 +287,7 @@ export function SearchList({ q, open }: { q: string; open: string | undefined })
             listing={listing}
             error={error}
             waiting={waiting}
+            asking={asking}
             none="Nothing found."
           />
         ) : (
@@ -278,6 +307,7 @@ function Mails({
   listing,
   error,
   waiting,
+  asking = false,
   none = "Nothing here.",
 }: {
   from: From;
@@ -285,6 +315,8 @@ function Mails({
   listing: Listing | undefined;
   error: string | undefined;
   waiting: boolean;
+  /** The list is what this Mac had: more may come from the servers. */
+  asking?: boolean;
   none?: string;
 }) {
   const accounts = useAccounts();
@@ -297,16 +329,16 @@ function Mails({
       </div>
     );
   }
-  if (waiting) return <p className="px-6 py-4 text-xs text-muted">Asking the servers…</p>;
+  const asked = <p className="px-6 py-4 text-xs text-muted">Asking the servers…</p>;
+  if (waiting) return asked;
   if (!listing) return null;
   return (
     <>
       <AccountProblems accounts={accounts} statuses={listing.problems} />
-      {listing.mails.length ? (
+      {listing.mails.length > 0 && (
         <MailList mails={listing.mails} byId={byId} now={now} from={from} open={open} />
-      ) : (
-        <Empty title={none} />
       )}
+      {asking ? asked : listing.mails.length === 0 && <Empty title={none} />}
     </>
   );
 }
