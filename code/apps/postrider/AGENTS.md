@@ -9,7 +9,7 @@ Trash and the other folders in the sidebar, Search mail (/), Settings →
 Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
 R to reply and its files to open. A folder's name in the top bar renames
 it. A mail opens beside its list, in three columns: the
-sidebar, the list, the mail. Esc closes it, J and K move. A narrow window
+sidebar, the list, the mail. Esc closes it, J and K or ↓ and ↑ move. A narrow window
 shows the list or the mail, with a way back. The desktop app notifies of
 new mail and counts what's unread on the dock. Step 2 is built too: the
 field at the foot of the list, where you ask Postrider something or tell

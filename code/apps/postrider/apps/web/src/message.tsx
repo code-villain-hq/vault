@@ -25,9 +25,9 @@ import { useWorkspace } from "./workspace";
 /**
  * `/$workspace/mail/$account/$uid`: a mail, opened beside the list it was
  * opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`). Esc
- * closes it; J and K open the next and the previous one in it; E archives
- * it, ⌫ deletes it and V moves it to a folder, and the next opens; R
- * answers it.
+ * closes it; J and K, or ↓ and ↑, open the next and the previous one in
+ * it, while Space and the wheel scroll the mail; E archives it, ⌫ deletes
+ * it and V moves it to a folder, and the next opens; R answers it.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
@@ -133,10 +133,10 @@ export function MailPage() {
       if (key === "Escape") {
         event.preventDefault();
         back.go();
-      } else if (key === "j" || key === "k") {
+      } else if (key === "j" || key === "k" || key === "ArrowDown" || key === "ArrowUp") {
         event.preventDefault();
         // Lists are newest first: J goes down, to older mail.
-        if (index >= 0) open(mails[index + (key === "j" ? 1 : -1)]);
+        if (index >= 0) open(mails[index + (key === "j" || key === "ArrowDown" ? 1 : -1)]);
       } else if (key === "e") {
         event.preventDefault();
         fileAway("archive");
@@ -426,7 +426,8 @@ function linked(text: string): ReactNode[] {
  * page its height, its links and its keys: the page can't listen in a
  * frame of no origin, and WebKit runs no listener in a frame without
  * scripts. So it grows to its content and the page scrolls as one, its
- * links open in the browser, and Esc, J and K work while it has focus.
+ * links open in the browser, and Esc, J, K and the arrows work while it
+ * has focus: the arrows move to the next mail there too, not down the page.
  */
 function MailHtml({ html }: { html: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -499,9 +500,13 @@ document.addEventListener("click", (event) => {
   event.preventDefault();
   say({ link: link.getAttribute("href") });
 });
-document.addEventListener("keydown", (event) =>
-  say({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, shiftKey: event.shiftKey }),
-);`;
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+  const plain = !(event.metaKey || event.ctrlKey || event.altKey);
+  if (plain && (event.key === "ArrowDown" || event.key === "ArrowUp")) event.preventDefault();
+  say({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, shiftKey: event.shiftKey });
+});`;
 
 /**
  * The frame's document: the mail's HTML under a policy that runs only
