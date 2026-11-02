@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { api, messageOf } from "./api";
 import { AccountProblems, type From, MailList, mailKey, useNow } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
-import { useAccounts, useFolders } from "./mail";
+import { useAccounts, useFolders, useInbox } from "./mail";
 import { Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -64,6 +64,7 @@ export function forgetListed(from: From, key: string) {
 function useListing(from: From, path: string | undefined) {
   const { workspace, place } = useWorkspace();
   const { refresh } = useFolders();
+  const { synced } = useInbox();
   const key = listKey(from);
   const [failed, setFailed] = useState<{ key: string; error: string }>();
   useSyncExternalStore(watch, () => version);
@@ -83,7 +84,7 @@ function useListing(from: From, path: string | undefined) {
       },
     );
     return () => stop.abort();
-  }, [workspace.id, place, path, key, refresh]);
+  }, [workspace.id, place, path, key, refresh, synced]);
 
   const error = failed?.key === key ? failed.error : undefined;
   const listing = listings.get(key);

@@ -80,6 +80,14 @@ An account's state (`connecting`, `online`, `offline`, `refused`) comes
 with it. Offline it tries again, waiting longer each time; refused
 (a wrong password) it waits until the account is connected again.
 
+The sync button at the sidebar's foot asks every account now
+(`POST /api/w/{id}/mail/sync`, `Mail::sync`): a watcher in IDLE or between
+tries looks at once, a refused one tries again, and the answer comes once
+each has asked its server, or after 30 seconds. Meanwhile the status
+reads "Syncing…"; then the page reads the folders, the list shown and
+today again. A woken connection that doesn't end IDLE within 20 seconds
+is taken as gone, as one the Mac slept through is, and opened again.
+
 A mail opens with `GET /api/w/{id}/mails/{account}/{uid}`: the server
 fetches its source over IMAP once and keeps it (`mail_sources`, gone with
 its line in the Inbox), so it opens again offline, and marks it read on

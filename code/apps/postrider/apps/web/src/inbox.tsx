@@ -335,6 +335,7 @@ function Today({ now }: { now: Date }) {
 function useDay(now: Date): Day | undefined {
   const { workspace, place } = useWorkspace();
   const calendars = useRecords("Calendar");
+  const { synced } = useInbox();
   const [day, setDay] = useState<{ key: string; day: Day }>();
   const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const to = new Date(from);
@@ -354,7 +355,7 @@ function useDay(now: Date): Day | undefined {
       () => undefined,
     );
     return () => stop.abort();
-  }, [workspace.id, place, query, key, changed, minute]);
+  }, [workspace.id, place, query, key, changed, minute, synced]);
 
   return day?.key === key ? day.day : undefined;
 }

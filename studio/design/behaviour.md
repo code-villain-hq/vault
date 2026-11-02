@@ -85,6 +85,7 @@ The sync status sits at the foot of the sidebar, a dot and a word:
 - "Connecting…" while the app finds the server.
 - "Offline · 3 waiting" when it can't, with what it will send once it can.
 - "Change refused: …" for a change the server turned down.
+- "Syncing…" after you press the sync button beside it, until the servers have answered. Only an app that reads servers of its own live has one, as Postrider has for mail.
 
 ## Desktop
 

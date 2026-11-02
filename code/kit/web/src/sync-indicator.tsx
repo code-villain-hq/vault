@@ -12,10 +12,13 @@ export interface SyncState {
 export function SyncIndicator({
   status,
   refusals,
+  syncing = false,
 }: {
   status: SyncState;
   /** Raises "refused", with the server's reason, when a change is turned down. */
   refusals: EventTarget;
+  /** A sync someone asked for, with the app's sync button, is on its way. */
+  syncing?: boolean;
 }) {
   const refused = useLatestRefusal(refusals);
   // Changes usually reach the server in a blink; saying "Syncing" for that
@@ -30,6 +33,7 @@ export function SyncIndicator({
     const waiting = status.pending > 0 ? ` · ${status.pending} waiting` : "";
     return <Pill tone="warn" label={`Offline${waiting}`} />;
   }
+  if (syncing) return <Pill tone="muted" label="Syncing…" />;
   if (status.connection === "connecting" && !status.ready) {
     return <Pill tone="muted" label="Connecting…" />;
   }

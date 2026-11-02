@@ -11,12 +11,13 @@ use std::time::Duration;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use postrider_domain::{AccountState, AccountStatus, Inbox, MailAccount, MailSummary, Message};
 use serde::Deserialize;
 use sqlx::PgPool;
-use tokio::sync::watch;
+use tokio::sync::{Notify, watch};
 use tokio::task::AbortHandle;
 use uuid::Uuid;
 
@@ -37,6 +38,13 @@ const POLL: Duration = Duration::from_secs(2 * 60);
 /// How long `?after=` waits for a change before answering with none.
 const LONG_POLL: Duration = Duration::from_secs(25);
 
+/// How long a server may take to answer the end of IDLE before its
+/// connection is taken as gone, as one the Mac slept through is.
+const ANSWER: Duration = Duration::from_secs(20);
+
+/// How long a sync waits for every account to ask its server.
+const SYNC: Duration = Duration::from_secs(30);
+
 /// Waits between tries while a server can't be reached: doubling, up to
 /// the last.
 const RETRY: [u64; 5] = [5, 15, 30, 60, 300];
@@ -55,7 +63,10 @@ pub struct Mail {
     /// Goes up whenever an Inbox or an account's state changes.
     version: watch::Sender<i64>,
     statuses: Mutex<HashMap<Uuid, AccountStatus>>,
-    watchers: Mutex<HashMap<Uuid, AbortHandle>>,
+    watchers: Mutex<HashMap<Uuid, Watcher>>,
+    /// How many times each account's watcher has asked its server, whether
+    /// or not it answered: what a sync waits on.
+    rounds: watch::Sender<HashMap<Uuid, u64>>,
     /// Connections per account for reading (a mail, a folder, a search),
     /// kept between uses, up to [`READERS`]: the watcher's own waits in IDLE.
     readers: Mutex<HashMap<Uuid, Vec<Session>>>,
@@ -74,6 +85,7 @@ impl Mail {
             version: watch::Sender::new(1),
             statuses: Mutex::default(),
             watchers: Mutex::default(),
+            rounds: watch::Sender::new(HashMap::new()),
             readers: Mutex::default(),
             places: Mutex::default(),
             lines: Mutex::default(),
@@ -133,17 +145,52 @@ impl Mail {
     pub fn watch(self: &Arc<Self>, account: MailAccount) {
         let id = account.id;
         self.set(id, AccountState::Connecting, None);
+        let wake = Arc::new(Notify::new());
         let mail = Arc::clone(self);
-        let task = tokio::spawn(async move { mail.run(account).await });
-        if let Some(old) = self.lock_watchers().insert(id, task.abort_handle()) {
-            old.abort();
+        let woken = Arc::clone(&wake);
+        let task = tokio::spawn(async move { mail.run(account, woken).await });
+        let watcher = Watcher {
+            task: task.abort_handle(),
+            wake,
+        };
+        if let Some(old) = self.lock_watchers().insert(id, watcher) {
+            old.task.abort();
         }
+    }
+
+    /// Asks every account's server now: a watcher waiting in IDLE or
+    /// between tries looks at once, and one that was refused tries again.
+    /// What's read next goes over new connections, in case the kept ones
+    /// died unnoticed. Done once each account has asked, or after [`SYNC`].
+    pub async fn sync(self: &Arc<Self>, workspace_id: Uuid) -> Result<(), sqlx::Error> {
+        let accounts = self.accounts(workspace_id).await?;
+        let mut rounds = self.rounds.subscribe();
+        let before = rounds.borrow_and_update().clone();
+        for account in &accounts {
+            self.lock_readers().remove(&account.id);
+            let wake = self
+                .lock_watchers()
+                .get(&account.id)
+                .filter(|watcher| !watcher.task.is_finished())
+                .map(|watcher| Arc::clone(&watcher.wake));
+            match wake {
+                Some(wake) => wake.notify_one(),
+                None => self.watch(account.clone()),
+            }
+        }
+        let asked = |now: &HashMap<Uuid, u64>| {
+            accounts
+                .iter()
+                .all(|account| now.get(&account.id) > before.get(&account.id))
+        };
+        let _ = tokio::time::timeout(SYNC, rounds.wait_for(asked)).await;
+        Ok(())
     }
 
     /// Stops watching an account that's gone.
     pub fn forget(&self, account_id: Uuid) {
-        if let Some(task) = self.lock_watchers().remove(&account_id) {
-            task.abort();
+        if let Some(watcher) = self.lock_watchers().remove(&account_id) {
+            watcher.task.abort();
         }
         self.lock_statuses().remove(&account_id);
         self.lock_readers().remove(&account_id);
@@ -154,8 +201,8 @@ impl Mail {
 
     /// Stops every watcher, when the server stops.
     pub fn stop(&self) {
-        for (_, task) in self.lock_watchers().drain() {
-            task.abort();
+        for (_, watcher) in self.lock_watchers().drain() {
+            watcher.task.abort();
         }
         self.lock_readers().clear();
     }
@@ -461,27 +508,33 @@ impl Mail {
     }
 
     /// Keeps one account's copy up to date for as long as it's watched.
-    async fn run(self: Arc<Self>, account: MailAccount) {
+    /// `wake` asks it to look now.
+    async fn run(self: Arc<Self>, account: MailAccount, wake: Arc<Notify>) {
         let mut tries = 0;
         loop {
-            let Err(failure) = self.follow(&account, &mut tries).await;
+            let Err(failure) = self.follow(&account, &mut tries, &wake).await;
             let message = failure.message();
             match &failure {
                 Failure::Refused(_) => {
                     tracing::warn!(address = %account.address, "refused: {message}");
                     self.set(account.id, AccountState::Refused, Some(message));
+                    self.asked(account.id);
                     // Trying again won't help until the password changes,
-                    // which adds the account again.
+                    // which adds the account again, or a sync asks.
                     return;
                 }
                 Failure::Offline(_) => {
                     tracing::info!(address = %account.address, "offline: {message}");
                     self.set(account.id, AccountState::Offline, Some(message));
+                    self.asked(account.id);
                 }
             }
             let wait = RETRY[tries.min(RETRY.len() - 1)];
             tries += 1;
-            tokio::time::sleep(Duration::from_secs(wait)).await;
+            tokio::select! {
+                () = tokio::time::sleep(Duration::from_secs(wait)) => {}
+                () = wake.notified() => {}
+            }
         }
     }
 
@@ -491,6 +544,7 @@ impl Mail {
         &self,
         account: &MailAccount,
         tries: &mut usize,
+        wake: &Notify,
     ) -> Result<Infallible, Failure> {
         let mut session = self.sign_in(account).await?;
         let idle = session.capabilities().await?.has_str("IDLE");
@@ -498,18 +552,30 @@ impl Mail {
             self.bump();
         }
         self.set(account.id, AccountState::Online, None);
+        self.asked(account.id);
         *tries = 0;
         loop {
             session = if idle {
-                wait_idle(session).await?
+                wait_idle(session, wake).await?
             } else {
-                tokio::time::sleep(POLL).await;
+                tokio::select! {
+                    () = tokio::time::sleep(POLL) => {}
+                    () = wake.notified() => {}
+                }
                 session
             };
             if imap::sync_inbox(&mut session, &self.pool, account.id).await? {
                 self.bump();
             }
+            self.asked(account.id);
         }
+    }
+
+    /// Counts that an account's watcher has asked its server, after its
+    /// state is set.
+    fn asked(&self, account_id: Uuid) {
+        self.rounds
+            .send_modify(|rounds| *rounds.entry(account_id).or_default() += 1);
     }
 
     fn set(&self, account_id: Uuid, state: AccountState, message: Option<String>) {
@@ -530,7 +596,7 @@ impl Mail {
         self.statuses.lock().expect("never poisoned")
     }
 
-    fn lock_watchers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, AbortHandle>> {
+    fn lock_watchers(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Watcher>> {
         self.watchers.lock().expect("never poisoned")
     }
 
@@ -547,22 +613,48 @@ impl Mail {
     }
 }
 
-/// Waits in IDLE until the server says something changed, or [`IDLE`]
-/// passes.
-async fn wait_idle(session: Session) -> Result<Session, Failure> {
+/// An account's watcher: its task, and what asks it to look now.
+struct Watcher {
+    task: AbortHandle,
+    wake: Arc<Notify>,
+}
+
+/// Waits in IDLE until the server says something changed, [`IDLE`] passes
+/// or `wake` asks. A server that doesn't answer the end of it within
+/// [`ANSWER`] is taken as gone.
+async fn wait_idle(session: Session, wake: &Notify) -> Result<Session, Failure> {
     let mut handle = session.idle();
     handle.init().await?;
     {
         // The stop source ends the wait when dropped: keep it until then.
-        let (wait, _stop) = handle.wait_with_timeout(IDLE);
-        wait.await?;
+        let (wait, stop) = handle.wait_with_timeout(IDLE);
+        tokio::pin!(wait);
+        tokio::select! {
+            done = &mut wait => {
+                done?;
+            }
+            () = wake.notified() => {
+                drop(stop);
+                wait.await?;
+            }
+        }
     }
-    Ok(handle.done().await?)
+    let done = tokio::time::timeout(ANSWER, handle.done())
+        .await
+        .map_err(|_| Failure::Offline("its server stopped answering".into()))?;
+    Ok(done?)
 }
 
 #[derive(Deserialize)]
 pub struct InboxParams {
     after: Option<i64>,
+}
+
+/// `POST /api/w/{workspace}/mail/sync`: asks every account's server now, and
+/// answers once each has (or after a while).
+pub async fn sync(State(state): State<AppState>, member: Member) -> Result<StatusCode, AppError> {
+    state.mail.sync(member.actor.workspace_id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `GET /api/w/{workspace}/inbox[?after=<version>]`: the unified Inbox;

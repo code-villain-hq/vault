@@ -33,6 +33,7 @@ pub fn router(state: AppState) -> Router {
         .route("/sync/transactions", post(transaction))
         .route("/sync/ws", get(ws::handler))
         .route("/inbox", get(mail::inbox))
+        .route("/mail/sync", post(mail::sync))
         .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
         .route("/mails/{account_id}/{uid}/trash", post(archive::trash))

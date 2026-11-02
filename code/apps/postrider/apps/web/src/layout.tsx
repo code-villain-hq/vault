@@ -33,11 +33,12 @@ import {
   type LucideIcon,
   Mail,
   MailWarning,
+  RefreshCw,
   Send,
   Trash2,
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
-import { InboxProvider, useFolders, useUnread } from "./mail";
+import { InboxProvider, useFolders, useInbox, useUnread } from "./mail";
 import { isDesktop } from "./platform";
 import { setCurrentPlace } from "./server";
 import {
@@ -219,10 +220,35 @@ function Sidebar() {
         {inSettings ? <SettingsNav /> : <MailNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">
-        <SyncIndicator status={useSyncStatus()} refusals={useWorkspace().refusals} />
+        <SyncIndicator
+          status={useSyncStatus()}
+          refusals={useWorkspace().refusals}
+          syncing={useInbox().syncing}
+        />
+        <SyncButton />
         <ShortcutsButton />
       </div>
     </aside>
+  );
+}
+
+/**
+ * Asks every account's server now, beside the word that says how it went:
+ * "Syncing…" until they've answered.
+ */
+function SyncButton() {
+  const { sync, syncing } = useInbox();
+  return (
+    <button
+      type="button"
+      aria-label="Sync now"
+      aria-disabled={syncing}
+      title="Sync now"
+      onClick={sync}
+      className="ui-button ui-icon-button"
+    >
+      <RefreshCw size={15} strokeWidth={1.75} aria-hidden="true" />
+    </button>
   );
 }
 

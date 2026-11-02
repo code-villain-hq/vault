@@ -20,6 +20,9 @@ const RETRY = [2, 5, 15, 30];
 /** How often the folders' unread counts are asked again while the app shows. */
 const FOLDERS_MS = 60_000;
 
+/** How long "Syncing…" shows at least, so a quick sync is seen to happen. */
+const SYNCING_MS = 600;
+
 type InboxState = {
   /** Undefined until the server first answers. */
   inbox?: Inbox;
@@ -29,12 +32,21 @@ type InboxState = {
   leave: (accountId: string, uid: number) => void;
   /** Puts it back, when its server refused. */
   stay: (accountId: string, uid: number) => void;
+  /** Asks every account's server now, as the sync button does. */
+  sync: () => void;
+  /** A sync is on its way. */
+  syncing: boolean;
+  /** Goes up after each sync, so what reads the servers reads them again. */
+  synced: number;
 };
 
 const Context = createContext<InboxState>({
   offline: false,
   leave: () => undefined,
   stay: () => undefined,
+  sync: () => undefined,
+  syncing: false,
+  synced: 0,
 });
 
 /**
@@ -46,6 +58,9 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const { workspace, place } = useWorkspace();
   const [state, setState] = useState<{ inbox?: Inbox; offline: boolean }>({ offline: false });
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
+  const [syncing, setSyncing] = useState(false);
+  const [synced, setSynced] = useState(0);
+  const asked = useRef(false);
 
   useEffect(() => {
     const stop = new AbortController();
@@ -92,18 +107,36 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+  // The server answers once every account has asked its server; the Inbox
+  // has what they said by then, and the rest is read again after.
+  const sync = useCallback(() => {
+    if (asked.current) return;
+    asked.current = true;
+    setSyncing(true);
+    void Promise.all([
+      // Offline, the Inbox says so already.
+      api("POST", `/api/w/${workspace.id}/mail/sync`, undefined, place).catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, SYNCING_MS)),
+    ]).finally(() => {
+      asked.current = false;
+      setSyncing(false);
+      setSynced((n) => n + 1);
+    });
+  }, [workspace.id, place]);
   const shown = useMemo<InboxState>(() => {
     const inbox = state.inbox && {
       ...state.inbox,
       mails: state.inbox.mails.filter((mail) => !leaving.has(`${mail.account_id}:${mail.uid}`)),
     };
-    return { inbox, offline: state.offline, leave, stay };
-  }, [state, leaving, leave, stay]);
+    return { inbox, offline: state.offline, leave, stay, sync, syncing, synced };
+  }, [state, leaving, leave, stay, sync, syncing, synced]);
   useNewMailNotices(state.inbox);
 
   return (
     <Context.Provider value={shown}>
-      <FoldersProvider version={state.inbox?.version}>{children}</FoldersProvider>
+      <FoldersProvider version={state.inbox?.version} synced={synced}>
+        {children}
+      </FoldersProvider>
     </Context.Provider>
   );
 }
@@ -156,10 +189,19 @@ const FoldersContext = createContext<FoldersState>({ folders: [], refresh: () =>
 /**
  * The workspace's folders with what's unread in them, read live: asked
  * when the sidebar shows, when the Inbox changes (an account connected,
- * mail came), when a folder's list or its unread mail is opened, and
- * every minute while the app shows, for mail filed or read elsewhere.
+ * mail came), when a folder's list or its unread mail is opened, after a
+ * sync, and every minute while the app shows, for mail filed or read
+ * elsewhere.
  */
-function FoldersProvider({ version, children }: { version?: number; children: ReactNode }) {
+function FoldersProvider({
+  version,
+  synced,
+  children,
+}: {
+  version?: number;
+  synced: number;
+  children: ReactNode;
+}) {
   const { workspace, place } = useWorkspace();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [asked, setAsked] = useState(0);
@@ -172,7 +214,7 @@ function FoldersProvider({ version, children }: { version?: number; children: Re
       () => undefined,
     );
     return () => stop.abort();
-  }, [workspace.id, place, version, asked]);
+  }, [workspace.id, place, version, synced, asked]);
 
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
   useEffect(() => {
