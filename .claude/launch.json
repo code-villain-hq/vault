@@ -107,6 +107,17 @@
         "dev"
       ],
       "port": 5177
+    },
+    {
+      "name": "postrider-dev",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "run",
+        "--cwd",
+        "code/apps/postrider",
+        "dev"
+      ],
+      "port": 5178
     }
   ]
 }

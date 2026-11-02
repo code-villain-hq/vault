@@ -1,0 +1,3 @@
+[test]
+# The Rust build isn't Bun's.
+pathIgnorePatterns = ["target/**"]

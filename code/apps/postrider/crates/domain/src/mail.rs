@@ -1,0 +1,368 @@
+//! Mail accounts and the calendar server, which sync, and what Postrider
+//! reads from them live: the Inbox and today's events.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+use uuid::Uuid;
+
+use crate::account::{clean_name, normalize_email};
+use crate::model::{Validate, ValidationError};
+
+/// How many data hues there are (`--data-1` to `--data-6`).
+pub const HUES: i32 = 6;
+
+/// A mail account Postrider reads over IMAP. Its password is in the macOS
+/// keychain, never here.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MailAccount {
+    pub id: Uuid,
+    pub workspace_id: Uuid,
+    /// What Postrider calls it: "Code Villain".
+    pub name: String,
+    /// The address its mail comes to.
+    pub address: String,
+    /// The IMAP server: `styx.uberspace.de`.
+    pub host: String,
+    /// 993, over TLS.
+    pub port: i32,
+    /// What it signs in with, usually the address.
+    pub username: String,
+    /// The data hue (1 to 6) its senders and its calendar wear.
+    pub hue: i32,
+    /// Where it sits among the accounts.
+    pub position: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A new account, as the server keeps it once it signed in.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct MailAccountCreate {
+    pub name: String,
+    pub address: String,
+    pub host: String,
+    pub port: i32,
+    pub username: String,
+    pub hue: i32,
+    /// After the last account when left out.
+    pub position: Option<i32>,
+}
+
+impl Validate for MailAccountCreate {
+    fn validate(&self) -> Result<(), ValidationError> {
+        account_name(&self.name)?;
+        normalize_email(&self.address)?;
+        host(&self.host)?;
+        port(self.port)?;
+        hue(self.hue)
+    }
+}
+
+/// What a client may change of an account: its name and its hue.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct MailAccountPatch {
+    pub name: Option<String>,
+    pub hue: Option<i32>,
+    pub position: Option<i32>,
+}
+
+impl Validate for MailAccountPatch {
+    fn validate(&self) -> Result<(), ValidationError> {
+        self.name.as_deref().map(account_name).transpose()?;
+        self.hue.map(hue).transpose()?;
+        Ok(())
+    }
+}
+
+/// "Add an account": checked by signing in before it's kept.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct MailAccountConnect {
+    pub name: String,
+    pub address: String,
+    pub host: String,
+    /// 993 when left out.
+    pub port: Option<i32>,
+    /// The address when left out.
+    pub username: Option<String>,
+    /// Goes to the keychain.
+    pub password: String,
+}
+
+impl MailAccountConnect {
+    /// The connection, cleaned up: the address in lowercase, the port and
+    /// the login filled in.
+    pub fn cleaned(&self) -> Result<MailAccountConnect, ValidationError> {
+        let address = normalize_email(&self.address)?;
+        let username = self
+            .username
+            .as_deref()
+            .map(str::trim)
+            .filter(|u| !u.is_empty())
+            .unwrap_or(&address)
+            .to_string();
+        let cleaned = MailAccountConnect {
+            name: account_name(&self.name)?,
+            host: host(&self.host)?,
+            port: Some(port(self.port.unwrap_or(993))?),
+            username: Some(username),
+            password: self.password.clone(),
+            address,
+        };
+        if cleaned.password.is_empty() {
+            return Err(ValidationError("The password is missing.".into()));
+        }
+        Ok(cleaned)
+    }
+}
+
+/// The calendar server, read over CalDAV: Radicale. Its password is in the
+/// keychain too. Each calendar on it wears the hue of the account it's
+/// named after, or of the account at its domain.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Calendar {
+    pub id: Uuid,
+    pub workspace_id: Uuid,
+    /// `https://calendar.lazarski.nu/`
+    pub url: String,
+    pub username: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// The calendar server, as the server keeps it once it signed in.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct CalendarCreate {
+    pub url: String,
+    pub username: String,
+}
+
+impl Validate for CalendarCreate {
+    fn validate(&self) -> Result<(), ValidationError> {
+        clean_name(&self.username, "the user name").map(|_| ())
+    }
+}
+
+/// "Add a calendar": checked by signing in before it's kept.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct CalendarConnect {
+    pub url: String,
+    pub username: String,
+    pub password: String,
+}
+
+impl CalendarConnect {
+    pub fn cleaned(&self) -> Result<CalendarConnect, ValidationError> {
+        let url = self.url.trim();
+        let url = if url.contains("://") {
+            url.to_string()
+        } else {
+            format!("https://{url}")
+        };
+        let url = if url.ends_with('/') {
+            url
+        } else {
+            format!("{url}/")
+        };
+        let local = ["http://localhost:", "http://127.0.0.1:"]
+            .iter()
+            .any(|p| url.starts_with(p));
+        if !url.starts_with("https://") && !local {
+            return Err(ValidationError(
+                "A calendar address starts with https://.".into(),
+            ));
+        }
+        let username = clean_name(&self.username, "the user name")?;
+        if self.password.is_empty() {
+            return Err(ValidationError("The password is missing.".into()));
+        }
+        Ok(CalendarConnect {
+            url,
+            username,
+            password: self.password.clone(),
+        })
+    }
+}
+
+/// Where an account's mail server stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AccountState {
+    /// Signing in, the first time since the app started.
+    Connecting,
+    /// Signed in and listening for new mail.
+    Online,
+    /// The server can't be reached; Postrider tries again.
+    Offline,
+    /// The server said no, as to a wrong password: trying again won't help.
+    Refused,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AccountStatus {
+    pub account_id: Uuid,
+    pub state: AccountState,
+    /// What went wrong, in the server's words, when offline or refused.
+    pub message: Option<String>,
+}
+
+/// A mail in the Inbox, as the list shows it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MailSummary {
+    pub account_id: Uuid,
+    /// Its IMAP UID in the account's Inbox.
+    #[ts(type = "number")]
+    pub uid: i64,
+    /// "Anna Weber", or the address when the mail gives no name.
+    pub from_name: String,
+    pub from_address: String,
+    pub subject: String,
+    /// The start of the text, on one line.
+    pub snippet: String,
+    pub date: DateTime<Utc>,
+    /// Read (`\Seen`), on the server.
+    pub seen: bool,
+}
+
+/// The unified Inbox: every account's newest mail, newest first.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Inbox {
+    /// Goes up whenever anything here changes; `GET .../inbox?after=` waits
+    /// for it.
+    #[ts(type = "number")]
+    pub version: i64,
+    pub accounts: Vec<AccountStatus>,
+    pub mails: Vec<MailSummary>,
+}
+
+/// An event in a day, from the calendar server.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Event {
+    pub title: String,
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
+    /// All day: `start` and `end` are the day's bounds.
+    pub all_day: bool,
+    /// The calendar it's in, as Radicale names it.
+    pub calendar: String,
+    /// The data hue of the account the calendar belongs to.
+    pub hue: i32,
+}
+
+/// One day's events, from every calendar on the server.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Day {
+    pub events: Vec<Event>,
+    /// Why the calendar couldn't be read, when it couldn't.
+    pub error: Option<String>,
+}
+
+fn invalid<T>(message: impl Into<String>) -> Result<T, ValidationError> {
+    Err(ValidationError(message.into()))
+}
+
+fn account_name(value: &str) -> Result<String, ValidationError> {
+    clean_name(value, "An account's name")
+}
+
+fn hue(value: i32) -> Result<(), ValidationError> {
+    if !(1..=HUES).contains(&value) {
+        return invalid(format!("A hue is 1 to {HUES}."));
+    }
+    Ok(())
+}
+
+fn port(value: i32) -> Result<i32, ValidationError> {
+    if !(1..=65535).contains(&value) {
+        return invalid("A port is 1 to 65535.");
+    }
+    Ok(value)
+}
+
+/// A host name: letters, digits, dots and dashes.
+fn host(value: &str) -> Result<String, ValidationError> {
+    let value = value.trim().to_lowercase();
+    let valid = !value.is_empty()
+        && value.len() <= 253
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        && !value.starts_with(['.', '-']);
+    if !valid {
+        return invalid("The server is a host name, like styx.uberspace.de.");
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn connect(address: &str, host: &str) -> MailAccountConnect {
+        MailAccountConnect {
+            name: " Lazarski ".into(),
+            address: address.into(),
+            host: host.into(),
+            port: None,
+            username: None,
+            password: "secret".into(),
+        }
+    }
+
+    #[test]
+    fn a_new_account_signs_in_with_its_address_on_993() {
+        let cleaned = connect("Michael@Lazarski.test", " Styx.Uberspace.de")
+            .cleaned()
+            .unwrap();
+        assert_eq!(cleaned.name, "Lazarski");
+        assert_eq!(cleaned.address, "michael@lazarski.test");
+        assert_eq!(cleaned.host, "styx.uberspace.de");
+        assert_eq!(cleaned.port, Some(993));
+        assert_eq!(cleaned.username.as_deref(), Some("michael@lazarski.test"));
+    }
+
+    #[test]
+    fn a_new_account_needs_a_host_and_a_password() {
+        assert!(
+            connect("michael@lazarski.test", "imap://x")
+                .cleaned()
+                .is_err()
+        );
+        let mut no_password = connect("michael@lazarski.test", "styx.uberspace.de");
+        no_password.password.clear();
+        assert!(no_password.cleaned().is_err());
+    }
+
+    #[test]
+    fn a_calendar_is_https_unless_on_this_mac() {
+        let calendar = |url: &str| CalendarConnect {
+            url: url.into(),
+            username: "michael".into(),
+            password: "secret".into(),
+        };
+        assert_eq!(
+            calendar("calendar.lazarski.test").cleaned().unwrap().url,
+            "https://calendar.lazarski.test/"
+        );
+        assert!(calendar("http://calendar.lazarski.test").cleaned().is_err());
+        assert!(calendar("http://127.0.0.1:5232").cleaned().is_ok());
+    }
+}

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "vp check && bun run check:css && bun run check:classes",
-    "check:css": "cd lint && stylelint --max-warnings 0 \"../components.css\" \"../../../code/apps/site/*.css\" \"../../../code/apps/forge/apps/web/src/**/*.css\" \"../../../code/apps/layer/src/**/*.css\" \"../../../code/apps/layer/web/src/**/*.css\" \"../../../code/apps/glyph/apps/web/src/**/*.css\" \"../../../code/apps/raven/apps/web/src/**/*.css\" \"../../../code/apps/almanac/apps/web/src/**/*.css\"",
+    "check:css": "cd lint && stylelint --max-warnings 0 \"../components.css\" \"../../../code/apps/site/*.css\" \"../../../code/apps/forge/apps/web/src/**/*.css\" \"../../../code/apps/layer/src/**/*.css\" \"../../../code/apps/layer/web/src/**/*.css\" \"../../../code/apps/glyph/apps/web/src/**/*.css\" \"../../../code/apps/raven/apps/web/src/**/*.css\" \"../../../code/apps/almanac/apps/web/src/**/*.css\" \"../../../code/apps/postrider/apps/web/src/**/*.css\"",
     "check:classes": "cd lint && bun check-classes.ts",
     "format": "vp check --fix"
   },

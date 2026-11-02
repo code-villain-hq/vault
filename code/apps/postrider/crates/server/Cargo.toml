@@ -1,0 +1,36 @@
+[package]
+name = "postrider-server"
+description = "Postrider's server: your accounts, the Inbox it reads over IMAP, the day it reads over CalDAV, and the API its web app reads"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-imap.workspace = true
+axum.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+code-villain-auth.workspace = true
+code-villain-sync.workspace = true
+futures.workspace = true
+keyring.workspace = true
+mail-parser.workspace = true
+postrider-domain.workspace = true
+postrider-sync.workspace = true
+quick-xml.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

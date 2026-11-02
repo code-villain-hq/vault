@@ -1,6 +1,6 @@
 # Design drift on every push that could cause it: the theme tests, the
 # generated outputs in studio/design/tokens against build.py, Forge's, Layer's,
-# Caster's, Glyph's, Raven's and the editor themes' copies against the vault, and the lint
+# Caster's, Glyph's, Raven's, Postrider's and the editor themes' copies against the vault, and the lint
 # guard over the web CSS and the apps' TSX (studio/design/lint; not the site's
 # HTML), with Vite+ over studio/design's own code and CSS. Each check writes
 # nothing and fails with the fix.
@@ -43,6 +43,9 @@ on:
       - "code/apps/raven/apps/web/src/**"
       - "code/apps/raven/apps/web/public/icon.svg"
       - "code/apps/raven/scripts/sync-design.ts"
+      - "code/apps/postrider/apps/web/src/**"
+      - "code/apps/postrider/apps/web/public/icon.svg"
+      - "code/apps/postrider/scripts/sync-design.ts"
       - ".forgejo/workflows/design.yml"
 
 jobs:
@@ -66,5 +69,7 @@ jobs:
         working-directory: code/apps/glyph
       - run: bun scripts/sync-design.ts --check
         working-directory: code/apps/raven
+      - run: bun scripts/sync-design.ts --check
+        working-directory: code/apps/postrider
       - run: bun install --frozen-lockfile && bun run check
         working-directory: studio/design

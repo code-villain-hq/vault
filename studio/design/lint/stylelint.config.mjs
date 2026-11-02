@@ -13,6 +13,7 @@ export default {
     "../../../code/apps/glyph/apps/web/src/design/**",
     "../../../code/apps/raven/apps/web/src/design/**",
     "../../../code/apps/almanac/apps/web/src/design/**",
+    "../../../code/apps/postrider/apps/web/src/design/**",
     // The phone's page: the mobile redesign is deferred (studio/design/layouts/app-window.md).
     "../../../code/apps/layer/src/phone/**",
     // Layer's theme sources: its extra themes (Tokyo Night, Cursor, Ayu) and

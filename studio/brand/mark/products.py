@@ -19,6 +19,7 @@ PRODUCTS = {
     "glyph": "Glyph",
     "raven": "Raven",
     "almanac": "Almanac",
+    "postrider": "Postrider",
 }
 # The studio pair: C and V at 0.88 of a product initial, 1 unit apart, so
 # their cuts meet and the strike stops between them. Centred on the tile,

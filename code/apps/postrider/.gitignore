@@ -1,0 +1,8 @@
+/target
+node_modules
+dist
+.env
+apps/desktop/src-tauri/gen/
+
+# The dev server's session, which Vite hands the browser (scripts/dev.ts).
+.dev-session

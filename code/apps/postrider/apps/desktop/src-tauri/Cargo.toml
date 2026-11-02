@@ -1,0 +1,26 @@
+[package]
+name = "postrider-desktop"
+description = "Postrider's desktop app: the web app in a Tauri window, with Postrider's server on its own Postgres"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+code-villain-desktop.workspace = true
+postrider-server.workspace = true
+postrider-sync.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# The plugin settings in tauri.conf.json are compiled in as JSON.
+serde_json.workspace = true
+tauri-plugin-opener = "2.7"
+
+[lints]
+workspace = true

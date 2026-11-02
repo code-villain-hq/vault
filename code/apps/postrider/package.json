@@ -1,0 +1,34 @@
+{
+  "name": "postrider",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "../../kit/sync/client",
+    "../../kit/web"
+  ],
+  "type": "module",
+  "scripts": {
+    "design:sync": "bun scripts/sync-design.ts",
+    "db": "docker compose up -d --wait",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "seed": "bun scripts/seed.ts",
+    "dev": "bun scripts/dev.ts",
+    "dev:desktop": "bun run --cwd apps/desktop tauri dev",
+    "build:desktop": "bun run --cwd apps/web build && bun run --cwd apps/desktop tauri build",
+    "gen:types": "bun scripts/gen-types.ts",
+    "typecheck": "vp check --no-fmt --no-lint",
+    "lint": "vp check",
+    "format": "vp check --fix",
+    "test": "cargo test --workspace && bun test",
+    "check": "bun scripts/check.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "typescript": "7.0.2",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+  }
+}

@@ -1,6 +1,6 @@
 // Tailwind arbitrary values and palette colours in markup bypass the tokens
 // where stylelint can't see them: `text-[12px]`, `bg-[#111]`, `bg-zinc-800`,
-// `text-white`. Scans the TSX/TS of the web kit, Forge, Layer (the app and its server's web app), Glyph, Raven and Almanac. A
+// `text-white`. Scans the TSX/TS of the web kit, Forge, Layer (the app and its server's web app), Glyph, Raven, Almanac and Postrider. A
 // line that must keep one says why with `design-lint-ignore` in a comment.
 import { Glob } from "bun";
 
@@ -12,6 +12,7 @@ const roots: [string, string][] = [
   ["../../../code/apps/glyph/apps/web/src", "**/*.{ts,tsx}"],
   ["../../../code/apps/raven/apps/web/src", "**/*.{ts,tsx}"],
   ["../../../code/apps/almanac/apps/web/src", "**/*.{ts,tsx}"],
+  ["../../../code/apps/postrider/apps/web/src", "**/*.{ts,tsx}"],
 ];
 const skip = [/\/design\//, /\/phone\//, /\.test\.tsx?$/, /\/__mock__\//];
 const palette =
@@ -52,5 +53,5 @@ if (found.length) {
   process.exit(1);
 }
 console.log(
-  "No arbitrary colours, sizes or radii in the web kit's, Forge's, Layer's, Glyph's, Raven's or Almanac's markup.",
+  "No arbitrary colours, sizes or radii in the web kit's, Forge's, Layer's, Glyph's, Raven's, Almanac's or Postrider's markup.",
 );

@@ -1,0 +1,53 @@
+name: code-villain-postrider
+
+# Postrider's local database and stand-ins for the mail and calendar
+# servers (`bun run db`). The stand-ins take any login with the password
+# "dev"; `bun run seed` fills them with the storyboard's mail and day.
+services:
+  postgres:
+    image: postgres:18
+    # Come back after Docker restarts, unless stopped on purpose.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postrider
+      POSTGRES_PASSWORD: postrider
+      POSTGRES_DB: postrider
+    ports:
+      # 5438 on this machine only: Raven has 5435, Layer 5436, Almanac 5437.
+      - "127.0.0.1:5438:5432"
+    volumes:
+      - postrider-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postrider"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # IMAP (3143) and ManageSieve (4190), as Dovecot on Uberspace's styx.
+  # Any address signs in, with the password "dev".
+  mail:
+    image: dovecot/dovecot:2.4.2
+    restart: unless-stopped
+    environment:
+      USER_PASSWORD: dev
+    volumes:
+      - ./dev/dovecot.conf:/etc/dovecot/conf.d/postrider.conf:ro
+      - postrider-mail:/srv/vmail
+    ports:
+      - "127.0.0.1:3143:31143"
+      - "127.0.0.1:4190:34190"
+
+  # CalDAV (5232), as Radicale on calendar.lazarski.nu.
+  calendar:
+    image: ghcr.io/kozea/radicale:3.8.3
+    restart: unless-stopped
+    volumes:
+      - ./dev/radicale.conf:/etc/radicale/config:ro
+      - postrider-calendar:/var/lib/radicale
+    ports:
+      - "127.0.0.1:5232:5232"
+
+volumes:
+  postrider-db:
+  postrider-mail:
+  postrider-calendar:
