@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::{accounts, archive, caldav, connect, files, folders, mail, reply, ws};
+use crate::{accounts, archive, ask, caldav, connect, files, folders, mail, reply, ws};
 
 /// The API, plus the built web app from `web_dir` when given.
 pub fn app(state: AppState, web_dir: Option<&std::path::Path>) -> Router {
@@ -33,6 +33,8 @@ pub fn router(state: AppState) -> Router {
         .route("/sync/transactions", post(transaction))
         .route("/sync/ws", get(ws::handler))
         .route("/inbox", get(mail::inbox))
+        .route("/ask", post(ask::ask))
+        .route("/answers/{answer}/undo", post(ask::undo))
         .route("/mail/sync", post(mail::sync))
         .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
@@ -53,6 +55,7 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .route("/api/health", get(|| async { "ok" }))
+        .route(ask::MCP_PATH, post(ask::mcp_endpoint))
         .route("/api/auth/logout", post(accounts::logout))
         .route("/api/auth/providers", get(providers))
         .route("/api/me", get(accounts::me))

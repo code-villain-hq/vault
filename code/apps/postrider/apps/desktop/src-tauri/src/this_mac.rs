@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use code_villain_claude::{Adapter, Kind};
 use code_villain_desktop::{LocalPostgres, LocalServer};
+use postrider_server::ask::{MCP_PATH, POSTRIDER};
 use postrider_server::secrets::Secrets;
 use postrider_server::{AppState, local};
 use serde::Serialize;
@@ -97,7 +99,7 @@ async fn start(dir: &Path) -> Result<Running, String> {
     let postgres = LocalPostgres::start(&dir.join("postgres"), POSTGRES_PORT)
         .await
         .map_err(|e| e.to_string())?;
-    match start_server(&postgres).await {
+    match start_server(&postgres, dir).await {
         Ok((server, pool, token)) => Ok(Running {
             postgres,
             server,
@@ -112,7 +114,10 @@ async fn start(dir: &Path) -> Result<Running, String> {
     }
 }
 
-async fn start_server(postgres: &LocalPostgres) -> Result<(LocalServer, PgPool, String), String> {
+async fn start_server(
+    postgres: &LocalPostgres,
+    dir: &Path,
+) -> Result<(LocalServer, PgPool, String), String> {
     let url = postgres
         .database("postrider")
         .await
@@ -137,7 +142,14 @@ async fn start_server(postgres: &LocalPostgres) -> Result<(LocalServer, PgPool, 
         // `bun run dev:desktop` shows the web app from Vite.
         state = state.allowing_origin("http://localhost:5178");
     }
-    let server = LocalServer::spawn(SERVER_PORT, |listener, shutdown| {
+    let folder = dir.join("claude");
+    let server = LocalServer::spawn(SERVER_PORT, move |listener, shutdown| {
+        // Claude Code answers what's asked, as you're signed in to it, in an
+        // empty folder of its own, with the tools of this server, at the
+        // port it got.
+        let port = listener.local_addr().map_or(SERVER_PORT, |a| a.port());
+        let mcp = format!("http://127.0.0.1:{port}{MCP_PATH}");
+        let state = state.with_claude_code(Adapter::new(POSTRIDER, Kind::ClaudeCode, folder, mcp));
         postrider_server::serve(state, listener, shutdown)
     })
     .await

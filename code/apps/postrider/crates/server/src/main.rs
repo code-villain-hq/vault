@@ -8,6 +8,8 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use code_villain_claude::{Adapter, Kind};
+use postrider_server::ask::{MCP_PATH, POSTRIDER};
 use postrider_server::secrets::Secrets;
 use postrider_server::{AppState, local};
 use sqlx::postgres::PgPoolOptions;
@@ -51,6 +53,11 @@ async fn main() -> anyhow::Result<()> {
     if let Ok(origin) = std::env::var("POSTRIDER_WEB_ORIGIN") {
         state = state.allowing_origin(origin);
     }
+    // Claude Code on this Mac answers what's asked, as you're signed in to
+    // it, in an empty folder of its own, with this server's tools.
+    let folder = std::env::temp_dir().join("postrider-dev-claude");
+    let mcp = format!("http://{addr}{MCP_PATH}");
+    state = state.with_claude_code(Adapter::new(POSTRIDER, Kind::ClaudeCode, folder, mcp));
     let listener = TcpListener::bind(addr).await?;
     tracing::info!("listening on http://{addr}");
     postrider_server::serve(state, listener, async {

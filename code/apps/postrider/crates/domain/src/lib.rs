@@ -17,10 +17,10 @@ mod user;
 
 pub use account::{Me, Role, UserInfo, WorkspaceInfo, clean_name, normalize_email, url_key_from};
 pub use mail::{
-    AccountState, AccountStatus, Attachment, Calendar, CalendarConnect, CalendarCreate,
-    CalendarPatch, Day, Event, Folder, FolderRole, HUES, Inbox, Listing, MailAccount,
-    MailAccountConnect, MailAccountCreate, MailAccountPatch, MailSummary, Message, Reply,
-    ServerCalendar,
+    AccountState, AccountStatus, Answer, Asked, Attachment, Calendar, CalendarConnect,
+    CalendarCreate, CalendarPatch, Day, Event, Folder, FolderLink, FolderRole, HUES, Inbox,
+    Listing, MailAccount, MailAccountConnect, MailAccountCreate, MailAccountPatch, MailSummary,
+    Message, Reply, ServerCalendar,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{

@@ -6,6 +6,7 @@
 
 pub mod accounts;
 pub mod archive;
+pub mod ask;
 pub mod auth;
 pub mod caldav;
 pub mod connect;
@@ -19,8 +20,10 @@ pub mod message;
 pub mod preview;
 pub mod reply;
 pub mod routes;
+pub mod rules;
 pub mod secrets;
 mod serve;
+pub mod sieve;
 pub mod state;
 pub mod ws;
 

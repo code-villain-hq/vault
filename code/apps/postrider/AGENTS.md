@@ -9,9 +9,12 @@ Trash and the other folders in the sidebar, Search mail (/), Settings →
 Accounts, and on a mail E to archive it, ⌫ to delete it, R to reply and
 its files to open. A mail opens beside its list, in three columns: the
 sidebar, the list, the mail. Esc closes it, J and K move. A narrow window
-shows the list or the mail, with a way back. The desktop app notifies of new mail and counts what's unread on the dock. Sieve
-rules (step 2), writing a new mail and "More professional" (3),
-newsletters (4) and the week (5) are still to come.
+shows the list or the mail, with a way back. The desktop app notifies of
+new mail and counts what's unread on the dock. Step 2 is built too: the
+field at the foot of the list, where you ask Postrider something or tell
+it how to sort, and it makes the rule on the mail server, says what it
+did, and Undo puts it back. Writing a new mail and "More professional"
+(3), newsletters (4) and the week (5) are still to come.
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -51,7 +54,12 @@ Run `bun run design:sync` after changing them in the vault.
   server writes this launch's session to `.dev-session` and Vite signs
   the browser's requests with it. `POSTRIDER_DEV_PASSWORD` (`dev` unless
   set) is every account's password, so nothing goes to the keychain; set
-  it empty to use the keychain with your own accounts.
+  it empty to use the keychain with your own accounts. Claude Code on this
+  Mac answers the ask field, as in the desktop app (`claude-agent-acp`
+  from `npm install -g @agentclientprotocol/claude-agent-acp`, signed in).
+  Dovecot runs Sieve on mail it delivers over LMTP and takes scripts over
+  ManageSieve (4190); IMAP's APPEND, as `bun run seed` fills folders, runs
+  no rules.
 - `bun run dev:desktop`: the Tauri app on the Vite dev server.
   `bun run build:desktop` packages it. The app runs Postrider on its own
   Postgres (7886) and server (7885). Its data is in
@@ -140,6 +148,36 @@ once are one), through `code/kit/notify`, and the dock badge counts the
 Inbox's unread mail (`mail.tsx`, `platform.ts`). What a server has when its
 account comes online doesn't notify.
 
+## Asking Postrider, and sorting
+
+The field at the foot of the list (`ask.tsx`) sends what you typed to
+`POST /api/w/{id}/ask` (`ask.rs`). Claude Code on this Mac answers, as
+you're signed in to it, through `code/kit/claude`, in an empty folder of
+its own and with Postrider's tools only, reached at `/api/ai/mcp` with a
+token that lasts the one question: `find_senders`, `find_mail`,
+`read_mail`, `sort_into` and `stop_sorting`. The prompt names the
+accounts, their folders and their rules, so "Dependabot too" adds to the
+rule it means. One question at a time; there's no talk to scroll back.
+Not installed or signed out, the answer says what to do.
+
+Rules live on each account's mail server, in a Sieve script named
+`postrider` (`rules.rs`, over ManageSieve in `sieve.rs`), so the server
+sorts while the Mac is shut and every mail app sees the same folders.
+Each rule is written with a `# rule {…}` comment, which is how Postrider
+reads its rules back; nothing about them is kept on the Mac. When the
+account ran a script of its own, `postrider-and-yours` runs that one,
+then Postrider's. A rule is a folder and what goes there: from a sender,
+to an address, words in the subject, a mailing list. `sort_into` writes
+it in every account that has such mail, makes the folder where it's
+missing, and moves what the Inbox has now with `UID MOVE`.
+
+The answer says what changed in words, with the names in bold, the
+rule's chips, Undo and the folder to open. Undo
+(`POST /answers/{answer}/undo`) writes each account's rules back as they
+were, moves the mail back to the Inbox, and takes away a folder it made
+once it's empty again. What Undo needs is kept in memory, so it lasts
+until the server stops.
+
 ## Layout
 
 - `crates/domain`: models, validation, sync protocol types (no database).
@@ -151,7 +189,9 @@ account comes online doesn't notify.
   `mail.rs`, the folders and search in `folders.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`), archiving, replying and
   files (`archive.rs`, `reply.rs`, `files.rs`), CalDAV (`caldav.rs`),
-  connecting accounts (`connect.rs`) and the keychain (`secrets.rs`).
+  connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
+  ask field's answers (`ask.rs`) and sorting rules (`rules.rs`, written
+  over ManageSieve by `sieve.rs`).
   `local.rs` is the one person on this Mac, who signs in to nothing.
   `serve.rs` runs it until told to stop, for `main.rs` (development) and
   the desktop app alike.
@@ -159,11 +199,11 @@ account comes online doesn't notify.
 - `apps/web`: React + Base UI + Tailwind. `mailbox.tsx` is the list
   column beside the open mail, `inbox.tsx` the Inbox and today,
   `folders.tsx` a folder, a search and the search field, `message.tsx` an
-  opened mail, `compose.tsx` a reply, `settings.tsx`
-  the accounts and calendars, `mail.tsx` the live Inbox, notifications
-  and the folder list.
+  opened mail, `compose.tsx` a reply, `ask.tsx` the ask field and its
+  answer, `settings.tsx` the accounts and calendars, `mail.tsx` the live
+  Inbox, notifications and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
-  for this Mac, with `code/kit/desktop`; `main.rs` notifies with
+  for this Mac, with `code/kit/desktop`, and Claude Code to answer; `main.rs` notifies with
   `code/kit/notify`; `files.rs` opens a mail's files.
 - `migrations`: SQL schema, applied by the server on start.
 - `dev`: the stand-ins' settings.

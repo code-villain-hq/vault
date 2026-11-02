@@ -182,13 +182,22 @@ type FoldersState = {
   folders: Folder[];
   /** Asks the servers again, as after a folder's mail was read. */
   refresh: () => void;
-  /** Goes up every minute while the app shows, and as it shows again. */
+  /**
+   * Mail moved between folders, as an answer or its Undo moved it: the
+   * folders and the folder shown are read again.
+   */
+  moved: () => void;
+  /**
+   * Goes up every minute while the app shows, as it shows again, and as
+   * mail moved: the folder shown reads its mail again with it.
+   */
   minutes: number;
 };
 
 const FoldersContext = createContext<FoldersState>({
   folders: [],
   refresh: () => undefined,
+  moved: () => undefined,
   minutes: 0,
 });
 
@@ -196,8 +205,8 @@ const FoldersContext = createContext<FoldersState>({
  * The workspace's folders with what's unread in them, read live: asked
  * when the sidebar shows, when the Inbox changes (an account connected,
  * mail came), when a folder's list or its unread mail is opened, after a
- * sync, and every minute while the app shows, for mail filed or read
- * elsewhere.
+ * sync, when an answer moved mail, and every minute while the app shows,
+ * for mail filed or read elsewhere.
  */
 function FoldersProvider({
   version,
@@ -224,6 +233,7 @@ function FoldersProvider({
   }, [workspace.id, place, version, synced, asked, minutes]);
 
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
+  const moved = useCallback(() => setMinutes((n) => n + 1), []);
   useEffect(() => {
     const ask = () => {
       if (document.visibilityState === "visible") setMinutes((n) => n + 1);
@@ -236,7 +246,10 @@ function FoldersProvider({
     };
   }, []);
 
-  const state = useMemo(() => ({ folders, refresh, minutes }), [folders, refresh, minutes]);
+  const state = useMemo(
+    () => ({ folders, refresh, moved, minutes }),
+    [folders, refresh, moved, minutes],
+  );
   return <FoldersContext.Provider value={state}>{children}</FoldersContext.Provider>;
 }
 

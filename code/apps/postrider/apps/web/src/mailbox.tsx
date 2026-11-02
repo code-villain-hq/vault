@@ -1,6 +1,7 @@
 import { useKeptWidth, WidthEdge, type Widths } from "@code-villain/web";
 import { Outlet, useLocation, useParams, useSearch } from "@tanstack/react-router";
 import { type CSSProperties, useMemo } from "react";
+import { Ask } from "./ask";
 import { FolderList, SearchList } from "./folders";
 import { type From, InboxList, mailKey, NoAccounts } from "./inbox";
 import { PageBody } from "./layout";
@@ -12,10 +13,10 @@ import { useSyncStatus, useWorkspace } from "./workspace";
 const LIST_WIDTH: Widths = { start: 440, min: 320, max: 720 };
 
 /**
- * The Inbox, a folder or a search: its list in the middle, and the mail
- * opened from it on the right (the child route). The list stays while
- * mails open beside it, where it was scrolled to. A narrow window shows one
- * of them at a time.
+ * The Inbox, a folder or a search: its list in the middle, with the field
+ * to ask Postrider at its foot, and the mail opened from it on the right
+ * (the child route). The list stays while mails open beside it, where it
+ * was scrolled to. A narrow window shows one of them at a time.
  */
 export function MailboxLayout() {
   const { ready } = useSyncStatus();
@@ -32,6 +33,7 @@ export function MailboxLayout() {
     >
       <section aria-label="Mail" className="mail-list flex min-h-0 min-w-0 shrink-0 flex-col">
         <ListColumn from={from} open={open} />
+        <Ask />
       </section>
       <WidthEdge
         width={width.width}

@@ -477,6 +477,38 @@ fn host(value: &str) -> Result<String, ValidationError> {
     Ok(value)
 }
 
+/// What you ask Postrider in the field at the foot of every view, or tell
+/// it to do.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Asked {
+    pub text: String,
+}
+
+/// What Postrider answered, and what it changed.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Answer {
+    /// What Undo names to put back what it changed; `None` when it changed
+    /// nothing.
+    pub id: Option<Uuid>,
+    /// Its words, with names in `**bold**`.
+    pub text: String,
+    /// What the rules it made or changed look for:
+    /// "From notifications@github.com".
+    pub chips: Vec<String>,
+    /// The folder it sorted into, to open.
+    pub folder: Option<FolderLink>,
+}
+
+/// A folder to open: its key and its name.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FolderLink {
+    pub key: String,
+    pub name: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

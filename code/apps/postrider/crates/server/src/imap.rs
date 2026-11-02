@@ -34,7 +34,7 @@ const PEEK: u32 = 16 * 1024;
 /// How many mails it asks for at once.
 const BATCH: usize = 50;
 
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub type Session = async_imap::Session<Stream>;
 
@@ -385,13 +385,14 @@ pub async fn put(session: &mut Session, folder: &str, raw: &[u8]) -> Result<(), 
     Ok(())
 }
 
-/// Makes a folder for `role`, called `name`, beside the account's others:
-/// under `INBOX.` where its server keeps them so. It's subscribed, so the
-/// account's other mail apps show it too. One made meanwhile will do.
+/// Makes a folder called `name`, for `role` if it has one, beside the
+/// account's others: under `INBOX.` where its server keeps them so. It's
+/// subscribed, so the account's other mail apps show it too. One made
+/// meanwhile will do.
 pub async fn make_folder(
     session: &mut Session,
     name: &str,
-    role: FolderRole,
+    role: Option<FolderRole>,
 ) -> Result<Place, Failure> {
     let names: Vec<_> = session
         .list(Some(""), Some("*"))
@@ -417,7 +418,7 @@ pub async fn make_folder(
     Ok(Place {
         path,
         name: name.to_string(),
-        role: Some(role),
+        role,
     })
 }
 
@@ -460,6 +461,14 @@ pub async fn folders(session: &mut Session) -> Result<Vec<Place>, Failure> {
         .await?
         .try_collect()
         .await?;
+    // Every account has an Inbox: a list without one came from a connection
+    // the server hung up on, which reads as nothing rather than failing.
+    if !names
+        .iter()
+        .any(|name| name.name().eq_ignore_ascii_case("INBOX"))
+    {
+        return Err(Failure::Offline("The server listed no folders.".into()));
+    }
     let listed = names
         .iter()
         .map(|name| {
@@ -844,7 +853,7 @@ fn one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn is_loopback(host: &str) -> bool {
+pub(crate) fn is_loopback(host: &str) -> bool {
     host == "localhost"
         || host
             .parse::<std::net::IpAddr>()
@@ -852,7 +861,7 @@ fn is_loopback(host: &str) -> bool {
 }
 
 /// TLS that trusts what macOS trusts.
-fn tls() -> Result<TlsConnector, Failure> {
+pub(crate) fn tls() -> Result<TlsConnector, Failure> {
     static CONFIG: OnceLock<Result<Arc<rustls::ClientConfig>, String>> = OnceLock::new();
     let config = CONFIG.get_or_init(|| {
         use rustls_platform_verifier::BuilderVerifierExt;

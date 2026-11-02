@@ -740,6 +740,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-villain-claude"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "hex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "code-villain-desktop"
 version = "0.1.0"
 dependencies = [
@@ -3656,6 +3669,7 @@ dependencies = [
 name = "postrider-desktop"
 version = "0.1.0"
 dependencies = [
+ "code-villain-claude",
  "code-villain-desktop",
  "code-villain-notify",
  "postrider-server",
@@ -3695,6 +3709,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "code-villain-auth",
+ "code-villain-claude",
  "code-villain-sync",
  "futures",
  "keyring",

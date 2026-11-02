@@ -76,7 +76,7 @@ impl Mail {
         let made = self
             .on_server(account, |session| {
                 let name = name.clone();
-                Box::pin(async move { imap::make_folder(session, &name, role).await })
+                Box::pin(async move { imap::make_folder(session, &name, Some(role)).await })
             })
             .await?;
         self.lock_places()

@@ -10,6 +10,7 @@ tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
 tauri = { version = "2.12", features = [] }
+code-villain-claude.workspace = true
 code-villain-desktop.workspace = true
 code-villain-notify.workspace = true
 postrider-server.workspace = true
