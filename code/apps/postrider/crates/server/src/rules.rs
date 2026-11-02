@@ -95,7 +95,7 @@ impl When {
 
     /// Its test in Sieve; `bodies` when the server reads a mail's text
     /// (`body`, RFC 5173).
-    fn test(&self, bodies: bool) -> String {
+    pub(crate) fn test(&self, bodies: bool) -> String {
         let address = |headers: &str, who: &str| {
             let part = if who.contains('@') { "" } else { ":domain " };
             format!("address {part}:is {headers} {}", sieve_string(who))
@@ -825,10 +825,19 @@ mod tests {
              not header :is \"precedence\" [\"bulk\", \"list\"]), \
              address :localpart :contains \"from\" [\"account\", "
         ));
+        assert!(
+            script.contains(
+                "address :domain :matches \"from\" [\"*account*.*.*\", \"*konto*.*.*\", "
+            )
+        );
         assert!(script.contains(
-            "address :domain :matches \"from\" [\"account.*\", \"accounts.*\", \"auth.*\", \"id.*\", \
-             \"login.*\", \"security.*\", \"signin.*\"]))) {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}"
+            "\"*inmail*.*.*\", \"account.*\", \"accounts.*\", \"auth.*\", \"id.*\", \
+             \"login.*\", \"security.*\", \"signin.*\"], allof (not address :localpart :contains \"from\" \
+             [\"newsletter\", \"news\"], header :contains \"subject\" [\"password\", "
         ));
+        assert!(
+            script.contains("\"tvåfaktor\"])))) {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}")
+        );
         // A server that doesn't read mail's text goes by the header alone.
         let header_only = super::script(&[newsletters], false);
         assert!(header_only.contains("require [\"fileinto\"];\n"));

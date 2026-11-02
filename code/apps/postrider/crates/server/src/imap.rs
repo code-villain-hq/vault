@@ -425,6 +425,25 @@ pub async fn make_folder(
     })
 }
 
+/// Subscribes the folders at `paths` that aren't, so the account's other
+/// mail apps show them; how many it subscribed.
+pub async fn subscribe(session: &mut Session, paths: &[String]) -> Result<usize, Failure> {
+    let subscribed: Vec<String> = session
+        .lsub(Some(""), Some("*"))
+        .await?
+        .map_ok(|name| name.name().to_string())
+        .try_collect()
+        .await?;
+    let mut count = 0;
+    for path in paths.iter().filter(|path| !subscribed.contains(path)) {
+        match session.subscribe(path).await {
+            Ok(()) => count += 1,
+            Err(e) => tracing::info!("couldn't subscribe to {path}: {e}"),
+        }
+    }
+    Ok(count)
+}
+
 /// Renames a folder where it is, among the same folders: "GitHub" to
 /// "Dev-Kram". What it holds goes with it.
 pub async fn rename_folder(

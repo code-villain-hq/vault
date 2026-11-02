@@ -245,25 +245,35 @@ Google and LinkedIn put the header on their notices too, so `is_notice`
 tells them by what the header can't: an `Auto-Submitted` other than `no`
 (RFC 3834) on mail that doesn't say it went to many (newsletters send it
 too, to keep auto-replies away, with one click to leave or
-`Precedence: bulk`), a word in the sender's local part (`NOTICE_WORDS`: account,
-security, login, order, receipt, payment, shipping, confirm, message, …
-in English, German and Swedish) or a host that sends only notices
-(`NOTICE_HOSTS`: `accounts.google.com`, `id.apple.com`). The rule's Sieve says the same (`notice_test`); IMAP
-SEARCH can't, so what it finds is read again by `FROM AUTO-SUBMITTED`.
-Keep in Inbox is the fix for a sender it still gets wrong.
+`Precedence: bulk`), a word in the sender's local part or in a host
+before its domain (`NOTICE_WORDS`: account, security, login, order,
+receipt, payment, shipping, confirm, message, … in English, German and
+Swedish; `receipt.max.se`), a host that sends only notices
+(`NOTICE_HOSTS`: `accounts.google.com`, `id.apple.com`), or a word in the
+subject (`SUBJECT_WORDS`: password, verification, security, your order,
+its receipt, payment, delivery: "Verifieringskod", "netcup Sicherheitstoken"),
+but not from a sender that calls itself a newsletter (`newsletter@`,
+`news@`: netcup's advisories stay newsletters). The rule's Sieve says the
+same (`notice_test`); IMAP SEARCH can't, so what it finds is read again by
+its header fields. Keep in Inbox is the fix for a sender it still gets
+wrong.
 
 The first time an account comes online, Postrider adds a rule to its
 Sieve script that files newsletters in its Newsletters folder (made where
 there's none), after the account's other rules, so a rule of yours still
 wins. It moves the Inbox's newsletters there too, and notes the account in
-`newsletters_set_aside`, so a rule you take away stays away. An account
-set aside before notices were told apart (`notices_back_at` empty) gets
-its rule written again and its notices moved back to the Inbox, once. One
-whose notices came back while `Auto-Submitted` alone made a notice
-(`bulk_aside_at` empty) gets its rule written again and the newsletters
-that said a machine sent them set aside, once (`sort_again`), and one set
-aside before the text counted (`services_aside_at` empty) gets those too. The
-folder is a role folder (`FolderRole::Newsletters`), named "Newsletters".
+`newsletters_set_aside`, so a rule you take away stays away, with what
+made a newsletter or a notice then (`sorted_by`: the rule's test in
+Sieve). When that changes, the account's mail is sorted again by it, once
+(`sort_again`): its rule is written again, the notices in Newsletters go
+back to the Inbox, and the Inbox's newsletters go to Newsletters, but
+those from senders kept in the Inbox. Change the words, and every account
+follows on its next start; there's nothing else to note. Both passes
+subscribe the folders Postrider puts mail in (Archive, Trash, Junk,
+Newsletters and those its rules sort into), since the account's other
+mail apps show only subscribed ones; a folder Postrider makes is
+subscribed as it's made. The folder is a role folder
+(`FolderRole::Newsletters`), named "Newsletters".
 
 The page (`newsletters.tsx`, `GET /newsletters`) reads each account's
 Newsletters of the last 90 days by sender (named as its newest mail
