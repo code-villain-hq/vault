@@ -11,6 +11,7 @@ tauri-build = { version = "2.7", features = [] }
 [dependencies]
 tauri = { version = "2.12", features = [] }
 code-villain-desktop.workspace = true
+code-villain-notify.workspace = true
 postrider-server.workspace = true
 postrider-sync.workspace = true
 serde.workspace = true
@@ -20,6 +21,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 # The plugin settings in tauri.conf.json are compiled in as JSON.
 serde_json.workspace = true
+tauri-plugin-notification = "2.6"
 tauri-plugin-opener = "2.7"
 
 [lints]

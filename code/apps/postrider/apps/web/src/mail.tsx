@@ -7,9 +7,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { api } from "./api";
+import { notify, setBadge } from "./platform";
 import { useRecords, useWorkspace } from "./workspace";
 
 /** Waits between tries while the server can't be reached, in seconds. */
@@ -97,12 +99,50 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     };
     return { inbox, offline: state.offline, leave, stay };
   }, [state, leaving, leave, stay]);
+  useNewMailNotices(state.inbox);
 
   return (
     <Context.Provider value={shown}>
       <FoldersProvider version={state.inbox?.version}>{children}</FoldersProvider>
     </Context.Provider>
   );
+}
+
+/** More new mail at once than this is one notification. */
+const NOTICES = 3;
+
+/**
+ * In the desktop app, the dock shows how much in the Inbox is unread, and
+ * unread mail that comes while the app runs is a notification. What an
+ * account's server has when it comes online (the app opened, the account
+ * was connected) is there already: it doesn't pop up.
+ */
+function useNewMailNotices(inbox: Inbox | undefined) {
+  const known = useRef({ online: new Set<string>(), mails: new Set<string>() });
+
+  useEffect(() => {
+    if (!inbox) return;
+    void setBadge(inbox.mails.filter((mail) => !mail.seen).length);
+    const { online, mails } = known.current;
+    const fresh = inbox.mails.filter((mail) => {
+      const key = `${mail.account_id}:${mail.uid}`;
+      if (mails.has(key)) return false;
+      mails.add(key);
+      return !mail.seen && online.has(mail.account_id);
+    });
+    for (const status of inbox.accounts) {
+      if (status.state === "online") online.add(status.account_id);
+    }
+    if (fresh.length > NOTICES) {
+      const senders = [...new Set(fresh.map((mail) => mail.from_name))];
+      void notify(`${fresh.length} new mails`, senders.join(", "));
+    } else {
+      for (const mail of fresh) void notify(mail.from_name, mail.subject || "(no subject)");
+    }
+  }, [inbox]);
+
+  // Gone (another workspace, or the app quits): no count left on the dock.
+  useEffect(() => () => void setBadge(0), []);
 }
 
 type FoldersState = {
