@@ -297,6 +297,53 @@ impl Mail {
         })
     }
 
+    /// Moves these mails from the account's Inbox to `path`: those of them
+    /// still there. Undo moves back whatever came to `path` since.
+    pub(crate) async fn move_uids(
+        &self,
+        account: &MailAccount,
+        uids: &[u32],
+        path: &str,
+    ) -> Result<Moved, Failure> {
+        if uids.is_empty() {
+            return Ok(Moved {
+                path: path.to_string(),
+                since: 0,
+                when: Vec::new(),
+                count: 0,
+            });
+        }
+        let set = uid_set(uids);
+        let (since, count) = self
+            .on_server(account, |session| {
+                let (set, path) = (set.clone(), path.to_string());
+                Box::pin(async move {
+                    let since = session
+                        .status(&path, "(UIDNEXT)")
+                        .await?
+                        .uid_next
+                        .unwrap_or(1);
+                    session.select("INBOX").await?;
+                    let there: Vec<u32> = session
+                        .uid_search(format!("UID {set}"))
+                        .await?
+                        .into_iter()
+                        .collect();
+                    if !there.is_empty() {
+                        session.uid_mv(uid_set(&there), &path).await?;
+                    }
+                    Ok((since, there.len()))
+                })
+            })
+            .await?;
+        Ok(Moved {
+            path: path.to_string(),
+            since,
+            when: Vec::new(),
+            count,
+        })
+    }
+
     /// Moves mail a rule moved back to the Inbox: what came to its folder
     /// since and matches it.
     pub(crate) async fn move_back(

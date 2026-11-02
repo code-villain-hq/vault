@@ -15,6 +15,8 @@ nothing: it translates with local models only.
   per question over the Agent Client Protocol, in an empty folder of its
   own, as you're signed in to it: no settings, no tools of its own, only the
   app's (`mcp__<app>__<tool>`) and the web's when the question allows it.
+  A question with no tools gets no MCP endpoint either: an app that shows
+  it a stranger's words, as Postrider's sorter shows it mail, asks so.
   A `Failure` says why it gave no answer: not installed, signed out, or
   what went wrong.
 - `src/questions.rs`: `Questions<T>`. The token each question opens, which

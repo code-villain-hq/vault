@@ -2,7 +2,8 @@
 //! it what to do, and Claude Code on this Mac answers
 //! (`studio/design/behaviour.md`, "Claude"), as you're signed in to it, in
 //! an empty folder of its own, with Postrider's tools and nothing else:
-//! finding senders and mail, reading a mail, and sorting (`rules.rs`). It
+//! finding senders and mail, reading a mail, and sorting, with rules on the
+//! mail server (`rules.rs`) or by reading on this Mac (`reading.rs`). It
 //! calls them at [`MCP_PATH`] with a token that lasts the one question.
 //! What an answer changed, Undo puts back. Postrider runs only on this Mac,
 //! so there's no key and no question handed over.
@@ -28,6 +29,7 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::mail::Mail;
 use crate::message;
+use crate::reading::ReadingRule;
 use crate::rules::{self, Moved, Rule, When, same_folder};
 use crate::state::AppState;
 
@@ -69,6 +71,9 @@ pub struct Done {
     moved: Vec<(MailAccount, Moved)>,
     /// The folders it made, by their path.
     made: Vec<(MailAccount, String)>,
+    /// The reading rules it made, and those it took away.
+    reading_made: Vec<Uuid>,
+    reading_removed: Vec<ReadingRule>,
     chips: Vec<String>,
     folder: Option<FolderLink>,
 }
@@ -76,6 +81,10 @@ pub struct Done {
 impl Done {
     fn changed(&self) -> bool {
         !self.before.is_empty()
+            || !self.moved.is_empty()
+            || !self.made.is_empty()
+            || !self.reading_made.is_empty()
+            || !self.reading_removed.is_empty()
     }
 }
 
@@ -84,6 +93,7 @@ const TOOLS: &[&str] = &[
     "find_mail",
     "read_mail",
     "sort_into",
+    "sort_by_reading",
     "stop_sorting",
 ];
 
@@ -150,9 +160,41 @@ fn definitions() -> Vec<Value> {
             },
         }),
         json!({
+            "name": "sort_by_reading",
+            "description": "Sorts mail into a folder by reading it, for what no rule on the \
+                mail server can tell, like \"anything that looks like an invoice\": Postrider \
+                reads the mail that comes to the Inbox from now on and moves what fits, on this \
+                Mac, while it's open. looks_like finishes \"mail that looks like …\", in \
+                English: \"an invoice\". mails are what's in the Inbox already that fits, by \
+                what find_mail said (folder none): they move now. accounts (addresses) says \
+                where; without it, every account. The folder is made where there's none. It \
+                answers with what it did.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "folder": { "type": "string" },
+                    "looks_like": { "type": "string" },
+                    "mails": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "account": { "type": "string" },
+                                "uid": { "type": "integer" },
+                            },
+                            "required": ["account", "uid"],
+                        },
+                    },
+                    "accounts": addresses,
+                },
+                "required": ["folder", "looks_like"],
+            },
+        }),
+        json!({
             "name": "stop_sorting",
-            "description": "Stops sorting into a folder: takes these from its rule, or the \
-                whole rule when none are given, in every account. What's in the folder stays.",
+            "description": "Stops sorting into a folder: takes these from its rule, or, with \
+                reading true, only its sorting by reading, or else the whole rule and its \
+                sorting by reading, in every account. What's in the folder stays.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -161,6 +203,7 @@ fn definitions() -> Vec<Value> {
                     "to": addresses,
                     "subject": addresses,
                     "list": addresses,
+                    "reading": { "type": "boolean" },
                 },
                 "required": ["folder"],
             },
@@ -179,6 +222,7 @@ impl Tools for Asking {
             "find_mail" => self.find_mail(&arguments).await,
             "read_mail" => self.read_mail(&arguments).await,
             "sort_into" => self.sort_into(&arguments).await,
+            "sort_by_reading" => self.sort_by_reading(&arguments).await,
             "stop_sorting" => self.stop_sorting(&arguments).await,
             _ => Err(format!("Postrider has no tool called {name}.")),
         };
@@ -273,52 +317,7 @@ impl Asking {
             .source_of(account, folder, uid)
             .await
             .map_err(|e| e.message)?;
-        let parsed = MessageParser::new().parse(&raw);
-        let from = parsed
-            .as_ref()
-            .and_then(|m| m.from())
-            .and_then(|list| list.first())
-            .map(|mailbox| match (mailbox.name(), mailbox.address()) {
-                (Some(name), Some(address)) => format!("{name} <{address}>"),
-                (name, address) => name.or(address).unwrap_or_default().to_string(),
-            })
-            .unwrap_or_default();
-        let subject = parsed
-            .as_ref()
-            .and_then(|m| m.subject())
-            .unwrap_or_default();
-        let date = parsed
-            .as_ref()
-            .and_then(|m| m.date())
-            .map(|d| d.to_rfc3339())
-            .unwrap_or_default();
-        let summary = MailSummary {
-            account_id: account.id,
-            folder: folder.map(str::to_string),
-            uid,
-            from_name: String::new(),
-            from_address: String::new(),
-            subject: String::new(),
-            snippet: String::new(),
-            date: Utc::now(),
-            seen: true,
-            to_name: None,
-        };
-        let opened = message::read(&raw, summary);
-        let mut body: String = opened.text.chars().take(READ_AT_MOST).collect();
-        if body.len() < opened.text.len() {
-            body.push_str("\n[…]");
-        }
-        let files: Vec<&str> = opened.attachments.iter().map(|a| a.name.as_str()).collect();
-        let mut read = format!(
-            "From: {from}\nTo: {}\nDate: {date}\nSubject: {subject}\n",
-            opened.to.join(", ")
-        );
-        if !files.is_empty() {
-            let _ = writeln!(read, "Files: {}", files.join(", "));
-        }
-        let _ = write!(read, "\n{body}");
-        Ok(read)
+        Ok(as_read(&raw, account.id, READ_AT_MOST))
     }
 
     async fn sort_into(&self, arguments: &Value) -> Result<String, String> {
@@ -422,13 +421,128 @@ impl Asking {
         Ok(format!("Done. Tell them so, in their language: {said}"))
     }
 
+    async fn sort_by_reading(&self, arguments: &Value) -> Result<String, String> {
+        let folder = text(arguments, "folder")?;
+        let about = text(arguments, "looks_like")?;
+        let about = about
+            .strip_prefix("mail that looks like ")
+            .unwrap_or(about)
+            .trim_end_matches('.')
+            .to_string();
+        let named = strings(arguments, "accounts");
+        let accounts: Vec<MailAccount> = if named.is_empty() {
+            self.accounts.clone()
+        } else {
+            named
+                .iter()
+                .map(|n| self.account_by_address(n).cloned())
+                .collect::<Result<_, _>>()?
+        };
+        let mut mails: Vec<(Uuid, u32)> = Vec::new();
+        for mail in arguments["mails"].as_array().into_iter().flatten() {
+            let account = self.account_by_address(mail["account"].as_str().unwrap_or(""))?;
+            let uid = mail["uid"]
+                .as_u64()
+                .and_then(|uid| u32::try_from(uid).ok())
+                .ok_or("Say each mail by its account and uid.")?;
+            mails.push((account.id, uid));
+        }
+        let mut done = self.done.lock().await;
+        let mut made_rule = Vec::new();
+        let mut moved = 0;
+        let mut shown = folder.to_string();
+        for account in &accounts {
+            let failed =
+                |failure: crate::imap::Failure| format!("{}: {}", account.name, failure.message());
+            let kept = |e: sqlx::Error| {
+                tracing::error!(error = %e, "couldn't keep a reading rule");
+                format!("{}: Postrider couldn't keep the rule.", account.name)
+            };
+            let (place, made) = self
+                .mail
+                .folder_named(account, folder)
+                .await
+                .map_err(failed)?;
+            if made {
+                done.made.push((account.clone(), place.path.clone()));
+            }
+            shown.clone_from(&place.name);
+            let rules = self.mail.reading_rules(account.id).await.map_err(kept)?;
+            let had = rules
+                .iter()
+                .any(|r| r.path == place.path && r.about.eq_ignore_ascii_case(&about));
+            if !had {
+                let rule = ReadingRule {
+                    id: Uuid::now_v7(),
+                    account_id: account.id,
+                    folder: place.name.clone(),
+                    path: place.path.clone(),
+                    about: about.clone(),
+                    created_at: Utc::now(),
+                };
+                self.mail.add_reading_rule(&rule).await.map_err(kept)?;
+                done.reading_made.push(rule.id);
+                made_rule.push(account.name.clone());
+            }
+            let uids: Vec<u32> = mails
+                .iter()
+                .filter(|(id, _)| *id == account.id)
+                .map(|(_, uid)| *uid)
+                .collect();
+            if !uids.is_empty() {
+                let out = self
+                    .mail
+                    .move_uids(account, &uids, &place.path)
+                    .await
+                    .map_err(failed)?;
+                for uid in &uids {
+                    let _ = self
+                        .mail
+                        .forget_inbox_line(account.id, i64::from(*uid))
+                        .await;
+                }
+                moved += out.count;
+                done.moved.push((account.clone(), out));
+            }
+            done.folder = Some(FolderLink {
+                key: place.key(),
+                name: place.name.clone(),
+            });
+        }
+        let chip = format!("Looks like {about}");
+        if !done.chips.contains(&chip) {
+            done.chips.push(chip);
+        }
+        let mut said = String::new();
+        if made_rule.is_empty() {
+            let _ = write!(
+                said,
+                "Postrider sorts mail that looks like **{about}** into **{shown}** already. "
+            );
+        } else {
+            let _ = write!(
+                said,
+                "Made a rule {}: mail that looks like **{about}** goes to **{shown}**. \
+                 Postrider sorts it by reading new mail, so only while it's open on this Mac. ",
+                self.in_accounts(&made_rule)
+            );
+        }
+        said.push_str(&match moved {
+            0 => "Nothing in the Inbox moved yet.".to_string(),
+            1 => "Moved 1 mail there.".to_string(),
+            n => format!("Moved {n} mails there."),
+        });
+        Ok(format!("Done. Tell them so, in their language: {said}"))
+    }
+
     async fn stop_sorting(&self, arguments: &Value) -> Result<String, String> {
         let folder = text(arguments, "folder")?;
         let when = whens(arguments);
+        let reading = arguments["reading"].as_bool().unwrap_or(false);
         let mut done = self.done.lock().await;
         let mut stopped = Vec::new();
         let mut problems = Vec::new();
-        for account in &self.accounts {
+        for account in self.accounts.iter().filter(|_| !reading) {
             let rules = match self.mail.rules(account).await {
                 Ok(rules) => rules,
                 Err(failure) => {
@@ -460,7 +574,40 @@ impl Asking {
             }
             stopped.push(account.name.clone());
         }
-        if stopped.is_empty() {
+        // Sorting by reading stops with the whole rule, or on its own.
+        let mut stopped_reading = Vec::new();
+        let mut abouts: Vec<String> = Vec::new();
+        for account in self.accounts.iter().filter(|_| when.is_empty()) {
+            let rules = match self.mail.reading_rules(account.id).await {
+                Ok(rules) => rules,
+                Err(e) => {
+                    tracing::error!(error = %e, "couldn't read the reading rules");
+                    problems.push(format!(
+                        "{}: Postrider couldn't read its rules.",
+                        account.name
+                    ));
+                    continue;
+                }
+            };
+            for rule in rules.into_iter().filter(|r| same_folder(&r.folder, folder)) {
+                if let Err(e) = self.mail.remove_reading_rule(rule.id).await {
+                    tracing::error!(error = %e, "couldn't take away a reading rule");
+                    problems.push(format!(
+                        "{}: Postrider couldn't change its rules.",
+                        account.name
+                    ));
+                    continue;
+                }
+                if !stopped_reading.contains(&account.name) {
+                    stopped_reading.push(account.name.clone());
+                }
+                if !abouts.contains(&rule.about) {
+                    abouts.push(rule.about.clone());
+                }
+                done.reading_removed.push(rule);
+            }
+        }
+        if stopped.is_empty() && stopped_reading.is_empty() {
             return match problems.is_empty() {
                 true => Ok(format!("No rule sorts that into {folder}.")),
                 false => Err(problems.join("\n")),
@@ -471,15 +618,36 @@ impl Asking {
                 done.chips.push(chip);
             }
         }
-        let what = if when.is_empty() {
-            String::new()
-        } else {
-            format!(" mail {}", self.who(&when).await)
-        };
+        for about in &abouts {
+            let chip = format!("Looks like {about}");
+            if !done.chips.contains(&chip) {
+                done.chips.push(chip);
+            }
+        }
+        let mut said = String::new();
+        if !stopped.is_empty() {
+            let what = if when.is_empty() {
+                String::new()
+            } else {
+                format!(" mail {}", self.who(&when).await)
+            };
+            let _ = write!(
+                said,
+                "Stopped sorting{what} into **{folder}** {}. ",
+                self.in_accounts(&stopped)
+            );
+        }
+        if !stopped_reading.is_empty() {
+            let looks: Vec<String> = abouts.iter().map(|a| format!("**{a}**")).collect();
+            let _ = write!(
+                said,
+                "Stopped sorting mail that looks like {} into **{folder}** {}. ",
+                or(&looks),
+                self.in_accounts(&stopped_reading)
+            );
+        }
         Ok(format!(
-            "Done. Tell them so, in their language: Stopped sorting{what} into **{folder}** {}. \
-             What's there stays.",
-            self.in_accounts(&stopped)
+            "Done. Tell them so, in their language: {said}What's there stays."
         ))
     }
 
@@ -620,6 +788,57 @@ fn strings(arguments: &Value, name: &str) -> Vec<String> {
     .collect()
 }
 
+/// A mail as Claude Code reads it: who it's from and to, when, its subject,
+/// its files and up to `at_most` characters of its text.
+pub(crate) fn as_read(raw: &[u8], account_id: Uuid, at_most: usize) -> String {
+    let parsed = MessageParser::new().parse(raw);
+    let from = parsed
+        .as_ref()
+        .and_then(|m| m.from())
+        .and_then(|list| list.first())
+        .map(|mailbox| match (mailbox.name(), mailbox.address()) {
+            (Some(name), Some(address)) => format!("{name} <{address}>"),
+            (name, address) => name.or(address).unwrap_or_default().to_string(),
+        })
+        .unwrap_or_default();
+    let subject = parsed
+        .as_ref()
+        .and_then(|m| m.subject())
+        .unwrap_or_default();
+    let date = parsed
+        .as_ref()
+        .and_then(|m| m.date())
+        .map(|d| d.to_rfc3339())
+        .unwrap_or_default();
+    let summary = MailSummary {
+        account_id,
+        folder: None,
+        uid: 0,
+        from_name: String::new(),
+        from_address: String::new(),
+        subject: String::new(),
+        snippet: String::new(),
+        date: Utc::now(),
+        seen: true,
+        to_name: None,
+    };
+    let opened = message::read(raw, summary);
+    let mut body: String = opened.text.chars().take(at_most).collect();
+    if body.len() < opened.text.len() {
+        body.push_str("\n[…]");
+    }
+    let files: Vec<&str> = opened.attachments.iter().map(|a| a.name.as_str()).collect();
+    let mut read = format!(
+        "From: {from}\nTo: {}\nDate: {date}\nSubject: {subject}\n",
+        opened.to.join(", ")
+    );
+    if !files.is_empty() {
+        let _ = writeln!(read, "Files: {}", files.join(", "));
+    }
+    let _ = write!(read, "\n{body}");
+    read
+}
+
 /// What a sort_into or stop_sorting looks for.
 fn whens(arguments: &Value) -> Vec<When> {
     let mut when = Vec::new();
@@ -673,10 +892,20 @@ async fn prompt(mail: &Arc<Mail>, workspace_id: Uuid, accounts: &[MailAccount]) 
     };
     let mut sorting = String::new();
     for account in accounts {
-        let rules = match mail.rules(account).await {
+        let mut rules = match mail.rules(account).await {
             Ok(rules) => rules::described(&rules),
             Err(failure) => format!("can't sort there: {}", failure.message()),
         };
+        let reading: Vec<String> = mail
+            .reading_rules(account.id)
+            .await
+            .unwrap_or_default()
+            .iter()
+            .map(|r| format!("{} ← looks like {}", r.folder, r.about))
+            .collect();
+        if !reading.is_empty() {
+            let _ = write!(rules, "; by reading: {}", reading.join("; "));
+        }
         let _ = writeln!(sorting, "- {}: {rules}", account.name);
     }
     let now = Local::now().format("%A, %e %B %Y, %H:%M");
@@ -701,7 +930,10 @@ async fn prompt(mail: &Arc<Mail>, workspace_id: Uuid, accounts: &[MailAccount]) 
          they asked for.\n\
          \n\
          Sorting that needs reading a mail, like \"anything that looks like an invoice\", \
-         can't be a rule on the mail server: say Postrider can't sort by reading yet.\n\
+         can't be a rule on the mail server: sort_by_reading does it, on this Mac while \
+         Postrider is open. Before it, find what's in the Inbox already that fits with \
+         find_mail, reading what you're unsure of, and give it those mails. When a sender \
+         says it all, a rule with sort_into is better: it sorts while the Mac is shut.\n\
          \n\
          To answer about their mail, find it with find_mail and read it with read_mail. \
          Never make up mail, senders, numbers or what a mail says.",
@@ -816,6 +1048,16 @@ async fn put_back(mail: &Mail, done: &Done) -> Result<(), crate::imap::Failure> 
     for (account, rules) in &done.before {
         mail.put_rules(account, rules).await?;
     }
+    let kept = |e: sqlx::Error| {
+        tracing::error!(error = %e, "couldn't put back a reading rule");
+        crate::imap::Failure::Offline("Postrider couldn't change its rules.".into())
+    };
+    for id in &done.reading_made {
+        mail.remove_reading_rule(*id).await.map_err(kept)?;
+    }
+    for rule in &done.reading_removed {
+        mail.add_reading_rule(rule).await.map_err(kept)?;
+    }
     for (account, moved) in &done.moved {
         mail.move_back(account, moved).await?;
     }
@@ -826,7 +1068,7 @@ async fn put_back(mail: &Mail, done: &Done) -> Result<(), crate::imap::Failure> 
 }
 
 /// Why Claude Code gave no answer, in words for the page.
-fn problem(failure: Failure) -> String {
+pub(crate) fn problem(failure: Failure) -> String {
     match failure {
         Failure::NotInstalled => "Postrider answers with Claude Code on this Mac, and its ACP \
              adapter isn't installed. Run npm install -g @agentclientprotocol/claude-agent-acp \

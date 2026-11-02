@@ -18,6 +18,7 @@ pub mod local;
 pub mod mail;
 pub mod message;
 pub mod preview;
+pub mod reading;
 pub mod reply;
 pub mod routes;
 pub mod rules;

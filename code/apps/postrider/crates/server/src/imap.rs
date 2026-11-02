@@ -300,8 +300,9 @@ pub async fn sync_inbox(
             let summary = summarize(fetch.body().unwrap_or_default(), arrived);
             sqlx::query(
                 "INSERT INTO inbox_mails \
-                 (account_id, uid, from_name, from_address, subject, snippet, date, seen) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+                 (account_id, uid, from_name, from_address, subject, snippet, date, seen, \
+                 message_id) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
                  ON CONFLICT (account_id, uid) DO UPDATE SET seen = EXCLUDED.seen",
             )
             .bind(account_id)
@@ -312,6 +313,7 @@ pub async fn sync_inbox(
             .bind(&summary.snippet)
             .bind(summary.date)
             .bind(is_seen(fetch))
+            .bind(&summary.message_id)
             .execute(pool)
             .await?;
             changed = true;
@@ -795,6 +797,8 @@ pub struct Summary {
     pub subject: String,
     pub snippet: String,
     pub date: DateTime<Utc>,
+    /// Its Message-ID, without the brackets; empty when it has none.
+    pub message_id: String,
 }
 
 /// Reads the list's line from the start of a mail: who it's from, its
@@ -845,6 +849,11 @@ pub fn summarize(raw: &[u8], arrived: Option<DateTime<Utc>>) -> Summary {
         subject,
         snippet,
         date: arrived.or(dated).unwrap_or_else(Utc::now),
+        message_id: message
+            .as_ref()
+            .and_then(|m| m.message_id())
+            .unwrap_or_default()
+            .to_string(),
     }
 }
 

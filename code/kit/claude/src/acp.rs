@@ -130,7 +130,8 @@ pub struct Question<'a> {
     pub images: &'a [Image],
     /// Whether it may search the web and read pages.
     pub web: bool,
-    /// The app's tools it may use, by their names in [`App::key`].
+    /// The app's tools it may use, by their names in [`App::key`]. With
+    /// none, it isn't given the app's MCP endpoint at all.
     pub tools: &'a [&'a str],
     /// The bearer the app's MCP endpoint knows this question by.
     pub token: &'a str,
@@ -359,8 +360,10 @@ impl Adapter {
             let mut agent = self.start(question).await?;
             let opened = tokio::time::timeout(self.start_timeout, async {
                 agent.initialize().await?;
+                // A question with no tools gets no endpoint to reach either.
+                let with_tools = !question.tools.is_empty();
                 agent
-                    .new_session(&self.cwd(), &self.mcp_url, question, true)
+                    .new_session(&self.cwd(), &self.mcp_url, question, with_tools)
                     .await
             })
             .await;

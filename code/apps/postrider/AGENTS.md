@@ -12,8 +12,9 @@ sidebar, the list, the mail. Esc closes it, J and K move. A narrow window
 shows the list or the mail, with a way back. The desktop app notifies of
 new mail and counts what's unread on the dock. Step 2 is built too: the
 field at the foot of the list, where you ask Postrider something or tell
-it how to sort, and it makes the rule on the mail server, says what it
-did, and Undo puts it back. Writing a new mail and "More professional"
+it how to sort, and it makes the rule on the mail server, or sorts by
+reading on this Mac what no server rule can tell, says what it did, and
+Undo puts it back. Writing a new mail and "More professional"
 (3), newsletters (4) and the week (5) are still to come.
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
@@ -155,9 +156,9 @@ The field at the foot of the list (`ask.tsx`) sends what you typed to
 you're signed in to it, through `code/kit/claude`, in an empty folder of
 its own and with Postrider's tools only, reached at `/api/ai/mcp` with a
 token that lasts the one question: `find_senders`, `find_mail`,
-`read_mail`, `sort_into` and `stop_sorting`. The prompt names the
-accounts, their folders and their rules, so "Dependabot too" adds to the
-rule it means. One question at a time; there's no talk to scroll back.
+`read_mail`, `sort_into`, `sort_by_reading` and `stop_sorting`. The
+prompt names the accounts, their folders and their rules, so "Dependabot
+too" adds to the rule it means. One question at a time; there's no talk to scroll back.
 Not installed or signed out, the answer says what to do.
 
 Rules live on each account's mail server, in a Sieve script named
@@ -178,6 +179,21 @@ were, moves the mail back to the Inbox, and takes away a folder it made
 once it's empty again. What Undo needs is kept in memory, so it lasts
 until the server stops.
 
+Sorting that needs reading a mail, "anything that looks like an invoice",
+is no rule a server can run. `sort_by_reading` keeps it on this Mac
+instead (`reading_rules`: a folder and, in words, what its mail looks
+like), moves the Inbox mail the answer found already, and the answer says
+it sorts only while Postrider is open. The sorter (`reading.rs`, started
+by `serve.rs` with Claude Code) wakes when an Inbox changes, takes the mail
+that came since the rule was made (its INTERNALDATE) and hasn't been read
+for it, ten at a time, and asks Claude Code with no tools at all, since a
+mail is a stranger's words: lines like `3: 1` put mail 3 in folder 1. It
+moves those with `UID MOVE` and keeps every mail it read in
+`reading_read`, by Message-ID, so one you move back stays in the Inbox.
+When Claude Code or a server fails, it tries again five minutes later.
+`stop_sorting` takes reading rules away with the whole rule, or alone
+with `reading`; Undo puts them back.
+
 ## Layout
 
 - `crates/domain`: models, validation, sync protocol types (no database).
@@ -190,8 +206,8 @@ until the server stops.
   (`message.rs`, its list line in `preview.rs`), archiving, replying and
   files (`archive.rs`, `reply.rs`, `files.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
-  ask field's answers (`ask.rs`) and sorting rules (`rules.rs`, written
-  over ManageSieve by `sieve.rs`).
+  ask field's answers (`ask.rs`), sorting rules (`rules.rs`, written
+  over ManageSieve by `sieve.rs`) and sorting by reading (`reading.rs`).
   `local.rs` is the one person on this Mac, who signs in to nothing.
   `serve.rs` runs it until told to stop, for `main.rs` (development) and
   the desktop app alike.
@@ -205,7 +221,9 @@ until the server stops.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
   for this Mac, with `code/kit/desktop`, and Claude Code to answer; `main.rs` notifies with
   `code/kit/notify`; `files.rs` opens a mail's files.
-- `migrations`: SQL schema, applied by the server on start.
+- `migrations`: SQL schema, applied by the server on start. They're
+  embedded in `crates/sync` when it builds; its `build.rs` rebuilds it
+  when one is added.
 - `dev`: the stand-ins' settings.
 
 ## Rules
