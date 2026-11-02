@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Herald: a day with your mail</title>
+<title>Postrider: a day with your mail</title>
 <link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
 <link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
 <link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
@@ -90,7 +90,7 @@
 .mail.unread .who, .mail.unread .line b { font-weight: 700; }
 .mail.unread .when { color: var(--muted); }
 
-/* What Herald did, above the field you asked in. */
+/* What Postrider did, above the field you asked in. */
 .answer { margin: 8px 24px 0; max-width: 720px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); display: grid; gap: 10px; }
 .asked { color: var(--faint); font-size: var(--type-ui-small-size); }
 .did { display: flex; gap: 10px; align-items: flex-start; }
@@ -169,18 +169,18 @@
 <div class="page">
 
 <header>
-  <h1>Herald: a day with your mail</h1>
-  <p>Mail and calendar in one villain app, for the Lazarski and Code Villain accounts on Uberspace and the calendar on Radicale. Work mail stays in Outlook. Monday, Nov 3. Night and day, with the Nightshade tokens. Herald is a working name, and the content is made up.</p>
+  <h1>Postrider: a day with your mail</h1>
+  <p>Mail and calendar in one villain app, for the Lazarski and Code Villain accounts on Uberspace and the calendar on Radicale. Work mail stays in Outlook. Monday, Nov 3. Night and day, with the Nightshade tokens. The content is made up.</p>
 </header>
 
 <section class="step" id="s1">
   <h2><span class="n">1</span>Your day, then your mail</h2>
-  <p>Monday, 08:40, with coffee. Herald opens on one Inbox for both accounts, with today's calendar above it.</p>
+  <p>Monday, 08:40, with coffee. Postrider opens on one Inbox for both accounts, with today's calendar above it.</p>
   <ul class="choices">
     <li><b>My choice:</b> one Inbox for both accounts. Each account wears one colour on its senders, and its calendar wears the same one.</li>
     <li><b>My choice:</b> today sits above the Inbox, 8 to 22, with a line for now. The week is in Calendar.</li>
     <li><b>My choice:</b> a mail opens in the list's place, and Esc goes back. J and K move, E archives, R replies.</li>
-    <li><b>My choice:</b> one field at the foot of every view, to ask Herald something or tell it what to do. Claude Code on this Mac answers, as in Almanac.</li>
+    <li><b>My choice:</b> one field at the foot of every view, to ask Postrider something or tell it what to do. Claude Code on this Mac answers, as in Almanac.</li>
   </ul>
   <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="inbox"></div></div>
   <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="inbox"></div></div>
@@ -188,11 +188,11 @@
 
 <section class="step" id="s2">
   <h2><span class="n">2</span>You tell it how to sort</h2>
-  <p>You type “Put GitHub and Forgejo mail in a folder called Code”. Herald makes the rule, moves what's already there, and says what it did.</p>
+  <p>You type “Put GitHub and Forgejo mail in a folder called Code”. Postrider makes the rule, moves what's already there, and says what it did.</p>
   <ul class="choices">
     <li><b>My choice:</b> the rule lives on the mail server (Sieve, which Uberspace runs), so it sorts while the Mac is shut, and your iPhone sees the same folders.</li>
     <li><b>My choice:</b> it says what it did in words, with Undo. There's no rule editor: to change a rule, you say so (“Dependabot too”).</li>
-    <li><b>My choice:</b> sorting that needs reading, like “anything that looks like an invoice”, can't be a server rule. Herald does that while it's open on this Mac, and says so when it makes one.</li>
+    <li><b>My choice:</b> sorting that needs reading, like “anything that looks like an invoice”, can't be a server rule. Postrider does that while it's open on this Mac, and says so when it makes one.</li>
     <li><b>My choice:</b> a folder with the same name in both accounts shows once.</li>
   </ul>
   <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="sorted"></div></div>
@@ -229,8 +229,8 @@
   <ul class="choices">
     <li><b>My choice:</b> Calendar is Radicale's, over CalDAV: both calendars in one week, each in its account's colour.</li>
     <li><b>My choice:</b> a mail that names a time offers the event above its text. The event remembers its mail and opens it.</li>
-    <li><b>My choice:</b> asked to find time, Herald draws what it proposes into the week first, striped. It's made when you pick.</li>
-    <li><b>Mind:</b> Herald doesn't see your DIB calendar, which stays in Outlook. So it plans evenings and weekends unless you tell it otherwise.</li>
+    <li><b>My choice:</b> asked to find time, Postrider draws what it proposes into the week first, striped. It's made when you pick.</li>
+    <li><b>Mind:</b> Postrider doesn't see your DIB calendar, which stays in Outlook. So it plans evenings and weekends unless you tell it otherwise.</li>
   </ul>
   <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="week"></div></div>
   <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="week"></div></div>
@@ -285,7 +285,7 @@
 
 <template id="askbox">
   <div class="ask">
-    <div class="askbox ui-field"><i data-i="sparkles"></i><span class="ph">Ask Herald, or tell it what to do</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="up"></i></button></div>
+    <div class="askbox ui-field"><i data-i="sparkles"></i><span class="ph">Ask Postrider, or tell it what to do</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="up"></i></button></div>
   </div>
 </template>
 
