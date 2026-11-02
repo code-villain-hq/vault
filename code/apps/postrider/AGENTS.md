@@ -233,8 +233,13 @@ with `reading`; Undo puts them back.
 
 ## Newsletters
 
-A newsletter is mail that carries `List-Unsubscribe` and isn't a notice
-(`newsletters.rs`). A notice is about something of yours: a sign-in, the
+A newsletter is mail that carries `List-Unsubscribe`, or that a mailing
+service sent (`SERVICE_FIELDS`: SparkPost's `X-MSFBL`, SendGrid's,
+Amazon SES's, Mailgun's, Mailchimp's, Mailjet's, `X-CSA-Complaints`) with
+"unsubscribe" in its text (`UNSUBSCRIBE_WORDS`, English, German, Swedish),
+and isn't a notice (`newsletters.rs`). Coursera's has no header to say
+so. The rule reads the text only where the server's ManageSieve offers
+`body` (`Sieve::can`); IMAP SEARCH reads it with `BODY`. A notice is about something of yours: a sign-in, the
 account, an order, a payment, a delivery, a message someone wrote you.
 Google and LinkedIn put the header on their notices too, so `is_notice`
 tells them by what the header can't: an `Auto-Submitted` other than `no`
@@ -256,7 +261,8 @@ set aside before notices were told apart (`notices_back_at` empty) gets
 its rule written again and its notices moved back to the Inbox, once. One
 whose notices came back while `Auto-Submitted` alone made a notice
 (`bulk_aside_at` empty) gets its rule written again and the newsletters
-that said a machine sent them set aside, once (`sort_again`). The
+that said a machine sent them set aside, once (`sort_again`), and one set
+aside before the text counted (`services_aside_at` empty) gets those too. The
 folder is a role folder (`FolderRole::Newsletters`), named "Newsletters".
 
 The page (`newsletters.tsx`, `GET /newsletters`) reads each account's

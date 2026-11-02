@@ -23,8 +23,7 @@ pub const SCRIPT: &str = "postrider";
 pub const BOTH: &str = "postrider-and-yours";
 
 const HEADER: &str = "# The mail you told Postrider to sort, and where it goes. Postrider\n\
-# writes this script again each time: tell it what to change.\n\
-require [\"fileinto\"];\n";
+# writes this script again each time: tell it what to change.\n";
 
 /// Mail that matches any of `when` goes to `folder`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,8 +75,9 @@ pub enum When {
     Subject(String),
     /// From this mailing list, by its List-Id.
     List(String),
-    /// With a link to unsubscribe (`List-Unsubscribe`), and not a notice: a
-    /// newsletter ([`crate::newsletters::is_notice`]).
+    /// With a link to unsubscribe (`List-Unsubscribe`), or from a mailing
+    /// service with one in its text, and not a notice: a newsletter
+    /// ([`crate::newsletters`]).
     Unsubscribe,
 }
 
@@ -93,8 +93,9 @@ impl When {
         }
     }
 
-    /// Its test in Sieve.
-    fn test(&self) -> String {
+    /// Its test in Sieve; `bodies` when the server reads a mail's text
+    /// (`body`, RFC 5173).
+    fn test(&self, bodies: bool) -> String {
         let address = |headers: &str, who: &str| {
             let part = if who.contains('@') { "" } else { ":domain " };
             format!("address {part}:is {headers} {}", sieve_string(who))
@@ -104,10 +105,17 @@ impl When {
             When::To(who) => address("[\"to\", \"cc\"]", who),
             When::Subject(words) => format!("header :contains \"subject\" {}", sieve_string(words)),
             When::List(list) => format!("header :contains \"list-id\" {}", sieve_string(list)),
-            When::Unsubscribe => format!(
-                "allof (exists \"list-unsubscribe\", not {})",
-                crate::newsletters::notice_test()
-            ),
+            When::Unsubscribe => {
+                let link = if bodies {
+                    format!(
+                        "anyof (exists \"list-unsubscribe\", {})",
+                        crate::newsletters::from_a_service_test()
+                    )
+                } else {
+                    "exists \"list-unsubscribe\"".into()
+                };
+                format!("allof ({link}, not {})", crate::newsletters::notice_test())
+            }
         }
     }
 
@@ -122,7 +130,10 @@ impl When {
             When::List(list) => format!("HEADER List-Id {}", quoted(list)),
             // An empty string is in every mail that has the header. SEARCH
             // can't tell a notice: what it finds is read again.
-            When::Unsubscribe => "HEADER List-Unsubscribe \"\"".into(),
+            When::Unsubscribe => format!(
+                "OR HEADER List-Unsubscribe \"\" ({})",
+                crate::newsletters::from_a_service_search()
+            ),
         }
     }
 
@@ -142,9 +153,16 @@ impl When {
 
 /// Postrider's script for these rules. Sieve stops at the first that
 /// matches, so yours come first, then the senders kept in the Inbox, then
-/// newsletters: a newsletter you sort into a folder goes there.
-pub fn script(rules: &[Rule]) -> String {
+/// newsletters: a newsletter you sort into a folder goes there. A server
+/// that reads mail's text (`can_read_bodies`) finds newsletters by it too.
+pub fn script(rules: &[Rule], can_read_bodies: bool) -> String {
+    let bodies = can_read_bodies && rules.iter().any(Rule::is_newsletters);
     let mut script = String::from(HEADER);
+    script.push_str(if bodies {
+        "require [\"fileinto\", \"body\"];\n"
+    } else {
+        "require [\"fileinto\"];\n"
+    });
     let mut ordered: Vec<&Rule> = rules.iter().filter(|rule| !rule.when.is_empty()).collect();
     ordered.sort_by_key(|rule| rule.place());
     for rule in ordered {
@@ -152,7 +170,7 @@ pub fn script(rules: &[Rule]) -> String {
         let tests = rule
             .when
             .iter()
-            .map(When::test)
+            .map(|when| when.test(bodies))
             .collect::<Vec<_>>()
             .join(", ");
         // Sieve names a folder in UTF-8, where IMAP has modified UTF-7.
@@ -196,19 +214,21 @@ fn sieve_string(text: &str) -> String {
 /// An IMAP SEARCH for mail that matches any of `when`, with the CHARSET it
 /// needs in front.
 pub(crate) fn search(when: &[When], first: &str) -> String {
-    fn any(keys: &[String]) -> String {
-        match keys {
-            [] => "ALL".into(),
-            [key] => key.clone(),
-            [key, rest @ ..] => format!("OR {key} ({})", any(rest)),
-        }
-    }
     let keys: Vec<String> = when.iter().map(When::search).collect();
     let query = format!("{first}{}", any(&keys));
     if when.iter().all(|w| w.text().is_ascii()) {
         query
     } else {
         format!("CHARSET UTF-8 {query}")
+    }
+}
+
+/// An IMAP SEARCH key that any of `keys` matches; every mail for none.
+pub(crate) fn any(keys: &[String]) -> String {
+    match keys {
+        [] => "ALL".into(),
+        [key] => key.clone(),
+        [key, rest @ ..] => format!("OR {key} ({})", any(rest)),
     }
 }
 
@@ -283,7 +303,7 @@ impl Mail {
     ) -> Result<(), Failure> {
         let mut sieve = self.sieve(account).await?;
         let put = async {
-            sieve.put(SCRIPT, &script(rules)).await?;
+            sieve.put(SCRIPT, &script(rules, sieve.can("body"))).await?;
             let scripts = sieve.scripts().await?;
             match scripts.iter().find(|(_, active)| *active) {
                 None => sieve.activate(SCRIPT).await,
@@ -742,7 +762,8 @@ mod tests {
 
     #[test]
     fn a_rule_is_written_and_read_back() {
-        let script = script(&[code()]);
+        let script = script(&[code()], true);
+        assert!(script.contains("require [\"fileinto\"];\n"));
         assert!(script.contains(
             "if anyof (address :is \"from\" \"notifications@github.com\", \
              address :domain :is \"from\" \"codevillain.eu\", \
@@ -759,7 +780,7 @@ mod tests {
             path: "Geb&APw-hren &- Rechnungen".into(),
             when: vec![When::From("netcup.test".into())],
         };
-        let script = script(std::slice::from_ref(&fees));
+        let script = script(std::slice::from_ref(&fees), true);
         assert!(script.contains("fileinto \"Gebühren & Rechnungen\";"));
         assert_eq!(rules_in(&script), vec![fees]);
     }
@@ -788,10 +809,18 @@ mod tests {
             path: "INBOX".into(),
             when: vec![When::From("news@bahn.test".into())],
         };
-        let script = script(&[newsletters.clone(), kept.clone(), code()]);
-        assert_eq!(rules_in(&script), vec![code(), kept, newsletters]);
+        let script = script(&[newsletters.clone(), kept.clone(), code()], true);
+        assert_eq!(rules_in(&script), vec![code(), kept, newsletters.clone()]);
+        assert!(script.contains("require [\"fileinto\", \"body\"];\n"));
         assert!(script.contains(
-            "if anyof (allof (exists \"list-unsubscribe\", not anyof (allof (exists \"auto-submitted\", \
+            "if anyof (allof (anyof (exists \"list-unsubscribe\", \
+             allof (anyof (exists \"x-msfbl\", exists \"x-sg-eid\", "
+        ));
+        assert!(script.contains(
+            "exists \"x-csa-complaints\"), body :text :contains [\"unsubscribe\", \"abmelden\", "
+        ));
+        assert!(script.contains(
+            "\"avsluta prenumeration\"])), not anyof (allof (exists \"auto-submitted\", \
              not header :is \"auto-submitted\" \"no\", not exists \"list-unsubscribe-post\", \
              not header :is \"precedence\" [\"bulk\", \"list\"]), \
              address :localpart :contains \"from\" [\"account\", "
@@ -800,10 +829,21 @@ mod tests {
             "address :domain :matches \"from\" [\"account.*\", \"accounts.*\", \"auth.*\", \"id.*\", \
              \"login.*\", \"security.*\", \"signin.*\"]))) {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}"
         ));
-        assert_eq!(
-            search(&[When::Unsubscribe], ""),
-            "HEADER List-Unsubscribe \"\""
-        );
+        // A server that doesn't read mail's text goes by the header alone.
+        let header_only = super::script(&[newsletters], false);
+        assert!(header_only.contains("require [\"fileinto\"];\n"));
+        assert!(header_only.contains(
+            "if anyof (allof (exists \"list-unsubscribe\", not anyof (allof (exists \"auto-submitted\", "
+        ));
+        let found = search(&[When::Unsubscribe], "");
+        assert!(found.starts_with(
+            "OR HEADER List-Unsubscribe \"\" (OR HEADER X-MSFBL \"\" (OR HEADER X-SG-EID \"\" ("
+        ));
+        assert!(found.ends_with(
+            "(HEADER X-CSA-Complaints \"\"))))))) OR BODY \"unsubscribe\" (OR BODY \"abmelden\" (\
+             OR BODY \"abbestellen\" (OR BODY \"avregistrera\" (OR BODY \"avprenumerera\" (\
+             BODY \"avsluta prenumeration\"))))))"
+        ));
     }
 
     #[test]

@@ -1,5 +1,7 @@
-//! Newsletters: mail with a link to unsubscribe (`List-Unsubscribe`) that
-//! isn't a notice ([`is_notice`]) skips the Inbox for a folder of its own,
+//! Newsletters: mail with a link to unsubscribe (`List-Unsubscribe`), or
+//! from a mailing service that offers one in its text where its header
+//! doesn't ([`from_a_service_test`]), that isn't a notice ([`is_notice`]),
+//! skips the Inbox for a folder of its own,
 //! by a rule on the account's server ([`When::Unsubscribe`], written after
 //! yours, so a rule of yours still wins). Postrider writes that rule once
 //! for each account, after its first sync, and moves the Inbox's
@@ -154,6 +156,31 @@ const SECOND_LEVEL: &[&str] = &["ac", "co", "com", "edu", "gov", "ne", "net", "o
 /// What `Precedence` says of mail sent to many.
 const BULK: &[&str] = &["bulk", "list"];
 
+/// Header fields a mailing service puts on what it sends for others:
+/// SparkPost's, SendGrid's, Amazon SES's, Mailgun's, Mailchimp's and
+/// Mandrill's, Mailjet's, and the Certified Senders Alliance's.
+const SERVICE_FIELDS: &[&str] = &[
+    "X-MSFBL",
+    "X-SG-EID",
+    "X-SES-Outgoing",
+    "X-Mailgun-Sid",
+    "X-MC-User",
+    "X-Mandrill-User",
+    "X-Mailjet-Campaign",
+    "X-CSA-Complaints",
+];
+
+/// How a newsletter's text offers to unsubscribe, in English, German or
+/// Swedish.
+const UNSUBSCRIBE_WORDS: &[&str] = &[
+    "unsubscribe",
+    "abmelden",
+    "abbestellen",
+    "avregistrera",
+    "avprenumerera",
+    "avsluta prenumeration",
+];
+
 /// The first part of a host that sends only notices: accounts.google.com,
 /// id.apple.com.
 const NOTICE_HOSTS: &[&str] = &[
@@ -224,16 +251,19 @@ impl Mail {
     /// moves the Inbox's newsletters to Newsletters, but those from senders
     /// kept in the Inbox.
     pub(crate) async fn set_newsletters_aside(&self, account: &MailAccount) -> Result<(), Failure> {
-        let done: Option<(bool, bool)> = sqlx::query_as(
-            "SELECT notices_back_at IS NOT NULL, bulk_aside_at IS NOT NULL \
+        let done: Option<(bool, bool, bool)> = sqlx::query_as(
+            "SELECT notices_back_at IS NOT NULL, bulk_aside_at IS NOT NULL, \
+             services_aside_at IS NOT NULL \
              FROM newsletters_set_aside WHERE account_id = $1",
         )
         .bind(account.id)
         .fetch_optional(&self.pool)
         .await?;
         match done {
-            Some((true, true)) => return Ok(()),
-            Some((notices_back, _)) => return self.sort_again(account, notices_back).await,
+            Some((true, true, true)) => return Ok(()),
+            Some((notices_back, bulk_aside, _)) => {
+                return self.sort_again(account, notices_back, bulk_aside).await;
+            }
             None => {}
         }
         let place = self.folder_for(account, FolderRole::Newsletters).await?;
@@ -242,7 +272,7 @@ impl Mail {
             rules.push(Rule::newsletters(&place));
             self.put_rules(account, &rules).await?;
         }
-        let query = unsubscribe_search(&rules, "");
+        let query = inbox_search(&rules, &rules::search(&[When::Unsubscribe], ""));
         let headed = self
             .on_server(account, |session| {
                 let query = query.clone();
@@ -260,8 +290,9 @@ impl Mail {
             .move_out(account, "INBOX", &uids, &[], &place.path)
             .await?;
         sqlx::query(
-            "INSERT INTO newsletters_set_aside (account_id, notices_back_at, bulk_aside_at) \
-             VALUES ($1, now(), now()) ON CONFLICT DO NOTHING",
+            "INSERT INTO newsletters_set_aside \
+             (account_id, notices_back_at, bulk_aside_at, services_aside_at) \
+             VALUES ($1, now(), now(), now()) ON CONFLICT DO NOTHING",
         )
         .bind(account.id)
         .execute(&self.pool)
@@ -273,16 +304,34 @@ impl Mail {
     /// For an account set aside before Postrider told mail apart as it does
     /// now, once: writes the rule again, so that it tells them apart too.
     /// Set aside when every mail with a link to unsubscribe was a newsletter
-    /// (`notices_back` not yet), it moves the notices back to the Inbox;
-    /// else it sets aside the newsletters it took for notices, since they
-    /// said a machine sent them.
-    async fn sort_again(&self, account: &MailAccount, notices_back: bool) -> Result<(), Failure> {
+    /// (`notices_back` not yet), it moves the notices back to the Inbox.
+    /// It sets aside the newsletters it took for notices, since they said a
+    /// machine sent them (`bulk_aside` not yet), and those that offer to
+    /// unsubscribe only in their text.
+    async fn sort_again(
+        &self,
+        account: &MailAccount,
+        notices_back: bool,
+        bulk_aside: bool,
+    ) -> Result<(), Failure> {
         let rules = self.rules(account).await?;
         let place = self.newsletters_folder(account).await?;
         if rules.iter().any(Rule::is_newsletters) {
             self.put_rules(account, &rules).await?;
-            if notices_back && let Some(place) = &place {
-                let query = unsubscribe_search(&rules, "HEADER Auto-Submitted \"\" ");
+            if let Some(place) = &place {
+                // What the rule finds now that it didn't then.
+                let in_text = format!(
+                    "{} NOT HEADER List-Unsubscribe \"\"",
+                    from_a_service_search()
+                );
+                let missed = if notices_back && !bulk_aside {
+                    format!(
+                        "OR (HEADER List-Unsubscribe \"\" HEADER Auto-Submitted \"\") ({in_text})"
+                    )
+                } else {
+                    in_text
+                };
+                let query = inbox_search(&rules, &missed);
                 let headed = self
                     .on_server(account, |session| {
                         let query = query.clone();
@@ -324,7 +373,8 @@ impl Mail {
         }
         sqlx::query(
             "UPDATE newsletters_set_aside \
-             SET notices_back_at = coalesce(notices_back_at, now()), bulk_aside_at = now() \
+             SET notices_back_at = coalesce(notices_back_at, now()), \
+             bulk_aside_at = coalesce(bulk_aside_at, now()), services_aside_at = now() \
              WHERE account_id = $1",
         )
         .bind(account.id)
@@ -498,15 +548,17 @@ pub(crate) fn is_notice(address: &str, auto_submitted: Option<&str>, bulk: bool)
             .is_some_and(|(first, _)| NOTICE_HOSTS.contains(&first))
 }
 
+/// Strings as a Sieve list's items, each with `after`: `"bulk", "list"`.
+fn strings(items: &[&str], after: &str) -> String {
+    items
+        .iter()
+        .map(|item| format!("\"{item}{after}\""))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// [`is_notice`] in Sieve, for the newsletters' rule.
 pub(crate) fn notice_test() -> String {
-    let strings = |items: &[&str], after: &str| {
-        items
-            .iter()
-            .map(|item| format!("\"{item}{after}\""))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
     format!(
         "anyof (allof (exists \"auto-submitted\", not header :is \"auto-submitted\" \"no\", \
          not exists \"list-unsubscribe-post\", not header :is \"precedence\" [{}]), \
@@ -518,18 +570,45 @@ pub(crate) fn notice_test() -> String {
     )
 }
 
-/// The Inbox's mail with a link to unsubscribe that `also` finds, but not
-/// from the senders kept in the Inbox.
-fn unsubscribe_search(rules: &[Rule], also: &str) -> String {
+/// Mail from a mailing service that offers to unsubscribe in its text,
+/// where its header doesn't: Coursera's, by SparkPost. In Sieve, for the
+/// newsletters' rule on a server that reads mail's text.
+pub(crate) fn from_a_service_test() -> String {
+    let fields = SERVICE_FIELDS
+        .iter()
+        .map(|field| format!("exists \"{}\"", field.to_ascii_lowercase()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "allof (anyof ({fields}), body :text :contains [{}])",
+        strings(UNSUBSCRIBE_WORDS, "")
+    )
+}
+
+/// [`from_a_service_test`] as IMAP SEARCH keys.
+pub(crate) fn from_a_service_search() -> String {
+    let keys = |items: &[&str], key: &dyn Fn(&str) -> String| {
+        rules::any(&items.iter().map(|item| key(item)).collect::<Vec<_>>())
+    };
+    format!(
+        "{} {}",
+        keys(SERVICE_FIELDS, &|field| format!("HEADER {field} \"\"")),
+        keys(UNSUBSCRIBE_WORDS, &|word| format!("BODY \"{word}\""))
+    )
+}
+
+/// The Inbox's mail that `what` finds, but not from the senders kept in
+/// the Inbox.
+fn inbox_search(rules: &[Rule], what: &str) -> String {
     let kept: Vec<When> = rules
         .iter()
         .filter(|rule| rule.path == "INBOX")
         .flat_map(|rule| rule.when.clone())
         .collect();
     if kept.is_empty() {
-        rules::search(&[When::Unsubscribe], also)
+        what.to_string()
     } else {
-        rules::search(&kept, &format!("HEADER List-Unsubscribe \"\" {also}NOT "))
+        rules::search(&kept, &format!("{what} NOT "))
     }
 }
 

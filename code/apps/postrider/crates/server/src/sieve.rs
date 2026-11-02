@@ -36,6 +36,9 @@ struct Ended {
 pub struct Sieve {
     conn: BufReader<Stream>,
     host: String,
+    /// The Sieve extensions its scripts may use, as it said: `fileinto`,
+    /// `body`.
+    extensions: Vec<String>,
 }
 
 impl Sieve {
@@ -77,10 +80,12 @@ impl Sieve {
         let mut sieve = Sieve {
             conn: BufReader::new(stream),
             host: host.to_string(),
+            extensions: extensions(&said),
         };
         if !is_loopback(host) {
             // It says what it offers again, now encrypted.
-            answer(&mut sieve.conn, host).await?;
+            let (said, _) = answer(&mut sieve.conn, host).await?;
+            sieve.extensions = extensions(&said);
         }
         let plain =
             base64::engine::general_purpose::STANDARD.encode(format!("\0{username}\0{password}"));
@@ -155,6 +160,13 @@ impl Sieve {
             .map(|_| ())
     }
 
+    /// Whether its scripts may use this Sieve extension.
+    pub fn can(&self, extension: &str) -> bool {
+        self.extensions
+            .iter()
+            .any(|offered| offered.eq_ignore_ascii_case(extension))
+    }
+
     /// Says goodbye. What it answers doesn't matter.
     pub async fn log_out(mut self) {
         let _ = self.run("LOGOUT").await;
@@ -163,6 +175,18 @@ impl Sieve {
     async fn run(&mut self, line: &str) -> Result<Vec<Vec<Word>>, Failure> {
         command(&mut self.conn, &self.host, line).await
     }
+}
+
+/// The Sieve extensions a server's greeting offers: its `"SIEVE"` line.
+fn extensions(said: &[Vec<Word>]) -> Vec<String> {
+    said.iter()
+        .find_map(|line| match line.as_slice() {
+            [Word::Text(name), Word::Text(offered), ..] if name.eq_ignore_ascii_case("SIEVE") => {
+                Some(offered.split_whitespace().map(str::to_string).collect())
+            }
+            _ => None,
+        })
+        .unwrap_or_default()
 }
 
 /// Sends a command and reads its answer: what it said before OK, or why not.
@@ -371,6 +395,20 @@ mod tests {
         assert_eq!(literal_at_end("{42}"), ("", Some(42)));
         assert_eq!(literal_at_end(r#"NO {7+}"#), ("NO ", Some(7)));
         assert_eq!(literal_at_end(r#""a {b}""#), (r#""a {b}""#, None));
+    }
+
+    #[test]
+    fn it_reads_what_scripts_may_use() {
+        let greeting = [
+            words_of(r#""IMPLEMENTATION" "Dovecot Pigeonhole""#),
+            words_of(r#""SIEVE" "fileinto reject envelope body""#),
+            words_of(r#""STARTTLS""#),
+        ];
+        assert_eq!(
+            extensions(&greeting),
+            ["fileinto", "reject", "envelope", "body"]
+        );
+        assert!(extensions(&greeting[..1]).is_empty());
     }
 
     #[tokio::test]
