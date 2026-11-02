@@ -182,9 +182,15 @@ type FoldersState = {
   folders: Folder[];
   /** Asks the servers again, as after a folder's mail was read. */
   refresh: () => void;
+  /** Goes up every minute while the app shows, and as it shows again. */
+  minutes: number;
 };
 
-const FoldersContext = createContext<FoldersState>({ folders: [], refresh: () => undefined });
+const FoldersContext = createContext<FoldersState>({
+  folders: [],
+  refresh: () => undefined,
+  minutes: 0,
+});
 
 /**
  * The workspace's folders with what's unread in them, read live: asked
@@ -205,6 +211,7 @@ function FoldersProvider({
   const { workspace, place } = useWorkspace();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [asked, setAsked] = useState(0);
+  const [minutes, setMinutes] = useState(0);
 
   useEffect(() => {
     const stop = new AbortController();
@@ -214,12 +221,12 @@ function FoldersProvider({
       () => undefined,
     );
     return () => stop.abort();
-  }, [workspace.id, place, version, synced, asked]);
+  }, [workspace.id, place, version, synced, asked, minutes]);
 
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
   useEffect(() => {
     const ask = () => {
-      if (document.visibilityState === "visible") refresh();
+      if (document.visibilityState === "visible") setMinutes((n) => n + 1);
     };
     const timer = setInterval(ask, FOLDERS_MS);
     document.addEventListener("visibilitychange", ask);
@@ -227,9 +234,9 @@ function FoldersProvider({
       clearInterval(timer);
       document.removeEventListener("visibilitychange", ask);
     };
-  }, [refresh]);
+  }, []);
 
-  const state = useMemo(() => ({ folders, refresh }), [folders, refresh]);
+  const state = useMemo(() => ({ folders, refresh, minutes }), [folders, refresh, minutes]);
   return <FoldersContext.Provider value={state}>{children}</FoldersContext.Provider>;
 }
 

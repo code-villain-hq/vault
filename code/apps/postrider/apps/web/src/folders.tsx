@@ -61,7 +61,7 @@ export function forgetListed(from: From, key: string) {
 }
 
 /** A folder's or a search's mail, from every account's server. */
-function useListing(from: From, path: string | undefined) {
+function useListing(from: From, path: string | undefined, again = 0) {
   const { workspace, place } = useWorkspace();
   const { refresh } = useFolders();
   const { synced } = useInbox();
@@ -84,7 +84,7 @@ function useListing(from: From, path: string | undefined) {
       },
     );
     return () => stop.abort();
-  }, [workspace.id, place, path, key, refresh, synced]);
+  }, [workspace.id, place, path, key, refresh, synced, again]);
 
   const error = failed?.key === key ? failed.error : undefined;
   const listing = listings.get(key);
@@ -98,10 +98,15 @@ function useListing(from: From, path: string | undefined) {
 
 /** A folder's newest mail, every account's, in the list column. */
 export function FolderList({ folder, open }: { folder: string; open: string | undefined }) {
-  const { folders } = useFolders();
+  const { folders, minutes } = useFolders();
   const name = folders.find((f) => f.key.toLowerCase() === folder.toLowerCase())?.name ?? folder;
   const from = useMemo(() => ({ folder }), [folder]);
-  const { listing, error, waiting } = useListing(from, `/folders/${encodeURIComponent(folder)}`);
+  // Read again with the sidebar's counts, for mail filed or read elsewhere.
+  const { listing, error, waiting } = useListing(
+    from,
+    `/folders/${encodeURIComponent(folder)}`,
+    minutes,
+  );
   return (
     <>
       <PageHeader title={name}>

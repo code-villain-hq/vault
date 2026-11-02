@@ -107,7 +107,7 @@ only its new mail. An account keeps up to three connections for this
 (`READERS`), beside its watcher's, and a search reads that many of its
 folders at once. The sidebar asks for the folders again when the Inbox
 changes, when a folder or unread mail is opened, and every minute while
-the app shows.
+the app shows; the folder shown reads its mail again with it.
 
 Today is read live too: `GET /api/w/{id}/day?from&to` asks the CalDAV
 server for every calendar's events (`caldav.rs`). A calendar wears the hue
