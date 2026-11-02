@@ -5,7 +5,7 @@ use ts_rs::TS;
 
 pub use code_villain_sync::{Actor, GuestView, ValidationError, Write};
 
-use crate::mail::{CalendarCreate, MailAccountCreate, MailAccountPatch};
+use crate::mail::{CalendarCreate, CalendarPatch, MailAccountCreate, MailAccountPatch};
 
 /// Every kind of record that clients sync: Postrider's own. Mail and events
 /// stay on their servers and never sync.
@@ -48,11 +48,11 @@ impl ModelKind {
     /// Whether clients may make this kind of write through sync. Accounts
     /// and the calendar come and go through the server, which checks the
     /// password and keeps it in the keychain; a client may only rename an
-    /// account or give it another hue.
+    /// account, give it another hue, or say whose colour a calendar wears.
     pub fn client_may(self, write: Write) -> bool {
         match self {
-            ModelKind::MailAccount => write == Write::Update,
-            ModelKind::Calendar | ModelKind::User => false,
+            ModelKind::MailAccount | ModelKind::Calendar => write == Write::Update,
+            ModelKind::User => false,
         }
     }
 
@@ -79,10 +79,8 @@ impl ModelKind {
     pub fn validate_patch(self, data: &Map<String, Value>) -> Result<(), ValidationError> {
         match self {
             ModelKind::MailAccount => check::<MailAccountPatch>(data),
-            ModelKind::Calendar | ModelKind::User => Err(ValidationError(format!(
-                "{} records are read-only",
-                self.name()
-            ))),
+            ModelKind::Calendar => check::<CalendarPatch>(data),
+            ModelKind::User => Err(ValidationError("users are read-only".into())),
         }
     }
 }
@@ -163,9 +161,22 @@ mod tests {
     }
 
     #[test]
-    fn the_calendar_and_users_are_read_only() {
+    fn a_client_only_says_whose_colour_a_calendar_wears() {
+        assert!(!ModelKind::Calendar.client_may(Write::Create));
+        assert!(!ModelKind::Calendar.client_may(Write::Delete));
+        assert!(ModelKind::Calendar.client_may(Write::Update));
+        let id = uuid::Uuid::nil();
+        let ok = map(json!({ "accounts": { "/michael/0f8e/": id } }));
+        assert!(ModelKind::Calendar.validate_patch(&ok).is_ok());
+        let url = map(json!({ "url": "https://calendar.example.com/" }));
+        assert!(ModelKind::Calendar.validate_patch(&url).is_err());
+        let empty = map(json!({ "accounts": { "": id } }));
+        assert!(ModelKind::Calendar.validate_patch(&empty).is_err());
+    }
+
+    #[test]
+    fn users_are_read_only() {
         for write in [Write::Create, Write::Update, Write::Delete] {
-            assert!(!ModelKind::Calendar.client_may(write));
             assert!(!ModelKind::User.client_may(write));
         }
     }

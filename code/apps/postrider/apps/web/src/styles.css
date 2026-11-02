@@ -107,6 +107,14 @@
   width: 18px;
   height: 18px;
 }
+/* A calendar, in Settings, in the colour it wears. */
+.swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--hue);
+}
 
 /* Today, above the Inbox: 8 to 22 on one track, with a line for now. */
 .today {

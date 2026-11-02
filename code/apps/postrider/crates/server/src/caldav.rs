@@ -2,20 +2,25 @@
 //! it: finding the calendars, then each one's events in a span of time,
 //! repeats expanded by the server.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use axum::Json;
 use axum::extract::{Query, State};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
-use postrider_domain::{Calendar, Day, Event, MailAccount};
+use postrider_domain::{Calendar, Day, Event, MailAccount, ServerCalendar};
 use reqwest::{Method, StatusCode};
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 
 const TIMEOUT: Duration = Duration::from_secs(20);
+
+/// How far ahead Settings looks for a calendar's next event.
+const AHEAD_DAYS: i64 = 28;
 
 /// A calendar on the server.
 #[derive(Debug, Clone, PartialEq)]
@@ -81,26 +86,7 @@ impl Server {
             .find_path(&["response", "propstat", "prop", "calendar-home-set", "href"])
             .map(|n| n.text.trim().to_string())
             .unwrap_or(principal);
-        let listing = self.propfind(&home, "1", LIST).await?;
-        let mut found: Vec<Found> = listing
-            .children_named("response")
-            .filter_map(|response| {
-                let href = response.child("href")?.text.trim().to_string();
-                let prop = response
-                    .children_named("propstat")
-                    .filter_map(|p| p.child("prop"))
-                    .find(|p| p.child("resourcetype").is_some())?;
-                prop.child("resourcetype")?.child("calendar")?;
-                let name = prop
-                    .child("displayname")
-                    .map(|n| n.text.trim().to_string())
-                    .filter(|n| !n.is_empty())
-                    .unwrap_or_else(|| last_segment(&href));
-                Some(Found { href, name })
-            })
-            .collect();
-        found.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(found)
+        Ok(found_calendars(&self.propfind(&home, "1", LIST).await?))
     }
 
     /// A calendar's events that overlap `from`..`to`, repeats expanded.
@@ -188,6 +174,31 @@ fn plain_error(e: &reqwest::Error) -> String {
     message
 }
 
+/// The calendars in a calendar home's listing, by name: the rest of what's
+/// in it isn't one.
+fn found_calendars(listing: &Node) -> Vec<Found> {
+    let mut found: Vec<Found> = listing
+        .children_named("response")
+        .filter_map(|response| {
+            let href = response.child("href")?.text.trim().to_string();
+            let prop = response
+                .children_named("propstat")
+                .filter_map(|p| p.child("prop"))
+                .find(|p| p.child("resourcetype").is_some())?;
+            prop.child("resourcetype")?.child("calendar")?;
+            // Radicale names a calendar without a name by its path.
+            let name = prop
+                .child("displayname")
+                .map(|n| n.text.trim().to_string())
+                .filter(|n| !n.is_empty() && n != href.trim_matches('/'))
+                .unwrap_or_else(|| last_segment(&href));
+            Some(Found { href, name })
+        })
+        .collect();
+    found.sort_by(|a, b| a.name.cmp(&b.name));
+    found
+}
+
 fn caldav_time(time: DateTime<Utc>) -> String {
     time.format("%Y%m%dT%H%M%SZ").to_string()
 }
@@ -200,14 +211,25 @@ fn last_segment(href: &str) -> String {
         .to_string()
 }
 
-/// The data hue a calendar wears: its account's. The account whose name is
-/// in the calendar's name ("Code Villain"), else the account at the
-/// calendar server's domain, else the first.
-pub fn hue_for(calendar: &str, host: &str, accounts: &[MailAccount]) -> i32 {
-    let calendar = calendar.to_lowercase();
-    let named = accounts
-        .iter()
-        .find(|a| calendar.contains(&a.name.to_lowercase()));
+/// The account whose colour a calendar wears: the one the person chose for
+/// it, else the one whose name is in the calendar's ("Code Villain"), else
+/// the one at the calendar server's domain, else the first.
+pub fn account_for<'a>(
+    calendar: &Found,
+    host: &str,
+    accounts: &'a [MailAccount],
+    chosen: &BTreeMap<String, Uuid>,
+) -> Option<&'a MailAccount> {
+    let chosen = || {
+        let id = chosen.get(&calendar.href)?;
+        accounts.iter().find(|a| a.id == *id)
+    };
+    let name = calendar.name.to_lowercase();
+    let named = || {
+        accounts
+            .iter()
+            .find(|a| name.contains(&a.name.to_lowercase()))
+    };
     let at_domain = || {
         accounts.iter().find(|a| {
             a.address
@@ -215,10 +237,10 @@ pub fn hue_for(calendar: &str, host: &str, accounts: &[MailAccount]) -> i32 {
                 .is_some_and(|(_, domain)| host == domain || host.ends_with(&format!(".{domain}")))
         })
     };
-    named
+    chosen()
+        .or_else(named)
         .or_else(at_domain)
         .or(accounts.first())
-        .map_or(1, |a| a.hue)
 }
 
 /// An event, as read from the calendar.
@@ -528,28 +550,12 @@ pub async fn day(
     if params.to <= params.from || params.to - params.from > chrono::Duration::days(42) {
         return Err(AppError::invalid("A day is from a time to a later one."));
     }
-    let workspace_id = member.actor.workspace_id;
-    let calendar: Option<serde_json::Value> =
-        sqlx::query_scalar("SELECT to_jsonb(c.*) FROM calendars c WHERE workspace_id = $1")
-            .bind(workspace_id)
-            .fetch_optional(&state.pool)
-            .await?;
-    let Some(calendar) = calendar else {
+    let Some((calendar, accounts)) = kept(&state, member.actor.workspace_id).await? else {
         return Ok(Json(Day {
             events: Vec::new(),
             error: None,
         }));
     };
-    let calendar: Calendar = serde_json::from_value(calendar).map_err(AppError::internal)?;
-    let accounts: Vec<MailAccount> = sqlx::query_scalar(
-        "SELECT to_jsonb(a.*) FROM mail_accounts a WHERE workspace_id = $1 ORDER BY position",
-    )
-    .bind(workspace_id)
-    .fetch_all(&state.pool)
-    .await?
-    .into_iter()
-    .filter_map(|row: serde_json::Value| serde_json::from_value(row).ok())
-    .collect();
     Ok(Json(
         match read_day(&state, &calendar, &accounts, params.from, params.to).await {
             Ok(events) => Day {
@@ -564,6 +570,57 @@ pub async fn day(
     ))
 }
 
+/// `GET /api/w/{workspace}/calendars`: the calendars on the server, for
+/// Settings to say whose colour each wears.
+pub async fn calendars(
+    State(state): State<AppState>,
+    member: Member,
+) -> Result<Json<Vec<ServerCalendar>>, AppError> {
+    let Some((calendar, accounts)) = kept(&state, member.actor.workspace_id).await? else {
+        return Ok(Json(Vec::new()));
+    };
+    let listed = list_calendars(&state, &calendar, &accounts)
+        .await
+        .map_err(AppError::refused)?;
+    Ok(Json(listed))
+}
+
+/// The workspace's calendar server and its mail accounts, when it has one.
+async fn kept(
+    state: &AppState,
+    workspace_id: Uuid,
+) -> Result<Option<(Calendar, Vec<MailAccount>)>, AppError> {
+    let calendar: Option<serde_json::Value> =
+        sqlx::query_scalar("SELECT to_jsonb(c.*) FROM calendars c WHERE workspace_id = $1")
+            .bind(workspace_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    let Some(calendar) = calendar else {
+        return Ok(None);
+    };
+    let calendar: Calendar = serde_json::from_value(calendar).map_err(AppError::internal)?;
+    let accounts: Vec<MailAccount> = sqlx::query_scalar(
+        "SELECT to_jsonb(a.*) FROM mail_accounts a WHERE workspace_id = $1 ORDER BY position",
+    )
+    .bind(workspace_id)
+    .fetch_all(&state.pool)
+    .await?
+    .into_iter()
+    .filter_map(|row: serde_json::Value| serde_json::from_value(row).ok())
+    .collect();
+    Ok(Some((calendar, accounts)))
+}
+
+/// The calendar server, signed in to with its password from the keychain.
+async fn sign_in(state: &AppState, calendar: &Calendar) -> Result<Server, String> {
+    let password = state
+        .secrets
+        .get(&calendar.url)
+        .await?
+        .ok_or("Its password isn't in the keychain. Add the calendar again.")?;
+    Server::new(&calendar.url, &calendar.username, &password)
+}
+
 async fn read_day(
     state: &AppState,
     calendar: &Calendar,
@@ -571,28 +628,58 @@ async fn read_day(
     from: DateTime<Utc>,
     to: DateTime<Utc>,
 ) -> Result<Vec<Event>, String> {
-    let password = state
-        .secrets
-        .get(&calendar.url)
-        .await?
-        .ok_or("Its password isn't in the keychain. Add the calendar again.")?;
-    let server = Server::new(&calendar.url, &calendar.username, &password)?;
+    let server = sign_in(state, calendar).await?;
     let mut events = Vec::new();
     for found in server.calendars().await? {
-        let hue = hue_for(&found.name, server.host(), accounts);
+        let hue =
+            account_for(&found, server.host(), accounts, &calendar.accounts).map_or(1, |a| a.hue);
         for parsed in server.events(&found, from, to).await? {
-            events.push(Event {
-                title: parsed.title,
-                start: parsed.start,
-                end: parsed.end,
-                all_day: parsed.all_day,
-                calendar: found.name.clone(),
-                hue,
-            });
+            events.push(event(parsed, &found, hue));
         }
     }
     events.sort_by_key(|a| (a.start, a.end));
     Ok(events)
+}
+
+async fn list_calendars(
+    state: &AppState,
+    calendar: &Calendar,
+    accounts: &[MailAccount],
+) -> Result<Vec<ServerCalendar>, String> {
+    let server = sign_in(state, calendar).await?;
+    let from = Utc::now();
+    let to = from + chrono::Duration::days(AHEAD_DAYS);
+    let mut listed = Vec::new();
+    for found in server.calendars().await? {
+        let hue =
+            account_for(&found, server.host(), accounts, &calendar.accounts).map_or(1, |a| a.hue);
+        let next = server
+            .events(&found, from, to)
+            .await?
+            .into_iter()
+            .filter(|parsed| parsed.end > from)
+            .min_by_key(|parsed| parsed.start)
+            .map(|parsed| event(parsed, &found, hue));
+        listed.push(ServerCalendar {
+            default_account: account_for(&found, server.host(), accounts, &BTreeMap::new())
+                .map(|a| a.id),
+            href: found.href,
+            name: found.name,
+            next,
+        });
+    }
+    Ok(listed)
+}
+
+fn event(parsed: Parsed, calendar: &Found, hue: i32) -> Event {
+    Event {
+        title: parsed.title,
+        start: parsed.start,
+        end: parsed.end,
+        all_day: parsed.all_day,
+        calendar: calendar.name.clone(),
+        hue,
+    }
 }
 
 #[cfg(test)]
@@ -630,20 +717,23 @@ mod tests {
             <resourcetype><collection/><C:calendar/></resourcetype><displayname>Code Villain</displayname>
             </prop></propstat></response>
             <response><href>/michael/</href><propstat><prop><resourcetype><collection/></resourcetype></prop></propstat></response>
+            <response><href>/michael/0f8e2c4a/</href><propstat><prop>
+            <resourcetype><collection/><C:calendar/></resourcetype><displayname>michael/0f8e2c4a</displayname>
+            </prop></propstat></response>
             </multistatus>"#;
-        let root = parse_xml(xml).unwrap();
-        let calendars: Vec<_> = root
-            .children_named("response")
-            .filter(|r| {
-                r.child("propstat")
-                    .and_then(|p| p.child("prop"))
-                    .and_then(|p| p.child("resourcetype"))
-                    .and_then(|t| t.child("calendar"))
-                    .is_some()
-            })
+        let found = found_calendars(&parse_xml(xml).unwrap());
+        let names: Vec<_> = found
+            .iter()
+            .map(|f| (f.href.as_str(), f.name.as_str()))
             .collect();
-        assert_eq!(calendars.len(), 1);
-        assert_eq!(calendars[0].child("href").unwrap().text, "/michael/work/");
+        // A calendar Radicale names by its path has no name but its id.
+        assert_eq!(
+            names,
+            [
+                ("/michael/0f8e2c4a/", "0f8e2c4a"),
+                ("/michael/work/", "Code Villain")
+            ]
+        );
     }
 
     #[test]
@@ -665,11 +755,40 @@ mod tests {
             account("Lazarski", "michael@lazarski.test", 2),
             account("Code Villain", "contact@codevillain.test", 5),
         ];
+        let hue = |name: &str, host: &str, chosen: &BTreeMap<String, Uuid>| {
+            let found = Found {
+                href: format!("/michael/{name}/"),
+                name: name.into(),
+            };
+            account_for(&found, host, &accounts, chosen).map(|a| a.hue)
+        };
+        let none = BTreeMap::new();
         assert_eq!(
-            hue_for("Code Villain", "calendar.lazarski.test", &accounts),
-            5
+            hue("Code Villain", "calendar.lazarski.test", &none),
+            Some(5)
         );
-        assert_eq!(hue_for("Family", "calendar.lazarski.test", &accounts), 2);
-        assert_eq!(hue_for("Family", "127.0.0.1", &accounts), 2);
+        assert_eq!(hue("Family", "calendar.lazarski.test", &none), Some(2));
+        assert_eq!(hue("Family", "127.0.0.1", &none), Some(2));
+
+        // Named by an id, a calendar wears the colour the person chose.
+        let id = "0f8e2c4a-7d1b-4f3e-9a6c-5b2d8e1f4a7c";
+        assert_eq!(hue(id, "calendar.lazarski.test", &none), Some(2));
+        let chosen = BTreeMap::from([(format!("/michael/{id}/"), accounts[1].id)]);
+        assert_eq!(hue(id, "calendar.lazarski.test", &chosen), Some(5));
+        // A removed account's choice is forgotten.
+        let gone = BTreeMap::from([(format!("/michael/{id}/"), Uuid::now_v7())]);
+        assert_eq!(hue(id, "calendar.lazarski.test", &gone), Some(2));
+        assert_eq!(
+            account_for(
+                &Found {
+                    href: "/".into(),
+                    name: "x".into()
+                },
+                "x",
+                &[],
+                &none
+            ),
+            None
+        );
     }
 }

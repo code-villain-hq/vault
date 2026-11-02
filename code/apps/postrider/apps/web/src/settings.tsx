@@ -5,11 +5,12 @@ import type {
   CalendarConnect,
   MailAccount,
   MailAccountConnect,
+  ServerCalendar,
 } from "@postrider/types";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { api } from "./api";
 import { PageBody, PageHeader } from "./layout";
-import { hue, useAccounts, useAccountStatus } from "./mail";
+import { clockTime, hue, useAccounts, useAccountStatus } from "./mail";
 import { Button, ErrorMessage, Section, TextField } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
@@ -213,18 +214,124 @@ function CalendarRow({ calendar }: { calendar: Calendar }) {
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-col">
           <span className="truncate font-medium">{new URL(calendar.url).host}</span>
-          <span className="truncate text-xs text-muted">
-            Signed in as {calendar.username}. Each calendar wears the colour of the account it's
-            named after.
-          </span>
+          <span className="truncate text-xs text-muted">Signed in as {calendar.username}.</span>
         </div>
         <Button variant="secondary" className="ml-auto" disabled={removing} onClick={remove}>
           {removing ? "Removing…" : "Remove"}
         </Button>
       </div>
       <ErrorMessage>{error}</ErrorMessage>
+      <Calendars calendar={calendar} />
     </div>
   );
+}
+
+/**
+ * The server's calendars, each wearing an account's colour: the one it's
+ * named after, or at the server's domain, until the person picks another.
+ */
+function Calendars({ calendar }: { calendar: Calendar }) {
+  const { workspace, place, sync } = useWorkspace();
+  const accounts = useAccounts();
+  const [listed, setListed] = useState<{ calendars?: ServerCalendar[]; error?: string }>();
+
+  useEffect(() => {
+    const stop = new AbortController();
+    api<ServerCalendar[]>(
+      "GET",
+      `/api/w/${workspace.id}/calendars`,
+      undefined,
+      place,
+      stop.signal,
+    ).then(
+      (calendars) => setListed({ calendars }),
+      (problem: unknown) => {
+        if (!stop.signal.aborted) setListed({ error: messageOf(problem) });
+      },
+    );
+    return () => stop.abort();
+  }, [workspace.id, place, calendar.id]);
+
+  if (!listed) return <p className="text-xs text-muted">Asking the calendar server…</p>;
+  if (listed.error) return <ErrorMessage>{listed.error}</ErrorMessage>;
+  if (!listed.calendars?.length) return <p className="text-xs text-muted">It has no calendars.</p>;
+
+  // A copy synced before Postrider kept choices has none until it's fresh.
+  const chosenFor: Record<string, string> = calendar.accounts ?? {};
+  const wears = (found: ServerCalendar) => {
+    const chosen = chosenFor[found.href];
+    return (
+      accounts.find((a) => a.id === chosen) ?? accounts.find((a) => a.id === found.default_account)
+    );
+  };
+  const choose = (found: ServerCalendar, accountId: string) => {
+    const chosen = { ...chosenFor };
+    // The account it would wear anyway isn't kept as a choice.
+    if (accountId === found.default_account) delete chosen[found.href];
+    else chosen[found.href] = accountId;
+    sync.update("Calendar", calendar.id, { accounts: chosen });
+  };
+
+  return (
+    <ul className="flex flex-col border-t border-line pt-2">
+      {listed.calendars.map((found) => {
+        const account = wears(found);
+        return (
+          <li key={found.href} className="flex items-center gap-3 py-1.5">
+            <span className="swatch" style={hue(account?.hue ?? 1)} aria-hidden="true" />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate">{calendarName(found)}</span>
+              <span className="truncate text-xs text-muted">{nextEvent(found)}</span>
+            </div>
+            {accounts.length > 0 && (
+              <select
+                aria-label={`Whose colour ${calendarName(found)} wears`}
+                value={account?.id ?? ""}
+                onChange={(event) => choose(found, event.target.value)}
+                className="ui-field ml-auto h-7 shrink-0 rounded-md px-2 text-xs"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** A calendar's name; one named only by an id, as some apps make them, has none. */
+function calendarName(found: ServerCalendar): string {
+  return /^[0-9a-f-]{20,}$/i.test(found.name) ? "A calendar without a name" : found.name;
+}
+
+const weekday = new Intl.DateTimeFormat("en", { weekday: "short" });
+const date = new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric" });
+
+/** "Next: Zahnarzt, Mon 15:00", to tell a calendar by. */
+function nextEvent(found: ServerCalendar): string {
+  if (!found.next) return "Nothing in the next four weeks.";
+  const start = new Date(found.next.start);
+  const now = new Date();
+  const days = Math.round(
+    (new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() -
+      new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+      86_400_000,
+  );
+  const day =
+    days <= 0
+      ? "today"
+      : days === 1
+        ? "tomorrow"
+        : days < 7
+          ? weekday.format(start)
+          : date.format(start);
+  const when = found.next.all_day ? day : `${day} ${clockTime(start)}`;
+  return `Next: ${found.next.title}, ${when}`;
 }
 
 function AddCalendar() {

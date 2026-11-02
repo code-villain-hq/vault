@@ -1,15 +1,22 @@
 import { HttpTransport, IndexedDbStore, SyncClient } from "@code-villain/sync-client";
 import { databaseName } from "@code-villain/web";
-import type { Calendar, MailAccount, MailAccountPatch, User } from "@postrider/types";
+import type {
+  Calendar,
+  CalendarPatch,
+  MailAccount,
+  MailAccountPatch,
+  User,
+} from "@postrider/types";
 import { authHeaders, credentialsFor, type Place, socketProtocols } from "./server";
 
 // Only Postrider's own records sync: the accounts and the calendar server.
 // They're added and removed through the server, which signs in to them
-// first (`/accounts`, `/calendar`); here they only change their name and
-// hue. Mail and events stay on their servers and are read live.
+// first (`/accounts`, `/calendar`); here they only change an account's
+// name and hue, and whose colour a calendar wears. Mail and events stay on
+// their servers and are read live.
 export type Schema = {
   MailAccount: { record: MailAccount; create: never; patch: MailAccountPatch };
-  Calendar: { record: Calendar; create: never; patch: never };
+  Calendar: { record: Calendar; create: never; patch: CalendarPatch };
   User: { record: User; create: never; patch: never };
 };
 

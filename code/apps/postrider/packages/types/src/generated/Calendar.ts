@@ -2,11 +2,17 @@
 
 /**
  * The calendar server, read over CalDAV: Radicale. Its password is in the
- * keychain too. Each calendar on it wears the hue of the account it's
- * named after, or of the account at its domain.
+ * keychain too. Each calendar on it wears the hue of the account the
+ * person chose for it, else of the account it's named after, else of the
+ * account at its domain.
  */
 export type Calendar = { id: string, workspace_id: string, 
 /**
  * `https://calendar.lazarski.nu/`
  */
-url: string, username: string, created_at: string, updated_at: string, };
+url: string, username: string, 
+/**
+ * The account each calendar wears the colour of, where the person
+ * chose: by the calendar's address on the server.
+ */
+accounts: Record<string, string>, created_at: string, updated_at: string, };

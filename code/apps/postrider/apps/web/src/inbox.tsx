@@ -333,6 +333,8 @@ function useDay(now: Date): Day | undefined {
   const query = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() }).toString();
   // A new day, or another calendar server, starts empty.
   const key = `${query}:${calendars.map((c) => c.id).join()}`;
+  // A calendar wearing another colour is asked for again, in place.
+  const changed = calendars.map((c) => c.updated_at).join();
   const minute = now.getTime();
 
   useEffect(() => {
@@ -343,7 +345,7 @@ function useDay(now: Date): Day | undefined {
       () => undefined,
     );
     return () => stop.abort();
-  }, [workspace.id, place, query, key, minute]);
+  }, [workspace.id, place, query, key, changed, minute]);
 
   return day?.key === key ? day.day : undefined;
 }

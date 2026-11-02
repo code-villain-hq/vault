@@ -38,6 +38,7 @@ pub fn router(state: AppState) -> Router {
         .route("/folders/{key}", get(folders::folder))
         .route("/search", get(folders::search))
         .route("/day", get(caldav::day))
+        .route("/calendars", get(caldav::calendars))
         .route("/accounts", post(connect::add_account))
         .route("/accounts/{id}", delete(connect::remove_account))
         .route(

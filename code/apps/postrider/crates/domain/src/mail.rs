@@ -1,6 +1,8 @@
 //! Mail accounts and the calendar server, which sync, and what Postrider
 //! reads from them live: the Inbox and today's events.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -124,8 +126,9 @@ impl MailAccountConnect {
 }
 
 /// The calendar server, read over CalDAV: Radicale. Its password is in the
-/// keychain too. Each calendar on it wears the hue of the account it's
-/// named after, or of the account at its domain.
+/// keychain too. Each calendar on it wears the hue of the account the
+/// person chose for it, else of the account it's named after, else of the
+/// account at its domain.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Calendar {
@@ -134,8 +137,57 @@ pub struct Calendar {
     /// `https://calendar.lazarski.nu/`
     pub url: String,
     pub username: String,
+    /// The account each calendar wears the colour of, where the person
+    /// chose: by the calendar's address on the server.
+    #[ts(type = "Record<string, string>")]
+    pub accounts: BTreeMap<String, Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// What a client may change of the calendar server: whose colour each
+/// calendar wears.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export, optional_fields)]
+pub struct CalendarPatch {
+    #[ts(type = "Record<string, string>")]
+    pub accounts: Option<BTreeMap<String, Uuid>>,
+}
+
+impl Validate for CalendarPatch {
+    fn validate(&self) -> Result<(), ValidationError> {
+        let Some(accounts) = &self.accounts else {
+            return Ok(());
+        };
+        if accounts.len() > 100 {
+            return invalid("Postrider colours up to 100 calendars.");
+        }
+        if accounts
+            .keys()
+            .any(|href| href.is_empty() || href.len() > 1000)
+        {
+            return invalid("A calendar's address is missing.");
+        }
+        Ok(())
+    }
+}
+
+/// A calendar on the calendar server, as Settings lists it: whose colour
+/// it wears unless the person chooses, and its next event, to tell it by.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ServerCalendar {
+    /// Its address on the server, as [`Calendar::accounts`] knows it.
+    pub href: String,
+    /// Its name there, else the last part of its address.
+    pub name: String,
+    /// The account whose colour it wears unless the person chooses: the
+    /// one it's named after, else the one at the server's domain, else the
+    /// first.
+    pub default_account: Option<Uuid>,
+    /// Its next event in the coming weeks.
+    pub next: Option<Event>,
 }
 
 /// The calendar server, as the server keeps it once it signed in.
