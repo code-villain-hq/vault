@@ -1,26 +1,27 @@
-//! Newsletters: mail with a link to unsubscribe (`List-Unsubscribe`), or
-//! from a mailing service that offers one in its text where its header
-//! doesn't ([`from_a_service_test`]), that isn't a notice ([`is_notice`]),
-//! skips the Inbox for a folder of its own,
-//! by a rule on the account's server ([`When::Unsubscribe`], written after
+//! Newsletters: mail that offers to unsubscribe (`List-Unsubscribe`, or a
+//! mailing service's header with the offer in its text, as Coursera's by
+//! SparkPost) and went to many skips the Inbox for a folder of its own, by
+//! a rule on the account's server ([`When::Unsubscribe`], written after
 //! yours, so a rule of yours still wins). Postrider writes that rule once
 //! for each account, after its first sync, and moves the Inbox's
 //! newsletters with it ([`Mail::set_newsletters_aside`]); a rule you take
-//! away stays away. When what makes a newsletter or a notice changes, or
-//! how the passes sort, it sorts the account's mail again by it, once
+//! away stays away. When what makes a newsletter changes, or how the passes
+//! sort, it sorts the account's mail again by it, once
 //! ([`Mail::sort_again`]).
 //!
-//! A notice is mail about something of yours: a sign-in, your account, an
-//! order, a payment, a delivery. Google's say where to unsubscribe as
-//! newsletters do, so the link alone doesn't tell them apart. A machine
-//! that says it sent the mail by itself (`Auto-Submitted`, RFC 3834), but
-//! not to many (newsletters say so too, to keep auto-replies away, and
-//! then offer one click to leave or say `Precedence: bulk`), or an address
-//! that names what it's about (`noreply-accounts@`, `auto-confirm@`,
-//! `receipt.max.se`, `accounts.google.com`), sends notices, and so does a
-//! subject that does ("Verifieringskod"), unless the sender calls itself a
-//! newsletter; they stay in the Inbox. Keep in Inbox is there for the
-//! senders this still gets wrong.
+//! Whether a mail went to many is read in what its header says, in no
+//! language: a mailing list's `List-Id`, `Precedence: bulk` or `list`, or a
+//! mailing service's marketing stream (Postmark's `broadcast`, Mailchimp's
+//! campaigns; not Mandrill, SES or SendGrid alone, which send orders too).
+//! A machine that says it sent the mail by itself (`Auto-Submitted`, RFC
+//! 3834), but not to many (newsletters say so too, to keep auto-replies
+//! away, and then offer one click to leave or say `Precedence: bulk`),
+//! sends notices. Mail that offers to unsubscribe and says neither stays in
+//! the Inbox, and Claude Code reads it ([`crate::judging`]): a sender it
+//! finds writing only to many is named in the rule ([`Rule::senders`]), so
+//! its mail skips the Inbox from then on, with the Mac off too. Keep in
+//! Inbox is there for the senders this still gets wrong, and takes one off
+//! the rule.
 //!
 //! `GET /api/w/{workspace}/newsletters` reads all of each account's
 //! Newsletters, by sender: how often each writes, when it last did, and how
@@ -50,8 +51,8 @@ use lettre::message::header::ContentType;
 use mail_parser::MessageParser;
 use postrider_domain::{
     AccountState, AccountStatus, FolderRole, KeptInInbox, Listing, MailAccount, Newsletter,
-    Newsletters, SenderProblem, Senders, SettingAside, UnsubscribeSent, Unsubscribed,
-    Unsubscribing, Validate,
+    NewsletterRef, Newsletters, SenderProblem, Senders, SettingAside, UnsubscribeSent,
+    Unsubscribed, Unsubscribing, Validate,
 };
 use reqwest::Url;
 use serde::Deserialize;
@@ -80,100 +81,16 @@ const TIMEOUT: Duration = Duration::from_secs(20);
 /// The header fields a newsletter is read by.
 const FIELDS: &str = "FROM LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST";
 
-/// The header fields a notice is told by.
-const NOTICE_FIELDS: &str = "FROM SUBJECT AUTO-SUBMITTED LIST-UNSUBSCRIBE-POST PRECEDENCE";
-
-/// What a notice's address says it's about, in its local part or a host
-/// before its domain (`receipt.max.se`), in English, German or Swedish:
-/// your account and signing in; an order, its bill and its payment; its
-/// delivery; a booking, or a confirmation of anything; a message someone
-/// wrote you, as LinkedIn's messaging-digest-noreply@ says.
-const NOTICE_WORDS: &[&str] = &[
-    "account",
-    "konto",
-    "security",
-    "sicherheit",
-    "sakerhet",
-    "verif",
-    "password",
-    "passwort",
-    "signin",
-    "sign-in",
-    "login",
-    "order",
-    "bestell",
-    "receipt",
-    "kvitto",
-    "invoice",
-    "rechnung",
-    "faktura",
-    "billing",
-    "payment",
-    "zahlung",
-    "betalning",
-    "shipping",
-    "shipment",
-    "versand",
-    "delivery",
-    "lieferung",
-    "leverans",
-    "tracking",
-    "booking",
-    "buchung",
-    "confirm",
-    "bestaetig",
-    "bekraftelse",
-    "messag",
-    "inmail",
+/// Header fields that say how a mail was sent, besides a mailing service's
+/// own ([`SERVICE_FIELDS`]).
+const SENT_BY: &[&str] = &[
+    "List-Unsubscribe",
+    "List-Unsubscribe-Post",
+    "List-Id",
+    "Precedence",
+    "Auto-Submitted",
+    "X-PM-Message-Stream",
 ];
-
-/// What a notice's subject says it's about, in English, German or Swedish:
-/// a password, a code to sign in or confirm with, security, an order, its
-/// receipt, bill and payment, its delivery. Narrower than [`NOTICE_WORDS`],
-/// since newsletters say "Order now": an order is "your order". A sender
-/// that calls itself a newsletter ([`NEWSLETTER_WORDS`]) stays one whatever
-/// its subject says, as netcup's newsletter@ with its security advisories.
-const SUBJECT_WORDS: &[&str] = &[
-    "password",
-    "verif",
-    "security",
-    "login",
-    "log-in",
-    "sign-in",
-    "two-factor",
-    "confirm",
-    "receipt",
-    "invoice",
-    "payment",
-    "your order",
-    "shipped",
-    "passwort",
-    "kennwort",
-    "sicherheit",
-    "bestätig",
-    "quittung",
-    "rechnung",
-    "zahlung",
-    "ihre bestellung",
-    "deine bestellung",
-    "versandt",
-    "zugestellt",
-    "zwei-faktor",
-    "lösenord",
-    "säkerhet",
-    "inloggning",
-    "bekräft",
-    "kvitto",
-    "faktura",
-    "betalning",
-    "din beställning",
-    "din order",
-    "levererad",
-    "tvåfaktor",
-];
-
-/// What a newsletter's address calls it.
-const NEWSLETTER_WORDS: &[&str] = &["newsletter", "news"];
 
 /// Senders' names that say nothing of who sends, written plain: the page
 /// names those senders by their organisation.
@@ -231,12 +148,6 @@ const UNSUBSCRIBE_WORDS: &[&str] = &[
     "avregistrera",
     "avprenumerera",
     "avsluta prenumeration",
-];
-
-/// The first part of a host that sends only notices: accounts.google.com,
-/// id.apple.com.
-const NOTICE_HOSTS: &[&str] = &[
-    "account", "accounts", "auth", "id", "login", "security", "signin",
 ];
 
 /// What unsubscribing and keeping in the Inbox changed, for Undo, by the id
@@ -301,8 +212,8 @@ struct Theirs {
 impl Mail {
     /// Sets the account's newsletters aside: the first time, writes their
     /// rule and moves the Inbox's newsletters to Newsletters, but those from
-    /// senders kept in the Inbox. Once what makes a newsletter or a notice
-    /// changes, it sorts them again ([`Mail::sort_again`]).
+    /// senders kept in the Inbox. Once what makes a newsletter changes, it
+    /// sorts them again ([`Mail::sort_again`]).
     pub(crate) async fn set_newsletters_aside(&self, account: &MailAccount) -> Result<(), Failure> {
         let sorted_by: Option<Option<String>> =
             sqlx::query_scalar("SELECT sorted_by FROM newsletters_set_aside WHERE account_id = $1")
@@ -321,11 +232,7 @@ impl Mail {
             rules.push(Rule::newsletters(&place));
             self.put_rules(account, &rules).await?;
         }
-        let query = but_yours(&rules, "INBOX", &rules::search(&[When::Unsubscribe], ""));
-        let (_, uids) = self.notices(account, "INBOX", &query, false).await?;
-        let moved = self
-            .move_out(account, "INBOX", &uids, &[], &place.path)
-            .await?;
+        let moved = self.set_aside(account, &rules, &place).await?;
         self.subscribe_folders(account, &rules).await?;
         sqlx::query(
             "INSERT INTO newsletters_set_aside (account_id, sorted_by) VALUES ($1, $2) \
@@ -335,88 +242,108 @@ impl Mail {
         .bind(&by)
         .execute(&self.pool)
         .await?;
-        tracing::info!(address = %account.address, "set {} newsletters aside", moved.count);
+        tracing::info!(address = %account.address, "set {moved} newsletters aside");
         Ok(())
     }
 
-    /// Sorts the account's mail again by what makes a newsletter or a
-    /// notice now ([`sorting`]), once for each change to it: writes the
-    /// rule again, moves the notices in Newsletters back to the Inbox, and
-    /// sets aside the Inbox's newsletters, but those from senders kept
-    /// there. It reads all of Newsletters, but what a rule of yours sorts
-    /// there: a notice comes back however it got there, and whatever the
-    /// server's SEARCH finds. A rule you took away stays away, and so do
-    /// newsletters: only notices come back. It subscribes the folders
-    /// Postrider sorts into too, so the account's other mail apps show
-    /// them.
+    /// Sorts the account's mail again by what makes a newsletter now
+    /// ([`sorting`]), once for each change to it: writes the rule again,
+    /// moves what a machine sent by itself from Newsletters back to the
+    /// Inbox, and sets aside the Inbox's newsletters, but those from senders
+    /// kept there. It reads all of Newsletters, but what a rule of yours
+    /// sorts there, whatever the server's SEARCH finds. What its header
+    /// can't tell, Claude Code reads there once (`judge_again`,
+    /// [`crate::judging`]), and the notices come back. A rule you took away
+    /// stays away. It subscribes the folders Postrider sorts into too, so
+    /// the account's other mail apps show them.
     async fn sort_again(&self, account: &MailAccount, by: &str) -> Result<(), Failure> {
         let rules = self.rules(account).await?;
         let sets_aside = rules.iter().any(Rule::is_newsletters);
         if sets_aside {
             self.put_rules(account, &rules).await?;
         }
+        let mut unsure = 0;
         if let Some(place) = self.newsletters_folder(account).await? {
-            let (read, uids) = self
-                .notices(
+            let there = self
+                .told_in(
                     account,
                     &place.path,
                     &but_yours(&rules, &place.path, "ALL"),
-                    true,
+                    &named(&rules),
                 )
                 .await?;
+            let notices = of(&there, Said::Notice);
+            unsure = of(&there, Said::Unsure).len();
             let back = self
-                .move_out(account, &place.path, &uids, &[], "INBOX")
+                .move_out(account, &place.path, &notices, &[], "INBOX")
                 .await?;
-            let mut aside = 0;
-            if sets_aside {
-                let newsletters = rules::search(&[When::Unsubscribe], "");
-                let query = but_yours(&rules, "INBOX", &newsletters);
-                let (_, uids) = self.notices(account, "INBOX", &query, false).await?;
-                aside = self
-                    .move_out(account, "INBOX", &uids, &[], &place.path)
-                    .await?
-                    .count;
-            }
+            let aside = if sets_aside {
+                self.set_aside(account, &rules, &place).await?
+            } else {
+                0
+            };
             tracing::info!(
                 address = %account.address,
-                "sorted again: {} of the {read} in Newsletters are notices, {} went back; \
+                "sorted again: of the {} in Newsletters, {} a machine sent by itself, \
+                 {} went back, and {unsure} say neither, for Claude Code to read; \
                  {aside} newsletters aside",
-                uids.len(),
+                there.len(),
+                notices.len(),
                 back.count
             );
         } else {
             tracing::info!(address = %account.address, "sorted again: no Newsletters");
         }
         self.subscribe_folders(account, &rules).await?;
-        sqlx::query("UPDATE newsletters_set_aside SET sorted_by = $2 WHERE account_id = $1")
-            .bind(account.id)
-            .bind(by)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE newsletters_set_aside SET sorted_by = $2, judge_again = $3 \
+             WHERE account_id = $1",
+        )
+        .bind(account.id)
+        .bind(by)
+        .bind(unsure > 0)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
-    /// How much mail `query` finds in the folder at `path`, and which of it
-    /// is a notice, or, not `notices`, isn't.
-    async fn notices(
+    /// Moves the Inbox's mail that the newsletters' rule would have to
+    /// Newsletters, but what a rule of yours keeps there: how much.
+    async fn set_aside(
+        &self,
+        account: &MailAccount,
+        rules: &[Rule],
+        place: &Place,
+    ) -> Result<usize, Failure> {
+        let query = but_yours(rules, "INBOX", &rules::search(&[When::Unsubscribe], ""));
+        let told = self
+            .told_in(account, "INBOX", &query, &named(rules))
+            .await?;
+        let moved = self
+            .move_out(account, "INBOX", &of(&told, Said::Many), &[], &place.path)
+            .await?;
+        Ok(moved.count)
+    }
+
+    /// The mail `query` finds in the folder at `path`, as the newsletters'
+    /// rule reads it with `senders` named.
+    pub(crate) async fn told_in(
         &self,
         account: &MailAccount,
         path: &str,
         query: &str,
-        notices: bool,
-    ) -> Result<(usize, Vec<u32>), Failure> {
+        senders: &[String],
+    ) -> Result<Vec<Told>, Failure> {
         let headed = self
             .on_server(account, |session| {
                 let (path, query) = (path.to_string(), query.to_string());
-                Box::pin(async move { imap::headers(session, &path, &query, NOTICE_FIELDS).await })
+                Box::pin(async move { imap::headers(session, &path, &query, &told_by()).await })
             })
             .await?;
-        let uids = headed
+        Ok(headed
             .iter()
-            .filter(|mail| notice(mail) == notices)
-            .map(|mail| mail.uid)
-            .collect();
-        Ok((headed.len(), uids))
+            .filter_map(|mail| told(mail, senders))
+            .collect())
     }
 
     /// Subscribes the folders Postrider puts mail in: Archive, Trash, Junk,
@@ -458,7 +385,10 @@ impl Mail {
     }
 
     /// The account's Newsletters, if it has one.
-    async fn newsletters_folder(&self, account: &MailAccount) -> Result<Option<Place>, Failure> {
+    pub(crate) async fn newsletters_folder(
+        &self,
+        account: &MailAccount,
+    ) -> Result<Option<Place>, Failure> {
         Ok(self
             .places(account)
             .await?
@@ -656,65 +586,142 @@ impl Mail {
     }
 }
 
-/// Whether mail from `address`, with this subject and `Auto-Submitted`, is
-/// a notice: sent by a machine by itself, and not to many (`bulk`), or from
-/// an address or with a subject that says what about.
-pub(crate) fn is_notice(
-    address: &str,
-    subject: Option<&str>,
-    auto_submitted: Option<&str>,
-    bulk: bool,
-) -> bool {
-    let address = address.trim().to_lowercase();
-    let (local, host) = address.rsplit_once('@').unwrap_or((&address, ""));
-    let labels: Vec<&str> = host.split('.').collect();
-    // The hosts before its domain: `receipt` in `receipt.max.se`.
-    let hosts = &labels[..labels.len().saturating_sub(2)];
-    let subject = subject.unwrap_or_default().to_lowercase();
-    (!bulk && auto_submitted.is_some_and(|said| !said.trim().eq_ignore_ascii_case("no")))
-        || NOTICE_WORDS
-            .iter()
-            .any(|word| local.contains(word) || hosts.iter().any(|host| host.contains(word)))
-        || (labels.len() > 1 && NOTICE_HOSTS.contains(&labels[0]))
-        || (!NEWSLETTER_WORDS.iter().any(|word| local.contains(word))
-            && SUBJECT_WORDS.iter().any(|word| subject.contains(word)))
+/// What a mail's header says it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Said {
+    /// Sent by a machine by itself, and not to many: a notice.
+    Notice,
+    /// Sent to many, or from a sender the rule names: a newsletter.
+    Many,
+    /// Neither: Claude Code reads it ([`crate::judging`]).
+    Unsure,
 }
 
-/// Strings as a Sieve list's items, each with `after`: `"bulk", "list"`.
-fn strings(items: &[&str], after: &str) -> String {
+/// A mail as the newsletters' rule reads it, by its [`told_by`] fields.
+#[derive(Debug, Clone)]
+pub(crate) struct Told {
+    pub uid: u32,
+    pub address: String,
+    pub subject: String,
+    /// As the Inbox's copy keeps it: without its brackets.
+    pub message_id: String,
+    pub said: Said,
+    /// The fields that say how it was sent, for Claude Code:
+    /// "List-Unsubscribe", "Precedence: bulk".
+    pub fields: Vec<String>,
+}
+
+/// The header fields a mail is told by.
+pub(crate) fn told_by() -> String {
+    format!(
+        "FROM SUBJECT MESSAGE-ID {} {}",
+        SENT_BY.join(" "),
+        SERVICE_FIELDS.join(" ")
+    )
+}
+
+/// A mail by its [`told_by`] fields, as the rule reads it with `senders`
+/// named ([`test`]); `None` without a sender.
+pub(crate) fn told(headed: &Headed, senders: &[String]) -> Option<Told> {
+    let message = MessageParser::new().parse_headers(&headed.header)?;
+    let address = message
+        .from()
+        .and_then(|list| list.first())
+        .and_then(|from| from.address())?
+        .trim()
+        .to_lowercase();
+    let raw = |field: &str| {
+        message.headers().get(field).map(|header| {
+            String::from_utf8_lossy(header.raw_value())
+                .trim()
+                .to_string()
+        })
+    };
+    let is = |field: &str, values: &[&str]| {
+        raw(field).is_some_and(|said| values.iter().any(|v| said.eq_ignore_ascii_case(v)))
+    };
+    let bulk = is("Precedence", BULK);
+    let many = raw("List-Id").is_some()
+        || bulk
+        || raw("X-PM-Message-Stream")
+            .is_some_and(|stream| stream.to_lowercase().contains("broadcast"))
+        || (raw("X-MC-User").is_some() && raw("X-Mandrill-User").is_none())
+        || senders.contains(&address);
+    let machine = raw("Auto-Submitted").is_some()
+        && !is("Auto-Submitted", &["no"])
+        && raw("List-Unsubscribe-Post").is_none()
+        && !bulk;
+    let fields = SENT_BY
+        .iter()
+        .chain(SERVICE_FIELDS)
+        .filter_map(|field| {
+            let value = raw(field)?;
+            Some(match *field {
+                "Precedence" | "Auto-Submitted" | "X-PM-Message-Stream" => {
+                    format!("{field}: {}", value.chars().take(60).collect::<String>())
+                }
+                _ => (*field).to_string(),
+            })
+        })
+        .collect();
+    Some(Told {
+        uid: headed.uid,
+        address,
+        subject: message.subject().unwrap_or_default().to_string(),
+        message_id: message.message_id().unwrap_or_default().to_string(),
+        said: if machine {
+            Said::Notice
+        } else if many {
+            Said::Many
+        } else {
+            Said::Unsure
+        },
+        fields,
+    })
+}
+
+/// Strings as a Sieve list's items: `"bulk", "list"`.
+fn strings(items: &[&str]) -> String {
     items
         .iter()
-        .map(|item| format!("\"{item}{after}\""))
+        .map(|item| format!("\"{item}\""))
         .collect::<Vec<_>>()
         .join(", ")
 }
 
-/// [`is_notice`] in Sieve, for the newsletters' rule.
-pub(crate) fn notice_test() -> String {
-    // A word in a host before the domain: two more parts follow it.
-    let hosts = NOTICE_WORDS
-        .iter()
-        .map(|word| format!("\"*{word}*.*.*\""))
-        .chain(NOTICE_HOSTS.iter().map(|host| format!("\"{host}.*\"")))
-        .collect::<Vec<_>>()
-        .join(", ");
+/// The newsletters' rule in Sieve, as [`told`] reads a mail: one with a way
+/// to unsubscribe, that went to many or comes from one of `senders`, and
+/// that no machine sent by itself. `bodies` when the server reads mail's
+/// text, for a mailing service's offer in it ([`from_a_service_test`]).
+pub(crate) fn test(bodies: bool, senders: &[String]) -> String {
+    let link = if bodies {
+        format!(
+            "anyof (exists \"list-unsubscribe\", {})",
+            from_a_service_test()
+        )
+    } else {
+        "exists \"list-unsubscribe\"".into()
+    };
+    let bulk = strings(BULK);
+    let mut many = format!(
+        "exists \"list-id\", header :is \"precedence\" [{bulk}], \
+         header :contains \"x-pm-message-stream\" \"broadcast\", \
+         allof (exists \"x-mc-user\", not exists \"x-mandrill-user\")"
+    );
+    if !senders.is_empty() {
+        let senders: Vec<String> = senders.iter().map(|s| rules::sieve_string(s)).collect();
+        many = format!("{many}, address :is \"from\" [{}]", senders.join(", "));
+    }
     format!(
-        "anyof (allof (exists \"auto-submitted\", not header :is \"auto-submitted\" \"no\", \
-         not exists \"list-unsubscribe-post\", not header :is \"precedence\" [{}]), \
-         address :localpart :contains \"from\" [{}], \
-         address :domain :matches \"from\" [{hosts}], \
-         allof (not address :localpart :contains \"from\" [{}], \
-         header :contains \"subject\" [{}]))",
-        strings(BULK, ""),
-        strings(NOTICE_WORDS, ""),
-        strings(NEWSLETTER_WORDS, ""),
-        strings(SUBJECT_WORDS, "")
+        "allof ({link}, anyof ({many}), not allof (exists \"auto-submitted\", \
+         not header :is \"auto-submitted\" \"no\", not exists \"list-unsubscribe-post\", \
+         not header :is \"precedence\" [{bulk}]))"
     )
 }
 
 /// How the passes sort, besides what the newsletters' rule says: counted up
 /// when they change, so each account's mail is sorted again by them.
-const PASSES: u32 = 2;
+const PASSES: u32 = 3;
 
 /// What makes a newsletter or a notice, as the newsletters' rule says it in
 /// Sieve, and how the passes sort ([`PASSES`]): when it changes, each
@@ -734,7 +741,7 @@ pub(crate) fn from_a_service_test() -> String {
         .join(", ");
     format!(
         "allof (anyof ({fields}), body :text :contains [{}])",
-        strings(UNSUBSCRIBE_WORDS, "")
+        strings(UNSUBSCRIBE_WORDS)
     )
 }
 
@@ -753,7 +760,7 @@ pub(crate) fn from_a_service_search() -> String {
 /// The mail that `what` finds in the folder at `path`, but not what a rule
 /// of yours sorts there: from senders kept in the Inbox, or sorted into
 /// Newsletters.
-fn but_yours(rules: &[Rule], path: &str, what: &str) -> String {
+pub(crate) fn but_yours(rules: &[Rule], path: &str, what: &str) -> String {
     let yours: Vec<When> = rules
         .iter()
         .filter(|rule| rule.path == path && !rule.is_newsletters())
@@ -766,33 +773,21 @@ fn but_yours(rules: &[Rule], path: &str, what: &str) -> String {
     }
 }
 
-/// Whether a mail, by its [`NOTICE_FIELDS`], is a notice.
-fn notice(headed: &Headed) -> bool {
-    let Some(message) = MessageParser::new().parse_headers(&headed.header) else {
-        return false;
-    };
-    let Some(address) = message
-        .from()
-        .and_then(|list| list.first())
-        .and_then(|from| from.address())
-    else {
-        return false;
-    };
-    let raw = |field: &str| {
-        message
-            .headers()
-            .get(field)
-            .map(|header| String::from_utf8_lossy(header.raw_value()).into_owned())
-    };
-    let bulk = raw("List-Unsubscribe-Post").is_some()
-        || raw("Precedence")
-            .is_some_and(|said| BULK.iter().any(|b| said.trim().eq_ignore_ascii_case(b)));
-    is_notice(
-        address,
-        message.subject(),
-        raw("Auto-Submitted").as_deref(),
-        bulk,
-    )
+/// The senders the newsletters' rule names.
+pub(crate) fn named(rules: &[Rule]) -> Vec<String> {
+    rules
+        .iter()
+        .find(|rule| rule.is_newsletters())
+        .map(|rule| rule.senders.clone())
+        .unwrap_or_default()
+}
+
+/// The UIDs of the mail whose header says `said`.
+pub(crate) fn of(told: &[Told], said: Said) -> Vec<u32> {
+    told.iter()
+        .filter(|mail| mail.said == said)
+        .map(|mail| mail.uid)
+        .collect()
 }
 
 /// A newsletter from its header fields; `None` without a sender.
@@ -1047,6 +1042,19 @@ pub async fn list(
             .map(|account| state.mail.newsletters_of(account, now)),
     )
     .await;
+    let rules = join_all(accounts.iter().map(|account| state.mail.rules(account))).await;
+    let named = accounts
+        .iter()
+        .zip(rules)
+        .flat_map(|(account, rules)| {
+            named(&rules.unwrap_or_default())
+                .into_iter()
+                .map(|address| NewsletterRef {
+                    account_id: account.id,
+                    address,
+                })
+        })
+        .collect();
     let set_aside: Vec<Uuid> = sqlx::query_scalar(
         "SELECT account_id FROM newsletters_set_aside WHERE account_id = ANY($1)",
     )
@@ -1095,6 +1103,7 @@ pub async fn list(
         problems,
         setting_aside,
         not_sorted,
+        named,
     }))
 }
 
@@ -1241,6 +1250,8 @@ pub async fn unsubscribed(
 
 /// `POST /api/w/{workspace}/newsletters/keep`: keeps the senders' mail in
 /// the Inbox, by a rule on the server, and moves what they sent back there.
+/// The newsletters' rule names them no more, and what Claude Code made of
+/// their mail is forgotten.
 pub async fn keep(
     State(state): State<AppState>,
     member: Member,
@@ -1255,6 +1266,9 @@ pub async fn keep(
             let before = state.mail.rules(&account).await?;
             let mut rules = before.clone();
             let when: Vec<When> = addresses.iter().cloned().map(When::From).collect();
+            for rule in rules.iter_mut().filter(|rule| rule.is_newsletters()) {
+                rule.senders.retain(|sender| !addresses.contains(sender));
+            }
             match rules.iter_mut().find(|rule| rule.path == "INBOX") {
                 Some(rule) => {
                     for w in when {
@@ -1267,10 +1281,18 @@ pub async fn keep(
                     folder: "Inbox".into(),
                     path: "INBOX".into(),
                     when,
+                    senders: Vec::new(),
                 }),
             }
             state.mail.put_rules(&account, &rules).await?;
             undo.rules.push((account.clone(), before));
+            sqlx::query(
+                "DELETE FROM newsletter_verdicts WHERE account_id = $1 AND address = ANY($2)",
+            )
+            .bind(account.id)
+            .bind(&addresses)
+            .execute(&state.mail.pool)
+            .await?;
             if let Some(place) = state.mail.newsletters_folder(&account).await? {
                 let theirs = state.mail.theirs(&account, &place, &addresses).await?;
                 let uids: Vec<u32> = theirs.values().flat_map(|t| t.uids.clone()).collect();
@@ -1339,74 +1361,109 @@ mod tests {
         Url::parse(text).unwrap()
     }
 
+    /// What [`told`] makes of a mail with these header lines, from
+    /// `from`, when the rule names `senders`.
+    fn said(from: &str, lines: &str, senders: &[&str]) -> Said {
+        let header = format!("From: {from}\nSubject: Hello\nMessage-ID: <1@x>\n{lines}\n")
+            .replace('\n', "\r\n");
+        let headed = crate::imap::Headed {
+            uid: 1,
+            arrived: None,
+            seen: false,
+            header: header.into_bytes(),
+        };
+        let senders: Vec<String> = senders.iter().map(|s| (*s).to_string()).collect();
+        told(&headed, &senders).unwrap().said
+    }
+
     #[test]
-    fn notices_are_told_from_newsletters() {
-        let notice = |address, subject| is_notice(address, subject, None, false);
-        // Google's notices of a sign-in say where to unsubscribe.
-        assert!(notice("noreply-accounts@google.com", None));
-        assert!(notice("no-reply@accounts.google.com", None));
-        assert!(notice("appleid@id.apple.com", None));
-        assert!(notice("auto-confirm@amazon.de", None));
-        assert!(notice("shipment-tracking@amazon.de", None));
-        assert!(notice("Buchungsbestaetigung@bahn.de", None));
-        assert!(notice("kvitto@coop.se", None));
-        assert!(is_notice(
-            "noreply@forge.test",
-            None,
-            Some(" auto-generated"),
-            false
+    fn a_header_tells_mail_sent_to_many_in_no_language() {
+        let offer = "List-Unsubscribe: <https://x/u>";
+        let said = |lines: &str| said("news@shop.test", &format!("{offer}\n{lines}"), &[]);
+        assert_eq!(said("List-Id: <news.shop.test>"), Said::Many);
+        assert_eq!(said("Precedence: bulk"), Said::Many);
+        assert_eq!(said("Precedence: List"), Said::Many);
+        assert_eq!(said("X-PM-Message-Stream: Broadcast"), Said::Many);
+        // Mailchimp's own, but not its Mandrill, which sends orders too.
+        assert_eq!(said("X-MC-User: 3f2a"), Said::Many);
+        assert_eq!(said("X-MC-User: 3f2a\nX-Mandrill-User: md_1"), Said::Unsure);
+        assert_eq!(said("X-PM-Message-Stream: outbound"), Said::Unsure);
+        // A way to unsubscribe alone says neither: Claude Code reads it.
+        assert_eq!(said(""), Said::Unsure);
+        assert_eq!(said("Precedence: first-class"), Said::Unsure);
+    }
+
+    #[test]
+    fn a_machine_that_sent_by_itself_is_a_notice() {
+        let offer = "List-Unsubscribe: <https://x/u>";
+        let said = |lines: &str| said("noreply@accounts.test", &format!("{offer}\n{lines}"), &[]);
+        // A sign-in that says where to unsubscribe.
+        assert_eq!(said("Auto-Submitted: auto-generated"), Said::Notice);
+        assert_eq!(
+            said("Auto-Submitted: auto-generated\nList-Id: <x>"),
+            Said::Notice
+        );
+        assert_eq!(said("Auto-Submitted: no"), Said::Unsure);
+        // Newsletters say it too, to keep auto-replies away, and then say
+        // they went to many.
+        assert_eq!(
+            said("Auto-Submitted: auto-generated\nPrecedence: bulk"),
+            Said::Many
+        );
+        assert_eq!(
+            said(
+                "Auto-Submitted: auto-generated\nList-Unsubscribe-Post: List-Unsubscribe=One-Click"
+            ),
+            Said::Unsure
+        );
+        assert_eq!(
+            said(
+                "Auto-Submitted: auto-generated\nList-Id: <x>\n\
+                 List-Unsubscribe-Post: List-Unsubscribe=One-Click"
+            ),
+            Said::Many
+        );
+    }
+
+    #[test]
+    fn a_sender_the_rule_names_writes_to_many() {
+        let offer = "List-Unsubscribe: <https://x/u>";
+        assert_eq!(
+            said(
+                "Coursera <No-Reply@M.Coursera.test>",
+                offer,
+                &["no-reply@m.coursera.test"]
+            ),
+            Said::Many
+        );
+        assert_eq!(
+            said(
+                "no-reply@coursera.test",
+                offer,
+                &["no-reply@m.coursera.test"]
+            ),
+            Said::Unsure
+        );
+        // A machine that sent by itself still goes to the Inbox.
+        assert_eq!(
+            said(
+                "no-reply@m.coursera.test",
+                &format!("{offer}\nAuto-Submitted: auto-replied"),
+                &["no-reply@m.coursera.test"]
+            ),
+            Said::Notice
+        );
+    }
+
+    #[test]
+    fn the_rule_names_its_senders_beside_the_header() {
+        let named = test(false, &["a@x.test".into(), "b@y.test".into()]);
+        assert!(named.contains(
+            "header :contains \"x-pm-message-stream\" \"broadcast\", \
+             allof (exists \"x-mc-user\", not exists \"x-mandrill-user\"), \
+             address :is \"from\" [\"a@x.test\", \"b@y.test\"])"
         ));
-        assert!(notice("messaging-digest-noreply@linkedin.com", None));
-        assert!(notice("messages-noreply@linkedin.com", None));
-        // A host before the domain may say it, or the subject.
-        assert!(notice("noreply@receipt.max.se", Some("Orderbekräftelse")));
-        assert!(notice("noreply@receipt.max.se", None));
-        assert!(notice("noreply@max.se", Some("Verifieringskod")));
-        assert!(notice("noreply@max.se", Some("Återställ lösenord")));
-        assert!(notice(
-            "donotreply@netcup.de",
-            Some("netcup Sicherheitstoken")
-        ));
-        assert!(notice(
-            "info@unaxus.com",
-            Some("Sicherheitsinformation zu Ihrem Konto")
-        ));
-        assert!(notice("hello@shop.test", Some("Your order has shipped")));
-        // Their newsletters don't.
-        assert!(!notice("googleplay-noreply@google.com", None));
-        assert!(!notice("store-news@amazon.de", None));
-        assert!(!is_notice("newsletter@coop.se", None, Some("no"), false));
-        assert!(!notice("info@fitness24seven.test", None));
-        assert!(!notice("news@identity.test", None));
-        assert!(!notice("updates-noreply@linkedin.com", None));
-        assert!(!notice(
-            "donotreply@netcup.de",
-            Some("netcup News November")
-        ));
-        assert!(!notice("news@compricer.se", Some("Order now and save 20%")));
-        // The domain itself isn't a host that says it.
-        assert!(!notice("deals@booking.com", None));
-        assert!(!notice("news@orderbird.com", None));
-        // netcup's advisories come from its newsletter: that stays one.
-        assert!(!notice(
-            "newsletter@netcup.com",
-            Some("Sicherheitshinweis: Wartung")
-        ));
-        assert!(!notice("notification@weave.engineering", None));
-        // Newsletters may say a machine sent them, to keep auto-replies away,
-        // and then say they went to many.
-        assert!(!is_notice(
-            "no-reply@m.learn.coursera.org",
-            Some("Recommended for you"),
-            Some("auto-generated"),
-            true
-        ));
-        assert!(is_notice(
-            "noreply-accounts@google.com",
-            None,
-            Some("auto-generated"),
-            true
-        ));
+        assert!(!test(false, &[]).contains("address :is"));
     }
 
     #[test]
@@ -1415,6 +1472,7 @@ mod tests {
             folder: path.into(),
             path: path.into(),
             when: vec![When::From(from.into())],
+            senders: Vec::new(),
         };
         let newsletters = Place {
             path: "INBOX.Newsletters".into(),

@@ -33,6 +33,11 @@ pub struct Rule {
     /// Its path on this account's server: "INBOX.Code".
     pub path: String,
     pub when: Vec<When>,
+    /// The newsletters' rule's senders that write to many without saying
+    /// so, as Claude Code found ([`crate::judging`]): their mail goes there
+    /// too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub senders: Vec<String>,
 }
 
 impl Rule {
@@ -54,12 +59,25 @@ impl Rule {
             folder: newsletters.name.clone(),
             path: newsletters.path.clone(),
             when: vec![When::Unsubscribe],
+            senders: Vec::new(),
         }
     }
 
     /// Whether it's the rule for newsletters.
     pub fn is_newsletters(&self) -> bool {
         self.when.contains(&When::Unsubscribe)
+    }
+
+    /// Its tests in Sieve, any of which files a mail there.
+    fn tests(&self, bodies: bool) -> String {
+        self.when
+            .iter()
+            .map(|when| match when {
+                When::Unsubscribe => crate::newsletters::test(bodies, &self.senders),
+                when => when.test(bodies),
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 }
 
@@ -75,9 +93,8 @@ pub enum When {
     Subject(String),
     /// From this mailing list, by its List-Id.
     List(String),
-    /// With a link to unsubscribe (`List-Unsubscribe`), or from a mailing
-    /// service with one in its text, and not a notice: a newsletter
-    /// ([`crate::newsletters`]).
+    /// With a way to unsubscribe, sent to many as its header says, and
+    /// not by a machine by itself: a newsletter ([`crate::newsletters`]).
     Unsubscribe,
 }
 
@@ -105,17 +122,7 @@ impl When {
             When::To(who) => address("[\"to\", \"cc\"]", who),
             When::Subject(words) => format!("header :contains \"subject\" {}", sieve_string(words)),
             When::List(list) => format!("header :contains \"list-id\" {}", sieve_string(list)),
-            When::Unsubscribe => {
-                let link = if bodies {
-                    format!(
-                        "anyof (exists \"list-unsubscribe\", {})",
-                        crate::newsletters::from_a_service_test()
-                    )
-                } else {
-                    "exists \"list-unsubscribe\"".into()
-                };
-                format!("allof ({link}, not {})", crate::newsletters::notice_test())
-            }
+            When::Unsubscribe => crate::newsletters::test(bodies, &[]),
         }
     }
 
@@ -128,8 +135,9 @@ impl When {
             When::To(who) => format!("OR TO {0} CC {0}", quoted(who)),
             When::Subject(words) => format!("SUBJECT {}", quoted(words)),
             When::List(list) => format!("HEADER List-Id {}", quoted(list)),
-            // An empty string is in every mail that has the header. SEARCH
-            // can't tell a notice: what it finds is read again.
+            // An empty string is in every mail that has the header. It finds
+            // what offers to unsubscribe; whether that went to many is read
+            // in its header after.
             When::Unsubscribe => format!(
                 "OR HEADER List-Unsubscribe \"\" ({})",
                 crate::newsletters::from_a_service_search()
@@ -167,12 +175,7 @@ pub fn script(rules: &[Rule], can_read_bodies: bool) -> String {
     ordered.sort_by_key(|rule| rule.place());
     for rule in ordered {
         let said = serde_json::to_string(rule).expect("a rule is JSON");
-        let tests = rule
-            .when
-            .iter()
-            .map(|when| when.test(bodies))
-            .collect::<Vec<_>>()
-            .join(", ");
+        let tests = rule.tests(bodies);
         // Sieve names a folder in UTF-8, where IMAP has modified UTF-7.
         let _ = write!(
             script,
@@ -206,7 +209,7 @@ fn running_both(theirs: &str) -> String {
 }
 
 /// A string as Sieve quotes it, on one line.
-fn sieve_string(text: &str) -> String {
+pub(crate) fn sieve_string(text: &str) -> String {
     let text: String = text.chars().filter(|c| !c.is_control()).collect();
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
@@ -233,7 +236,7 @@ pub(crate) fn any(keys: &[String]) -> String {
 }
 
 /// UIDs as a set IMAP reads, runs joined: `3:7,9`.
-fn uid_set(uids: &[u32]) -> String {
+pub(crate) fn uid_set(uids: &[u32]) -> String {
     let mut uids = uids.to_vec();
     uids.sort_unstable();
     let mut set = String::new();
@@ -757,6 +760,7 @@ mod tests {
                 When::From("codevillain.eu".into()),
                 When::Subject("\"PR\"".into()),
             ],
+            senders: Vec::new(),
         }
     }
 
@@ -779,6 +783,7 @@ mod tests {
             folder: "Gebühren & Rechnungen".into(),
             path: "Geb&APw-hren &- Rechnungen".into(),
             when: vec![When::From("netcup.test".into())],
+            senders: Vec::new(),
         };
         let script = script(std::slice::from_ref(&fees), true);
         assert!(script.contains("fileinto \"Gebühren & Rechnungen\";"));
@@ -808,6 +813,7 @@ mod tests {
             folder: "Inbox".into(),
             path: "INBOX".into(),
             when: vec![When::From("news@bahn.test".into())],
+            senders: Vec::new(),
         };
         let script = script(&[newsletters.clone(), kept.clone(), code()], true);
         assert_eq!(rules_in(&script), vec![code(), kept, newsletters.clone()]);
@@ -820,30 +826,34 @@ mod tests {
             "exists \"x-csa-complaints\"), body :text :contains [\"unsubscribe\", \"abmelden\", "
         ));
         assert!(script.contains(
-            "\"avsluta prenumeration\"])), not anyof (allof (exists \"auto-submitted\", \
-             not header :is \"auto-submitted\" \"no\", not exists \"list-unsubscribe-post\", \
-             not header :is \"precedence\" [\"bulk\", \"list\"]), \
-             address :localpart :contains \"from\" [\"account\", "
+            "\"avsluta prenumeration\"])), anyof (exists \"list-id\", \
+             header :is \"precedence\" [\"bulk\", \"list\"], \
+             header :contains \"x-pm-message-stream\" \"broadcast\", \
+             allof (exists \"x-mc-user\", not exists \"x-mandrill-user\")), \
+             not allof (exists \"auto-submitted\", not header :is \"auto-submitted\" \"no\", \
+             not exists \"list-unsubscribe-post\", \
+             not header :is \"precedence\" [\"bulk\", \"list\"]))) {\n  \
+             fileinto \"INBOX.Newsletters\";\n  stop;\n}"
         ));
+        // A server that doesn't read mail's text goes by the header alone.
+        let header_only = super::script(std::slice::from_ref(&newsletters), false);
+        assert!(header_only.contains("require [\"fileinto\"];\n"));
         assert!(
-            script.contains(
-                "address :domain :matches \"from\" [\"*account*.*.*\", \"*konto*.*.*\", "
+            header_only.contains(
+                "if anyof (allof (exists \"list-unsubscribe\", anyof (exists \"list-id\", "
             )
         );
+        // The senders Claude Code found writing to many go in its test, and
+        // come back with it.
+        let named = Rule {
+            senders: vec!["no-reply@m.coursera.test".into()],
+            ..newsletters
+        };
+        let script = super::script(std::slice::from_ref(&named), false);
         assert!(script.contains(
-            "\"*inmail*.*.*\", \"account.*\", \"accounts.*\", \"auth.*\", \"id.*\", \
-             \"login.*\", \"security.*\", \"signin.*\"], allof (not address :localpart :contains \"from\" \
-             [\"newsletter\", \"news\"], header :contains \"subject\" [\"password\", "
+            "not exists \"x-mandrill-user\"), address :is \"from\" [\"no-reply@m.coursera.test\"])"
         ));
-        assert!(
-            script.contains("\"tvåfaktor\"])))) {\n  fileinto \"INBOX.Newsletters\";\n  stop;\n}")
-        );
-        // A server that doesn't read mail's text goes by the header alone.
-        let header_only = super::script(&[newsletters], false);
-        assert!(header_only.contains("require [\"fileinto\"];\n"));
-        assert!(header_only.contains(
-            "if anyof (allof (exists \"list-unsubscribe\", not anyof (allof (exists \"auto-submitted\", "
-        ));
+        assert_eq!(rules_in(&script), vec![named]);
         let found = search(&[When::Unsubscribe], "");
         assert!(found.starts_with(
             "OR HEADER List-Unsubscribe \"\" (OR HEADER X-MSFBL \"\" (OR HEADER X-SG-EID \"\" ("

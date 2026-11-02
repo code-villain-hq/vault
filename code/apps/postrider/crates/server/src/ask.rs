@@ -552,6 +552,7 @@ impl Asking {
                         folder: place.name.clone(),
                         path: place.path.clone(),
                         when: when.clone(),
+                        senders: Vec::new(),
                     });
                     made_rule.push(account.name.clone());
                     when.clone()

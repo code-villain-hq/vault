@@ -657,6 +657,9 @@ pub struct Newsletters {
     /// a newsletter or a notice now, and why. It tries again the next time
     /// each connects.
     pub not_sorted: Vec<SettingAside>,
+    /// The senders the newsletters' rule names, since their mail doesn't
+    /// say it went to many and Claude Code found it does.
+    pub named: Vec<NewsletterRef>,
 }
 
 /// An account whose newsletters are still being set aside, or sorted

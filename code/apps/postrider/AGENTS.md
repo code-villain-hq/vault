@@ -239,30 +239,41 @@ with `reading`; Undo puts them back.
 
 ## Newsletters
 
-A newsletter is mail that carries `List-Unsubscribe`, or that a mailing
-service sent (`SERVICE_FIELDS`: SparkPost's `X-MSFBL`, SendGrid's,
-Amazon SES's, Mailgun's, Mailchimp's, Mailjet's, `X-CSA-Complaints`) with
-"unsubscribe" in its text (`UNSUBSCRIBE_WORDS`, English, German, Swedish),
-and isn't a notice (`newsletters.rs`). Coursera's has no header to say
-so. The rule reads the text only where the server's ManageSieve offers
-`body` (`Sieve::can`); IMAP SEARCH reads it with `BODY`. A notice is about something of yours: a sign-in, the
-account, an order, a payment, a delivery, a message someone wrote you.
-Google and LinkedIn put the header on their notices too, so `is_notice`
-tells them by what the header can't: an `Auto-Submitted` other than `no`
-(RFC 3834) on mail that doesn't say it went to many (newsletters send it
-too, to keep auto-replies away, with one click to leave or
-`Precedence: bulk`), a word in the sender's local part or in a host
-before its domain (`NOTICE_WORDS`: account, security, login, order,
-receipt, payment, shipping, confirm, message, … in English, German and
-Swedish; `receipt.max.se`), a host that sends only notices
-(`NOTICE_HOSTS`: `accounts.google.com`, `id.apple.com`), or a word in the
-subject (`SUBJECT_WORDS`: password, verification, security, your order,
-its receipt, payment, delivery: "Verifieringskod", "netcup Sicherheitstoken"),
-but not from a sender that calls itself a newsletter (`newsletter@`,
-`news@`: netcup's advisories stay newsletters). The rule's Sieve says the
-same (`notice_test`); IMAP SEARCH can't, so what it finds is read again by
-its header fields. Keep in Inbox is the fix for a sender it still gets
-wrong.
+A newsletter is mail sent to many, and Postrider tells it by what needs
+no language (`newsletters.rs`). It offers a way to unsubscribe: it
+carries `List-Unsubscribe`, or a mailing service sent it
+(`SERVICE_FIELDS`: SparkPost's `X-MSFBL`, SendGrid's, Amazon SES's,
+Mailgun's, Mailchimp's, Mailjet's, `X-CSA-Complaints`) with "unsubscribe"
+in its text (`UNSUBSCRIBE_WORDS`, English, German, Swedish; the rule reads
+the text only where the server's ManageSieve offers `body`, `Sieve::can`,
+and IMAP SEARCH reads it with `BODY`). And its header says it went to
+many: `List-Id`, `Precedence: bulk` or `list`, a Postmark broadcast
+stream (`X-PM-Message-Stream`), or Mailchimp's own `X-MC-User` (not
+Mandrill's, nor SES or SendGrid alone: they send orders too). Mail an
+`Auto-Submitted` other than `no` (RFC 3834) says a machine sent by itself
+is a notice, unless it also says it went to many with one click to leave
+or `Precedence: bulk`, as newsletters do to keep auto-replies away. The
+rule's Sieve (`newsletters::test`) and the Rust that reads a header
+(`told`: `Said::Many`, `Notice` or `Unsure`) say the same.
+
+What offers to unsubscribe but says neither stays in the Inbox, and
+Claude Code on this Mac reads it (`judging.rs`, started by `serve.rs`
+beside the sorter): the sender, how it was sent, the subject and its
+first lines, twenty at a time, with no tools. Is it about something of
+yours (an order, a delivery, a booking, a code, a sign-in, your account, a
+payment, a person writing you) or sent to many? Lines like `3: many` say;
+what it isn't sure of stays. Mail sent to many moves to Newsletters. The
+verdict is kept by sender and kind of mail (`newsletter_verdicts`; the
+kind is the subject in lower case, numbers left out), so the same isn't
+asked twice, and each mail is read once (`newsletter_judged`, by
+Message-ID), so one you move back stays where you put it. A sender found
+writing to many in two kinds of mail, and never about something of
+yours, is named in the newsletters' rule (`Rule::senders`, `address :is
+"from"` beside the header test): from then on the server sorts its mail
+at once, with the Mac off. One found writing about something of yours
+comes off it again, and a sender that writes both stays with Claude Code.
+Keep in Inbox wins: it takes the sender off the rule and forgets its
+verdicts. Without Claude Code, such mail stays in the Inbox.
 
 The first time an account comes online, Postrider adds a rule to its
 Sieve script that files newsletters in its Newsletters folder (made where
@@ -274,12 +285,13 @@ Sieve, after `PASSES`, counted up when the passes change). When that
 changes, the account's mail is sorted again by it, once (`sort_again`):
 its rule is written again, the notices in Newsletters go back to the
 Inbox, and the Inbox's newsletters go to Newsletters, but those from
-senders kept in the Inbox. It reads all of Newsletters, but what a rule
-of yours sorts there, so a notice comes back however it got there and
-whatever the server's SEARCH finds; the log says how many it read, found
-and moved. Change the words, and every account follows on its next start;
-there's nothing else to note. Both passes
-subscribe the folders Postrider puts mail in (Archive, Trash, Junk,
+senders kept in the Inbox. What in Newsletters says neither is marked
+(`judge_again`) for Claude Code to read once: the notices among it go
+back too. It reads all of Newsletters, but what a rule of yours sorts
+there, so a notice comes back however it got there and whatever the
+server's SEARCH finds; the log says how many it read, found and moved.
+Change the test, and every account follows on its next start; there's
+nothing else to note. Both passes subscribe the folders Postrider puts mail in (Archive, Trash, Junk,
 Newsletters and those its rules sort into), since the account's other
 mail apps show only subscribed ones; a folder Postrider makes is
 subscribed as it's made. The folder is a role folder
@@ -306,6 +318,8 @@ it says so and reads every 5 seconds until they are. When setting them
 aside or sorting them again failed, it says why (kept in memory,
 `set_aside_failed`, as `setting_aside` or `not_sorted`); the account
 tries again when it next connects. The page is as wide as the window.
+Below its senders, one muted line names those the rule names (`named`),
+and that Keep in Inbox takes one off.
 
 A sender's name, or Enter, opens what it sent (`SenderList`, at
 `/newsletters/{address}`): every account's Newsletters asked for that
@@ -343,7 +357,7 @@ Like the ask field's, what it needs is kept in memory.
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
   ask field's answers (`ask.rs`), sorting rules (`rules.rs`, written
   over ManageSieve by `sieve.rs`), sorting by reading (`reading.rs`) and
-  newsletters (`newsletters.rs`).
+  newsletters (`newsletters.rs`, read by Claude Code in `judging.rs`).
   `local.rs` is the one person on this Mac, who signs in to nothing.
   `serve.rs` runs it until told to stop, for `main.rs` (development) and
   the desktop app alike.

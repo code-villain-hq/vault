@@ -1,5 +1,6 @@
-// Newsletters: every sender whose mail carries a link to unsubscribe, the
-// least read first, led by the ones you never open. Each column's head sorts
+// Newsletters: every sender whose mail went to many, as its header says or
+// Claude Code found reading it, the least read first, led by the ones you
+// never open. Each column's head sorts
 // by it, remembered on this device, and / finds a sender by any name it
 // wrote as. Unsubscribing asks nothing: it archives what the sender sent,
 // and the request waits 10 seconds on the server, so Undo really undoes it.
@@ -11,6 +12,7 @@ import type {
   KeptInInbox,
   MailAccount,
   Newsletter,
+  NewsletterRef,
   Newsletters,
   SenderProblem,
   SettingAside,
@@ -358,12 +360,12 @@ export function NewslettersPage() {
             all.length === 0 &&
             (moving ? (
               <Empty title="Moving your newsletters here">
-                The first time, Postrider moves the mail in your Inbox with a link to unsubscribe
-                here. It shows in a moment.
+                The first time, Postrider moves the newsletters in your Inbox here. It shows in a
+                moment.
               </Empty>
             ) : (
               <Empty title="No newsletters yet">
-                Mail with a link to unsubscribe comes here, instead of to your Inbox.
+                Newsletters and offers, mail sent to many, come here instead of to your Inbox.
               </Empty>
             ))}
           {all.length > 0 && (
@@ -397,6 +399,7 @@ export function NewslettersPage() {
               </ol>
             </div>
           )}
+          {data && <Named named={data.named} rows={all} />}
         </div>
       </PageBody>
     </>
@@ -672,6 +675,32 @@ function undoable(batch: Batch, keys: string[], done: Map<string, { done: Done }
 
 function failedBySender(failed: SenderProblem[]): Map<string, string> {
   return new Map(failed.map((f) => [senderKey(f), f.message]));
+}
+
+/** The senders Postrider's rule names, since their mail doesn't say it went
+ * to many but Claude Code found it always does: by the name they write as. */
+function Named({ named, rows }: { named: NewsletterRef[]; rows: Newsletter[] }) {
+  const names = [
+    ...new Set(
+      named.map(
+        (n) =>
+          rows.find((r) => r.account_id === n.account_id && r.address === n.address)?.name ??
+          n.address,
+      ),
+    ),
+  ];
+  if (names.length === 0) return null;
+  const shown = names.length > 5 ? [...names.slice(0, 4), `${names.length - 4} more`] : names;
+  const list = new Intl.ListFormat("en", { type: "conjunction" }).format(shown);
+  return (
+    <p className="px-3 pt-4 text-muted">
+      {names.length === 1
+        ? `${list} doesn't say its mail goes to many, so Postrider's rule names it and its ` +
+          "mail comes here at once. Keep in Inbox takes it off."
+        : `${list} don't say their mail goes to many, so Postrider's rule names them and ` +
+          "their mail comes here at once. Keep in Inbox takes one off."}
+    </p>
+  );
 }
 
 /** "1 mail", "23 mails". */
