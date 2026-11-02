@@ -18,6 +18,7 @@ The sidebar and top bar together form an inverted L. Nothing divides the regions
 - In the desktop app the native title bar is hidden and macOS's traffic lights take the wordmark's place, as in Layer; Grenze beside them clashed. They sit centred on the top bar, 16px from the left (`trafficLightPosition` 16, 18), at the same spot in every app. The empty part of the top row and of the top bar move the window.
 - Global Search and the product's create action (New issue in Forge) sit together at the right of the top row, as quiet 28px icon buttons with accessible names. They do not occupy a separate row between the workspace and navigation.
 - The workspace picker is a separate row below the product identity and above navigation. It shows the workspace's avatar and name; switching workspace never renames the product wordmark.
+- Only the navigation scrolls; the top row, the workspace picker and the foot stay. Its scrollbar runs at the sidebar's edge, in the margin beside the items, never over them or beside the top row.
 - Items in the `ui` role, text `fg` with `muted` icons, 6px corners, as Layer's task list reads. Hover fills `hover`.
 - The current item fills `selected`, with text `fg` at 700.
 - A count shows only when it asks for something: unread, waiting in Triage. The page you're on shows no count; its list says it. Empty counts never show.

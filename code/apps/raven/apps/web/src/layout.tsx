@@ -390,29 +390,28 @@ function Sidebar() {
   const inSettings = pathname.includes("/settings/");
   if (!inSettings) lastAppPath = pathname;
   return (
-    <aside
-      className="app-sidebar flex w-56 shrink-0 flex-col gap-4 overflow-y-auto px-2 pb-2"
-      aria-label="Sidebar"
-    >
-      <div className="sidebar-navigation flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto">
-        {/* The top row lines up with the page's toolbar. In the desktop app
-            macOS draws the traffic lights here, in the wordmark's place. */}
-        <div
-          className="sidebar-heading sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 bg-bg"
-          data-tauri-drag-region="deep"
-        >
-          {isDesktop ? (
-            <div className="min-w-0 flex-1" />
-          ) : (
-            <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
-              <span className="font-display text-wordmark font-bold">Raven</span>
-            </div>
-          )}
-          <SearchButton />
-        </div>
-        <div className="workspace-switcher">
-          <WorkspaceMenu />
-        </div>
+    <aside className="app-sidebar flex w-56 shrink-0 flex-col gap-4 px-2 pb-2" aria-label="Sidebar">
+      {/* The top row lines up with the page's toolbar. In the desktop app
+          macOS draws the traffic lights here, in the wordmark's place. */}
+      <div
+        className="sidebar-heading flex h-12 shrink-0 items-center gap-1"
+        data-tauri-drag-region="deep"
+      >
+        {isDesktop ? (
+          <div className="min-w-0 flex-1" />
+        ) : (
+          <div className="app-brand flex h-9 min-w-0 flex-1 items-center gap-2 px-2">
+            <span className="font-display text-wordmark font-bold">Raven</span>
+          </div>
+        )}
+        <SearchButton />
+      </div>
+      <div className="workspace-switcher">
+        <WorkspaceMenu />
+      </div>
+      {/* Only the navigation scrolls. Its box reaches the sidebar's edges, so
+          the scrollbar runs in the margin beside the items, not over them. */}
+      <div className="sidebar-navigation -m-2 flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-2">
         {inSettings ? <SettingsNav /> : <AppNav />}
       </div>
       <div className="sidebar-footer mt-auto flex items-center gap-2 px-2 pb-1">

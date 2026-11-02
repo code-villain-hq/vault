@@ -65,6 +65,7 @@ A server runs for one company, and the company's account says who's in: its sign
 - G then a letter goes to a place. C creates the app's main thing. J and K (and the arrows) move through a list. Esc goes back or closes. ⌘Enter sends or saves what you're writing.
 - Shortcuts don't fire while you type or while a dialog or menu is open.
 - A menu or select closed with keys gives the focus back to what opened it, so the keys go on from there. Closed with a click, it leaves the focus alone, so no ring is left behind.
+- A link clicked with the pointer lets go of the focus, so the next key doesn't ring it after the page has moved on. One reached with Tab keeps it (`bootApp` in `code/kit/web`).
 - In the desktop apps, ⌘, opens settings.
 
 ## Settings

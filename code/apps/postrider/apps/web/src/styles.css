@@ -437,6 +437,8 @@ label.compose-from:focus-within {
     overflow: hidden;
   }
   .sidebar-navigation {
+    margin: 0;
+    padding: 0;
     flex-direction: row;
     align-items: center;
     gap: 0.5rem;
