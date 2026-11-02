@@ -737,6 +737,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-villain-notify"
+version = "0.1.0"
+dependencies = [
+ "block2",
+ "objc2",
+ "objc2-foundation",
+ "objc2-user-notifications",
+ "tracing",
+]
+
+[[package]]
 name = "code-villain-scim"
 version = "0.1.0"
 dependencies = [
@@ -3399,6 +3410,8 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9df9128cbbfef73cda168416ccf7f837b62737d748333bfe9ab71c245d76613e"
 dependencies = [
+ "bitflags 2.13.2",
+ "block2",
  "objc2",
  "objc2-foundation",
 ]
@@ -5589,26 +5602,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-notification"
-version = "2.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b939d7b19c8af1381a72ef8474b3aba2b56c1ddac2c23f0c8e96abbcf86b198b"
-dependencies = [
- "log",
- "notify-rust",
- "rand 0.9.5",
- "serde",
- "serde_json",
- "serde_repr",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.21",
- "time",
- "url",
- "zbus",
-]
-
-[[package]]
 name = "tauri-plugin-opener"
 version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6457,6 +6450,7 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "code-villain-desktop",
+ "code-villain-notify",
  "futures-util",
  "hex",
  "keyring",
@@ -6480,7 +6474,6 @@ dependencies = [
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
- "tauri-plugin-notification",
  "tauri-plugin-opener",
  "thiserror 2.0.21",
  "tokio",

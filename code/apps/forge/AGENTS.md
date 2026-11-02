@@ -138,7 +138,9 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
   (`server.ts`): this Mac, the server it came from, or servers the desktop
   app signed in to, each with its own session.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Forge on Postgres for
-  the workspaces on this Mac, with `code/kit/desktop`.
+  the workspaces on this Mac, with `code/kit/desktop`. The inbox's
+  notifications go through its `notify` command, with `code/kit/notify`:
+  the notification plugin's never show on macOS.
 - `migrations`: SQL schema, applied by the server on start.
 - `scripts`: dev, check, seeding, type generation, and Claude Code's runner
   (`agent-runner`).

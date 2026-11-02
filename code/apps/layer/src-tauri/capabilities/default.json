@@ -14,7 +14,6 @@
     "dialog:default",
     "dialog:allow-open",
     "opener:allow-reveal-item-in-dir",
-    "clipboard-manager:allow-write-text",
-    "notification:default"
+    "clipboard-manager:allow-write-text"
   ]
 }

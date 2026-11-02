@@ -5,7 +5,6 @@ import { themeTerminals } from "./components/Terminal";
 import { api } from "./lib/api";
 import { CHAT_TASK_ID } from "./lib/derive";
 import { goTo } from "./lib/goto";
-import { prepareNotifications } from "./lib/notify";
 import { useSpecs } from "./lib/specs";
 import { useTheme } from "./lib/theme";
 import type { SpecPart, Target } from "./lib/types";
@@ -44,7 +43,6 @@ export function Watchers() {
   const refreshPanes = useStore((s) => s.refreshPanes);
   const refreshPrs = useStore((s) => s.refreshPrs);
   const refreshReviewQueue = useStore((s) => s.refreshReviewQueue);
-  const notifyOn = useStore((s) => s.settings?.ui.system_notifications);
   const refreshTasks = useStore((s) => s.refreshTasks);
   const setAppActive = useStore((s) => s.setAppActive);
   const toast = useStore((s) => s.toast);
@@ -263,11 +261,6 @@ export function Watchers() {
     }, 180_000);
     return () => clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    if (!notifyOn) return;
-    void prepareNotifications().catch(() => {});
-  }, [notifyOn]);
 
   // An agent exiting is the moment worth telling someone about.
   useEffect(() => {

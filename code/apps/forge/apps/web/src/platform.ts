@@ -6,14 +6,14 @@ import { isDesktop } from "@code-villain/web";
 
 export { isDesktop, onAppLink, openExternalLinksInBrowser, openInBrowser } from "@code-villain/web";
 
-/** Shows a native notification. Desktop only; does nothing in the browser. */
+/**
+ * Shows a native notification. Desktop only; does nothing in the browser.
+ * The desktop app shows it (`notify`): the plugin's own never show on macOS.
+ */
 export async function notify(title: string, body: string) {
   if (!isDesktop) return;
-  const { isPermissionGranted, requestPermission, sendNotification } =
-    await import("@tauri-apps/plugin-notification");
-  let granted = await isPermissionGranted();
-  if (!granted) granted = (await requestPermission()) === "granted";
-  if (granted) sendNotification({ title, body });
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("notify", { title, body });
 }
 
 /** The number on the dock icon; zero clears it. Desktop only. */

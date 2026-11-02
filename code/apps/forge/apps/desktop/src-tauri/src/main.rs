@@ -13,7 +13,8 @@ mod this_mac;
 
 use code_villain_claude::{Answered, ClaudeCodeInfo, HandedQuestion, Here};
 use forge_server::drift::here::{FORGE, MCP_PATH};
-use tauri::{Manager, RunEvent, State};
+use tauri::{AppHandle, Manager, RunEvent, State};
+use tauri_plugin_notification::NotificationExt;
 use this_mac::{Place, ThisMac};
 
 /// Keychain entries are named after the app, one per server.
@@ -71,6 +72,18 @@ fn mac_user_name() -> String {
     this_mac::account_name()
 }
 
+/// A notification for the inbox. Outside an app bundle, in `tauri dev`, the
+/// plugin shows it: its own never show on macOS (`code/kit/notify`).
+#[tauri::command]
+fn notify(app: AppHandle, title: String, body: String) {
+    if code_villain_notify::show(&title, &body) {
+        return;
+    }
+    if let Err(error) = app.notification().builder().title(title).body(body).show() {
+        tracing::warn!("couldn't show a notification: {error}");
+    }
+}
+
 /// Whether Claude Code on this Mac can run Forge AI for the server at
 /// `origin`, as Settings → Claude shows it.
 #[tauri::command]
@@ -101,6 +114,8 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // The inbox notifies: macOS asks once whether it may.
+            code_villain_notify::ask();
             let data = app.path().app_data_dir()?;
             app.manage(Here::new(FORGE, data.join("claude"), MCP_PATH));
             app.manage(ThisMac::new(data));
@@ -114,6 +129,7 @@ fn main() {
             this_mac,
             start_on_this_mac,
             mac_user_name,
+            notify,
             claude_here,
             answer_here
         ])

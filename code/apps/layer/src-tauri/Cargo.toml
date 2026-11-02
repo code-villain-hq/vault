@@ -63,7 +63,10 @@ base64 = "0.23"
 parking_lot = "0.13"
 libc = "0.2"
 tauri-plugin-clipboard-manager = "2"
-tauri-plugin-notification = "2"
+# Banners, with UserNotifications: notify-rust posts through
+# NSUserNotificationCenter, which macOS no longer shows. It stays for a dev
+# build, which has no app bundle for UserNotifications.
+code-villain-notify = { workspace = true }
 notify-rust = "4"
 # Profiles (§25): bringing another copy of the app forward, and marking each
 # copy's Dock icon. Tauri has neither. Already in the build through tao, so

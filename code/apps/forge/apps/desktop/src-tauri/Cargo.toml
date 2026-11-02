@@ -13,6 +13,7 @@ tauri = { version = "2.12", features = [] }
 keyring = "4.2"
 code-villain-claude.workspace = true
 code-villain-desktop.workspace = true
+code-villain-notify.workspace = true
 forge-server.workspace = true
 forge-sync.workspace = true
 serde.workspace = true

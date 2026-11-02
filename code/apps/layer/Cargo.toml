@@ -47,6 +47,7 @@ ts-rs = { version = "12", features = ["uuid-impl", "chrono-impl", "serde-json-im
 uuid = { version = "1.28", features = ["v7", "serde"] }
 
 code-villain-desktop = { path = "../../kit/desktop" }
+code-villain-notify = { path = "../../kit/notify" }
 code-villain-auth = { path = "../../kit/auth" }
 code-villain-scim = { path = "../../kit/scim" }
 code-villain-settings = { path = "../../kit/settings" }

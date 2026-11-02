@@ -138,11 +138,21 @@ pub fn set_ui_prefs(app: AppHandle, state: State<AppState>, ui: UiPrefs) -> Resu
 /// A banner, and what a click on it should open: `target` is handed back
 /// untouched in `system-notify-click`, as `target::Target` wrote it.
 ///
+/// `code/kit/notify` shows it, and hands the click to `on_open` in `lib.rs`:
+/// notify-rust, like the notification plugin, posts through
+/// NSUserNotificationCenter, which macOS no longer shows, so no banner did.
+/// A dev build has no app bundle for the kit, and gets notify-rust.
+///
 /// The notification plugin's desktop backend shows the banner and drops the
 /// click — `show` never waits for it — so a click could focus the app and
-/// still leave you on whichever view you had left. This shows it itself and
-/// emits `system-notify-click` only for the activation, not a dismissal.
+/// still leave you on whichever view you had left. notify-rust waits for it
+/// here, and emits `system-notify-click` only for the activation, not a
+/// dismissal.
 pub(crate) fn banner<R: Runtime>(app: &AppHandle<R>, title: String, body: String, target: String) -> Result<()> {
+    let title = crate::profiles::banner_title(&title);
+    if code_villain_notify::show_opening(&title, &body, &target) {
+        return Ok(());
+    }
     // A dev build has no bundle id macOS will attribute a notification to.
     // Borrowing Terminal's is what the plugin does, and without it a `tauri
     // dev` banner is delivered to nobody.
@@ -160,7 +170,7 @@ pub(crate) fn banner<R: Runtime>(app: &AppHandle<R>, title: String, body: String
         .name("system-notify".into())
         .spawn(move || {
             let mut notification = notify_rust::Notification::new();
-            notification.summary(&crate::profiles::banner_title(&title)).body(&body);
+            notification.summary(&title).body(&body);
             let Ok(handle) = notification.show() else {
                 return;
             };

@@ -31,7 +31,7 @@ mod workspace;
 use commands::AppState;
 use config::ConfigStore;
 use pty::PtyManager;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Where a crash is written down, so a packaged app leaves evidence too.
 fn panic_log() -> std::path::PathBuf {
@@ -121,7 +121,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
         .on_window_event(|window, event| {
             match event {
@@ -180,6 +179,16 @@ pub fn run() {
                         }
                     }
                 });
+            }
+            // A click on a banner opens what it is about (NOTE-4). macOS asks
+            // once whether banners may show: now, while the window opens, so
+            // the first banner is not also the question.
+            let clicked = handle.clone();
+            code_villain_notify::on_open(move |target| {
+                let _ = clicked.emit("system-notify-click", target);
+            });
+            if handle.state::<AppState>().config.with(|c| c.ui.system_notifications || c.ui.notify_waiting_agents) {
+                code_villain_notify::ask();
             }
             // Before the window first draws, or a light theme opens dark.
             theme::apply(handle, &handle.state::<AppState>().config.read().ui.theme);
