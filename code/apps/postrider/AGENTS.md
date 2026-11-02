@@ -4,8 +4,9 @@ Postrider is the studio's mail and calendar app: one Inbox for every
 account, read over IMAP, with today's events from a CalDAV server (Radicale)
 above it. [`storyboards/a-day-with-your-mail.html`](storyboards/a-day-with-your-mail.html)
 is the approved storyboard; build from it, a step at a time, not beyond it.
-Step 1 is built: the unified Inbox, today, and Settings → Accounts.
-A mail opens in the Inbox's place; Esc goes back, J and K move. Archiving,
+Step 1's reading is built: the unified Inbox, today, Sent, Archive and
+the other folders in the sidebar, Search mail (/), and Settings → Accounts.
+A mail opens in its list's place; Esc goes back, J and K move. Archiving,
 replying, composing, Sieve rules, newsletters, the ask field and the week
 view are still to come.
 
@@ -37,7 +38,9 @@ Run `bun run design:sync` after changing them in the vault.
   IMAP (3143) and Radicale for CalDAV (5232). Both take any user name with
   the password `dev`. `bun run db:reset` wipes them.
 - `bun run seed`: the storyboard's morning: two accounts (Code Villain and
-  Lazarski) with ten mails, and their calendars with today's events.
+  Lazarski) with ten mails and a few folders (Sent, Archive, Rechnungen…),
+  and their calendars with today's events. A folder that has mail isn't
+  filled again.
 - `bun run dev`: the Rust server (:7880) plus the web app (:5178, proxies
   `/api`), for the person on this Mac, as the desktop app runs it. The
   server writes this launch's session to `.dev-session` and Vite signs
@@ -59,9 +62,10 @@ Run `bun run design:sync` after changing them in the vault.
 
 A workspace syncs its settings: the mail accounts (`MailAccount`: name,
 address, IMAP server, user name, hue) and the calendar server
-(`Calendar`). Passwords never sync and never touch Postgres: the server
-signs in once before it keeps an account, then puts the password in the
-macOS keychain under "Postrider", by address (`secrets.rs`).
+(`Calendar`, with whose colour each of its calendars wears). Passwords
+never sync and never touch Postgres: the server signs in once before it
+keeps an account, then puts the password in the macOS keychain under
+"Postrider", by address (`secrets.rs`).
 
 Mail is read live. For each account the server keeps an IMAP connection
 open (`mail.rs`): it copies the Inbox's summaries, waits with IDLE, and
@@ -78,9 +82,23 @@ the server. `message.rs` reads the source: who it went to, its text, its
 HTML with inline pictures written in, its attachments. The page shows the
 HTML in a frame where no script runs and pictures load without a referrer.
 
+Only the Inbox is followed and kept. The other folders are read when
+they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
+account's folders, each once by its role (Sent, Archive, Drafts, Trash,
+Junk) or its name, with what's unread; `/folders/{key}` is a folder's
+newest mail; `/search?q=` asks every folder but Drafts, Trash and Junk for
+the mail with every word in it (IMAP `TEXT`). A mail opened from them is
+`/mails/{account}/{uid}?folder=<key>`, read from its server each time.
+What the lists showed is kept in memory, so a folder opened again reads
+only its new mail.
+
 Today is read live too: `GET /api/w/{id}/day?from&to` asks the CalDAV
 server for every calendar's events (`caldav.rs`). A calendar wears the hue
-of the account it's named after.
+of the account Settings picked for it (`Calendar.accounts`, by its href),
+else of the account it's named after, else of the one at the server's
+domain. Radicale names a calendar without a name by its path, so Settings
+lists them (`GET /api/w/{id}/calendars`) with their next event to tell
+them by.
 
 ## Layout
 
@@ -90,14 +108,16 @@ of the account it's named after.
   others. Accounts and the calendar are made by the server, after it
   signs in (`POST /accounts`, `/calendar`), never by the web app.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
-  `mail.rs`), reading a mail (`message.rs`), CalDAV (`caldav.rs`), connecting accounts (`connect.rs`) and
-  the keychain (`secrets.rs`). `local.rs` is the one person on this Mac,
+  `mail.rs`, the folders and search in `folders.rs`), reading a mail
+  (`message.rs`), CalDAV (`caldav.rs`), connecting accounts (`connect.rs`)
+  and the keychain (`secrets.rs`). `local.rs` is the one person on this Mac,
   who signs in to nothing. `serve.rs` runs it until told to stop, for
   `main.rs` (development) and the desktop app alike.
 - `packages/types`: generated from Rust. Never edit by hand.
 - `apps/web`: React + Base UI + Tailwind. `inbox.tsx` is the Inbox and
-  today, `message.tsx` an opened mail, `settings.tsx` the accounts,
-  `mail.tsx` the live Inbox.
+  today, `folders.tsx` a folder, a search and the search field,
+  `message.tsx` an opened mail, `settings.tsx` the accounts and
+  calendars, `mail.tsx` the live Inbox and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
   for this Mac, with `code/kit/desktop`.
 - `migrations`: SQL schema, applied by the server on start.
