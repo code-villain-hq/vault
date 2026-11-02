@@ -65,7 +65,7 @@ impl Server {
         const HOME: &str = r#"<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-home-set/></d:prop></d:propfind>"#;
         const LIST: &str = r#"<?xml version="1.0" encoding="utf-8"?>
-<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>"#;
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:resourcetype/><d:displayname/><c:supported-calendar-component-set/></d:prop></d:propfind>"#;
 
         let base = self.base.path().to_string();
         let principal = self
@@ -175,7 +175,7 @@ fn plain_error(e: &reqwest::Error) -> String {
 }
 
 /// The calendars in a calendar home's listing, by name: the rest of what's
-/// in it isn't one.
+/// in it isn't one, nor is a list of tasks, which holds no events.
 fn found_calendars(listing: &Node) -> Vec<Found> {
     let mut found: Vec<Found> = listing
         .children_named("response")
@@ -186,17 +186,35 @@ fn found_calendars(listing: &Node) -> Vec<Found> {
                 .filter_map(|p| p.child("prop"))
                 .find(|p| p.child("resourcetype").is_some())?;
             prop.child("resourcetype")?.child("calendar")?;
-            // Radicale names a calendar without a name by its path.
+            if let Some(set) = prop.child("supported-calendar-component-set") {
+                set.children.iter().find(|c| {
+                    c.name == "comp"
+                        && c.attributes
+                            .iter()
+                            .any(|(k, v)| k == "name" && v.eq_ignore_ascii_case("VEVENT"))
+                })?;
+            }
+            // Radicale names a calendar without a name by its path, and an
+            // app that made one may leave its own placeholder:
+            // DEFAULT_CALENDAR_NAME.
             let name = prop
                 .child("displayname")
                 .map(|n| n.text.trim().to_string())
-                .filter(|n| !n.is_empty() && n != href.trim_matches('/'))
+                .filter(|n| !n.is_empty() && n != href.trim_matches('/') && !is_placeholder(n))
                 .unwrap_or_else(|| last_segment(&href));
             Some(Found { href, name })
         })
         .collect();
-    found.sort_by(|a, b| a.name.cmp(&b.name));
+    found.sort_by_key(|f| f.name.to_lowercase());
     found
+}
+
+/// A name no one gave: an app's key for words it didn't fill in.
+fn is_placeholder(name: &str) -> bool {
+    name.contains('_')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
 }
 
 fn caldav_time(time: DateTime<Utc>) -> String {
@@ -439,6 +457,8 @@ fn parse_duration(value: &str) -> Option<chrono::Duration> {
 #[derive(Debug, Default)]
 pub struct Node {
     pub name: String,
+    /// Its attributes, by local name.
+    pub attributes: Vec<(String, String)>,
     pub text: String,
     pub children: Vec<Node>,
 }
@@ -478,6 +498,15 @@ pub fn parse_xml(xml: &str) -> Result<Node, String> {
     let mut reader = quick_xml::Reader::from_str(xml);
     let mut stack = vec![Node::default()];
     let name = |local: quick_xml::name::LocalName<'_>| local.as_ref().to_string();
+    let attributes = |e: &quick_xml::events::BytesStart<'_>| {
+        e.attributes()
+            .flatten()
+            .map(|a| {
+                let key = a.key.local_name().into_inner().to_string();
+                (key, a.value.to_string())
+            })
+            .collect()
+    };
     loop {
         let event = reader
             .read_event()
@@ -485,11 +514,13 @@ pub fn parse_xml(xml: &str) -> Result<Node, String> {
         match event {
             Xml::Start(e) => stack.push(Node {
                 name: name(e.local_name()),
+                attributes: attributes(&e),
                 ..Node::default()
             }),
             Xml::Empty(e) => {
                 let node = Node {
                     name: name(e.local_name()),
+                    attributes: attributes(&e),
                     ..Node::default()
                 };
                 stack.last_mut().expect("the document").children.push(node);
@@ -719,6 +750,14 @@ mod tests {
             <response><href>/michael/</href><propstat><prop><resourcetype><collection/></resourcetype></prop></propstat></response>
             <response><href>/michael/0f8e2c4a/</href><propstat><prop>
             <resourcetype><collection/><C:calendar/></resourcetype><displayname>michael/0f8e2c4a</displayname>
+            <C:supported-calendar-component-set><C:comp name="VEVENT"/><C:comp name="VTODO"/></C:supported-calendar-component-set>
+            </prop></propstat></response>
+            <response><href>/michael/tasks/</href><propstat><prop>
+            <resourcetype><collection/><C:calendar/></resourcetype><displayname>DEFAULT_TASK_CALENDAR_NAME</displayname>
+            <C:supported-calendar-component-set><C:comp name="VTODO"/></C:supported-calendar-component-set>
+            </prop></propstat></response>
+            <response><href>/michael/b7a1/</href><propstat><prop>
+            <resourcetype><collection/><C:calendar/></resourcetype><displayname>DEFAULT_CALENDAR_NAME</displayname>
             </prop></propstat></response>
             </multistatus>"#;
         let found = found_calendars(&parse_xml(xml).unwrap());
@@ -726,11 +765,13 @@ mod tests {
             .iter()
             .map(|f| (f.href.as_str(), f.name.as_str()))
             .collect();
-        // A calendar Radicale names by its path has no name but its id.
+        // A calendar Radicale names by its path, or an app by its
+        // placeholder, has no name but its id; a list of tasks isn't one.
         assert_eq!(
             names,
             [
                 ("/michael/0f8e2c4a/", "0f8e2c4a"),
+                ("/michael/b7a1/", "b7a1"),
                 ("/michael/work/", "Code Villain")
             ]
         );
